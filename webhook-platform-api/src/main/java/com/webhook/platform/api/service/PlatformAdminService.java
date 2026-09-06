@@ -92,8 +92,23 @@ public class PlatformAdminService {
         // than the TTL's idea of it.
         suspensionLookup.evict(organizationId);
 
-        log.warn("Organization {} suspended by operator ({}): {}", organizationId, suspendedBy, reason);
+        log.warn("Organization {} suspended by operator ({}): {}",
+                organizationId,
+                sanitizeForLog(suspendedBy),
+                sanitizeForLog(reason));
         return toResponse(organization);
+    }
+
+    private String sanitizeForLog(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value
+                .replace('\n', '_')
+                .replace('\r', '_')
+                .chars()
+                .mapToObj(c -> Character.isISOControl(c) ? "_" : String.valueOf((char) c))
+                .reduce("", String::concat);
     }
 
     @SystemTenant("lifting a suspension is an operator action on a tenant, taken from outside it")
