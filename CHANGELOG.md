@@ -82,6 +82,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Tomcat 11.0.25.** Boot 4.1.1's BOM manages 11.0.24, which carries three CRITICALs -
+  CVE-2026-65182 (security-constraint bypass), CVE-2026-65905 (authentication bypass) and
+  CVE-2026-68525. They are in the container that terminates every request the API serves, so
+  the CI container scan was failing the build on `develop`, correctly.
+
+  Worth knowing before anyone tidies this away: setting `<tomcat.version>` alone does nothing
+  here. This build *imports* `spring-boot-dependencies` rather than inheriting from
+  `spring-boot-starter-parent`, and an imported BOM resolves its own `${tomcat.version}`
+  against its own properties - the override is simply not read. The dependency tree still said
+  11.0.24 with the property set. The three artifacts are therefore pinned by explicit
+  `dependencyManagement` entries declared *before* the BOM import, because
+  `dependencyManagement` takes the first declaration it finds. The property remains, now read
+  by those entries, so the version is still stated once.
+
 - **Email verification is enforced on the server.** It was a component in the dashboard:
   `VerificationGate.tsx` greyed out the buttons, and login refused only `DISABLED`, so an
   unverified account got an ordinary token and had the whole API with curl. Writes now require
