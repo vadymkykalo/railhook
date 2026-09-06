@@ -30,7 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   `UPGRADING.md` has what breaks: three new SDK package names, `import hookflow` becoming
   `import railhook`, new image and chart names, seventeen `HOOKFLOW_*` variables becoming
-  `RAILHOOK_*`, and the CLI invoked as `railhook`. Old images stay pullable, so a running
+  `RAILHOOK_*`, and the CLI invoked as `railhook`. Three of those seventeen —
+  `BIND`, `PORT` and `DOMAIN` — cross from `.env` into `docker-compose.yml`, so both
+  spellings keep working there and no action is needed for them. Old images stay pullable, so a running
   deployment is untouched until it is upgraded. On Kubernetes the chart rename is an install
   beside the old release rather than an upgrade of it, because Helm derives resource names
   from the chart name.

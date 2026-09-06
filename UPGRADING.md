@@ -59,14 +59,28 @@ the new images.
 
 #### Environment variables for the installer and the CLI
 
-Seventeen `HOOKFLOW_*` variables are now `RAILHOOK_*`: `RAILHOOK_PORT`,
-`RAILHOOK_DOMAIN`, `RAILHOOK_INSTALL_DIR`, `RAILHOOK_CONFIG`,
-`RAILHOOK_API_KEY`, `RAILHOOK_VERSION`, and the rest. There is deliberately no
-fallback to the old spelling: a rename that half-works is harder to debug than
-one that fails immediately, and the failure here is loud — the variable is
-simply unset and the documented default applies.
+Seventeen `HOOKFLOW_*` variables are now `RAILHOOK_*`: `RAILHOOK_INSTALL_DIR`,
+`RAILHOOK_CONFIG`, `RAILHOOK_API_KEY`, `RAILHOOK_VERSION`, and the rest. Most
+are arguments to `install.sh` and the CLI, and for those there is deliberately
+no fallback to the old spelling — a rename that half-works is harder to debug
+than one that fails outright, and this fails loudly: the variable is unset and
+the documented default applies.
 
-These only ever affected `install.sh` and the CLI. Nothing in `.env` used them.
+**Three of them are different, and you do not have to do anything about them.**
+`RAILHOOK_BIND`, `RAILHOOK_PORT` and `RAILHOOK_DOMAIN` are written into `.env`
+and read back by `docker-compose.yml`, so they cross a boundary the other
+fourteen do not. Both spellings keep working:
+
+- `docker-compose.yml` reads the old names when the new ones are absent, so an
+  existing `.env` — which `install.sh` keeps rather than rewrites — still puts
+  your dashboard on the port you chose. Without this the published port would
+  have quietly reverted to 80 on upgrade: a stack that starts cleanly, logs
+  nothing, and is wrong.
+- `install.sh` writes both, so pinning an older version (`--version v2.11.0`)
+  still produces a `.env` that release can read.
+
+The duplicates are marked in both files and can go once no supported release
+reads them.
 
 #### The CLI is invoked as `railhook`
 

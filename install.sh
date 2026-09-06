@@ -486,6 +486,18 @@ RAILHOOK_PORT=${PORT}
 # TLS terminator only runs under the \`tls\` profile, which COMPOSE_PROFILES
 # below turns on.
 RAILHOOK_DOMAIN=${DOMAIN}
+
+# The same three under their pre-2.12.0 names, because this installer can pin
+# any released version and every Compose file published as Hookflow reads these
+# instead. Without them, \`--version v2.11.0\` writes a .env that release cannot
+# read: the published port falls back to its default and the dashboard comes up
+# somewhere other than where you asked for it.
+#
+# Delete these once no supported version reads them. They are duplicates, not
+# separate settings - change one and change the other.
+HOOKFLOW_BIND=${BIND}
+HOOKFLOW_PORT=${PORT}
+HOOKFLOW_DOMAIN=${DOMAIN}
 ACME_EMAIL=${ACME_EMAIL}
 COMPOSE_PROFILES=${PROFILES}${BACKUP_PROFILE}
 
