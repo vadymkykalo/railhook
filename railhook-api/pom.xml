@@ -326,7 +326,7 @@
                   junit-platform-launcher jars") instead of failing loudly.
                 -->
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.6</version>
+                <version>3.6.0</version>
             </plugin>
             <!--
               See the matching comment in railhook-common's
