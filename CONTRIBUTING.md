@@ -85,7 +85,7 @@ Create a Pull Request to `develop` branch on GitHub.
 
 ```bash
 git clone https://github.com/vadymkykalo/railhook.git
-cd webhook-platform
+cd railhook
 make up          # builds all three images and starts everything
 make help        # every other target
 ```
@@ -111,11 +111,11 @@ mvn test -Dtest='*IntegrationTest,*IT,*RepositoryTest,*ConcurrencyTest,*RbacTest
   -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false
 
 # One class, or one method. Always scope with -pl: the reactor is multi-module.
-mvn test -pl webhook-platform-api -am -Dtest=TunnelServiceTest
+mvn test -pl railhook-api -am -Dtest=TunnelServiceTest
 
 # Frontend
 make test-ui
-cd webhook-platform-ui && npm run lint && npm run typecheck
+cd railhook-ui && npm run lint && npm run typecheck
 ```
 
 Use `mvn test`, not `mvn verify`, for ordinary work: the per-module JaCoCo
@@ -142,8 +142,8 @@ Two whose remedy nobody guesses:
 
 - **Changed a DTO?** `openapi.yaml` is committed and semantically diffed against
   what springdoc serves. Regenerate rather than hand-edit:
-  `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`.
-  Then `cd webhook-platform-ui && npm run types:generate`, and fix whatever
+  `mvn test -pl railhook-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`.
+  Then `cd railhook-ui && npm run types:generate`, and fix whatever
   `src/types/api.contract.ts` reports.
 - **Changed the API surface?** `npm run docs:api-index` regenerates the in-app
   reference. Never hand-write an endpoint table — that is what the 4,000-line

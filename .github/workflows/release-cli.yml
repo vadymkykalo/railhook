@@ -39,7 +39,7 @@ jobs:
           cache: 'maven'
 
       - name: Build CLI JAR
-        run: mvn clean package -pl webhook-platform-cli -am -DskipTests -B
+        run: mvn clean package -pl railhook-cli -am -DskipTests -B
 
       - name: Prepare release assets
         env:
@@ -47,9 +47,9 @@ jobs:
         run: |
           VERSION="${TAG#v}"
           echo "TAG=$TAG" >> $GITHUB_ENV
-          cp webhook-platform-cli/target/webhook-platform-cli-*.jar railhook-cli.jar
+          cp railhook-cli/target/railhook-cli-*.jar railhook-cli.jar
           # install.sh refuses to run a JAR that doesn't match this file (see
-          # verify_checksum() in webhook-platform-cli/install.sh) — table
+          # verify_checksum() in railhook-cli/install.sh) — table
           # stakes for a curl-pipe installer.
           sha256sum railhook-cli.jar > SHA256SUMS
           echo "VERSION=$VERSION" >> $GITHUB_ENV
@@ -64,7 +64,7 @@ jobs:
 
             ### Install
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/webhook-platform-cli/install.sh | bash
+            curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/railhook-cli/install.sh | bash
             ```
 
             Or download `railhook-cli.jar` and run:
@@ -196,7 +196,7 @@ jobs:
             fi
           }
           check "npm @railhook/node" "$NPM"
-          check "PyPI webhook-platform" "$PYPI"
+          check "PyPI railhook" "$PYPI"
           check "Packagist railhook/php" "$PACKAGIST"
 
           exit $FAILED

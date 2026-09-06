@@ -45,7 +45,7 @@ accident.
    the public build, and regenerate the sitemap:
 
    ```bash
-   cd webhook-platform-ui && SITE_URL=https://railhook.dev npm run seo:sitemap
+   cd railhook-ui && SITE_URL=https://railhook.dev npm run seo:sitemap
    ```
 
    and edit the `Sitemap:` line in `public/robots.txt` to match.
@@ -59,7 +59,7 @@ accident.
 1. Create release branch: `git checkout -b release/1.x.0 develop`
 2. Update version numbers everywhere in one step: `make version-set VERSION=1.x.0`
    (wraps `scripts/set-version.sh`, which sets the reactor poms, `Chart.yaml`,
-   `webhook-platform-ui/package.json` and the three SDK manifests together —
+   `railhook-ui/package.json` and the three SDK manifests together —
    don't hand-edit them individually, that's how these drifted apart in the
    first place). Verify with `make version-check`.
 3. Update `CHANGELOG.md`: move `[Unreleased]` content under the new version

@@ -53,11 +53,11 @@ jobs:
       matrix:
         include:
           - service: api
-            dockerfile: webhook-platform-api/Dockerfile
+            dockerfile: railhook-api/Dockerfile
           - service: worker
-            dockerfile: webhook-platform-worker/Dockerfile
+            dockerfile: railhook-worker/Dockerfile
           - service: ui
-            dockerfile: webhook-platform-ui/Dockerfile
+            dockerfile: railhook-ui/Dockerfile
     steps:
       - name: Checkout code
         uses: actions/checkout@v7

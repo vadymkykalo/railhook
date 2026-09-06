@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.webhook.platform</groupId>
-    <artifactId>webhook-platform</artifactId>
+    <artifactId>railhook</artifactId>
     <version>2.12.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
@@ -13,17 +13,17 @@
     <description>Event Delivery Platform with Kafka and Spring Boot</description>
 
     <modules>
-        <module>webhook-platform-common</module>
-        <module>webhook-platform-api</module>
-        <module>webhook-platform-worker</module>
-        <module>webhook-platform-cli</module>
+        <module>railhook-common</module>
+        <module>railhook-api</module>
+        <module>railhook-worker</module>
+        <module>railhook-cli</module>
         <!--
           Must come after the four real modules above: it depends on all of
           them (compile scope) purely so JaCoCo's report-aggregate goal can
           discover their target/classes + jacoco*.exec at reactor build time.
-          See webhook-platform-coverage-report/pom.xml for why it exists.
+          See railhook-coverage-report/pom.xml for why it exists.
         -->
-        <module>webhook-platform-coverage-report</module>
+        <module>railhook-coverage-report</module>
     </modules>
 
     <properties>
@@ -168,7 +168,7 @@
               2. report: generates a per-module HTML/CSV/XML report right
                  after that module's own tests, from ${jacoco.destFile}. This
                  is NOT the cross-module number - see
-                 webhook-platform-coverage-report for the real aggregate.
+                 railhook-coverage-report for the real aggregate.
                  It's just a quick per-module sanity report, and is skipped
                  (not failed) by JaCoCo when no exec data exists yet, which is
                  why it's harmless on modules like the coverage-report

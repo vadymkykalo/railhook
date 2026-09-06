@@ -53,13 +53,13 @@
     ],
     "component" : {
       "group" : "com.webhook.platform",
-      "name" : "webhook-platform",
+      "name" : "railhook",
       "version" : "2.2.1",
       "description" : "Event Delivery Platform with Kafka and Spring Boot",
       "licenses" : [ ],
-      "purl" : "pkg:maven/com.webhook.platform/webhook-platform@2.2.1?type=pom",
+      "purl" : "pkg:maven/com.webhook.platform/railhook@2.2.1?type=pom",
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.webhook.platform/webhook-platform@2.2.1?type=pom"
+      "bom-ref" : "pkg:maven/com.webhook.platform/railhook@2.2.1?type=pom"
     },
     "properties" : [
       {
@@ -75,13 +75,13 @@
   "components" : [
     {
       "group" : "com.webhook.platform",
-      "name" : "webhook-platform-common",
+      "name" : "railhook-common",
       "version" : "2.2.1",
       "description" : "Shared DTOs, constants, and utilities",
       "licenses" : [ ],
-      "purl" : "pkg:maven/com.webhook.platform/webhook-platform-common@2.2.1?type=jar",
+      "purl" : "pkg:maven/com.webhook.platform/railhook-common@2.2.1?type=jar",
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.webhook.platform/webhook-platform-common@2.2.1?type=jar"
+      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-common@2.2.1?type=jar"
     },
     {
       "publisher" : "VMware, Inc.",
@@ -1902,13 +1902,13 @@
     },
     {
       "group" : "com.webhook.platform",
-      "name" : "webhook-platform-api",
+      "name" : "railhook-api",
       "version" : "2.2.1",
       "description" : "REST API for event ingestion and management",
       "licenses" : [ ],
-      "purl" : "pkg:maven/com.webhook.platform/webhook-platform-api@2.2.1?type=jar",
+      "purl" : "pkg:maven/com.webhook.platform/railhook-api@2.2.1?type=jar",
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.webhook.platform/webhook-platform-api@2.2.1?type=jar"
+      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-api@2.2.1?type=jar"
     },
     {
       "publisher" : "VMware, Inc.",
@@ -11359,13 +11359,13 @@
     },
     {
       "group" : "com.webhook.platform",
-      "name" : "webhook-platform-worker",
+      "name" : "railhook-worker",
       "version" : "2.2.1",
       "description" : "Kafka consumer for webhook delivery",
       "licenses" : [ ],
-      "purl" : "pkg:maven/com.webhook.platform/webhook-platform-worker@2.2.1?type=jar",
+      "purl" : "pkg:maven/com.webhook.platform/railhook-worker@2.2.1?type=jar",
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.webhook.platform/webhook-platform-worker@2.2.1?type=jar"
+      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-worker@2.2.1?type=jar"
     },
     {
       "group" : "io.github.resilience4j",
@@ -12237,13 +12237,13 @@
     },
     {
       "group" : "com.webhook.platform",
-      "name" : "webhook-platform-cli",
+      "name" : "railhook-cli",
       "version" : "2.2.1",
       "description" : "Railhook CLI — local tunnel, event replay, and diagnostics",
       "licenses" : [ ],
-      "purl" : "pkg:maven/com.webhook.platform/webhook-platform-cli@2.2.1?type=jar",
+      "purl" : "pkg:maven/com.webhook.platform/railhook-cli@2.2.1?type=jar",
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.webhook.platform/webhook-platform-cli@2.2.1?type=jar"
+      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-cli@2.2.1?type=jar"
     },
     {
       "group" : "info.picocli",
@@ -12389,13 +12389,13 @@
     },
     {
       "group" : "com.webhook.platform",
-      "name" : "webhook-platform-coverage-report",
+      "name" : "railhook-coverage-report",
       "version" : "2.2.1",
-      "description" : "P1-28: not a real module - it ships no code of its own. It exists only so jacoco-maven-plugin's report-aggregate goal has a project whose *dependencies* are the four real modules, which is how JaCoCo discovers their target/classes and target/jacoco*.exec at reactor build time (report-aggregate walks the current project's dependency list, not the reactor's modules list - a plain multi-module pom parent is not enough on its own). Threshold enforcement (jacoco:check) deliberately does NOT live here: the check goal, unlike report-aggregate, only ever reads a single `dataFile` against ITS OWN project's compiled classes - it has no equivalent of report-aggregate's dependency-walking, so binding it in a pom-packaging module with no classes of its own just silently skips (\"missing execution data file:.../webhook-platform-coverage-report/target/jacoco.exec\"), which was tried and confirmed dead-on-arrival during this task's own verification (see the Progress log in .claude/features/P1-28-coverage-tooling.md). Each of common/api/worker/cli therefore declares its own `check` execution against its own merged coverage instead - see the jacoco-merge execution in the root pom for how that per-module merged file gets built, and each module's own pom.xml for its threshold rules. Declared last in the root pom's modules list so the reactor builds it after common/api/worker/cli have already produced their classes and exec data (Maven also reorders by the dependency graph below regardless, so this is belt-and-braces).",
+      "description" : "P1-28: not a real module - it ships no code of its own. It exists only so jacoco-maven-plugin's report-aggregate goal has a project whose *dependencies* are the four real modules, which is how JaCoCo discovers their target/classes and target/jacoco*.exec at reactor build time (report-aggregate walks the current project's dependency list, not the reactor's modules list - a plain multi-module pom parent is not enough on its own). Threshold enforcement (jacoco:check) deliberately does NOT live here: the check goal, unlike report-aggregate, only ever reads a single `dataFile` against ITS OWN project's compiled classes - it has no equivalent of report-aggregate's dependency-walking, so binding it in a pom-packaging module with no classes of its own just silently skips (\"missing execution data file:.../railhook-coverage-report/target/jacoco.exec\"), which was tried and confirmed dead-on-arrival during this task's own verification (see the Progress log in .claude/features/P1-28-coverage-tooling.md). Each of common/api/worker/cli therefore declares its own `check` execution against its own merged coverage instead - see the jacoco-merge execution in the root pom for how that per-module merged file gets built, and each module's own pom.xml for its threshold rules. Declared last in the root pom's modules list so the reactor builds it after common/api/worker/cli have already produced their classes and exec data (Maven also reorders by the dependency graph below regardless, so this is belt-and-braces).",
       "licenses" : [ ],
-      "purl" : "pkg:maven/com.webhook.platform/webhook-platform-coverage-report@2.2.1?type=pom",
+      "purl" : "pkg:maven/com.webhook.platform/railhook-coverage-report@2.2.1?type=pom",
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.webhook.platform/webhook-platform-coverage-report@2.2.1?type=pom"
+      "bom-ref" : "pkg:maven/com.webhook.platform/railhook-coverage-report@2.2.1?type=pom"
     },
     {
       "group" : "com.jayway.jsonpath",
@@ -12461,17 +12461,17 @@
   ],
   "dependencies" : [
     {
-      "ref" : "pkg:maven/com.webhook.platform/webhook-platform@2.2.1?type=pom",
+      "ref" : "pkg:maven/com.webhook.platform/railhook@2.2.1?type=pom",
       "dependsOn" : [
-        "pkg:maven/com.webhook.platform/webhook-platform-common@2.2.1?type=jar",
-        "pkg:maven/com.webhook.platform/webhook-platform-api@2.2.1?type=jar",
-        "pkg:maven/com.webhook.platform/webhook-platform-worker@2.2.1?type=jar",
-        "pkg:maven/com.webhook.platform/webhook-platform-cli@2.2.1?type=jar",
-        "pkg:maven/com.webhook.platform/webhook-platform-coverage-report@2.2.1?type=pom"
+        "pkg:maven/com.webhook.platform/railhook-common@2.2.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-api@2.2.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-worker@2.2.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-cli@2.2.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-coverage-report@2.2.1?type=pom"
       ]
     },
     {
-      "ref" : "pkg:maven/com.webhook.platform/webhook-platform-common@2.2.1?type=jar",
+      "ref" : "pkg:maven/com.webhook.platform/railhook-common@2.2.1?type=jar",
       "dependsOn" : [
         "pkg:maven/org.springframework.boot/spring-boot-starter@3.2.0?type=jar",
         "pkg:maven/org.projectlombok/lombok@1.18.30?type=jar",
@@ -12635,9 +12635,9 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.webhook.platform/webhook-platform-api@2.2.1?type=jar",
+      "ref" : "pkg:maven/com.webhook.platform/railhook-api@2.2.1?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.webhook.platform/webhook-platform-common@2.2.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-common@2.2.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-validation@3.2.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-actuator@3.2.0?type=jar",
@@ -13681,9 +13681,9 @@
       ]
     },
     {
-      "ref" : "pkg:maven/com.webhook.platform/webhook-platform-worker@2.2.1?type=jar",
+      "ref" : "pkg:maven/com.webhook.platform/railhook-worker@2.2.1?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.webhook.platform/webhook-platform-common@2.2.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-common@2.2.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter@3.2.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-actuator@3.2.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@3.2.0?type=jar",
@@ -13819,9 +13819,9 @@
       ]
     },
     {
-      "ref" : "pkg:maven/com.webhook.platform/webhook-platform-cli@2.2.1?type=jar",
+      "ref" : "pkg:maven/com.webhook.platform/railhook-cli@2.2.1?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.webhook.platform/webhook-platform-common@2.2.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-common@2.2.1?type=jar",
         "pkg:maven/info.picocli/picocli@4.7.5?type=jar",
         "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.15.3?type=jar",
         "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.15.3?type=jar",
@@ -13839,12 +13839,12 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.webhook.platform/webhook-platform-coverage-report@2.2.1?type=pom",
+      "ref" : "pkg:maven/com.webhook.platform/railhook-coverage-report@2.2.1?type=pom",
       "dependsOn" : [
-        "pkg:maven/com.webhook.platform/webhook-platform-common@2.2.1?type=jar",
-        "pkg:maven/com.webhook.platform/webhook-platform-api@2.2.1?type=jar",
-        "pkg:maven/com.webhook.platform/webhook-platform-worker@2.2.1?type=jar",
-        "pkg:maven/com.webhook.platform/webhook-platform-cli@2.2.1?type=jar"
+        "pkg:maven/com.webhook.platform/railhook-common@2.2.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-api@2.2.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-worker@2.2.1?type=jar",
+        "pkg:maven/com.webhook.platform/railhook-cli@2.2.1?type=jar"
       ]
     },
     {

@@ -50,7 +50,7 @@ updates:
 
   # --- npm: dashboard UI ---
   - package-ecosystem: "npm"
-    directory: "/webhook-platform-ui"
+    directory: "/railhook-ui"
     target-branch: "develop"
     schedule:
       interval: "weekly"

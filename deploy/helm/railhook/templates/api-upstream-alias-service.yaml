@@ -1,6 +1,6 @@
 {{- if .Values.ui.apiUpstreamAlias.enabled }}
 {{- /*
-  The UI image is nginx serving a baked-in webhook-platform-ui/nginx.conf, and
+  The UI image is nginx serving a baked-in railhook-ui/nginx.conf, and
   that file names its upstream literally: `proxy_pass http://api:8080` (and
   http://api:8082 for /actuator/health). nginx resolves a literal upstream once,
   at startup, and refuses to start if it does not resolve —

@@ -188,7 +188,7 @@ curl -s http://localhost:9093/api/v2/alerts | jq .
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │                       Docker Network                            │
-│                webhook-platform_webhook-network                 │
+│                railhook_webhook-network                 │
 │                                                                  │
 │  ┌─────────┐   ┌──────────┐   ┌───────────────┐  ┌────────────┐│
 │  │   API    │   │  Worker   │   │  Prometheus   │  │Alertmanager││

@@ -29,7 +29,7 @@ pom_compare="${pom_version%-SNAPSHOT}"
 chart_version=$(grep -E '^version:' deploy/helm/railhook/Chart.yaml | awk '{print $2}')
 chart_app_version=$(grep -E '^appVersion:' deploy/helm/railhook/Chart.yaml | awk '{print $2}' | tr -d '"')
 
-ui_version=$(grep -m1 '"version"' webhook-platform-ui/package.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
+ui_version=$(grep -m1 '"version"' railhook-ui/package.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
 
 node_sdk_version=$(grep -m1 '"version"' sdks/node/package.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
 python_sdk_version=$(grep -m1 -E '^version *=' sdks/python/pyproject.toml | sed -E 's/^version *= *"([^"]+)".*/\1/')
@@ -38,7 +38,7 @@ php_sdk_version=$(grep -m1 '"version"' sdks/php/composer.json | sed -E 's/.*"ver
 echo "pom.xml (reactor):          $pom_version  (compared as $pom_compare)"
 echo "Chart.yaml version:         $chart_version"
 echo "Chart.yaml appVersion:      $chart_app_version"
-echo "webhook-platform-ui:        $ui_version"
+echo "railhook-ui:        $ui_version"
 echo "sdks/node/package.json:     $node_sdk_version"
 echo "sdks/python/pyproject.toml: $python_sdk_version"
 echo "sdks/php/composer.json:     $php_sdk_version"
@@ -63,7 +63,7 @@ php_sdk_const=$(sed -nE "s/.*private const SDK_VERSION = '(.*)';/\1/p" sdks/php/
 
 check "Chart.yaml version" "$chart_version"
 check "Chart.yaml appVersion" "$chart_app_version"
-check "webhook-platform-ui/package.json" "$ui_version"
+check "railhook-ui/package.json" "$ui_version"
 check "sdks/node/package.json" "$node_sdk_version"
 check "sdks/python/pyproject.toml" "$python_sdk_version"
 check "sdks/php/composer.json" "$php_sdk_version"

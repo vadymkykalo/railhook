@@ -22,19 +22,19 @@ services:
   api:
     build:
       context: .
-      dockerfile: ./webhook-platform-api/Dockerfile
-    image: webhook-platform-api:${API_IMAGE_TAG:-local}
+      dockerfile: ./railhook-api/Dockerfile
+    image: railhook-api:${API_IMAGE_TAG:-local}
 
   worker:
     build:
       context: .
-      dockerfile: ./webhook-platform-worker/Dockerfile
-    image: webhook-platform-worker:${WORKER_IMAGE_TAG:-local}
+      dockerfile: ./railhook-worker/Dockerfile
+    image: railhook-worker:${WORKER_IMAGE_TAG:-local}
 
   ui:
     build:
       context: .
-      dockerfile: ./webhook-platform-ui/Dockerfile
+      dockerfile: ./railhook-ui/Dockerfile
       # Vite inlines import.meta.env.VITE_* at build time, so these have to be
       # build args; as runtime env on the nginx stage they were dead config.
       args:
@@ -42,4 +42,4 @@ services:
         VITE_CSP_EXTRA_CONNECT: ${VITE_CSP_EXTRA_CONNECT:-}
         VITE_SITE_URL: ${VITE_SITE_URL:-}
         VITE_CONTACT_DOMAIN: ${VITE_CONTACT_DOMAIN:-}
-    image: webhook-platform-ui:${UI_IMAGE_TAG:-local}
+    image: railhook-ui:${UI_IMAGE_TAG:-local}

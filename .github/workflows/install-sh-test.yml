@@ -1,6 +1,6 @@
 name: Install Script
 
-# webhook-platform-cli/install.sh is the headline install method
+# railhook-cli/install.sh is the headline install method
 # (README tells users to curl | bash it) but was never exercised in CI. This
 # workflow runs it end to end against a fake "GitHub release" fixture built
 # from the JAR this job compiles — not the real repo's releases — so the run
@@ -16,14 +16,14 @@ on:
       - develop
       - 'release/**'
     paths:
-      - 'webhook-platform-cli/install.sh'
+      - 'railhook-cli/install.sh'
       - '.github/workflows/install-sh-test.yml'
   pull_request:
     branches:
       - main
       - develop
     paths:
-      - 'webhook-platform-cli/install.sh'
+      - 'railhook-cli/install.sh'
       - '.github/workflows/install-sh-test.yml'
 
 concurrency:
@@ -56,7 +56,7 @@ jobs:
           cache: 'maven'
 
       - name: Build CLI JAR
-        run: mvn clean package -pl webhook-platform-cli -am -DskipTests -B
+        run: mvn clean package -pl railhook-cli -am -DskipTests -B
 
       - name: Build fixture release (fake GitHub release, served via file://)
         run: |
@@ -64,7 +64,7 @@ jobs:
           FIXTURE_ROOT="$RUNNER_TEMP/fixture"
           FIXTURE="$FIXTURE_ROOT/vadymkykalo/railhook/releases/download/v0.0.0-ci"
           mkdir -p "$FIXTURE"
-          cp webhook-platform-cli/target/webhook-platform-cli-*.jar "$FIXTURE/railhook-cli.jar"
+          cp railhook-cli/target/railhook-cli-*.jar "$FIXTURE/railhook-cli.jar"
           if command -v sha256sum >/dev/null 2>&1; then
             (cd "$FIXTURE" && sha256sum railhook-cli.jar > SHA256SUMS)
           else
@@ -78,7 +78,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Run install.sh
-        run: bash webhook-platform-cli/install.sh
+        run: bash railhook-cli/install.sh
 
       - name: Assert railhook --version works
         run: |
@@ -115,7 +115,7 @@ jobs:
           cache: 'maven'
 
       - name: Build CLI JAR
-        run: mvn clean package -pl webhook-platform-cli -am -DskipTests -B
+        run: mvn clean package -pl railhook-cli -am -DskipTests -B
 
       - name: Build fixture release tree (valid + tampered)
         run: |
@@ -125,10 +125,10 @@ jobs:
           BAD="$FIXTURE_ROOT/vadymkykalo/railhook/releases/download/v0.0.0-ci-tampered"
           mkdir -p "$GOOD" "$BAD"
 
-          cp webhook-platform-cli/target/webhook-platform-cli-*.jar "$GOOD/railhook-cli.jar"
+          cp railhook-cli/target/railhook-cli-*.jar "$GOOD/railhook-cli.jar"
           (cd "$GOOD" && sha256sum railhook-cli.jar > SHA256SUMS)
 
-          cp webhook-platform-cli/target/webhook-platform-cli-*.jar "$BAD/railhook-cli.jar"
+          cp railhook-cli/target/railhook-cli-*.jar "$BAD/railhook-cli.jar"
           echo "0000000000000000000000000000000000000000000000000000000000000000  railhook-cli.jar" > "$BAD/SHA256SUMS"
 
           echo "FIXTURE_ROOT=$FIXTURE_ROOT" >> "$GITHUB_ENV"
@@ -220,7 +220,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$FIXTURE_ROOT":/fixture:ro \
-            -v "$PWD/webhook-platform-cli/install.sh":/install.sh:ro \
+            -v "$PWD/railhook-cli/install.sh":/install.sh:ro \
             -v "$CASES/skip-java-no-java.sh":/case.sh:ro \
             ubuntu:22.04 bash /case.sh
 
@@ -228,7 +228,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$FIXTURE_ROOT":/fixture:ro \
-            -v "$PWD/webhook-platform-cli/install.sh":/install.sh:ro \
+            -v "$PWD/railhook-cli/install.sh":/install.sh:ro \
             -v "$CASES/with-java.sh":/case.sh:ro \
             ubuntu:22.04 bash /case.sh
 
@@ -236,7 +236,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$FIXTURE_ROOT":/fixture:ro \
-            -v "$PWD/webhook-platform-cli/install.sh":/install.sh:ro \
+            -v "$PWD/railhook-cli/install.sh":/install.sh:ro \
             -v "$CASES/rcfile-already-has-local-bin.sh":/case.sh:ro \
             ubuntu:22.04 bash /case.sh
 
@@ -244,7 +244,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$FIXTURE_ROOT":/fixture:ro \
-            -v "$PWD/webhook-platform-cli/install.sh":/install.sh:ro \
+            -v "$PWD/railhook-cli/install.sh":/install.sh:ro \
             -v "$CASES/tampered-checksum.sh":/case.sh:ro \
             ubuntu:22.04 bash /case.sh
 

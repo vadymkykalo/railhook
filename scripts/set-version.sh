@@ -40,11 +40,11 @@ sed -i.bak -E "s/^version: .*/version: $RELEASE_VERSION/" deploy/helm/railhook/C
 sed -i.bak -E "s/^appVersion: .*/appVersion: \"$RELEASE_VERSION\"/" deploy/helm/railhook/Chart.yaml
 rm -f deploy/helm/railhook/Chart.yaml.bak
 
-echo "Setting webhook-platform-ui version to $RELEASE_VERSION"
+echo "Setting railhook-ui version to $RELEASE_VERSION"
 node -e "
 const fs = require('fs');
 const version = '$RELEASE_VERSION';
-for (const f of ['webhook-platform-ui/package.json', 'webhook-platform-ui/package-lock.json']) {
+for (const f of ['railhook-ui/package.json', 'railhook-ui/package-lock.json']) {
   const data = JSON.parse(fs.readFileSync(f, 'utf8'));
   data.version = version;
   if (data.packages && data.packages['']) data.packages[''].version = version;

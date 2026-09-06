@@ -250,7 +250,7 @@ this project owns from the working tree instead:
 
 ```bash
 git clone https://github.com/vadymkykalo/railhook.git
-cd webhook-platform
+cd railhook
 make up          # the overlay, the embedded-db profile and the topic creation
 make health
 ```

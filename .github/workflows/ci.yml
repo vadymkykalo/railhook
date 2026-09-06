@@ -94,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           NGINX_PORT=$(sed -n 's/^[[:space:]]*listen[[:space:]]\+\([0-9]\+\);.*/\1/p' \
-            webhook-platform-ui/nginx.conf | head -1)
+            railhook-ui/nginx.conf | head -1)
           echo "nginx.conf listens on ${NGINX_PORT}"
 
           python3 - "$NGINX_PORT" <<'EOF'
@@ -152,8 +152,8 @@ jobs:
           set -e
           for svc in api worker ui; do
             docker buildx build --load \
-              -f "webhook-platform-${svc}/Dockerfile" \
-              -t "webhook-platform-${svc}:test" \
+              -f "railhook-${svc}/Dockerfile" \
+              -t "railhook-${svc}:test" \
               --cache-from "type=gha,scope=${svc}" .
           done
 
@@ -167,7 +167,7 @@ jobs:
         run: |
           set -e
           for svc in api worker ui; do
-            kind load docker-image "webhook-platform-${svc}:test" --name "$KIND_CLUSTER"
+            kind load docker-image "railhook-${svc}:test" --name "$KIND_CLUSTER"
           done
 
       - name: Set up Helm
@@ -220,11 +220,11 @@ jobs:
             --set postgresql.external.host=postgres \
             --set kafka.external.bootstrapServers=kafka:9092 \
             --set redis.external.host=redis \
-            --set api.image.repository=webhook-platform-api \
+            --set api.image.repository=railhook-api \
             --set api.image.tag=test \
-            --set worker.image.repository=webhook-platform-worker \
+            --set worker.image.repository=railhook-worker \
             --set worker.image.tag=test \
-            --set ui.image.repository=webhook-platform-ui \
+            --set ui.image.repository=railhook-ui \
             --set ui.image.tag=test \
             --set api.replicaCount=1 \
             --set worker.replicaCount=1 \
@@ -348,7 +348,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: railhook-cli
-          path: webhook-platform-cli/target/webhook-platform-cli-*.jar
+          path: railhook-cli/target/railhook-cli-*.jar
           retention-days: 30
 
   backend-test:
@@ -402,7 +402,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: jacoco-unit-exec
-          path: webhook-platform-*/target/jacoco-unit.exec
+          path: railhook-*/target/jacoco-unit.exec
           retention-days: 7
           if-no-files-found: warn
 
@@ -450,7 +450,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: jacoco-integration-exec
-          path: webhook-platform-*/target/jacoco-it.exec
+          path: railhook-*/target/jacoco-it.exec
           retention-days: 7
           if-no-files-found: warn
 
@@ -462,7 +462,7 @@ jobs:
   # recompiles (tests skipped - only the just-downloaded exec data is used
   # for coverage, not a fresh run) so class files exist for JaCoCo to map
   # execution data onto, then runs `mvn verify` so both
-  # jacoco:report-aggregate (webhook-platform-coverage-report/pom.xml) and
+  # jacoco:report-aggregate (railhook-coverage-report/pom.xml) and
   # each real module's own jacoco:merge + jacoco:check (root pom.xml +
   # common/api/worker/cli's own pom.xml) fire against the true merged
   # unit+integration coverage.
@@ -505,7 +505,7 @@ jobs:
       # -DskipTests: tests are not re-run here - class files are needed only
       # so JaCoCo can map the exec data just downloaded onto real bytecode
       # and source. Needs `verify`, not `test`: report-aggregate (in
-      # webhook-platform-coverage-report/pom.xml) is bound to `test`, but the
+      # railhook-coverage-report/pom.xml) is bound to `test`, but the
       # per-module jacoco-merge (root pom.xml) and jacoco:check executions
       # (each of common/api/worker/cli's own pom.xml) are bound to `verify` -
       # deliberately later than `test`, so CI's two split `mvn test`
@@ -514,7 +514,7 @@ jobs:
       # the one place in the whole pipeline that reaches `verify`, so it's
       # the only place those merge+check executions run for real.
       - name: Compile modules, aggregate report, threshold check
-        run: mvn verify -B -pl webhook-platform-coverage-report -am -DskipTests
+        run: mvn verify -B -pl railhook-coverage-report -am -DskipTests
 
       - name: Coverage Summary
         if: always()
@@ -629,10 +629,10 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: webhook-platform-ui/package-lock.json
+          cache-dependency-path: railhook-ui/package-lock.json
       
       - name: Install dependencies
-        working-directory: webhook-platform-ui
+        working-directory: railhook-ui
         run: npm ci
       
       # openapi.yaml is drift-checked against springdoc by OpenApiDriftIntegrationTest,
@@ -653,22 +653,22 @@ jobs:
       # reference was 2,100 lines of hand-written endpoint tables that nothing
       # kept in sync — this is what stops the replacement rotting the same way.
       - name: Check generated docs API index matches openapi.yaml
-        working-directory: webhook-platform-ui
+        working-directory: railhook-ui
         run: npm run docs:api-index:check
 
       # sitemap.xml is derived from the same guide list the docs sidebar renders
       # and committed, so a guide added without regenerating it would be a page
       # that exists and is never crawled.
       - name: Check sitemap.xml matches the public route list
-        working-directory: webhook-platform-ui
+        working-directory: railhook-ui
         run: npm run seo:sitemap:check
 
       - name: Run ESLint
-        working-directory: webhook-platform-ui
+        working-directory: railhook-ui
         run: npm run lint
       
       - name: Run TypeScript typecheck
-        working-directory: webhook-platform-ui
+        working-directory: railhook-ui
         run: npm run typecheck
 
   frontend-test:
@@ -686,10 +686,10 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: webhook-platform-ui/package-lock.json
+          cache-dependency-path: railhook-ui/package-lock.json
       
       - name: Install dependencies
-        working-directory: webhook-platform-ui
+        working-directory: railhook-ui
         run: npm ci
       
       # test:coverage (vitest run --coverage) subsumes test:ci - it
@@ -698,7 +698,7 @@ jobs:
       # step) means the coverage gate is the same command a PR's CI actually
       # ran, not a second, easier-to-drift-from invocation.
       - name: Run tests with coverage
-        working-directory: webhook-platform-ui
+        working-directory: railhook-ui
         run: npm run test:coverage
 
       - name: Test Summary
@@ -712,7 +712,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: vitest-coverage-report
-          path: webhook-platform-ui/coverage
+          path: railhook-ui/coverage
           retention-days: 30
           if-no-files-found: warn
 
@@ -781,14 +781,14 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: webhook-platform-ui/package-lock.json
+          cache-dependency-path: railhook-ui/package-lock.json
       
       - name: Install dependencies
-        working-directory: webhook-platform-ui
+        working-directory: railhook-ui
         run: npm ci
       
       - name: Build production bundle
-        working-directory: webhook-platform-ui
+        working-directory: railhook-ui
         run: npm run build
       
       - name: Build Summary
@@ -863,8 +863,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: webhook-platform-api/Dockerfile
-          tags: webhook-platform-api:test
+          file: railhook-api/Dockerfile
+          tags: railhook-api:test
           load: false
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
@@ -873,8 +873,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: webhook-platform-worker/Dockerfile
-          tags: webhook-platform-worker:test
+          file: railhook-worker/Dockerfile
+          tags: railhook-worker:test
           load: false
           cache-from: type=gha,scope=worker
           cache-to: type=gha,mode=max,scope=worker
@@ -883,8 +883,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: webhook-platform-ui/Dockerfile
-          tags: webhook-platform-ui:test
+          file: railhook-ui/Dockerfile
+          tags: railhook-ui:test
           load: false
           cache-from: type=gha,scope=ui
           cache-to: type=gha,mode=max,scope=ui
@@ -923,8 +923,8 @@ jobs:
           set -e
           for svc in api worker ui; do
             docker buildx build --load \
-              -f "webhook-platform-${svc}/Dockerfile" \
-              -t "webhook-platform-${svc}:test" \
+              -f "railhook-${svc}/Dockerfile" \
+              -t "railhook-${svc}:test" \
               --cache-from "type=gha,scope=${svc}" .
           done
 
@@ -937,7 +937,7 @@ jobs:
           # Point it at the images just built rather than pulling the release.
           cd "$HOME/railhook"
           sed -i 's|^API_IMAGE_TAG=.*|API_IMAGE_TAG=test|;s|^WORKER_IMAGE_TAG=.*|WORKER_IMAGE_TAG=test|;s|^UI_IMAGE_TAG=.*|UI_IMAGE_TAG=test|' .env
-          echo "DOCKER_REGISTRY=webhook-platform" >> .env
+          echo "DOCKER_REGISTRY=railhook" >> .env
           # COMPOSE_PROFILES comes from the .env the installer wrote: the
           # database and the backup sidecar are behind profiles, so a run that
           # ignored it would come up with no database at all.
@@ -1111,8 +1111,8 @@ jobs:
           set -e
           for svc in api worker ui; do
             docker buildx build --load \
-              -f "webhook-platform-${svc}/Dockerfile" \
-              -t "webhook-platform-${svc}:test" \
+              -f "railhook-${svc}/Dockerfile" \
+              -t "railhook-${svc}:test" \
               --cache-from "type=gha,scope=${svc}" .
           done
 
@@ -1127,8 +1127,8 @@ jobs:
           # left behind - which is what an operator following UPGRADING.md ends up with.
           cp "$RAILHOOK_COMPOSE_SRC" docker-compose.yml
           sed -i 's|^API_IMAGE_TAG=.*|API_IMAGE_TAG=test|;s|^WORKER_IMAGE_TAG=.*|WORKER_IMAGE_TAG=test|;s|^UI_IMAGE_TAG=.*|UI_IMAGE_TAG=test|' .env
-          grep -q '^DOCKER_REGISTRY=' .env && sed -i 's|^DOCKER_REGISTRY=.*|DOCKER_REGISTRY=webhook-platform|' .env \
-            || echo "DOCKER_REGISTRY=webhook-platform" >> .env
+          grep -q '^DOCKER_REGISTRY=' .env && sed -i 's|^DOCKER_REGISTRY=.*|DOCKER_REGISTRY=railhook|' .env \
+            || echo "DOCKER_REGISTRY=railhook" >> .env
           docker compose up -d
           for i in $(seq 1 60); do
             curl -sf -o /dev/null http://localhost:8080/actuator/health/liveness && { echo "up after ${i}0s"; exit 0; }
@@ -1179,8 +1179,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: webhook-platform-api/Dockerfile
-          tags: webhook-platform-api:test
+          file: railhook-api/Dockerfile
+          tags: railhook-api:test
           load: true
           cache-from: type=gha,scope=api
       
@@ -1188,8 +1188,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: webhook-platform-worker/Dockerfile
-          tags: webhook-platform-worker:test
+          file: railhook-worker/Dockerfile
+          tags: railhook-worker:test
           load: true
           cache-from: type=gha,scope=worker
       
@@ -1197,8 +1197,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: webhook-platform-ui/Dockerfile
-          tags: webhook-platform-ui:test
+          file: railhook-ui/Dockerfile
+          tags: railhook-ui:test
           load: true
           cache-from: type=gha,scope=ui
       
@@ -1221,27 +1221,27 @@ jobs:
       # Widen to HIGH by dropping `--severity CRITICAL --exit-code 1` for the
       # advisory step below and deleting the gating step once ready.
       - name: Run Trivy on API image (CRITICAL - gating)
-        run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update webhook-platform-api:test
+        run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update railhook-api:test
 
       - name: Run Trivy on API image (HIGH - informational)
         if: always()
-        run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-api:test
+        run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update railhook-api:test
 
       - name: Run Trivy on Worker image (CRITICAL - gating)
         if: always()
-        run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update webhook-platform-worker:test
+        run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update railhook-worker:test
 
       - name: Run Trivy on Worker image (HIGH - informational)
         if: always()
-        run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-worker:test
+        run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update railhook-worker:test
 
       - name: Run Trivy on UI image (CRITICAL - gating)
         if: always()
-        run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update webhook-platform-ui:test
+        run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update railhook-ui:test
 
       - name: Run Trivy on UI image (HIGH - informational)
         if: always()
-        run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-ui:test
+        run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update railhook-ui:test
 
       - name: Container Scan Summary
         if: always()

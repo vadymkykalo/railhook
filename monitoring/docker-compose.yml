@@ -171,4 +171,4 @@ networks:
     driver: bridge
   railhook:
     external: true
-    name: webhook-platform_webhook-network
+    name: railhook_webhook-network

@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.webhook.platform</groupId>
+        <artifactId>railhook</artifactId>
+        <version>2.12.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>railhook-worker</artifactId>
+    <name>Webhook Platform Worker</name>
+    <description>Kafka consumer for webhook delivery</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.webhook.platform</groupId>
+            <artifactId>railhook-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <!--
+          Both, and not one or the other. Boot 4 split WebClient's auto-configuration out of
+          the WebFlux starter: webflux is kept because it is what serves this service's
+          actuator port - the worker has no servlet stack, and the Compose healthcheck and
+          the Helm probes read /actuator over it - and webclient is what supplies the
+          WebClient.Builder every delivery attempt is made with.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webclient</artifactId>
+        </dependency>
+        <!--
+          Here for the bean, not for HTTP conversion: the worker serves nothing but actuator,
+          and what it needs is a Jackson 2 ObjectMapper, which Boot auto-configured until 4
+          replaced Jackson 2 with Jackson 3. AttemptRunner, PayloadTransformService,
+          IncomingAttemptStore and DestinationAuthenticator all take one - which is to say the
+          whole delivery path does, including the body a signature is computed over. The
+          reasoning for staying on Jackson 2 is on the same dependency in the API's pom.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
+        </dependency>
+        <!--
+          The starter rather than bare spring-kafka: Boot 4 moved the Kafka
+          auto-configuration out of spring-boot-autoconfigure into its own
+          spring-boot-kafka module, which only the starter pulls in. Without it
+          the spring.kafka.* block in application.yml would bind to nothing and
+          the autoconfigure.exclude in the integration tests would name a class
+          that is not on the classpath, which Boot treats as a startup failure.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.10.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <!--
+          4.x is the Boot 4 line: its starter builds against spring-boot 4.1 and registers
+          the auto-configuration Boot 4 looks for, where 3.52.0 wires itself against Boot 3's
+          module layout. It also renamed RScript.ReturnType's constants to match the Java
+          types they return - INTEGER to LONG, MULTI to LIST - which is what the circuit
+          breaker's and the ordering buffer's Lua scripts ask for.
+
+          Verify this one against a running stack, not the test suite: the integration tests
+          exclude RedissonAutoConfigurationV2 outright and mock every service that reaches for
+          Redis, so a Redisson that fails to wire would leave them all green.
+        -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson-spring-boot-starter</artifactId>
+            <version>4.7.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-reactor</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.jayway.jsonpath</groupId>
+            <artifactId>json-path</artifactId>
+            <version>2.9.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>9.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Boot 4 split spring-boot-test-autoconfigure apart: @AutoConfigureMockMvc,
+          @DataJpaTest, TestEntityManager and @AutoConfigureTestDatabase each moved into a
+          module of their own, and spring-boot-starter-test no longer carries any of them.
+          These four starters are that one dependency, unbundled.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>2.0.5</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>1.21.4</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>1.21.4</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>kafka</artifactId>
+            <version>1.21.4</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- No dedicated Testcontainers Redis module is used anywhere in this repo yet;
+                 a plain GenericContainer("redis:7-alpine") (matching docker-compose.yml's
+                 default REDIS_IMAGE) is used instead, so no extra Testcontainers artifact is
+                 needed here beyond the generic "testcontainers" one already above. -->
+            <!-- "wiremock" (not -standalone) has no bundled HTTP server implementation
+                 (Jetty), so it fails at startup with "no suitable HttpServerFactory
+                 extension was found" - wiremock-standalone bundles a shaded Jetty 11. -->
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>3.13.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- wiremock-standalone:3.13.1 transitively pulls httpclient5:5.2.1, which is
+                 missing RequestConfig.Builder#setProtocolUpgradeEnabled that WireMock's own
+                 (non-shaded) admin/proxy client calls (NoSuchMethodError at startup) - pin
+                 explicitly to a version that has it, along with the matching
+                 httpcore5/httpcore5-h2 versions it needs. -->
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <version>5.6.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents.core5</groupId>
+            <artifactId>httpcore5</artifactId>
+            <version>5.4.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents.core5</groupId>
+            <artifactId>httpcore5-h2</artifactId>
+            <version>5.4.3</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <!-- See railhook-api/pom.xml for why this was bumped. -->
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.6</version>
+            </plugin>
+            <!--
+              See the matching comment in railhook-common's
+              pom.xml for the shared rationale (merged exec file, `verify`
+              phase choice). Two rules here, not one:
+
+              1. BUNDLE - project floor for this module. Baseline measured
+                 2026-08-21 (unit + integration merged): INSTRUCTION 73.0%
+                 (9332/12779).
+              2. CLASS - the actual point of this gate, not the BUNDLE
+                 number above:
+                 this module's overall percentage could stay high while the
+                 delivery path itself regresses, because it also contains a
+                 lot of easy-to-cover CRUD/config code. Pins a floor
+                 specifically to the classes carrying dedicated delivery-path
+                 tests (WebhookDeliveryService 73.2%, RetrySchedulerService
+                 82.7%, OrderingBufferService 95.3%, DeliveryConsumer 95.8%
+                 - all measured 2026-08-21), so those cannot silently erode
+                 while the module-wide number keeps climbing elsewhere. 65%
+                 leaves a margin under the lowest of the four
+                 (WebhookDeliveryService).
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.65</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>com.webhook.platform.worker.service.WebhookDeliveryService</include>
+                                        <include>com.webhook.platform.worker.service.RetrySchedulerService</include>
+                                        <include>com.webhook.platform.worker.service.OrderingBufferService</include>
+                                        <include>com.webhook.platform.worker.consumer.DeliveryConsumer</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.65</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -163,7 +163,7 @@ rebuild-external-db: ## Rebuild and restart services (external DB)
 ##@ Development (Fast Rebuilds)
 # Every target below builds through DOCKER_COMPOSE_BUILD *and starts through it
 # too*. The overlay does not only add build contexts — it renames the images
-# (`image: webhook-platform-ui:${UI_IMAGE_TAG:-local}`), so a `build` through the
+# (`image: railhook-ui:${UI_IMAGE_TAG:-local}`), so a `build` through the
 # overlay followed by an `up -d` through the base file built one image and
 # started another: the published ghcr one, silently, with none of your changes.
 # `make dev-ui` looked like it worked and served five-day-old code.
@@ -225,7 +225,7 @@ dev-ui: ## Quick dev: rebuild UI with cache + restart
 
 test-ui: ## Run frontend unit tests (Vitest)
 	@echo "$(GREEN)Running frontend tests...$(NC)"
-	@cd webhook-platform-ui && npm run test:ci
+	@cd railhook-ui && npm run test:ci
 	@echo "$(GREEN)Frontend tests passed$(NC)"
 
 # Enumerates the live set of ratchets instead of asking a doc to list them. Two
@@ -239,13 +239,13 @@ types-check: ## Fail if the UI's generated API types are stale vs openapi.yaml (
 	@scripts/check-types-drift.sh
 
 docs-check: ## Fail if the in-app API reference index is stale vs openapi.yaml (same check CI runs)
-	@cd webhook-platform-ui && npm run docs:api-index:check
+	@cd railhook-ui && npm run docs:api-index:check
 
 seo-check: ## Fail if public/sitemap.xml is stale vs the docs guide list (same check CI runs)
-	@cd webhook-platform-ui && npm run seo:sitemap:check
+	@cd railhook-ui && npm run seo:sitemap:check
 
 prerender: ## Render the public pages to static HTML over an existing dist/ (needs a Chromium)
-	@cd webhook-platform-ui && npm run build && npm run prerender
+	@cd railhook-ui && npm run build && npm run prerender
 
 ##@ Scaling
 scale-worker: ## Scale worker instances (usage: make scale-worker N=3)
@@ -487,5 +487,5 @@ nuke: ## DESTROY EVERYTHING including volumes (requires CONFIRM=YES)
 	@echo "$(RED)Stopping main platform...$(NC)"
 	@$(DOCKER_COMPOSE) --profile embedded-db down -v --remove-orphans --rmi local 2>/dev/null || true
 	@docker volume rm webhook_pgdata kafka_data redis_data 2>/dev/null || true
-	@docker network rm webhook-platform_webhook-network 2>/dev/null || true
+	@docker network rm railhook_webhook-network 2>/dev/null || true
 	@echo "$(GREEN)Nuclear option complete — platform + monitoring destroyed$(NC)"

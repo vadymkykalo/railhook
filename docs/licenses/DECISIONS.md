@@ -69,7 +69,7 @@ mvn org.cyclonedx:cyclonedx-maven-plugin:2.8.0:makeAggregateBom -DskipTests -Dou
 # -> target/sbom.json (copied here as backend-sbom.json)
 
 # Frontend: 654 npm packages scanned
-cd webhook-platform-ui && npm ci
+cd railhook-ui && npm ci
 npx license-checker --summary
 # -> 563 MIT, 49 ISC, 14 Apache-2.0, 10 BSD-2-Clause, 9 BSD-3-Clause, 2 MPL-2.0,
 #    1 MIT-0, 1 Python-2.0, 1 CC-BY-4.0, 1 0BSD, 1 (MIT OR CC0-1.0), 1 MIT AND ISC

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A log line that lied about which number was which.** `RetryGovernor`'s AIMD-decrease warning
+  was written with `{:.1f}` - Python's format syntax, not SLF4J's. SLF4J substitutes only `{}`,
+  so that token printed literally, every argument after it landed one placeholder early, and the
+  last one was dropped without a warning. The result read `AIMD decrease: failureRate={:.1f}%,
+  batch 94.44444444444444 → 18` about a batch that was 18 and a failure rate that was 94.4%:
+  the number an operator would read as the batch size was the failure rate. It is the line that
+  explains why retry throughput just halved, which makes it exactly the wrong line to garble.
+
 ### Added
 
 - **A ratchet on migration checksums.** Flyway validates the checksum of every migration it has
@@ -23,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   renamed. Adding a migration means regenerating that file and committing it alongside:
 
   ```bash
-  mvn test -pl webhook-platform-api -am -Dtest=MigrationChecksumTest -Dmigrations.regenerate=true
+  mvn test -pl railhook-api -am -Dtest=MigrationChecksumTest -Dmigrations.regenerate=true
   ```
 
   The two cases read differently on review, which is the point: a new migration adds a line,
@@ -820,7 +830,7 @@ the real API.
   outage can no longer fail an ingest the caller has already been told was accepted.
 
 ### Changed
-- `SsrfProtectionCustomizer` lives once, in `webhook-platform-common`, next to the
+- `SsrfProtectionCustomizer` lives once, in `railhook-common`, next to the
   `UrlValidator` it validates against. It had been byte-identical in the api and the worker
   apart from its package line, so an SSRF fix had to be applied in two places and nothing
   said so. Reactor Netty is a `provided` dependency of common on purpose: the api and worker
@@ -863,7 +873,7 @@ the real API.
     counterparts of the existing `webhook_dlq_depth` and
     `webhook_dlq_topic_retained_total`. The row count is the actionable one and has an
     alert; the topic gauge is informational, as on the Outgoing side.
-- `RetryLadder` and `RetryLadderDefaults` (`webhook-platform-common`): one shared
+- `RetryLadder` and `RetryLadderDefaults` (`railhook-common`): one shared
   implementation of the retry ladder — parsing, tier clamping, jitter, exhaustion,
   and the worst-case fit against the escalation hard cap. The two directions'
   defaults are now declared once, and stay deliberately different: outgoing gets
@@ -899,7 +909,7 @@ the real API.
   booting the whole Compose stack with `SWAGGER_ENABLED=true` and diffing with a
   Python script. The check runs in the existing backend integration job, and an
   intentional API change is regenerated with
-  `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`.
+  `mvn test -pl railhook-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`.
   The `servers` block is now excluded from the comparison: springdoc derives it
   from the request, so it describes where an instance is reachable, not the API.
 - Dropped task-tracker ids (`P0-…`/`P1-…`/`P2-…`) and links to the gitignored
@@ -1008,7 +1018,7 @@ record of what shipped:
 - **Billing**: plans, subscriptions, and yearly-interval pricing
   (`V036_billing_plans`, `V037_billing_subscriptions`,
   `V038_billing_yearly_interval`)
-- **CLI** (`webhook-platform-cli`) as a standalone Picocli module, published
+- **CLI** (`railhook-cli`) as a standalone Picocli module, published
   via a new `release-cli.yml` workflow
 - **Tunnel**: `CLI ↔ /ws/tunnel` local-development tunneling, with session
   tracking, request logging, and plan-based limits (`V040_tunnel_sessions`,

@@ -59,7 +59,7 @@ pnpm-debug.log*
 # and regenerated on every run; one of these got staged during a UI typecheck.
 *.tsbuildinfo
 
-# vitest --coverage output (webhook-platform-ui/coverage/, and any SDK's)
+# vitest --coverage output (railhook-ui/coverage/, and any SDK's)
 coverage/
 
 # === Local override configs ===
@@ -115,9 +115,9 @@ deploy/helm/**/Chart.lock
 # A screenshot dropped next to the pom is a scratch file, not an asset. The
 # repo root is the first thing a visitor reads; keep it to files that earn
 # their place. Assets live under docs/screenshots/ or
-# webhook-platform-ui/public/.
+# railhook-ui/public/.
 /*.png
 /*.jpg
 /*.jpeg
 /*.webp
-webhook-platform-ui/*.png
+railhook-ui/*.png

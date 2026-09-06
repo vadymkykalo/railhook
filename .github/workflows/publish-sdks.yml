@@ -137,7 +137,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-python:
-    name: Publish Python SDK to PyPI (webhook-platform)
+    name: Publish Python SDK to PyPI (railhook)
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'push' ||

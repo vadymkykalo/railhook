@@ -32,7 +32,7 @@ spec:
           imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
           ports:
             # 5173, not 80: the image is nginx serving `listen 5173`
-            # (webhook-platform-ui/nginx.conf) and EXPOSE 5173. While this said
+            # (railhook-ui/nginx.conf) and EXPOSE 5173. While this said
             # 80 the readiness probe could never pass and the Service pointed at
             # a closed port, so `helm install` produced a UI that never came up.
             - name: http

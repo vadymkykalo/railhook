@@ -189,7 +189,7 @@ ui:
       cpu: 200m
       memory: 128Mi
   
-  # The image is nginx with `listen 5173` (webhook-platform-ui/nginx.conf), not
+  # The image is nginx with `listen 5173` (railhook-ui/nginx.conf), not
   # 80. Probing 80 meant readiness could never pass.
   livenessProbe:
     httpGet:

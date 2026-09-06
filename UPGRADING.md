@@ -127,7 +127,7 @@ If you serve a public site and want a sitemap that names it, regenerate the two 
 together:
 
 ```bash
-cd webhook-platform-ui && SITE_URL=https://your.domain npm run seo:sitemap
+cd railhook-ui && SITE_URL=https://your.domain npm run seo:sitemap
 # then edit the Sitemap: line in public/robots.txt to match
 ```
 
@@ -234,7 +234,7 @@ credentials are AES-256-GCM encrypted at rest. The key derivation changed:
 | Inputs | `WEBHOOK_ENCRYPTION_KEY` only | `WEBHOOK_ENCRYPTION_KEY` **and** `WEBHOOK_ENCRYPTION_SALT` |
 | Effective key size | AES-128 | AES-256 |
 
-(`webhook-platform-common/src/main/java/com/webhook/platform/common/util/CryptoUtils.java`,
+(`railhook-common/src/main/java/com/webhook/platform/common/util/CryptoUtils.java`,
 `deriveKey`)
 
 `EncryptionKeyRegistry` has no fallback to the old algorithm — it always
@@ -270,7 +270,7 @@ This release is built for a **fresh database**. If you need to carry
 forward existing data:
 
 1. Take a full backup first.
-2. Compare the old (`git show v1.0.3:webhook-platform-api/src/main/resources/db/migration/`)
+2. Compare the old (`git show v1.0.3:railhook-api/src/main/resources/db/migration/`)
    and new schemas by hand — table/column names changed in several places
    (e.g. `users`/`organizations`/`memberships` are now created directly in
    `V001` instead of across `V010`–`V012`).

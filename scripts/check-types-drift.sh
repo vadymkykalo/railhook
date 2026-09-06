@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Fails when webhook-platform-ui/src/types/api.generated.ts is not what
+# Fails when railhook-ui/src/types/api.generated.ts is not what
 # openapi.yaml currently generates.
 #
 # openapi.yaml is itself kept honest against springdoc by
@@ -19,21 +19,21 @@ set -euo pipefail
 # schemas current and `npm run typecheck` keeps the mirror honest against them.
 #
 # Usage: scripts/check-types-drift.sh
-# Regenerate with: cd webhook-platform-ui && npm run types:generate
+# Regenerate with: cd railhook-ui && npm run types:generate
 
 cd "$(git rev-parse --show-toplevel)"
 
-GENERATED="webhook-platform-ui/src/types/api.generated.ts"
+GENERATED="railhook-ui/src/types/api.generated.ts"
 
 if [ ! -f "$GENERATED" ]; then
-    echo "::error::$GENERATED is missing. Run: cd webhook-platform-ui && npm run types:generate"
+    echo "::error::$GENERATED is missing. Run: cd railhook-ui && npm run types:generate"
     exit 1
 fi
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-(cd webhook-platform-ui && npx --no-install openapi-typescript ../openapi.yaml -o "$TMP/api.generated.ts" >/dev/null)
+(cd railhook-ui && npx --no-install openapi-typescript ../openapi.yaml -o "$TMP/api.generated.ts" >/dev/null)
 
 if ! diff -u "$GENERATED" "$TMP/api.generated.ts" > "$TMP/drift.diff"; then
     echo "::error::$GENERATED is stale — openapi.yaml generates something else."
@@ -41,7 +41,7 @@ if ! diff -u "$GENERATED" "$TMP/api.generated.ts" > "$TMP/drift.diff"; then
     echo "A backend DTO changed and the frontend's copy of the schema did not."
     echo "Regenerate and commit the result:"
     echo ""
-    echo "  cd webhook-platform-ui && npm run types:generate"
+    echo "  cd railhook-ui && npm run types:generate"
     echo ""
     echo "Then fix whatever src/types/api.contract.ts now reports: the mirror in"
     echo "api.types.ts is what the app actually imports, and it has to keep matching."
