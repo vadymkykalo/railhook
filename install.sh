@@ -351,8 +351,17 @@ write_files() {
         # docker-compose.yml. Those merged into one canonical docker-compose.yml,
         # so try that first and fall back — this installer has to be able to
         # install a release older than the change.
+        #
+        # The image prefix is matched against both spellings for the same
+        # reason. The product was Hookflow until 2.12.0, so every release before
+        # it pins ghcr.io/vadymkykalo/hookflow-*; matching only the current name
+        # would make this installer unable to install any of them, and the
+        # failure would be the confusing one — a fallback to a
+        # docker-compose.pull.yml that modern releases do not have, then "could
+        # not download the Compose file". The old prefix stays here as long as
+        # those releases are installable at all.
         curl -fsSL "${RAW}/${VERSION}/docker-compose.yml" -o "${INSTALL_DIR}/docker-compose.yml" 2>/dev/null \
-            && grep -q 'ghcr.io/vadymkykalo/railhook' "${INSTALL_DIR}/docker-compose.yml" \
+            && grep -qE 'ghcr\.io/vadymkykalo/(railhook|hookflow)' "${INSTALL_DIR}/docker-compose.yml" \
             || curl -fsSL "${RAW}/${VERSION}/docker-compose.pull.yml" -o "${INSTALL_DIR}/docker-compose.yml" \
             || die "Could not download the Compose file for ${VERSION}."
         ok "docker-compose.yml (pinned to ${VERSION})"
