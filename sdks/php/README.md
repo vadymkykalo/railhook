@@ -2,8 +2,10 @@
 
 Official PHP SDK for [Railhook](https://github.com/vadymkykalo/railhook).
 
-> The Packagist package is `railhook/php`; the PHP namespace is
-> `Railhook\`. The two names differ on purpose.
+> The Packagist package is `railhook/php` and the PHP namespace is
+> `Railhook\`. Published as `webhook-platform/php` with the namespace
+> `Hookflow\` before 2.12.0; that package is marked abandoned in favour of
+> this one.
 
 **Scope.** This SDK covers Events, Endpoints, Subscriptions, Deliveries,
 Incoming Sources, Incoming Events, and webhook signature verification —

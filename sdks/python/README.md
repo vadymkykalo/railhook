@@ -1,9 +1,13 @@
-# webhook-platform
+# railhook
 
 Official Python SDK for [Railhook](https://github.com/vadymkykalo/railhook).
 
-> The PyPI distribution is `webhook-platform`; the module you import is
-> `railhook`. `pip install railhook`, then `from railhook import ...`.
+```bash
+pip install railhook
+```
+
+> Published as `webhook-platform` before 2.12.0, importable as `hookflow`. That
+> package is not updated any further; install `railhook` and change the import.
 
 **Scope.** This SDK covers Events, Endpoints, Subscriptions, Deliveries,
 Incoming Sources, Incoming Events, and webhook signature verification —
