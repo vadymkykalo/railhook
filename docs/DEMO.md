@@ -1,12 +1,10 @@
 # Public demo instance — plan (deferred)
 
-**Status: not deployed. This is a plan, not a live URL.** Deferred because
-this sandbox has no way to provision or expose long-running public
-infrastructure (no cloud credentials, no DNS, no ability to hand the user a
-reachable public IP/hostname) — spinning up `docker compose` locally inside
-this environment doesn't produce anything an external evaluator could reach.
-Standing up the actual instance is an infra/ops task for whoever has hosting
-access (a small VPS or a free-tier cloud VM is enough — see "Sizing" below).
+**Status: not deployed. This is a plan, not a live URL.** What it needs is
+hosting, not code: a reachable host, a DNS record and a certificate. Nothing in
+this document is blocked on the platform — the seeding, the read-only access
+model and the isolation rules below are all expressible with what already
+ships. A small VPS or a free-tier cloud VM is enough; see "Sizing".
 
 ## Why this is worth doing (and why it was scoped carefully)
 

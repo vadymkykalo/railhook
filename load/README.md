@@ -116,20 +116,21 @@ pending count + oldest-pending age, and Redis `DBSIZE`. Look for:
   "$REDIS_PASSWORD" --scan --pattern 'seq:endpoint:*' | wc -l` (and similarly
   for other prefixes) narrows down which key family is accumulating.
 
-## What was actually verified in this sandbox session
+## What these scenarios have been verified against
 
-This session had **no spare capacity to run the real Spring Boot stack** —
-other agents were concurrently running Testcontainers-backed suites against
-the same Docker daemon (confirmed via `docker ps`/`free -h`: ~1.2GB free RAM
-at the time), and `docker-compose.yml` uses fixed container names
-(`webhook-postgres`, `webhook-kafka`, ...) shared across every worktree, so a
-second `make up` risks colliding with or starving another agent's run. Per
-the task's own allowance for this situation, no real throughput/latency/soak
-numbers are claimed here.
+**No throughput, latency or soak numbers are published yet**, and none are
+claimed below. What follows is the harness proving itself, which is a different
+and smaller claim: that a red run means a real regression rather than a broken
+script.
 
-What **was** verified: every scenario (`ingest.js`, `fanout.js`,
-`failure-recovery.js`, `ordering.js`, `soak.js`) was run end-to-end with `k6
-run` against a minimal stand-in API
+Running the scenarios against the real stack needs a machine that is not also
+running the test suite. `docker-compose.yml` uses fixed container names
+(`webhook-postgres`, `webhook-kafka`, ...), so a `make up` alongside a
+Testcontainers run competes with it for both names and memory, and any number
+measured under that contention describes the contention.
+
+Every scenario (`ingest.js`, `fanout.js`, `failure-recovery.js`, `ordering.js`,
+`soak.js`) has been run end-to-end with `k6 run` against a minimal stand-in API
 (`register`/`projects`/`api-keys`/`endpoints`/`subscriptions`/`events`,
 fanning out to `load-receiver` with one retry on failure — not committed to
 the repo, throwaway) plus the real `load/receiver/server.js`. This confirmed:
@@ -150,15 +151,13 @@ the repo, throwaway) plus the real `load/receiver/server.js`. This confirmed:
   been run against the actual `OrderingBufferService`; the Redis-flush drill
   in `DeliveryEndToEndIntegrationTest` exercises that code directly instead.
 - `soak.js` runs under `constant-arrival-rate` and reports a receiver summary
-  in teardown; the 4-hour run itself was not executed here (a few hours is
-  a few hours regardless of sandbox time budget).
+  in teardown. The four-hour run is what it says it is and has not been done.
 
 **To get real numbers**: run the "Setup" and "Running a scenario" sections
-above against an actual `make up` stack, ideally on a machine not shared with
-other work. Record the results in this file's own table below (or wherever
-your team tracks operational baselines) as you get them — an unmeasured
-platform is the whole problem this task exists to fix, so numbers that exist
-only in a chat transcript don't count as done.
+above against an actual `make up` stack on a machine not shared with other
+work, and fill in the table below. Until it has rows, the platform's
+performance is an assertion — which is the one claim a delivery platform
+cannot make on prose alone.
 
 ### Target numbers (fill in from a real run)
 

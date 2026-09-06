@@ -82,6 +82,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Two public documents described the conditions they were written under rather than the
+  project.** `docs/DEMO.md` opened by explaining that "this sandbox has no way to provision or
+  expose long-running public infrastructure", and `load/README.md` had a section headed "What was
+  actually verified in this sandbox session" that discussed other agents contending for a Docker
+  daemon. Both are read by someone evaluating whether to run this, and neither told them anything
+  about it. They now say what is true of the project: the demo needs hosting rather than code, and
+  the load harness has proven its scripts but published no numbers.
+
 - **The dashboard stopped doing SEO for somebody else's website.** `hookflow.dev` is not this
   project's domain - it serves an unrelated product - and the shipped UI named it in
   `rel="canonical"`, `og:url`, `og:image`, `twitter:image` and the schema.org block, listed 23 of
@@ -117,6 +125,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   build-time placeholder as the rest.
 
 ### Security
+
+- **CodeQL.** The security set covered known CVEs in dependencies from two angles (Trivy over the
+  built images on every push, OWASP Dependency-Check nightly with a reviewed suppression file) and
+  bug patterns per method (SpotBugs), but nothing asked the taint-tracking question: whether
+  attacker-controlled input reaches a sink. It runs nightly, on pull requests into `develop`, and
+  on `main`/`release/**`/`hotfix/**`; results land in the Security tab.
+
+  It does not fail the build on a finding, on purpose. A first CodeQL run over an existing
+  codebase reports a backlog, and a gate that is red the day it arrives is a gate somebody
+  switches off. Raising `fail-on` is the follow-up once that backlog is triaged - and note that
+  making it a *required* check on `main` before it has completed there once leaves every pull
+  request pending forever.
 
 - **Tomcat 11.0.25.** Boot 4.1.1's BOM manages 11.0.24, which carries three CRITICALs -
   CVE-2026-65182 (security-constraint bypass), CVE-2026-65905 (authentication bypass) and

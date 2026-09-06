@@ -1,0 +1,100 @@
+name: CodeQL
+
+# Static analysis for vulnerability *patterns* — the taint-tracking question of
+# whether attacker-controlled input reaches a sink — which nothing else here
+# asks. The rest of the security set answers different questions and none of
+# them substitute:
+#
+#   Trivy (in ci.yml)        known CVEs in the dependencies inside the images
+#   OWASP DC (security-sca)  known CVEs, OWASP's matching + the suppression file
+#   SpotBugs (in ci.yml)     bug patterns per method, no cross-procedural taint
+#
+# Not a per-push gate, for the same reason the SCA workflow is not: a full
+# database build over four Maven modules and the UI is minutes of compute, and
+# its findings move with the rulepack far more than with any one diff. It runs
+# nightly, on pull requests into develop, and on release and hotfix branches so
+# nothing reaches main unanalysed.
+#
+# Results land in the repository's Security tab. Deliberately NOT wired to fail
+# the build on a finding: CodeQL's first run on an existing codebase reports a
+# backlog, and a gate that is red on arrival is a gate somebody disables. Turn
+# `fail-on` up once the backlog is triaged.
+#
+# One thing to get right before making this a required status check on main: a
+# required check that has never run on the target branch leaves every PR pending
+# forever. Let it complete on main at least once first.
+
+on:
+  schedule:
+    # 04:40 UTC — after Security SCA's 04:00 slot, so the two never contend for
+    # a runner or for the Maven cache.
+    - cron: '40 4 * * *'
+  pull_request:
+    branches:
+      - develop
+  push:
+    branches:
+      - main
+      - 'release/**'
+      - 'hotfix/**'
+  workflow_dispatch: {}
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      # Writing the SARIF result into the Security tab.
+      security-events: write
+      actions: read
+      contents: read
+    strategy:
+      # One language failing should not hide the other's findings.
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Java only. The UI is analysed from source with build-mode: none, so it
+      # needs no toolchain at all.
+      - name: Set up JDK 17
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v6
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-and-quality
+
+      # build-mode: manual rather than autobuild. Autobuild guesses at a Maven
+      # reactor and its guess here would be `mvn package`, which runs the tests
+      # — Testcontainers included, so it would want a Docker daemon to analyse
+      # source code. Compiling is all CodeQL needs to observe.
+      - name: Compile all modules
+        if: matrix.language == 'java-kotlin'
+        run: mvn clean compile -B -DskipTests
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
