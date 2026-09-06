@@ -12,7 +12,6 @@ import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.Iterator;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -72,9 +71,7 @@ public class TemplateTransformer {
 
     private ObjectNode applyToObject(ObjectNode template, JsonNode source) {
         ObjectNode result = objectMapper.createObjectNode();
-        Iterator<Map.Entry<String, JsonNode>> fields = template.fields();
-        while (fields.hasNext()) {
-            Map.Entry<String, JsonNode> field = fields.next();
+        for (Map.Entry<String, JsonNode> field : template.properties()) {
             result.set(field.getKey(), apply(field.getValue(), source));
         }
         return result;
