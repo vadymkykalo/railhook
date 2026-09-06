@@ -78,6 +78,20 @@ accidental.
 hangs off event ingestion. A subscription cannot carry its own filter, and the incoming
 direction has no filtering at all — every incoming event goes to every enabled destination.
 
+**HTTP is the only way out.** A Delivery reaches an Endpoint over HTTP or it does not go.
+Hookdeck's Outpost — the closest open-source comparison, Apache-2.0 and the same
+self-hosted-plus-managed shape — also delivers to AWS SQS, S3 and EventBridge, GCP Pub/Sub,
+RabbitMQ and Kafka, and makes "destination types" the first row of its own comparison table.
+For a customer whose receivers are queues rather than services, no retry ladder substitutes.
+
+The seam is closer than it looks: `AttemptRunner` is already generic over the store, and
+`Finalization` — Succeeded, Deferred, Retry, Abandoned, TerminallyFailed — says nothing about
+HTTP. What is HTTP-shaped is narrower and nameable: a `WebClient` on `RequestSpec`, an
+`Integer statusCode` on `AttemptRecord`, a URL on `AttemptContext`, and `RetryPolicy`'s
+`408 or 429 or 5xx`. The questions that decide the design are not those, though — they are
+whether a signature means anything without HTTP headers, and what a rate limit and a circuit
+breaker measure against a broker that accepts everything.
+
 **No batching**, no static egress IPs, no PagerDuty or OpsGenie channel, no cold-storage
 archival. Archival has no object store behind it either: MinIO used to sit in the Compose
 file with nothing consuming it, and was removed rather than left there implying a feature.
