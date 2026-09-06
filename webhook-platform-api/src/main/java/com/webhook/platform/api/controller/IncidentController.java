@@ -1,6 +1,7 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
+import com.webhook.platform.api.dto.IncidentCountsResponse;
 import com.webhook.platform.api.dto.IncidentRequest;
 import com.webhook.platform.api.dto.IncidentResponse;
 import com.webhook.platform.api.dto.TimelineEntryRequest;
@@ -20,7 +21,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -105,12 +105,15 @@ public class IncidentController {
     }
 
     @Operation(summary = "Count open incidents",
-            description = "How many incidents are not yet resolved — for a badge, not a report.")
+            description = "How many incidents are not yet resolved, how many are being "
+                    + "investigated, and how many of them are critical — for a badge and the "
+                    + "three tiles above the list, not a report. Every count spans the project, "
+                    + "which is what separates them from anything derived from a page of it.")
     @GetMapping("/open-count")
-    public ResponseEntity<Map<String, Long>> countOpen(
+    public ResponseEntity<IncidentCountsResponse> countOpen(
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(Map.of("count", incidentService.countOpen(projectId)));
+        return ResponseEntity.ok(incidentService.countUnresolved(projectId));
     }
 }

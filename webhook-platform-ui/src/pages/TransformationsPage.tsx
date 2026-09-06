@@ -301,7 +301,7 @@ export default function TransformationsPage() {
 
       {/* Create / edit */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editing ? t('transformations.editTitle') : t('transformations.createTitle')}</DialogTitle>
             <DialogDescription>

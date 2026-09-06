@@ -19,6 +19,7 @@ import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
+import com.webhook.platform.api.service.captcha.CaptchaVerifier;
 import com.webhook.platform.api.service.AuthService;
 import com.webhook.platform.api.service.SessionOrigin;
 import com.webhook.platform.api.service.UserSessionService;
@@ -51,6 +52,7 @@ public class AuthController {
     private final UserSessionService userSessionService;
     private final AuthRateLimiterService authRateLimiterService;
     private final TrustedProxyResolver trustedProxyResolver;
+    private final CaptchaVerifier captchaVerifier;
     private final boolean isProduction;
     private final int refreshCookieMaxAgeSeconds;
 
@@ -59,12 +61,14 @@ public class AuthController {
             UserSessionService userSessionService,
             AuthRateLimiterService authRateLimiterService,
             TrustedProxyResolver trustedProxyResolver,
+            CaptchaVerifier captchaVerifier,
             @Value("${app.env:development}") String appEnv,
             @Value("${jwt.refresh-token-expiration:86400000}") long refreshTokenExpirationMs) {
         this.authService = authService;
         this.userSessionService = userSessionService;
         this.authRateLimiterService = authRateLimiterService;
         this.trustedProxyResolver = trustedProxyResolver;
+        this.captchaVerifier = captchaVerifier;
         this.isProduction = "production".equalsIgnoreCase(appEnv);
         // Derived from the token's own lifetime rather than hardcoded. The cookie used to be
         // pinned at seven days while the token it carries expires in one, so for six of those
@@ -82,9 +86,18 @@ public class AuthController {
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        if (!authRateLimiterService.allowRegister(getClientIp(httpRequest))) {
+        String clientIp = getClientIp(httpRequest);
+        if (!authRateLimiterService.allowRegister(clientIp)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "Too many registration attempts. Try again later.");
+        }
+        // After the rate limit, before anything is written: the rate limit is per address and a
+        // determined signup farm distributes across many, which is the gap a challenge closes.
+        // Unconfigured deployments get a verifier that accepts everything, so this is a no-op
+        // for self-hosting rather than a requirement it has to opt out of.
+        if (!captchaVerifier.verify(request.getCaptchaToken(), clientIp)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "CAPTCHA verification failed. Please try again.");
         }
         try {
             AuthResponse response = authService.register(request, originOf(httpRequest));

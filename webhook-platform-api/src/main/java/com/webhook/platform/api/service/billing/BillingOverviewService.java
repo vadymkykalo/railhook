@@ -11,6 +11,7 @@ import com.webhook.platform.api.dto.OrganizationBillingResponse;
 import com.webhook.platform.api.dto.PlanResponse;
 import com.webhook.platform.api.dto.UsageResponse;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -53,7 +54,22 @@ public class BillingOverviewService {
     private final MembershipRepository membershipRepository;
     private final Clock clock;
 
-    /** The self-hosted plan is an internal row, not something to offer anyone. */
+    /**
+     * The plan catalog, which is the same rows for everyone and for nobody in particular.
+     *
+     * <p>Declared system-scoped because this is the one genuinely anonymous read in the API:
+     * SecurityConfig permits it, TenantContextFilter sets no scope without a caller, and
+     * OrganizationTenantResolver refuses to guess - so without this it answered 500 to exactly
+     * the visitor it exists for. Nothing noticed because the only caller is the dashboard's
+     * billing page, which is behind a login and therefore always carried a scope.
+     *
+     * <p>Root scope is safe here in the way it usually is not: plans are a catalog, not tenant
+     * data, and nothing on this path writes.
+     *
+     * <p>The self-hosted plan is an internal row, not something to offer anyone.
+     */
+    @SystemTenant("the plan catalog is identical for every organization, and this endpoint is "
+            + "reachable without credentials, so there is no tenant to run as")
     public List<PlanResponse> catalog() {
         return billingService.listActivePlans().stream()
                 .filter(plan -> !"self_hosted".equals(plan.getName()))

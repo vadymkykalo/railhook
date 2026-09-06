@@ -91,7 +91,7 @@ class OutboundWebClientSsrfDeclarationTest {
                     Apply it, as EndpointService does:
 
                         webClientBuilder.clientConnector(new ReactorClientHttpConnector(
-                                SsrfProtectionCustomizer.apply(HttpClient.create(), allowPrivateIps)))
+                                SsrfProtectionCustomizer.apply(HttpClient.create(), allowPrivateIps, allowedHosts)))
 
                     If the client genuinely cannot be aimed at a host an attacker chooses, add it
                     to NO_ATTACKER_CONTROLLED_HOST with the reason. Validating the URL beforehand

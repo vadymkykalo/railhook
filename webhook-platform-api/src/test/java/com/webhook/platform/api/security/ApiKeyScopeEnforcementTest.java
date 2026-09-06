@@ -155,7 +155,7 @@ class ApiKeyScopeEnforcementTest {
         authenticateAsApiKey(keyProjectId);
 
         try {
-            ScopeEnforcementInterceptor interceptor = new ScopeEnforcementInterceptor();
+            ScopeEnforcementInterceptor interceptor = new ScopeEnforcementInterceptor(org -> java.util.Optional.empty());
             ForbiddenException ex = assertThrows(ForbiddenException.class,
                     () -> interceptor.preHandle(request, new MockHttpServletResponse(), rotateSecretHandler));
             assertTrue(ex.getMessage().contains("does not have access to this project"));
@@ -173,7 +173,7 @@ class ApiKeyScopeEnforcementTest {
         authenticateAsApiKey(projectId);
 
         try {
-            ScopeEnforcementInterceptor interceptor = new ScopeEnforcementInterceptor();
+            ScopeEnforcementInterceptor interceptor = new ScopeEnforcementInterceptor(org -> java.util.Optional.empty());
             assertDoesNotThrow(
                     () -> interceptor.preHandle(request, new MockHttpServletResponse(), rotateSecretHandler));
         } finally {

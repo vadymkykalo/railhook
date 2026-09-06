@@ -72,10 +72,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         UUID organizationId = UUID.fromString(claims.get("organizationId", String.class));
                         MembershipRole role = MembershipRole.valueOf(claims.get("role", String.class));
 
+                        // Absent on tokens minted before the claim existed; those read as
+                        // verified rather than signing every live session out on upgrade.
+                        Boolean verifiedClaim = claims.get(JwtUtil.CLAIM_EMAIL_VERIFIED, Boolean.class);
+
                         JwtAuthenticationToken authentication = new JwtAuthenticationToken(
                                 userId,
                                 organizationId,
                                 role,
+                                verifiedClaim == null || verifiedClaim,
                                 Collections.emptyList()
                         );
                         SecurityContextHolder.getContext().setAuthentication(authentication);

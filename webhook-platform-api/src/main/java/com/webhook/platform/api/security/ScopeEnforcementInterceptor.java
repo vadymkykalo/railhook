@@ -14,6 +14,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.HandlerMapping;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -35,6 +36,14 @@ import java.util.UUID;
 public class ScopeEnforcementInterceptor implements HandlerInterceptor {
 
     private static final String PROJECT_ID_PATH_VAR = "projectId";
+
+    private static final Set<String> READ_METHODS = Set.of("GET", "HEAD", "OPTIONS");
+
+    private final SuspensionCheck suspensionCheck;
+
+    public ScopeEnforcementInterceptor(SuspensionCheck suspensionCheck) {
+        this.suspensionCheck = suspensionCheck;
+    }
 
     /**
      * Enforces {@link RequireAccess}, for both JWT and API-key callers.
@@ -84,6 +93,89 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
     }
 
 
+    /**
+     * Refuses a write from an account that has not proved it owns its address.
+     *
+     * <p>This lived only in the browser: {@code VerificationGate.tsx} greys the buttons out, and
+     * the server issued an ordinary token to a {@code PENDING_VERIFICATION} account and asked
+     * nothing further — login refuses {@code DISABLED} and nothing else. Anyone reaching past
+     * the dashboard had the whole API.
+     *
+     * <p>Inert where verification is meaningless: with mail disabled, registration marks the
+     * account verified on the spot, because an unsent token proves nothing about an address and
+     * a gate with no key is just a locked-out user. So a self-hosted instance sees no change,
+     * and an instance with open registration and a free tier gets the rule it needs.
+     *
+     * <p>Hung off {@link RequireAccess} rather than a path list, so it covers exactly what
+     * writing covers. Reading stays open — the screen that tells the user to check their mail
+     * is a read, and so is every screen they might be looking at when they find out.
+     *
+     * <p>API keys are not re-checked: a key exists only because someone created one, and
+     * creating one is a write that passed this gate. Asking again would mean a user row read on
+     * the hot path of every ingest to re-answer a settled question.
+     */
+    void enforceVerifiedEmail(HandlerMethod handlerMethod, Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken jwt) || jwt.isEmailVerified()) {
+            return;
+        }
+
+        RequireAccess required = handlerMethod.getMethodAnnotation(RequireAccess.class);
+        if (required == null) {
+            required = handlerMethod.getBeanType().getAnnotation(RequireAccess.class);
+        }
+        if (required == null || required.value() == AccessLevel.READ) {
+            return;
+        }
+
+        log.warn("Write refused: user {} has not verified its email address ({}.{})",
+                jwt.getUserId(), handlerMethod.getBeanType().getSimpleName(),
+                handlerMethod.getMethod().getName());
+        throw new ForbiddenException(
+                "Verify your email address before making changes. A new verification link can be "
+                        + "requested from the dashboard.");
+    }
+
+    /**
+     * Refuses to change anything on behalf of a suspended organization.
+     *
+     * <p>Suspension used to be a word. {@code BillingStatus.SUSPENDED} is written by the dunning
+     * scheduler when a grace period expires and read by nothing at all, so an organization that
+     * had stopped paying — or one an operator wanted stopped for abuse — went on ingesting and
+     * delivering exactly as before. There was also no way for an operator to suspend anyone
+     * except by editing the database.
+     *
+     * <p>Keyed off the HTTP method rather than {@link RequireAccess}, unlike the verification
+     * gate next to it, and for a specific reason: ingest carries no access-level annotation, and
+     * ingest is the thing a suspension most needs to stop. Reads stay open so the tenant can
+     * sign in and be told why, and so support can look at the same screens they can.
+     *
+     * <p>The reason the operator wrote is returned to the caller. That is deliberate — a tenant
+     * discovering they are suspended should not have to open a ticket to find out what for —
+     * and it is why the field is documented as something a customer can be shown.
+     */
+    void enforceNotSuspended(HttpServletRequest request, Authentication authentication) {
+        if (READ_METHODS.contains(request.getMethod())) {
+            return;
+        }
+
+        UUID organizationId;
+        if (authentication instanceof JwtAuthenticationToken jwt) {
+            organizationId = jwt.getOrganizationId();
+        } else if (authentication instanceof ApiKeyAuthenticationToken apiKey) {
+            organizationId = apiKey.getOrganizationId();
+        } else {
+            // Unauthenticated, or the platform admin - who is the one able to lift a suspension
+            // and must not be locked out by it.
+            return;
+        }
+
+        suspensionCheck.suspensionReason(organizationId).ifPresent(reason -> {
+            log.warn("Write refused: organization {} is suspended ({})", organizationId, reason);
+            throw new ForbiddenException("This organization is suspended and cannot make changes."
+                    + (reason.isBlank() ? "" : " Reason: " + reason));
+        });
+    }
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if (!(handler instanceof HandlerMethod handlerMethod)) {
@@ -94,6 +186,8 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
 
         enforceProjectScope(request, handlerMethod, authentication);
         enforceAccessLevel(handlerMethod, authentication);
+        enforceVerifiedEmail(handlerMethod, authentication);
+        enforceNotSuspended(request, authentication);
 
         if (!(authentication instanceof ApiKeyAuthenticationToken apiKeyAuth)) {
             return true;

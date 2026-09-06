@@ -31,5 +31,10 @@ public enum AuditAction {
      */
     REPLAY,
     DLQ_RETRY,
-    DLQ_PURGE
+    DLQ_PURGE,
+
+    // Operator actions. Not a tenant's own doing, which is exactly why they are worth a row:
+    // the audit log is where a customer's "why did this stop working" gets answered.
+    ORGANIZATION_SUSPENDED,
+    ORGANIZATION_REINSTATED
 }

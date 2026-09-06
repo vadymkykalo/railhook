@@ -716,6 +716,56 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+  sdk-test:
+    name: SDK Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # The three SDKs had no per-PR coverage at all: their suites ran on a release tag
+    # (publish-sdks.yml) and in the nightly contract workflow, so a change that broke one
+    # merged green and surfaced either overnight or at release. These are the unit tests
+    # only - no stack, no containers - which is what makes them cheap enough to run here.
+    # The contract tests, which need a live platform, stay nightly.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: sdks/node/package-lock.json
+
+      - name: Node SDK tests
+        working-directory: sdks/node
+        run: |
+          npm ci
+          npm test
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Python SDK tests
+        working-directory: sdks/python
+        run: |
+          pip install -e ".[dev]"
+          pytest -m "not contract"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+
+      - name: PHP SDK tests
+        working-directory: sdks/php
+        run: |
+          composer install --prefer-dist --no-progress
+          vendor/bin/phpunit --no-coverage
+
   frontend-build:
     name: Frontend Build
     runs-on: ubuntu-latest
@@ -982,6 +1032,135 @@ jobs:
       - name: Tear down
         if: always()
         run: cd "$HOME/hookflow" && docker compose down -v || true
+
+  upgrade-smoke:
+    name: Upgrade Smoke Test
+    runs-on: ubuntu-latest
+    needs: docker-build
+    timeout-minutes: 30
+
+    # CI tested a fresh install and a backup/restore, and nothing tested the path most
+    # deployments actually take: an instance that already has data, upgraded in place. That is
+    # also the riskiest one - UPGRADING.md is the most dangerous document in the repository,
+    # and OPERATIONS.md admits that backward-compatibility of migrations under a rolling
+    # deploy is argued rather than verified.
+    #
+    # So: install the last release, put real rows in it, swap in the images built from this
+    # branch, and check the rows survived and the platform still works. Flyway runs against a
+    # populated schema, which is the thing a fresh install can never exercise.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Find the last release tag
+        id: last
+        run: |
+          tag=$(git tag --sort=-creatordate | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -z "$tag" ]; then
+            echo "::notice::no release tag yet, nothing to upgrade from"
+            echo "found=" >> "$GITHUB_OUTPUT"
+          else
+            echo "upgrading from $tag"
+            echo "found=$tag" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install the last release
+        if: steps.last.outputs.found != ''
+        run: |
+          ./install.sh --dir "$HOME/hookflow" --version "${{ steps.last.outputs.found }}" \
+            --port 8080 --yes
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:8080/actuator/health/liveness && break
+            sleep 10
+          done
+          curl -sf -o /dev/null http://localhost:8080/actuator/health/liveness \
+            || { echo "::error::the released version did not come up"; cd "$HOME/hookflow" && docker compose logs; exit 1; }
+
+      - name: Put data in it
+        if: steps.last.outputs.found != ''
+        id: seed
+        run: |
+          set -e
+          body=$(curl -sf -X POST http://localhost:8080/api/v1/auth/register \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"upgrade@example.com","password":"Upgrade1234!","fullName":"Before","organizationName":"Upgrade Co"}')
+          token=$(echo "$body" | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+          project=$(curl -sf -X POST http://localhost:8080/api/v1/projects \
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            -d '{"name":"Before the upgrade"}')
+          project_id=$(echo "$project" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+          key=$(curl -sf -X POST "http://localhost:8080/api/v1/projects/$project_id/api-keys" \
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            -d '{"name":"before"}' | sed -n 's/.*"key":"\([^"]*\)".*/\1/p')
+          # An event, so the upgrade meets rows in the tables a migration is most likely to
+          # touch rather than an empty schema.
+          curl -sf -X POST http://localhost:8080/api/v1/events \
+            -H "X-API-Key: $key" -H 'Content-Type: application/json' \
+            -d '{"type":"upgrade.before","data":{"n":1}}' > /dev/null
+          echo "project_id=$project_id" >> "$GITHUB_OUTPUT"
+          echo "api_key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Build this branch's images
+        if: steps.last.outputs.found != ''
+        run: |
+          set -e
+          for svc in api worker ui; do
+            docker buildx build --load \
+              -f "webhook-platform-${svc}/Dockerfile" \
+              -t "webhook-platform-${svc}:test" \
+              --cache-from "type=gha,scope=${svc}" .
+          done
+
+      - name: Upgrade in place
+        if: steps.last.outputs.found != ''
+        env:
+          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
+        run: |
+          set -e
+          cd "$HOME/hookflow"
+          # The Compose file from this branch, against the .env and the volumes the release
+          # left behind - which is what an operator following UPGRADING.md ends up with.
+          cp "$HOOKFLOW_COMPOSE_SRC" docker-compose.yml
+          sed -i 's|^API_IMAGE_TAG=.*|API_IMAGE_TAG=test|;s|^WORKER_IMAGE_TAG=.*|WORKER_IMAGE_TAG=test|;s|^UI_IMAGE_TAG=.*|UI_IMAGE_TAG=test|' .env
+          grep -q '^DOCKER_REGISTRY=' .env && sed -i 's|^DOCKER_REGISTRY=.*|DOCKER_REGISTRY=webhook-platform|' .env \
+            || echo "DOCKER_REGISTRY=webhook-platform" >> .env
+          docker compose up -d
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:8080/actuator/health/liveness && { echo "up after ${i}0s"; exit 0; }
+            sleep 10
+          done
+          echo "::error::the upgraded stack did not come up - most likely a migration against a populated schema"
+          docker compose ps
+          docker compose logs api
+          exit 1
+
+      - name: The data is still there and still works
+        if: steps.last.outputs.found != ''
+        run: |
+          set -e
+          # Reading with the credential minted before the upgrade: this is what a customer's
+          # integration does the morning after, and a broken JWT claim or API-key hash would
+          # show up here rather than in a fresh install.
+          curl -sf "http://localhost:8080/api/v1/projects/${{ steps.seed.outputs.project_id }}/events" \
+            -H "X-API-Key: ${{ steps.seed.outputs.api_key }}" \
+            | grep -q 'upgrade.before' \
+            || { echo "::error::the event created before the upgrade is gone"; exit 1; }
+
+          curl -sf -X POST http://localhost:8080/api/v1/events \
+            -H "X-API-Key: ${{ steps.seed.outputs.api_key }}" -H 'Content-Type: application/json' \
+            -d '{"type":"upgrade.after","data":{"n":2}}' \
+            | grep -q '"eventId"' \
+            || { echo "::error::ingest is broken after the upgrade"; exit 1; }
+          echo "data survived and ingest still works"
+
+      - name: Dump logs on failure
+        if: failure() && steps.last.outputs.found != ''
+        run: cd "$HOME/hookflow" && docker compose logs || true
 
   container-scan:
     name: Container Security Scan (Trivy)

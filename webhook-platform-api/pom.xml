@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.webhook.platform</groupId>
         <artifactId>webhook-platform</artifactId>
-        <version>2.10.0</version>
+        <version>2.11.0</version>
     </parent>
 
     <artifactId>webhook-platform-api</artifactId>
@@ -42,15 +42,23 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
+        <!--
+          The starter rather than bare spring-kafka: Boot 4 moved the Kafka
+          auto-configuration out of spring-boot-autoconfigure into its own
+          spring-boot-kafka module, which only the starter pulls in. Without it
+          the spring.kafka.* block in application.yml would bind to nothing and
+          the autoconfigure.exclude in the integration tests would name a class
+          that is not on the classpath, which Boot treats as a startup failure.
+        -->
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -66,9 +74,17 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!--
+          The starter, not bare flyway-core: Boot 4 no longer auto-configures a
+          technology just because its library is on the classpath, and Flyway's
+          auto-configuration moved into a module only this starter pulls in.
+          With flyway-core alone the application starts, runs no migrations at
+          all, and then fails Hibernate's schema validation on the first missing
+          table - which is exactly how this was found.
+        -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <!--
           Required as of Flyway 10 (bundled from Spring Boot 3.3+) -
@@ -140,23 +156,67 @@
             <artifactId>stripe-java</artifactId>
             <version>28.4.0</version>
         </dependency>
+        <!--
+          springdoc 3.x is the Boot 4 line; the 2.x we were on builds against
+          Framework 6 and Boot 3's module layout. Not a routine version bump:
+          the whole of openapi.yaml, and everything generated from it, is this
+          library's output, so OpenApiDriftIntegrationTest is the check that
+          the upgrade did not quietly reshape the published contract.
+        -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>2.9.0</version>
+            <version>3.1.0</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
+        <!--
+          4.x is the Boot 4 line: its starter builds against spring-boot 4.1 and registers
+          the auto-configuration Boot 4 looks for, where 3.52.0 wires itself against Boot 3's
+          module layout. It also renamed RScript.ReturnType's constants to match the Java
+          types they return - INTEGER to LONG, MULTI to LIST - which is what the circuit
+          breaker's and the ordering buffer's Lua scripts ask for.
+
+          Verify this one against a running stack, not the test suite: the integration tests
+          exclude RedissonAutoConfigurationV2 outright and mock every service that reaches for
+          Redis, so a Redisson that fails to wire would leave them all green.
+        -->
         <dependency>
             <groupId>org.redisson</groupId>
             <artifactId>redisson-spring-boot-starter</artifactId>
-            <version>3.52.0</version>
+            <version>4.7.0</version>
         </dependency>
+        <!--
+          webclient, not webflux. Boot 4 split WebClient's auto-configuration out of the
+          WebFlux starter, which is now only the reactive *server* stack - and this service
+          serves over Tomcat via spring-boot-starter-web. WebClient is all it ever wanted
+          from webflux; without this starter there is no WebClient.Builder bean and every
+          outbound call (alert notifications, billing providers, Slack nodes) fails to wire.
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webflux</artifactId>
+            <artifactId>spring-boot-starter-webclient</artifactId>
+        </dependency>
+        <!--
+          What keeps HTTP on Jackson 2, which Boot 4 otherwise replaces with Jackson 3.
+          Deprecated by Spring, and taken anyway: two DTOs put a Jackson 2 JsonNode on the wire
+          (EventIngestRequest.data, PlanResponse.features), and the second is a JSONB column on
+          the Plan entity that the schema-validation gate also reads. Moving to Jackson 3 means
+          changing an entity's persisted type and its copy in the worker, which is a data-layer
+          change with a migration behind it - not a side effect of an upgrade whose whole
+          purpose is closing five CVSS 9.8s.
+
+          This module and spring.http.converters.preferred-json-mapper in application.yml are
+          both required, and they fail differently: without the module nothing wires at all,
+          while without the property reading a body into a JsonNode field answers 500 and
+          writing one still works. JsonSerializationContractIntegrationTest covers both
+          directions for exactly that reason.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -186,6 +246,32 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Boot 4 split spring-boot-test-autoconfigure apart: @AutoConfigureMockMvc,
+          @DataJpaTest, TestEntityManager and @AutoConfigureTestDatabase each moved into a
+          module of their own, and spring-boot-starter-test no longer carries any of them.
+          These four starters are that one dependency, unbundled.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jpa-test</artifactId>
             <scope>test</scope>
         </dependency>
         <!-- 1.21.4 is already the latest 1.x release (matches Spring

@@ -56,11 +56,12 @@ gated behind a verification email you never receive. Pass
 `-s -- --dir /opt/hookflow --port 8080` to put it elsewhere.
 
 ```bash
-# Send your first event, with the API key the dashboard just gave you
-curl -X POST http://localhost/api/v1/projects/{projectId}/events \
+# Send your first event, with the API key the dashboard just gave you.
+# The key already says which project this is, so the path carries no id.
+curl -X POST http://localhost/api/v1/events \
   -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"type": "user.signup", "payload": {"userId": "usr_42"}}'
+  -d '{"type": "user.signup", "data": {"userId": "usr_42"}}'
 ```
 
 **One published port.** nginx serves the dashboard and proxies every API path

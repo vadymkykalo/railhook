@@ -1,3 +1,4 @@
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Menu, Search, Mail, Loader2, Moon, Sun } from 'lucide-react';
@@ -206,7 +207,14 @@ export default function AppLayout() {
           <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto">
             <div className="animate-fade-in">
               <ProtectedRoute requiredRole={requiredRoleFor(location.pathname)}>
-                <Outlet />
+                {/*
+                  Keyed by path so the boundary resets on navigation: a class component holds
+                  its error state forever otherwise, and the user who clicks another nav item
+                  would keep seeing the page that broke.
+                */}
+                <ErrorBoundary variant="page" key={location.pathname}>
+                  <Outlet />
+                </ErrorBoundary>
               </ProtectedRoute>
             </div>
           </main>

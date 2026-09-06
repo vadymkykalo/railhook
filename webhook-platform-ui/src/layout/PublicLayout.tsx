@@ -1,4 +1,5 @@
-import { Link, Outlet } from 'react-router-dom';
+import { useLayoutEffect } from 'react';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { RailRule } from '../pages/landing/primitives';
@@ -16,7 +17,28 @@ const API_REFERENCE_URL = 'https://vadymkykalo.github.io/webhook-platform/';
  * outside this layout entirely, so the deepest page in the funnel was the one
  * page with no link back to pricing, the repository or a signup.
  */
+/**
+ * A new public page starts at the top of itself.
+ *
+ * <p>`createBrowserRouter` leaves the scroll offset alone across a navigation, which is right
+ * for an app shell whose panes scroll independently and wrong for a set of long marketing
+ * pages: following "Pricing" from halfway down the home page landed on the pricing page at the
+ * same offset, which is somewhere in its FAQ. The page looked like it had lost its top.
+ *
+ * <p>The landing page keeps its own effect because it has something extra to do — the nav still
+ * links to `#security` and friends, and a hash has to win over this. Scrolling on layout rather
+ * than after paint so the jump is never drawn.
+ */
+function useScrollToTopOnNavigate() {
+  const { pathname, hash } = useLocation();
+  useLayoutEffect(() => {
+    if (hash) return;
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [pathname, hash]);
+}
+
 export default function PublicLayout({ nav = true }: { nav?: boolean }) {
+  useScrollToTopOnNavigate();
   return (
     <div className="flex min-h-screen flex-col">
       {nav && <LandingNav />}

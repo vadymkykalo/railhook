@@ -44,7 +44,9 @@ class GlobalExceptionHandlerTest {
     @DisplayName("an unmapped path is a 404, not a server error")
     void unmappedPathIsNotFound() {
         ResponseEntity<ErrorResponse> response =
-                handler.handleNoResourceFound(new NoResourceFoundException(HttpMethod.GET, "actuator/health"), null);
+                handler.handleNoResourceFound(
+                        // Framework 7 takes the request URI as well as the resource path.
+                        new NoResourceFoundException(HttpMethod.GET, "/actuator/health", "actuator/health"), null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).isNotNull();

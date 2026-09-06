@@ -10,8 +10,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -37,7 +37,7 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
     // Mocked so tests can capture the plaintext reset token EmailService would have
     // emailed to the user (the DB column now holds only CryptoUtils.hashApiKey(token),
     // so the raw token is no longer recoverable by reading the row back).
-    @MockBean
+    @MockitoBean
     private EmailService emailService;
 
     private static final String EMAIL = "reset-test@example.com";

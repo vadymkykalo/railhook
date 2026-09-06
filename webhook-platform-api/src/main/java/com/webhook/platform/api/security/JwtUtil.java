@@ -100,12 +100,24 @@ public class JwtUtil {
      */
     public static final String CLAIM_SESSION_ID = "sid";
 
-    public String generateAccessToken(UUID userId, UUID organizationId, MembershipRole role, UUID sessionId) {
+    /**
+     * Name of the claim saying the account has proved it owns its address.
+     *
+     * <p>Absent on every token minted before this existed, and read as {@code true} there —
+     * see {@code JwtAuthenticationFilter}. Treating absence as unverified would have signed
+     * out every live session on upgrade to enforce a rule that, on the deployment shape where
+     * mail is off, has nothing to enforce.
+     */
+    public static final String CLAIM_EMAIL_VERIFIED = "evf";
+
+    public String generateAccessToken(UUID userId, UUID organizationId, MembershipRole role, UUID sessionId,
+                                      boolean emailVerified) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId.toString());
         claims.put("organizationId", organizationId.toString());
         claims.put("role", role.name());
         claims.put("typ", TOKEN_TYPE_ACCESS);
+        claims.put(CLAIM_EMAIL_VERIFIED, emailVerified);
         if (sessionId != null) {
             claims.put(CLAIM_SESSION_ID, sessionId.toString());
         }

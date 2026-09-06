@@ -15,3 +15,17 @@ expect.extend(toHaveNoViolations);
 // every render() call.
 i18n.addResourceBundle('en', 'translation', en, true, true);
 i18n.addResourceBundle('uk', 'translation', uk, true, true);
+
+// jsdom implements neither, and React Flow measures its canvas with both on mount. Without
+// them the workflow builder throws during render rather than rendering an empty canvas, so a
+// test of that page would only ever be testing the absence of a polyfill.
+class NoopResizeObserver implements ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+globalThis.ResizeObserver ??= NoopResizeObserver;
+globalThis.DOMMatrixReadOnly ??= class {
+  m22 = 1;
+  constructor(_transform?: string) {}
+} as unknown as typeof DOMMatrixReadOnly;

@@ -43,8 +43,17 @@ export const NODE_ROLE_COLOR: Record<NodeRole, string> = {
   action: 'hsl(var(--foreground))',
 };
 
+/**
+ * The types React Flow has a component for, and therefore the only types a template may name.
+ *
+ * Typed off the map rather than restated as a union: a template for a type with no component
+ * used to compile and only fail on the canvas, and a typo in it fell through to the locale as a
+ * missing key rather than to the compiler.
+ */
+export type WorkflowNodeType = keyof typeof nodeTypes;
+
 export interface NodeTemplate {
-  type: string;
+  type: WorkflowNodeType;
   /** i18n key under `workflows.nodeTypes.<type>` — resolve via t() at render time, never hardcode English here. */
   icon: string;
   role: NodeRole;

@@ -36,6 +36,7 @@ public class DeviceAuthService {
 
     private final DeviceAuthCodeRepository deviceAuthCodeRepository;
     private final MembershipRepository membershipRepository;
+    private final com.webhook.platform.api.domain.repository.UserRepository userRepository;
     private final UserSessionService userSessionService;
     private final JwtUtil jwtUtil;
 
@@ -193,8 +194,15 @@ public class DeviceAuthService {
                 .expiresAt(jwtUtil.getExpirationFromToken(refreshToken).toInstant())
                 .build());
 
+        // A device-code grant is approved from a signed-in browser, so the account behind it
+        // has already been through whatever the dashboard required; the claim still has to
+        // carry the truth rather than an assumption, or a CLI would outrank the browser.
+        boolean emailVerified = userRepository.findById(code.getUserId())
+                .map(u -> Boolean.TRUE.equals(u.getEmailVerified()))
+                .orElse(false);
+
         String accessToken = jwtUtil.generateAccessToken(
-                code.getUserId(), code.getOrganizationId(), membership.getRole(), sessionId);
+                code.getUserId(), code.getOrganizationId(), membership.getRole(), sessionId, emailVerified);
 
         return AuthResponse.builder()
                 .accessToken(accessToken)

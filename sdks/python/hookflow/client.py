@@ -37,7 +37,7 @@ from .errors import (
 
 DEFAULT_BASE_URL = "http://localhost:8080"
 DEFAULT_TIMEOUT = 30
-SDK_VERSION = "2.10.0"
+SDK_VERSION = "2.11.0"
 
 
 class Hookflow:

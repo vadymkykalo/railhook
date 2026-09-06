@@ -1,6 +1,18 @@
 spring:
   application:
     name: webhook-platform-api
+  http:
+    converters:
+      # Spring Boot 4 serializes HTTP through Jackson 3 unless told otherwise, and this is what
+      # tells it otherwise. Not decoration: without it, a request body deserialized into a
+      # Jackson 2 JsonNode field answers 500 with "Type definition error" - EventIngestRequest
+      # .data is one, so that is every event this platform ingests. Serialization happens to
+      # survive without it, which is exactly why it is easy to remove and believe nothing broke.
+      #
+      # Why Jackson 2 at all is on the spring-boot-jackson2 dependency in the pom; briefly, the
+      # other JsonNode DTO is backed by a JSONB column. Deprecated upstream, and held down by
+      # JsonSerializationContractIntegrationTest, which covers both directions for that reason.
+      preferred-json-mapper: jackson2
   lifecycle:
     timeout-per-shutdown-phase: 30s
   task:
@@ -287,7 +299,7 @@ app:
     evaluation-cron: ${ALERTS_EVALUATION_CRON:0 * * * * *}
   email:
     enabled: ${EMAIL_ENABLED:false}
-    from: ${EMAIL_FROM:noreply@hookflow.dev}
+    from: ${EMAIL_FROM:noreply@example.com}
 
 spring.mail:
   host: ${SMTP_HOST:localhost}
@@ -319,6 +331,19 @@ ordering:
   # endpoints when comparing the Redis sequence counter against the durable high-water mark.
   sequence-reconciliation-lookback-hours: ${ORDERING_SEQUENCE_RECONCILIATION_LOOKBACK_HOURS:48}
   sequence-reconciliation-interval-ms: ${ORDERING_SEQUENCE_RECONCILIATION_INTERVAL_MS:900000}
+
+captcha:
+  # Empty is the shipped default and means no challenge: a self-hosted registration page has
+  # nobody to challenge, and sending its visitors to a third party would be a worse default.
+  # Setting a secret turns it on. Turnstile and hCaptcha share this siteverify shape, so the
+  # URL is what picks between them.
+  secret-key: ${CAPTCHA_SECRET_KEY:}
+  verify-url: ${CAPTCHA_VERIFY_URL:https://challenges.cloudflare.com/turnstile/v0/siteverify}
+
+organization:
+  # Suspension is asked on the write path of every request, ingest included; this is what
+  # keeps it from being a row read per event. See SuspensionLookup.
+  suspension-cache-ttl-seconds: ${ORGANIZATION_SUSPENSION_CACHE_TTL_SECONDS:60}
 
 billing:
   enabled: ${BILLING_ENABLED:false}

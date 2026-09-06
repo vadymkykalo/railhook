@@ -28,8 +28,9 @@ public class WebClientConfig {
      */
     @Bean
     public WebClient outgoingWebClient(WebClient.Builder builder, ConnectionProvider webhookConnectionProvider,
-            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps) {
-        return ssrfSafe(builder, webhookConnectionProvider, allowPrivateIps)
+            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
+            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts) {
+        return ssrfSafe(builder, webhookConnectionProvider, allowPrivateIps, allowedHosts)
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0")
                 .build();
     }
@@ -38,13 +39,15 @@ public class WebClientConfig {
     @Bean
     public WebClient incomingForwardWebClient(WebClient.Builder builder,
             ConnectionProvider webhookConnectionProvider,
-            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps) {
-        return ssrfSafe(builder, webhookConnectionProvider, allowPrivateIps).build();
+            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
+            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts) {
+        return ssrfSafe(builder, webhookConnectionProvider, allowPrivateIps, allowedHosts).build();
     }
 
     private WebClient.Builder ssrfSafe(WebClient.Builder builder, ConnectionProvider connectionProvider,
-            boolean allowPrivateIps) {
-        HttpClient httpClient = SsrfProtectionCustomizer.createHttpClient(connectionProvider, allowPrivateIps);
+            boolean allowPrivateIps, java.util.List<String> allowedHosts) {
+        HttpClient httpClient = SsrfProtectionCustomizer.createHttpClient(
+                connectionProvider, allowPrivateIps, allowedHosts);
         return builder.clientConnector(new ReactorClientHttpConnector(httpClient));
     }
 }

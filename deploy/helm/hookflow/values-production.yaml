@@ -78,7 +78,7 @@ ui:
 # half-configured relay.
 email:
   enabled: true
-  from: noreply@hookflow.dev
+  from: noreply@example.com
   smtp:
     host: ""  # e.g., smtp.example.com — required while enabled is true
     port: 587

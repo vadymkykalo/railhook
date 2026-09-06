@@ -78,7 +78,30 @@ class ServiceTenantParameterTest {
             // Outbound calls to a payment provider. The organization is part of the request being
             // built for an external system, not a tenancy decision this process makes.
             "BillingProvider.createCustomer",
-            "StripeBillingProvider.createCustomer"
+            "StripeBillingProvider.createCustomer",
+
+            // The operator back-office, for the same reason as acceptInvite above: the
+            // {organizationId} in the path is the subject being administered, and the caller is
+            // the platform-admin credential, which belongs to no organization at all. There is
+            // no ambient tenant to read here - reading one would mean the operator could only
+            // ever act on their own, which is the opposite of what a back-office is. Each method
+            // is @SystemTenant and says so.
+            "PlatformAdminService.getOrganization",
+            "PlatformAdminService.suspend",
+            "PlatformAdminService.reinstate",
+
+            // Same subject-not-caller reason, with one addition worth stating: getUsage does not
+            // query anything itself. It enters the subject's tenant scope with callAs and asks
+            // the service the tenant's own billing page asks, so the operator and the customer
+            // read one set of figures rather than two implementations of the same question.
+            "PlatformAdminService.getUsage",
+
+            // Suspension lookup and its cache, exactly parallel to PlanLookup above: asked about
+            // an organization by whoever holds its id - the request filter chain, before any
+            // handler, and the operator evicting after a change.
+            "SuspensionLookup.forOrganization",
+            "SuspensionLookup.suspensionReason",
+            "SuspensionLookup.evict"
     ));
 
     @Test

@@ -3,7 +3,7 @@
   "description": "Official PHP SDK for Hookflow — reliable webhook infrastructure",
   "type": "library",
   "license": "MIT",
-  "version": "2.10.0",
+  "version": "2.11.0",
   "keywords": [
     "webhook",
     "webhooks",

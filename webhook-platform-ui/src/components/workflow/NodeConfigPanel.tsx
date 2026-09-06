@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { type Node } from '@xyflow/react';
 import { X, Loader2, Plus, Key, AlertCircle, Check, Copy, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -6,10 +6,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { endpointsApi } from '../../api/endpoints.api';
+import { transformationsApi } from '../../api/transformations.api';
 import { subscriptionsApi } from '../../api/subscriptions.api';
 import { apiKeysApi } from '../../api/apiKeys.api';
-import { queryKeys } from '../../api/queries';
+import { queryKeys, useEventTypes } from '../../api/queries';
 import { showSuccess, showApiError } from '../../lib/toast';
+import { cn } from '../../lib/utils';
 import JsonEditor from '../JsonEditor';
 import ConditionTreeEditor, { mkGroup } from '../ConditionTreeEditor';
 import type { ConditionNode } from '../../api/rules.api';
@@ -97,15 +99,12 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
 
         {/* ── Transform node ──────────────────────────────────────── */}
         {nodeType === 'transform' && (
-          <Field label={t('workflows.nodeConfig.template')} hint={t('workflows.nodeConfig.templateHint')}>
-            <JsonEditor
-              value={String(d.template || '{}')}
-              onChange={(v) => updateField('template', v)}
-              placeholder='{"name":"{{data.customer}}"}'
-              minHeight="120px"
-              maxHeight="250px"
-            />
-          </Field>
+          <TransformSource
+            transformationId={String(d.transformationId || '')}
+            template={String(d.template || '')}
+            onUseSaved={(id) => onUpdate(node.id, { ...d, transformationId: id })}
+            onUseInline={(value) => onUpdate(node.id, { ...d, transformationId: '', template: value })}
+          />
         )}
 
         {/* ── HTTP node ───────────────────────────────────────────── */}
@@ -229,13 +228,17 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
         {/* ── Create Event node ───────────────────────────────────── */}
         {nodeType === 'createEvent' && (
           <>
-            <Field label={t('workflows.nodeConfig.eventType')} required error={!d.eventType ? t('workflows.validation.required') : undefined}>
+            <Field label={t('workflows.nodeConfig.eventType')} hint={t('workflows.nodeConfig.eventTypeHint')} required error={!d.eventType ? t('workflows.validation.required') : undefined}>
+              {/* Suggestions, not a closed list: the catalogue holds the types somebody has
+                  written a schema for, and emitting one that has no schema yet is allowed. */}
               <input
+                list="workflow-event-types"
                 value={String(d.eventType || '')}
                 onChange={(e) => updateField('eventType', e.target.value)}
                 placeholder="order.completed"
                 className={d.eventType ? inputCls : inputErrCls}
               />
+              <EventTypeSuggestions />
             </Field>
             <Field label={t('workflows.nodeConfig.projectId')} hint={t('workflows.nodeConfig.projectIdHint')}>
               <div className="flex gap-1.5">
@@ -370,6 +373,181 @@ function EndpointSelector({ value, onChange }: { value: string; onChange: (val: 
 }
 
 // ── API Key info + creation for trigger node ────────────────────────────
+
+/**
+ * Where a transform node's reshaping comes from: the project's transformation library, or a
+ * template written here.
+ *
+ * <p>The library was unreachable from the canvas. A project could build up named
+ * transformations on the Transformations page, point rule actions at them — and then, in a
+ * workflow, have to retype one into a box, in a different syntax, with no error to say the
+ * syntaxes differ. A saved transformation is `${$.json.path}`; this node's own template is
+ * `{{field.path}}`. Text written for one does nothing in the other.
+ *
+ * <p>So the choice is explicit rather than inferred from what somebody pasted, and picking the
+ * library does not mean leaving the canvas to fill it: a transformation created here is saved
+ * to the project and selected, the same way the endpoint selector below already works.
+ */
+function TransformSource({ transformationId, template, onUseSaved, onUseInline }: {
+  transformationId: string;
+  template: string;
+  onUseSaved: (id: string) => void;
+  onUseInline: (template: string) => void;
+}) {
+  const { t } = useTranslation();
+  const { projectId } = useParams<{ projectId: string }>();
+  const qc = useQueryClient();
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newTemplate, setNewTemplate] = useState('{}');
+
+  const usingSaved = !!transformationId;
+
+  const { data: transformations, isLoading } = useQuery({
+    queryKey: queryKeys.transformations.list(projectId!),
+    queryFn: () => transformationsApi.list(projectId!),
+    enabled: !!projectId,
+  });
+
+  const createMut = useMutation({
+    mutationFn: () => transformationsApi.create(projectId!, {
+      name: newName,
+      template: newTemplate,
+      enabled: true,
+    }),
+    onSuccess: (created) => {
+      showSuccess(t('workflows.nodeConfig.transformationCreated'));
+      qc.invalidateQueries({ queryKey: queryKeys.transformations.list(projectId!) });
+      onUseSaved(created.id);
+      setShowCreate(false);
+      setNewName('');
+      setNewTemplate('{}');
+    },
+    onError: (err) => showApiError(err, t('workflows.nodeConfig.transformationCreateFailed')),
+  });
+
+  return (
+    <>
+      <Field label={t('workflows.nodeConfig.transformSource')} hint={t('workflows.nodeConfig.transformSourceHint')}>
+        <div role="group" aria-label={t('workflows.nodeConfig.transformSource')} className="flex gap-0.5 rounded-lg border border-rail p-0.5">
+          <button
+            type="button"
+            aria-pressed={usingSaved}
+            onClick={() => onUseSaved(transformations?.[0]?.id ?? '')}
+            className={cn('flex-1 rounded-md px-2 py-1 text-xs transition-colors',
+              usingSaved ? 'bg-primary font-medium text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
+          >
+            {t('workflows.nodeConfig.transformSourceSaved')}
+          </button>
+          <button
+            type="button"
+            aria-pressed={!usingSaved}
+            onClick={() => onUseInline(template || '{}')}
+            className={cn('flex-1 rounded-md px-2 py-1 text-xs transition-colors',
+              !usingSaved ? 'bg-primary font-medium text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
+          >
+            {t('workflows.nodeConfig.transformSourceInline')}
+          </button>
+        </div>
+      </Field>
+
+      {usingSaved ? (
+        <>
+          <Field
+            label={t('workflows.nodeConfig.transformation')}
+            hint={t('workflows.nodeConfig.transformationHint')}
+            required
+            error={!transformationId ? t('workflows.validation.required') : undefined}
+          >
+            {isLoading ? (
+              <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {t('workflows.nodeConfig.loadingTransformations')}
+              </div>
+            ) : (
+              <select
+                value={transformationId}
+                onChange={(e) => onUseSaved(e.target.value)}
+                className={transformationId ? inputCls : inputErrCls}
+                aria-label={t('workflows.nodeConfig.transformation')}
+              >
+                <option value="">{t('workflows.nodeConfig.selectTransformation')}</option>
+                {transformations?.map((tr) => (
+                  <option key={tr.id} value={tr.id}>
+                    {tr.name}{tr.enabled === false ? ` — ${t('common.disabled')}` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+
+          {!showCreate ? (
+            <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" onClick={() => setShowCreate(true)}>
+              <Plus className="h-3 w-3" />
+              {t('workflows.nodeConfig.createTransformation')}
+            </Button>
+          ) : (
+            <div className="space-y-2 rounded-md border border-rail bg-secondary/30 p-3">
+              <p className="mono-label">{t('workflows.nodeConfig.newTransformation')}</p>
+              <Field label={t('workflows.nodeConfig.transformationName')} required error={!newName ? t('workflows.validation.required') : undefined}>
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder={t('workflows.nodeConfig.transformationNamePlaceholder')}
+                  className={newName ? inputCls : inputErrCls}
+                />
+              </Field>
+              <Field label={t('workflows.nodeConfig.template')} hint={t('workflows.nodeConfig.savedTemplateHint')}>
+                <JsonEditor
+                  value={newTemplate}
+                  onChange={setNewTemplate}
+                  placeholder={'{"email":"${$.customer.email}"}'}
+                  minHeight="100px"
+                  maxHeight="200px"
+                />
+              </Field>
+              <div className="flex gap-1.5">
+                <Button size="sm" className="flex-1 text-xs" disabled={!newName.trim() || createMut.isPending} onClick={() => createMut.mutate()}>
+                  {createMut.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {t('common.create')}
+                </Button>
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setShowCreate(false)}>
+                  {t('common.cancel')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <Field label={t('workflows.nodeConfig.template')} hint={t('workflows.nodeConfig.templateHint')}>
+          <JsonEditor
+            value={template || '{}'}
+            onChange={onUseInline}
+            placeholder='{"name":"{{data.customer}}"}'
+            minHeight="120px"
+            maxHeight="250px"
+          />
+        </Field>
+      )}
+    </>
+  );
+}
+
+/**
+ * The event types this project has a schema for, offered to the create-event node as
+ * suggestions. A datalist rather than a select: emitting a type the catalogue has never seen
+ * is allowed, and turning that into a validation error would be a new rule this node does not
+ * have.
+ */
+function EventTypeSuggestions() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const { data: eventTypes } = useEventTypes(projectId);
+  return (
+    <datalist id="workflow-event-types">
+      {eventTypes?.map((type) => <option key={type.id} value={type.name} />)}
+    </datalist>
+  );
+}
 
 function ApiKeyInfo() {
   const { t } = useTranslation();
@@ -653,17 +831,41 @@ function EndpointQuickFill({ onSelect }: { onSelect: (url: string) => void }) {
 
 // ── Field wrapper with validation ──────────────────────────────────────
 
+/**
+ * Attaches the field's id to the one control inside it.
+ *
+ * <p>The label and the control were siblings with nothing joining them, so every input in this
+ * panel — the URL a workflow posts to, the endpoint it delivers through, the delay it waits —
+ * was announced as an unlabelled textbox, and clicking a label focused nothing. The id is
+ * threaded to the first native control found rather than by wrapping the whole field in the
+ * label, because the hint underneath would otherwise be read out as part of the name.
+ */
+function withFieldId(children: React.ReactNode, id: string): React.ReactNode {
+  let claimed = false;
+  const visit = (node: React.ReactNode): React.ReactNode => {
+    if (claimed || !React.isValidElement(node)) return node;
+    if (typeof node.type === 'string' && ['input', 'select', 'textarea'].includes(node.type)) {
+      claimed = true;
+      const element = node as React.ReactElement<{ id?: string }>;
+      return element.props.id ? element : React.cloneElement(element, { id });
+    }
+    return node;
+  };
+  return React.Children.map(children, visit);
+}
+
 function Field({ label, hint, required, error, children }: {
   label: string; hint?: string; required?: boolean; error?: string; children: React.ReactNode;
 }) {
+  const id = React.useId();
   return (
     <div className="space-y-1">
-      <label className="text-xs font-medium text-foreground">
+      <label htmlFor={id} className="text-xs font-medium text-foreground">
         {label}
         {required && <span className="ml-0.5 text-halt">*</span>}
       </label>
       {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
-      {children}
+      {withFieldId(children, id)}
       {error && <p role="alert" className="flex items-center gap-1 text-[10px] text-halt"><AlertCircle className="h-3 w-3" aria-hidden />{error}</p>}
     </div>
   );

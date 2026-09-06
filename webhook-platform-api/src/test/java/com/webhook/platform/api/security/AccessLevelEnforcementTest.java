@@ -37,7 +37,7 @@ import static org.mockito.Mockito.mock;
  */
 class AccessLevelEnforcementTest {
 
-    private final ScopeEnforcementInterceptor interceptor = new ScopeEnforcementInterceptor();
+    private final ScopeEnforcementInterceptor interceptor = new ScopeEnforcementInterceptor(org -> java.util.Optional.empty());
 
     @AfterEach
     void clearAuth() {
@@ -58,7 +58,7 @@ class AccessLevelEnforcementTest {
     }
 
     private static Authentication jwt(MembershipRole role) {
-        return new JwtAuthenticationToken(UUID.randomUUID(), UUID.randomUUID(), role, List.of());
+        return new JwtAuthenticationToken(UUID.randomUUID(), UUID.randomUUID(), role, true, List.of());
     }
 
     private static Authentication apiKey(ApiKeyScope scope) {

@@ -32,4 +32,15 @@ public class RegisterRequest {
     @NotBlank(message = "Organization name is required")
     @Size(min = 2, max = 100, message = "Organization name must be 2-100 characters")
     private String organizationName;
+
+    /**
+     * The CAPTCHA widget's token, when the deployment configured one.
+     *
+     * <p>Not {@code @NotBlank}: a self-hosted instance has no CAPTCHA and its clients send
+     * nothing, so requiring it here would break every deployment that does not want one. The
+     * requirement belongs where the answer is known — {@code AuthController} asks the verifier,
+     * and the verifier for an unconfigured deployment accepts everything.
+     */
+    @Size(max = 4096)
+    private String captchaToken;
 }

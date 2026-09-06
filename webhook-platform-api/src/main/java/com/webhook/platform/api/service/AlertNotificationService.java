@@ -29,14 +29,15 @@ public class AlertNotificationService {
             WebClient.Builder webClientBuilder,
             EmailService emailService,
             @Value("${app.alerts.notifications-enabled:false}") boolean enabled,
-            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps) {
+            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
+            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts) {
         // Validating the URL when the rule is written is necessary and not sufficient: between
         // that check and this request the name can resolve somewhere else. Every other outbound
         // client in the product closes that window with the same connector; this one did not,
         // and it is the client a user gets to aim.
         this.webClient = webClientBuilder
                 .clientConnector(new ReactorClientHttpConnector(
-                        SsrfProtectionCustomizer.apply(HttpClient.create(), allowPrivateIps)))
+                        SsrfProtectionCustomizer.apply(HttpClient.create(), allowPrivateIps, allowedHosts)))
                 .defaultHeader("User-Agent", "Hookflow-Alerts/1.0")
                 .build();
         this.emailService = emailService;

@@ -92,7 +92,7 @@ export default function AddMemberModal({ orgId, open, onClose, onSuccess }: AddM
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t(issued ? 'members.addModal.issuedTitle' : 'members.addModal.title')}</DialogTitle>
           <DialogDescription>

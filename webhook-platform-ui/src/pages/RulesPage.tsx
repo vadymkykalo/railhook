@@ -368,7 +368,7 @@ export default function RulesPage() {
 
       {/* Create / edit */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editing ? t('rules.editRule') : t('rules.createRule')}</DialogTitle>
             <DialogDescription>{t('rules.dialogDescription')}</DialogDescription>

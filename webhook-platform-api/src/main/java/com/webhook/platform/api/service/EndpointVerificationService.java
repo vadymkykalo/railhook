@@ -30,16 +30,19 @@ public class EndpointVerificationService {
     private final EndpointRepository endpointRepository;
     private final WebClient.Builder webClientBuilder;
     private final boolean allowPrivateIps;
+    private final java.util.List<String> allowedHosts;
 
     private static final int VERIFICATION_TIMEOUT_SECONDS = 10;
 
     public EndpointVerificationService(
             EndpointRepository endpointRepository,
             WebClient.Builder webClientBuilder,
-            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps) {
+            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
+            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts) {
         this.endpointRepository = endpointRepository;
         this.webClientBuilder = webClientBuilder;
         this.allowPrivateIps = allowPrivateIps;
+        this.allowedHosts = allowedHosts;
     }
 
     public String generateVerificationToken() {
@@ -76,7 +79,7 @@ public class EndpointVerificationService {
             WebClient webClient = webClientBuilder
                     .clientConnector(new ReactorClientHttpConnector(
                             SsrfProtectionCustomizer.apply(
-                                    HttpClient.create(), allowPrivateIps)))
+                                    HttpClient.create(), allowPrivateIps, allowedHosts)))
                     .defaultHeader("User-Agent", "WebhookPlatform/1.0 Verification")
                     .build();
 

@@ -91,7 +91,7 @@ class OrderingBufferServiceTest {
         // Faithfully mirrors lua/ordering_cursor_cas.lua: SET only if newVal > current
         // (missing key treated as "current == false"), atomically (synchronized -- this test
         // fake is what stands in for Redis's single-threaded Lua execution guarantee).
-        when(rScript.eval(eq(RScript.Mode.READ_WRITE), any(String.class), eq(RScript.ReturnType.INTEGER),
+        when(rScript.eval(eq(RScript.Mode.READ_WRITE), any(String.class), eq(RScript.ReturnType.LONG),
                 any(List.class), any(), any())).thenAnswer(invocation -> {
             List<String> keys = invocation.getArgument(3);
             String key = keys.get(0);

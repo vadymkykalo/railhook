@@ -21,6 +21,18 @@ import java.util.concurrent.atomic.AtomicLong;
  * Per-project rate limiter to prevent noisy-neighbor issues.
  * One project cannot consume more than {@code ratePerSecond} delivery dispatches per second.
  * Uses Redis (Redisson) with local fallback when Redis is unavailable.
+ *
+ * <p><strong>Not the plan's rate limit, and deliberately not derived from it.</strong> A plan's
+ * {@code rateLimitPerSecond} is what a customer may send <em>in</em>, and
+ * {@code EntitlementService.getRateLimitForProject} enforces exactly that at ingest. This one
+ * is an operational cap on what one project may take out of a shared worker pool, so it answers
+ * a different question - how much of this deployment's delivery capacity any single tenant can
+ * hold - and its right value follows from the pool's size, not from what someone paid.
+ *
+ * <p>Making it plan-derived would look like an improvement and would not be one: a large plan
+ * would be allowed to starve every other tenant on the same worker, which is the failure this
+ * class exists to prevent. If the two should ever be linked, the link belongs in whatever sizes
+ * the pool, not here.
  */
 @Service
 @Slf4j

@@ -59,7 +59,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>Deliberately unrelated to {@code com.webhook.platform.api.AbstractIntegrationTest}</b>
  * (a different module: {@code webhook-platform-api}). That class excludes Kafka/Redisson
- * autoconfiguration and {@code @MockBean}s {@code OutboxPublisherService},
+ * autoconfiguration and {@code @MockitoBean}s {@code OutboxPublisherService},
  * {@code SequenceGeneratorService} and {@code RedisRateLimiterService} on purpose, so that
  * api-module tests which only care about REST/DB behaviour don't pay for a broker and a cache
  * on every run. This class exists specifically to exercise the real Kafka/Redis wiring that

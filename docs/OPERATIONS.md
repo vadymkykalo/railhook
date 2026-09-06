@@ -86,6 +86,116 @@ reconciling the three — see [Backup & Restore](#backup--restore) for the detai
 **Delivery is at-least-once.** An Attempt can succeed at the endpoint and fail to record. Receivers
 must dedupe on the delivery id, which the `webhook-id` header carries unchanged across retries.
 
+## Registration on a public instance
+
+Two settings decide whether an open signup is a signup or a farm.
+
+`EMAIL_ENABLED=true` makes verification real: without it, registration marks every account
+verified on the spot, because a token nobody receives proves nothing about an address. The API
+refuses every write from an unverified account and lets reads through, so the tenant can sign in
+and be told to check their mail.
+
+`CAPTCHA_SECRET_KEY` adds the challenge. The auth rate limit is per address, and an address is
+the one thing a signup farm has plenty of. Cloudflare Turnstile by default; hCaptcha speaks the
+same siteverify shape, so `CAPTCHA_VERIFY_URL` is all that changes. The dashboard needs
+`VITE_CAPTCHA_SITE_KEY` at build time — without it the registration page renders no challenge
+and sends no token, which is exactly what the unconfigured server side expects.
+
+Verification **fails closed**: a provider that is unreachable or answering nonsense means
+registration is refused, not waved through. A deployment that would rather stay open when the
+provider is down should turn the CAPTCHA off — a decision someone makes, rather than an outage
+making it for them.
+
+With `APP_ENV=production` and `BILLING_ENABLED=true`, the API refuses to start without both.
+Neither is required, or wanted, for self-hosting.
+
+## The operator back-office
+
+Everything under `/api/v1/admin/**` takes the `X-Platform-Admin-Token` header and nothing else —
+no tenant JWT or API key satisfies it, however privileged the role. Set `PLATFORM_ADMIN_TOKEN`;
+leaving it empty keeps these endpoints unreachable, which is the shipped default.
+
+The CLI is the intended client:
+
+```bash
+export HOOKFLOW_ADMIN_TOKEN=...        # or pass --token; never saved to the config file
+
+hookflow admin orgs                    # who is on this deployment
+hookflow admin orgs --search acme
+hookflow admin orgs --suspended        # only the ones currently stopped
+
+hookflow admin org $ORG_ID             # plan, counts, and usage against the plan's limits
+
+hookflow admin suspend $ORG_ID --reason "Confirmed spam reports" --by ops@example.com
+hookflow admin reinstate $ORG_ID
+```
+
+The same over HTTP, for a script or a runbook that would rather not depend on the CLI:
+
+```bash
+curl -H "X-Platform-Admin-Token: $TOKEN" \
+  'http://localhost/api/v1/admin/organizations?search=acme&size=20'
+
+curl -H "X-Platform-Admin-Token: $TOKEN" \
+  http://localhost/api/v1/admin/organizations/$ORG_ID
+curl -H "X-Platform-Admin-Token: $TOKEN" \
+  http://localhost/api/v1/admin/organizations/$ORG_ID/usage
+
+# The reason is required, and the tenant is shown it.
+curl -X POST -H "X-Platform-Admin-Token: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"reason":"Confirmed spam reports","suspendedBy":"ops@example.com"}' \
+  http://localhost/api/v1/admin/organizations/$ORG_ID/suspend
+
+curl -X POST -H "X-Platform-Admin-Token: $TOKEN" \
+  http://localhost/api/v1/admin/organizations/$ORG_ID/reinstate
+```
+
+### Why there is no back-office page in the dashboard
+
+There is deliberately no browser UI for any of this. The dashboard is served from the same
+origin as the API, so a platform-admin token kept in a browser turns any XSS anywhere in the
+tenant dashboard into the deployment's master credential — one that is the same secret for
+every tenant on the instance and that no tenant role can otherwise reach. A terminal is a much
+smaller blast radius than a page a hundred customers also load.
+
+`hookflow admin` reads the token from `HOOKFLOW_ADMIN_TOKEN` or `--token` on each invocation
+and never writes it to `~/.config/hookflow/config.json`, so it does not outlive the command and
+`hookflow status` cannot print it.
+
+### What the usage view answers
+
+`hookflow admin org $ORG_ID` shows events this billing period, endpoints, projects and members,
+each against the limit the tenant's plan allows — the **same** numbers the customer sees on
+their own billing page, because it is the same service reading them under that tenant's scope
+rather than a second set of queries. Two implementations of "how much have they used" is how a
+support conversation ends up with the operator and the customer reading different figures.
+
+It carries counts and limits only: no member emails, no endpoint URLs, no payloads. Answering
+"who is this and are they in trouble" needs none of them, and a support view that shows customer
+data by default becomes a reason not to give anyone the credential.
+
+### What suspension does, and what it deliberately does not
+
+A suspended organization can read and cannot write. Every mutating request is refused with 403
+and the reason the operator typed, ingest included — which is the point, since ingest is what an
+abusive tenant is doing. Reads stay open so the customer can sign in and be told what happened,
+and so support can look at the same screens they can.
+
+It is **not** `billing_status`. That column belongs to the payment state machine: the dunning
+scheduler writes `SUSPENDED` there when a grace period expires, and the subscription lifecycle
+overwrites it on the next sync — so an abuse suspension recorded there would be lifted by a
+successful charge. Suspension lives in `organizations.suspended_at`, and the two are independent
+on purpose. (Before this existed, `billing_status = SUSPENDED` was read by nothing at all: a
+non-paying organization went on ingesting and delivering exactly as before.)
+
+The decision is cached for `ORGANIZATION_SUSPENSION_CACHE_TTL_SECONDS` (60 by default), because
+it is asked on the write path of every request. A suspend or reinstate takes effect immediately
+on the node that served it and within that window on the others. Acceptable for an abuse
+control; it would not be for an authorization one.
+
+Both actions are written to the audit log as `ORGANIZATION_SUSPENDED` / `ORGANIZATION_REINSTATED`,
+which is where a customer's "why did this stop working" gets answered.
+
 ## Common Issues
 
 ### High Kafka lag
@@ -228,6 +338,18 @@ helm upgrade hookflow ./deploy/helm/hookflow
 # Rollback if needed
 kubectl rollout undo deployment hookflow-api
 ```
+
+**Upgrade drill (CI):** `.github/workflows/ci.yml`'s `upgrade-smoke` job installs the last
+release tag, registers an account, creates a project and an API key, ingests an event, then
+swaps in the images built from the branch and checks the rows survived and ingest still works —
+using the credential minted before the upgrade, which is what a customer's integration does the
+morning after. It is the only place Flyway meets a populated schema; a fresh install can never
+exercise that, and it is where a migration written against an empty database goes wrong.
+
+It does not prove a *rolling* upgrade. Both versions never run at once here, so a migration that
+breaks the previous release's code while it is still serving — a `NOT NULL` column added without
+a default, say — would pass this and fail in Kubernetes. See the V056 note below for what that
+looks like in practice.
 
 ### V056 — the tenant column is not an instant migration
 

@@ -90,6 +90,11 @@ class MutatingHandlerAccessDeclarationTest {
             // in SecurityConfig. A platform admin holds no membership role, so the interceptor
             // deliberately lets these through untouched.
             "EncryptionAdminController.rotateEncryptionKeys",
+            // Same credential, same reason: suspending a tenant is the deployment operator's
+            // act, not any member's, and declaring an access level here would refuse the only
+            // caller who is supposed to make it.
+            "PlatformAdminOrganizationController.suspend",
+            "PlatformAdminOrganizationController.reinstate",
 
             // The API key IS the intended caller, and what it may do is decided by its scope:
             // these carry @RequireScope instead. See MutatingHandlerScopeDeclarationTest.

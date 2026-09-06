@@ -93,6 +93,35 @@ public class UrlValidator {
         }
     }
 
+    /**
+     * The admission check's decision, made again against an address that is already connected.
+     *
+     * <p>{@link #validateWebhookUrl} answers this question at DNS time; the post-connect
+     * customizer has to answer the same one about the socket's real peer, which is what closes
+     * the DNS rebinding window. Both must reach the same verdict from the same inputs, or an
+     * operator's configuration is honoured by one half and silently ignored by the other — as
+     * happened with {@code allowedHosts}, where an allow-listed internal host passed admission
+     * and then had every connection to it torn down.
+     *
+     * @param host        the host as it was written, not as it resolved — the allow list is a
+     *                    list of names, and matching a resolved literal against it would let a
+     *                    rebinding answer inherit an entry meant for something else
+     * @param address     the address the connection actually reached
+     */
+    public static boolean isBlockedTarget(String host, InetAddress address,
+                                          boolean allowPrivateIps, List<String> allowedHosts) {
+        if (host != null && BLOCKED_HOSTS.contains(host.toLowerCase())) {
+            return true;
+        }
+        if (allowPrivateIps) {
+            return false;
+        }
+        if (host != null && allowedHosts != null && allowedHosts.contains(host)) {
+            return false;
+        }
+        return isPrivateOrLocalAddress(address);
+    }
+
     public static boolean isPrivateOrLocalAddress(InetAddress address) {
         if (address.isLoopbackAddress()) {
             return true;

@@ -3,7 +3,12 @@ import type { PageResponse } from '../types/api.types';
 
 export interface SendEventRequest {
   type: string;
-  data: any;
+  /**
+   * The event body, as the caller's own JSON. `unknown` rather than `any`: this is whatever
+   * shape the producer sends and nothing here reads into it, so the type's job is to accept any
+   * JSON and to stop a field access from compiling — which is exactly what `any` allowed.
+   */
+  data: unknown;
 }
 
 export interface EventResponse {

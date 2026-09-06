@@ -22,7 +22,7 @@ interface LanguageSwitcherProps {
 }
 
 export default function LanguageSwitcher({ variant = 'icon', className }: LanguageSwitcherProps) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const activeIndex = Math.max(
     LANGUAGES.findIndex((l) => i18n.language?.startsWith(l.code)),
     0
@@ -30,7 +30,7 @@ export default function LanguageSwitcher({ variant = 'icon', className }: Langua
 
   if (variant === 'full') {
     return (
-      <div className={cn('flex flex-col gap-1', className)}>
+      <div role="group" aria-label={t('settings.language')} className={cn('flex flex-col gap-1', className)}>
         {LANGUAGES.map((lang, i) => (
           <button
             key={lang.code}
@@ -53,12 +53,9 @@ export default function LanguageSwitcher({ variant = 'icon', className }: Langua
   }
 
   return (
-    // TODO(i18n): the aria-label below is untranslated — it needs a key
-    // (suggest settings.language). The locale files are owned elsewhere on
-    // this branch, so the literal stays until that key exists.
     <div
       role="group"
-      aria-label="Language"
+      aria-label={t('settings.language')}
       className={cn(
         'relative inline-flex h-7 items-center rounded-md border border-rail bg-card p-0.5',
         className

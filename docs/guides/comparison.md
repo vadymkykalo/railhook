@@ -21,6 +21,7 @@ than left for you to find during an evaluation, and
 | Replay as a new obligation, not a re-send | **yes** | re-send | re-send | re-send |
 | Built-in request bin and localhost tunnel | **yes** | Svix Play | CLI | CLI |
 | Workflow builder beyond transformations | **yes** | — | — | — |
+| Delivers anywhere but an HTTP endpoint | **no** | — | queues, via the gateway | — |
 | Customer-facing app portal | **no** | yes | — | Portal Links |
 | SSO (SAML / OIDC) | **no** | yes | yes | yes |
 | OpenTelemetry traces | **no** | yes | — | — |
@@ -31,6 +32,13 @@ than left for you to find during an evaluation, and
 
 <sub>Competitor columns reflect their public documentation at the time of
 writing and are not a substitute for reading it. Corrections welcome as a PR.</sub>
+
+**A second gap worth naming before you find it**: Hookflow delivers over HTTP and nothing
+else. Hookdeck's Outpost — the closest open-source comparison, and the same
+self-hosted-plus-managed shape — also delivers to AWS SQS, S3 and EventBridge, GCP Pub/Sub,
+RabbitMQ and Kafka, and puts "destination types" first in its own comparison table. If your
+receivers are queues rather than services, that is the difference, and no amount of retry
+ladder makes up for it.
 
 **The one gap that matters most** is the app portal — a surface a customer
 embeds in their own product so *their* users can register an endpoint, see why

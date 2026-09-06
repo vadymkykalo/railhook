@@ -1,12 +1,10 @@
 # Public demo instance — plan (deferred)
 
-**Status: not deployed. This is a plan, not a live URL.** Deferred because
-this sandbox has no way to provision or expose long-running public
-infrastructure (no cloud credentials, no DNS, no ability to hand the user a
-reachable public IP/hostname) — spinning up `docker compose` locally inside
-this environment doesn't produce anything an external evaluator could reach.
-Standing up the actual instance is an infra/ops task for whoever has hosting
-access (a small VPS or a free-tier cloud VM is enough — see "Sizing" below).
+**Status: not deployed. This is a plan, not a live URL.** What it needs is
+hosting, not code: a reachable host, a DNS record and a certificate. Nothing in
+this document is blocked on the platform — the seeding, the read-only access
+model and the isolation rules below are all expressible with what already
+ships. A small VPS or a free-tier cloud VM is enough; see "Sizing".
 
 ## Why this is worth doing (and why it was scoped carefully)
 
@@ -96,12 +94,12 @@ section — this is a demo, not a production tenant, so the smallest documented
 tier is enough: 2 vCPU / 4 GB RAM is comfortable for Postgres + Redis + Kafka
 (single broker, `KAFKA_NUM_PARTITIONS` turned down since demo throughput is
 trivial) + API + worker + UI, all in one `docker compose -f
-install.sh | bash --domain demo.hookflow.dev` on a small VPS.
+install.sh | bash --domain demo.example.com` on a small VPS.
 
 ## What would make this "DONE" instead of deferred
 
 1. Deploy the stack above on any reachable host (a $5–10/mo VPS is enough).
-2. Point a subdomain at it (e.g. `demo.hookflow.dev`) and link it from the
+2. Point a subdomain at it (e.g. `demo.example.com`) and link it from the
    README next to `docs/screenshots/deliveries.png`.
 3. Run the cross-tenant check from "Isolation model" above against the live
    instance from a second (real, non-demo) account and paste the result here.

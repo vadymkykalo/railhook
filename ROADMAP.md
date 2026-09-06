@@ -51,8 +51,19 @@ blocker for larger organizations.
 delivery cannot be followed across ingest → Kafka → attempt. Correlation ids exist and would
 carry it.
 
+**A rolling upgrade is untested.** CI installs the last release, upgrades it in place and
+checks the data survived, which is what a Compose deployment does. It never runs two versions at
+once, so a migration that breaks the previous release's code while it is still serving would
+pass. `docs/OPERATIONS.md` argues the current migrations are safe; nothing verifies it.
+
 **RBAC granularity.** Three fixed roles (`OWNER` / `DEVELOPER` / `VIEWER`) and two API-key
 scopes (`READ_WRITE` / `READ_ONLY`). No custom roles, no per-resource scoping.
+
+**The operator back-office is thin.** `/api/v1/admin/**` lists and searches organizations, shows
+one with its plan and counts, and suspends or reinstates it — enough to answer a support question
+and act on an abuse report without psql. What it does not have: usage and delivery history per
+tenant, a way to adjust a quota outside the plan catalog, or a read-only support view of a
+customer's own screens.
 
 **Terraform provider, and SDKs beyond Node/PHP/Python.** No Go SDK. The three that exist cover
 the send-an-event / manage-endpoints / verify-a-signature path and offer a generic
@@ -67,8 +78,23 @@ accidental.
 hangs off event ingestion. A subscription cannot carry its own filter, and the incoming
 direction has no filtering at all — every incoming event goes to every enabled destination.
 
+**HTTP is the only way out.** A Delivery reaches an Endpoint over HTTP or it does not go.
+Hookdeck's Outpost — the closest open-source comparison, Apache-2.0 and the same
+self-hosted-plus-managed shape — also delivers to AWS SQS, S3 and EventBridge, GCP Pub/Sub,
+RabbitMQ and Kafka, and makes "destination types" the first row of its own comparison table.
+For a customer whose receivers are queues rather than services, no retry ladder substitutes.
+
+The seam is closer than it looks: `AttemptRunner` is already generic over the store, and
+`Finalization` — Succeeded, Deferred, Retry, Abandoned, TerminallyFailed — says nothing about
+HTTP. What is HTTP-shaped is narrower and nameable: a `WebClient` on `RequestSpec`, an
+`Integer statusCode` on `AttemptRecord`, a URL on `AttemptContext`, and `RetryPolicy`'s
+`408 or 429 or 5xx`. The questions that decide the design are not those, though — they are
+whether a signature means anything without HTTP headers, and what a rate limit and a circuit
+breaker measure against a broker that accepts everything.
+
 **No batching**, no static egress IPs, no PagerDuty or OpsGenie channel, no cold-storage
-archival. MinIO is present in the Compose file but nothing consumes it yet.
+archival. Archival has no object store behind it either: MinIO used to sit in the Compose
+file with nothing consuming it, and was removed rather than left there implying a feature.
 
 ## Deliberately not planned
 

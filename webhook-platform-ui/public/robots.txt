@@ -1,4 +1,4 @@
-# Hookflow — https://hookflow.dev
+# Hookflow
 # Admin, auth and share routes render nothing to a crawler and are behind a
 # session; listing them only invites requests that will 401 or redirect.
 
@@ -14,4 +14,8 @@ Disallow: /accept-invite
 Disallow: /device
 Disallow: /shared/
 
-Sitemap: https://hookflow.dev/sitemap.xml
+# Regenerate this line and public/sitemap.xml together for the domain you
+# serve from: SITE_URL=https://your.domain npm run seo:sitemap
+# example.com is IANA-reserved, so an unconfigured deployment points nowhere
+# real rather than at somebody else's site.
+Sitemap: https://example.com/sitemap.xml

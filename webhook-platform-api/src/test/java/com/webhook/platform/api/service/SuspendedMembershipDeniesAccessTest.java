@@ -32,6 +32,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -90,7 +91,7 @@ class SuspendedMembershipDeniesAccessTest {
 
         when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
-        when(jwtUtil.generateAccessToken(any(), any(), any(), any())).thenReturn("access");
+        when(jwtUtil.generateAccessToken(any(), any(), any(), any(), anyBoolean())).thenReturn("access");
         when(jwtUtil.generateRefreshToken(any(), any())).thenReturn("refresh");
         when(jwtUtil.validateToken(any())).thenReturn(true);
         when(jwtUtil.getTokenType(any())).thenReturn(JwtUtil.TOKEN_TYPE_REFRESH);
@@ -127,7 +128,7 @@ class SuspendedMembershipDeniesAccessTest {
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
 
-        verify(jwtUtil, never()).generateAccessToken(any(), any(), any(), any());
+        verify(jwtUtil, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
     }
 
     @Test
@@ -141,7 +142,7 @@ class SuspendedMembershipDeniesAccessTest {
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
 
-        verify(jwtUtil, never()).generateAccessToken(any(), any(), any(), any());
+        verify(jwtUtil, never()).generateAccessToken(any(), any(), any(), any(), anyBoolean());
     }
 
     @Test
@@ -156,7 +157,7 @@ class SuspendedMembershipDeniesAccessTest {
                 LoginRequest.builder().email(user.getEmail()).password("correct-password").build(), WEB_ORIGIN);
 
         assertThat(response.getAccessToken()).isEqualTo("access");
-        verify(jwtUtil).generateAccessToken(eq(user.getId()), eq(activeOrgId), eq(MembershipRole.VIEWER), any());
+        verify(jwtUtil).generateAccessToken(eq(user.getId()), eq(activeOrgId), eq(MembershipRole.VIEWER), any(), anyBoolean());
     }
 
     @Test
@@ -167,6 +168,6 @@ class SuspendedMembershipDeniesAccessTest {
 
         authService.login(LoginRequest.builder().email(user.getEmail()).password("correct-password").build(), WEB_ORIGIN);
 
-        verify(jwtUtil).generateAccessToken(eq(user.getId()), eq(activeOrgId), eq(MembershipRole.DEVELOPER), any());
+        verify(jwtUtil).generateAccessToken(eq(user.getId()), eq(activeOrgId), eq(MembershipRole.DEVELOPER), any(), anyBoolean());
     }
 }

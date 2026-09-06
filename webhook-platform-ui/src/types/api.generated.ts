@@ -2004,6 +2004,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/organizations/{organizationId}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suspend an organization
+         * @description Stops the organization changing anything — ingest included — until it is reinstated. Reads keep working, so the tenant can sign in and be shown why. Independent of billing status, so a payment does not lift it.
+         */
+        post: operations["adminSuspendOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/organizations/{organizationId}/reinstate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reinstate an organization
+         * @description Lifts a suspension. Reinstating one that is not suspended is a no-op.
+         */
+        post: operations["adminReinstateOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/encryption/rotate": {
         parameters: {
             query?: never;
@@ -2469,7 +2509,7 @@ export interface paths {
         };
         /**
          * Count open incidents
-         * @description How many incidents are not yet resolved — for a badge, not a report.
+         * @description How many incidents are not yet resolved, how many are being investigated, and how many of them are critical — for a badge and the three tiles above the list, not a report. Every count spans the project, which is what separates them from anything derived from a page of it.
          */
         get: operations["countOpen"];
         put?: never;
@@ -2976,6 +3016,66 @@ export interface paths {
          * @description The same entries the listing returns, under the same filters, streamed as CSV rather than paged. A from= or to= that is not a yyyy-MM-dd date is rejected rather than ignored.
          */
         get: operations["exportAuditLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List organizations
+         * @description Every organization on this deployment, newest first. Optionally narrowed by name, or to those currently suspended. Requires X-Platform-Admin-Token.
+         */
+        get: operations["adminListOrganizations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/organizations/{organizationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one organization
+         * @description Plan, billing status, project and member counts, and any suspension.
+         */
+        get: operations["adminGetOrganization"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/organizations/{organizationId}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What one organization has used
+         * @description Events this billing period, endpoints, projects and members, each against the limit their plan allows — the same numbers the tenant sees on their own billing page, so a support conversation is about one set of figures. Carries no customer data: counts and limits only.
+         */
+        get: operations["adminGetOrganizationUsage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4253,6 +4353,7 @@ export interface components {
             password: string;
             fullName?: string;
             organizationName: string;
+            captchaToken?: string;
         };
         RefreshTokenRequest: {
             refreshToken: string;
@@ -4292,6 +4393,28 @@ export interface components {
         ChangePasswordRequest: {
             currentPassword: string;
             newPassword: string;
+        };
+        SuspendOrganizationRequest: {
+            reason: string;
+            suspendedBy?: string;
+        };
+        AdminOrganizationResponse: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            planName?: string;
+            /** @enum {string} */
+            billingStatus?: "ACTIVE" | "PAST_DUE" | "GRACE_PERIOD" | "SUSPENDED" | "CANCELLED";
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int64 */
+            projectCount?: number;
+            /** Format: int64 */
+            memberCount?: number;
+            /** Format: date-time */
+            suspendedAt?: string;
+            suspensionReason?: string;
+            suspendedBy?: string;
         };
         EncryptionRotationResponse: {
             status?: string;
@@ -4352,19 +4475,19 @@ export interface components {
             empty?: boolean;
         };
         PageableObject: {
+            /** Format: int64 */
+            offset?: number;
+            sort?: components["schemas"]["SortObject"];
             paged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
-            /** Format: int64 */
-            offset?: number;
-            sort?: components["schemas"]["SortObject"];
             unpaged?: boolean;
         };
         SortObject: {
-            sorted?: boolean;
             empty?: boolean;
+            sorted?: boolean;
             unsorted?: boolean;
         };
         TunnelRequestLog: {
@@ -4730,6 +4853,24 @@ export interface components {
             last?: boolean;
             empty?: boolean;
         };
+        /** @description Unresolved incident counts for a project */
+        IncidentCountsResponse: {
+            /**
+             * Format: int64
+             * @description Incidents that are not resolved — OPEN and INVESTIGATING together
+             */
+            count?: number;
+            /**
+             * Format: int64
+             * @description Incidents someone is actively working
+             */
+            investigating?: number;
+            /**
+             * Format: int64
+             * @description Unresolved incidents at CRITICAL severity
+             */
+            critical?: number;
+        };
         PageEventResponse: {
             /** Format: int32 */
             totalPages?: number;
@@ -5008,7 +5149,8 @@ export interface components {
             endpointId?: string;
             /** Format: uuid */
             subscriptionId?: string;
-            status?: string;
+            /** @enum {string} */
+            status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
             /** Format: int32 */
             attemptCount?: number;
             /** Format: int32 */
@@ -5133,7 +5275,8 @@ export interface components {
             /** Format: int64 */
             p95LatencyMs?: number;
             lastDeliveryAt?: string;
-            status?: string;
+            /** @enum {string} */
+            status?: "HEALTHY" | "DEGRADED" | "FAILING";
         };
         EventTypeBreakdown: {
             eventType?: string;
@@ -5288,6 +5431,31 @@ export interface components {
             /** Format: int32 */
             size?: number;
             content?: components["schemas"]["AuditLogResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"];
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            numberOfElements?: number;
+            first?: boolean;
+            last?: boolean;
+            empty?: boolean;
+        };
+        Pageable: {
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string[];
+        };
+        PageAdminOrganizationResponse: {
+            /** Format: int32 */
+            totalPages?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["AdminOrganizationResponse"][];
             /** Format: int32 */
             number?: number;
             sort?: components["schemas"]["SortObject"];
@@ -9079,6 +9247,99 @@ export interface operations {
             };
         };
     };
+    adminSuspendOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuspendOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description Suspended */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminOrganizationResponse"];
+                };
+            };
+            /** @description No reason given — the tenant is shown it */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminOrganizationResponse"];
+                };
+            };
+            /** @description Forbidden — requires the platform-admin operator credential */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminOrganizationResponse"];
+                };
+            };
+            /** @description No such organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminOrganizationResponse"];
+                };
+            };
+        };
+    };
+    adminReinstateOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reinstated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminOrganizationResponse"];
+                };
+            };
+            /** @description Forbidden — requires the platform-admin operator credential */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminOrganizationResponse"];
+                };
+            };
+            /** @description No such organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminOrganizationResponse"];
+                };
+            };
+        };
+    };
     rotateEncryptionKeys: {
         parameters: {
             query?: never;
@@ -9772,9 +10033,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": {
-                        [key: string]: number;
-                    };
+                    "*/*": components["schemas"]["IncidentCountsResponse"];
                 };
             };
         };
@@ -10419,6 +10678,119 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    adminListOrganizations: {
+        parameters: {
+            query: {
+                search?: string;
+                suspendedOnly?: boolean;
+                pageable: components["schemas"]["Pageable"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of organizations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminOrganizationResponse"];
+                };
+            };
+            /** @description Forbidden — requires the platform-admin operator credential */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminOrganizationResponse"];
+                };
+            };
+        };
+    };
+    adminGetOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The organization */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminOrganizationResponse"];
+                };
+            };
+            /** @description Forbidden — requires the platform-admin operator credential */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminOrganizationResponse"];
+                };
+            };
+            /** @description No such organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminOrganizationResponse"];
+                };
+            };
+        };
+    };
+    adminGetOrganizationUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usage against the plan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UsageResponse"];
+                };
+            };
+            /** @description Forbidden — requires the platform-admin operator credential */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UsageResponse"];
+                };
+            };
+            /** @description No such organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UsageResponse"];
+                };
             };
         };
     };

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "webhook-platform"
-version = "2.10.0"
+version = "2.11.0"
 description = "Official Python SDK for Hookflow — reliable webhook infrastructure"
 readme = "README.md"
 license = {text = "MIT"}

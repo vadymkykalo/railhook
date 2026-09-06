@@ -203,7 +203,7 @@ public class AuthService {
                 .build());
 
         return AuthResponse.builder()
-                .accessToken(jwtUtil.generateAccessToken(user.getId(), organizationId, role, sessionId))
+                .accessToken(jwtUtil.generateAccessToken(user.getId(), organizationId, role, sessionId, emailVerified))
                 .refreshToken(refreshToken)
                 .emailVerified(emailVerified)
                 .build();
@@ -247,7 +247,8 @@ public class AuthService {
 
         return AuthResponse.builder()
                 .accessToken(jwtUtil.generateAccessToken(
-                        userId, membership.getOrganizationId(), membership.getRole(), session.getId()))
+                        userId, membership.getOrganizationId(), membership.getRole(), session.getId(),
+                        Boolean.TRUE.equals(user.getEmailVerified())))
                 .emailVerified(Boolean.TRUE.equals(user.getEmailVerified()))
                 .build();
     }
@@ -341,7 +342,8 @@ public class AuthService {
 
         return AuthResponse.builder()
                 .accessToken(jwtUtil.generateAccessToken(
-                        user.getId(), membership.getOrganizationId(), membership.getRole(), session.getId()))
+                        user.getId(), membership.getOrganizationId(), membership.getRole(), session.getId(),
+                        Boolean.TRUE.equals(user.getEmailVerified())))
                 .refreshToken(newRefreshToken)
                 .emailVerified(Boolean.TRUE.equals(user.getEmailVerified()))
                 .build();

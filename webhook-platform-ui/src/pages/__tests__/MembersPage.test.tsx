@@ -189,4 +189,36 @@ describe('MembersPage', () => {
     await screen.findByText('owner@example.com');
     expect(screen.queryByRole('button', { name: /suspend owner@example\.com/i })).toBeNull();
   });
+  // The list arrives as one unpaginated array, so scrolling was the only way to find anyone.
+  it('filters the list by email', async () => {
+    vi.mocked(membersApi.list).mockResolvedValue([OWNER, ACTIVE_MEMBER]);
+    renderMembers();
+
+    await screen.findByText('owner@example.com');
+    await userEvent.type(screen.getByRole('textbox', { name: /search by email or role/i }), 'dev@');
+
+    expect(screen.getByText('dev@example.com')).toBeInTheDocument();
+    expect(screen.queryByText('owner@example.com')).toBeNull();
+  });
+
+  it('filters by role too, because that is the other way people look for someone', async () => {
+    vi.mocked(membersApi.list).mockResolvedValue([OWNER, ACTIVE_MEMBER]);
+    renderMembers();
+
+    await screen.findByText('owner@example.com');
+    await userEvent.type(screen.getByRole('textbox', { name: /search by email or role/i }), 'owner');
+
+    expect(screen.getByText('owner@example.com')).toBeInTheDocument();
+    expect(screen.queryByText('dev@example.com')).toBeNull();
+  });
+
+  it('says so when nothing matches, rather than showing an empty table', async () => {
+    vi.mocked(membersApi.list).mockResolvedValue([OWNER, ACTIVE_MEMBER]);
+    renderMembers();
+
+    await screen.findByText('owner@example.com');
+    await userEvent.type(screen.getByRole('textbox', { name: /search by email or role/i }), 'nobody');
+
+    expect(screen.getByText(/no members match this search/i)).toBeInTheDocument();
+  });
 });

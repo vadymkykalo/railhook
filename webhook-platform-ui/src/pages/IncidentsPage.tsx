@@ -79,9 +79,13 @@ export default function IncidentsPage() {
   const { data: expandedIncident } = useIncident(projectId, expandedId ?? undefined);
 
   const incidents = incidentsData?.content ?? [];
+  // All three come from the server, all three span the project. They used to be one real
+  // count beside two derived from `incidents` — which is one page of a filtered list, so a
+  // project with more open incidents than fit on a page read "Critical: 0" with a critical
+  // incident open on page two.
   const openIncidents = openCount?.count ?? 0;
-  const investigating = incidents.filter((i) => i.status === 'INVESTIGATING').length;
-  const critical = incidents.filter((i) => i.severity === 'CRITICAL' && i.status !== 'RESOLVED').length;
+  const investigating = openCount?.investigating ?? 0;
+  const critical = openCount?.critical ?? 0;
 
   const handleCreate = async () => {
     try {

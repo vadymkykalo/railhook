@@ -60,7 +60,7 @@ public class EndpointService {
         this.webClient = webClientBuilder
                 .clientConnector(new ReactorClientHttpConnector(
                         SsrfProtectionCustomizer.apply(
-                                HttpClient.create(), allowPrivateIps)))
+                                HttpClient.create(), allowPrivateIps, allowedHosts)))
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0-Test")
                 .build();
         this.encryptionKeyRegistry = encryptionKeyRegistry;

@@ -39,7 +39,7 @@ hookflow login --email user@example.com --password
 **Custom backend URL:**
 
 ```bash
-hookflow login --server https://api.hookflow.dev
+hookflow login --server https://api.example.com
 ```
 
 ### Local Webhook Tunnel
@@ -129,7 +129,7 @@ hookflow events <projectId> --type order.created --count 50
 hookflow config show
 
 # Set backend URL
-hookflow config set backend-url https://api.hookflow.dev
+hookflow config set backend-url https://api.example.com
 
 # Set default project
 hookflow config set project-id <uuid>

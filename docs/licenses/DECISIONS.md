@@ -30,32 +30,28 @@ API rather than MinIO specifically, so an operator can point it at MinIO,
 hosted bucket (AWS S3, Cloudflare R2, Backblaze B2). The AGPL obligation is
 then a choice the operator makes, not one the default distribution ships.
 
-## Bitnami subchart pins (Helm chart)
+## Bitnami subcharts (Helm chart) — removed, not pinned
 
-`deploy/helm/hookflow/Chart.yaml` declares three optional subchart
-dependencies from `https://charts.bitnami.com/bitnami`:
+`deploy/helm/hookflow/Chart.yaml` used to declare three optional subchart
+dependencies from `https://charts.bitnami.com/bitnami` — postgresql 12.x.x,
+redis 18.x.x and kafka 26.x.x. It now declares `dependencies: []`.
 
-```yaml
-- name: postgresql
-  version: "12.x.x"
-  condition: postgresql.enabled
-- name: redis
-  version: "18.x.x"
-  condition: redis.enabled
-- name: kafka
-  version: "26.x.x"
-  condition: kafka.enabled
-```
+License was never the problem: all three are Apache-2.0, wrapping upstream
+PostgreSQL/Redis/Kafka. Availability was. Bitnami moved its free catalog to a
+restricted "Legacy" tier on 2025-08-28, images referenced by those chart
+versions stopped receiving updates, Kafka was dropped from the catalog
+outright, and the AWS-hosted mirror retires 2026-06-10. Re-pinning would have
+been a bet on a catalog that is actively shrinking.
 
-All three are themselves Apache-2.0 (the Bitnami *chart* wraps upstream
-PostgreSQL/Redis/Kafka, all permissively licensed). The relevant risk here
-isn't license, it's *availability*: Bitnami's free container registry
-retention/tagging policy has changed unfavorably before, and the exact image
-tags these subchart versions resolve to are outside this repo's control —
-that's tracked separately as an infrastructure/supply-chain concern, not a
-license one. This document only records that the pins exist and are
-Apache-2.0, so there is no license exception to write up for them — only an
-availability one to watch.
+The chart therefore requires bring-your-own PostgreSQL/Kafka/Redis — see the
+`external:` blocks in `values.yaml` and the Helm README's prerequisites, which
+is how production deployments were documented to work anyway.
+`docker-compose.yml` names the exact images this project is tested against
+(postgres:16-alpine, apache/kafka:3.7.0, redis:7-alpine — none of them
+Bitnami) as a reference for a self-managed in-cluster deployment.
+
+There is consequently no third-party license exception to record here for the
+Helm chart at all.
 
 ## How this was verified (not just asserted)
 

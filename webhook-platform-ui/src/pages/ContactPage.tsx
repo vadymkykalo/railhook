@@ -17,12 +17,22 @@ import { useDocumentMeta } from '../hooks/useDocumentMeta';
  * Addresses are role accounts and are assembled at render rather than written
  * into the markup, which stops the cheapest scrapers without hiding anything
  * from a reader or a screen reader.
+ *
+ * The domain comes from VITE_CONTACT_DOMAIN and there is no default. It was a
+ * constant naming a domain this project does not own, so every self-hosted
+ * install invited its users to write to a stranger about a product that
+ * stranger has never heard of.
+ *
+ * With the variable unset the two mail cards are not rendered at all, rather
+ * than falling back to the repository. A deployment someone runs for their own
+ * company has no sales desk, and an address that reaches nobody is worse than
+ * an absent one — the reader who needs a human still has the issues card and
+ * the docs card, which are true everywhere.
  */
-const SALES = ['sales', 'hookflow.dev'];
-const SUPPORT = ['support', 'hookflow.dev'];
+const CONTACT_DOMAIN = (import.meta.env.VITE_CONTACT_DOMAIN as string | undefined)?.trim();
 
-function mailto(parts: string[]): string {
-  return `mailto:${parts[0]}@${parts[1]}`;
+function mailto(mailbox: string): string {
+  return `mailto:${mailbox}@${CONTACT_DOMAIN}`;
 }
 
 function Card({
@@ -64,30 +74,34 @@ export default function ContactPage() {
       </Reveal>
 
       <div className="mt-10 grid gap-4 sm:grid-cols-2">
-        <Reveal className="h-full">
-          <Card
-            icon={Mail}
-            title={t('contact.salesTitle')}
-            body={t('contact.salesBody')}
-            action={
-              <a href={mailto(SALES)} className={LINK}>
-                {`${SALES[0]}@${SALES[1]}`}
-              </a>
-            }
-          />
-        </Reveal>
-        <Reveal className="h-full" delay={60}>
-          <Card
-            icon={LifeBuoy}
-            title={t('contact.supportTitle')}
-            body={t('contact.supportBody')}
-            action={
-              <a href={mailto(SUPPORT)} className={LINK}>
-                {`${SUPPORT[0]}@${SUPPORT[1]}`}
-              </a>
-            }
-          />
-        </Reveal>
+        {CONTACT_DOMAIN && (
+          <>
+            <Reveal className="h-full">
+              <Card
+                icon={Mail}
+                title={t('contact.salesTitle')}
+                body={t('contact.salesBody')}
+                action={
+                  <a href={mailto('sales')} className={LINK}>
+                    {`sales@${CONTACT_DOMAIN}`}
+                  </a>
+                }
+              />
+            </Reveal>
+            <Reveal className="h-full" delay={60}>
+              <Card
+                icon={LifeBuoy}
+                title={t('contact.supportTitle')}
+                body={t('contact.supportBody')}
+                action={
+                  <a href={mailto('support')} className={LINK}>
+                    {`support@${CONTACT_DOMAIN}`}
+                  </a>
+                }
+              />
+            </Reveal>
+          </>
+        )}
         <Reveal className="h-full" delay={120}>
           <Card
             icon={Github}

@@ -27,7 +27,23 @@ import { publicRoutes } from './public-routes.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(here, '../public/sitemap.xml');
 
-const SITE = 'https://hookflow.dev';
+/**
+ * A sitemap has to carry absolute URLs — the spec allows nothing else — so
+ * this file cannot be origin-neutral the way the rest of the build now is.
+ *
+ * The committed copy therefore names example.com, which IANA reserves for
+ * exactly this and which can never become somebody's product. It used to name
+ * a real domain this project does not own, and shipped in every self-hosted
+ * image: a sitemap is a list of pages you are asking a crawler to index, and
+ * that one asked it to go index a stranger.
+ *
+ * The deployment that has a domain sets SITE_URL and regenerates:
+ *
+ *   SITE_URL=https://example.org npm run seo:sitemap
+ *
+ * Keep `public/robots.txt`'s `Sitemap:` line pointing at the same origin.
+ */
+const SITE = (process.env.SITE_URL || 'https://example.com').replace(/\/+$/, '');
 
 function urlEntry({ path, priority, changefreq }) {
   return [

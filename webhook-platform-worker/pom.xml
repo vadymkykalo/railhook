@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.webhook.platform</groupId>
         <artifactId>webhook-platform</artifactId>
-        <version>2.10.0</version>
+        <version>2.11.0</version>
     </parent>
 
     <artifactId>webhook-platform-worker</artifactId>
@@ -32,13 +32,44 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+        <!--
+          Both, and not one or the other. Boot 4 split WebClient's auto-configuration out of
+          the WebFlux starter: webflux is kept because it is what serves this service's
+          actuator port - the worker has no servlet stack, and the Compose healthcheck and
+          the Helm probes read /actuator over it - and webclient is what supplies the
+          WebClient.Builder every delivery attempt is made with.
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webclient</artifactId>
+        </dependency>
+        <!--
+          Here for the bean, not for HTTP conversion: the worker serves nothing but actuator,
+          and what it needs is a Jackson 2 ObjectMapper, which Boot auto-configured until 4
+          replaced Jackson 2 with Jackson 3. AttemptRunner, PayloadTransformService,
+          IncomingAttemptStore and DestinationAuthenticator all take one - which is to say the
+          whole delivery path does, including the body a signature is computed over. The
+          reasoning for staying on Jackson 2 is on the same dependency in the API's pom.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
+        </dependency>
+        <!--
+          The starter rather than bare spring-kafka: Boot 4 moved the Kafka
+          auto-configuration out of spring-boot-autoconfigure into its own
+          spring-boot-kafka module, which only the starter pulls in. Without it
+          the spring.kafka.* block in application.yml would bind to nothing and
+          the autoconfigure.exclude in the integration tests would name a class
+          that is not on the classpath, which Boot treats as a startup failure.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
         <dependency>
             <groupId>com.bucket4j</groupId>
@@ -49,10 +80,21 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
+        <!--
+          4.x is the Boot 4 line: its starter builds against spring-boot 4.1 and registers
+          the auto-configuration Boot 4 looks for, where 3.52.0 wires itself against Boot 3's
+          module layout. It also renamed RScript.ReturnType's constants to match the Java
+          types they return - INTEGER to LONG, MULTI to LIST - which is what the circuit
+          breaker's and the ordering buffer's Lua scripts ask for.
+
+          Verify this one against a running stack, not the test suite: the integration tests
+          exclude RedissonAutoConfigurationV2 outright and mock every service that reaches for
+          Redis, so a Redisson that fails to wire would leave them all green.
+        -->
         <dependency>
             <groupId>org.redisson</groupId>
             <artifactId>redisson-spring-boot-starter</artifactId>
-            <version>3.52.0</version>
+            <version>4.7.0</version>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -95,6 +137,32 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+          Boot 4 split spring-boot-test-autoconfigure apart: @AutoConfigureMockMvc,
+          @DataJpaTest, TestEntityManager and @AutoConfigureTestDatabase each moved into a
+          module of their own, and spring-boot-starter-test no longer carries any of them.
+          These four starters are that one dependency, unbundled.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jpa-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

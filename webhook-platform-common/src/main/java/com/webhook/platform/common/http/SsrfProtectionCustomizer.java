@@ -9,6 +9,7 @@ import reactor.netty.resources.ConnectionProvider;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.time.Duration;
+import java.util.List;
 
 /**
  * Applies post-connect SSRF protection to Reactor Netty HttpClient.
@@ -53,14 +54,24 @@ public final class SsrfProtectionCustomizer {
      * Creates a new HttpClient with the given connection provider, connect timeout,
      * and SSRF protection.
      */
-    public static HttpClient createHttpClient(ConnectionProvider connectionProvider, boolean allowPrivateIps) {
-        return apply(HttpClient.create(connectionProvider), allowPrivateIps);
+    public static HttpClient createHttpClient(ConnectionProvider connectionProvider,
+                                              boolean allowPrivateIps, List<String> allowedHosts) {
+        return apply(HttpClient.create(connectionProvider), allowPrivateIps, allowedHosts);
     }
 
-    public static HttpClient apply(HttpClient httpClient, boolean allowPrivateIps) {
+    /**
+     * @param allowedHosts the same list {@code UrlValidator.validateWebhookUrl} was given at
+     *                     admission. Passing it matters: without it this check reaches a
+     *                     different verdict than admission did, and an operator who
+     *                     allow-listed an internal host watches every delivery to it die at
+     *                     the TCP layer with nothing in the configuration to explain it.
+     */
+    public static HttpClient apply(HttpClient httpClient, boolean allowPrivateIps, List<String> allowedHosts) {
         httpClient = httpClient
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5_000);
 
+        // allow-private-ips is the operator switching the protection off outright, and
+        // ProductionSafetyValidator refuses to start with it on in production. Unchanged.
         if (allowPrivateIps) {
             return httpClient;
         }
@@ -69,7 +80,11 @@ public final class SsrfProtectionCustomizer {
             var remoteAddress = conn.channel().remoteAddress();
             if (remoteAddress instanceof InetSocketAddress isa) {
                 InetAddress addr = isa.getAddress();
-                if (addr != null && UrlValidator.isPrivateOrLocalAddress(addr)) {
+                // getHostString gives the name the client was pointed at when there is one,
+                // which is what the allow list holds; it falls back to the literal, and a
+                // literal simply will not match a name entry - fail closed, as before.
+                if (addr != null
+                        && UrlValidator.isBlockedTarget(isa.getHostString(), addr, allowPrivateIps, allowedHosts)) {
                     log.warn("SSRF protection: DNS rebinding detected, resolved to private IP {}", addr.getHostAddress());
                     conn.dispose();
                     throw new UrlValidator.InvalidUrlException(

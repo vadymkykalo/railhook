@@ -113,6 +113,10 @@ class MutatingHandlerScopeDeclarationTest {
             // Platform-admin only, gated on the PLATFORM_ADMIN authority for /api/v1/admin/**
             // in SecurityConfig rather than on a tenant scope.
             "EncryptionAdminController.rotateEncryptionKeys",
+            // Same: an API key belongs to a project inside one organization, and suspension is
+            // an act on an organization from outside it. No scope answers that question.
+            "PlatformAdminOrganizationController.suspend",
+            "PlatformAdminOrganizationController.reinstate",
 
             // POST-shaped reads: these compute a response from caller-supplied input and
             // persist nothing. They are POSTs only because the input does not fit in a query

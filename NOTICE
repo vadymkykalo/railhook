@@ -16,10 +16,13 @@ Notable licenses among bundled/runtime components, called out here because
 they are not MIT/Apache-2.0/BSD/ISC (the common case for the rest of the
 stack — see the full report for the complete list):
 
-  - The Bitnami subcharts referenced as optional dependencies of the Helm
-    chart (deploy/helm/hookflow/Chart.yaml) carry their own upstream licenses
-    (predominantly Apache-2.0); see docs/licenses/DECISIONS.md for the pinned
-    versions and how to swap them.
+  - Nothing. Every bundled and runtime component is MIT, Apache-2.0, BSD or
+    ISC. The two entries that used to sit here are both gone: MinIO (AGPL-3.0)
+    was removed from the Compose file, and the Helm chart's Bitnami subcharts
+    were dropped in favour of bring-your-own datastores, so
+    deploy/helm/hookflow/Chart.yaml now declares no dependencies at all.
+    docs/licenses/DECISIONS.md records both decisions and how they were
+    verified.
 
 This NOTICE file is informational and does not modify the terms of the MIT
 LICENSE that governs Hookflow's own source code.

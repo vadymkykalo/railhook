@@ -231,14 +231,14 @@ ui:
       cert-manager.io/cluster-issuer: letsencrypt-prod
       nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     hosts:
-      - host: app.hookflow.dev
+      - host: app.example.com
         paths:
           - path: /
             pathType: Prefix
     tls:
       - secretName: hookflow-ui-tls
         hosts:
-          - app.hookflow.dev
+          - app.example.com
 
 # PostgreSQL configuration
 # This chart no longer ships a PostgreSQL subchart (was Bitnami,
@@ -337,7 +337,7 @@ backup:
 # whenever enabled is true. Variable names match .env.dist / docker-compose.yml.
 email:
   enabled: false
-  from: noreply@hookflow.dev
+  from: noreply@example.com
   smtp:
     host: ""
     port: 587

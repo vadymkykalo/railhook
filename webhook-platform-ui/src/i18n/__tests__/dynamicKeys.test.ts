@@ -6,6 +6,8 @@ import yaml from 'js-yaml';
 import en from '../locales/en.json';
 import uk from '../locales/uk.json';
 import { STATUS_KIND } from '../../pages/EventsPage';
+import { STATUS_TEXT } from '../../components/charts/statusScale';
+import { nodeTemplates } from '../../components/workflow/nodes/nodeTypes';
 
 /**
  * Locale parity (en vs uk) cannot catch a key missing from *both* files, and
@@ -24,8 +26,18 @@ const spec = yaml.load(readFileSync(resolve(root, '../openapi.yaml'), 'utf8')) a
   components: { schemas: Record<string, { properties?: Record<string, { enum?: string[] }> }> };
 };
 
-/** Locale namespace → the schema property whose enum it has to cover. */
-const ENUM_BACKED: Array<[namespace: string, schema: string, property: string]> = [
+/**
+ * Locale namespace → the schema property whose enum it has to cover, and the values of that
+ * enum the UI never renders.
+ *
+ * <p>The fourth element exists for one real case rather than as a general escape hatch:
+ * MembershipRole carries API_KEY, which is what an API-key caller authenticates as and never
+ * something a membership row is. A label for it would be a dead entry of exactly the kind the
+ * "no label for a value the API cannot return" assertion is here to prevent, so the value is
+ * named as unrendered and then required to be absent — which keeps both directions honest
+ * instead of quietly widening one of them.
+ */
+const ENUM_BACKED: Array<[namespace: string, schema: string, property: string, unrendered?: string[]]> = [
   ['billing.statuses', 'OrganizationBillingResponse', 'billingStatus'],
   ['replay.status', 'ReplaySessionResponse', 'status'],
   ['workflows.execStatus', 'WorkflowExecutionResponse', 'status'],
@@ -34,6 +46,21 @@ const ENUM_BACKED: Array<[namespace: string, schema: string, property: string]> 
   ['alerts.severities', 'AlertRuleResponse', 'severity'],
   ['alerts.channels', 'AlertRuleResponse', 'channel'],
   ['piiRules.maskStyles', 'PiiMaskingRuleResponse', 'maskStyle'],
+  // Added after 2.10.0 shipped four sets of raw keys to a customer's screen. Each of these is
+  // a t(`namespace.${value}`) call with the same drift risk as the four that broke; the first
+  // is the most-rendered status label in the product, and until DeliveryResponse.status was
+  // typed as its enum rather than a String, the spec did not say enough for this test to
+  // check it at all.
+  ['deliveries.status', 'DeliveryResponse', 'status'],
+  ['members.statuses', 'MemberResponse', 'status'],
+  ['roles', 'MemberResponse', 'role', ['API_KEY']],
+  ['rules.actionTypes', 'RuleActionResponse', 'type'],
+  ['workflows.triggerTypes', 'WorkflowResponse', 'triggerType'],
+  // The dashboard says the same five statuses in its own words -- "Abandoned" where the
+  // deliveries table says "DLQ" -- so it is a second set of labels over one enum, and it
+  // drifts separately.
+  ['dashboard.inFlight.status', 'DeliveryResponse', 'status'],
+  ['analytics.endpointStatus', 'EndpointPerformance', 'status'],
 ];
 
 function labelsUnder(locale: object, namespace: string): Record<string, unknown> {
@@ -46,8 +73,9 @@ function labelsUnder(locale: object, namespace: string): Record<string, unknown>
 }
 
 describe('interpolated translation keys resolve', () => {
-  describe.each(ENUM_BACKED)('%s covers %s.%s', (namespace, schema, property) => {
+  describe.each(ENUM_BACKED)('%s covers %s.%s', (namespace, schema, property, unrendered = []) => {
     const values = spec.components.schemas[schema]?.properties?.[property]?.enum;
+    const rendered = () => values!.filter((v) => !unrendered.includes(v));
 
     it('the schema still declares the enum this maps to', () => {
       expect(values, `${schema}.${property} has no enum in openapi.yaml — fix this mapping`)
@@ -56,11 +84,16 @@ describe('interpolated translation keys resolve', () => {
 
     it.each([['en', en], ['uk', uk]] as const)('%s has a label for every value', (_name, locale) => {
       const labels = labelsUnder(locale, namespace);
-      expect(values!.filter((v) => !(v in labels))).toEqual([]);
+      expect(rendered().filter((v) => !(v in labels))).toEqual([]);
     });
 
     it('carries no label for a value the API cannot return', () => {
       expect(Object.keys(labelsUnder(en, namespace)).filter((k) => !values!.includes(k))).toEqual([]);
+    });
+
+    it.runIf(unrendered.length > 0)('carries no label for a value the UI never renders', () => {
+      const labels = labelsUnder(en, namespace);
+      expect(unrendered.filter((v) => v in labels)).toEqual([]);
     });
   });
 
@@ -75,4 +108,48 @@ describe('interpolated translation keys resolve', () => {
       expect(Object.keys(STATUS_KIND).filter((k) => !(k in labels))).toEqual([]);
     },
   );
+
+  /* The dashboard's one-word answer to "is this project healthy". Derived by
+     verdictOfDeliveryStats from the delivery rollup, so it is a StatusKind and
+     nothing the API names. STATUS_TEXT is a Record over that union, which makes
+     its keys the complete set for the same reason STATUS_KIND is.
+
+     Only the forward direction is checked: the namespace also carries `label`,
+     `detail` and `idleDetail`, which are prose around the verdict rather than
+     values of it. */
+  it.each([['en', en], ['uk', uk]] as const)(
+    'dashboard.verdict has a label for every status kind (%s)',
+    (_name, locale) => {
+      const labels = labelsUnder(locale, 'dashboard.verdict');
+      expect(Object.keys(STATUS_TEXT).filter((k) => !(k in labels))).toEqual([]);
+    },
+  );
+
+  /* Workflow node types. Not an enum at either end: the nine types are a
+     frontend catalogue, and the canvas renders each one's name and its one-line
+     description from the locale whenever the node carries no label of its own —
+     which is every node the moment it is dropped. A missing entry here is a
+     palette item reading `workflows.nodeTypes.slack.label`.
+
+     `nodeTemplates` is typed against the map React Flow is handed, so a
+     template for a type with no component does not compile and this list cannot
+     fall behind the canvas. */
+  describe('workflows.nodeTypes', () => {
+    it.each([['en', en], ['uk', uk]] as const)('%s names and describes every node type', (_name, locale) => {
+      const labels = labelsUnder(locale, 'workflows.nodeTypes');
+      const missing = nodeTemplates.flatMap(({ type }) => {
+        const entry = labels[type] as Record<string, unknown> | undefined;
+        return ['label', 'description']
+          .filter((field) => typeof entry?.[field] !== 'string')
+          .map((field) => `${type}.${field}`);
+      });
+      expect(missing).toEqual([]);
+    });
+
+    it('carries no entry for a node type the palette cannot offer', () => {
+      const offered = new Set<string>(nodeTemplates.map((t) => t.type));
+      expect(Object.keys(labelsUnder(en, 'workflows.nodeTypes')).filter((k) => !offered.has(k)))
+        .toEqual([]);
+    });
+  });
 });

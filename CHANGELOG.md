@@ -7,6 +7,236 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-09-06
+
+### Changed
+
+- **Spring Boot 4.1.1.** 3.5.16 was the final OSS release of the 3.5.x line, and the fixes for
+  the five CVSS 9.8/9.1 CVEs in `spring-core`/`spring-web` 6.2.19 and `spring-security` 6.5.11
+  ship only in Framework 7 / Security 7 — there was no patch coming to the line we were on, so
+  the nightly `Security SCA` had been failing on vulnerabilities that could not be fixed by
+  waiting. Java stays on 17.
+
+  Most of the work was not renaming imports. Boot 4 stopped auto-configuring a technology just
+  because its library is on the classpath, and the way that announces itself is silence:
+  `flyway-core` without `spring-boot-starter-flyway` starts the application, applies no
+  migrations at all, and fails on the first missing table. Kafka's auto-configuration and
+  WebClient's each moved into modules only their own starter pulls in — the latter meaning
+  `spring-boot-starter-webflux`, which this API only ever wanted for `WebClient`, no longer
+  provides one.
+
+  Redisson moves to 4.7.0 for the same reason its predecessor worked: the 3.x starter wires
+  itself against Boot 3's module layout. Nothing in the test suite would have caught that —
+  the integration tests exclude Redisson's auto-configuration outright and mock every service
+  that reaches for Redis — so it was checked against a running stack instead.
+
+- **HTTP stays on Jackson 2**, through Spring's own bridge module and one property. Boot 4
+  defaults to Jackson 3, and two DTOs put a Jackson 2 `JsonNode` on the wire; one of them is
+  backed by a JSONB column on the `Plan` entity that the schema-validation gate also reads.
+  Changing mappers is therefore an entity change with a migration behind it, which is not
+  something an upgrade whose purpose is closing CVEs should smuggle in.
+
+  The two directions fail separately, which is worth knowing before someone tidies either
+  piece away: without the property, *reading* a body into a `JsonNode` field answers 500 while
+  writing one still works — and `EventIngestRequest.data` is such a field, so what breaks first
+  is every event the platform ingests. Both the bridge and the property are deprecated or
+  easily mistaken for decoration, so the contract is pinned by a test that covers each
+  direction rather than left for whoever removes them to rediscover.
+
+### Added
+
+- **An operator back-office.** `/api/v1/admin/**` was one endpoint that rotates encryption keys;
+  everything else an operator might need — who is on this deployment, why did this customer's
+  deliveries stop, make this one stop — was psql. It now lists and searches organizations, shows
+  one with its plan, billing status and project/member counts, and suspends or reinstates it.
+  Behind the same platform-admin credential, which no tenant JWT or API key can carry.
+
+- **Suspension that suspends.** `BillingStatus.SUSPENDED` was written by the dunning scheduler
+  when a grace period expired and read by nothing at all, so an organization that had stopped
+  paying went on ingesting and delivering exactly as before — and an operator had no way to stop
+  an abusive tenant except by editing the database. A suspended organization is now refused
+  every write, ingest included, with the reason the operator typed; reads keep working so the
+  tenant can sign in and be told what happened.
+
+  Stored on the organization rather than in `billing_status`, deliberately: that column belongs
+  to the payment state machine, and an abuse suspension recorded there would be lifted by the
+  next successful charge. Both actions land in the audit log.
+
+- **A transform node can use the project's transformation library.** The library was
+  unreachable from the canvas: a project could build up named transformations and point rule
+  actions at them, and then in a workflow had to retype one into a box. Retyping it did not
+  work, silently — a saved transformation is `${$.json.path}` run by the engine that transforms
+  a delivery payload, the node's own template is `{{field.path}}`, and text written for one is a
+  literal string in the other with no error either way. The node now takes either, as an
+  explicit choice rather than a guess about what was pasted, and a transformation can be created
+  from the node panel without leaving the canvas. A reference that is deleted or disabled fails
+  the step: passing the payload through would send a raw event somewhere promised a reshaped
+  one and report it as a success.
+
+- **`hookflow admin`** — orgs, org, suspend, reinstate — and `/admin/organizations/{id}/usage`
+  behind it, so an operator can see what a tenant has used against their plan. Deliberately no
+  page in the dashboard: it is served from the same origin as the API, so a platform-admin token
+  in a browser turns any XSS in the tenant dashboard into the deployment's master credential.
+  The token is read from the environment or a flag on each invocation and never saved.
+
+- **The create-event node offers the schema registry's event types** as suggestions. A datalist
+  and not a select, because emitting a type that has no schema yet is allowed.
+
+### Fixed
+
+- **Two public documents described the conditions they were written under rather than the
+  project.** `docs/DEMO.md` opened by explaining that "this sandbox has no way to provision or
+  expose long-running public infrastructure", and `load/README.md` had a section headed "What was
+  actually verified in this sandbox session" that discussed other agents contending for a Docker
+  daemon. Both are read by someone evaluating whether to run this, and neither told them anything
+  about it. They now say what is true of the project: the demo needs hosting rather than code, and
+  the load harness has proven its scripts but published no numbers.
+
+- **The dashboard stopped doing SEO for somebody else's website.** `hookflow.dev` is not this
+  project's domain - it serves an unrelated product - and the shipped UI named it in
+  `rel="canonical"`, `og:url`, `og:image`, `twitter:image` and the schema.org block, listed 23 of
+  its URLs in `public/sitemap.xml`, pointed `robots.txt`'s `Sitemap:` line at it, and offered
+  `sales@` and `support@` there on `/contact`. A canonical is an instruction to a search engine to
+  credit the page it names, so every self-hosted install was issuing that instruction on every
+  page, and anyone who took the support address wrote to a stranger.
+
+  The same constant was the default `EMAIL_FROM` in `.env.dist`, `docker-compose.yml`,
+  `application.yml`, `EmailService`, both Helm values files and the monitoring stack's
+  Alertmanager config. Mail from a domain you do not own fails SPF and DKIM at the receiver, so
+  an operator who turned `EMAIL_ENABLED` on without noticing got verification mail silently
+  refused - and a user staring at a screen telling them to check an inbox nothing would reach.
+
+  Nothing is replaced with a different constant. What a deployment publishes about itself now
+  comes from the deployment:
+
+  - `VITE_SITE_URL` gives the public origin. Unset - the default, and what every private
+    dashboard wants - the canonical follows the browser's own origin and index.html carries no
+    absolute self-reference at all, the JSON-LD block included. `scripts/prerender.mjs` needs the
+    variable set, or it would freeze its throwaway local server's address into the static HTML.
+  - `VITE_CONTACT_DOMAIN` gives the `/contact` mail addresses. Unset, those two cards are not
+    rendered: a deployment someone runs for their own company has no sales desk, and an address
+    that reaches nobody is worse than an absent one. The issues and documentation cards, which
+    are true everywhere, stay.
+  - The sitemap generator takes `SITE_URL`. A sitemap must carry absolute URLs, so the committed
+    copy names `example.com` - IANA-reserved, and unable to become anyone's product - as do every
+    placeholder address and the Helm ingress host.
+
+  One trap for whoever edits `index.html` next: the canonical cannot be written as a relative
+  `"/"`. Vite treats `href` on a `<link>` as an asset reference and reads it, so a root-relative
+  canonical fails the build with `EISDIR` on the public directory. It goes through the same
+  build-time placeholder as the rest.
+
+### Security
+
+- **CodeQL.** The security set covered known CVEs in dependencies from two angles (Trivy over the
+  built images on every push, OWASP Dependency-Check nightly with a reviewed suppression file) and
+  bug patterns per method (SpotBugs), but nothing asked the taint-tracking question: whether
+  attacker-controlled input reaches a sink. It runs nightly, on pull requests into `develop`, and
+  on `main`/`release/**`/`hotfix/**`; results land in the Security tab.
+
+  It does not fail the build on a finding, on purpose. A first CodeQL run over an existing
+  codebase reports a backlog, and a gate that is red the day it arrives is a gate somebody
+  switches off. Raising `fail-on` is the follow-up once that backlog is triaged - and note that
+  making it a *required* check on `main` before it has completed there once leaves every pull
+  request pending forever.
+
+- **Tomcat 11.0.25.** Boot 4.1.1's BOM manages 11.0.24, which carries three CRITICALs -
+  CVE-2026-65182 (security-constraint bypass), CVE-2026-65905 (authentication bypass) and
+  CVE-2026-68525. They are in the container that terminates every request the API serves, so
+  the CI container scan was failing the build on `develop`, correctly.
+
+  Worth knowing before anyone tidies this away: setting `<tomcat.version>` alone does nothing
+  here. This build *imports* `spring-boot-dependencies` rather than inheriting from
+  `spring-boot-starter-parent`, and an imported BOM resolves its own `${tomcat.version}`
+  against its own properties - the override is simply not read. The dependency tree still said
+  11.0.24 with the property set. The three artifacts are therefore pinned by explicit
+  `dependencyManagement` entries declared *before* the BOM import, because
+  `dependencyManagement` takes the first declaration it finds. The property remains, now read
+  by those entries, so the version is still stated once.
+
+- **Email verification is enforced on the server.** It was a component in the dashboard:
+  `VerificationGate.tsx` greyed out the buttons, and login refused only `DISABLED`, so an
+  unverified account got an ordinary token and had the whole API with curl. Writes now require
+  a verified address; reads stay open, because the screen telling the user to check their mail
+  is a read. Inert where verification is meaningless — with mail off, registration marks the
+  account verified on the spot, so a self-hosted instance sees no change.
+
+- **A CAPTCHA on registration**, off by default. The auth rate limit is per address, and an
+  address is the one thing a signup farm has plenty of. Cloudflare Turnstile out of the box;
+  hCaptcha speaks the same siteverify shape, so the URL is what picks between them. Verification
+  fails closed — an unreachable provider refuses the registration rather than waving it through,
+  because a CAPTCHA that silently stops checking is the state it was added to prevent. A
+  deployment that configures none gets a verifier that accepts everything, which is the honest
+  shape of a control that is switched off and the right default for self-hosting.
+
+- **A hosted deployment refuses to start half configured.** `BILLING_ENABLED` is the whole of
+  what separates hosted from self-hosted, which also means one unset variable away from an
+  open, unbilled, unverified service that starts happily. In production it now requires
+  `EMAIL_ENABLED=true`, a CAPTCHA and a real payment provider: billing on with mail off is a
+  paid tier behind an address nobody proved they own, billing on with no challenge is a free
+  tier anyone can mint, and billing on with the no-op provider is plans enforced and never
+  charged for.
+
+### Fixed
+
+- **A dialog taller than the window had no reachable edges.** `DialogContent` is centred with
+  `translate-y-[-50%]` and had no height cap and no overflow, and Radix freezes the page behind
+  an open dialog — so the endpoint form opened with its title above the top of the screen and
+  Save and Cancel below the bottom, with nothing to scroll. Six call sites had already hit this
+  and pasted `max-h-[85vh] overflow-y-auto` onto their own dialog at three different heights,
+  which is what kept it alive: the bug looked fixed everywhere anyone had looked. The cap is
+  now the primitive's, in `dvh` rather than `vh`, and a test fails if a call site starts setting
+  its own.
+
+- **Two of the three incident tiles counted one page, not the project.** "Open" came from a
+  server count; "Investigating" and "Critical" were `filter()` over the twenty rows on screen.
+  A project with more open incidents than fit on a page showed "Critical: 0" with a critical
+  incident open on page two — the tile went quiet exactly when there was too much going on to
+  fit. All three are now counted server-side over the project.
+
+- **A public page starts at its own top.** `createBrowserRouter` leaves the scroll offset alone
+  across a navigation, so following "Pricing" from halfway down the home page opened `/pricing`
+  somewhere in its FAQ. A hash still wins, or every anchor in the header would break.
+
+- **No input in the workflow node inspector had an accessible name.** The label and the control
+  were siblings with nothing joining them, so every field — the URL a workflow posts to, the
+  endpoint it delivers through — was announced as an unlabelled textbox and clicking a label
+  focused nothing.
+
+- **The pricing page said "requests / second"** where only ingest is metered per plan, which is
+  what the billing page had already been corrected to say.
+
+- **`WEBHOOK_ALLOWED_HOSTS` reaches the connection it exempts.** The admission check honoured
+  the list and the post-connect check — the one that closes the DNS rebinding window — had no
+  idea it existed, so an operator who allow-listed an internal host watched every delivery to
+  it die at the TCP layer with nothing in the configuration to explain why. Both halves now
+  answer through one function. It failed closed, so this was a knob that did nothing rather
+  than a hole.
+
+- **The plan catalog answers an anonymous caller.** `/api/v1/billing/plans` is permitted and
+  a comment called it public; it returned 500 to anyone without a token and always had, because
+  nothing set a tenant scope and the resolver refuses to guess. Only the dashboard called it,
+  from behind a login, which is why nobody noticed.
+
+- **A page's crash stays inside that page.** The app had one error boundary, at the root, so a
+  render error anywhere replaced the whole dashboard and the only way back was a reload.
+
+- **`DeliveryResponse.status` is typed as its enum.** The JSON is unchanged — Jackson writes an
+  enum as its name — but the published contract now names the five values, the generated
+  TypeScript narrows from `string` to a union, and the locale ratchet can finally cover the
+  most-rendered status label in the product.
+
+### Added
+
+- **Search on the members list**, which the API serves as one unpaginated array — so finding
+  someone meant scrolling.
+
+- **SDK unit tests run on every pull request.** They ran on a release tag and nightly, so a
+  change that broke one merged green.
+
+- **Five more interpolated locale namespaces are checked against the spec**, after 2.10.0
+  shipped four sets of raw translation keys to a customer's screen and guarded only those four.
+
 ## [2.10.0] - 2026-09-04
 
 Fifty-five commits since 2.9.1. The theme, if there is one, is closing the gap between what the

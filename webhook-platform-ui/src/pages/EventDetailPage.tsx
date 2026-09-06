@@ -89,7 +89,7 @@ export default function EventDetailPage() {
     refetchDeliveries();
   };
 
-  const matchingSchema = eventTypes?.find((et: any) => et.name === event?.eventType);
+  const matchingSchema = eventTypes?.find((et) => et.name === event?.eventType);
 
   if (isLoading) return <PageSkeleton maxWidth="max-w-none" />;
   if (isError) {

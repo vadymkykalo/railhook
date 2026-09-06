@@ -15,7 +15,9 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
     private final ApiKeyScope scope;
 
     public ApiKeyAuthenticationToken(String apiKey) {
-        super(null);
+        // Cast because Spring Security 7 added a second, builder-taking constructor, which
+        // makes a bare null ambiguous. Still the authorities overload, still "none yet".
+        super((Collection<? extends GrantedAuthority>) null);
         this.apiKey = apiKey;
         this.projectId = null;
         this.organizationId = null;

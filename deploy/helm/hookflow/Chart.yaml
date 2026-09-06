@@ -2,8 +2,8 @@ apiVersion: v2
 name: hookflow
 description: Self-hosted webhook infrastructure platform
 type: application
-version: 2.10.0
-appVersion: "2.10.0"
+version: 2.11.0
+appVersion: "2.11.0"
 keywords:
   - webhooks
   - event-delivery
@@ -13,8 +13,8 @@ home: https://github.com/vadymkykalo/webhook-platform
 sources:
   - https://github.com/vadymkykalo/webhook-platform
 maintainers:
-  - name: Hookflow Team
-    email: info@hookflow.dev
+  - name: Hookflow maintainers
+    url: https://github.com/vadymkykalo/webhook-platform/issues
 # The postgresql (12.x.x), redis (18.x.x) and kafka (26.x.x) Bitnami
 # subchart dependencies that used to live here were removed. Bitnami moved
 # its free catalog to a restricted/"Legacy" tier starting 2025-08-28 (see

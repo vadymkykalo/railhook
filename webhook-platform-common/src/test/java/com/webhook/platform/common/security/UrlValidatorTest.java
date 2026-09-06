@@ -2,6 +2,7 @@ package com.webhook.platform.common.security;
 
 import org.junit.jupiter.api.Test;
 
+import java.net.InetAddress;
 import java.util.Collections;
 import java.util.List;
 
@@ -266,5 +267,54 @@ class UrlValidatorTest {
         assertDoesNotThrow(() ->
             UrlValidator.validateWebhookUrl("http://240.0.0.1", true, Collections.emptyList())
         );
+    }
+    // ── The post-connect half of the same decision ──────────────────────────────
+    //
+    // validateWebhookUrl runs at admission; SsrfProtectionCustomizer re-runs the check
+    // against the address the socket actually connected to, which is what closes the DNS
+    // rebinding window. Those two have to agree, and they did not: admission honoured
+    // allowedHosts and the post-connect check did not know the list existed, so an operator
+    // who allow-listed one internal host got every delivery to it killed at the TCP layer
+    // with nothing in the config to explain why.
+
+    @Test
+    void postConnectRejectsAPrivateAddressWhenNothingIsAllowListed() throws Exception {
+        assertTrue(UrlValidator.isBlockedTarget(
+                "internal.example.com", InetAddress.getByName("10.1.2.3"), false, Collections.emptyList()));
+    }
+
+    @Test
+    void postConnectHonoursTheAllowListTheAdmissionCheckHonours() throws Exception {
+        assertFalse(UrlValidator.isBlockedTarget(
+                "internal.example.com", InetAddress.getByName("10.1.2.3"), false,
+                List.of("internal.example.com")));
+    }
+
+    @Test
+    void postConnectAllowListDoesNotCoverAHostThatIsNotOnIt() throws Exception {
+        assertTrue(UrlValidator.isBlockedTarget(
+                "other.example.com", InetAddress.getByName("10.1.2.3"), false,
+                List.of("internal.example.com")));
+    }
+
+    @Test
+    void postConnectNeverAllowListsAMetadataEndpoint() throws Exception {
+        // Same precedence as admission: BLOCKED_HOSTS wins over the allow list. Putting the
+        // metadata address on it must not be a way to reach cloud credentials.
+        assertTrue(UrlValidator.isBlockedTarget(
+                "169.254.169.254", InetAddress.getByName("169.254.169.254"), false,
+                List.of("169.254.169.254")));
+    }
+
+    @Test
+    void postConnectAllowsAPublicAddressWithoutAnyList() throws Exception {
+        assertFalse(UrlValidator.isBlockedTarget(
+                "example.com", InetAddress.getByName("93.184.216.34"), false, Collections.emptyList()));
+    }
+
+    @Test
+    void postConnectAllowsAPrivateAddressWhenPrivateIpsAreAllowedOutright() throws Exception {
+        assertFalse(UrlValidator.isBlockedTarget(
+                "internal.example.com", InetAddress.getByName("10.1.2.3"), true, Collections.emptyList()));
     }
 }

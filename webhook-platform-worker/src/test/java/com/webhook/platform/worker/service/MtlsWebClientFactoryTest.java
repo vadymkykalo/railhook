@@ -75,7 +75,7 @@ class MtlsWebClientFactoryTest {
     @BeforeEach
     void setUp() throws Exception {
         encryptionKeyRegistry = createTestRegistry(ENCRYPTION_KEY, ENCRYPTION_SALT);
-        factory = new MtlsWebClientFactory(encryptionKeyRegistry, true, WebClient.builder(), ConnectionProvider.newConnection());
+        factory = new MtlsWebClientFactory(encryptionKeyRegistry, true, java.util.List.of(), WebClient.builder(), ConnectionProvider.newConnection());
     }
 
     private static EncryptionKeyRegistry createTestRegistry(String key, String salt) throws Exception {

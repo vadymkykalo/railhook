@@ -178,7 +178,7 @@ export default function CreateSubscriptionModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5 text-primary" />
@@ -414,12 +414,8 @@ export default function CreateSubscriptionModal({
                       {errors.payloadTemplate ? (
                         <p className="text-[11px] text-halt">{errors.payloadTemplate}</p>
                       ) : (
-                        // TODO(i18n): the sentence below is the only literal
-                        // English left in JSX. It needs a key (suggest
-                        // createSubscription.fields.payloadTemplateHint); the
-                        // locale files are owned elsewhere on this branch.
                         <p className="text-[11px] text-muted-foreground">
-                          JSONPath: <code className="bg-muted px-0.5 rounded">${'{'}$.path{'}'}</code>. Empty = original payload.
+                          {t('createSubscription.fields.payloadTemplateHint')}
                         </p>
                       )}
                     </div>

@@ -5,6 +5,14 @@ import i18n from '../i18n';
 
 interface Props {
   children: ReactNode;
+  /**
+   * `page` keeps the failure inside the content area, leaving the shell — sidebar, project
+   * switcher, navigation — alive and usable. Without it the app had exactly one boundary, at
+   * the root, so a render error anywhere took the whole dashboard down and the only way out
+   * was a reload. The heaviest pages are the likeliest to throw and the least likely to be
+   * where the user wants to stay.
+   */
+  variant?: 'app' | 'page';
 }
 
 interface State {
@@ -37,13 +45,24 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      const page = this.props.variant === 'page';
       return (
-        <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div
+          className={
+            page
+              ? 'flex min-h-[60vh] items-center justify-center p-6'
+              : 'flex min-h-screen items-center justify-center bg-background p-6'
+          }
+        >
           <div role="alert" className="w-full max-w-md text-center">
             <div className="mx-auto mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-halt/30 bg-halt-soft">
               <AlertTriangle className="h-5 w-5 text-halt" aria-hidden />
             </div>
-            <h1 className="text-title">{i18n.t('errorBoundary.title')}</h1>
+            {page ? (
+              <h2 className="text-title">{i18n.t('errorBoundary.title')}</h2>
+            ) : (
+              <h1 className="text-title">{i18n.t('errorBoundary.title')}</h1>
+            )}
             <p className="mt-1.5 text-sm text-muted-foreground">
               {i18n.t('errorBoundary.description')}
             </p>

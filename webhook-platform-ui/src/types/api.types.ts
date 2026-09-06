@@ -13,6 +13,8 @@ export interface RegisterRequest {
   password: string;
   fullName: string;
   organizationName: string;
+  /** Only sent when the deployment configured a CAPTCHA; absent otherwise. */
+  captchaToken?: string;
 }
 
 export interface LoginRequest {

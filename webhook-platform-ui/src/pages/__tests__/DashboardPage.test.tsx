@@ -96,7 +96,7 @@ describe('DashboardPage', () => {
     });
     vi.mocked(deliveriesApi.listByProject).mockResolvedValue(EMPTY_PAGE);
     vi.mocked(alertsApi.unresolvedCount).mockResolvedValue({ count: 0 });
-    vi.mocked(incidentsApi.countOpen).mockResolvedValue({ count: 0 });
+    vi.mocked(incidentsApi.countOpen).mockResolvedValue({ count: 0, investigating: 0, critical: 0 });
     vi.mocked(incomingSourcesApi.list).mockResolvedValue({
       content: [], totalElements: 0, totalPages: 0, size: 20, number: 0, first: true, last: true,
     });

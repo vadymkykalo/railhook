@@ -35,6 +35,10 @@ class ProductionSafetyValidatorTest {
         ReflectionTestUtils.setField(v, "corsAllowedOrigins", "https://app.example.com");
         ReflectionTestUtils.setField(v, "allowPrivateIps", false);
         ReflectionTestUtils.setField(v, "swaggerEnabled", false);
+        ReflectionTestUtils.setField(v, "billingEnabled", false);
+        ReflectionTestUtils.setField(v, "emailEnabled", false);
+        ReflectionTestUtils.setField(v, "billingProvider", "noop");
+        ReflectionTestUtils.setField(v, "captchaSecretKey", "");
     }
 
     // -----------------------------------------------------------------
@@ -217,5 +221,74 @@ class ProductionSafetyValidatorTest {
         IllegalStateException ex = assertThrows(IllegalStateException.class, v::validateProductionConfig);
         assertTrue(ex.getMessage().contains("WEBHOOK_ALLOW_PRIVATE_IPS"));
         assertTrue(ex.getMessage().contains("SWAGGER_ENABLED"));
+    }
+    // -----------------------------------------------------------------
+    // Hosted mode: BILLING_ENABLED is the only thing separating a paid
+    // multi-tenant deployment from a self-hosted one, so the settings that
+    // have to accompany it are checked rather than assumed.
+    // -----------------------------------------------------------------
+
+    @Test
+    void selfHostedIsUnaffectedByTheHostedModeChecks() {
+        // Billing off is the shipped default and the whole of what makes self-hosting
+        // ungated; nothing about mail or a payment provider is required there.
+        ProductionSafetyValidator v = newValidator();
+        setValid(v);
+
+        assertDoesNotThrow(v::validateProductionConfig);
+    }
+
+    @Test
+    void billingWithoutMailIsRejected() {
+        // Registration marks an account verified when nothing can be sent to it. Open
+        // registration plus that is a paid tier behind an unproven address.
+        ProductionSafetyValidator v = newValidator();
+        setValid(v);
+        ReflectionTestUtils.setField(v, "billingEnabled", true);
+        ReflectionTestUtils.setField(v, "billingProvider", "stripe");
+        ReflectionTestUtils.setField(v, "captchaSecretKey", "0x4AAAAAAA-turnstile-secret");
+        ReflectionTestUtils.setField(v, "emailEnabled", false);
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, v::validateProductionConfig);
+        assertTrue(e.getMessage().contains("EMAIL_ENABLED=false"));
+    }
+
+    @Test
+    void billingWithTheNoOpProviderIsRejected() {
+        ProductionSafetyValidator v = newValidator();
+        setValid(v);
+        ReflectionTestUtils.setField(v, "billingEnabled", true);
+        ReflectionTestUtils.setField(v, "emailEnabled", true);
+        ReflectionTestUtils.setField(v, "captchaSecretKey", "0x4AAAAAAA-turnstile-secret");
+        ReflectionTestUtils.setField(v, "billingProvider", "noop");
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, v::validateProductionConfig);
+        assertTrue(e.getMessage().contains("BILLING_DEFAULT_PROVIDER"));
+    }
+
+    @Test
+    void aCoherentHostedConfigurationIsAccepted() {
+        ProductionSafetyValidator v = newValidator();
+        setValid(v);
+        ReflectionTestUtils.setField(v, "billingEnabled", true);
+        ReflectionTestUtils.setField(v, "emailEnabled", true);
+        ReflectionTestUtils.setField(v, "billingProvider", "stripe");
+        ReflectionTestUtils.setField(v, "captchaSecretKey", "0x4AAAAAAA-turnstile-secret");
+
+        assertDoesNotThrow(v::validateProductionConfig);
+    }
+    @Test
+    void billingWithoutACaptchaIsRejected() {
+        // The registration rate limit is per address, and an address is the one thing a signup
+        // farm has plenty of. A free tier with no challenge is a free tier anyone can mint.
+        ProductionSafetyValidator v = newValidator();
+        setValid(v);
+        ReflectionTestUtils.setField(v, "billingEnabled", true);
+        ReflectionTestUtils.setField(v, "emailEnabled", true);
+        ReflectionTestUtils.setField(v, "billingProvider", "stripe");
+        ReflectionTestUtils.setField(v, "captchaSecretKey", "");
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, v::validateProductionConfig);
+        assertTrue(e.getMessage().contains("CAPTCHA_SECRET_KEY"));
     }
 }

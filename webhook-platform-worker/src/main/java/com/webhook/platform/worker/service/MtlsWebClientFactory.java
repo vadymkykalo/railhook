@@ -38,6 +38,7 @@ public class MtlsWebClientFactory {
 
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
+    private final java.util.List<String> allowedHosts;
     private final WebClient.Builder webClientBuilder;
     private final ConnectionProvider connectionProvider;
     private final Cache<UUID, CachedClient> mtlsClientCache = Caffeine.newBuilder()
@@ -50,10 +51,12 @@ public class MtlsWebClientFactory {
     public MtlsWebClientFactory(
             EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
+            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts,
             WebClient.Builder webClientBuilder,
             ConnectionProvider webhookConnectionProvider) {
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.allowPrivateIps = allowPrivateIps;
+        this.allowedHosts = allowedHosts;
         this.webClientBuilder = webClientBuilder;
         this.connectionProvider = webhookConnectionProvider;
     }
@@ -133,7 +136,7 @@ public class MtlsWebClientFactory {
         SslContext sslContext = sslContextBuilder.build();
 
         HttpClient httpClient = SsrfProtectionCustomizer.apply(
-                HttpClient.create(connectionProvider), allowPrivateIps)
+                HttpClient.create(connectionProvider), allowPrivateIps, allowedHosts)
                 .secure(spec -> spec.sslContext(sslContext));
 
         log.info("Created mTLS WebClient for endpoint {}", endpoint.getId());

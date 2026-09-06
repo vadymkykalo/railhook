@@ -34,13 +34,13 @@ import com.webhook.platform.api.service.SequenceGeneratorService;
 import com.webhook.platform.api.service.TestEndpointCleanupService;
 import com.webhook.platform.api.service.TokenBlacklistService;
 import org.redisson.api.RedissonClient;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.annotation.DirtiesContext;
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration,org.redisson.spring.starter.RedissonAutoConfigurationV2"
+        "spring.autoconfigure.exclude=org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration,org.redisson.spring.starter.RedissonAutoConfigurationV2"
     }
 )
 @Testcontainers
@@ -57,28 +57,28 @@ public class DataRetentionIntegrationTest {
      */
     private static final UUID FIXTURE_ORG = UUID.randomUUID();
 
-    @MockBean
+    @MockitoBean
     private RedissonClient redissonClient;
 
-    @MockBean
+    @MockitoBean
     private SequenceGeneratorService sequenceGeneratorService;
 
-    @MockBean
+    @MockitoBean
     private RedisRateLimiterService redisRateLimiterService;
 
-    @MockBean
+    @MockitoBean
     private OutboxPublisherService outboxPublisherService;
 
-    @MockBean
+    @MockitoBean
     private TestEndpointCleanupService testEndpointCleanupService;
 
-    @MockBean
+    @MockitoBean
     private AuthRateLimiterService authRateLimiterService;
 
-    @MockBean
+    @MockitoBean
     private TokenBlacklistService tokenBlacklistService;
 
-    @MockBean
+    @MockitoBean
     private RedisTunnelCoordinator redisTunnelCoordinator;
 
     @Container

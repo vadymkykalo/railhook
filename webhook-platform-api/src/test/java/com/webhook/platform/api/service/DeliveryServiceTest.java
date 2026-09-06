@@ -153,7 +153,7 @@ class DeliveryServiceTest {
         DeliveryResponse response = deliveryService.getDelivery(deliveryId, auth);
 
         assertThat(response.getId()).isEqualTo(deliveryId);
-        assertThat(response.getStatus()).isEqualTo("SUCCESS");
+        assertThat(response.getStatus()).isEqualTo(DeliveryStatus.SUCCESS);
     }
 
     // ─── listDeliveries ──────────────────────────────────────────────────

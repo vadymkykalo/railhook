@@ -47,7 +47,7 @@ public class HttpNodeExecutor implements NodeExecutor {
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         this.webClient = webClientBuilder
                 .clientConnector(new ReactorClientHttpConnector(
-                        SsrfProtectionCustomizer.apply(HttpClient.create(), allowPrivateIps)))
+                        SsrfProtectionCustomizer.apply(HttpClient.create(), allowPrivateIps, allowedHosts)))
                 .build();
         this.objectMapper = objectMapper;
         this.allowPrivateIps = allowPrivateIps;

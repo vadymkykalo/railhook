@@ -77,13 +77,13 @@ class CircuitBreakerServiceTest {
 
     @SuppressWarnings("unchecked")
     private void stubFailureEval(List<Object> result) {
-        when(rScript.eval(eq(RScript.Mode.READ_WRITE), anyString(), eq(RScript.ReturnType.MULTI),
+        when(rScript.eval(eq(RScript.Mode.READ_WRITE), anyString(), eq(RScript.ReturnType.LIST),
                 anyList(), any(), any(), any())).thenReturn(result);
     }
 
     @SuppressWarnings("unchecked")
     private void stubSuccessEval(List<Object> result) {
-        when(rScript.eval(eq(RScript.Mode.READ_WRITE), anyString(), eq(RScript.ReturnType.MULTI),
+        when(rScript.eval(eq(RScript.Mode.READ_WRITE), anyString(), eq(RScript.ReturnType.LIST),
                 anyList(), any(), any(), any(), any(), any())).thenReturn(result);
     }
 

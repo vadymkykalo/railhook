@@ -31,7 +31,7 @@ class CliConfigServiceTest {
         CliConfigService service = new CliConfigService(configPath);
 
         CliConfig config = new CliConfig();
-        config.setBackendUrl("https://api.hookflow.dev");
+        config.setBackendUrl("https://api.example.com");
         config.setAccessToken("test-token-123");
         config.setRefreshToken("refresh-token-456");
         config.setUserId("user-001");
@@ -41,7 +41,7 @@ class CliConfigServiceTest {
         service.save(config);
 
         CliConfig loaded = service.load();
-        assertEquals("https://api.hookflow.dev", loaded.getBackendUrl());
+        assertEquals("https://api.example.com", loaded.getBackendUrl());
         assertEquals("test-token-123", loaded.getAccessToken());
         assertEquals("refresh-token-456", loaded.getRefreshToken());
         assertEquals("user-001", loaded.getUserId());
@@ -114,8 +114,8 @@ class CliConfigServiceTest {
         config.setBackendUrl("http://localhost:8080");
         assertEquals("ws://localhost:8080", config.getWsUrl());
 
-        config.setBackendUrl("https://api.hookflow.dev");
-        assertEquals("wss://api.hookflow.dev", config.getWsUrl());
+        config.setBackendUrl("https://api.example.com");
+        assertEquals("wss://api.example.com", config.getWsUrl());
     }
 
     @Test

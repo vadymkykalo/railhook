@@ -30,8 +30,12 @@ COPY webhook-platform-ui/ .
 # origin and needs no absolute API URL.
 ARG VITE_API_URL=""
 ARG VITE_CSP_EXTRA_CONNECT=""
+ARG VITE_SITE_URL=""
+ARG VITE_CONTACT_DOMAIN=""
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_CSP_EXTRA_CONNECT=$VITE_CSP_EXTRA_CONNECT
+ENV VITE_SITE_URL=$VITE_SITE_URL
+ENV VITE_CONTACT_DOMAIN=$VITE_CONTACT_DOMAIN
 
 # Chromium for the prerender step. Alpine's package rather than a Puppeteer download:
 # puppeteer-core ships no browser, and the musl builds Puppeteer fetches do not run here.

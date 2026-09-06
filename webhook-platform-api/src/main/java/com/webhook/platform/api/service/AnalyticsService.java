@@ -10,6 +10,7 @@ import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import com.webhook.platform.api.domain.enums.EndpointHealth;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 
 import java.time.Instant;
@@ -187,17 +188,6 @@ public class AnalyticsService {
                             ? (double) successfulDeliveries / totalDeliveries * 100 
                             : 0;
 
-                    String status;
-                    if (totalDeliveries == 0) {
-                        status = "HEALTHY";
-                    } else if (successRate >= 99) {
-                        status = "HEALTHY";
-                    } else if (successRate >= 95) {
-                        status = "DEGRADED";
-                    } else {
-                        status = "FAILING";
-                    }
-
                     return EndpointPerformance.builder()
                             .endpointId((String) row[0])
                             .url((String) row[1])
@@ -209,7 +199,7 @@ public class AnalyticsService {
                             .avgLatencyMs(row[6] != null ? ((Number) row[6]).doubleValue() : 0)
                             .p95LatencyMs(row[7] != null ? ((Number) row[7]).longValue() : 0)
                             .lastDeliveryAt(row[8] != null ? row[8].toString() : null)
-                            .status(status)
+                            .status(EndpointHealth.of(totalDeliveries, successRate))
                             .build();
                 })
                 .collect(Collectors.toList());

@@ -114,7 +114,7 @@ public class CircuitBreakerService {
             java.util.List<Object> result = script.eval(
                     RScript.Mode.READ_WRITE,
                     recordSuccessScript,
-                    RScript.ReturnType.MULTI,
+                    RScript.ReturnType.LIST,
                     java.util.Arrays.asList(callsKey(endpointId), slowKey(endpointId)),
                     windowTtlSeconds, durationMs, slowCallThresholdMs, minimumNumberOfCalls, slowCallRateThreshold
             );
@@ -145,7 +145,7 @@ public class CircuitBreakerService {
             java.util.List<Object> result = script.eval(
                     RScript.Mode.READ_WRITE,
                     recordFailureScript,
-                    RScript.ReturnType.MULTI,
+                    RScript.ReturnType.LIST,
                     java.util.Arrays.asList(failsKey(endpointId), callsKey(endpointId)),
                     windowTtlSeconds, minimumNumberOfCalls, failureRateThreshold
             );

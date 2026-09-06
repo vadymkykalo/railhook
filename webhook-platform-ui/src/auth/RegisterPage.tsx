@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import CaptchaWidget, { isCaptchaConfigured } from '../components/CaptchaWidget';
 import { useNavigate, Link } from 'react-router-dom';
 import { Loader2, Mail } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -20,6 +21,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [organizationName, setOrganizationName] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
@@ -39,6 +41,9 @@ export default function RegisterPage() {
         password,
         fullName,
         organizationName,
+        // Absent unless the deployment configured a challenge; the API accepts a registration
+        // without one in exactly that case.
+        ...(captchaToken ? { captchaToken } : {}),
       });
       http.setToken(authResponse.accessToken);
       const user = await authApi.getCurrentUser();
@@ -188,7 +193,14 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <Button type="submit" className="h-10 w-full" disabled={loading || !passwordMeetsPolicy(password)}>
+        <CaptchaWidget onToken={setCaptchaToken} />
+
+        <Button
+          type="submit"
+          className="h-10 w-full"
+          disabled={loading || !passwordMeetsPolicy(password)
+            || (isCaptchaConfigured() && !captchaToken)}
+        >
           {loading && <Loader2 className="h-4 w-4 animate-spin" />}
           {loading ? t('auth.register.submitting') : t('auth.register.submit')}
         </Button>

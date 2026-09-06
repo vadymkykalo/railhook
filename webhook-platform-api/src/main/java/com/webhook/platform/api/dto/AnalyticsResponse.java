@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.api.domain.enums.EndpointHealth;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -87,7 +88,7 @@ public class AnalyticsResponse {
         private double avgLatencyMs;
         private long p95LatencyMs;
         private String lastDeliveryAt;
-        private String status; // HEALTHY, DEGRADED, FAILING
+        private EndpointHealth status;
     }
 
     @Data

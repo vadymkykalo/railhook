@@ -163,7 +163,7 @@ public class OrderingBufferService {
         Long advanced = script.eval(
                 RScript.Mode.READ_WRITE,
                 cursorCasScript,
-                RScript.ReturnType.INTEGER,
+                RScript.ReturnType.LONG,
                 Collections.singletonList(key),
                 authoritative,
                 deliveredSeqTtl.toMillis());

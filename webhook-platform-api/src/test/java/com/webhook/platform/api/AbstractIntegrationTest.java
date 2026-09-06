@@ -12,9 +12,9 @@ import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.redisson.api.RedissonClient;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
-                "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration,org.redisson.spring.starter.RedissonAutoConfigurationV2"
+                "spring.autoconfigure.exclude=org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration,org.redisson.spring.starter.RedissonAutoConfigurationV2"
         }
 )
 @Testcontainers
@@ -37,31 +37,31 @@ import static org.mockito.Mockito.when;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class AbstractIntegrationTest {
 
-    @MockBean
+    @MockitoBean
     protected RedissonClient redissonClient;
 
-    @MockBean
+    @MockitoBean
     protected SequenceGeneratorService sequenceGeneratorService;
 
-    @MockBean
+    @MockitoBean
     protected SequenceReconciliationService sequenceReconciliationService;
 
-    @MockBean
+    @MockitoBean
     protected RedisRateLimiterService redisRateLimiterService;
 
-    @MockBean
+    @MockitoBean
     protected OutboxPublisherService outboxPublisherService;
 
-    @MockBean
+    @MockitoBean
     protected TestEndpointCleanupService testEndpointCleanupService;
 
-    @MockBean
+    @MockitoBean
     protected AuthRateLimiterService authRateLimiterService;
 
-    @MockBean
+    @MockitoBean
     protected TokenBlacklistService tokenBlacklistService;
 
-    @MockBean
+    @MockitoBean
     protected RedisTunnelCoordinator redisTunnelCoordinator;
 
     /**

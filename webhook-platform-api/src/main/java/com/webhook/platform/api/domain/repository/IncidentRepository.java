@@ -1,6 +1,7 @@
 package com.webhook.platform.api.domain.repository;
 
 import com.webhook.platform.api.domain.entity.Incident;
+import com.webhook.platform.api.domain.enums.AlertSeverity;
 import com.webhook.platform.api.domain.enums.IncidentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,4 +17,9 @@ public interface IncidentRepository extends JpaRepository<Incident, UUID> {
     Page<Incident> findByProjectIdAndStatusNotOrderByCreatedAtDesc(UUID projectId, IncidentStatus excludeStatus, Pageable pageable);
     Optional<Incident> findByIdAndProjectId(UUID id, UUID projectId);
     long countByProjectIdAndStatusNot(UUID projectId, IncidentStatus excludeStatus);
+
+    long countByProjectIdAndStatus(UUID projectId, IncidentStatus status);
+
+    long countByProjectIdAndSeverityAndStatusNot(UUID projectId, AlertSeverity severity,
+                                                 IncidentStatus excludeStatus);
 }

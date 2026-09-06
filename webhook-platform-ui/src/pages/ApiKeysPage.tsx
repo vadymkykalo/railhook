@@ -295,7 +295,7 @@ export default function ApiKeysPage() {
 
       {/* Create */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('apiKeys.createDialog.title')}</DialogTitle>
             <DialogDescription>{t('apiKeys.createDialog.description')}</DialogDescription>
@@ -419,7 +419,7 @@ export default function ApiKeysPage() {
 
       {/* The one and only sighting of the secret. */}
       <Dialog open={!!newApiKey} onOpenChange={(open) => { if (!open) { setNewApiKey(null); setCopied(false); } }}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('apiKeys.keyDialog.title', { name: newApiKey?.name ?? '' })}</DialogTitle>
             <DialogDescription>{t('apiKeys.keyDialog.description')}</DialogDescription>

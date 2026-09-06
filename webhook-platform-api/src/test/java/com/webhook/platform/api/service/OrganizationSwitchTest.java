@@ -182,7 +182,7 @@ class OrganizationSwitchTest {
     @Test
     @DisplayName("an access token presented in place of the refresh token is not accepted")
     void refusesAnAccessTokenAtTheRefreshSlot() {
-        String accessToken = jwtUtil.generateAccessToken(userId, homeOrgId, MembershipRole.OWNER, sessionId);
+        String accessToken = jwtUtil.generateAccessToken(userId, homeOrgId, MembershipRole.OWNER, sessionId, true);
 
         assertThatThrownBy(() -> authService.switchOrganization(userId, to(clientOrgId), accessToken))
                 .isInstanceOf(ResponseStatusException.class)

@@ -83,6 +83,20 @@ public class ProductionSafetyValidator {
     @Value("${swagger.enabled:true}")
     private boolean swaggerEnabled;
 
+    // The hosted-mode pair. Neither is unsafe on its own; together, one on and the other off
+    // is a service that bills nobody and verifies nobody while believing it does both.
+    @Value("${billing.enabled:false}")
+    private boolean billingEnabled;
+
+    @Value("${app.email.enabled:false}")
+    private boolean emailEnabled;
+
+    @Value("${billing.default-provider:noop}")
+    private String billingProvider;
+
+    @Value("${captcha.secret-key:}")
+    private String captchaSecretKey;
+
     @PostConstruct
     public void validateProductionConfig() {
         if (!"production".equalsIgnoreCase(appEnv)) {
@@ -110,6 +124,8 @@ public class ProductionSafetyValidator {
         if (swaggerEnabled) {
             violations.add("SWAGGER_ENABLED=true — should be false in production (info disclosure)");
         }
+        validateHostedMode(violations);
+
         if (corsAllowedOrigins != null && !corsAllowedOrigins.isBlank()) {
             String lower = corsAllowedOrigins.toLowerCase();
             if (lower.contains("localhost") || lower.contains("127.0.0.1")) {
@@ -125,6 +141,50 @@ public class ProductionSafetyValidator {
         }
 
         log.info("Production safety checks passed");
+    }
+
+    /**
+     * Checks the settings that only make sense together once the platform is charging strangers.
+     *
+     * <p>{@code BILLING_ENABLED=true} is the whole of what separates a hosted deployment from a
+     * self-hosted one — there is no separate build, no profile, no licence key. Which means the
+     * hosted deployment is one unset variable away from being an open, unbilled, unverified
+     * multi-tenant service that starts up perfectly happily and says nothing.
+     *
+     * <p>Two things it must not be missing:
+     *
+     * <ul>
+     *   <li>Mail. Registration marks an account verified when no mail can be sent, because a
+     *       token nobody receives proves nothing — correct for self-hosting, and on open
+     *       registration it means every account is verified by assertion.</li>
+     *   <li>A payment provider. {@code noop} accepts every plan change and charges for none, so
+     *       billing is "enabled" and free.</li>
+     *   <li>A CAPTCHA. The registration rate limit is per address, which is the one thing a
+     *       signup farm has plenty of.</li>
+     * </ul>
+     *
+     * <p>Nothing here fires for a self-hosted deployment: with billing off, which is the shipped
+     * default, this method has nothing to say.
+     */
+    private void validateHostedMode(List<String> violations) {
+        if (!billingEnabled) {
+            return;
+        }
+        if (!emailEnabled) {
+            violations.add("BILLING_ENABLED=true with EMAIL_ENABLED=false — registration would mark "
+                    + "every account verified without sending anything, so a paid tier sits behind "
+                    + "an address nobody proved they own");
+        }
+        if (billingProvider == null || billingProvider.isBlank() || "noop".equalsIgnoreCase(billingProvider)) {
+            violations.add("BILLING_ENABLED=true with BILLING_DEFAULT_PROVIDER=" + billingProvider
+                    + " — the no-op provider accepts every plan change and charges for none, so plans "
+                    + "would be enforced and free");
+        }
+        if (captchaSecretKey == null || captchaSecretKey.isBlank()) {
+            violations.add("BILLING_ENABLED=true with no CAPTCHA_SECRET_KEY — registration is then "
+                    + "rate-limited per address and nothing else, which a signup farm distributes "
+                    + "around; a free tier with no challenge is a free tier anyone can mint");
+        }
     }
 
     /**

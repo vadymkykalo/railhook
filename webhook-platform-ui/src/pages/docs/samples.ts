@@ -241,7 +241,7 @@ export const cliSamples = {
 # ✓ Logged in as you@company.com`,
   listen: `hookflow listen 3000
 
-#   Public URL:  https://tun-x4k9.hookflow.dev/t/tun-x4k9
+#   Public URL:  https://tun-x4k9.example.com/t/tun-x4k9
 #   Forwarding:  → http://localhost:3000
 #   Press Ctrl+C to stop`,
   profiles: `hookflow config profile create staging --url https://staging.company.com

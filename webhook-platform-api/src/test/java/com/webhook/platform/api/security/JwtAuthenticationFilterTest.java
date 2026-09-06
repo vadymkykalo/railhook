@@ -49,7 +49,7 @@ class JwtAuthenticationFilterTest {
 
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
 
-        String token = jwtUtil.generateAccessToken(UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, null);
+        String token = jwtUtil.generateAccessToken(UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, null, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + token);
@@ -93,7 +93,7 @@ class JwtAuthenticationFilterTest {
 
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
         String token = jwtUtil.generateAccessToken(
-                UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, sessionId);
+                UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, sessionId, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + token);
@@ -123,7 +123,7 @@ class JwtAuthenticationFilterTest {
 
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, blacklistService);
         String token = jwtUtil.generateAccessToken(
-                UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, null);
+                UUID.randomUUID(), UUID.randomUUID(), MembershipRole.OWNER, null, true);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + token);

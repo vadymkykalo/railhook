@@ -15,7 +15,7 @@ import com.webhook.platform.api.security.JwtUtil;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -123,7 +123,7 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
         // Approve the device code while acting in the client org context (a JWT scoped
         // to clientOrgId — exactly what the dashboard would present if the user had the
         // client org selected when they approved the CLI login).
-        String clientOrgToken = jwtUtil.generateAccessToken(userId, clientOrgId, MembershipRole.VIEWER, null);
+        String clientOrgToken = jwtUtil.generateAccessToken(userId, clientOrgId, MembershipRole.VIEWER, null, true);
 
         DeviceCodeResponse deviceCode = initiate();
         mockMvc.perform(post("/api/v1/auth/device/approve")
@@ -164,7 +164,7 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
         // a membership revoked between JWT issuance and the poll. The service must not
         // trust the org/role encoded on the JWT to imply real membership; it must fail
         // closed.
-        String bogusOrgToken = jwtUtil.generateAccessToken(userId, otherOrgId, MembershipRole.OWNER, null);
+        String bogusOrgToken = jwtUtil.generateAccessToken(userId, otherOrgId, MembershipRole.OWNER, null, true);
 
         DeviceCodeResponse deviceCode = initiate();
         mockMvc.perform(post("/api/v1/auth/device/approve")

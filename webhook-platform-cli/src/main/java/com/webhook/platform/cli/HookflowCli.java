@@ -16,7 +16,8 @@ import picocli.CommandLine.Command;
                 ReplayCommand.class,
                 TunnelsCommand.class,
                 EventsTailCommand.class,
-                ConfigCommand.class
+                ConfigCommand.class,
+                AdminCommand.class
         }
 )
 public class HookflowCli implements Runnable {

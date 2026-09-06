@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { UserPlus, Trash2, Users, RefreshCw, MailX, Ban, UserCheck } from 'lucide-react';
+import { UserPlus, Trash2, Users, RefreshCw, MailX, Ban, UserCheck, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -21,6 +21,7 @@ import {
 import { useAuth } from '../auth/auth.store';
 import { usePermissions } from '../auth/usePermissions';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Select } from '../components/ui/select';
@@ -58,6 +59,18 @@ export default function MembersPage() {
   const queryClient = useQueryClient();
 
   const { data: members = [], isLoading, isError, error, refetch, isRefetching } = useMembers(orgId);
+
+  // Client-side, because the API serves members as one unpaginated array - which is fine for
+  // the size an organization actually is, and is why scrolling was the only way to find
+  // someone. Matching on email and role covers what people search a member list for.
+  const [searchFilter, setSearchFilter] = useState('');
+  const filteredMembers = useMemo(() => {
+    if (!searchFilter) return members;
+    const q = searchFilter.toLowerCase();
+    return members.filter(
+      (m) => m.email?.toLowerCase().includes(q) || m.role?.toLowerCase().includes(q),
+    );
+  }, [members, searchFilter]);
   const changeRole = useChangeMemberRole(orgId!);
   const removeMember = useRemoveMember(orgId!);
   const reissueInvite = useReissueInvite(orgId!);
@@ -186,7 +199,24 @@ export default function MembersPage() {
           ) : undefined}
         />
       ) : (
-        <Card className="animate-fade-in overflow-hidden">
+        <>
+          <div className="relative mb-4 max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input
+              aria-label={t('members.search')}
+              placeholder={t('members.search')}
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {filteredMembers.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-rail px-6 py-12 text-center text-sm text-muted-foreground">
+              {t('members.noResults')}
+            </p>
+          ) : (
+          <Card className="animate-fade-in overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
@@ -200,7 +230,7 @@ export default function MembersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {members.map((member) => {
+              {filteredMembers.map((member) => {
                 const isSelf = member.userId === user?.user?.id;
                 const RoleIcon = ROLE_ICON[member.role];
                 return (
@@ -335,6 +365,8 @@ export default function MembersPage() {
             </TableBody>
           </Table>
         </Card>
+          )}
+        </>
       )}
 
       {canManageMembers && (
