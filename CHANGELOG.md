@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-09-06
+
 ### Changed
 
 - **Spring Boot 4.1.1.** 3.5.16 was the final OSS release of the 3.5.x line, and the fixes for

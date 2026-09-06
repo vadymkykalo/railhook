@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+## v2.11.0
+
+### The shipped defaults stopped naming a domain this project does not own
+
+`hookflow.dev` serves an unrelated product, and it was the hardcoded value behind
+`rel="canonical"`, `og:image`, `public/sitemap.xml`, `robots.txt`'s `Sitemap:` line, the
+`sales@` / `support@` addresses on `/contact`, and the default `EMAIL_FROM` in `.env.dist`,
+`docker-compose.yml`, `application.yml` and both Helm values files. Nothing replaces it with
+another constant — a deployment now says what it is, or says nothing.
+
+**Act on this if you never set `EMAIL_FROM`.** The default is now
+`noreply@example.com`, which will not deliver. It never really did — mail from a domain you
+do not own fails SPF and DKIM at the receiver — but the old value looked plausible enough to
+leave alone. Set it to an address at a domain you control:
+
+```env
+EMAIL_FROM=noreply@your-domain.example
+```
+
+Two new build-time variables, both optional and both irrelevant to a private dashboard:
+
+```env
+# Public origin, if this deployment has one. Empty: the canonical follows the
+# browser's own origin and index.html publishes no absolute self-reference.
+VITE_SITE_URL=
+
+# Domain behind the sales@ / support@ cards on /contact. Empty: those two cards
+# are not rendered, which is the right answer for an internal deployment.
+VITE_CONTACT_DOMAIN=
+```
+
+Being `VITE_*`, they are inlined at build time and take effect only when the UI image is
+rebuilt; on the pre-built images they cannot be set at all.
+
+If you serve a public site and want a sitemap that names it, regenerate the two files
+together:
+
+```bash
+cd webhook-platform-ui && SITE_URL=https://your.domain npm run seo:sitemap
+# then edit the Sitemap: line in public/robots.txt to match
+```
+
+## v2.10.0
+
+*(These notes were previously filed under "Unreleased"; they describe upgrading to 2.10.0.)*
+
 ### `VITE_API_URL` now takes effect — check your `.env` before rebuilding the UI
 
 `VITE_API_URL` and `VITE_CSP_EXTRA_CONNECT` were being passed as runtime
