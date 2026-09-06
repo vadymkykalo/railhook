@@ -2,8 +2,8 @@ apiVersion: v2
 name: hookflow
 description: Self-hosted webhook infrastructure platform
 type: application
-version: 2.11.0
-appVersion: "2.11.0"
+version: 2.12.0
+appVersion: "2.12.0"
 keywords:
   - webhooks
   - event-delivery
