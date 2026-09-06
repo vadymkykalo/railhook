@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { HookflowIcon } from '../components/icons/HookflowIcon';
+import { RailhookIcon } from '../components/icons/RailhookIcon';
 import AttemptRail from '../components/AttemptRail';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
@@ -21,8 +21,8 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
  * X-Sequence-Number, Idempotency-Key. The signature format is
  * `t=<unix-ms>,v1=<hex>` from WebhookSignatureUtils.buildSignatureHeader.
  *
- * This panel used to invent `x-hookflow-signature: sha256=…` and
- * `x-hookflow-attempt: 4 of 8` — headers the product does not send, in a
+ * This panel used to invent `x-railhook-signature: sha256=…` and
+ * `x-railhook-attempt: 4 of 8` — headers the product does not send, in a
  * format the docs teach differently, over an attempt count the outgoing ladder
  * does not have. It is the first thing a developer sees on all seven auth
  * screens; a fabricated wire format is the most expensive kind of wrong.
@@ -50,9 +50,9 @@ export default function AuthLayout({
       <aside className="surface-ink relative hidden overflow-hidden lg:flex lg:w-[46%] lg:flex-col lg:justify-between lg:p-12">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15">
-            <HookflowIcon className="h-4 w-4" />
+            <RailhookIcon className="h-4 w-4" />
           </div>
-          <span className="text-[15px] font-semibold tracking-tight">Hookflow</span>
+          <span className="text-[15px] font-semibold tracking-tight">Railhook</span>
         </Link>
 
         <div>
@@ -103,9 +103,9 @@ export default function AuthLayout({
             <div className="mb-7">
               <Link to="/" className="mb-6 flex items-center gap-2.5 lg:hidden">
                 <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-                  <HookflowIcon className="h-4 w-4 text-primary-foreground" />
+                  <RailhookIcon className="h-4 w-4 text-primary-foreground" />
                 </div>
-                <span className="text-[15px] font-semibold">Hookflow</span>
+                <span className="text-[15px] font-semibold">Railhook</span>
               </Link>
               <h1 className="text-title">{title}</h1>
               {subtitle && <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>}

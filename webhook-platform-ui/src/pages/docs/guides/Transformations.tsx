@@ -132,5 +132,5 @@ const TEMPLATE_SAMPLE = `{
     "plan": "\${$.data.subscription.plan_name}"
   },
   "amount_cents": "\${$.data.amount}",
-  "source": "hookflow"
+  "source": "railhook"
 }`;

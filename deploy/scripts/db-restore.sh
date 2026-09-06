@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared Postgres restore logic for Hookflow. Counterpart to db-backup.sh
+# Shared Postgres restore logic for Railhook. Counterpart to db-backup.sh
 # — see that file's header for the sharing rationale (Helm CronJob duplicates the
 # pg_dump/pg_restore flags rather than sourcing this, because Helm charts can't
 # reach outside their own chart directory).

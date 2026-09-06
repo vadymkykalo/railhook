@@ -2,7 +2,7 @@
  * The ambient layer behind the hero band.
  *
  * It draws the thing the product does — webhooks arriving from several sources,
- * passing through Hookflow, leaving for several destinations, and one of them
+ * passing through Railhook, leaving for several destinations, and one of them
  * looping back into the ladder — and nothing else. No particles, no
  * constellations, no drifting stars: if it would look at home on another
  * product's page it does not belong on this one.

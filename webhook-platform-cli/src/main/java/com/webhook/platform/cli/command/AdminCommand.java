@@ -14,7 +14,7 @@ import java.util.concurrent.Callable;
  * The operator back-office, from a terminal.
  *
  * <p>Everything here needs the deployment's platform-admin token, which is the same secret for
- * every tenant on the instance. It is read from {@code HOOKFLOW_ADMIN_TOKEN} or {@code --token}
+ * every tenant on the instance. It is read from {@code RAILHOOK_ADMIN_TOKEN} or {@code --token}
  * and never saved: a credential that outlives the command that used it is one more place it can
  * leak from, and this one is not a login.
  *
@@ -37,7 +37,7 @@ public class AdminCommand implements Runnable {
 
     @Override
     public void run() {
-        System.out.println("Run 'hookflow admin --help' to see the operator commands.");
+        System.out.println("Run 'railhook admin --help' to see the operator commands.");
     }
 
     /** Shared by every subcommand: where the token comes from, and how failures are reported. */

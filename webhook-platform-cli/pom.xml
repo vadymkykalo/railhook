@@ -12,7 +12,7 @@
 
     <artifactId>webhook-platform-cli</artifactId>
     <name>Webhook Platform CLI</name>
-    <description>Hookflow CLI — local tunnel, event replay, and diagnostics</description>
+    <description>Railhook CLI — local tunnel, event replay, and diagnostics</description>
 
     <properties>
         <picocli.version>4.7.5</picocli.version>
@@ -102,7 +102,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.webhook.platform.cli.HookflowCli</mainClass>
+                            <mainClass>com.webhook.platform.cli.RailhookCli</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -120,7 +120,7 @@
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.webhook.platform.cli.HookflowCli</mainClass>
+                                    <mainClass>com.webhook.platform.cli.RailhookCli</mainClass>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
@@ -149,7 +149,7 @@
                       CliCommandTestBase isolates each test's config file by
                       redirecting the `user.home` system property to a JUnit
                       @TempDir — but CliConfigService checks XDG_CONFIG_HOME
-                      and HOOKFLOW_CONFIG *before* user.home. GitHub Actions'
+                      and RAILHOOK_CONFIG *before* user.home. GitHub Actions'
                       hosted runners set XDG_CONFIG_HOME, which silently
                       breaks that isolation and made every CLI command test
                       read/write the wrong config path in CI (all passed
@@ -159,7 +159,7 @@
                     -->
                     <environmentVariables>
                         <XDG_CONFIG_HOME combine.self="override"></XDG_CONFIG_HOME>
-                        <HOOKFLOW_CONFIG combine.self="override"></HOOKFLOW_CONFIG>
+                        <RAILHOOK_CONFIG combine.self="override"></RAILHOOK_CONFIG>
                     </environmentVariables>
                 </configuration>
             </plugin>

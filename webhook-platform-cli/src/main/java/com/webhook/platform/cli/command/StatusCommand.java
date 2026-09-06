@@ -24,7 +24,7 @@ public class StatusCommand implements Callable<Integer> {
         CliConfigService configService = new CliConfigService();
         CliConfig config = configService.load();
 
-        out.println("Hookflow CLI Status");
+        out.println("Railhook CLI Status");
         out.println("═══════════════════════════════════════");
         out.println();
 
@@ -41,7 +41,7 @@ public class StatusCommand implements Callable<Integer> {
         } else {
             out.println("  Auth:       ✗ not authenticated");
             out.println();
-            out.println("  Run 'hookflow login' to authenticate.");
+            out.println("  Run 'railhook login' to authenticate.");
             return 0;
         }
 

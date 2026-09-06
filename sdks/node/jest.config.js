@@ -3,11 +3,11 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts'],
-  // Lets the smoke test `import ... from '@webhook-platform/node'` resolve to this
+  // Lets the smoke test `import ... from '@railhook/node'` resolve to this
   // package's own source without a real install — mirrors what a consumer
-  // gets from node_modules after `npm install @webhook-platform/node`.
+  // gets from node_modules after `npm install @railhook/node`.
   moduleNameMapper: {
-    '^@webhook-platform/node$': '<rootDir>/src/index.ts',
+    '^@railhook/node$': '<rootDir>/src/index.ts',
   },
   collectCoverageFrom: [
     'src/**/*.ts',

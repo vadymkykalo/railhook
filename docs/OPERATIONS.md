@@ -1,9 +1,9 @@
-# Hookflow Operations Guide
+# Railhook Operations Guide
 
 ## Quick Start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh | bash
 
 # Health, on the one published port. The actuator itself is on 8082 inside the
 # network and is not bound to the host; nginx proxies these two paths from it
@@ -11,7 +11,7 @@ curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/i
 curl -f http://localhost/actuator/health/liveness
 ```
 
-Day-to-day, from the install directory: `./hookflow status | logs | stop |
+Day-to-day, from the install directory: `./railhook status | logs | stop |
 start | upgrade | backup | doctor`. `doctor` re-runs the machine and
 configuration checks against what is on disk.
 
@@ -23,24 +23,24 @@ Building from source instead (`git clone ... && make up`) is documented in the
 
 ```bash
 # Create secrets
-kubectl create secret generic hookflow-secrets \
+kubectl create secret generic railhook-secrets \
   --from-literal=encryption-key="$(openssl rand -base64 32)" \
   --from-literal=jwt-secret="$(openssl rand -base64 64)"
 
-kubectl create secret generic hookflow-postgresql-secret \
+kubectl create secret generic railhook-postgresql-secret \
   --from-literal=password="$(openssl rand -base64 32)"
 
-kubectl create secret generic hookflow-redis-secret \
+kubectl create secret generic railhook-redis-secret \
   --from-literal=password="$(openssl rand -base64 32)"
 
 # Install the published chart directly — no repo clone required:
-helm install hookflow oci://ghcr.io/vadymkykalo/charts/hookflow --version <version> \
+helm install railhook oci://ghcr.io/vadymkykalo/charts/railhook --version <version> \
   --set postgresql.external.host=your-postgres-host \
   --set kafka.external.bootstrapServers=your-kafka:9092 \
   --set ui.ingress.hosts[0].host=app.yourdomain.com
 
 # Or, from a clone, with the local chart + production values file:
-# helm install hookflow ./deploy/helm/hookflow -f ./deploy/helm/hookflow/values-production.yaml \
+# helm install railhook ./deploy/helm/railhook -f ./deploy/helm/railhook/values-production.yaml \
 #   --set postgresql.external.host=your-postgres-host \
 #   --set kafka.external.bootstrapServers=your-kafka:9092 \
 #   --set ui.ingress.hosts[0].host=app.yourdomain.com
@@ -118,16 +118,16 @@ leaving it empty keeps these endpoints unreachable, which is the shipped default
 The CLI is the intended client:
 
 ```bash
-export HOOKFLOW_ADMIN_TOKEN=...        # or pass --token; never saved to the config file
+export RAILHOOK_ADMIN_TOKEN=...        # or pass --token; never saved to the config file
 
-hookflow admin orgs                    # who is on this deployment
-hookflow admin orgs --search acme
-hookflow admin orgs --suspended        # only the ones currently stopped
+railhook admin orgs                    # who is on this deployment
+railhook admin orgs --search acme
+railhook admin orgs --suspended        # only the ones currently stopped
 
-hookflow admin org $ORG_ID             # plan, counts, and usage against the plan's limits
+railhook admin org $ORG_ID             # plan, counts, and usage against the plan's limits
 
-hookflow admin suspend $ORG_ID --reason "Confirmed spam reports" --by ops@example.com
-hookflow admin reinstate $ORG_ID
+railhook admin suspend $ORG_ID --reason "Confirmed spam reports" --by ops@example.com
+railhook admin reinstate $ORG_ID
 ```
 
 The same over HTTP, for a script or a runbook that would rather not depend on the CLI:
@@ -158,13 +158,13 @@ tenant dashboard into the deployment's master credential — one that is the sam
 every tenant on the instance and that no tenant role can otherwise reach. A terminal is a much
 smaller blast radius than a page a hundred customers also load.
 
-`hookflow admin` reads the token from `HOOKFLOW_ADMIN_TOKEN` or `--token` on each invocation
-and never writes it to `~/.config/hookflow/config.json`, so it does not outlive the command and
-`hookflow status` cannot print it.
+`railhook admin` reads the token from `RAILHOOK_ADMIN_TOKEN` or `--token` on each invocation
+and never writes it to `~/.config/railhook/config.json`, so it does not outlive the command and
+`railhook status` cannot print it.
 
 ### What the usage view answers
 
-`hookflow admin org $ORG_ID` shows events this billing period, endpoints, projects and members,
+`railhook admin org $ORG_ID` shows events this billing period, endpoints, projects and members,
 each against the limit the tenant's plan allows — the **same** numbers the customer sees on
 their own billing page, because it is the same service reading them under that tenant's scope
 rather than a second set of queries. Two implementations of "how much have they used" is how a
@@ -199,7 +199,7 @@ which is where a customer's "why did this stop working" gets answered.
 ## Common Issues
 
 ### High Kafka lag
-- Scale workers: `make scale-worker N=5` or `kubectl scale deployment hookflow-worker --replicas=5`
+- Scale workers: `make scale-worker N=5` or `kubectl scale deployment railhook-worker --replicas=5`
 - Check DB connection pool in logs
 - Increase `KAFKA_DELIVERY_CONCURRENCY` env var
 
@@ -292,7 +292,7 @@ make restore-db FILE=backups/webhook_platform_20260101_120000.dump
 (embedded-DB profile) also starts a `db-backup` sidecar that runs
 `deploy/scripts/db-backup.sh` on a fixed interval (`DB_BACKUP_INTERVAL_SECONDS`,
 default 86400/daily) with age-based retention (`BACKUP_RETENTION_DAYS`, default
-30) — mirroring `deploy/helm/hookflow/templates/db-backup-cronjob.yaml`, the
+30) — mirroring `deploy/helm/railhook/templates/db-backup-cronjob.yaml`, the
 only prior scheduled backup (Kubernetes-only). `docker compose logs db-backup`
 shows each run; a failed backup logs and retries on the next interval rather
 than crash-looping the container.
@@ -322,7 +322,7 @@ make scale-api N=3     # The API publishes no host port, so replicas have
                        # specific replica: `docker compose exec api ...`.
 
 # Kubernetes (auto-scales with HPA)
-kubectl scale deployment hookflow-worker --replicas=10
+kubectl scale deployment railhook-worker --replicas=10
 ```
 
 ## Upgrades
@@ -333,10 +333,10 @@ docker compose pull
 make rebuild
 
 # Kubernetes (zero-downtime)
-helm upgrade hookflow ./deploy/helm/hookflow
+helm upgrade railhook ./deploy/helm/railhook
 
 # Rollback if needed
-kubectl rollout undo deployment hookflow-api
+kubectl rollout undo deployment railhook-api
 ```
 
 **Upgrade drill (CI):** `.github/workflows/ci.yml`'s `upgrade-smoke` job installs the last
@@ -413,5 +413,5 @@ Key settings:
 
 ## Support
 
-- Docs: https://github.com/vadymkykalo/webhook-platform
-- Issues: https://github.com/vadymkykalo/webhook-platform/issues
+- Docs: https://github.com/vadymkykalo/railhook
+- Issues: https://github.com/vadymkykalo/railhook/issues

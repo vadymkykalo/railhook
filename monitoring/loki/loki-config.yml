@@ -1,4 +1,4 @@
-# Hookflow Loki config.
+# Railhook Loki config.
 #
 # Single-node, filesystem-backed — matches this repo's "one docker compose stack per
 # self-hoster" deployment model (same spirit as the embedded Postgres/Redis/Kafka in

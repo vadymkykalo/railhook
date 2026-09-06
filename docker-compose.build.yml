@@ -2,7 +2,7 @@
 # Build from source — an overlay, not a second copy of the stack.
 # ============================================================================
 # docker-compose.yml resolves every service to a published image. Layer this on
-# top and the three services Hookflow actually owns are built from the working
+# top and the three services Railhook actually owns are built from the working
 # tree instead:
 #
 #   docker compose -f docker-compose.yml -f docker-compose.build.yml \

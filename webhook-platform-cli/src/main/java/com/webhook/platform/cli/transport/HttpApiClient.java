@@ -19,7 +19,7 @@ import java.time.Duration;
 import java.util.Map;
 
 /**
- * HTTP client for communicating with the Hookflow backend API.
+ * HTTP client for communicating with the Railhook backend API.
  * Handles authentication headers, token refresh, and JSON serialization.
  */
 public class HttpApiClient {

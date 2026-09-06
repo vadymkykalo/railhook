@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Three things are being held down, and only the first is about output.
  *
  * <p><strong>The credential never comes from the config file.</strong> Every other command here
- * reads a bearer token that {@code hookflow login} saved; this one must not, because the token
+ * reads a bearer token that {@code railhook login} saved; this one must not, because the token
  * is the deployment's rather than a person's and is the same secret for every tenant on it. A
  * command that silently fell back to the saved login would either do nothing or, worse, appear
  * to work while sending the wrong credential.
@@ -164,7 +164,7 @@ class AdminCommandTest extends CliCommandTestBase {
         int exitCode = run("admin", "orgs");
 
         assertEquals(2, exitCode);
-        assertTrue(err().contains("HOOKFLOW_ADMIN_TOKEN"), err());
+        assertTrue(err().contains("RAILHOOK_ADMIN_TOKEN"), err());
         assertTrue(seenTokens.isEmpty());
     }
 

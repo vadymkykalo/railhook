@@ -62,7 +62,7 @@ permissions:
 
 jobs:
   publish-node:
-    name: Publish Node.js SDK to npm (@webhook-platform/node)
+    name: Publish Node.js SDK to npm (@railhook/node)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -92,7 +92,7 @@ jobs:
         id: check
         run: |
           LOCAL_VERSION=$(node -p "require('./package.json').version")
-          PUBLISHED_VERSION=$(npm view @webhook-platform/node version 2>/dev/null || echo "")
+          PUBLISHED_VERSION=$(npm view @railhook/node version 2>/dev/null || echo "")
           echo "local=$LOCAL_VERSION published=$PUBLISHED_VERSION"
           if [ "$LOCAL_VERSION" = "$PUBLISHED_VERSION" ]; then
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
@@ -160,7 +160,7 @@ jobs:
         id: check
         run: |
           LOCAL_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          PUBLISHED_VERSION=$(curl -s https://pypi.org/pypi/webhook-platform/json | python -c "import sys,json; d=json.load(sys.stdin); print(d.get('info',{}).get('version',''))" 2>/dev/null || echo "")
+          PUBLISHED_VERSION=$(curl -s https://pypi.org/pypi/railhook/json | python -c "import sys,json; d=json.load(sys.stdin); print(d.get('info',{}).get('version',''))" 2>/dev/null || echo "")
           echo "local=$LOCAL_VERSION published=$PUBLISHED_VERSION"
           if [ "$LOCAL_VERSION" = "$PUBLISHED_VERSION" ]; then
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
@@ -190,7 +190,7 @@ jobs:
         run: twine upload dist/*
 
   publish-php:
-    name: Publish PHP SDK to Packagist (webhook-platform/php)
+    name: Publish PHP SDK to Packagist (railhook/php)
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'push' ||
@@ -214,9 +214,9 @@ jobs:
         id: check
         run: |
           LOCAL_VERSION=$(php -r "echo json_decode(file_get_contents('composer.json'), true)['version'] ?? '';")
-          PUBLISHED_VERSION=$(curl -s https://repo.packagist.org/p2/webhook-platform/php.json | php -r "
+          PUBLISHED_VERSION=$(curl -s https://repo.packagist.org/p2/railhook/php.json | php -r "
             \$d = json_decode(file_get_contents('php://stdin'), true);
-            \$versions = \$d['packages']['webhook-platform/php'] ?? [];
+            \$versions = \$d['packages']['railhook/php'] ?? [];
             echo \$versions[0]['version'] ?? '';
           ")
           echo "local=$LOCAL_VERSION published=$PUBLISHED_VERSION"
@@ -235,8 +235,8 @@ jobs:
         run: vendor/bin/phpunit --no-coverage
 
       # Packagist cannot serve a package whose composer.json lives in a subdirectory, so
-      # `webhook-platform/php` there is registered against a separate repository,
-      # vadymkykalo/webhook-platform-php. That repository was kept in step by hand, and the
+      # `railhook/php` there is registered against a separate repository,
+      # vadymkykalo/railhook-php. That repository was kept in step by hand, and the
       # hand stopped: its last commit is the v2.2.1 release, and every release since has
       # shipped a PHP SDK that nothing published. Meanwhile this job reported success every
       # time, because it posted an update-package call naming *this* monorepo — a URL
@@ -245,7 +245,7 @@ jobs:
       #
       # Authenticated with a deploy key rather than a personal access token: a deploy key
       # grants write to exactly one repository and nothing else, which is all this needs.
-      # The public half is registered on vadymkykalo/webhook-platform-php ("hookflow-release
+      # The public half is registered on vadymkykalo/railhook-php ("railhook-release
       # (SDK split push)"); revoking it there is enough to cut this off. GITHUB_TOKEN cannot
       # be used — it is scoped to the repository running the workflow.
       - name: Publish sdks/php to the split repository
@@ -253,7 +253,7 @@ jobs:
         working-directory: .
         env:
           SDK_SPLIT_SSH_KEY: ${{ secrets.SDK_SPLIT_SSH_KEY }}
-          SPLIT_REPO: vadymkykalo/webhook-platform-php
+          SPLIT_REPO: vadymkykalo/railhook-php
         run: |
           set -euo pipefail
 
@@ -330,11 +330,11 @@ jobs:
           RESPONSE=$(curl -sS -X POST \
             -H "Content-Type: application/json" \
             "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}&autoUpdated=1" \
-            -d '{"repository":{"url":"https://github.com/vadymkykalo/webhook-platform-php"}}')
+            -d '{"repository":{"url":"https://github.com/vadymkykalo/railhook-php"}}')
 
           echo "Packagist responded: $RESPONSE"
 
           if ! echo "$RESPONSE" | grep -q '"status" *: *"success"'; then
-            echo "::error::Packagist did not accept the update. Check that webhook-platform/php is registered against vadymkykalo/webhook-platform-php."
+            echo "::error::Packagist did not accept the update. Check that railhook/php is registered against vadymkykalo/railhook-php."
             exit 1
           fi

@@ -73,7 +73,7 @@ class LoginCommandTest extends CliCommandTestBase {
         assertTrue(capturedLoginBody.get().contains("hunter2"));
 
         // Verify the token + fetched identity were actually persisted to disk.
-        Path configPath = Path.of(System.getProperty("user.home"), ".config", "hookflow", "config.json");
+        Path configPath = Path.of(System.getProperty("user.home"), ".config", "railhook", "config.json");
         CliConfigService configService = new CliConfigService(configPath);
         CliConfig saved = configService.load();
         assertEquals("acc-tok-1", saved.getAccessToken());
@@ -95,7 +95,7 @@ class LoginCommandTest extends CliCommandTestBase {
         int exitCode = runWithPasswordPrompt("hunter2", "login", "--server", backendUrl, "--email", "dev@example.com", "--password");
 
         assertEquals(0, exitCode);
-        Path configPath = Path.of(System.getProperty("user.home"), ".config", "hookflow", "config.json");
+        Path configPath = Path.of(System.getProperty("user.home"), ".config", "railhook", "config.json");
         CliConfig saved = new CliConfigService(configPath).load();
         assertEquals(backendUrl, saved.getBackendUrl());
         assertEquals("acc-tok-2", saved.getAccessToken());
@@ -124,7 +124,7 @@ class LoginCommandTest extends CliCommandTestBase {
         int exitCode = runWithPasswordPrompt("hunter2", "login", "--email", "dev@example.com", "--password");
 
         assertEquals(0, exitCode, "the /me lookup is best-effort — its failure must not fail the login");
-        Path configPath = Path.of(System.getProperty("user.home"), ".config", "hookflow", "config.json");
+        Path configPath = Path.of(System.getProperty("user.home"), ".config", "railhook", "config.json");
         CliConfig saved = new CliConfigService(configPath).load();
         assertEquals("acc-tok-3", saved.getAccessToken());
         assertNull(saved.getUserId());

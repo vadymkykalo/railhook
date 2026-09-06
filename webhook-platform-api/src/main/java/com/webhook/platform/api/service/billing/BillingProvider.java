@@ -66,7 +66,7 @@ public interface BillingProvider {
     /** List invoices from external system. */
     default List<ExternalInvoice> fetchInvoices(String externalCustomerId) { return List.of(); }
 
-    // Refunds are not initiated from here. Hookflow has no refund endpoint and no screen that
+    // Refunds are not initiated from here. Railhook has no refund endpoint and no screen that
     // asks for one; a refund is issued in the provider's own dashboard and arrives back as a
     // `payment.refunded` webhook, which BillingService records on the payment row. The outbound
     // refund() this interface used to declare — implemented against the Stripe and WayForPay

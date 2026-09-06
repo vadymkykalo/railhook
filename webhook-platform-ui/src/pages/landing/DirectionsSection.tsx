@@ -11,7 +11,7 @@ import { cn } from '../../lib/utils';
  * Outgoing fans out: one event a customer announced becomes a delivery to every
  * endpoint their own users registered. Incoming fans in: webhooks from
  * providers the customer connected — Stripe, GitHub, Twilio — arrive at
- * Hookflow and are forwarded to a destination the customer nominated. Drawing a
+ * Railhook and are forwarded to a destination the customer nominated. Drawing a
  * provider on the outgoing side would teach the wrong model.
  */
 
@@ -26,7 +26,7 @@ const ENDPOINT_PATHS = ['/hooks/orders', '/webhooks/acme', '/events/in'];
 const FAN_Y = [16, 54, 92];
 
 /**
- * Motion here is the mechanism, not decoration: one event reaches Hookflow and
+ * Motion here is the mechanism, not decoration: one event reaches Railhook and
  * fans out to every endpoint that subscribed, and several sources fan in and
  * leave as one forward. Each packet is a dash on the same rail the diagram
  * draws, normalised with pathLength so one keyframe pair drives every path.
@@ -83,7 +83,7 @@ function OutgoingDiagram() {
       <circle cx={58} cy={54} r={3} fill="hsl(var(--primary))" />
       <rect x={112} y={41} width={56} height={26} rx={6} fill="hsl(var(--card))" stroke="hsl(var(--rail))" />
       <text x={140} y={57} textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize={8.5} fill="hsl(var(--foreground))">
-        hookflow
+        railhook
       </text>
       {FAN_Y.map((y) => (
         <g key={y}>
@@ -137,7 +137,7 @@ function IncomingDiagram() {
       ))}
       <rect x={112} y={41} width={56} height={26} rx={6} fill="hsl(var(--card))" stroke="hsl(var(--rail))" />
       <text x={140} y={57} textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize={8.5} fill="hsl(var(--foreground))">
-        hookflow
+        railhook
       </text>
       <line x1={168} y1={54} x2={228} y2={54} stroke="hsl(var(--rail))" strokeWidth={1} />
       <Packet d="M 168 54 L 228 54" leg="second" />
@@ -246,7 +246,7 @@ function VerifiedSources() {
 }
 
 /**
- * The headers Hookflow puts on a delivery, as the outgoing card's counterpart to the incoming
+ * The headers Railhook puts on a delivery, as the outgoing card's counterpart to the incoming
  * card's verified-source list.
  *
  * Without it the outgoing card was a third empty: one card carried a six-row list and the one

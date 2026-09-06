@@ -44,9 +44,9 @@ const REQUIRED: Setting[] = [
 // to be here; they are gone because the API and the actuator are no longer
 // bound to the host at all — nginx reaches them over the Docker network.
 const ADDRESSES: Setting[] = [
-  { name: 'HOOKFLOW_PORT', fallback: '80', key: 'hookflowPort' },
-  { name: 'HOOKFLOW_BIND', fallback: '0.0.0.0', key: 'hookflowBind' },
-  { name: 'HOOKFLOW_DOMAIN', fallback: 'empty', key: 'hookflowDomain' },
+  { name: 'RAILHOOK_PORT', fallback: '80', key: 'railhookPort' },
+  { name: 'RAILHOOK_BIND', fallback: '0.0.0.0', key: 'railhookBind' },
+  { name: 'RAILHOOK_DOMAIN', fallback: 'empty', key: 'railhookDomain' },
   { name: 'APP_BASE_URL', fallback: 'http://localhost', key: 'appBaseUrl' },
   { name: 'VITE_API_URL', fallback: 'empty', key: 'viteApiUrl' },
   { name: 'CORS_ALLOWED_ORIGINS', fallback: 'http://localhost', key: 'cors' },

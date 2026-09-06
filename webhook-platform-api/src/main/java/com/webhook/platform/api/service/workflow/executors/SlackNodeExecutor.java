@@ -70,7 +70,7 @@ public class SlackNodeExecutor implements NodeExecutor {
             String response = webClient.post()
                     .uri(webhookUrl)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .header("User-Agent", "HookflowWorkflow/1.0")
+                    .header("User-Agent", "RailhookWorkflow/1.0")
                     .bodyValue(payload.toString())
                     .retrieve()
                     .bodyToMono(String.class)

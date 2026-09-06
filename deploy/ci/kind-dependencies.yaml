@@ -8,7 +8,7 @@
 #
 # Single replica, emptyDir storage, no resource requests: this exists for the
 # lifetime of one CI job on one kind node. It is not a template for running
-# Hookflow's dependencies in production — a managed service or a StatefulSet is,
+# Railhook's dependencies in production — a managed service or a StatefulSet is,
 # and the README says so.
 #
 # Passwords come from the same Secrets the chart reads, created by the workflow
@@ -37,13 +37,13 @@ spec:
           image: postgres:16-alpine
           env:
             - name: POSTGRES_DB
-              value: hookflow
+              value: railhook
             - name: POSTGRES_USER
               value: webhook_user
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: hookflow-postgresql-secret
+                  name: railhook-postgresql-secret
                   key: password
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
@@ -60,7 +60,7 @@ spec:
               command:
                 - sh
                 - -c
-                - pg_isready -h 127.0.0.1 -U webhook_user -d hookflow && psql -U webhook_user -d hookflow -c 'SELECT 1'
+                - pg_isready -h 127.0.0.1 -U webhook_user -d railhook && psql -U webhook_user -d railhook -c 'SELECT 1'
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 5
@@ -196,7 +196,7 @@ spec:
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: hookflow-redis-secret
+                  name: railhook-redis-secret
                   key: password
           ports:
             - containerPort: 6379

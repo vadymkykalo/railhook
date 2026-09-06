@@ -53,7 +53,7 @@ describe('SettingsPage — active sessions', () => {
   it('lists a CLI grant next to a browser session, naming each', async () => {
     vi.mocked(authApi.listSessions).mockResolvedValue([
       session({ id: 'web-1', current: true }),
-      session({ id: 'cli-1', client: 'CLI', userAgent: 'hookflow-cli/2.9.1' }),
+      session({ id: 'cli-1', client: 'CLI', userAgent: 'railhook-cli/2.9.1' }),
     ]);
 
     renderSettings();
@@ -78,7 +78,7 @@ describe('SettingsPage — active sessions', () => {
     const user = userEvent.setup();
     vi.mocked(authApi.listSessions).mockResolvedValue([
       session({ id: 'web-1', current: true }),
-      session({ id: 'cli-1', client: 'CLI', userAgent: 'hookflow-cli/2.9.1' }),
+      session({ id: 'cli-1', client: 'CLI', userAgent: 'railhook-cli/2.9.1' }),
     ]);
     vi.mocked(authApi.revokeSession).mockResolvedValue(undefined);
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Shared Postgres backup logic for Hookflow.
+# Shared Postgres backup logic for Railhook.
 #
 # One script, two Compose callers:
 #   - `make backup-db`                          (Makefile, embedded or external DB)
 #   - the `db-backup` sidecar in docker-compose.yml (scheduled, embedded DB only)
 #
-# The Kubernetes path (deploy/helm/hookflow/templates/db-backup-cronjob.yaml)
+# The Kubernetes path (deploy/helm/railhook/templates/db-backup-cronjob.yaml)
 # cannot `source` this file directly: Helm only packages files that live inside
 # the chart directory, and this script intentionally lives at the repo root so
 # the Makefile/Compose paths (which are NOT packaged/shipped) can use it without

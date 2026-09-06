@@ -1,9 +1,9 @@
 # webhook-platform
 
-Official Python SDK for [Hookflow](https://github.com/vadymkykalo/webhook-platform).
+Official Python SDK for [Railhook](https://github.com/vadymkykalo/railhook).
 
 > The PyPI distribution is `webhook-platform`; the module you import is
-> `hookflow`. `pip install webhook-platform`, then `from hookflow import ...`.
+> `railhook`. `pip install railhook`, then `from railhook import ...`.
 
 **Scope.** This SDK covers Events, Endpoints, Subscriptions, Deliveries,
 Incoming Sources, Incoming Events, and webhook signature verification —
@@ -16,7 +16,7 @@ SDK grows to cover them.
 ## Installation
 
 ```bash
-pip install webhook-platform
+pip install railhook
 ```
 
 ## Quick Start
@@ -24,10 +24,10 @@ pip install webhook-platform
 ```python
 import os
 
-from hookflow import Hookflow, Event
+from railhook import Railhook, Event
 
-client = Hookflow(
-    api_key=os.environ["HOOKFLOW_API_KEY"],  # e.g. "Kz1uAIM8VeJUQN7yGSYCst64WxNLabBHfOYbrPlJ1yk"
+client = Railhook(
+    api_key=os.environ["RAILHOOK_API_KEY"],  # e.g. "Kz1uAIM8VeJUQN7yGSYCst64WxNLabBHfOYbrPlJ1yk"
     base_url="http://localhost:8080",  # optional
 )
 
@@ -52,7 +52,7 @@ print(f"Deliveries created: {event.deliveries_created}")
 ### Events
 
 ```python
-from hookflow import Event
+from railhook import Event
 
 # Send event with idempotency key
 event = client.events.send(
@@ -64,7 +64,7 @@ event = client.events.send(
 ### Endpoints
 
 ```python
-from hookflow import EndpointCreateParams, EndpointUpdateParams
+from railhook import EndpointCreateParams, EndpointUpdateParams
 
 # Create endpoint
 endpoint = client.endpoints.create(
@@ -105,7 +105,7 @@ print(f"{result.http_status_code} — {result.message}")
 ### Subscriptions
 
 ```python
-from hookflow import SubscriptionCreateParams
+from railhook import SubscriptionCreateParams
 
 # Subscribe endpoint to an event type
 subscription = client.subscriptions.create(
@@ -134,7 +134,7 @@ client.subscriptions.delete(project_id, subscription_id)
 ### Deliveries
 
 ```python
-from hookflow import DeliveryListParams, DeliveryStatus
+from railhook import DeliveryListParams, DeliveryStatus
 
 # List deliveries with filters
 deliveries = client.deliveries.list(
@@ -160,7 +160,7 @@ Receive, validate, and forward webhooks from third-party providers (Stripe, GitH
 ### Incoming Sources
 
 ```python
-from hookflow import IncomingSourceCreateParams, IncomingSourceUpdateParams
+from railhook import IncomingSourceCreateParams, IncomingSourceUpdateParams
 
 # Create an incoming source with HMAC verification
 source = client.incoming_sources.create(
@@ -194,7 +194,7 @@ client.incoming_sources.delete(project_id, source_id)
 ### Incoming Destinations
 
 ```python
-from hookflow import IncomingDestinationCreateParams
+from railhook import IncomingDestinationCreateParams
 
 # Add a forwarding destination
 dest = client.incoming_sources.create_destination(
@@ -218,7 +218,7 @@ client.incoming_sources.delete_destination(project_id, source_id, dest_id)
 ### Incoming Events
 
 ```python
-from hookflow import IncomingEventListParams
+from railhook import IncomingEventListParams
 
 # List incoming events (with optional source filter)
 events = client.incoming_events.list(
@@ -242,7 +242,7 @@ print(f"Replayed to {result.destinations_count} destinations")
 Verify incoming webhooks in your endpoint:
 
 ```python
-from hookflow import verify_signature, construct_event, HookflowError
+from railhook import verify_signature, construct_event, RailhookError
 
 # Flask example
 from flask import Flask, request
@@ -271,14 +271,14 @@ def handle_webhook():
 
         return "OK", 200
 
-    except HookflowError as e:
+    except RailhookError as e:
         print(f"Webhook verification failed: {e.message}")
         return "Invalid signature", 400
 ```
 
 ### What lands on your endpoint
 
-Hookflow PUTs the event's **payload** on the wire, not an envelope. This:
+Railhook PUTs the event's **payload** on the wire, not an envelope. This:
 
 ```python
 client.events.send(Event(type="order.completed", data={"order_id": "ord_1"}))
@@ -314,7 +314,7 @@ re-serialize.
 
 ```python
 from fastapi import FastAPI, Request, HTTPException
-from hookflow import construct_event, HookflowError
+from railhook import construct_event, RailhookError
 
 app = FastAPI()
 
@@ -333,15 +333,15 @@ async def handle_webhook(request: Request):
         # Process event...
         return {"status": "ok"}
 
-    except HookflowError as e:
+    except RailhookError as e:
         raise HTTPException(status_code=400, detail=e.message)
 ```
 
 ## Error Handling
 
 ```python
-from hookflow import (
-    HookflowError,
+from railhook import (
+    RailhookError,
     RateLimitError,
     AuthenticationError,
     ValidationError,
@@ -358,7 +358,7 @@ except AuthenticationError:
     print("Invalid API key")
 except ValidationError as e:
     print(f"Validation failed: {e.field_errors}")
-except HookflowError as e:
+except RailhookError as e:
     print(f"Error {e.status}: {e.message}")
 ```
 
@@ -385,14 +385,14 @@ All API errors return a consistent JSON body:
 | HTTP Status | `error` Code | SDK Exception | Description |
 |---|---|---|---|
 | 400 | `validation_error` | `ValidationError` | Invalid request parameters; see `fieldErrors` |
-| 400 | `invalid_request` | `HookflowError` | Malformed or semantically invalid request |
+| 400 | `invalid_request` | `RailhookError` | Malformed or semantically invalid request |
 | 401 | `unauthorized` | `AuthenticationError` | Missing or invalid API key / expired token |
-| 403 | `forbidden` | `HookflowError` | Insufficient permissions for the action |
+| 403 | `forbidden` | `RailhookError` | Insufficient permissions for the action |
 | 404 | `not_found` | `NotFoundError` | Requested resource does not exist |
-| 413 | `payload_too_large` | `HookflowError` | Request body exceeds maximum allowed size |
-| 422 | `unprocessable_entity` | `HookflowError` | Valid syntax but violates business rules |
+| 413 | `payload_too_large` | `RailhookError` | Request body exceeds maximum allowed size |
+| 422 | `unprocessable_entity` | `RailhookError` | Valid syntax but violates business rules |
 | 429 | `rate_limit_exceeded` | `RateLimitError` | Too many requests; check `X-RateLimit-*` headers |
-| 500 | `internal_error` | `HookflowError` | Unexpected server error |
+| 500 | `internal_error` | `RailhookError` | Unexpected server error |
 
 ## Generic Requests
 
@@ -423,8 +423,8 @@ All generic methods use the same authentication, error handling, and rate-limit 
 ## Configuration
 
 ```python
-client = Hookflow(
-    api_key=os.environ["HOOKFLOW_API_KEY"],  # Required: Your project API key
+client = Railhook(
+    api_key=os.environ["RAILHOOK_API_KEY"],  # Required: Your project API key
     base_url="https://api.example.com",  # Optional (default: http://localhost:8080)
     timeout=30,                     # Optional: Request timeout in seconds (default: 30)
 )
@@ -432,7 +432,7 @@ client = Hookflow(
 
 ### Timeouts and retries
 
-`timeout` is passed straight to `requests`; hitting it raises `HookflowError`
+`timeout` is passed straight to `requests`; hitting it raises `RailhookError`
 with `code="timeout"` and `status=0`. A connection-level failure raises the
 same class with `code="network_error"`.
 
@@ -458,7 +458,7 @@ HTTP.
 This SDK includes full type hints for better IDE support:
 
 ```python
-from hookflow import (
+from railhook import (
     Event,
     EventResponse,
     Endpoint,

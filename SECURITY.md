@@ -15,7 +15,7 @@ first, and see [`UPGRADING.md`](./UPGRADING.md) if the jump crosses a major.
 If you discover a security vulnerability, please report it responsibly:
 
 1. **Do NOT** open a public GitHub issue
-2. Preferred: use [GitHub's private vulnerability reporting](https://github.com/vadymkykalo/webhook-platform/security/advisories/new)
+2. Preferred: use [GitHub's private vulnerability reporting](https://github.com/vadymkykalo/railhook/security/advisories/new)
    for this repository (Security tab → Report a vulnerability).
 3. Alternatively, email **vadymkykalo@gmail.com** with:
    - Description of the vulnerability

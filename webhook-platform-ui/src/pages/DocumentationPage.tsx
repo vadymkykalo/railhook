@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, ExternalLink, Menu, X } from 'lucide-react';
-import { HookflowIcon } from '../components/icons/HookflowIcon';
+import { RailhookIcon } from '../components/icons/RailhookIcon';
 import ThemeToggle from '../components/ThemeToggle';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { Skeleton } from '../components/ui/skeleton';
@@ -93,7 +93,7 @@ export default function DocumentationPage() {
   const sampleProps = { language, onLanguageChange: setLanguage };
 
   /* Each guide has its own URL now, so each needs its own title: thirteen pages sharing
-     "Documentation — Hookflow" is one page as far as a search result is concerned. The
+     "Documentation — Railhook" is one page as far as a search result is concerned. The
      section's own sidebar label is the name it is already known by. */
   const sectionLabel = [...GUIDE_SECTIONS, REFERENCE_SECTION].find((s) => s.id === section)?.labelKey;
   useDocumentMeta({
@@ -210,9 +210,9 @@ function DocsNav({
         className="mb-8 flex items-center gap-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-          <HookflowIcon className="h-4 w-4 text-primary-foreground" />
+          <RailhookIcon className="h-4 w-4 text-primary-foreground" />
         </div>
-        <span className="text-base font-semibold tracking-tight">Hookflow</span>
+        <span className="text-base font-semibold tracking-tight">Railhook</span>
       </Link>
 
       <p className="mono-label mb-2 px-3">{t('docsPage.sidebar.guides')}</p>

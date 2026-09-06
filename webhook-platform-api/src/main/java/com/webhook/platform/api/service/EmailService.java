@@ -53,7 +53,7 @@ public class EmailService {
             var helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress);
             helper.setTo(to);
-            helper.setSubject("Verify your email — Hookflow");
+            helper.setSubject("Verify your email — Railhook");
             helper.setText(buildVerificationHtml(verifyUrl), true);
             mailSender.send(message);
             log.info("Verification email sent to {}", to);
@@ -79,7 +79,7 @@ public class EmailService {
             var helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress);
             helper.setTo(to);
-            helper.setSubject("Reset your password — Hookflow");
+            helper.setSubject("Reset your password — Railhook");
             helper.setText(buildPasswordResetHtml(resetUrl), true);
             mailSender.send(message);
             log.info("Password reset email sent to {}", to);
@@ -115,7 +115,7 @@ public class EmailService {
             var helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress);
             helper.setTo(to);
-            helper.setSubject("You've been invited to join an organization — Hookflow");
+            helper.setSubject("You've been invited to join an organization — Railhook");
             helper.setText(buildInviteHtml(inviteUrl), true);
             mailSender.send(message);
             log.info("Invite email sent to {}", to);
@@ -148,7 +148,7 @@ public class EmailService {
             var helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress);
             helper.setTo(to);
-            helper.setSubject("Your temporary password — Hookflow");
+            helper.setSubject("Your temporary password — Railhook");
             helper.setText(buildTemporaryPasswordHtml(tempPassword), true);
             mailSender.send(message);
             log.info("Temporary password email sent to {}", to);
@@ -186,7 +186,7 @@ public class EmailService {
             <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
                 <h2 style="color: #111;">You're invited!</h2>
                 <p style="color: #555; line-height: 1.5;">
-                    You've been invited to join an organization on Hookflow.
+                    You've been invited to join an organization on Railhook.
                     Click the button below to accept the invitation.
                 </p>
                 <a href="%s"
@@ -205,9 +205,9 @@ public class EmailService {
         String loginUrl = baseUrl + "/login";
         return """
             <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-                <h2 style="color: #111;">Your Hookflow account is ready</h2>
+                <h2 style="color: #111;">Your Railhook account is ready</h2>
                 <p style="color: #555; line-height: 1.5;">
-                    An organization invited you to Hookflow and an account was created for you.
+                    An organization invited you to Railhook and an account was created for you.
                     Use the temporary password below to sign in, then change it right away.
                 </p>
                 <p style="font-family: monospace; font-size: 18px; background: #f4f4f4;
@@ -233,7 +233,7 @@ public class EmailService {
             <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
                 <h2 style="color: #111;">Reset your password</h2>
                 <p style="color: #555; line-height: 1.5;">
-                    We received a request to reset the password for your Hookflow account.
+                    We received a request to reset the password for your Railhook account.
                     Click the button below to set a new password.
                 </p>
                 <a href="%s"
@@ -254,7 +254,7 @@ public class EmailService {
             <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
                 <h2 style="color: #111;">Verify your email</h2>
                 <p style="color: #555; line-height: 1.5;">
-                    Thanks for signing up for Hookflow. Click the button below to verify your email address.
+                    Thanks for signing up for Railhook. Click the button below to verify your email address.
                 </p>
                 <a href="%s"
                    style="display: inline-block; padding: 12px 24px; background: #111; color: #fff;

@@ -36,22 +36,22 @@ if (file_exists($autoload)) {
     require $autoload;
 } else {
     spl_autoload_register(static function (string $class): void {
-        if (!str_starts_with($class, 'Hookflow\\')) {
+        if (!str_starts_with($class, 'Railhook\\')) {
             return;
         }
-        $path = __DIR__ . '/../src/' . str_replace('\\', '/', substr($class, strlen('Hookflow\\'))) . '.php';
+        $path = __DIR__ . '/../src/' . str_replace('\\', '/', substr($class, strlen('Railhook\\'))) . '.php';
         if (file_exists($path)) {
             require $path;
         }
     });
 }
 
-use Hookflow\Exception\AuthenticationException;
-use Hookflow\Exception\HookflowException;
-use Hookflow\Exception\NotFoundException;
-use Hookflow\Exception\ValidationException;
-use Hookflow\Hookflow;
-use Hookflow\Webhook;
+use Railhook\Exception\AuthenticationException;
+use Railhook\Exception\RailhookException;
+use Railhook\Exception\NotFoundException;
+use Railhook\Exception\ValidationException;
+use Railhook\Railhook;
+use Railhook\Webhook;
 
 const PASSWORD = 'SmokeCheck!2026x'; // meets AuthController's complexity policy
 
@@ -112,7 +112,7 @@ function truthy(bool $cond, string $what): void
 
 /**
  * Raw HTTP, used ONLY to bootstrap a tenant. The SDK is API-key scoped by
- * design — it has no register/login/create-project surface (see src/Hookflow.php)
+ * design — it has no register/login/create-project surface (see src/Railhook.php)
  * — so these three calls cannot go through it. Everything after this point does.
  */
 function raw(string $baseUrl, string $method, string $path, ?array $body = null, array $headers = []): mixed
@@ -178,7 +178,7 @@ function poll(callable $fn, callable $ready, int $attempts = 20, int $delayMs = 
     return $value;
 }
 
-echo "Hookflow PHP SDK — live API smoke check against {$baseUrl}\n\n";
+echo "Railhook PHP SDK — live API smoke check against {$baseUrl}\n\n";
 
 if (!apiIsUp($baseUrl)) {
     fwrite(STDERR, "{$baseUrl} is not answering. Start the stack with `make up` from the repo root.\n");
@@ -208,7 +208,7 @@ $apiKey = raw($baseUrl, 'POST', "/api/v1/projects/{$project['id']}/api-keys", [
 ], $bearer);
 
 $projectId = $project['id'];
-$client = new Hookflow($apiKey['key'], $baseUrl);
+$client = new Railhook($apiKey['key'], $baseUrl);
 
 // ── Endpoints ──
 echo "\nendpoints:\n";
@@ -391,7 +391,7 @@ if (count($incoming['content']) > 0) {
 
 // ── Errors ──
 echo "\nerrors:\n";
-$badClient = new Hookflow('not-a-real-key', $baseUrl);
+$badClient = new Railhook('not-a-real-key', $baseUrl);
 $expectError(
     'an invalid API key throws AuthenticationException(401)',
     static fn () => $badClient->events->send('order.completed', []),
@@ -418,10 +418,10 @@ $expectError(
     }
 );
 $expectError(
-    "another project's resources throw a 403 HookflowException",
+    "another project's resources throw a 403 RailhookException",
     static fn () => $client->endpoints->list('00000000-0000-0000-0000-000000000000'),
     static function (\Throwable $e) {
-        truthy($e instanceof HookflowException, 'expected HookflowException, got ' . $e::class);
+        truthy($e instanceof RailhookException, 'expected RailhookException, got ' . $e::class);
         eqv($e->getStatusCode(), 403, 'status');
         eqv($e->getErrorCode(), 'forbidden', 'error code (taken from the envelope\'s "error" field)');
     }
@@ -448,7 +448,7 @@ $check('Webhook::verifySignature accepts the signature the server computed', sta
 $expectError(
     'Webhook::verifySignature rejects a tampered body',
     static fn () => Webhook::verifySignature($signedBody . ' ', $signature, $rotated['secret']),
-    static fn (\Throwable $e) => eqv($e instanceof HookflowException ? $e->getErrorCode() : null, 'invalid_signature', 'error code')
+    static fn (\Throwable $e) => eqv($e instanceof RailhookException ? $e->getErrorCode() : null, 'invalid_signature', 'error code')
 );
 $expectError(
     'Webhook::verifySignature rejects a signature outside the 300s tolerance',
@@ -457,7 +457,7 @@ $expectError(
         Webhook::generateSignature($signedBody, $rotated['secret'], (int) (microtime(true) * 1000) - 301000),
         $rotated['secret']
     ),
-    static fn (\Throwable $e) => eqv($e instanceof HookflowException ? $e->getErrorCode() : null, 'timestamp_expired', 'error code')
+    static fn (\Throwable $e) => eqv($e instanceof RailhookException ? $e->getErrorCode() : null, 'timestamp_expired', 'error code')
 );
 
 // ── Cleanup ──

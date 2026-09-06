@@ -5,7 +5,7 @@ const LOCALE_MAP: Record<string, string> = {
   uk: 'uk-UA',
 };
 
-const TZ_STORAGE_KEY = 'hookflow_timezone';
+const TZ_STORAGE_KEY = 'railhook_timezone';
 
 function getLocale(): string {
   return LOCALE_MAP[i18n.language] || 'en-US';

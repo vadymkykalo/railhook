@@ -6,12 +6,12 @@
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{20} - %msg%n</pattern>
         </encoder>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>${HOOKFLOW_LOG_LEVEL:-WARN}</level>
+            <level>${RAILHOOK_LOG_LEVEL:-WARN}</level>
         </filter>
     </appender>
 
-    <logger name="com.webhook.platform.cli" level="${HOOKFLOW_LOG_LEVEL:-INFO}" />
-    <logger name="com.webhook.platform.cli.tunnel" level="${HOOKFLOW_LOG_LEVEL:-INFO}" />
+    <logger name="com.webhook.platform.cli" level="${RAILHOOK_LOG_LEVEL:-INFO}" />
+    <logger name="com.webhook.platform.cli.tunnel" level="${RAILHOOK_LOG_LEVEL:-INFO}" />
     <logger name="org.glassfish.tyrus" level="WARN" />
 
     <root level="WARN">

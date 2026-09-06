@@ -94,7 +94,7 @@ const TOKEN_CLASS: Record<string, string> = {
  *
  *   - A group named `pre` is the boundary a token needed in order to be found
  *     at all, not part of the token; it is emitted as an operator. That is how
- *     `bash` tells the command `hookflow` from the directory `~/.config/hookflow`
+ *     `bash` tells the command `railhook` from the directory `~/.config/railhook`
  *     without a lookbehind — Safari only grew lookbehind in 16.4, and a
  *     lookbehind in a module-level literal is a parse error that takes the whole
  *     bundle down rather than degrading.
@@ -102,7 +102,7 @@ const TOKEN_CLASS: Record<string, string> = {
  *     as plain text.
  */
 const GRAMMARS: Partial<Record<CodeLanguage, RegExp>> = {
-  bash: /(?<comment>#[^\n]*)|(?<string>'(?:[^'\\]|\\[\s\S])*'|"(?:[^"\\]|\\[\s\S])*")|(?<variable>\$\{[^}\n]*\}|\$[A-Za-z_]\w*)|(?<flag>(?:^|[ \t])--?[A-Za-z][\w-]*)|(?<pre>^|[|;&]{1,2}|\$\()[ \t]*(?<keyword>(?:curl|openssl|printf|echo|export|cut|npm|pip|composer|docker|hookflow|git|node|python3?|bash|sh|make|sudo|exit|source|cd)\b)|(?<number>\b\d+(?:\.\d+)?\b)|(?<operator>\\\n|\|\||&&|[|;])/gm,
+  bash: /(?<comment>#[^\n]*)|(?<string>'(?:[^'\\]|\\[\s\S])*'|"(?:[^"\\]|\\[\s\S])*")|(?<variable>\$\{[^}\n]*\}|\$[A-Za-z_]\w*)|(?<flag>(?:^|[ \t])--?[A-Za-z][\w-]*)|(?<pre>^|[|;&]{1,2}|\$\()[ \t]*(?<keyword>(?:curl|openssl|printf|echo|export|cut|npm|pip|composer|docker|railhook|git|node|python3?|bash|sh|make|sudo|exit|source|cd)\b)|(?<number>\b\d+(?:\.\d+)?\b)|(?<operator>\\\n|\|\||&&|[|;])/gm,
 
   json: /(?<key>"(?:[^"\\]|\\[\s\S])*"(?=\s*:))|(?<string>"(?:[^"\\]|\\[\s\S])*")|(?<literal>\b(?:true|false|null)\b)|(?<number>-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|(?<punctuation>[{}[\],:])/g,
 

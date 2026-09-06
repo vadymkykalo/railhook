@@ -453,7 +453,7 @@ export default function ApiKeysPage() {
               <p className="mono-label">{t('apiKeys.keyDialog.howToUse')}</p>
               <pre className="overflow-x-auto rounded-lg border border-rail bg-secondary/60 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
 {`curl -X POST https://your-domain.com/api/v1/events \\
-  -H "X-API-Key: $HOOKFLOW_API_KEY" \\
+  -H "X-API-Key: $RAILHOOK_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"type":"user.created","data":{"userId":"123"}}'`}
               </pre>

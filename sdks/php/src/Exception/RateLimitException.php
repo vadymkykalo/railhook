@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hookflow\Exception;
+namespace Railhook\Exception;
 
-class RateLimitException extends HookflowException
+class RateLimitException extends RailhookException
 {
     private array $rateLimitInfo;
 

@@ -38,7 +38,7 @@ public class OpenApiConfig {
     public OpenAPI webhookPlatformOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Hookflow API")
+                        .title("Railhook API")
                         .description("""
                                 Enterprise-grade distributed webhook delivery system with at-least-once guarantees.
                                 
@@ -55,8 +55,8 @@ public class OpenApiConfig {
                                 """)
                         .version("1.0.0")
                         .contact(new Contact()
-                                .name("Hookflow")
-                                .url("https://github.com/vadymkykalo/webhook-platform"))
+                                .name("Railhook")
+                                .url("https://github.com/vadymkykalo/railhook"))
                         .license(new License()
                                 .name("MIT")
                                 .url("https://opensource.org/licenses/MIT")))
@@ -91,7 +91,7 @@ public class OpenApiConfig {
     }
 
     /**
-     * One server, whose host the reader fills in: Hookflow is self-hosted, so there is no address
+     * One server, whose host the reader fills in: Railhook is self-hosted, so there is no address
      * this document could name that would be right for anybody but its author. The default is the
      * local one, which is where a reader following the quickstart already is: the port is the
      * one docker-compose publishes, not whatever this process happens to be bound to — a spec
@@ -100,7 +100,7 @@ public class OpenApiConfig {
     private Server installationServer() {
         return new Server()
                 .url("{baseUrl}")
-                .description("Your Hookflow installation — the same origin the dashboard runs on")
+                .description("Your Railhook installation — the same origin the dashboard runs on")
                 .variables(new ServerVariables().addServerVariable("baseUrl", new ServerVariable()
                         ._default(DEFAULT_BASE_URL)
                         .description("Scheme and host of your installation, without a trailing slash")));

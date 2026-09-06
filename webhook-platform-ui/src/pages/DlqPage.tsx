@@ -36,7 +36,7 @@ function Metric({ label, value, halt }: { label: string; value: number; halt?: b
 
 /**
  * The DLQ is not a separate product — it is the Deliveries table filtered down
- * to the obligations Hookflow has stopped trying: every row's Retry Ladder is
+ * to the obligations Railhook has stopped trying: every row's Retry Ladder is
  * exhausted, so every row is `halt`, and the only question left is whether a
  * human wants it replayed or purged.
  */

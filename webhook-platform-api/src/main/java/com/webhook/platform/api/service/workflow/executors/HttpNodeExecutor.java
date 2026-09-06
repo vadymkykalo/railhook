@@ -90,7 +90,7 @@ public class HttpNodeExecutor implements NodeExecutor {
             WebClient.RequestBodySpec requestSpec = webClient.method(org.springframework.http.HttpMethod.valueOf(method))
                     .uri(url)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .header("User-Agent", "HookflowWorkflow/1.0");
+                    .header("User-Agent", "RailhookWorkflow/1.0");
 
             // Custom headers
             if (nodeConfig.has("headers") && nodeConfig.get("headers").isObject()) {

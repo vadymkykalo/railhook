@@ -1,14 +1,14 @@
 # Architecture
 
-How Hookflow is put together, and why it is put together that way.
+How Railhook is put together, and why it is put together that way.
 
 For the vocabulary these diagrams use — Event, Delivery, Forward, Claim, Attempt, Deferral —
 read [`CONTEXT.md`](../CONTEXT.md) first. Each term there carries a list of near-synonyms
 deliberately not used, and this document holds to them: a Claim is never a lock, a Deferral is
 never a failure, and the Ordering Buffer is never a queue.
 
-Hookflow carries traffic in two directions, and they are not mirror images. Outgoing, Hookflow
-is the sender and signs what it sends. Incoming, Hookflow is the receiver and verifies what it
+Railhook carries traffic in two directions, and they are not mirror images. Outgoing, Railhook
+is the sender and signs what it sends. Incoming, Railhook is the receiver and verifies what it
 receives. They share one attempt lifecycle and differ everywhere else — different ladders,
 different ordering guarantees, different failure semantics. Most of this document is about that
 shared lifecycle, because that is where the subtlety lives.
@@ -40,7 +40,7 @@ graph LR
     App["Your Application"]
     UI["Dashboard<br/>React + Vite"]
 
-    subgraph Hookflow
+    subgraph Railhook
         API["API Service"]
         DB[("PostgreSQL<br/>Events · Deliveries<br/>Attempts · Outbox")]
         Kafka["Kafka<br/>dispatch · 6 retry tiers · DLQ"]
@@ -70,7 +70,7 @@ graph LR
     GitHub["GitHub"]
     Shopify["Shopify"]
 
-    subgraph Hookflow
+    subgraph Railhook
         API["API Service"]
         DB[("PostgreSQL<br/>Incoming Events<br/>Forward Attempts · Outbox")]
         Kafka["Kafka<br/>forward dispatch · retry · DLQ"]
@@ -93,7 +93,7 @@ graph LR
 
 Two asymmetries are visible here and are deliberate:
 
-- The incoming direction has **no Ordering Buffer**. Hookflow did not originate these events and
+- The incoming direction has **no Ordering Buffer**. Railhook did not originate these events and
   cannot know what order the provider intended, so it does not pretend to.
 - The incoming direction has a **shorter Retry Ladder**. Relaying somebody else's webhook for a
   day is not a service to anyone; the provider will usually have given up long before.
@@ -421,7 +421,7 @@ Three transitions carry the whole design:
   anything still `PENDING` past a hard cap (default 96h, comfortably past the default Ladder's
   ~83h worst case) so a long-degraded endpoint cannot grow the backlog without bound. It also
   exports `delivery_oldest_pending_age_seconds`, which is the gauge to alert on.
-- `DLQ → PENDING` is a human decision. The DLQ is where an obligation is abandoned by Hookflow
+- `DLQ → PENDING` is a human decision. The DLQ is where an obligation is abandoned by Railhook
   and kept for a person to decide about — the UI calls it **Failed Messages** on purpose,
   because "DLQ" is vocabulary you have to already know.
 
@@ -652,12 +652,12 @@ upgrade look impossible.
 sequenceDiagram
     autonumber
     participant Dev as Developer (localhost)
-    participant CLI as Hookflow CLI
+    participant CLI as Railhook CLI
     participant API as API Service
     participant WS as WebSocket Hub
     participant P as Provider
 
-    Dev->>CLI: hookflow listen 3000
+    Dev->>CLI: railhook listen 3000
     CLI->>API: POST /api/v1/tunnels
     API-->>CLI: 201 {slug, wsUrl}
     CLI->>WS: connect WSS /ws/tunnel

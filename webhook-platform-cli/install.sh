@@ -1,42 +1,42 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Hookflow CLI installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash
+# Railhook CLI installer
+# Usage: curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/webhook-platform-cli/install.sh | bash
 #
 # Pass flags after `--` when piping into bash:
 #   curl -fsSL .../install.sh | bash -s -- --with-java
 #   curl -fsSL .../install.sh | bash -s -- --uninstall
 #
 # Environment variables:
-#   HOOKFLOW_VERSION       — version to install (default: latest release)
-#   HOOKFLOW_INSTALL_DIR   — where to put the hookflow wrapper (default: ~/.local/bin)
-#   HOOKFLOW_SKIP_JAVA     — set to 1 to skip auto-install of Java entirely (you manage
+#   RAILHOOK_VERSION       — version to install (default: latest release)
+#   RAILHOOK_INSTALL_DIR   — where to put the railhook wrapper (default: ~/.local/bin)
+#   RAILHOOK_SKIP_JAVA     — set to 1 to skip auto-install of Java entirely (you manage
 #                            your own JVM, e.g. via SDKMAN, and `java` may not be on PATH
 #                            yet in this non-interactive shell)
-#   HOOKFLOW_WITH_JAVA     — set to 1 to allow this script to install Java 17 via the OS
+#   RAILHOOK_WITH_JAVA     — set to 1 to allow this script to install Java 17 via the OS
 #                            package manager (requires sudo). Equivalent to --with-java.
 #
 # Flags:
 #   --with-java   allow installing Java 17 via sudo + the OS package manager. Without
-#                 this flag (or HOOKFLOW_WITH_JAVA=1), if Java 17+ isn't already on PATH
+#                 this flag (or RAILHOOK_WITH_JAVA=1), if Java 17+ isn't already on PATH
 #                 the script tells you how to install it yourself rather than silently
 #                 invoking sudo.
-#   --uninstall   remove the hookflow wrapper and installed JAR, then exit.
+#   --uninstall   remove the railhook wrapper and installed JAR, then exit.
 #   -h, --help    show this help and exit.
 
-VERSION="${HOOKFLOW_VERSION:-latest}"
-INSTALL_DIR="${HOOKFLOW_INSTALL_DIR:-$HOME/.local/bin}"
-JAR_DIR="$HOME/.local/lib/hookflow"
-REPO="vadymkykalo/webhook-platform"
-WITH_JAVA="${HOOKFLOW_WITH_JAVA:-0}"
+VERSION="${RAILHOOK_VERSION:-latest}"
+INSTALL_DIR="${RAILHOOK_INSTALL_DIR:-$HOME/.local/bin}"
+JAR_DIR="$HOME/.local/lib/railhook"
+REPO="vadymkykalo/railhook"
+WITH_JAVA="${RAILHOOK_WITH_JAVA:-0}"
 DO_UNINSTALL=0
 
 # Override points for CI/tests only — point the installer at a local fixture
 # server instead of real GitHub, so tests don't depend on (or mutate) actual
 # releases. Not meant to be set by end users; not documented above on purpose.
-GITHUB_BASE_URL="${HOOKFLOW_GITHUB_BASE_URL:-https://github.com}"
-GITHUB_API_BASE_URL="${HOOKFLOW_GITHUB_API_BASE_URL:-https://api.github.com}"
+GITHUB_BASE_URL="${RAILHOOK_GITHUB_BASE_URL:-https://github.com}"
+GITHUB_API_BASE_URL="${RAILHOOK_GITHUB_API_BASE_URL:-https://api.github.com}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -52,22 +52,22 @@ fail()  { echo -e "${RED}✗${RESET} $1" >&2; exit 1; }
 
 print_help() {
     cat <<'EOF'
-Hookflow CLI installer
+Railhook CLI installer
 
 Usage:
-  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/webhook-platform-cli/install.sh | bash
   curl -fsSL .../install.sh | bash -s -- [--with-java] [--uninstall] [-h|--help]
 
 Flags:
   --with-java   allow installing Java 17 via sudo + the OS package manager
-  --uninstall   remove the hookflow wrapper and installed JAR, then exit
+  --uninstall   remove the railhook wrapper and installed JAR, then exit
   -h, --help    show this help and exit
 
 Environment variables:
-  HOOKFLOW_VERSION       version to install (default: latest release)
-  HOOKFLOW_INSTALL_DIR   wrapper install location (default: ~/.local/bin)
-  HOOKFLOW_SKIP_JAVA     1 = skip Java auto-install entirely
-  HOOKFLOW_WITH_JAVA     1 = same as --with-java
+  RAILHOOK_VERSION       version to install (default: latest release)
+  RAILHOOK_INSTALL_DIR   wrapper install location (default: ~/.local/bin)
+  RAILHOOK_SKIP_JAVA     1 = skip Java auto-install entirely
+  RAILHOOK_WITH_JAVA     1 = same as --with-java
 EOF
 }
 
@@ -82,12 +82,12 @@ done
 
 # ── Uninstall ─────────────────────────────────────────────────
 uninstall() {
-    info "Uninstalling hookflow..."
-    if [ -e "$INSTALL_DIR/hookflow" ]; then
-        rm -f "$INSTALL_DIR/hookflow"
-        ok "Removed $INSTALL_DIR/hookflow"
+    info "Uninstalling railhook..."
+    if [ -e "$INSTALL_DIR/railhook" ]; then
+        rm -f "$INSTALL_DIR/railhook"
+        ok "Removed $INSTALL_DIR/railhook"
     else
-        warn "$INSTALL_DIR/hookflow not found — nothing to remove there"
+        warn "$INSTALL_DIR/railhook not found — nothing to remove there"
     fi
 
     if [ -d "$JAR_DIR" ]; then
@@ -97,7 +97,7 @@ uninstall() {
 
     echo ""
     echo "Note: any PATH entry added to your shell profile was left in place"
-    echo "(harmless if hookflow is gone), and ~/.config/hookflow/config.json"
+    echo "(harmless if railhook is gone), and ~/.config/railhook/config.json"
     echo "was left in place — remove it manually if you want a clean slate."
 }
 
@@ -164,9 +164,9 @@ ensure_java() {
         warn "Found Java ${JAVA_VER:-(unrecognized version)}, but 17+ is required"
     fi
 
-    if [ "${HOOKFLOW_SKIP_JAVA:-0}" = "1" ]; then
-        warn "HOOKFLOW_SKIP_JAVA=1 — skipping Java auto-install."
-        warn "Make sure a Java 17+ 'java' is on PATH before running hookflow."
+    if [ "${RAILHOOK_SKIP_JAVA:-0}" = "1" ]; then
+        warn "RAILHOOK_SKIP_JAVA=1 — skipping Java auto-install."
+        warn "Make sure a Java 17+ 'java' is on PATH before running railhook."
         return
     fi
 
@@ -178,11 +178,11 @@ ensure_java() {
     Arch:           sudo pacman -S jre17-openjdk-headless
     macOS:          brew install openjdk@17
 
-    ...or re-run with --with-java (or HOOKFLOW_WITH_JAVA=1) to let this script
+    ...or re-run with --with-java (or RAILHOOK_WITH_JAVA=1) to let this script
     install it for you via sudo + your OS package manager.
 
     If you manage Java yourself and it just isn't on PATH in this shell yet
-    (e.g. SDKMAN before a profile reload), set HOOKFLOW_SKIP_JAVA=1 instead."
+    (e.g. SDKMAN before a profile reload), set RAILHOOK_SKIP_JAVA=1 instead."
     fi
 
     info "Installing Java 17 (headless runtime) — this will use sudo..."
@@ -239,7 +239,7 @@ resolve_version() {
 }
 
 # ── Checksum verification ────────────────────────────────────
-# Every real release publishes SHA256SUMS alongside hookflow-cli.jar (see
+# Every real release publishes SHA256SUMS alongside railhook-cli.jar (see
 # .github/workflows/release-cli.yml). Refuse to install a JAR we can't
 # verify against it — this is a curl-pipe installer, integrity checking is
 # table stakes, not optional.
@@ -255,10 +255,10 @@ verify_checksum() {
     fi
 
     local expected
-    expected=$(grep 'hookflow-cli\.jar' "$sums_file" | awk '{print $1}' | head -1)
+    expected=$(grep 'railhook-cli\.jar' "$sums_file" | awk '{print $1}' | head -1)
     rm -f "$sums_file"
     if [ -z "$expected" ]; then
-        fail "SHA256SUMS for $tag does not list hookflow-cli.jar — refusing to install an unverified JAR."
+        fail "SHA256SUMS for $tag does not list railhook-cli.jar — refusing to install an unverified JAR."
     fi
 
     local actual
@@ -272,7 +272,7 @@ verify_checksum() {
 
     if [ "$expected" != "$actual" ]; then
         rm -f "$JAR_FILE"
-        fail "Checksum mismatch for hookflow-cli.jar — refusing to run it.
+        fail "Checksum mismatch for railhook-cli.jar — refusing to run it.
     expected: $expected
     actual:   $actual
     The downloaded JAR does not match the published SHA256SUMS and has been
@@ -286,7 +286,7 @@ verify_checksum() {
 # ── Download JAR ─────────────────────────────────────────────
 download_jar() {
     mkdir -p "$JAR_DIR"
-    JAR_FILE="$JAR_DIR/hookflow-cli.jar"
+    JAR_FILE="$JAR_DIR/railhook-cli.jar"
 
     if echo "$VERSION" | grep -q "SNAPSHOT"; then
         # SNAPSHOT — try a local build first (only meaningful when this script
@@ -316,12 +316,12 @@ download_jar() {
 
         fail "No pre-built JAR available yet. Build from source:
     git clone https://github.com/$REPO.git
-    cd webhook-platform
+    cd railhook
     mvn clean package -pl webhook-platform-cli -am -DskipTests
     ./webhook-platform-cli/install.sh"
     else
-        DOWNLOAD_URL="$GITHUB_BASE_URL/$REPO/releases/download/$VERSION/hookflow-cli.jar"
-        info "Downloading hookflow-cli $VERSION..."
+        DOWNLOAD_URL="$GITHUB_BASE_URL/$REPO/releases/download/$VERSION/railhook-cli.jar"
+        info "Downloading railhook-cli $VERSION..."
         if ! curl -fsSL -o "$JAR_FILE" "$DOWNLOAD_URL"; then
             fail "Download failed. Check: https://github.com/$REPO/releases"
         fi
@@ -333,17 +333,17 @@ download_jar() {
 # ── Create wrapper script ────────────────────────────────────
 create_wrapper() {
     mkdir -p "$INSTALL_DIR"
-    WRAPPER="$INSTALL_DIR/hookflow"
+    WRAPPER="$INSTALL_DIR/railhook"
 
     cat > "$WRAPPER" << 'WRAPPER_EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-JAR_DIR="$HOME/.local/lib/hookflow"
-JAR_FILE="$JAR_DIR/hookflow-cli.jar"
+JAR_DIR="$HOME/.local/lib/railhook"
+JAR_FILE="$JAR_DIR/railhook-cli.jar"
 
 if [ ! -f "$JAR_FILE" ]; then
-    echo "hookflow: $JAR_FILE not found. Re-run the installer:" >&2
-    echo "  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash" >&2
+    echo "railhook: $JAR_FILE not found. Re-run the installer:" >&2
+    echo "  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/webhook-platform-cli/install.sh | bash" >&2
     exit 1
 fi
 
@@ -377,7 +377,7 @@ ensure_path() {
         if ! grep -q "fish_add_path.*$INSTALL_DIR" "$PROFILE" 2>/dev/null; then
             {
                 echo ""
-                echo "# Hookflow CLI"
+                echo "# Railhook CLI"
                 echo "fish_add_path $INSTALL_DIR"
             } >> "$PROFILE"
             ok "Added $INSTALL_DIR to PATH in $PROFILE (via fish_add_path)"
@@ -389,7 +389,7 @@ ensure_path() {
     if ! grep -qxF "export PATH=\"$INSTALL_DIR:\$PATH\"" "$PROFILE" 2>/dev/null; then
         {
             echo ""
-            echo "# Hookflow CLI"
+            echo "# Railhook CLI"
             echo "export PATH=\"$INSTALL_DIR:\$PATH\""
         } >> "$PROFILE"
         ok "Added $INSTALL_DIR to PATH in $PROFILE"
@@ -406,7 +406,7 @@ main() {
 
     echo ""
     echo -e "${BOLD}${CYAN}  ╔═══════════════════════════════════╗${RESET}"
-    echo -e "${BOLD}${CYAN}  ║   Hookflow CLI Installer          ║${RESET}"
+    echo -e "${BOLD}${CYAN}  ║   Railhook CLI Installer          ║${RESET}"
     echo -e "${BOLD}${CYAN}  ╚═══════════════════════════════════╝${RESET}"
     echo ""
 
@@ -418,28 +418,28 @@ main() {
     ensure_path
 
     echo ""
-    # Only claim success once hookflow is genuinely runnable as a bare
+    # Only claim success once railhook is genuinely runnable as a bare
     # command on the CURRENT PATH. If ensure_path just appended to a shell
     # profile, that doesn't take effect until the shell is reloaded — this
     # process still won't see it, and users need to be told that plainly
     # instead of an unconditional "Installation complete!".
-    if command -v hookflow &>/dev/null; then
+    if command -v railhook &>/dev/null; then
         echo -e "${GREEN}${BOLD}  Installation complete!${RESET}"
         echo ""
         echo "  Quick start:"
-        echo "    hookflow login              # Authenticate with your server"
-        echo "    hookflow listen 3000        # Start tunnel → localhost:3000"
-        echo "    hookflow tunnels status     # Check active tunnels"
-        echo "    hookflow config show        # View configuration"
+        echo "    railhook login              # Authenticate with your server"
+        echo "    railhook listen 3000        # Start tunnel → localhost:3000"
+        echo "    railhook tunnels status     # Check active tunnels"
+        echo "    railhook config show        # View configuration"
         echo ""
-        echo "  Config: ~/.config/hookflow/config.json"
+        echo "  Config: ~/.config/railhook/config.json"
         echo "  Docs:   https://github.com/$REPO#cli-commands"
     else
-        echo -e "${YELLOW}${BOLD}  hookflow is installed but not yet on your PATH.${RESET}"
+        echo -e "${YELLOW}${BOLD}  railhook is installed but not yet on your PATH.${RESET}"
         echo ""
         echo "  Start a new shell (or run the export below), then verify:"
         echo "    export PATH=\"$INSTALL_DIR:\$PATH\""
-        echo "    hookflow --version"
+        echo "    railhook --version"
     fi
     echo ""
     echo "  Uninstall: curl -fsSL https://raw.githubusercontent.com/$REPO/main/webhook-platform-cli/install.sh | bash -s -- --uninstall"

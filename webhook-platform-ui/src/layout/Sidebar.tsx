@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BookOpen, ChevronsLeft, LogOut, Settings, X } from 'lucide-react';
-import { HookflowIcon } from '../components/icons/HookflowIcon';
+import { RailhookIcon } from '../components/icons/RailhookIcon';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { hasMinRole, type Role } from '../auth/ProtectedRoute';
@@ -71,9 +71,9 @@ export default function Sidebar({
       <div className={cn('flex h-14 items-center border-b border-rail px-3', narrow && 'justify-center px-2')}>
         <Link to="/" className="flex items-center gap-2 transition-opacity hover:opacity-70">
           <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-primary">
-            <HookflowIcon className="h-3.5 w-3.5 text-primary-foreground" />
+            <RailhookIcon className="h-3.5 w-3.5 text-primary-foreground" />
           </div>
-          {!narrow && <span className="text-[15px] font-semibold tracking-tight">Hookflow</span>}
+          {!narrow && <span className="text-[15px] font-semibold tracking-tight">Railhook</span>}
         </Link>
         {isMobile ? (
           <Button variant="ghost" size="icon-sm" onClick={onNavigate} className="ml-auto"

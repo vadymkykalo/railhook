@@ -20,7 +20,7 @@ import { authSamples, quickstartSamples } from '../samples';
  * invocation: an integrator reading this wants an instance to talk to, not a
  * deployment decision.
  */
-const runInstance = `curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
+const runInstance = `curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh | bash
 
 # Everything is served on one port. Health, once it is up:
 curl -f http://localhost/actuator/health/liveness`;
@@ -33,7 +33,7 @@ curl -f http://localhost/actuator/health/liveness`;
  * every API path — so the other two are here to say where they went, not how to reach them.
  */
 const PORTS = [
-  { port: '80', envVar: 'HOOKFLOW_PORT', key: 'docsPage.gettingStarted.portWeb' },
+  { port: '80', envVar: 'RAILHOOK_PORT', key: 'docsPage.gettingStarted.portWeb' },
   { port: '8080', envVar: null, key: 'docsPage.gettingStarted.portApi' },
   { port: '8082', envVar: null, key: 'docsPage.gettingStarted.portActuator' },
 ];

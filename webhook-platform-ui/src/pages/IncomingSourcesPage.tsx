@@ -37,7 +37,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
  * Incoming sources — the same shape as Connections, one direction over.
  *
  * A source is a third-party provider a customer has connected, together with
- * what Hookflow needs to prove a webhook genuinely came from it. Its
+ * what Railhook needs to prove a webhook genuinely came from it. Its
  * destinations live on its own page, the way subscriptions live on a
  * connection: open a source to see where its incoming events are forwarded.
  */
@@ -49,7 +49,7 @@ const VERIFICATION_MODES: VerificationMode[] = ['NONE', 'HMAC_GENERIC', 'PROVIDE
  * The providers WebhookVerifierFactory actually ships a verifier for — which is now every
  * provider type except GENERIC.
  *
- * GENERIC is the label for a provider Hookflow has no preset for, so PROVIDER mode with it is
+ * GENERIC is the label for a provider Railhook has no preset for, so PROVIDER mode with it is
  * refused by the API: HMAC_GENERIC, with that provider's own header and prefix, is what verifies
  * those. It used to be worse than a refusal — the source saved, and then threw at ingress once
  * the provider was already sending. Narrowing the list here means the choice that fails cannot

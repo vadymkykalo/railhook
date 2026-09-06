@@ -39,12 +39,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import requests  # noqa: E402
 
-from hookflow import (  # noqa: E402
+from railhook import (  # noqa: E402
     AuthenticationError,
     EndpointCreateParams,
     Event,
-    Hookflow,
-    HookflowError,
+    Railhook,
+    RailhookError,
     IncomingDestinationCreateParams,
     IncomingEventListParams,
     IncomingSourceCreateParams,
@@ -100,7 +100,7 @@ def raw(method: str, path: str, body: Optional[Dict[str, Any]] = None, headers: 
     """Raw HTTP, used ONLY to bootstrap a tenant.
 
     The SDK is API-key scoped by design — it has no register/login/create-project
-    surface (see ``hookflow/client.py``) — so these three calls cannot go through
+    surface (see ``railhook/client.py``) — so these three calls cannot go through
     it. Everything after this point does.
     """
     res = requests.request(method, f"{BASE_URL}{path}", json=body, headers=headers, timeout=15)
@@ -132,7 +132,7 @@ def poll(fn: Callable[[], Any], ready: Callable[[Any], bool], attempts: int = 20
 
 
 def main() -> int:
-    print(f"Hookflow Python SDK — live API smoke check against {BASE_URL}\n")
+    print(f"Railhook Python SDK — live API smoke check against {BASE_URL}\n")
 
     if not api_is_up():
         print(f"{BASE_URL} is not answering. Start the stack with `make up` from the repo root.", file=sys.stderr)
@@ -170,7 +170,7 @@ def main() -> int:
     )
 
     project_id = project["id"]
-    client = Hookflow(api_key=api_key["key"], base_url=BASE_URL)
+    client = Railhook(api_key=api_key["key"], base_url=BASE_URL)
 
     # ── Endpoints ──
     print("\nendpoints:")
@@ -389,7 +389,7 @@ def main() -> int:
 
     # ── Errors ──
     print("\nerrors:")
-    bad_client = Hookflow(api_key="not-a-real-key", base_url=BASE_URL)
+    bad_client = Railhook(api_key="not-a-real-key", base_url=BASE_URL)
 
     def _auth(exc: Exception) -> None:
         assert isinstance(exc, AuthenticationError), f"expected AuthenticationError, got {type(exc).__name__}"
@@ -423,12 +423,12 @@ def main() -> int:
     )
 
     def _forbidden(exc: Exception) -> None:
-        assert isinstance(exc, HookflowError), f"expected HookflowError, got {type(exc).__name__}"
+        assert isinstance(exc, RailhookError), f"expected RailhookError, got {type(exc).__name__}"
         eq(exc.status, 403, "status")
         eq(exc.code, "forbidden", 'code (taken from the envelope\'s "error" field)')
 
     expect_error(
-        "another project's resources raise a 403 HookflowError",
+        "another project's resources raise a 403 RailhookError",
         lambda: client.endpoints.list("00000000-0000-0000-0000-000000000000"),
         _forbidden,
     )

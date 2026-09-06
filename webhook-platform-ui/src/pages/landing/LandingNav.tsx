@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Github, Menu, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { HookflowIcon } from '../../components/icons/HookflowIcon';
+import { RailhookIcon } from '../../components/icons/RailhookIcon';
 import { Button } from '../../components/ui/button';
 import ThemeToggle from '../../components/ThemeToggle';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
@@ -67,9 +67,9 @@ export default function LandingNav() {
         <div className="flex items-center gap-7">
           <Link to="/" className="flex items-center gap-2.5">
             <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-              <HookflowIcon className="h-3.5 w-3.5 text-primary-foreground" />
+              <RailhookIcon className="h-3.5 w-3.5 text-primary-foreground" />
             </span>
-            <span className="text-[15px] font-semibold tracking-tight">Hookflow</span>
+            <span className="text-[15px] font-semibold tracking-tight">Railhook</span>
           </Link>
           <ul className="hidden items-center gap-6 lg:flex">
             {LINKS.map((link) => (

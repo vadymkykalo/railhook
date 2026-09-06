@@ -1,7 +1,7 @@
 """Tests for incoming webhooks functionality."""
 
-from hookflow import (
-    Hookflow,
+from railhook import (
+    Railhook,
     IncomingSource,
     IncomingSourceCreateParams,
     IncomingSourceUpdateParams,
@@ -325,7 +325,7 @@ class TestClientIncomingModules:
     """Tests that the client initializes incoming API modules."""
 
     def test_has_incoming_sources(self):
-        client = Hookflow(api_key="test_key")
+        client = Railhook(api_key="test_key")
         assert client.incoming_sources is not None
         assert hasattr(client.incoming_sources, "create")
         assert hasattr(client.incoming_sources, "get")
@@ -339,7 +339,7 @@ class TestClientIncomingModules:
         assert hasattr(client.incoming_sources, "delete_destination")
 
     def test_has_incoming_events(self):
-        client = Hookflow(api_key="test_key")
+        client = Railhook(api_key="test_key")
         assert client.incoming_events is not None
         assert hasattr(client.incoming_events, "list")
         assert hasattr(client.incoming_events, "get")

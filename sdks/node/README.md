@@ -1,6 +1,6 @@
-# @webhook-platform/node
+# @railhook/node
 
-Official Node.js SDK for [Hookflow](https://github.com/vadymkykalo/webhook-platform).
+Official Node.js SDK for [Railhook](https://github.com/vadymkykalo/railhook).
 
 **Zero runtime dependencies.** This SDK talks to the API using Node's built-in
 `node:https` module — no third-party HTTP client, no transitive dependency
@@ -20,16 +20,16 @@ need them before the SDK grows to cover them.
 ## Installation
 
 ```bash
-npm install @webhook-platform/node
+npm install @railhook/node
 ```
 
 ## Quick Start
 
 ```typescript
-import { Hookflow } from '@webhook-platform/node';
+import { Railhook } from '@railhook/node';
 
-const client = new Hookflow({
-  apiKey: process.env.HOOKFLOW_API_KEY, // e.g. 'Kz1uAIM8VeJUQN7yGSYCst64WxNLabBHfOYbrPlJ1yk'
+const client = new Railhook({
+  apiKey: process.env.RAILHOOK_API_KEY, // e.g. 'Kz1uAIM8VeJUQN7yGSYCst64WxNLabBHfOYbrPlJ1yk'
   baseUrl: 'http://localhost:8080', // optional, defaults to localhost
 });
 
@@ -219,7 +219,7 @@ console.log(`Replayed to ${result.destinationsCount} destinations`);
 Verify incoming webhooks in your endpoint:
 
 ```typescript
-import { verifySignature, constructEvent } from '@webhook-platform/node';
+import { verifySignature, constructEvent } from '@railhook/node';
 
 app.post('/webhooks', (req, res) => {
   const payload = req.body; // raw body string
@@ -249,7 +249,7 @@ app.post('/webhooks', (req, res) => {
 
 ### What lands on your endpoint
 
-Hookflow PUTs the event's **payload** on the wire, not an envelope. This:
+Railhook PUTs the event's **payload** on the wire, not an envelope. This:
 
 ```typescript
 await client.events.send({ type: 'order.completed', data: { orderId: 'ord_1' } });
@@ -285,7 +285,7 @@ re-serialize.
 
 ```typescript
 import express from 'express';
-import { constructEvent } from '@webhook-platform/node';
+import { constructEvent } from '@railhook/node';
 
 const app = express();
 
@@ -306,11 +306,11 @@ app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
 
 ```typescript
 import { 
-  HookflowError, 
+  RailhookError, 
   RateLimitError, 
   AuthenticationError,
   ValidationError 
-} from '@webhook-platform/node';
+} from '@railhook/node';
 
 try {
   await client.events.send({ type: 'test', data: {} });
@@ -324,7 +324,7 @@ try {
     console.error('Invalid API key');
   } else if (err instanceof ValidationError) {
     console.error('Validation failed:', err.fieldErrors);
-  } else if (err instanceof HookflowError) {
+  } else if (err instanceof RailhookError) {
     console.error(`Error ${err.status}: ${err.message}`);
   }
 }
@@ -353,14 +353,14 @@ All API errors return a consistent JSON body:
 | HTTP Status | `error` Code | SDK Exception | Description |
 |---|---|---|---|
 | 400 | `validation_error` | `ValidationError` | Invalid request parameters; see `fieldErrors` |
-| 400 | `invalid_request` | `HookflowError` | Malformed or semantically invalid request |
+| 400 | `invalid_request` | `RailhookError` | Malformed or semantically invalid request |
 | 401 | `unauthorized` | `AuthenticationError` | Missing or invalid API key / expired token |
-| 403 | `forbidden` | `HookflowError` | Insufficient permissions for the action |
+| 403 | `forbidden` | `RailhookError` | Insufficient permissions for the action |
 | 404 | `not_found` | `NotFoundError` | Requested resource does not exist |
-| 413 | `payload_too_large` | `HookflowError` | Request body exceeds maximum allowed size |
-| 422 | `unprocessable_entity` | `HookflowError` | Valid syntax but violates business rules |
+| 413 | `payload_too_large` | `RailhookError` | Request body exceeds maximum allowed size |
+| 422 | `unprocessable_entity` | `RailhookError` | Valid syntax but violates business rules |
 | 429 | `rate_limit_exceeded` | `RateLimitError` | Too many requests; check `X-RateLimit-*` headers |
-| 500 | `internal_error` | `HookflowError` | Unexpected server error |
+| 500 | `internal_error` | `RailhookError` | Unexpected server error |
 
 ## Generic Requests
 
@@ -391,8 +391,8 @@ All generic methods use the same authentication, error handling, and rate-limit 
 ## Configuration
 
 ```typescript
-const client = new Hookflow({
-  apiKey: process.env.HOOKFLOW_API_KEY, // Required: Your project API key
+const client = new Railhook({
+  apiKey: process.env.RAILHOOK_API_KEY, // Required: Your project API key
   baseUrl: 'https://api.example.com', // Optional: API base URL (default: http://localhost:8080)
   timeout: 30000,              // Optional: Request timeout in ms (default: 30000)
 });
@@ -401,7 +401,7 @@ const client = new Hookflow({
 ### Timeouts and retries
 
 `timeout` is a per-request socket timeout; hitting it rejects with
-`HookflowError` (`code: 'timeout'`, `status: 0`). A connection-level failure
+`RailhookError` (`code: 'timeout'`, `status: 0`). A connection-level failure
 rejects the same way with `code: 'network_error'`.
 
 **The client does not retry.** One SDK call is exactly one HTTP request — no
@@ -431,7 +431,7 @@ import type {
   Endpoint, 
   Delivery,
   DeliveryStatus 
-} from '@webhook-platform/node';
+} from '@railhook/node';
 ```
 
 ## Development

@@ -1,7 +1,7 @@
 import { useLayoutEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { HookflowIcon } from '../components/icons/HookflowIcon';
+import { RailhookIcon } from '../components/icons/RailhookIcon';
 import { RailRule } from '../pages/landing/primitives';
 import LandingNav from '../pages/landing/LandingNav';
 import { REPO_URL } from '../pages/landing/plans';
@@ -85,9 +85,9 @@ export function Footer() {
           <div>
             <Link to="/" className="mb-4 flex items-center gap-2.5">
               <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-                <HookflowIcon className="h-3.5 w-3.5 text-primary-foreground" />
+                <RailhookIcon className="h-3.5 w-3.5 text-primary-foreground" />
               </span>
-              <span className="text-sm font-semibold">Hookflow</span>
+              <span className="text-sm font-semibold">Railhook</span>
             </Link>
             <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">{t('footer.tagline')}</p>
           </div>
@@ -116,9 +116,9 @@ export function Footer() {
             <ul className="space-y-2">
               <FooterExternal href={REPO_URL}>{t('footer.sourceCode')}</FooterExternal>
               <FooterExternal href={API_REFERENCE_URL}>{t('footer.apiReference')}</FooterExternal>
-              <FooterExternal href="https://www.npmjs.com/package/@webhook-platform/node">Node.js SDK</FooterExternal>
+              <FooterExternal href="https://www.npmjs.com/package/@railhook/node">Node.js SDK</FooterExternal>
               <FooterExternal href="https://pypi.org/project/webhook-platform/">Python SDK</FooterExternal>
-              <FooterExternal href="https://packagist.org/packages/webhook-platform/php">PHP SDK</FooterExternal>
+              <FooterExternal href="https://packagist.org/packages/railhook/php">PHP SDK</FooterExternal>
             </ul>
           </div>
         </div>

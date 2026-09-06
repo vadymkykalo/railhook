@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Hookflow\Api;
+namespace Railhook\Api;
 
-use Hookflow\Hookflow;
+use Railhook\Railhook;
 
 class Endpoints
 {
-    private Hookflow $client;
+    private Railhook $client;
 
-    public function __construct(Hookflow $client)
+    public function __construct(Railhook $client)
     {
         $this->client = $client;
     }

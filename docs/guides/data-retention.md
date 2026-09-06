@@ -1,6 +1,6 @@
 # Data retention and export
 
-Hookflow stores every Event, every Attempt and every Incoming Event as it arrived. Two of those
+Railhook stores every Event, every Attempt and every Incoming Event as it arrived. Two of those
 tables are the largest in the database by an order of magnitude, and retention is the only thing
 that bounds them. This is also the machinery that answers a GDPR request.
 
@@ -84,7 +84,7 @@ the schedule above. **Do not reach for PII masking here.** Masking is applied wh
 *displayed* — in the dashboard, in an event diff, through a shared debug link — and changes
 neither what is stored nor what is delivered. It limits who sees a value; it does not stop the
 value being kept. If a field must never be stored, the place to drop it is before the Event is
-sent to Hookflow, or in a Transformation.
+sent to Railhook, or in a Transformation.
 
 ## Related
 

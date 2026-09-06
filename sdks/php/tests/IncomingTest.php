@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Hookflow\Tests;
+namespace Railhook\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Hookflow\Hookflow;
-use Hookflow\Api\IncomingSources;
-use Hookflow\Api\IncomingEvents;
+use Railhook\Railhook;
+use Railhook\Api\IncomingSources;
+use Railhook\Api\IncomingEvents;
 
 class IncomingTest extends TestCase
 {
     public function testClientInitializesIncomingModules(): void
     {
-        $client = new Hookflow('test_api_key');
+        $client = new Railhook('test_api_key');
 
         $this->assertInstanceOf(IncomingSources::class, $client->incomingSources);
         $this->assertInstanceOf(IncomingEvents::class, $client->incomingEvents);
@@ -21,7 +21,7 @@ class IncomingTest extends TestCase
 
     public function testIncomingSourcesHasExpectedMethods(): void
     {
-        $client = new Hookflow('test_api_key');
+        $client = new Railhook('test_api_key');
         $sources = $client->incomingSources;
 
         $this->assertTrue(method_exists($sources, 'create'));
@@ -38,7 +38,7 @@ class IncomingTest extends TestCase
 
     public function testIncomingEventsHasExpectedMethods(): void
     {
-        $client = new Hookflow('test_api_key');
+        $client = new Railhook('test_api_key');
         $events = $client->incomingEvents;
 
         $this->assertTrue(method_exists($events, 'list'));
@@ -49,7 +49,7 @@ class IncomingTest extends TestCase
 
     public function testIncomingSourcesCreateSignature(): void
     {
-        $client = new Hookflow('test_api_key');
+        $client = new Railhook('test_api_key');
         $ref = new \ReflectionMethod($client->incomingSources, 'create');
 
         $params = $ref->getParameters();
@@ -62,7 +62,7 @@ class IncomingTest extends TestCase
 
     public function testIncomingSourcesCreateDestinationSignature(): void
     {
-        $client = new Hookflow('test_api_key');
+        $client = new Railhook('test_api_key');
         $ref = new \ReflectionMethod($client->incomingSources, 'createDestination');
 
         $params = $ref->getParameters();
@@ -74,7 +74,7 @@ class IncomingTest extends TestCase
 
     public function testIncomingSourcesDeleteDestinationSignature(): void
     {
-        $client = new Hookflow('test_api_key');
+        $client = new Railhook('test_api_key');
         $ref = new \ReflectionMethod($client->incomingSources, 'deleteDestination');
 
         $params = $ref->getParameters();
@@ -87,7 +87,7 @@ class IncomingTest extends TestCase
 
     public function testIncomingEventsListSignature(): void
     {
-        $client = new Hookflow('test_api_key');
+        $client = new Railhook('test_api_key');
         $ref = new \ReflectionMethod($client->incomingEvents, 'list');
 
         $params = $ref->getParameters();
@@ -99,7 +99,7 @@ class IncomingTest extends TestCase
 
     public function testIncomingEventsReplaySignature(): void
     {
-        $client = new Hookflow('test_api_key');
+        $client = new Railhook('test_api_key');
         $ref = new \ReflectionMethod($client->incomingEvents, 'replay');
 
         $params = $ref->getParameters();

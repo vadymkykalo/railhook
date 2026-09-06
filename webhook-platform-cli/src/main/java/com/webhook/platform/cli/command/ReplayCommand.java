@@ -48,7 +48,7 @@ public class ReplayCommand implements Callable<Integer> {
         CliConfig config = configService.load();
 
         if (!config.isAuthenticated()) {
-            err.println("✗ Not authenticated. Run 'hookflow login' first.");
+            err.println("✗ Not authenticated. Run 'railhook login' first.");
             return 1;
         }
 
@@ -110,7 +110,7 @@ public class ReplayCommand implements Callable<Integer> {
             }
             out.println();
             out.println("  Session still running. Check status with:");
-            out.println("  hookflow replay " + projectId + " --session " + sessionId);
+            out.println("  railhook replay " + projectId + " --session " + sessionId);
         }
 
         return 0;

@@ -358,7 +358,7 @@
       "codeLabel": "Device code",
       "confirmDesc": "You are about to authorize a CLI session with this code:",
       "confirmTitle": "Confirm Authorization",
-      "confirmWarning": "Only approve if you initiated this request from the Hookflow CLI.",
+      "confirmWarning": "Only approve if you initiated this request from the Railhook CLI.",
       "continue": "Continue",
       "denied": "Device authorization denied",
       "deniedDesc": "The CLI session was refused. Whoever asked for this code will not get in.",
@@ -406,12 +406,12 @@
       "send": "I send webhooks",
       "sendDesc": "Deliver events to your customers' endpoints with retries, monitoring, and delivery guarantees.",
       "subtitle": "This helps us tailor your experience. You can always change later.",
-      "title": "What brings you to Hookflow?"
+      "title": "What brings you to Railhook?"
     },
     "login": {
       "brandSubtitle": "Reliable delivery, automatic retries, and complete visibility for every webhook.",
       "brandTitle": "Webhook infrastructure\nyou can trust",
-      "copyright": "© {{year}} Hookflow. Built for production systems.",
+      "copyright": "© {{year}} Railhook. Built for production systems.",
       "createAccount": "Create account",
       "email": "Email address",
       "emailPlaceholder": "name@company.com",
@@ -429,7 +429,7 @@
       "welcomeBack": "Welcome back!"
     },
     "panel": {
-      "caption": "Every event Hookflow sends is signed, and every attempt it takes is recorded. When one fails, the ladder backs off and tries again — this one landed on the fourth attempt, fifteen minutes in.",
+      "caption": "Every event Railhook sends is signed, and every attempt it takes is recorded. When one fails, the ladder backs off and tries again — this one landed on the fourth attempt, fifteen minutes in.",
       "eyebrow": "A signed delivery",
       "railLabel": "Four attempts: three failed, the fourth returned 200"
     },
@@ -895,7 +895,7 @@
     "attention": {
       "alerts": "Unresolved alerts",
       "clearBadge": "All clear",
-      "desc": "Work Hookflow has stopped doing on its own",
+      "desc": "Work Railhook has stopped doing on its own",
       "dlq": "Abandoned in the DLQ",
       "failed": "Failed, retrying",
       "incidents": "Open incidents",
@@ -984,7 +984,7 @@
       "totalDeliveriesDesc": "Webhook deliveries sent",
       "window": "Last 7 days"
     },
-    "subtitle": "Overview of your Hookflow activity",
+    "subtitle": "Overview of your Railhook activity",
     "title": "Dashboard",
     "toast": {
       "loadFailed": "Failed to load dashboard data"
@@ -1286,7 +1286,7 @@
       "twoKinds": "Two things called alerts",
       "twoKindsDesc": "Worth separating before anything else, because both appear in a deployment and they watch different things.",
       "twoKindsLabel": "This page is about the first kind",
-      "twoKindsNote": "Alert rules are created in the dashboard and watch your endpoints — failure rates, latency, deliveries piling up. Separately, the Helm chart ships Prometheus rules that watch the platform itself: queue depth, breaker trips, the age of the oldest unresolved delivery. Those go to whoever runs Hookflow, not to whoever owns an endpoint. If you self-host, you want both.",
+      "twoKindsNote": "Alert rules are created in the dashboard and watch your endpoints — failure rates, latency, deliveries piling up. Separately, the Helm chart ships Prometheus rules that watch the platform itself: queue depth, breaker trips, the age of the oldest unresolved delivery. Those go to whoever runs Railhook, not to whoever owns an endpoint. If you self-host, you want both.",
       "typeConsecutive": "A run of failures with no success between them. Catches an endpoint that has gone away entirely, and does it sooner than a rate can — a rate needs volume, a run does not.",
       "typeDlq": "Failed messages accumulating past a count. This is the one that says obligations are being abandoned, not merely retried.",
       "typeFailureRate": "The proportion of attempts that failed, as a percentage over the window. The right choice for an endpoint that is degrading rather than dead.",
@@ -1310,9 +1310,9 @@
       "usingJwtDesc": "Every authenticated request carries the access token in the `Authorization` header:"
     },
     "cli": {
-      "authSubtitle": "hookflow login opens a browser and confirms a device code, so no password is typed into the terminal. --server points it at an instance other than the configured one.",
+      "authSubtitle": "railhook login opens a browser and confirms a device code, so no password is typed into the terminal. --server points it at an instance other than the configured one.",
       "authTitle": "Authentication",
-      "authTokens": "~/.config/hookflow/config.json, with permissions 600, holding the access and refresh tokens, the server URL, the organization, the user and the active project. Tokens refresh on expiry; hookflow config clear is how you log out. HOOKFLOW_CONFIG overrides the path.",
+      "authTokens": "~/.config/railhook/config.json, with permissions 600, holding the access and refresh tokens, the server URL, the organization, the user and the active project. Tokens refresh on expiry; railhook config clear is how you log out. RAILHOOK_CONFIG overrides the path.",
       "cmdConfigClear": "Erase the stored tokens — this is how you log out.",
       "cmdConfigSet": "Set one configuration value.",
       "cmdConfigShow": "Print the current configuration, with tokens redacted.",
@@ -1321,7 +1321,7 @@
       "cmdListen": "Open a tunnel and forward everything it receives to localhost on this port.",
       "cmdListenProject": "Open a tunnel for a project other than the active one.",
       "cmdLogin": "Log in through the browser using the device code flow.",
-      "cmdLoginServer": "Log in against a specific Hookflow server.",
+      "cmdLoginServer": "Log in against a specific Railhook server.",
       "cmdProfileCreate": "Create a profile pointing at another server.",
       "cmdProfileDelete": "Delete a profile and the tokens stored with it.",
       "cmdProfileList": "List the configured profiles and show which one is active.",
@@ -1338,7 +1338,7 @@
       "configFileDetails": "Everything the CLI knows lives in that one file: server URL, tokens, organization and user id, active project, and the profiles. config show prints it with the tokens redacted.",
       "configProfilesDesc": "A profile is a server URL and the tokens for it. Create one per instance — staging, production, a local build — and switch without logging in again.",
       "configTitle": "Profiles",
-      "installOpt1Desc": "Installs Java 17 if it is missing (apt, dnf or brew), downloads the CLI jar from GitHub Releases, and puts a hookflow wrapper in ~/.local/bin, adding it to PATH.",
+      "installOpt1Desc": "Installs Java 17 if it is missing (apt, dnf or brew), downloads the CLI jar from GitHub Releases, and puts a railhook wrapper in ~/.local/bin, adding it to PATH.",
       "installOpt1Title": "Install script",
       "installOpt3Desc": "Runs the same jar in a container, for a machine you would rather not install Java on.",
       "installOpt3Title": "Docker",
@@ -1346,17 +1346,17 @@
       "installTitle": "Installation",
       "requirementsLabel": "Requirements",
       "subtitle": "Tunnels a public URL to a local port, and reads events and replays from a terminal.",
-      "title": "Hookflow CLI",
+      "title": "Railhook CLI",
       "tokensLabel": "Where the tokens live",
       "troubleshoot1a": "Install Java 17 or newer: sudo apt install openjdk-17-jre-headless, or brew install openjdk@17.",
       "troubleshoot1q": "Java not found",
       "troubleshoot2a": "The tunnel forwards to localhost on the port you gave it. Nothing is listening there.",
       "troubleshoot2q": "Connection refused while tunnelling",
-      "troubleshoot3a": "Tokens refresh on their own. If it keeps happening, the refresh token has expired — run hookflow login again.",
+      "troubleshoot3a": "Tokens refresh on their own. If it keeps happening, the refresh token has expired — run railhook login again.",
       "troubleshoot3q": "Repeated 401s",
       "troubleshoot4a": "Reconnection is automatic. Close code 1008 is the server refusing, not the network: the plan allows no tunnels, or all of its slots are open already.",
       "troubleshoot4q": "The tunnel keeps dropping",
-      "troubleshoot5a": "~/.config/hookflow/config.json, unless HOOKFLOW_CONFIG says otherwise.",
+      "troubleshoot5a": "~/.config/railhook/config.json, unless RAILHOOK_CONFIG says otherwise.",
       "troubleshoot5q": "Where the config file is",
       "troubleshootTitle": "Troubleshooting",
       "tunnelsAutoReconnect": "Reconnects",
@@ -1365,7 +1365,7 @@
       "tunnelsLoggingDesc": "Each request through the tunnel prints its headers, body size, response status and latency.",
       "tunnelsPlanLimits": "Plan limits",
       "tunnelsPlanLimitsDesc": "Free: none. Starter: 3 open at once. Pro: 10. Enterprise: unlimited. Over the limit, the server closes the socket with code 1008.",
-      "tunnelsSubtitle": "hookflow listen opens a WebSocket to the server, which hands out a public URL and forwards what arrives there to a port on your machine. It is how you receive a real webhook while the code handling it runs locally.",
+      "tunnelsSubtitle": "railhook listen opens a WebSocket to the server, which hands out a public URL and forwards what arrives there to a port on your machine. It is how you receive a real webhook while the code handling it runs locally.",
       "tunnelsTitle": "Local tunnels"
     },
     "concepts": {
@@ -1384,7 +1384,7 @@
       "forward": "Forward",
       "forwardDesc": "The obligation to get one incoming event to one destination. The incoming counterpart of a delivery.",
       "source": "Source",
-      "sourceDesc": "A third-party provider you have connected, together with what Hookflow needs to prove that a webhook genuinely came from it.",
+      "sourceDesc": "A third-party provider you have connected, together with what Railhook needs to prove that a webhook genuinely came from it.",
       "subscription": "Subscription",
       "subscriptionDesc": "A standing statement that one endpoint wants events of a given type."
     },
@@ -1392,9 +1392,9 @@
       "addresses": {
         "appBaseUrl": "Where your users' browsers reach the dashboard. It is what goes into verification emails, password resets and shared debug links — left on localhost, those links are unusable for everyone but you.",
         "cors": "Origins allowed to call the API from a browser. Comma-separated.",
-        "hookflowBind": "Which host interface that port is published on. Installing with a domain moves it to `127.0.0.1` and puts the TLS terminator in front.",
-        "hookflowDomain": "The domain the built-in TLS terminator obtains a certificate for. It only runs under the `tls` Compose profile, which `install.sh --domain` turns on.",
-        "hookflowPort": "The one port published to the host. nginx serves the dashboard on it and proxies every API path, so it is the single URL to hand out and the single thing to put a certificate on.",
+        "railhookBind": "Which host interface that port is published on. Installing with a domain moves it to `127.0.0.1` and puts the TLS terminator in front.",
+        "railhookDomain": "The domain the built-in TLS terminator obtains a certificate for. It only runs under the `tls` Compose profile, which `install.sh --domain` turns on.",
+        "railhookPort": "The one port published to the host. nginx serves the dashboard on it and proxies every API path, so it is the single URL to hand out and the single thing to put a certificate on.",
         "ingressBase": "The prefix of the ingress URL shown for each incoming source. It is the URL you paste into Stripe or GitHub, so it has to be the address they can reach, not yours.",
         "tunnelBase": "The same, for the public URL a CLI tunnel prints.",
         "viteApiUrl": "The API origin the dashboard calls. Baked in at image build time, not read at runtime."
@@ -1494,7 +1494,7 @@
     },
     "endpointSecurity": {
       "allowedIps": "Allowed source IPs",
-      "allowedIpsDesc": "Despite the name, this does not restrict anything. It is a place to record which addresses your endpoint expects webhooks from, so the information sits next to the endpoint instead of in someone's notes. Nothing reads it to make a decision. If you need your customers to allowlist Hookflow's outbound address, that is solved at the network layer — see the static egress IP guide in the repository.",
+      "allowedIpsDesc": "Despite the name, this does not restrict anything. It is a place to record which addresses your endpoint expects webhooks from, so the information sits next to the endpoint instead of in someone's notes. Nothing reads it to make a decision. If you need your customers to allowlist Railhook's outbound address, that is solved at the network layer — see the static egress IP guide in the repository.",
       "allowedIpsLabel": "A note field, not a control",
       "encryption": "Secrets at rest",
       "encryptionDesc": "Endpoint secrets, client certificates and client keys are encrypted in the database, each row recording which key version encrypted it. Keys can be rotated without downtime: new writes use the new version while old rows are re-encrypted in the background.",
@@ -1503,7 +1503,7 @@
       "mtlsCaDesc": "Optional. Supply it when the endpoint presents a certificate signed by an authority the platform's trust store does not carry — an internal CA, most often. Without it, an internal endpoint's certificate is rejected before a request is made.",
       "mtlsCert": "Client certificate",
       "mtlsCertDesc": "PEM. Presented on every delivery to this endpoint. Encrypted at rest.",
-      "mtlsDesc": "For an endpoint that requires Hookflow to prove who it is at the TLS layer, not just at the signature layer. Enable it and supply the pair.",
+      "mtlsDesc": "For an endpoint that requires Railhook to prove who it is at the TLS layer, not just at the signature layer. Enable it and supply the pair.",
       "mtlsKey": "Client key",
       "mtlsKeyDesc": "PEM, matching the certificate. Encrypted at rest and never returned by the API once stored.",
       "rotStep1": "Rotate",
@@ -1525,7 +1525,7 @@
       "verification": "Proving the endpoint is yours",
       "verificationDesc": "A URL anyone can type is a URL anyone can point at somebody else. Verification is what stops an endpoint being registered against a host its owner did not consent to.",
       "verifyChallenge": "Challenge",
-      "verifyChallengeDesc": "Hookflow sends a token to the URL and expects it echoed back. Passing proves whoever registered the endpoint can read responses from it.",
+      "verifyChallengeDesc": "Railhook sends a token to the URL and expects it echoed back. Passing proves whoever registered the endpoint can read responses from it.",
       "verifySkip": "Skipping it",
       "verifySkipDesc": "Verification can be skipped with a recorded reason. The reason is kept on the endpoint, so an unverified endpoint is a decision somebody made rather than a step that quietly did not happen."
     },
@@ -1538,7 +1538,7 @@
       "code409": "It already exists, or it changed while you were editing it. Re-read it and send again.",
       "code413": "The body is over the limit — 256 KB for the API, 512 KB at an ingress URL.",
       "code429": "The rate limit is spent. Wait the seconds given in `Retry-After`, then retry.",
-      "code5xx": "Hookflow failed. The request is safe to retry with backoff — event ingestion is idempotent when you send an `Idempotency-Key`.",
+      "code5xx": "Railhook failed. The request is safe to retry with backoff — event ingestion is idempotent when you send an `Idempotency-Key`.",
       "errorFormat": "Error envelope",
       "errorFormatDesc": "Every error answers with the same shape, so one handler covers all of them. fieldErrors appears only on validation failures and maps a field name to what is wrong with it.",
       "headerLimit": "How many requests the current window allows.",
@@ -1585,7 +1585,7 @@
       "verifyLabel": "It receives nothing until it is verified"
     },
     "incomingWebhooks": {
-      "dedupDesc": "Providers resend. When the request carries an id Hookflow recognises — `X-Webhook-Id`, Stripe-Webhook-Id, `X-GitHub-Delivery`, `X-Shopify-Webhook-Id`, `X-Twilio-Webhook-Id`, or Slack's event_id — a second arrival of the same id returns the stored event instead of forwarding it again. A provider that sends none of these is not deduplicated.",
+      "dedupDesc": "Providers resend. When the request carries an id Railhook recognises — `X-Webhook-Id`, Stripe-Webhook-Id, `X-GitHub-Delivery`, `X-Shopify-Webhook-Id`, `X-Twilio-Webhook-Id`, or Slack's event_id — a second arrival of the same id returns the stored event instead of forwarding it again. A provider that sends none of these is not deduplicated.",
       "dedupLabel": "Resends",
       "destinations": "Destinations",
       "destinationsDesc": "A source forwards every verified webhook to each of its destinations. Each destination carries its own retry ladder, timeout and authentication, so a slow internal service cannot hold up the rest.",
@@ -1640,7 +1640,7 @@
       "guaranteesDesc": "Precisely, because ordering is the feature people most often assume means more than it does.",
       "howItWorks": "How it works",
       "howItWorksDesc": "Every delivery to an endpoint is stamped with a position at creation. A delivery whose predecessors have not resolved waits until they do.",
-      "scopeDesc": "Hookflow did not originate a provider's webhooks and cannot know what order the provider intended, so it does not pretend to. Every incoming event is forwarded as soon as it can be. If you need incoming order, the provider's own sequence field in the payload is the only honest source.",
+      "scopeDesc": "Railhook did not originate a provider's webhooks and cannot know what order the provider intended, so it does not pretend to. Every incoming event is forwarded as soon as it can be. If you need incoming order, the provider's own sequence field in the payload is the only honest source.",
       "scopeLabel": "The incoming direction has no ordering at all",
       "subtitle": "Delivering one endpoint's events in the order they happened, what it costs, and the one case where the guarantee is deliberately broken.",
       "termBuffer": "Ordering buffer",
@@ -1653,10 +1653,10 @@
     },
     "overview": {
       "coreConcepts": "Core concepts",
-      "diagDirAlt": "Two rows sharing one layout. Outgoing: your system announces order.created, Hookflow delivers it to an endpoint and writes the X-Signature header on the way out, and the attempt rail under the row shows seven rungs. Incoming: a provider posts to Hookflow, which reads the provider's own Stripe-Signature header on the way in and forwards to a destination, with five rungs on its rail.",
+      "diagDirAlt": "Two rows sharing one layout. Outgoing: your system announces order.created, Railhook delivers it to an endpoint and writes the X-Signature header on the way out, and the attempt rail under the row shows seven rungs. Incoming: a provider posts to Railhook, which reads the provider's own Stripe-Signature header on the way in and forwards to a destination, with five rungs on its rail.",
       "diagDirAttemptsIn": "5 tries",
       "diagDirAttemptsOut": "7 tries",
-      "diagDirCaption": "The same platform in the middle both times, and the same attempt rail underneath. What changes is which side of Hookflow the proof sits on: it writes the signature on the way out and reads the provider's on the way in.",
+      "diagDirCaption": "The same platform in the middle both times, and the same attempt rail underneath. What changes is which side of Railhook the proof sits on: it writes the signature on the way out and reads the provider's on the way in.",
       "diagDirProvider": "A provider",
       "diagDirShared": "one attempt lifecycle, both directions",
       "diagDirSigns": "signs",
@@ -1679,14 +1679,14 @@
       "flow4": "Closed",
       "flow4Desc": "A `2xx` ends the delivery. An exhausted retry ladder abandons it to Failed Messages.",
       "incoming": "Incoming",
-      "incomingDesc": "A third-party provider sends a webhook to Hookflow, which proves it came from that provider and forwards it to the destinations you nominated. Hookflow is the receiver.",
+      "incomingDesc": "A third-party provider sends a webhook to Railhook, which proves it came from that provider and forwards it to the destinations you nominated. Railhook is the receiver.",
       "next": "Next: getting started",
       "outgoing": "Outgoing",
-      "outgoingDesc": "Your system announces an event, and Hookflow carries it to the endpoints your users registered. Hookflow is the sender and signs what it sends.",
+      "outgoingDesc": "Your system announces an event, and Railhook carries it to the endpoints your users registered. Railhook is the sender and signs what it sends.",
       "subtitle": "How to send events, receive webhooks, and read what happened.",
       "title": "Documentation",
       "whatIs": "What it does",
-      "whatIsDesc1": "Hookflow sends your events to the endpoints your customers registered, and takes webhooks in from other services to forward where you choose.",
+      "whatIsDesc1": "Railhook sends your events to the endpoints your customers registered, and takes webhooks in from other services to forward where you choose.",
       "whatIsDesc2": "Both directions share one attempt log, one retry ladder and one set of screens."
     },
     "paramTable": {
@@ -1716,7 +1716,7 @@
       "styles": "Redaction styles",
       "subtitle": "Hide personal data in the dashboard without changing what is stored or what is delivered.",
       "title": "PII masking",
-      "typeBuiltin": "A named pattern Hookflow recognises wherever it appears in a payload, at any depth. You choose the style, not the pattern.",
+      "typeBuiltin": "A named pattern Railhook recognises wherever it appears in a payload, at any depth. You choose the style, not the pattern.",
       "typeCustom": "A JSONPath you write, pointing at a specific field. Use this for anything domain-specific — an internal customer reference, a document number, a free-text note.",
       "whatItIs": "What it is",
       "whatItIsDesc": "Rules that redact values in a payload when that payload is shown to a person. A rule names a field — by built-in pattern or by JSONPath — and a style to redact it with.",
@@ -1758,7 +1758,7 @@
       "ageCapDesc": "A delivery outstanding longer than 96 hours, or a forward longer than 24, is moved to the DLQ whatever its attempt count says. It exists for obligations that stopped moving — never rescheduled, never claimed — rather than for ones that are failing on the ladder, which the ladder itself ends.",
       "diagramAlt": "State diagram. `PENDING` is claimed into PROCESSING, which ends in `SUCCESS` on a `2xx`, in `FAILED` on a result not worth retrying, or in DLQ once the retry ladder is exhausted. A retryable failure sends it back to `PENDING`, and a deferral sends it back without spending an attempt. A dashed arrow marks the second way into DLQ: the age cap.",
       "diagramCaption": "The transitions a delivery makes on its own. The manual ones — replaying it, retrying it from Failed Messages — are described below.",
-      "dlqDesc": "The DLQ — Failed Messages on screen — is where a delivery lands once Hookflow has abandoned it: kept for a person to decide about, not deleted. `GET /api/v1/projects/{projectId}/dlq` is the same list the screen shows: the endpoint URL, the event type, how many attempts were made, the last error and when it was given up on.",
+      "dlqDesc": "The DLQ — Failed Messages on screen — is where a delivery lands once Railhook has abandoned it: kept for a person to decide about, not deleted. `GET /api/v1/projects/{projectId}/dlq` is the same list the screen shows: the endpoint URL, the event type, how many attempts were made, the last error and when it was given up on.",
       "dlqRetryDesc": "Retrying a failed message resets that same delivery — `PENDING`, attempt count back to zero — and walks the whole ladder again from the first tier. It keeps its delivery id, its sequence number and its `Idempotency-Key`, so a consumer that already processed it sees a duplicate it can recognise.",
       "dlqRetryLabel": "Retrying from there",
       "dlqTitle": "Failed Messages",
@@ -1787,7 +1787,7 @@
       "statusProcessing": "Claimed by a worker for one attempt. A row left here by a worker that died is handed back to `PENDING` by the stuck sweep, so a crash costs time rather than the delivery.",
       "statusSuccess": "The endpoint answered `2xx`. Nothing further is sent.",
       "statuses": "What a delivery can be",
-      "subtitle": "When Hookflow tries again, when it stops, and what it does with what it gave up on.",
+      "subtitle": "When Railhook tries again, when it stops, and what it does with what it gave up on.",
       "timeouts": "Timeouts",
       "timeoutsDesc": "One attempt waits 30 seconds for the response unless the subscription says otherwise, and a value outside 1–60 seconds is clamped into it. A timeout is recorded as a failed attempt and retried like any other failure.",
       "title": "Retries and the delivery lifecycle",
@@ -1906,8 +1906,8 @@
       "workflowAutomation": "Workflows"
     },
     "security": {
-      "challengeRequest": "What Hookflow sends",
-      "diagAlt": "Hookflow POSTs to your endpoint. The request carries an `X-Signature` header holding t and v1, computed over the timestamp and the raw body. The receiver recomputes the same HMAC, compares it in constant time, and rejects a timestamp more than 300 seconds old.",
+      "challengeRequest": "What Railhook sends",
+      "diagAlt": "Railhook POSTs to your endpoint. The request carries an `X-Signature` header holding t and v1, computed over the timestamp and the raw body. The receiver recomputes the same HMAC, compares it in constant time, and rejects a timestamp more than 300 seconds old.",
       "diagCaption": "The signature is over the timestamp and the raw body joined by a dot — not over the body. Hashing the body alone produces a digest that never matches and never says why.",
       "diagReceiver": "Your endpoint",
       "diagSigned": "signed: <t>.<raw body>, keyed with the endpoint secret",
@@ -1925,7 +1925,7 @@
       "headerSignature": "`t=<unix-ms>,v1=<hex>`. The HMAC-SHA256 of `<t>.<raw body>`, keyed with the endpoint secret. Carries a second `v1` while a rotated secret is inside its grace window.",
       "headerTimestamp": "The same value as t in the signature: when this body was signed, which is per attempt, not per event.",
       "headers": "Headers on every delivery",
-      "pitfallsDesc": "Sign the raw bytes, not a re-serialized object: a reordered or reformatted JSON hashes differently. Compare with a constant-time function. Reject an old `t` — Hookflow allows 300 seconds of skew when it verifies a signature, and five minutes is a reasonable window on your side too. And read every `v1` in the header rather than the first or the last, so a rotation does not look like a forged request.",
+      "pitfallsDesc": "Sign the raw bytes, not a re-serialized object: a reordered or reformatted JSON hashes differently. Compare with a constant-time function. Reject an old `t` — Railhook allows 300 seconds of skew when it verifies a signature, and five minutes is a reasonable window on your side too. And read every `v1` in the header rather than the first or the last, so a rotation does not look like a forged request.",
       "pitfallsLabel": "Common mistakes",
       "rotation": "Rotating a secret",
       "rotationAfter": "So the two deploys do not have to be simultaneous: rotate, then roll the new secret out whenever it suits you. Once the window closes the old signature stops being sent. If you verify with a library that reads a single `v1`, deploy inside the window or update it first — the official SDKs already accept either.",
@@ -1945,7 +1945,7 @@
       "standardPitfallsLabel": "Common mistakes",
       "standardSecret": "Which secret",
       "standardSecretDesc": "Not the same string. `X-Signature` is keyed with the endpoint secret as it is; the Standard Webhooks headers are keyed with that same secret in the conventional `whsec_<base64>` form. The API returns it as `standardWebhooksSecret` whenever it returns the secret itself — at creation and at rotation — and the dashboard shows it beside the other. The official SDKs accept a raw secret too and use it as-is, so handing over the wrong form fails as an invalid signature rather than as an error that says which one you meant.",
-      "subtitle": "What Hookflow puts on a request it sends, and how the receiver checks it.",
+      "subtitle": "What Railhook puts on a request it sends, and how the receiver checks it.",
       "title": "Webhook Security",
       "verificationExamples": "Verifying it"
     },
@@ -2012,7 +2012,7 @@
       "executionModel": "Execution model",
       "howItWorks": "How a workflow runs",
       "howItWorksDesc": "A workflow is a graph of nodes. A trigger starts it, and each node's output becomes the next node's input.",
-      "nodeCreateEvent": "Announces a new event back into Hookflow, which its own subscriptions then pick up.",
+      "nodeCreateEvent": "Announces a new event back into Railhook, which its own subscriptions then pick up.",
       "nodeFilter": "Tests the payload and stops the branch when it does not match. Everything downstream is skipped.",
       "nodeHttp": "Calls an external URL and passes the response on. Private and loopback addresses are refused.",
       "nodeSlack": "Posts a message to a Slack webhook URL.",
@@ -2348,7 +2348,7 @@
     "apiReference": "API reference",
     "capabilities": "Product",
     "contact": "Contact",
-    "copyright": "© {{year}} Hookflow — MIT licensed",
+    "copyright": "© {{year}} Railhook — MIT licensed",
     "createAccount": "Create account",
     "dashboard": "Dashboard",
     "directions": "How it works",
@@ -2762,7 +2762,7 @@
     "directions": {
       "body": "Outgoing and incoming share the same attempt log, the same retries and the same screens. Only the number of attempts differs.",
       "eyebrow": "TWO DIRECTIONS",
-      "inBody": "A provider posts to a URL Hookflow owns. The signature is checked first, the payload is kept exactly as it arrived, and a forward carries it to every destination you named.",
+      "inBody": "A provider posts to a URL Railhook owns. The signature is checked first, the payload is kept exactly as it arrived, and a forward carries it to every destination you named.",
       "inChain": "source → incoming event → forward → attempt",
       "inCta": "Start receiving",
       "inLabel": "INCOMING",
@@ -2779,13 +2779,13 @@
     },
     "faq": {
       "a1": "10,000 events a month, 3 projects, 5 endpoints per project, 5 team members and 7 days of payload retention. Retries, signatures, Failed Messages, replay, analytics and the audit log are all included — no credit card, and nothing expires after a trial.",
-      "a2": "Hookflow retries on a ladder — 1m, 5m, 15m, 1h, 6h, 24h for outgoing, one rung shorter for incoming. When the rungs run out, the delivery moves to Failed Messages with every attempt and response kept, and waits there for a person to retry it or let it go.",
+      "a2": "Railhook retries on a ladder — 1m, 5m, 15m, 1h, 6h, 24h for outgoing, one rung shorter for incoming. When the rungs run out, the delivery moves to Failed Messages with every attempt and response kept, and waits there for a person to retry it or let it go.",
       "a3": "Every delivery carries an HMAC-SHA256 signature over the timestamp and the raw body, with a secret unique to that endpoint. The Node, Python and PHP SDKs ship a verification helper; anything else is a few lines with a standard HMAC library.",
-      "a4": "Outgoing: your system announces an event and Hookflow delivers it to the endpoints your customers registered — Hookflow is the sender and signs. Incoming: a provider posts to a URL Hookflow owns, the signature is verified, and the payload is forwarded to the destinations you nominated — Hookflow is the receiver. Both share one attempt log and one set of screens.",
+      "a4": "Outgoing: your system announces an event and Railhook delivers it to the endpoints your customers registered — Railhook is the sender and signs. Incoming: a provider posts to a URL Railhook owns, the signature is verified, and the payload is forwarded to the destinations you nominated — Railhook is the receiver. Both share one attempt log and one set of screens.",
       "a5": "Yes — it is the same code. The self-hosted build is MIT licensed with every feature on and no limits on events, projects, endpoints, members or retention. One command installs it, and pointing it at a domain gets it a TLS certificate of its own.",
       "a6": "The dashboard shows usage against your plan as you approach it, and you can change plan at any time from Billing. Rate limits are per second, so a burst is smoothed rather than dropped.",
       "a7": "Per endpoint, yes. Each delivery carries a sequence number, and a delivery whose predecessor is still retrying waits its turn instead of overtaking it.",
-      "a8": "Any of them. Stripe, GitHub, GitLab, Slack, Shopify and Twilio verify with no configuration — each has a verifier written for the exact header it sends. For any other provider that signs its body with a shared secret, name the header and the prefix and Hookflow verifies it the same way. A provider that does not sign at all can still deliver; the payload is stored and forwarded, marked unverified.",
+      "a8": "Any of them. Stripe, GitHub, GitLab, Slack, Shopify and Twilio verify with no configuration — each has a verifier written for the exact header it sends. For any other provider that signs its body with a shared secret, name the header and the prefix and Railhook verifies it the same way. A provider that does not sign at all can still deliver; the payload is stored and forwarded, marked unverified.",
       "eyebrow": "QUESTIONS",
       "q1": "What's actually in the free plan?",
       "q2": "What happens when an endpoint is down?",
@@ -2794,7 +2794,7 @@
       "q5": "Can I move to self-hosted later?",
       "q6": "What happens when I hit a plan limit?",
       "q7": "Are deliveries ordered?",
-      "q8": "Which providers can Hookflow receive from?",
+      "q8": "Which providers can Railhook receive from?",
       "title": "Before you sign up"
     },
     "hero": {
@@ -2813,7 +2813,7 @@
       "statusFailed": "Attempt {{n}} failed · 500",
       "statusInFlight": "Attempt {{n}} in flight",
       "statusWaiting": "Waiting {{delay}} before attempt {{n}}",
-      "subtitle": "Hookflow is the webhook layer for your product: deliveries out to the endpoints your customers registered, and webhooks in from any provider you receive from. Signed, retried, and every attempt on the record.",
+      "subtitle": "Railhook is the webhook layer for your product: deliveries out to the endpoints your customers registered, and webhooks in from any provider you receive from. Signed, retried, and every attempt on the record.",
       "title": "Never lose a webhook"
     },
     "nav": {
@@ -2878,8 +2878,8 @@
       "yearlySave": "Save ~17%"
     },
     "problem": {
-      "after": "With Hookflow",
-      "before": "Without Hookflow",
+      "after": "With Railhook",
+      "before": "Without Railhook",
       "body": "It starts as one HTTP POST. It ends as a queue, a retry schedule, a signature scheme, an ordering guarantee and a screen someone has to build to see any of it.",
       "eyebrow": "WHY NOT BUILD IT",
       "item1After": "A retry ladder from 1 minute to 24 hours, per direction",
@@ -2901,13 +2901,13 @@
     },
     "product": {
       "body": "Every delivery with each attempt and the response it got, incoming events exactly as they arrived, Failed Messages, Time Machine, API keys and who on your team did what.",
-      "connectionsAlt": "Hookflow connections screen listing incoming sources and destinations",
+      "connectionsAlt": "Railhook connections screen listing incoming sources and destinations",
       "connectionsBody": "The sources you receive from and the destinations you forward to, with their verification mode.",
       "connectionsTitle": "Connections",
-      "dashboardAlt": "Hookflow dashboard: delivery volume and attempt outcomes over time",
+      "dashboardAlt": "Railhook dashboard: delivery volume and attempt outcomes over time",
       "dashboardBody": "Volume, outcomes and what is retrying right now.",
       "dashboardTitle": "Dashboard",
-      "deliveriesAlt": "Hookflow deliveries list with per-attempt status and response codes",
+      "deliveriesAlt": "Railhook deliveries list with per-attempt status and response codes",
       "deliveriesBody": "Every attempt on a delivery, its response code, and when the next one is due.",
       "deliveriesTitle": "Deliveries",
       "eyebrow": "THE DASHBOARD",
@@ -2939,7 +2939,7 @@
       "apiKeysTitle": "Scoped API keys",
       "auditDesc": "Who changed which endpoint, rotated which secret, replayed which events, purged which Failed Messages — and when.",
       "auditTitle": "Audit log",
-      "body": "Webhooks carry order totals, email addresses and card metadata across the open internet. Here is what Hookflow does about that.",
+      "body": "Webhooks carry order totals, email addresses and card metadata across the open internet. Here is what Railhook does about that.",
       "encryptionDesc": "Secrets and certificates are AES-256-GCM encrypted, each row tagged with the key that sealed it, so a key can be rotated without re-encrypting the world.",
       "encryptionTitle": "Encrypted at rest, with key versions",
       "eyebrow": "SECURITY AND CONTROL",
@@ -2972,7 +2972,7 @@
       "body": "Create an account, register the endpoint you want to reach, and send the event. The attempt shows up in the dashboard before you have switched tabs.",
       "docsLink": "Full quickstart",
       "eyebrow": "FIVE MINUTES",
-      "sdkNote": "Or use an SDK: @webhook-platform/node · webhook-platform (PyPI) · webhook-platform/php",
+      "sdkNote": "Or use an SDK: @railhook/node · webhook-platform (PyPI) · railhook/php",
       "step1Body": "The URL you want reached, and what it should hear about.",
       "step1Title": "Register an endpoint",
       "step2Body": "One POST. An idempotency key makes a retried call safe.",
@@ -3110,20 +3110,20 @@
   "meta": {
     "contact": {
       "description": "Talk to us about Enterprise plans, volume pricing or self-hosted support.",
-      "title": "Contact — Hookflow"
+      "title": "Contact — Railhook"
     },
     "docs": {
       "description": "How to send events, receive webhooks, verify signatures, and read what happened — guides and the full API reference.",
-      "title": "Documentation — Hookflow",
-      "titleSection": "{{section}} — Hookflow docs"
+      "title": "Documentation — Railhook",
+      "titleSection": "{{section}} — Railhook docs"
     },
     "landing": {
       "description": "Send webhooks to your customers' endpoints and receive them from Stripe, GitHub or Slack. HMAC-signed, retried on a ladder from 1 minute to 24 hours, with Failed Messages and replay. Free for 10,000 events a month, or self-host under MIT.",
-      "title": "Hookflow — Webhook infrastructure, both directions"
+      "title": "Railhook — Webhook infrastructure, both directions"
     },
     "pricing": {
       "description": "Free for 10,000 events a month. Starter $29, Pro $99, Enterprise on request — or run the MIT-licensed build yourself with no limits at all.",
-      "title": "Pricing — Hookflow"
+      "title": "Pricing — Railhook"
     }
   },
   "mtls": {
@@ -3224,7 +3224,7 @@
     "title": "Page not found"
   },
   "onboarding": {
-    "allDone": "You're all set — Hookflow is carrying your webhooks.",
+    "allDone": "You're all set — Railhook is carrying your webhooks.",
     "allDoneAction": "Read the quickstart",
     "dismiss": "Dismiss",
     "progress": "{{done}} of {{total}}",
@@ -3918,10 +3918,10 @@
       "desc": "Verify whichever one you already have code for, and move to the other later without a deploy on both sides at once. The default, and the answer when you are not sure.",
       "title": "Both header sets"
     },
-    "desc": "Which signature Hookflow puts on every delivery to this endpoint. A receiver ignores the headers it does not read, so sending a set it has never seen breaks nothing that already works.",
+    "desc": "Which signature Railhook puts on every delivery to this endpoint. A receiver ignores the headers it does not read, so sending a set it has never seen breaks nothing that already works.",
     "label": "Signature headers",
     "legacy": {
-      "desc": "Hookflow’s own header: HMAC-SHA256 of <t>.<raw body> in hex, keyed with the raw secret. Choose it when your receiver already verifies this and you would rather it saw nothing else.",
+      "desc": "Railhook’s own header: HMAC-SHA256 of <t>.<raw body> in hex, keyed with the raw secret. Choose it when your receiver already verifies this and you would rather it saw nothing else.",
       "title": "X-Signature only"
     },
     "saveFailed": "Could not change the signature headers",
@@ -4063,11 +4063,11 @@
     "verdictRunning": "Running",
     "verifyBody": "Signed body",
     "verifyBodyHint": "Paste the exact bytes the endpoint received — a reformatted body will not match.",
-    "verifyDesc": "Check a signature Hookflow sent, without sending anything. Everything stays in this browser.",
+    "verifyDesc": "Check a signature Railhook sent, without sending anything. Everything stays in this browser.",
     "verifyEmptyDesc": "Paste a secret, a signature header and the body to check them.",
     "verifyEmptyTitle": "Nothing checked yet",
     "verifyHeader": "Signature header",
-    "verifyHeaderHint": "The X-Hookflow-Signature value from the request.",
+    "verifyHeaderHint": "The X-Railhook-Signature value from the request.",
     "verifyInvalid": "No match",
     "verifyInvalidDesc": "The signature does not match this body and secret. Check that the body is byte-for-byte what was sent, and that the secret is the current one.",
     "verifyRunHint": "The secret and body never leave this browser.",
@@ -4301,7 +4301,7 @@
     "lastHeartbeat": "Last heartbeat",
     "localPort": "Local port",
     "noTunnels": "No active tunnels",
-    "noTunnelsDesc": "Start a tunnel from the CLI with `hookflow listen --port 3000` to forward requests to your local machine.",
+    "noTunnelsDesc": "Start a tunnel from the CLI with `railhook listen --port 3000` to forward requests to your local machine.",
     "openCount": "Open · {{count}}",
     "refresh": "Refresh",
     "stats": {

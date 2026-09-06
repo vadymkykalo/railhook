@@ -1,4 +1,4 @@
-import { HookflowIcon } from './icons/HookflowIcon';
+import { RailhookIcon } from './icons/RailhookIcon';
 
 /**
  * The first thing every visitor sees, and the only screen that renders before
@@ -18,10 +18,10 @@ import { HookflowIcon } from './icons/HookflowIcon';
 export default function BootSplash() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
-      <HookflowIcon
+      <RailhookIcon
         className="h-10 w-10 animate-pulse text-primary"
         role="img"
-        aria-label="Hookflow"
+        aria-label="Railhook"
       />
     </div>
   );

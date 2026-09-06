@@ -38,7 +38,7 @@ public class ConfigCommand implements Callable<Integer> {
             CliConfigService configService = new CliConfigService();
             CliConfig config = configService.load();
 
-            out.println("Hookflow CLI Configuration");
+            out.println("Railhook CLI Configuration");
             out.println("══════════════════════════════════════");
             out.println("  File:        " + configService.getConfigPath());
             out.println("  Backend URL: " + config.getBackendUrl());
@@ -186,7 +186,7 @@ public class ConfigCommand implements Callable<Integer> {
                 } else {
                     CliConfig.ProfileConfig target = config.ensureProfiles().get(name);
                     if (target == null) {
-                        err.println("✗ Profile '" + name + "' not found. Create it first: hookflow config profile create " + name);
+                        err.println("✗ Profile '" + name + "' not found. Create it first: railhook config profile create " + name);
                         return 1;
                     }
                     config.applyProfile(target);
@@ -230,8 +230,8 @@ public class ConfigCommand implements Callable<Integer> {
 
                 out.println("✓ Profile '" + name + "' created");
                 out.println("  Backend URL: " + profile.getBackendUrl());
-                out.println("  Switch to it: hookflow config profile use " + name);
-                out.println("  Then login:   hookflow login");
+                out.println("  Switch to it: railhook config profile use " + name);
+                out.println("  Then login:   railhook login");
                 return 0;
             }
         }

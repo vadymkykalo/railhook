@@ -36,7 +36,7 @@ import { formatJson } from '../lib/json';
 type ConsoleMode = 'event' | 'ping' | 'verify';
 
 /**
- * Recomputes the signature Hookflow would have sent and compares it to the one
+ * Recomputes the signature Railhook would have sent and compares it to the one
  * that arrived. Entirely local — the secret never leaves the browser, which is
  * why this is arithmetic here rather than a call to the API.
  */

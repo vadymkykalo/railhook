@@ -11,9 +11,9 @@ const SDKS: Array<{ id: SdkId; name: string; pkg: string; url: string; install: 
   {
     id: 'node',
     name: 'Node.js / TypeScript',
-    pkg: '@webhook-platform/node',
-    url: 'https://www.npmjs.com/package/@webhook-platform/node',
-    install: 'npm install @webhook-platform/node',
+    pkg: '@railhook/node',
+    url: 'https://www.npmjs.com/package/@railhook/node',
+    install: 'npm install @railhook/node',
     label: 'typescript',
   },
   {
@@ -21,15 +21,15 @@ const SDKS: Array<{ id: SdkId; name: string; pkg: string; url: string; install: 
     name: 'Python',
     pkg: 'webhook-platform',
     url: 'https://pypi.org/project/webhook-platform/',
-    install: 'pip install webhook-platform',
+    install: 'pip install railhook',
     label: 'python',
   },
   {
     id: 'php',
     name: 'PHP',
-    pkg: 'webhook-platform/php',
-    url: 'https://packagist.org/packages/webhook-platform/php',
-    install: 'composer require webhook-platform/php',
+    pkg: 'railhook/php',
+    url: 'https://packagist.org/packages/railhook/php',
+    install: 'composer require railhook/php',
     label: 'php',
   },
 ];

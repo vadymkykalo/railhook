@@ -15,10 +15,10 @@ import java.time.Duration;
  * Talks to {@code /api/v1/admin/**} with the deployment's operator credential.
  *
  * <p>Separate from {@link HttpApiClient} on purpose, and not a flag on it. That client carries a
- * tenant's bearer token, refreshes it, and persists it to {@code ~/.hookflow}; none of the three
+ * tenant's bearer token, refreshes it, and persists it to {@code ~/.railhook}; none of the three
  * is right for this credential. The operator token belongs to whoever runs the deployment, is
  * the same secret for every tenant on it, and is read from the environment or a flag each time —
- * so it is never written to a config file that a later {@code hookflow status} would print.
+ * so it is never written to a config file that a later {@code railhook status} would print.
  *
  * <p>It is also why these commands live here and not in the dashboard. The web UI is served from
  * the same origin as the API; a platform-admin token kept in a browser would turn any XSS
@@ -27,7 +27,7 @@ import java.time.Duration;
  */
 public class AdminApiClient {
 
-    public static final String TOKEN_ENV = "HOOKFLOW_ADMIN_TOKEN";
+    public static final String TOKEN_ENV = "RAILHOOK_ADMIN_TOKEN";
     private static final String TOKEN_HEADER = "X-Platform-Admin-Token";
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
 

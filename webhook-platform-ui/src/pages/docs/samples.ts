@@ -58,7 +58,7 @@ export const quickstartSamples = {
 };
 
 export const signatureSamples = {
-  curl: `# Hookflow signs "<timestamp>.<raw body>" with the endpoint secret.
+  curl: `# Railhook signs "<timestamp>.<raw body>" with the endpoint secret.
 # X-Signature: t=<unix-ms>,v1=<hex hmac-sha256>
 
 SIGNED="\${TIMESTAMP}.\${BODY}"
@@ -116,14 +116,14 @@ EXPECTED=$(printf '%s' "$SIGNED" \\
 # a rotation window — any one of them matching is enough.
 case " $WEBHOOK_SIGNATURE " in *" v1,$EXPECTED "*) ;; *) exit 1 ;; esac`,
   node: `import express from 'express';
-import { verifyStandardWebhook } from '@webhook-platform/node';
+import { verifyStandardWebhook } from '@railhook/node';
 
 // express.raw, not express.json: the signature is over the bytes that arrived,
 // and a parsed-then-reserialized body hashes differently.
 app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
   try {
     // The endpoint's standardWebhooksSecret — the whsec_… form, not the raw one.
-    verifyStandardWebhook(req.body.toString('utf8'), req.headers, process.env.HOOKFLOW_WHSEC);
+    verifyStandardWebhook(req.body.toString('utf8'), req.headers, process.env.RAILHOOK_WHSEC);
   } catch {
     return res.sendStatus(400); // wrong signature, or older than 300 seconds
   }
@@ -134,7 +134,7 @@ app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
   python: `import os
 
 from fastapi import HTTPException, Request, Response
-from hookflow import HookflowError, verify_standard_webhook
+from railhook import RailhookError, verify_standard_webhook
 
 
 @app.post("/webhooks")
@@ -144,8 +144,8 @@ async def receive(request: Request) -> Response:
     body = (await request.body()).decode()
     try:
         # The endpoint's standardWebhooksSecret — the whsec_… form.
-        verify_standard_webhook(body, dict(request.headers), os.environ["HOOKFLOW_WHSEC"])
-    except HookflowError:
+        verify_standard_webhook(body, dict(request.headers), os.environ["RAILHOOK_WHSEC"])
+    except RailhookError:
         raise HTTPException(status_code=400)  # wrong signature, or too old
 
     return Response(status_code=204)`,
@@ -231,28 +231,28 @@ export const errorSamples = {
 };
 
 export const cliSamples = {
-  install: `curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash`,
-  docker: `docker run --rm -it -v ~/.config/hookflow:/root/.config/hookflow \\
-  ghcr.io/vadymkykalo/hookflow-cli:latest listen 3000`,
-  login: `hookflow login
+  install: `curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/webhook-platform-cli/install.sh | bash`,
+  docker: `docker run --rm -it -v ~/.config/railhook:/root/.config/railhook \\
+  ghcr.io/vadymkykalo/railhook-cli:latest listen 3000`,
+  login: `railhook login
 
 # ▸ Open: http://localhost/device?code=ABCD-1234
 # ▸ Code: ABCD-1234
 # ✓ Logged in as you@company.com`,
-  listen: `hookflow listen 3000
+  listen: `railhook listen 3000
 
 #   Public URL:  https://tun-x4k9.example.com/t/tun-x4k9
 #   Forwarding:  → http://localhost:3000
 #   Press Ctrl+C to stop`,
-  profiles: `hookflow config profile create staging --url https://staging.company.com
-hookflow config profile use staging && hookflow login
-hookflow config profile list`,
+  profiles: `railhook config profile create staging --url https://staging.company.com
+railhook config profile use staging && railhook login
+railhook config profile list`,
 };
 
 export const sdkSamples = {
-  node: `import { Hookflow } from '@webhook-platform/node';
+  node: `import { Railhook } from '@railhook/node';
 
-const client = new Hookflow({ apiKey: process.env.HOOKFLOW_API_KEY });
+const client = new Railhook({ apiKey: process.env.RAILHOOK_API_KEY });
 
 const event = await client.events.send({
   type: 'order.completed',
@@ -260,17 +260,17 @@ const event = await client.events.send({
 });`,
   python: `import os
 
-from hookflow import Hookflow, Event
+from railhook import Railhook, Event
 
-client = Hookflow(api_key=os.environ["HOOKFLOW_API_KEY"])
+client = Railhook(api_key=os.environ["RAILHOOK_API_KEY"])
 
 event = client.events.send(
     Event(type="order.completed", data={"order_id": "ord_12345", "amount": 99.99})
 )`,
   php: `<?php
-use Hookflow\\Hookflow;
+use Railhook\\Railhook;
 
-$client = new Hookflow(apiKey: getenv('HOOKFLOW_API_KEY'));
+$client = new Railhook(apiKey: getenv('RAILHOOK_API_KEY'));
 
 $event = $client->events->send(
     type: 'order.completed',

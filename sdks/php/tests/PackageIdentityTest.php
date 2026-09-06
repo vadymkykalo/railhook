@@ -2,15 +2,21 @@
 
 declare(strict_types=1);
 
-namespace Hookflow\Tests;
+namespace Railhook\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Hookflow\Hookflow;
+use Railhook\Railhook;
 
 /**
  * Guards the published identity of this SDK: the Packagist package is
- * webhook-platform/php while the PHP namespace is Hookflow\. The two names
- * differ on purpose, so this fails loudly if either drifts.
+ * railhook/php and the PHP namespace is Railhook\. They agree, and this
+ * exists to keep them agreeing.
+ *
+ * They used to disagree - the package was webhook-platform/php while the
+ * namespace was Hookflow\ - which meant `composer require` and `use` needed
+ * two unrelated names. That is what the rename to Railhook was for, and a
+ * rename that touches one and not the other brings the old problem straight
+ * back with nothing else in the build noticing.
  */
 class PackageIdentityTest extends TestCase
 {
@@ -21,13 +27,13 @@ class PackageIdentityTest extends TestCase
             true
         );
 
-        $this->assertSame('webhook-platform/php', $composerJson['name']);
+        $this->assertSame('railhook/php', $composerJson['name']);
     }
 
-    public function testSmokeConstructsClientUnderHookflowNamespace(): void
+    public function testSmokeConstructsClientUnderRailhookNamespace(): void
     {
-        $client = new Hookflow('test_api_key');
+        $client = new Railhook('test_api_key');
 
-        $this->assertInstanceOf(Hookflow::class, $client);
+        $this->assertInstanceOf(Railhook::class, $client);
     }
 }

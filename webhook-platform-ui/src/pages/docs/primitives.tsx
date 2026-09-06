@@ -387,7 +387,7 @@ const fill = (tone: SketchTone) => (tone === 'rail' ? 'hsl(var(--card))' : `hsl(
  *
  * It used to be a pill — a 2px rounded rect with one centred word in it — and a row of those
  * joined by arrows is a flowchart from a slide deck, not a drawing of this system. Three of
- * them said "Your system", "Hookflow", "Endpoint", which is the sentence underneath the
+ * them said "Your system", "Railhook", "Endpoint", which is the sentence underneath the
  * figure with boxes around it.
  *
  * What makes a node worth drawing is what it carries, so the shape is built for content: a
@@ -500,7 +500,7 @@ export function SketchEdge({
 /**
  * A mono token sitting on a connector: the thing that travels.
  *
- * This is the element the old diagrams had no answer for. "Hookflow → Endpoint" with the word
+ * This is the element the old diagrams had no answer for. "Railhook → Endpoint" with the word
  * "signs" floating underneath tells the reader a verb; `X-Signature: t=…,v1=…` riding the
  * arrow tells them what to look for in their own logs. The plate behind it is the page
  * background rather than a fill, so the line appears to pass behind the text instead of

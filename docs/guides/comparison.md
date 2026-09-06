@@ -1,16 +1,16 @@
-# How Hookflow compares
+# How Railhook compares
 
 Kept out of the README on purpose: a comparison table is the kind of thing that
 grows, dates badly, and pushes the one command a reader actually needs below the
 fold. It lives here so it can be as detailed as it wants to be.
 
 
-The honest version. Hookflow is younger than Svix, Hookdeck and Convoy, and
+The honest version. Railhook is younger than Svix, Hookdeck and Convoy, and
 there are things they do that it does not — the gaps are listed here rather
 than left for you to find during an evaluation, and
 [`ROADMAP.md`](../../ROADMAP.md) keeps that list current.
 
-|  | Hookflow | Svix | Hookdeck | Convoy |
+|  | Railhook | Svix | Hookdeck | Convoy |
 |---|---|---|---|---|
 | Self-hosted with every feature, no licence key | **yes** | open-source server, portal is the hosted product | SaaS (Outpost is the OSS piece) | open source, some features are paid |
 | Sending webhooks | yes | yes | yes | yes |
@@ -33,7 +33,7 @@ than left for you to find during an evaluation, and
 <sub>Competitor columns reflect their public documentation at the time of
 writing and are not a substitute for reading it. Corrections welcome as a PR.</sub>
 
-**A second gap worth naming before you find it**: Hookflow delivers over HTTP and nothing
+**A second gap worth naming before you find it**: Railhook delivers over HTTP and nothing
 else. Hookdeck's Outpost — the closest open-source comparison, and the same
 self-hosted-plus-managed shape — also delivers to AWS SQS, S3 and EventBridge, GCP Pub/Sub,
 RabbitMQ and Kafka, and puts "destination types" first in its own comparison table. If your
@@ -43,10 +43,10 @@ ladder makes up for it.
 **The one gap that matters most** is the app portal — a surface a customer
 embeds in their own product so *their* users can register an endpoint, see why
 a delivery failed, and replay it. That is the thing people pay Svix for, and
-Hookflow has only a shareable single-event debug link. It is the top item on
+Railhook has only a shareable single-event debug link. It is the top item on
 the roadmap.
 
-**Migrating is cheaper than it looks.** Hookflow implements Standard Webhooks
+**Migrating is cheaper than it looks.** Railhook implements Standard Webhooks
 exactly, so a receiver already using a Svix or Standard Webhooks library keeps
 working with a new secret and a new URL — nothing else changes. Both platforms
 can run side by side with no cutover window; see

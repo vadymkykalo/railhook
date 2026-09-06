@@ -32,7 +32,7 @@ function Metric({ label, value, halt }: { label: string; value: number; halt?: b
 }
 
 /**
- * The same page as the outgoing DLQ, read from the other end: a Forward that Hookflow
+ * The same page as the outgoing DLQ, read from the other end: a Forward that Railhook
  * stopped trying to get to a Destination, rather than a Delivery it stopped trying to get
  * to an Endpoint.
  *

@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import { WebhookEvent } from './types';
-import { HookflowError } from './errors';
+import { RailhookError } from './errors';
 
 const SIGNATURE_HEADER = 'x-signature';
 const TIMESTAMP_HEADER = 'x-timestamp';
@@ -25,7 +25,7 @@ export interface VerifyOptions {
  * Verifies the webhook signature using HMAC-SHA256.
  *
  * The header is `t=<unix-ms>,v1=<hex>`, and it may carry **more than one** `v1`.
- * After you rotate an endpoint's secret, Hookflow signs each delivery with both
+ * After you rotate an endpoint's secret, Railhook signs each delivery with both
  * the new secret and the retired one for the endpoint's grace window (24 hours
  * by default), so you can deploy the new secret whenever you like instead of at
  * the instant you press rotate. The delivery is authentic if *any* `v1` matches,
@@ -36,7 +36,7 @@ export interface VerifyOptions {
  * @param secret - Endpoint webhook secret
  * @param options - Verification options
  * @returns true if signature is valid
- * @throws HookflowError if signature is invalid
+ * @throws RailhookError if signature is invalid
  */
 export function verifySignature(
   payload: string,
@@ -47,7 +47,7 @@ export function verifySignature(
   const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
 
   if (!signature) {
-    throw new HookflowError('Missing signature header', 400, 'invalid_signature');
+    throw new RailhookError('Missing signature header', 400, 'invalid_signature');
   }
 
   const parts = signature.split(',');
@@ -64,7 +64,7 @@ export function verifySignature(
   }
 
   if (!timestamp || signatures.length === 0) {
-    throw new HookflowError(
+    throw new RailhookError(
       'Invalid signature format. Expected: t=timestamp,v1=signature',
       400,
       'invalid_signature'
@@ -75,7 +75,7 @@ export function verifySignature(
   const now = Date.now();
 
   if (Math.abs(now - timestampMs) > tolerance) {
-    throw new HookflowError(
+    throw new RailhookError(
       'Webhook timestamp is outside tolerance window',
       400,
       'timestamp_expired'
@@ -100,7 +100,7 @@ export function verifySignature(
   }
 
   if (!matched) {
-    throw new HookflowError('Invalid signature', 400, 'invalid_signature');
+    throw new RailhookError('Invalid signature', 400, 'invalid_signature');
   }
 
   return true;
@@ -120,7 +120,7 @@ const DEFAULT_STANDARD_TOLERANCE_SECONDS = 300;
  * whichever you prefer — this one if you would rather your verification match what other
  * providers send, `verifySignature` if you are already verifying `X-Signature`.
  *
- * Two things differ from Hookflow's own scheme beyond the header names: the message id is
+ * Two things differ from Railhook's own scheme beyond the header names: the message id is
  * part of what is signed, and the digest is base64 rather than hex. Rotation works the same
  * way — during the grace window the header carries a space-separated signature per valid
  * secret, and any one matching is enough.
@@ -130,7 +130,7 @@ const DEFAULT_STANDARD_TOLERANCE_SECONDS = 300;
  * @param secret - The endpoint's `standardWebhooksSecret` (`whsec_…`), not the raw secret.
  *                 A plain secret is accepted too and used as-is.
  * @returns true if the signature is valid
- * @throws HookflowError if it is not
+ * @throws RailhookError if it is not
  */
 export function verifyStandardWebhook(
   payload: string,
@@ -145,7 +145,7 @@ export function verifyStandardWebhook(
   const signature = headers[STANDARD_SIGNATURE_HEADER] || headers['Webhook-Signature'];
 
   if (!id || !timestamp || !signature) {
-    throw new HookflowError(
+    throw new RailhookError(
       'Missing webhook-id, webhook-timestamp or webhook-signature header',
       400,
       'invalid_signature'
@@ -154,12 +154,12 @@ export function verifyStandardWebhook(
 
   const timestampSeconds = parseInt(timestamp, 10);
   if (Number.isNaN(timestampSeconds)) {
-    throw new HookflowError('Invalid webhook-timestamp header', 400, 'invalid_signature');
+    throw new RailhookError('Invalid webhook-timestamp header', 400, 'invalid_signature');
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
   if (Math.abs(nowSeconds - timestampSeconds) > tolerance) {
-    throw new HookflowError(
+    throw new RailhookError(
       'Webhook timestamp is outside tolerance window',
       400,
       'timestamp_expired'
@@ -192,7 +192,7 @@ export function verifyStandardWebhook(
   }
 
   if (!matched) {
-    throw new HookflowError('Invalid signature', 400, 'invalid_signature');
+    throw new RailhookError('Invalid signature', 400, 'invalid_signature');
   }
 
   return true;
@@ -201,7 +201,7 @@ export function verifyStandardWebhook(
 /**
  * Constructs a webhook event from the request.
  *
- * What Hookflow actually PUTs on the wire is the event's **payload**, not an
+ * What Railhook actually PUTs on the wire is the event's **payload**, not an
  * envelope: a `client.events.send({ type: 'order.completed', data: {...} })`
  * arrives at your endpoint as the `data` object alone, with the identifiers
  * carried in headers (`X-Event-Id`, `X-Delivery-Id`, `X-Timestamp`,
@@ -233,7 +233,7 @@ export function constructEvent(
   const deliveryId = headers[DELIVERY_ID_HEADER] || headers['X-Delivery-Id'];
 
   if (!signature) {
-    throw new HookflowError('Missing X-Signature header', 400, 'missing_header');
+    throw new RailhookError('Missing X-Signature header', 400, 'missing_header');
   }
 
   verifySignature(payload, signature, secret, options);
@@ -242,7 +242,7 @@ export function constructEvent(
   try {
     data = JSON.parse(payload);
   } catch {
-    throw new HookflowError('Invalid JSON payload', 400, 'invalid_payload');
+    throw new RailhookError('Invalid JSON payload', 400, 'invalid_payload');
   }
 
   return {

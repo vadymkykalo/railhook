@@ -9,8 +9,8 @@ import time
 
 import pytest
 
-from hookflow import verify_standard_webhook
-from hookflow.errors import HookflowError
+from railhook import verify_standard_webhook
+from railhook.errors import RailhookError
 
 MESSAGE_ID = "msg_p5jXN8AQM9LWM0D4loKWxJek"
 PAYLOAD = '{"test": 2432232314}'
@@ -63,29 +63,29 @@ def test_rejects_a_replay_despite_a_valid_signature():
     # A signature over a fixed body never expires on its own, so without the timestamp
     # check a captured request stays replayable for as long as the secret lives.
     old = int(time.time()) - 3600
-    with pytest.raises(HookflowError):
+    with pytest.raises(RailhookError):
         verify_standard_webhook(PAYLOAD, headers(old, f"v1,{sign(old)}"), SHARED_SECRET)
 
 
 def test_rejects_a_signature_from_another_message():
     ts = int(time.time())
     other = sign(ts, message_id="msg_somethingelse")
-    with pytest.raises(HookflowError):
+    with pytest.raises(RailhookError):
         verify_standard_webhook(PAYLOAD, headers(ts, f"v1,{other}"), SHARED_SECRET)
 
 
 def test_rejects_a_tampered_body():
     ts = int(time.time())
-    with pytest.raises(HookflowError):
+    with pytest.raises(RailhookError):
         verify_standard_webhook('{"test": 1}', headers(ts, f"v1,{sign(ts)}"), SHARED_SECRET)
 
 
 def test_missing_headers_are_reported_not_treated_as_unsigned():
-    with pytest.raises(HookflowError):
+    with pytest.raises(RailhookError):
         verify_standard_webhook(PAYLOAD, {"webhook-id": MESSAGE_ID}, SHARED_SECRET)
 
 
 def test_unknown_signature_version_is_ignored():
     ts = int(time.time())
-    with pytest.raises(HookflowError):
+    with pytest.raises(RailhookError):
         verify_standard_webhook(PAYLOAD, headers(ts, f"v2,{sign(ts)}"), SHARED_SECRET)

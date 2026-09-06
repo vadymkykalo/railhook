@@ -79,7 +79,7 @@ beforeEach(() => {
 describe('GettingStarted', () => {
   it('asks for the direction when the account is empty and nothing was answered', async () => {
     render();
-    expect(await screen.findByText('What brings you to Hookflow?')).toBeInTheDocument();
+    expect(await screen.findByText('What brings you to Railhook?')).toBeInTheDocument();
     expect(screen.queryByText('Create a connection')).not.toBeInTheDocument();
   });
 
@@ -100,7 +100,7 @@ describe('GettingStarted', () => {
     localStorage.setItem(INTENT_KEY, 'send');
     render();
     expect(await screen.findByText('Create a connection')).toBeInTheDocument();
-    expect(screen.queryByText('What brings you to Hookflow?')).not.toBeInTheDocument();
+    expect(screen.queryByText('What brings you to Railhook?')).not.toBeInTheDocument();
   });
 
   it('lets what the account has outrank what was answered', async () => {

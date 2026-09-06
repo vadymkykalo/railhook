@@ -12239,7 +12239,7 @@
       "group" : "com.webhook.platform",
       "name" : "webhook-platform-cli",
       "version" : "2.2.1",
-      "description" : "Hookflow CLI — local tunnel, event replay, and diagnostics",
+      "description" : "Railhook CLI — local tunnel, event replay, and diagnostics",
       "licenses" : [ ],
       "purl" : "pkg:maven/com.webhook.platform/webhook-platform-cli@2.2.1?type=jar",
       "type" : "library",

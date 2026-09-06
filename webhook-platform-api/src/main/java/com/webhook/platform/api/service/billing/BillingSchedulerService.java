@@ -80,7 +80,7 @@ public class BillingSchedulerService {
         long amountCents = sub.getBillingInterval() == BillingInterval.YEARLY
                 ? sub.getPlan().getPriceYearlyCents()
                 : sub.getPlan().getPriceMonthlyCents();
-        String orderRef = "hookflow_renew_" + sub.getId() + "_" + System.currentTimeMillis();
+        String orderRef = "railhook_renew_" + sub.getId() + "_" + System.currentTimeMillis();
 
         // Create invoice
         BillingInvoice invoice = BillingInvoice.builder()
@@ -106,7 +106,7 @@ public class BillingSchedulerService {
                         amountCents,
                         sub.getCurrency(),
                         orderRef,
-                        "Hookflow " + sub.getPlan().getDisplayName() + " renewal"
+                        "Railhook " + sub.getPlan().getDisplayName() + " renewal"
                 ));
 
         // Record payment

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hookflow;
+namespace Railhook;
 
-use Hookflow\Exception\HookflowException;
+use Railhook\Exception\RailhookException;
 
 class Webhook
 {
@@ -17,7 +17,7 @@ class Webhook
      * Verify webhook signature using HMAC-SHA256.
      *
      * The header is `t=<unix-ms>,v1=<hex>` and may carry more than one `v1`.
-     * After you rotate an endpoint's secret, Hookflow signs each delivery with
+     * After you rotate an endpoint's secret, Railhook signs each delivery with
      * both the new secret and the retired one for the endpoint's grace window
      * (24 hours by default), so the new secret can be deployed whenever you like
      * rather than at the instant you press rotate. The delivery is authentic if
@@ -28,7 +28,7 @@ class Webhook
      * @param string $secret Endpoint webhook secret
      * @param int $toleranceMs Maximum age of signature in milliseconds
      * @return bool True if signature is valid
-     * @throws HookflowException If signature is invalid or expired
+     * @throws RailhookException If signature is invalid or expired
      */
     public static function verifySignature(
         string $payload,
@@ -37,7 +37,7 @@ class Webhook
         int $toleranceMs = self::DEFAULT_TOLERANCE_MS
     ): bool {
         if (empty($signature)) {
-            throw new HookflowException('Missing signature header', 400, 'invalid_signature');
+            throw new RailhookException('Missing signature header', 400, 'invalid_signature');
         }
 
         $timestamp = null;
@@ -55,7 +55,7 @@ class Webhook
         }
 
         if ($timestamp === null || $signatures === []) {
-            throw new HookflowException(
+            throw new RailhookException(
                 'Invalid signature format. Expected: t=timestamp,v1=signature',
                 400,
                 'invalid_signature'
@@ -66,7 +66,7 @@ class Webhook
         $nowMs = (int) (microtime(true) * 1000);
 
         if (abs($nowMs - $timestampMs) > $toleranceMs) {
-            throw new HookflowException(
+            throw new RailhookException(
                 'Webhook timestamp is outside tolerance window',
                 400,
                 'timestamp_expired'
@@ -86,7 +86,7 @@ class Webhook
         }
 
         if (!$matched) {
-            throw new HookflowException('Invalid signature', 400, 'invalid_signature');
+            throw new RailhookException('Invalid signature', 400, 'invalid_signature');
         }
 
         return true;
@@ -99,7 +99,7 @@ class Webhook
      * whichever suits you — this one if you would rather verify the same way as the other
      * providers you integrate with, `verifySignature` if you already verify `X-Signature`.
      *
-     * Two things differ from Hookflow's own scheme beyond the header names: the message id
+     * Two things differ from Railhook's own scheme beyond the header names: the message id
      * is part of what is signed, and the digest is base64 rather than hex. Rotation behaves
      * the same — through the grace window the header carries a space-separated signature per
      * valid secret, and any one matching is enough.
@@ -110,7 +110,7 @@ class Webhook
      *                       secret is accepted too and used as-is.
      * @param int $toleranceSeconds How far the timestamp may be from now, either way
      * @return bool True if the signature is valid
-     * @throws HookflowException If it is not
+     * @throws RailhookException If it is not
      */
     public static function verifyStandardWebhook(
         string $payload,
@@ -128,7 +128,7 @@ class Webhook
         $signature = $normalized['webhook-signature'] ?? null;
 
         if (!$messageId || !$timestamp || !$signature) {
-            throw new HookflowException(
+            throw new RailhookException(
                 'Missing webhook-id, webhook-timestamp or webhook-signature header',
                 400,
                 'invalid_signature'
@@ -136,12 +136,12 @@ class Webhook
         }
 
         if (!is_numeric(trim((string) $timestamp))) {
-            throw new HookflowException('Invalid webhook-timestamp header', 400, 'invalid_signature');
+            throw new RailhookException('Invalid webhook-timestamp header', 400, 'invalid_signature');
         }
         $timestampSeconds = (int) trim((string) $timestamp);
 
         if (abs(time() - $timestampSeconds) > $toleranceSeconds) {
-            throw new HookflowException(
+            throw new RailhookException(
                 'Webhook timestamp is outside tolerance window',
                 400,
                 'timestamp_expired'
@@ -155,7 +155,7 @@ class Webhook
             ? base64_decode(substr($secret, strlen('whsec_')), true)
             : $secret;
         if ($key === false) {
-            throw new HookflowException('Malformed whsec_ secret', 400, 'invalid_signature');
+            throw new RailhookException('Malformed whsec_ secret', 400, 'invalid_signature');
         }
 
         $expected = base64_encode(
@@ -176,7 +176,7 @@ class Webhook
         }
 
         if (!$matched) {
-            throw new HookflowException('Invalid signature', 400, 'invalid_signature');
+            throw new RailhookException('Invalid signature', 400, 'invalid_signature');
         }
 
         return true;
@@ -185,7 +185,7 @@ class Webhook
     /**
      * Construct a webhook event from request, verifying signature.
      *
-     * What Hookflow actually PUTs on the wire is the event's **payload**, not
+     * What Railhook actually PUTs on the wire is the event's **payload**, not
      * an envelope: a `$client->events->send(type: 'order.completed', data:
      * [...])` arrives at your endpoint as the `data` array alone, with the
      * identifiers carried in headers (`X-Event-Id`, `X-Delivery-Id`,
@@ -201,7 +201,7 @@ class Webhook
      * @param string $secret Endpoint webhook secret
      * @param int $toleranceMs Maximum age of signature in milliseconds
      * @return array Parsed webhook event with eventId, deliveryId, timestamp, type, data
-     * @throws HookflowException If signature is invalid or payload is malformed
+     * @throws RailhookException If signature is invalid or payload is malformed
      */
     public static function constructEvent(
         string $payload,
@@ -221,14 +221,14 @@ class Webhook
         $deliveryId = $normalizedHeaders['x-delivery-id'] ?? '';
 
         if (empty($signature)) {
-            throw new HookflowException('Missing X-Signature header', 400, 'missing_header');
+            throw new RailhookException('Missing X-Signature header', 400, 'missing_header');
         }
 
         self::verifySignature($payload, $signature, $secret, $toleranceMs);
 
         $data = json_decode($payload, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new HookflowException('Invalid JSON payload', 400, 'invalid_payload');
+            throw new RailhookException('Invalid JSON payload', 400, 'invalid_payload');
         }
 
         return [

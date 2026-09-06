@@ -1,5 +1,5 @@
 import { verifySignature, constructEvent, generateSignature } from '../webhooks';
-import { HookflowError } from '../errors';
+import { RailhookError } from '../errors';
 
 describe('Webhook Signature Verification', () => {
   const secret = 'whsec_test_secret_key_123';
@@ -40,7 +40,7 @@ describe('Webhook Signature Verification', () => {
   });
 
   /**
-   * After a rotation Hookflow signs each delivery with the new secret and the retired one
+   * After a rotation Railhook signs each delivery with the new secret and the retired one
    * for the endpoint's grace window, so a receiver that has not deployed the new secret yet
    * keeps working. The parser used to keep only the last v1 and rejected whichever half of
    * the pair the receiver was holding.
@@ -64,12 +64,12 @@ describe('Webhook Signature Verification', () => {
 
     it('still rejects an unrelated secret', () => {
       expect(() => verifySignature(payload, dualHeader(payload), 'whsec_someone_else'))
-        .toThrow(HookflowError);
+        .toThrow(RailhookError);
     });
 
     it('still rejects a tampered body', () => {
       expect(() => verifySignature(`${payload} `, dualHeader(payload), newSecret))
-        .toThrow(HookflowError);
+        .toThrow(RailhookError);
     });
   });
 
@@ -81,7 +81,7 @@ describe('Webhook Signature Verification', () => {
     });
 
     it('should throw on missing signature', () => {
-      expect(() => verifySignature(payload, '', secret)).toThrow(HookflowError);
+      expect(() => verifySignature(payload, '', secret)).toThrow(RailhookError);
       expect(() => verifySignature(payload, '', secret)).toThrow('Missing signature header');
     });
 

@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Hookflow design tokens
+   Railhook design tokens
 
    One rule governs this palette: the four status hues — ok, retry, halt,
    idle — belong to statuses and to nothing else. Chrome never borrows them.

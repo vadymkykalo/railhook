@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Hookflow\Tests;
+namespace Railhook\Tests;
 
-use Hookflow\Exception\HookflowException;
-use Hookflow\Webhook;
+use Railhook\Exception\RailhookException;
+use Railhook\Webhook;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -87,7 +87,7 @@ class StandardWebhookTest extends TestCase
         // A signature over a fixed body never expires by itself, so without the timestamp
         // check a captured request stays replayable for as long as the secret lives.
         $old = time() - 3600;
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         Webhook::verifyStandardWebhook(
             self::PAYLOAD, $this->headers($old, 'v1,' . $this->sign($old)), $this->sharedSecret());
     }
@@ -96,7 +96,7 @@ class StandardWebhookTest extends TestCase
     {
         $ts = time();
         $other = $this->sign($ts, self::SECRET_B64, 'msg_somethingelse');
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         Webhook::verifyStandardWebhook(
             self::PAYLOAD, $this->headers($ts, 'v1,' . $other), $this->sharedSecret());
     }
@@ -104,14 +104,14 @@ class StandardWebhookTest extends TestCase
     public function testRejectsATamperedBody(): void
     {
         $ts = time();
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         Webhook::verifyStandardWebhook(
             '{"test": 1}', $this->headers($ts, 'v1,' . $this->sign($ts)), $this->sharedSecret());
     }
 
     public function testMissingHeadersAreReportedNotTreatedAsUnsigned(): void
     {
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         Webhook::verifyStandardWebhook(
             self::PAYLOAD, ['webhook-id' => self::MESSAGE_ID], $this->sharedSecret());
     }
@@ -119,7 +119,7 @@ class StandardWebhookTest extends TestCase
     public function testUnknownSignatureVersionIsIgnored(): void
     {
         $ts = time();
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         Webhook::verifyStandardWebhook(
             self::PAYLOAD, $this->headers($ts, 'v2,' . $this->sign($ts)), $this->sharedSecret());
     }

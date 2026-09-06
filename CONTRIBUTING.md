@@ -84,7 +84,7 @@ Create a Pull Request to `develop` branch on GitHub.
 **You need:** Java 17, Maven 3.9+, Node 22+, Docker with Compose v2.
 
 ```bash
-git clone https://github.com/vadymkykalo/webhook-platform.git
+git clone https://github.com/vadymkykalo/railhook.git
 cd webhook-platform
 make up          # builds all three images and starts everything
 make help        # every other target

@@ -1,4 +1,4 @@
-# Hookflow — Prometheus Alert Rules
+# Railhook — Prometheus Alert Rules
 # Deploy alongside Prometheus via configmap or PrometheusRule CRD.
 #
 # Metrics sources:
@@ -26,7 +26,7 @@
 
 groups:
   # ── Retry Backlog ────────────────────────────────────────────
-  - name: hookflow.retry_backlog
+  - name: railhook.retry_backlog
     rules:
       # Pending delivery queue growing fast (>500 increase in 15 min)
       - alert: DeliveryPendingBacklogGrowing
@@ -84,7 +84,7 @@ groups:
             {{ $value | printf "%.0f" }} incoming forwards pending for >10 min.
 
   # ── DLQ ──────────────────────────────────────────────────────
-  - name: hookflow.dlq
+  - name: railhook.dlq
     rules:
       # DLQ depth growing
       - alert: DlqDepthGrowing
@@ -173,7 +173,7 @@ groups:
             see incoming_forward_dlq_topic_retained_total for raw topic volume.
 
   # ── Retry Governor ───────────────────────────────────────────
-  - name: hookflow.retry_governor
+  - name: railhook.retry_governor
     rules:
       # Governor in sustained cooldown (indicating persistent downstream failures)
       - alert: RetryGovernorCooldown
@@ -204,7 +204,7 @@ groups:
             Check Kafka broker health, worker logs, and network connectivity.
 
   # ── Circuit Breaker ──────────────────────────────────────────
-  - name: hookflow.circuit_breaker
+  - name: railhook.circuit_breaker
     rules:
       # Many circuit breakers tripping
       - alert: CircuitBreakerTripsHigh
@@ -252,7 +252,7 @@ groups:
             dashboards.
 
   # ── API Availability (from SLOs) ─────────────────────────────
-  - name: hookflow.api
+  - name: railhook.api
     rules:
       - alert: ApiErrorRateHigh
         expr: |
@@ -271,7 +271,7 @@ groups:
             SLO target: <0.1% over 30d. Investigate API logs immediately.
 
   # ── Oldest Pending Age ───────────────────────────────────────
-  - name: hookflow.staleness
+  - name: railhook.staleness
     rules:
       # Oldest pending delivery is stale (metric exposed by StaleDeliveryEscalationService)
       - alert: OldestPendingDeliveryStale

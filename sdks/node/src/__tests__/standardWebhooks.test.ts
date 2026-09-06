@@ -1,5 +1,5 @@
 import { verifyStandardWebhook } from '../webhooks';
-import { HookflowError } from '../errors';
+import { RailhookError } from '../errors';
 import * as crypto from 'crypto';
 
 /**
@@ -34,7 +34,7 @@ describe('verifyStandardWebhook', () => {
   it('accepts either signature during a secret rotation', () => {
     const ts = Math.floor(Date.now() / 1000);
     const retired = 'b2xkLXNlY3JldC1ieXRlcy1oZXJlLXBhZGRpbmc=';
-    // What Hookflow sends through the grace window: one signature per valid secret.
+    // What Railhook sends through the grace window: one signature per valid secret.
     const header = `v1,${sign(ts)} v1,${sign(ts, retired)}`;
 
     expect(verifyStandardWebhook(payload, headers(ts, header), sharedSecret)).toBe(true);
@@ -46,7 +46,7 @@ describe('verifyStandardWebhook', () => {
     // a captured request stays replayable for as long as the secret lives.
     const old = Math.floor(Date.now() / 1000) - 3600;
     expect(() => verifyStandardWebhook(payload, headers(old, `v1,${sign(old)}`), sharedSecret))
-      .toThrow(HookflowError);
+      .toThrow(RailhookError);
   });
 
   it('rejects a signature lifted from a different message', () => {
@@ -58,28 +58,28 @@ describe('verifyStandardWebhook', () => {
 
     expect(() =>
       verifyStandardWebhook(payload, headers(ts, `v1,${forAnotherMessage}`), sharedSecret)
-    ).toThrow(HookflowError);
+    ).toThrow(RailhookError);
   });
 
   it('rejects a tampered body', () => {
     const ts = Math.floor(Date.now() / 1000);
     expect(() =>
       verifyStandardWebhook('{"test": 1}', headers(ts, `v1,${sign(ts)}`), sharedSecret)
-    ).toThrow(HookflowError);
+    ).toThrow(RailhookError);
   });
 
   it('reports missing headers rather than treating them as unsigned', () => {
     const ts = Math.floor(Date.now() / 1000);
     expect(() => verifyStandardWebhook(payload, { 'webhook-id': id }, sharedSecret))
-      .toThrow(HookflowError);
+      .toThrow(RailhookError);
     expect(() =>
       verifyStandardWebhook(payload, { ...headers(ts, `v1,${sign(ts)}`), 'webhook-id': undefined }, sharedSecret)
-    ).toThrow(HookflowError);
+    ).toThrow(RailhookError);
   });
 
   it('ignores signature entries of an unknown version', () => {
     const ts = Math.floor(Date.now() / 1000);
     expect(() => verifyStandardWebhook(payload, headers(ts, `v2,${sign(ts)}`), sharedSecret))
-      .toThrow(HookflowError);
+      .toThrow(RailhookError);
   });
 });

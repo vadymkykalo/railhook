@@ -79,7 +79,7 @@ export default function AddMemberModal({ orgId, open, onClose, onSuccess }: AddM
         setIssued(response);
         return;
       }
-      // Somebody who already had a Hookflow account: they are a member as of now,
+      // Somebody who already had a Railhook account: they are a member as of now,
       // there is no invite to accept and nothing to hand over.
       showSuccess(t('members.toast.added'));
       handleClose();

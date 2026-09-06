@@ -1,0 +1,143 @@
+# Production overrides for Railhook Helm chart
+# Usage: helm install railhook ./railhook -f values-production.yaml
+
+api:
+  replicaCount: 3
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 768Mi
+    limits:
+      cpu: 2000m
+      memory: 1536Mi
+  
+  env:
+    APP_ENV: production
+    LOG_LEVEL: WARN
+
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 15
+    targetCPUUtilizationPercentage: 70
+  
+  pdb:
+    enabled: true
+    minAvailable: 2
+
+worker:
+  replicaCount: 3
+  
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 4000m
+      memory: 2Gi
+  
+  env:
+    APP_ENV: production
+    LOG_LEVEL: WARN
+    KAFKA_DELIVERY_CONCURRENCY: "12"
+  
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 30
+    targetCPUUtilizationPercentage: 60
+  
+  pdb:
+    enabled: true
+    minAvailable: 2
+
+ui:
+  replicaCount: 2
+  
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+# Transactional email.
+#
+# This used to be `api.env.EMAIL_ENABLED: "true"` and nothing else — the chart
+# carried no SMTP settings at all, so production turned on mail the deployment
+# had no way to send: signup accepted the account and then could not deliver
+# the verification link. Enabled here still, because a production install that
+# cannot send mail creates every account already-verified and can never invite
+# anyone (install.sh warns about the same thing), but the relay has to be
+# supplied — the same bring-your-own arrangement as redis.external below:
+#
+#   --set email.smtp.host=smtp.example.com \
+#   --set email.smtp.username=railhook@example.com \
+#   --set email.smtp.existingSecret=railhook-smtp-secret \
+#   --set app.baseUrl=https://app.railhook.yourdomain.com
+#
+# Set email.enabled=false if you would rather run without mail than with a
+# half-configured relay.
+email:
+  enabled: true
+  from: noreply@example.com
+  smtp:
+    host: ""  # e.g., smtp.example.com — required while enabled is true
+    port: 587
+    auth: true
+    starttls: true
+    existingSecret: ""  # Secret with the SMTP password under `smtp-password`
+
+# Use external managed services in production
+postgresql:
+  enabled: false
+
+kafka:
+  enabled: false
+  topicReplicationFactor: 3  # Production: 3-way replication across brokers
+  topicPartitions: 24        # Higher partition count for parallel consumers
+
+# Automated PostgreSQL backups
+backup:
+  enabled: true
+  schedule: "0 2 * * *"       # Daily at 2 AM UTC
+  retainCount: 14             # Keep 2 weeks of backups
+  storageSize: 50Gi
+
+# No embedded Redis subchart any more (see Chart.yaml / values.yaml) -
+# production must point redis.external at a managed instance
+# (ElastiCache/Memorystore/etc.), e.g. via
+# `--set redis.external.host=redis.prod.local` at install time.
+redis:
+  enabled: false
+
+# Monitoring — enable for kube-prometheus-stack
+monitoring:
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: prometheus  # Match your Prometheus Operator's label selector
+  prometheusRule:
+    enabled: true
+    labels:
+      release: prometheus
+  grafanaDashboards:
+    enabled: true
+    labels:
+      grafana_dashboard: "1"
+
+# Enable network policies for security
+networkPolicy:
+  enabled: true
+
+# Pod anti-affinity for high availability
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - railhook
+          topologyKey: kubernetes.io/hostname

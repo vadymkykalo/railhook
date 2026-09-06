@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hookflow\Tests\Contract;
+namespace Railhook\Tests\Contract;
 
 /**
  * Contract tests: run the PHP SDK against a REAL API instance and assert its
@@ -23,8 +23,8 @@ namespace Hookflow\Tests\Contract;
  */
 
 use PHPUnit\Framework\TestCase;
-use Hookflow\Hookflow;
-use Hookflow\Exception\AuthenticationException;
+use Railhook\Railhook;
+use Railhook\Exception\AuthenticationException;
 
 class ClientContractTest extends TestCase
 {
@@ -50,9 +50,9 @@ class ClientContractTest extends TestCase
         }
     }
 
-    private function makeClient(): Hookflow
+    private function makeClient(): Railhook
     {
-        return new Hookflow(self::$ctx['apiKey'], ContractSupport::baseUrl());
+        return new Railhook(self::$ctx['apiKey'], ContractSupport::baseUrl());
     }
 
     public function testEndpointsCreateReturnsTheShapeTheSdkExpects(): void
@@ -128,7 +128,7 @@ class ClientContractTest extends TestCase
     public function testInvalidApiKeyIsRejectedAs401(): void
     {
         $this->skipIfApiUnreachable();
-        $badClient = new Hookflow('not-a-real-key', ContractSupport::baseUrl());
+        $badClient = new Railhook('not-a-real-key', ContractSupport::baseUrl());
 
         $this->expectException(AuthenticationException::class);
         $badClient->events->send('contract.test.bad_key', []);

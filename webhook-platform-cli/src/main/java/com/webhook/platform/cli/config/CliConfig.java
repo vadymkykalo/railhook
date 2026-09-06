@@ -7,7 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Persistent CLI configuration stored at ~/.config/hookflow/config.json.
+ * Persistent CLI configuration stored at ~/.config/railhook/config.json.
  * Supports named profiles for switching between environments (e.g. staging, production).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)

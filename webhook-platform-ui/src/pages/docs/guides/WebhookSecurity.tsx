@@ -47,7 +47,7 @@ function SigningDiagram() {
       <SketchEdge d="M158,40 H278" />
       <SketchChip x={218} y={24}>POST</SketchChip>
 
-      <SketchBox x={14} y={18} w={144} h={44} label="Hookflow" />
+      <SketchBox x={14} y={18} w={144} h={44} label="Railhook" />
       <SketchBox x={282} y={18} w={144} h={44} role={t('docsPage.security.diagReceiver')} sub="api.acme.io" align="start" />
 
       {/* what actually travels */}

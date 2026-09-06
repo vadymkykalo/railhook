@@ -136,7 +136,7 @@ describe('DashboardPage', () => {
     await user.click(restore);
     // A brand-new account has no direction to infer, so the returning card
     // asks — which is the card, back.
-    expect(await screen.findByText('What brings you to Hookflow?')).toBeInTheDocument();
+    expect(await screen.findByText('What brings you to Railhook?')).toBeInTheDocument();
   }, TEST_TIMEOUT_MS);
 
   it('renders a loading skeleton before the project list arrives', () => {

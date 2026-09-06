@@ -2,11 +2,84 @@
 
 ## Unreleased
 
+### Hookflow is now Railhook, and several names you may have scripted changed
+
+The name "Hookflow" was taken on every surface that matters, twice by products
+in this same category: `hookflow.dev` serves an unrelated webhook product, the
+npm scope `@hookflow` holds eleven reserved packages describing "full-lifecycle
+webhook processing", and PyPI `hookflow` and the GitHub organisation `hookflow`
+belong to other people. `railhook` is free everywhere, and the rail is already
+this product's own language — `AttemptRail` draws the retry ladder on a log
+scale of delay.
+
+This is a rename, not a fork. Nothing about the delivery pipeline, the data
+model or the API changed.
+
+**Your existing installation keeps working.** Old container images are not
+deleted and stay pullable, so a deployment that is running now continues to run
+untouched. What follows applies when you upgrade it.
+
+#### The three SDKs are published under new names
+
+Package registries have no rename operation — an installed name can never
+change meaning underneath you — so these are new packages. The old ones remain
+installable and are marked as moved.
+
+| | Was | Now |
+|---|---|---|
+| npm | `@webhook-platform/node` | `@railhook/node` |
+| PyPI | `webhook-platform` | `railhook` |
+| Packagist | `webhook-platform/php` | `railhook/php` |
+
+The Python import path changes with it — `import hookflow` becomes
+`import railhook`. That is the one change inside your own code, and it is the
+whole point: `pip install webhook-platform` followed by `import hookflow` asked
+you to know two unrelated names for one library. Now there is one.
+
+The Node and PHP surfaces keep their class names in spirit — `Hookflow` becomes
+`Railhook`, `HookflowError` becomes `RailhookError`, and the PHP namespace
+`Hookflow\` becomes `Railhook\`.
+
+#### Container images and the Helm chart have new names
+
+```
+ghcr.io/vadymkykalo/hookflow-{api,worker,ui}  ->  ghcr.io/vadymkykalo/railhook-{api,worker,ui}
+oci://ghcr.io/vadymkykalo/charts/hookflow     ->  oci://ghcr.io/vadymkykalo/charts/railhook
+```
+
+**On Kubernetes this is not a `helm upgrade`.** Resource names are derived from
+the chart name, so Helm sees the new chart as a different release: it would
+create `railhook-api` beside your existing `hookflow-api` rather than replacing
+it. Install the new release, verify it, then uninstall the old one — and be
+aware the two would both be consuming the same Kafka topics while they overlap,
+which is safe (the consumer group coordinates them) but doubles the workers.
+
+A Compose deployment has none of this: `install.sh` rewrites the file and pulls
+the new images.
+
+#### Environment variables for the installer and the CLI
+
+Seventeen `HOOKFLOW_*` variables are now `RAILHOOK_*`: `RAILHOOK_PORT`,
+`RAILHOOK_DOMAIN`, `RAILHOOK_INSTALL_DIR`, `RAILHOOK_CONFIG`,
+`RAILHOOK_API_KEY`, `RAILHOOK_VERSION`, and the rest. There is deliberately no
+fallback to the old spelling: a rename that half-works is harder to debug than
+one that fails immediately, and the failure here is loud — the variable is
+simply unset and the documented default applies.
+
+These only ever affected `install.sh` and the CLI. Nothing in `.env` used them.
+
+#### The CLI is invoked as `railhook`
+
+`hookflow login` becomes `railhook login`, and the wrapper the installer writes
+into your deployment directory is `./railhook` rather than `./hookflow`. Re-run
+the CLI installer to get the new binary; remove the old wrapper by hand.
+
+
 ## v2.11.0
 
 ### The shipped defaults stopped naming a domain this project does not own
 
-`hookflow.dev` serves an unrelated product, and it was the hardcoded value behind
+`railhook.dev` serves an unrelated product, and it was the hardcoded value behind
 `rel="canonical"`, `og:image`, `public/sitemap.xml`, `robots.txt`'s `Sitemap:` line, the
 `sales@` / `support@` addresses on `/contact`, and the default `EMAIL_FROM` in `.env.dist`,
 `docker-compose.yml`, `application.yml` and both Helm values files. Nothing replaces it with
@@ -209,7 +282,7 @@ becomes unreachable from outside the host after upgrading.
 
 > `API_BIND` no longer exists. The api service publishes no host port at
 > all in current releases, so there is nothing to bind: reach it through
-> the dashboard's nginx on `HOOKFLOW_PORT`, or uncomment the example
+> the dashboard's nginx on `RAILHOOK_PORT`, or uncomment the example
 > `ports:` block in `docker-compose.yml` to publish it yourself.
 
 ### 4. Redis requires a password

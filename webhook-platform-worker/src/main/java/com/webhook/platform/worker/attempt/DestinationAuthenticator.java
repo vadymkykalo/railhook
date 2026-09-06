@@ -11,7 +11,7 @@ import java.util.Map;
 
 /**
  * Authenticates a Forward to its Destination. The Outgoing counterpart is {@link DeliverySigner}:
- * Hookflow signs what it sends and proves who it is when relaying onward.
+ * Railhook signs what it sends and proves who it is when relaying onward.
  */
 @Slf4j
 class DestinationAuthenticator {

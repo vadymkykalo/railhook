@@ -3,7 +3,7 @@ package com.webhook.platform.api.domain.enums;
 /**
  * What became of one charge.
  *
- * <p>No {@code PROCESSING}: a provider tells Hookflow about a charge once it has resolved, so a
+ * <p>No {@code PROCESSING}: a provider tells Railhook about a charge once it has resolved, so a
  * payment row goes straight from {@code PENDING} to {@code SUCCEEDED} or {@code FAILED} and there
  * is no signal that would move it to an in-flight state.
  */

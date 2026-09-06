@@ -1,6 +1,6 @@
-# Hookflow CLI
+# Railhook CLI
 
-Production-grade CLI for the Hookflow webhook platform. Provides local webhook tunneling, event replay, and diagnostics.
+Production-grade CLI for the Railhook webhook platform. Provides local webhook tunneling, event replay, and diagnostics.
 
 ## Quick Start
 
@@ -17,7 +17,7 @@ mvn clean package -pl webhook-platform-cli -am -DskipTests
 ### Install (optional alias)
 
 ```bash
-alias hookflow='java -jar /path/to/webhook-platform-cli-1.0.0-SNAPSHOT.jar'
+alias railhook='java -jar /path/to/webhook-platform-cli-1.0.0-SNAPSHOT.jar'
 ```
 
 ### Login
@@ -25,27 +25,27 @@ alias hookflow='java -jar /path/to/webhook-platform-cli-1.0.0-SNAPSHOT.jar'
 **Device code flow** (recommended — no password in terminal):
 
 ```bash
-hookflow login
+railhook login
 # Opens a URL + shows a code. Approve in the browser.
 ```
 
 **Direct login** (non-interactive, e.g. CI):
 
 ```bash
-hookflow login --email user@example.com --password
+railhook login --email user@example.com --password
 # Password will be prompted securely
 ```
 
 **Custom backend URL:**
 
 ```bash
-hookflow login --server https://api.example.com
+railhook login --server https://api.example.com
 ```
 
 ### Local Webhook Tunnel
 
 ```bash
-hookflow listen 3000
+railhook listen 3000
 ```
 
 This will:
@@ -58,7 +58,7 @@ This will:
 Output:
 ```
 ╔══════════════════════════════════════════════════════╗
-║  Hookflow tunnel is active                          ║
+║  Railhook tunnel is active                          ║
 ╚══════════════════════════════════════════════════════╝
 
   Public URL:  http://localhost:8080/tunnel/tun-abc123xyz
@@ -75,13 +75,13 @@ Output:
 
 Options:
 ```bash
-hookflow listen 3000 --project <projectId>
+railhook listen 3000 --project <projectId>
 ```
 
 ### Status
 
 ```bash
-hookflow status
+railhook status
 ```
 
 Shows: backend URL, auth state, health, active tunnels.
@@ -90,57 +90,57 @@ Shows: backend URL, auth state, health, active tunnels.
 
 ```bash
 # Estimate replay (dry run)
-hookflow replay <projectId> --dry-run
+railhook replay <projectId> --dry-run
 
 # Replay events from the last 24h
-hookflow replay <projectId>
+railhook replay <projectId>
 
 # Replay with filters
-hookflow replay <projectId> --event-type order.created --from 2024-01-01T00:00:00Z --to 2024-01-02T00:00:00Z
+railhook replay <projectId> --event-type order.created --from 2024-01-01T00:00:00Z --to 2024-01-02T00:00:00Z
 ```
 
 ### Tunnel Management
 
 ```bash
 # List active tunnels
-hookflow tunnels list
+railhook tunnels list
 
 # Close a tunnel
-hookflow tunnels close <sessionId>
+railhook tunnels close <sessionId>
 ```
 
 ### Event Tail
 
 ```bash
 # Show recent events
-hookflow events <projectId>
+railhook events <projectId>
 
 # Follow mode (poll for new events)
-hookflow events <projectId> --follow
+railhook events <projectId> --follow
 
 # Filter by type
-hookflow events <projectId> --type order.created --count 50
+railhook events <projectId> --type order.created --count 50
 ```
 
 ### Configuration
 
 ```bash
 # Show config
-hookflow config show
+railhook config show
 
 # Set backend URL
-hookflow config set backend-url https://api.example.com
+railhook config set backend-url https://api.example.com
 
 # Set default project
-hookflow config set project-id <uuid>
+railhook config set project-id <uuid>
 
 # Clear all config (logout)
-hookflow config clear
+railhook config clear
 ```
 
 ## Configuration File
 
-Stored at `~/.config/hookflow/config.json` (respects `XDG_CONFIG_HOME` and `HOOKFLOW_CONFIG` env vars).
+Stored at `~/.config/railhook/config.json` (respects `XDG_CONFIG_HOME` and `RAILHOOK_CONFIG` env vars).
 
 File permissions are set to `600` (owner-only) to protect tokens.
 
@@ -159,14 +159,14 @@ File permissions are set to `600` (owner-only) to protect tokens.
 
 | Variable | Description |
 |---|---|
-| `HOOKFLOW_CONFIG` | Override config file path |
+| `RAILHOOK_CONFIG` | Override config file path |
 | `XDG_CONFIG_HOME` | XDG config directory (default: `~/.config`) |
-| `HOOKFLOW_DEBUG` | Enable debug stack traces on errors |
-| `HOOKFLOW_LOG_LEVEL` | Log level: `DEBUG`, `INFO`, `WARN`, `ERROR` |
+| `RAILHOOK_DEBUG` | Enable debug stack traces on errors |
+| `RAILHOOK_LOG_LEVEL` | Log level: `DEBUG`, `INFO`, `WARN`, `ERROR` |
 
 ## Security
 
-- Tokens are stored in `~/.config/hookflow/config.json` with `600` permissions
+- Tokens are stored in `~/.config/railhook/config.json` with `600` permissions
 - Access tokens are automatically refreshed on 401 responses
 - Tunnel authentication uses a per-session token (never reused)
 - WebSocket connections are authenticated via tunnel token

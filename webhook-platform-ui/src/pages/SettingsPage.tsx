@@ -32,7 +32,7 @@ const COMMON_TIMEZONES = [
   'Australia/Sydney', 'Pacific/Auckland',
 ];
 
-const NOTIF_STORAGE_KEY = 'hookflow_notification_prefs';
+const NOTIF_STORAGE_KEY = 'railhook_notification_prefs';
 
 interface NotificationPrefs {
   inApp: boolean;

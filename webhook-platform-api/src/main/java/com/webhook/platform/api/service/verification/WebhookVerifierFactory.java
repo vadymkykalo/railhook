@@ -53,7 +53,7 @@ public class WebhookVerifierFactory {
      * Whether {@code PROVIDER} mode can actually verify this provider.
      *
      * <p>{@code GENERIC} is the one name that answers no on purpose: it is the label for a
-     * provider Hookflow has no preset for, and the way to verify one of those is
+     * provider Railhook has no preset for, and the way to verify one of those is
      * {@code HMAC_GENERIC} with the header and prefix that provider signs in. Selecting it with
      * {@code PROVIDER} mode used to save happily and then throw {@link IllegalStateException} at
      * ingress, so the source looked configured and the failure arrived once the provider was

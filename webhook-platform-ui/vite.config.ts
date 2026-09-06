@@ -27,7 +27,7 @@ import react from '@vitejs/plugin-react'
 function siteUrlHtml(): import('vite').Plugin {
   const LD_JSON = /\n\s*<script type="application\/ld\+json">[\s\S]*?<\/script>/
   return {
-    name: 'hookflow-site-url-html',
+    name: 'railhook-site-url-html',
     transformIndexHtml(html) {
       const site = (process.env.VITE_SITE_URL || '').trim().replace(/\/+$/, '')
       if (site) return html.split('%SITE_URL%').join(site)

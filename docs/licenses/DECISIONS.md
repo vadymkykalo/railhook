@@ -1,6 +1,6 @@
 # License decisions
 
-Hookflow itself is [MIT](../../LICENSE). This records the license questions an evaluating company's legal team is
+Railhook itself is [MIT](../../LICENSE). This records the license questions an evaluating company's legal team is
 most likely to raise, plus how they were checked.
 
 ## MinIO was AGPL-3.0 — decision: removed, because nothing ever used it
@@ -20,7 +20,7 @@ product could not use, and a licensing question every evaluating legal team
 had to be walked through for no benefit.
 
 **Decision:** removed from `docker-compose.yml`, `.env.dist`, the `Makefile`,
-`NOTICE` and `ProductionSafetyValidator`. Hookflow's dependency graph now
+`NOTICE` and `ProductionSafetyValidator`. Railhook's dependency graph now
 contains no AGPL/GPL/SSPL/BSL component at all, which is a simpler and more
 honest answer than the one this section used to give.
 
@@ -32,7 +32,7 @@ then a choice the operator makes, not one the default distribution ships.
 
 ## Bitnami subcharts (Helm chart) — removed, not pinned
 
-`deploy/helm/hookflow/Chart.yaml` used to declare three optional subchart
+`deploy/helm/railhook/Chart.yaml` used to declare three optional subchart
 dependencies from `https://charts.bitnami.com/bitnami` — postgresql 12.x.x,
 redis 18.x.x and kafka 26.x.x. It now declares `dependencies: []`.
 

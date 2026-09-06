@@ -1,10 +1,10 @@
-"""Tests for Hookflow client."""
+"""Tests for Railhook client."""
 
 import pytest
 
-from hookflow import (
-    Hookflow,
-    HookflowError,
+from railhook import (
+    Railhook,
+    RailhookError,
     AuthenticationError,
     RateLimitError,
     ValidationError,
@@ -24,29 +24,29 @@ from hookflow import (
 )
 
 
-class TestHookflowClient:
-    """Tests for Hookflow client initialization."""
+class TestRailhookClient:
+    """Tests for Railhook client initialization."""
 
     def test_creates_with_api_key(self):
         """Should create client with API key."""
-        client = Hookflow(api_key="test_api_key")
+        client = Railhook(api_key="test_api_key")
         assert client is not None
         assert client.api_key == "test_api_key"
 
     def test_raises_without_api_key(self):
         """Should raise error without API key."""
         with pytest.raises(ValueError) as exc:
-            Hookflow(api_key="")
+            Railhook(api_key="")
         assert "API key is required" in str(exc.value)
 
     def test_uses_default_base_url(self):
         """Should use default base URL."""
-        client = Hookflow(api_key="test_api_key")
+        client = Railhook(api_key="test_api_key")
         assert client.base_url == "http://localhost:8080"
 
     def test_accepts_custom_base_url(self):
         """Should accept custom base URL."""
-        client = Hookflow(
+        client = Railhook(
             api_key="test_api_key",
             base_url="https://api.example.com/",
         )
@@ -54,7 +54,7 @@ class TestHookflowClient:
 
     def test_strips_trailing_slash(self):
         """Should strip trailing slash from base URL."""
-        client = Hookflow(
+        client = Railhook(
             api_key="test_api_key",
             base_url="https://api.example.com/",
         )
@@ -62,12 +62,12 @@ class TestHookflowClient:
 
     def test_accepts_custom_timeout(self):
         """Should accept custom timeout."""
-        client = Hookflow(api_key="test_api_key", timeout=60)
+        client = Railhook(api_key="test_api_key", timeout=60)
         assert client.timeout == 60
 
     def test_initializes_api_modules(self):
         """Should initialize all API modules."""
-        client = Hookflow(api_key="test_api_key")
+        client = Railhook(api_key="test_api_key")
         assert client.events is not None
         assert client.endpoints is not None
         assert client.subscriptions is not None
@@ -79,36 +79,36 @@ class TestGenericRequestMethods:
 
     def test_exposes_get_method(self):
         """Should expose public get method."""
-        client = Hookflow(api_key="test_api_key")
+        client = Railhook(api_key="test_api_key")
         assert callable(client.get)
 
     def test_exposes_post_method(self):
         """Should expose public post method."""
-        client = Hookflow(api_key="test_api_key")
+        client = Railhook(api_key="test_api_key")
         assert callable(client.post)
 
     def test_exposes_put_method(self):
         """Should expose public put method."""
-        client = Hookflow(api_key="test_api_key")
+        client = Railhook(api_key="test_api_key")
         assert callable(client.put)
 
     def test_exposes_patch_method(self):
         """Should expose public patch method."""
-        client = Hookflow(api_key="test_api_key")
+        client = Railhook(api_key="test_api_key")
         assert callable(client.patch)
 
     def test_exposes_delete_method(self):
         """Should expose public delete method."""
-        client = Hookflow(api_key="test_api_key")
+        client = Railhook(api_key="test_api_key")
         assert callable(client.delete)
 
 
 class TestErrorClasses:
     """Tests for error classes."""
 
-    def test_hookflow_error(self):
-        """HookflowError should have correct properties."""
-        error = HookflowError("Test error", 500, "test_code")
+    def test_railhook_error(self):
+        """RailhookError should have correct properties."""
+        error = RailhookError("Test error", 500, "test_code")
         assert error.message == "Test error"
         assert error.status == 500
         assert error.code == "test_code"
@@ -293,7 +293,7 @@ class TestTypeClasses:
 
     def test_delivery_list_params_to_params(self):
         """DeliveryListParams should convert to query params correctly."""
-        from hookflow.types import DeliveryStatus
+        from railhook.types import DeliveryStatus
         
         params = DeliveryListParams(
             status=DeliveryStatus.FAILED,

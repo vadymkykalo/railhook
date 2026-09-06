@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hookflow\Exception;
+namespace Railhook\Exception;
 
-class ValidationException extends HookflowException
+class ValidationException extends RailhookException
 {
     private array $fieldErrors;
 

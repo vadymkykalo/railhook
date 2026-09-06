@@ -1,8 +1,8 @@
 """Shared bootstrap for the python SDK's contract suite.
 
 Same pattern as sdks/node/tests/contract/support.ts and
-load/lib/setup.js: the Hookflow client is API-key scoped only (no
-register/login/create-project surface — see hookflow/client.py), so
+load/lib/setup.js: the Railhook client is API-key scoped only (no
+register/login/create-project surface — see railhook/client.py), so
 bootstrapping a throwaway tenant needs a couple of raw `requests` calls
 against the JWT-authenticated endpoints before the SDK proper takes over.
 """

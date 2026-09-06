@@ -1,19 +1,19 @@
 <div align="center">
 
-# Hookflow
+# Railhook
 
 **Self-hosted webhook infrastructure. Outgoing delivery + incoming ingress.**
 
-[![CI](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
-[![Latest Release](https://img.shields.io/github/v/release/vadymkykalo/webhook-platform?label=release)](https://github.com/vadymkykalo/webhook-platform/releases/latest)
+[![CI](https://github.com/vadymkykalo/railhook/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/railhook/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/vadymkykalo/railhook?label=release)](https://github.com/vadymkykalo/railhook/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java 17](https://img.shields.io/badge/Java-17-orange)](https://openjdk.org/projects/jdk/17/)
 [![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-green)](https://spring.io/projects/spring-boot)
 [![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Fhookflow-blue?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=webhook-platform)
+[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Frailhook-blue?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=railhook)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh | bash
 ```
 
 Checks the machine, writes a Compose file pinned to the latest release and a
@@ -46,14 +46,14 @@ config to write, no secrets to invent.
 ## Quick Start
 
 **Prerequisites:** Docker 20.10+, Compose v2, ~4 GB of RAM. The images are
-[multi-arch](https://github.com/vadymkykalo?tab=packages&repo_name=webhook-platform),
+[multi-arch](https://github.com/vadymkykalo?tab=packages&repo_name=railhook),
 so nothing is compiled on your machine.
 
 The installer above refuses to start until Docker, memory, disk and the port
 all check out, and verifies the configuration it wrote before starting
 anything. Open **http://localhost**, register, create a project — nothing is
 gated behind a verification email you never receive. Pass
-`-s -- --dir /opt/hookflow --port 8080` to put it elsewhere.
+`-s -- --dir /opt/railhook --port 8080` to put it elsewhere.
 
 ```bash
 # Send your first event, with the API key the dashboard just gave you.
@@ -85,8 +85,8 @@ unsafe configuration rather than running with it.
 ### Day two
 
 ```bash
-cd ~/hookflow
-./hookflow status | logs | stop | start | backup | doctor
+cd ~/railhook
+./railhook status | logs | stop | start | backup | doctor
 ```
 
 `doctor` re-runs the machine and configuration checks against what is on disk,
@@ -101,7 +101,7 @@ To remove it: `... install.sh | bash -s -- --uninstall` keeps your data,
 ### Running it from a clone
 
 ```bash
-git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-platform
+git clone https://github.com/vadymkykalo/railhook.git && cd railhook
 make up      # builds the three services from your tree, writes .env, creates the topics
 make help    # everything else
 ```
@@ -115,14 +115,14 @@ each build guard means when it fails.
 
 ## What it does
 
-**Outgoing** — your system announces an event; Hookflow gets it to every endpoint
+**Outgoing** — your system announces an event; Railhook gets it to every endpoint
 your customers registered. Written to a transactional outbox in the same
 statement as the work itself, so an event cannot be accepted and then lost.
 Signed with HMAC-SHA256, ordered per endpoint, retried on a six-rung ladder
 (1m → 24h), and parked in a DLQ for a human once the ladder runs out. Every
 attempt is on the record with the response it got.
 
-**Incoming** — a provider posts to a URL you own; Hookflow verifies the
+**Incoming** — a provider posts to a URL you own; Railhook verifies the
 signature and forwards it to the destinations you nominated. Stripe, GitHub,
 GitLab, Shopify, Slack and Twilio are understood out of the box, plus generic
 HMAC for anything else.
@@ -190,7 +190,7 @@ authenticated-request escape hatch for the rest, and authenticates with
 ## Documentation
 
 **[`docs/`](docs/README.md)** is the front door, split by audience: the
-repository holds what you read while evaluating or operating Hookflow, the
+repository holds what you read while evaluating or operating Railhook, the
 dashboard's `/docs` holds what you read with the product open. Nothing is
 written in both places.
 
@@ -216,15 +216,15 @@ and [`docs/OPERATIONS.md`](docs/OPERATIONS.md) covers the runbooks.
 Receive webhooks on `localhost` while you develop — no deploy, no ngrok.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash -s -- --with-java
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/webhook-platform-cli/install.sh | bash -s -- --with-java
 
-hookflow login              # device-code flow, like `gh auth login`
-hookflow listen 3000        # public URL → your machine, responses flow back
-hookflow events <projectId> --follow
-hookflow replay <projectId> --dry-run
+railhook login              # device-code flow, like `gh auth login`
+railhook listen 3000        # public URL → your machine, responses flow back
+railhook events <projectId> --follow
+railhook replay <projectId> --dry-run
 ```
 
-`hookflow -h` lists the rest.
+`railhook -h` lists the rest.
 
 ## Contributing
 

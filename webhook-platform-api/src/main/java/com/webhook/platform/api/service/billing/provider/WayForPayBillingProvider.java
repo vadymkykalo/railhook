@@ -91,11 +91,11 @@ public class WayForPayBillingProvider implements BillingProvider {
             throw new IllegalArgumentException("No WayForPay price configured for plan: " + request.planName());
         }
 
-        String orderRef = "hookflow_" + request.organizationId() + "_" + System.currentTimeMillis();
+        String orderRef = "railhook_" + request.organizationId() + "_" + System.currentTimeMillis();
         long orderDate = Instant.now().getEpochSecond();
         String amount = String.valueOf(priceCents / 100.0);
         String currency = request.currency() != null ? request.currency() : "UAH";
-        String productName = "Hookflow " + request.planName() + " plan";
+        String productName = "Railhook " + request.planName() + " plan";
 
         String signString = String.join(";",
                 merchantAccount, merchantDomain, orderRef, String.valueOf(orderDate),
@@ -139,7 +139,7 @@ public class WayForPayBillingProvider implements BillingProvider {
     public ChargeResult chargeRecurring(RecurringChargeRequest request) {
         String orderRef = request.orderReference() != null
                 ? request.orderReference()
-                : "hookflow_rec_" + request.organizationId() + "_" + System.currentTimeMillis();
+                : "railhook_rec_" + request.organizationId() + "_" + System.currentTimeMillis();
         long orderDate = Instant.now().getEpochSecond();
         String amount = String.valueOf(request.amountCents() / 100.0);
         String currency = request.currency() != null ? request.currency() : "UAH";
@@ -156,7 +156,7 @@ public class WayForPayBillingProvider implements BillingProvider {
         body.put("orderDate", orderDate);
         body.put("amount", amount);
         body.put("currency", currency);
-        body.put("productName", new String[]{request.description() != null ? request.description() : "Hookflow subscription"});
+        body.put("productName", new String[]{request.description() != null ? request.description() : "Railhook subscription"});
         body.put("productPrice", new String[]{amount});
         body.put("productCount", new String[]{"1"});
         body.put("recToken", request.recurringToken());

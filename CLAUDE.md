@@ -47,7 +47,7 @@ rather than a list here. Each failure names its remedy. Three whose remedy nobod
   `src/pages/docs/` stay hand-written — they explain *why*, which a spec cannot. Never
   hand-write an endpoint table: that is what the 4,000-line page this replaced was, and nothing
   kept it in sync.
-- **The version lives in seven places** — reactor pom, `deploy/helm/hookflow/Chart.yaml` (version
+- **The version lives in seven places** — reactor pom, `deploy/helm/railhook/Chart.yaml` (version
   *and* appVersion), `webhook-platform-ui/package.json`, all three SDK manifests under `sdks/`.
   Never bump one by hand: `make version-set VERSION=2.4.0`; `make version-check` mirrors CI.
 - **Per-module JaCoCo ratchets** bind to `verify`, and CI runs them only after merging the unit

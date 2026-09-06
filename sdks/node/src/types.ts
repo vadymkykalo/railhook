@@ -1,4 +1,4 @@
-export interface HookflowConfig {
+export interface RailhookConfig {
   apiKey: string;
   baseUrl?: string;
   timeout?: number;

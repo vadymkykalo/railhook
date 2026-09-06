@@ -1,7 +1,7 @@
 blank_issues_enabled: true
 contact_links:
   - name: Report a security vulnerability
-    url: https://github.com/vadymkykalo/webhook-platform/security/advisories/new
+    url: https://github.com/vadymkykalo/railhook/security/advisories/new
     about: >-
       Do NOT open a public issue for security vulnerabilities. Use GitHub's
       private vulnerability reporting (link above) or see SECURITY.md for

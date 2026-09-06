@@ -44,4 +44,4 @@ export const SELF_HOSTED_RATE = 10000;
 /** The single route to a human about a paid plan. */
 export const CONTACT_PATH = '/contact';
 
-export const REPO_URL = 'https://github.com/vadymkykalo/webhook-platform';
+export const REPO_URL = 'https://github.com/vadymkykalo/railhook';

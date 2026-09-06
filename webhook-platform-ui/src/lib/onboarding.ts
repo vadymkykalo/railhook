@@ -42,8 +42,8 @@ export interface OnboardingInputs {
   sources: IncomingSourceResponse[];
 }
 
-export const INTENT_KEY = 'hookflow_intent';
-export const DISMISS_KEY = 'hookflow_onboarding_dismissed';
+export const INTENT_KEY = 'railhook_intent';
+export const DISMISS_KEY = 'railhook_onboarding_dismissed';
 
 const TRACKS: readonly Track[] = ['send', 'receive', 'both'];
 

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Hookflow\Tests;
+namespace Railhook\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Hookflow\Webhook;
-use Hookflow\Exception\HookflowException;
+use Railhook\Webhook;
+use Railhook\Exception\RailhookException;
 
 class WebhookTest extends TestCase
 {
@@ -69,7 +69,7 @@ class WebhookTest extends TestCase
     }
 
     /**
-     * After a rotation Hookflow signs each delivery with the new secret and the retired
+     * After a rotation Railhook signs each delivery with the new secret and the retired
      * one for the endpoint's grace window, so a receiver that has not deployed the new
      * secret yet keeps working. The parser used to keep only the last v1 and rejected
      * whichever half of the pair the receiver was holding.
@@ -101,7 +101,7 @@ class WebhookTest extends TestCase
     {
         $header = $this->dualSignatureHeader(self::PAYLOAD, 'whsec_new', 'whsec_retired');
 
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         Webhook::verifySignature(self::PAYLOAD, $header, 'whsec_someone_else');
     }
 
@@ -109,13 +109,13 @@ class WebhookTest extends TestCase
     {
         $header = $this->dualSignatureHeader(self::PAYLOAD, 'whsec_new', 'whsec_retired');
 
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         Webhook::verifySignature(self::PAYLOAD . ' ', $header, 'whsec_new');
     }
 
     public function testVerifySignatureThrowsOnMissingSignature(): void
     {
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         $this->expectExceptionMessage('Missing signature header');
         
         Webhook::verifySignature(self::PAYLOAD, '', self::SECRET);
@@ -123,7 +123,7 @@ class WebhookTest extends TestCase
 
     public function testVerifySignatureThrowsOnInvalidFormat(): void
     {
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         $this->expectExceptionMessage('Invalid signature format');
         
         Webhook::verifySignature(self::PAYLOAD, 'invalid_format', self::SECRET);
@@ -131,7 +131,7 @@ class WebhookTest extends TestCase
 
     public function testVerifySignatureThrowsOnMissingTimestamp(): void
     {
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         $this->expectExceptionMessage('Invalid signature format');
         
         Webhook::verifySignature(self::PAYLOAD, 'v1=abc123', self::SECRET);
@@ -139,7 +139,7 @@ class WebhookTest extends TestCase
 
     public function testVerifySignatureThrowsOnMissingV1(): void
     {
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         $this->expectExceptionMessage('Invalid signature format');
         
         Webhook::verifySignature(self::PAYLOAD, 't=1700000000000', self::SECRET);
@@ -150,7 +150,7 @@ class WebhookTest extends TestCase
         $oldTimestamp = (int) (microtime(true) * 1000) - 600000; // 10 min ago
         $signature = Webhook::generateSignature(self::PAYLOAD, self::SECRET, $oldTimestamp);
         
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         $this->expectExceptionMessage('outside tolerance window');
         
         Webhook::verifySignature(self::PAYLOAD, $signature, self::SECRET);
@@ -161,7 +161,7 @@ class WebhookTest extends TestCase
         $futureTimestamp = (int) (microtime(true) * 1000) + 600000; // 10 min in future
         $signature = Webhook::generateSignature(self::PAYLOAD, self::SECRET, $futureTimestamp);
         
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         $this->expectExceptionMessage('outside tolerance window');
         
         Webhook::verifySignature(self::PAYLOAD, $signature, self::SECRET);
@@ -181,7 +181,7 @@ class WebhookTest extends TestCase
     {
         $timestamp = (int) (microtime(true) * 1000);
         
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         $this->expectExceptionMessage('Invalid signature');
         
         Webhook::verifySignature(self::PAYLOAD, "t={$timestamp},v1=invalid", self::SECRET);
@@ -193,7 +193,7 @@ class WebhookTest extends TestCase
         $signature = Webhook::generateSignature(self::PAYLOAD, self::SECRET, $timestamp);
         $tamperedPayload = '{"type": "hacked"}';
         
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         $this->expectExceptionMessage('Invalid signature');
         
         Webhook::verifySignature($tamperedPayload, $signature, self::SECRET);
@@ -205,7 +205,7 @@ class WebhookTest extends TestCase
         $signature = Webhook::generateSignature(self::PAYLOAD, self::SECRET, $oldTimestamp);
         
         // Should fail with 30s tolerance
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         Webhook::verifySignature(self::PAYLOAD, $signature, self::SECRET, 30000);
     }
 
@@ -262,7 +262,7 @@ class WebhookTest extends TestCase
     {
         $headers = ['x-timestamp' => '1700000000000'];
         
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         $this->expectExceptionMessage('Missing X-Signature header');
         
         Webhook::constructEvent(self::PAYLOAD, $headers, self::SECRET);
@@ -276,7 +276,7 @@ class WebhookTest extends TestCase
         
         $headers = ['x-signature' => $signature];
         
-        $this->expectException(HookflowException::class);
+        $this->expectException(RailhookException::class);
         $this->expectExceptionMessage('Invalid JSON payload');
         
         Webhook::constructEvent($invalidPayload, $headers, self::SECRET);

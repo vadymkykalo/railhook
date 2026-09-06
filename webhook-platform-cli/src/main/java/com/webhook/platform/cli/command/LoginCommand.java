@@ -14,7 +14,7 @@ import java.util.concurrent.Callable;
 
 @Command(
         name = "login",
-        description = "Authenticate with the Hookflow platform",
+        description = "Authenticate with the Railhook platform",
         mixinStandardHelpOptions = true
 )
 public class LoginCommand implements Callable<Integer> {

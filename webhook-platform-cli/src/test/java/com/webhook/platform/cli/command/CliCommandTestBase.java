@@ -3,7 +3,7 @@ package com.webhook.platform.cli.command;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.sun.net.httpserver.HttpServer;
-import com.webhook.platform.cli.HookflowCli;
+import com.webhook.platform.cli.RailhookCli;
 import com.webhook.platform.cli.config.CliConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,12 +23,12 @@ import java.nio.file.Path;
  * <p>None of the command classes ({@code StatusCommand}, {@code ReplayCommand}, etc.)
  * take a {@code CliConfigService} via constructor injection — they each do
  * {@code new CliConfigService()} internally, which resolves the config file from
- * (in order) {@code XDG_CONFIG_HOME}, {@code HOOKFLOW_CONFIG}, or
- * {@code ~/.config/hookflow/config.json}. Neither env var is set in CI or in this
+ * (in order) {@code XDG_CONFIG_HOME}, {@code RAILHOOK_CONFIG}, or
+ * {@code ~/.config/railhook/config.json}. Neither env var is set in CI or in this
  * sandbox, so redirecting the {@code user.home} system property to a JUnit
  * {@code @TempDir} is the only way to point a command at a throwaway config
  * without touching production code — this must happen *before*
- * {@code new CommandLine(new HookflowCli())}, because picocli eagerly
+ * {@code new CommandLine(new RailhookCli())}, because picocli eagerly
  * instantiates every declared subcommand (and each one's
  * {@code PrintStream out = System.out} field initializer) while building the
  * command tree, not lazily when a subcommand is actually invoked.
@@ -79,9 +79,9 @@ abstract class CliCommandTestBase {
         }
     }
 
-    /** Writes a config file at the redirected ~/.config/hookflow/config.json. */
+    /** Writes a config file at the redirected ~/.config/railhook/config.json. */
     protected void writeConfig(CliConfig config) throws Exception {
-        Path configPath = tempDir.resolve(".config").resolve("hookflow").resolve("config.json");
+        Path configPath = tempDir.resolve(".config").resolve("railhook").resolve("config.json");
         Files.createDirectories(configPath.getParent());
         CONFIG_MAPPER.writeValue(configPath.toFile(), config);
     }
@@ -99,7 +99,7 @@ abstract class CliCommandTestBase {
 
     /** Runs the CLI with the given args, capturing System.out/System.err. Returns the exit code. */
     protected int run(String... args) {
-        CommandLine cmd = new CommandLine(new HookflowCli());
+        CommandLine cmd = new CommandLine(new RailhookCli());
         return cmd.execute(args);
     }
 

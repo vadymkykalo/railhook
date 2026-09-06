@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Hookflow API
+  title: Railhook API
   description: |
     Enterprise-grade distributed webhook delivery system with at-least-once guarantees.
 
@@ -15,15 +15,15 @@ info:
     - **JWT Bearer Token**: For all operations (UI / user context)
     - **API Key**: For all project-scoped operations (`X-API-Key` header, SDK usage)
   contact:
-    name: Hookflow
-    url: https://github.com/vadymkykalo/webhook-platform
+    name: Railhook
+    url: https://github.com/vadymkykalo/railhook
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
   version: 1.0.0
 servers:
 - url: "{baseUrl}"
-  description: Your Hookflow installation — the same origin the dashboard runs on
+  description: Your Railhook installation — the same origin the dashboard runs on
   variables:
     baseUrl:
       description: "Scheme and host of your installation, without a trailing slash"

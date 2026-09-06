@@ -20,7 +20,7 @@ class StatusCommandTest extends CliCommandTestBase {
 
         assertEquals(0, exitCode);
         assertTrue(out().contains("not authenticated"));
-        assertTrue(out().contains("hookflow login"));
+        assertTrue(out().contains("railhook login"));
         // Must return before ever attempting to reach the backend.
         assertFalse(out().contains("Health:"));
     }

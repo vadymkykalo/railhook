@@ -1,0 +1,55 @@
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "railhook.fullname" . }}-api
+  labels:
+    {{- include "railhook.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "railhook.name" . }}
+      app.kubernetes.io/component: api
+  endpoints:
+    # The management port, by name — on the main port /actuator/prometheus goes
+    # through SecurityConfig's authenticated filter chain and answers 401, so
+    # every scrape failed and the alerts in prometheusrule.yaml fired on absent
+    # data instead of on anything that had happened.
+    - port: management
+      path: /actuator/prometheus
+      interval: {{ .Values.monitoring.serviceMonitor.interval | default "15s" }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout | default "10s" }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "railhook.fullname" . }}-worker
+  labels:
+    {{- include "railhook.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "railhook.name" . }}
+      app.kubernetes.io/component: worker
+  endpoints:
+    # The management port, by name — on the main port /actuator/prometheus goes
+    # through SecurityConfig's authenticated filter chain and answers 401, so
+    # every scrape failed and the alerts in prometheusrule.yaml fired on absent
+    # data instead of on anything that had happened.
+    - port: management
+      path: /actuator/prometheus
+      interval: {{ .Values.monitoring.serviceMonitor.interval | default "15s" }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout | default "10s" }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+{{- end }}

@@ -50,7 +50,7 @@ jobs:
           version: v3.16.3
 
       - name: helm lint
-        run: helm lint deploy/helm/hookflow
+        run: helm lint deploy/helm/railhook
 
       # Both values files, because values-production.yaml overrides enough
       # (external database, replica counts, resources) to render templates the
@@ -59,10 +59,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p rendered
-          helm template hookflow deploy/helm/hookflow \
+          helm template railhook deploy/helm/railhook \
             > rendered/default.yaml
-          helm template hookflow deploy/helm/hookflow \
-            -f deploy/helm/hookflow/values-production.yaml \
+          helm template railhook deploy/helm/railhook \
+            -f deploy/helm/railhook/values-production.yaml \
             > rendered/production.yaml
           wc -l rendered/*.yaml
 
@@ -138,7 +138,7 @@ jobs:
     timeout-minutes: 30
 
     env:
-      KIND_CLUSTER: hookflow-smoke
+      KIND_CLUSTER: railhook-smoke
 
     steps:
       - name: Checkout code
@@ -160,7 +160,7 @@ jobs:
       - name: Create kind cluster
         uses: helm/kind-action@v1
         with:
-          cluster_name: hookflow-smoke
+          cluster_name: railhook-smoke
           node_image: kindest/node:v1.31.0
 
       - name: Load the images into the cluster
@@ -181,13 +181,13 @@ jobs:
       - name: Create secrets, the way the chart README says to
         run: |
           set -e
-          kubectl create secret generic hookflow-secrets \
+          kubectl create secret generic railhook-secrets \
             --from-literal=encryption-key="$(openssl rand -base64 32)" \
             --from-literal=encryption-salt="$(openssl rand -base64 24)" \
             --from-literal=jwt-secret="$(openssl rand -base64 64)"
-          kubectl create secret generic hookflow-postgresql-secret \
+          kubectl create secret generic railhook-postgresql-secret \
             --from-literal=password="$(openssl rand -base64 32)"
-          kubectl create secret generic hookflow-redis-secret \
+          kubectl create secret generic railhook-redis-secret \
             --from-literal=password="$(openssl rand -base64 32)"
 
       - name: Stand up PostgreSQL, Kafka and Redis
@@ -215,7 +215,7 @@ jobs:
       - name: helm install
         run: |
           set -e
-          helm install hookflow deploy/helm/hookflow \
+          helm install railhook deploy/helm/railhook \
             --wait --timeout 15m \
             --set postgresql.external.host=postgres \
             --set kafka.external.bootstrapServers=kafka:9092 \
@@ -239,9 +239,9 @@ jobs:
         run: |
           set -e
           kubectl get pods -o wide
-          kubectl rollout status deployment/hookflow-api --timeout=5m
-          kubectl rollout status deployment/hookflow-worker --timeout=5m
-          kubectl rollout status deployment/hookflow-ui --timeout=5m
+          kubectl rollout status deployment/railhook-api --timeout=5m
+          kubectl rollout status deployment/railhook-worker --timeout=5m
+          kubectl rollout status deployment/railhook-ui --timeout=5m
 
       - name: The PodDisruptionBudgets exist
         run: |
@@ -253,8 +253,8 @@ jobs:
       - name: Mail links do not point at localhost
         run: |
           set -e
-          BASE=$(kubectl get configmap hookflow-config -o jsonpath='{.data.APP_BASE_URL}')
-          CORS=$(kubectl get configmap hookflow-config -o jsonpath='{.data.CORS_ALLOWED_ORIGINS}')
+          BASE=$(kubectl get configmap railhook-config -o jsonpath='{.data.APP_BASE_URL}')
+          CORS=$(kubectl get configmap railhook-config -o jsonpath='{.data.CORS_ALLOWED_ORIGINS}')
           echo "APP_BASE_URL=$BASE  CORS_ALLOWED_ORIGINS=$CORS"
           case "$BASE$CORS" in
             *localhost*|*127.0.0.1*|"")
@@ -277,13 +277,13 @@ jobs:
           }
 
           # Actuator on the management port, for both services.
-          check http://hookflow-api:8082/actuator/health          200
-          check http://hookflow-worker:8081/actuator/health/liveness 200
+          check http://railhook-api:8082/actuator/health          200
+          check http://railhook-worker:8081/actuator/health/liveness 200
           # The scrape the ServiceMonitor performs. 200, not the 401 it got
           # while the chart left actuator on the authenticated main port —
           # which is the whole reason MANAGEMENT_PORT is set now.
-          check http://hookflow-api:8082/actuator/prometheus      200
-          check http://hookflow-worker:8081/actuator/prometheus   200
+          check http://railhook-api:8082/actuator/prometheus      200
+          check http://railhook-worker:8081/actuator/prometheus   200
           # And the main port still refuses it, so the 200 above is the split
           # doing the work rather than actuator having been left wide open.
           # Asserted as "not 200" rather than a specific code: SecurityConfig
@@ -292,15 +292,15 @@ jobs:
           # that metrics are not served unauthenticated on the traffic port.
           code=$(kubectl exec smoke-curl -- \
             curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
-            http://hookflow-api:8080/actuator/prometheus)
-          echo "http://hookflow-api:8080/actuator/prometheus  $code (want anything but 200)"
+            http://railhook-api:8080/actuator/prometheus)
+          echo "http://railhook-api:8080/actuator/prometheus  $code (want anything but 200)"
           [ "$code" != "200" ] || { echo "::error::metrics are served unauthenticated on the traffic port"; exit 1; }
           # The UI image's nginx proxies /actuator/health to the literal
           # upstream `api` on 8082 — this proves the alias Service forwards to
           # the real management port.
           check http://api:8082/actuator/health/liveness          200
-          check http://hookflow-ui/                               200
-          check http://hookflow-ui/actuator/health/liveness       200
+          check http://railhook-ui/                               200
+          check http://railhook-ui/actuator/health/liveness       200
 
       - name: Helm Kind Smoke Summary
         if: always()
@@ -320,7 +320,7 @@ jobs:
 
       - name: Tear down
         if: always()
-        run: helm uninstall hookflow || true
+        run: helm uninstall railhook || true
 
   backend-build:
     name: Backend Build & Compile
@@ -347,7 +347,7 @@ jobs:
       - name: Upload CLI JAR
         uses: actions/upload-artifact@v7
         with:
-          name: hookflow-cli
+          name: railhook-cli
           path: webhook-platform-cli/target/webhook-platform-cli-*.jar
           retention-days: 30
 
@@ -931,11 +931,11 @@ jobs:
       - name: Install, exactly as the README says
         env:
           # Test the Compose file in this PR, not the one in the last release.
-          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
+          RAILHOOK_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
         run: |
-          ./install.sh --dir "$HOME/hookflow" --version v0.0.0-ci --port 8080 --no-start --yes
+          ./install.sh --dir "$HOME/railhook" --version v0.0.0-ci --port 8080 --no-start --yes
           # Point it at the images just built rather than pulling the release.
-          cd "$HOME/hookflow"
+          cd "$HOME/railhook"
           sed -i 's|^API_IMAGE_TAG=.*|API_IMAGE_TAG=test|;s|^WORKER_IMAGE_TAG=.*|WORKER_IMAGE_TAG=test|;s|^UI_IMAGE_TAG=.*|UI_IMAGE_TAG=test|' .env
           echo "DOCKER_REGISTRY=webhook-platform" >> .env
           # COMPOSE_PROFILES comes from the .env the installer wrote: the
@@ -946,7 +946,7 @@ jobs:
 
       - name: Wait for the platform
         run: |
-          cd "$HOME/hookflow"
+          cd "$HOME/railhook"
           for i in $(seq 1 60); do
             curl -sf -o /dev/null http://localhost:8080/actuator/health/liveness && { echo "up after ${i}0s"; exit 0; }
             sleep 10
@@ -1006,19 +1006,19 @@ jobs:
 
       - name: The installer's own checks pass against what it wrote
         env:
-          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
-        run: ./install.sh --check --dir "$HOME/hookflow"
+          RAILHOOK_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
+        run: ./install.sh --check --dir "$HOME/railhook"
 
       - name: A domain install wires TLS in without publishing the dashboard
         env:
-          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
+          RAILHOOK_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
         run: |
           # No certificate can be issued in CI, so this checks the wiring: the
           # terminator is in the service list, the dashboard has moved to
           # loopback behind it, and production mode is on.
-          ./install.sh --dir "$HOME/hookflow-tls" --version v0.0.0-ci \
+          ./install.sh --dir "$HOME/railhook-tls" --version v0.0.0-ci \
             --domain hooks.example.com --email ops@example.com --no-start --yes
-          cd "$HOME/hookflow-tls"
+          cd "$HOME/railhook-tls"
           docker compose config --services | grep -qx caddy || { echo "::error::no TLS terminator"; exit 1; }
           docker compose config | grep -q "host_ip: 127.0.0.1" || { echo "::error::dashboard still bound publicly"; exit 1; }
           grep -qx 'APP_ENV=production' .env || { echo "::error::APP_ENV not production"; exit 1; }
@@ -1027,11 +1027,11 @@ jobs:
 
       - name: Dump logs on failure
         if: failure()
-        run: cd "$HOME/hookflow" && docker compose logs || true
+        run: cd "$HOME/railhook" && docker compose logs || true
 
       - name: Tear down
         if: always()
-        run: cd "$HOME/hookflow" && docker compose down -v || true
+        run: cd "$HOME/railhook" && docker compose down -v || true
 
   upgrade-smoke:
     name: Upgrade Smoke Test
@@ -1072,14 +1072,14 @@ jobs:
       - name: Install the last release
         if: steps.last.outputs.found != ''
         run: |
-          ./install.sh --dir "$HOME/hookflow" --version "${{ steps.last.outputs.found }}" \
+          ./install.sh --dir "$HOME/railhook" --version "${{ steps.last.outputs.found }}" \
             --port 8080 --yes
           for i in $(seq 1 60); do
             curl -sf -o /dev/null http://localhost:8080/actuator/health/liveness && break
             sleep 10
           done
           curl -sf -o /dev/null http://localhost:8080/actuator/health/liveness \
-            || { echo "::error::the released version did not come up"; cd "$HOME/hookflow" && docker compose logs; exit 1; }
+            || { echo "::error::the released version did not come up"; cd "$HOME/railhook" && docker compose logs; exit 1; }
 
       - name: Put data in it
         if: steps.last.outputs.found != ''
@@ -1119,13 +1119,13 @@ jobs:
       - name: Upgrade in place
         if: steps.last.outputs.found != ''
         env:
-          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
+          RAILHOOK_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
         run: |
           set -e
-          cd "$HOME/hookflow"
+          cd "$HOME/railhook"
           # The Compose file from this branch, against the .env and the volumes the release
           # left behind - which is what an operator following UPGRADING.md ends up with.
-          cp "$HOOKFLOW_COMPOSE_SRC" docker-compose.yml
+          cp "$RAILHOOK_COMPOSE_SRC" docker-compose.yml
           sed -i 's|^API_IMAGE_TAG=.*|API_IMAGE_TAG=test|;s|^WORKER_IMAGE_TAG=.*|WORKER_IMAGE_TAG=test|;s|^UI_IMAGE_TAG=.*|UI_IMAGE_TAG=test|' .env
           grep -q '^DOCKER_REGISTRY=' .env && sed -i 's|^DOCKER_REGISTRY=.*|DOCKER_REGISTRY=webhook-platform|' .env \
             || echo "DOCKER_REGISTRY=webhook-platform" >> .env
@@ -1160,7 +1160,7 @@ jobs:
 
       - name: Dump logs on failure
         if: failure() && steps.last.outputs.found != ''
-        run: cd "$HOME/hookflow" && docker compose logs || true
+        run: cd "$HOME/railhook" && docker compose logs || true
 
   container-scan:
     name: Container Security Scan (Trivy)

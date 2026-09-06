@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Hookflow is now Railhook.** The name was taken on every surface that matters, twice by
+  products in this same category: `hookflow.dev` serves an unrelated webhook product, the npm
+  scope `@hookflow` holds eleven reserved packages describing "full-lifecycle webhook
+  processing", and PyPI `hookflow` and the GitHub organisation `hookflow` belong to other
+  people. `railhook` was verified free across GitHub, the npm scope, PyPI, Packagist and
+  `.dev`/`.app`/`.sh` — each checked individually, because a batch of unauthenticated checks
+  earns rate limits that read exactly like "available".
+
+  Renaming buys no stars and was not done for discovery. It closes one concrete thing: the
+  published names disagreed with the product and with each other. `pip install
+  webhook-platform` gave you `import hookflow`; `npm i @webhook-platform/node` gave you
+  `new Hookflow()`. Someone installing the SDK had to know two unrelated names, and that is
+  the moment an unfamiliar project spends the trust it has. The cost of fixing it only ever
+  goes up.
+
+  The rail was already this product's own language — `AttemptRail` draws the retry ladder on a
+  log scale of delay — so the name describes what the thing does rather than sitting on top of
+  it.
+
+  `UPGRADING.md` has what breaks: three new SDK package names, `import hookflow` becoming
+  `import railhook`, new image and chart names, seventeen `HOOKFLOW_*` variables becoming
+  `RAILHOOK_*`, and the CLI invoked as `railhook`. Old images stay pullable, so a running
+  deployment is untouched until it is upgraded. On Kubernetes the chart rename is an install
+  beside the old release rather than an upgrade of it, because Helm derives resource names
+  from the chart name.
+
+  Deliberately **not** renamed: the Java packages `com.webhook.platform.*` and the Maven
+  artifact ids. Nothing publishes them, no user sees them, and touching them would rewrite
+  every import, the logging configuration and component scanning for no part of the reason
+  this was done.
+
+
 ## [2.11.0] - 2026-09-06
 
 ### Changed
@@ -73,7 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the step: passing the payload through would send a raw event somewhere promised a reshaped
   one and report it as a success.
 
-- **`hookflow admin`** — orgs, org, suspend, reinstate — and `/admin/organizations/{id}/usage`
+- **`railhook admin`** — orgs, org, suspend, reinstate — and `/admin/organizations/{id}/usage`
   behind it, so an operator can see what a tenant has used against their plan. Deliberately no
   page in the dashboard: it is served from the same origin as the API, so a platform-admin token
   in a browser turns any XSS in the tenant dashboard into the deployment's master credential.
@@ -92,7 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   about it. They now say what is true of the project: the demo needs hosting rather than code, and
   the load harness has proven its scripts but published no numbers.
 
-- **The dashboard stopped doing SEO for somebody else's website.** `hookflow.dev` is not this
+- **The dashboard stopped doing SEO for somebody else's website.** `railhook.dev` is not this
   project's domain - it serves an unrelated product - and the shipped UI named it in
   `rel="canonical"`, `og:url`, `og:image`, `twitter:image` and the schema.org block, listed 23 of
   its URLs in `public/sitemap.xml`, pointed `robots.txt`'s `Sitemap:` line at it, and offered
@@ -335,7 +369,7 @@ ways: who is signed in to this account, with what, and how do I take it back.
 ### Documentation
 
 Substantially expanded, and split by audience: the repository holds what you read while
-evaluating or operating Hookflow, the dashboard's `/docs` holds what you read with the product
+evaluating or operating Railhook, the dashboard's `/docs` holds what you read with the product
 open. Nothing is written in both places.
 
 - **`docs/ARCHITECTURE.md` rewritten.** It was four diagrams and their captions. It is now
@@ -348,7 +382,7 @@ open. Nothing is written in both places.
   the gaps included. In the app: transformations, ordering, endpoint security, PII masking, and
   alerts and incidents — all in both English and Ukrainian.
 - **A migration guide** for Svix, Hookdeck and Convoy, which documents something that was true and
-  unstated: Hookflow implements Standard Webhooks exactly, so a receiver already using a Svix
+  unstated: Railhook implements Standard Webhooks exactly, so a receiver already using a Svix
   library keeps working with nothing but a new secret and URL.
 - **`OPERATIONS.md` known limitations** are their own section rather than buried in the backup
   runbook — including that a Postgres restore does not reconcile Kafka and Redis.
@@ -413,7 +447,7 @@ row, and the structural work that stops each of them recurring. No API change.
   `AuthContext` — an internal object resolved from the bearer token or the API
   key, never sent by a caller. springdoc read it off the controller signatures and
   published it; it is now hidden, and 834 lines of it left the spec.
-- **The reference told readers to call `http://localhost:8080`.** Hookflow is
+- **The reference told readers to call `http://localhost:8080`.** Railhook is
   self-hosted, so no address is right for everyone: the server is now a
   `{baseUrl}` variable a reader fills in, defaulting to the local one the
   quickstart already has them open.
@@ -473,7 +507,7 @@ Release-pipeline repairs and dependency updates. No product change.
 
 ## [2.7.0] - 2026-08-28
 
-Hookflow now speaks [Standard Webhooks](https://www.standardwebhooks.com) as well as
+Railhook now speaks [Standard Webhooks](https://www.standardwebhooks.com) as well as
 its own signature scheme, so a receiver can verify with a library they already
 have instead of reading our documentation.
 
@@ -621,7 +655,7 @@ check added in 2.6.1 exists to prevent happening again.
   obtains and renews its own certificate, moves the dashboard behind it onto
   loopback, and switches the platform to `APP_ENV=production`, where
   `ProductionSafetyValidator` refuses to start on unsafe configuration.
-- **`hookflow doctor`** re-runs the machine and configuration checks against an
+- **`railhook doctor`** re-runs the machine and configuration checks against an
   existing install, catching a hand-edited `.env` before it becomes an outage.
   It knows the mistakes that actually happen — a shipped default left in a
   secret, `POSTGRES_PASSWORD` drifting from `DB_PASSWORD`.
@@ -854,7 +888,7 @@ the real API.
 ### Fixed
 - `deploy/prometheus/alerts.yml` declared `groups:` twice at the top level. Prometheus
   rejects a duplicate mapping key, so the whole file failed to load — the
-  `hookflow.outbox` group and every rule after it included. The two are now one mapping.
+  `railhook.outbox` group and every rule after it included. The two are now one mapping.
 
 ## [2.3.0] - 2026-08-22
 
@@ -904,7 +938,7 @@ the real API.
 - UI build image `node:18-alpine` (EOL April 2025) → `node:22-alpine`;
   runtime image `nginx:1.25-alpine` → `nginx:1.30-alpine`. Vite 5 → 7,
   Vitest 1 → 3.
-- Helm chart (`deploy/helm/hookflow`): removed the Bitnami
+- Helm chart (`deploy/helm/railhook`): removed the Bitnami
   postgresql/redis/kafka subchart dependencies (Bitnami restricted its free
   catalog in August 2025 and dropped Kafka from it entirely). The chart now
   requires bring-your-own PostgreSQL/Kafka/Redis via each service's
@@ -1125,23 +1159,23 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.10.0...HEAD
-[2.10.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.9.1...v2.10.0
-[2.9.1]: https://github.com/vadymkykalo/webhook-platform/compare/v2.9.0...v2.9.1
-[2.9.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.8.0...v2.9.0
-[2.8.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.7.0...v2.8.0
-[2.7.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.6.1...v2.7.0
-[2.6.1]: https://github.com/vadymkykalo/webhook-platform/compare/v2.6.0...v2.6.1
-[2.6.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.5.0...v2.6.0
-[2.5.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.4.0...v2.5.0
-[2.4.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.3.0...v2.4.0
-[2.3.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.2.1...v2.3.0
-[2.2.1]: https://github.com/vadymkykalo/webhook-platform/compare/v2.2.0...v2.2.1
-[2.2.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.1.0...v2.2.0
-[2.1.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.0.0...v2.1.0
-[2.0.0]: https://github.com/vadymkykalo/webhook-platform/compare/v1.0.3...v2.0.0
-[1.1.0]: https://github.com/vadymkykalo/webhook-platform/compare/v1.0.0...v1.1.0
-[1.0.1]: https://github.com/vadymkykalo/webhook-platform/compare/v1.1.0...v1.0.1
-[1.0.2]: https://github.com/vadymkykalo/webhook-platform/compare/v1.0.1...v1.0.2
-[1.0.3]: https://github.com/vadymkykalo/webhook-platform/compare/v1.0.2...v1.0.3
-[1.0.0]: https://github.com/vadymkykalo/webhook-platform/releases/tag/v1.0.0
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/vadymkykalo/railhook/compare/v2.9.1...v2.10.0
+[2.9.1]: https://github.com/vadymkykalo/railhook/compare/v2.9.0...v2.9.1
+[2.9.0]: https://github.com/vadymkykalo/railhook/compare/v2.8.0...v2.9.0
+[2.8.0]: https://github.com/vadymkykalo/railhook/compare/v2.7.0...v2.8.0
+[2.7.0]: https://github.com/vadymkykalo/railhook/compare/v2.6.1...v2.7.0
+[2.6.1]: https://github.com/vadymkykalo/railhook/compare/v2.6.0...v2.6.1
+[2.6.0]: https://github.com/vadymkykalo/railhook/compare/v2.5.0...v2.6.0
+[2.5.0]: https://github.com/vadymkykalo/railhook/compare/v2.4.0...v2.5.0
+[2.4.0]: https://github.com/vadymkykalo/railhook/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/vadymkykalo/railhook/compare/v2.2.1...v2.3.0
+[2.2.1]: https://github.com/vadymkykalo/railhook/compare/v2.2.0...v2.2.1
+[2.2.0]: https://github.com/vadymkykalo/railhook/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/vadymkykalo/railhook/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/vadymkykalo/railhook/compare/v1.0.3...v2.0.0
+[1.1.0]: https://github.com/vadymkykalo/railhook/compare/v1.0.0...v1.1.0
+[1.0.1]: https://github.com/vadymkykalo/railhook/compare/v1.1.0...v1.0.1
+[1.0.2]: https://github.com/vadymkykalo/railhook/compare/v1.0.1...v1.0.2
+[1.0.3]: https://github.com/vadymkykalo/railhook/compare/v1.0.2...v1.0.3
+[1.0.0]: https://github.com/vadymkykalo/railhook/releases/tag/v1.0.0

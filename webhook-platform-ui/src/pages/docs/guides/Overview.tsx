@@ -26,14 +26,14 @@ import {
 /**
  * The two directions, as one picture.
  *
- * The version this replaces was six rounded boxes reading "Your system → Hookflow →
- * Endpoint" and "A provider → Hookflow → Destination", with the words "signs" and "verifies"
+ * The version this replaces was six rounded boxes reading "Your system → Railhook →
+ * Endpoint" and "A provider → Railhook → Destination", with the words "signs" and "verifies"
  * floating underneath. That is the paragraph beside it, drawn — the reader learns nothing
  * from the picture they did not learn from the sentence.
  *
  * What is actually worth drawing is the header. In both rows the same platform sits in the
  * middle and the same lifecycle runs underneath; the only thing that differs is which side of
- * Hookflow the proof is on. Outgoing, Hookflow writes `X-Signature` on the way out. Incoming,
+ * Railhook the proof is on. Outgoing, Railhook writes `X-Signature` on the way out. Incoming,
  * it reads the provider's own header on the way in — and the chip says `Stripe-Signature`
  * rather than "verifies", because that is the string the reader will be looking at in their
  * own logs.
@@ -59,7 +59,7 @@ function DirectionsDiagram() {
       <SketchEdge d="M126,44 H164" />
       <SketchEdge d="M282,44 H316" />
       <SketchBox x={8} y={20} w={118} h={48} role={t('docsPage.overview.diagDirYourSystem')} sub="order.created" align="start" />
-      <SketchBox x={168} y={20} w={110} h={48} label="Hookflow" />
+      <SketchBox x={168} y={20} w={110} h={48} label="Railhook" />
       <SketchBox x={320} y={20} w={112} h={48} role={t('docsPage.concepts.endpoint')} sub="api.acme.io" align="start" />
       <SketchChip x={299} y={82} leaderFrom={46}>X-Signature</SketchChip>
 
@@ -76,7 +76,7 @@ function DirectionsDiagram() {
       <SketchEdge d="M126,180 H164" />
       <SketchEdge d="M282,180 H316" />
       <SketchBox x={8} y={156} w={118} h={48} role={t('docsPage.overview.diagDirProvider')} sub="stripe.com" align="start" />
-      <SketchBox x={168} y={156} w={110} h={48} label="Hookflow" />
+      <SketchBox x={168} y={156} w={110} h={48} label="Railhook" />
       <SketchBox x={320} y={156} w={112} h={48} role={t('docsPage.concepts.destination')} sub="internal/orders" align="start" />
       <SketchChip x={145} y={218} leaderFrom={182}>Stripe-Signature</SketchChip>
 

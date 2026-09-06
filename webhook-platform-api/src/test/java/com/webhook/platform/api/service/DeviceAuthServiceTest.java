@@ -59,7 +59,7 @@ class DeviceAuthServiceTest {
 
     /** What the CLI's poll looks like as far as the session list is concerned. */
     private static final SessionOrigin CLI_ORIGIN =
-            SessionOrigin.of(SessionClient.CLI, "hookflow-cli/2.9.1", "203.0.113.7");
+            SessionOrigin.of(SessionClient.CLI, "railhook-cli/2.9.1", "203.0.113.7");
 
     @InjectMocks
     private DeviceAuthService deviceAuthService;

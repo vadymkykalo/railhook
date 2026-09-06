@@ -3,7 +3,7 @@ apiVersion: 1
 datasources:
   - name: Prometheus
     type: prometheus
-    uid: hookflow-prometheus
+    uid: railhook-prometheus
     access: proxy
     url: http://prometheus:9090
     isDefault: true
@@ -15,7 +15,7 @@ datasources:
   # See monitoring/README.md "Logs".
   - name: Loki
     type: loki
-    uid: hookflow-loki
+    uid: railhook-loki
     access: proxy
     url: http://loki:3100
     editable: false

@@ -37,7 +37,7 @@ public class ListenCommand implements Callable<Integer> {
         CliConfig config = configService.load();
 
         if (!config.isAuthenticated()) {
-            err.println("✗ Not authenticated. Run 'hookflow login' first.");
+            err.println("✗ Not authenticated. Run 'railhook login' first.");
             return 1;
         }
 
@@ -54,7 +54,7 @@ public class ListenCommand implements Callable<Integer> {
         // Step 1: Create tunnel session via REST API
         String query = "/api/v1/tunnels?localPort=" + port;
         if (projectId != null) query += "&projectId=" + projectId;
-        query += "&clientInfo=hookflow-cli/1.0.0";
+        query += "&clientInfo=railhook-cli/1.0.0";
 
         JsonNode createResponse = client.postForJson(query, null);
         String tunnelToken = createResponse.get("tunnelToken").asText();
@@ -72,7 +72,7 @@ public class ListenCommand implements Callable<Integer> {
         wsClient.onRegistered(url -> {
             out.println();
             out.println("╔══════════════════════════════════════════════════════╗");
-            out.println("║  Hookflow tunnel is active                          ║");
+            out.println("║  Railhook tunnel is active                          ║");
             out.println("╚══════════════════════════════════════════════════════╝");
             out.println();
             out.println("  Public URL:  " + url);

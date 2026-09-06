@@ -10,7 +10,7 @@ import { useDocumentMeta } from '../hooks/useDocumentMeta';
  * The route that replaces a mailto to a personal Gmail address.
  *
  * Two places on the pricing section used to link
- * `mailto:vadymkykalo@gmail.com?subject=Hookflow Enterprise` — the largest deal
+ * `mailto:vadymkykalo@gmail.com?subject=Railhook Enterprise` — the largest deal
  * on the page priced at "Custom" and then routed to an inbox that reads as a
  * side project, with the address itself published for anything that scrapes.
  *

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hookflow\Exception;
+namespace Railhook\Exception;
 
-class AuthenticationException extends HookflowException
+class AuthenticationException extends RailhookException
 {
     public function __construct(string $message = 'Invalid API key')
     {

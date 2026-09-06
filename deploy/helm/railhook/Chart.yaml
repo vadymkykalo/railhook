@@ -1,0 +1,35 @@
+apiVersion: v2
+name: railhook
+description: Self-hosted webhook infrastructure platform
+type: application
+version: 2.12.0
+appVersion: "2.12.0"
+keywords:
+  - webhooks
+  - event-delivery
+  - api
+  - automation
+home: https://github.com/vadymkykalo/railhook
+sources:
+  - https://github.com/vadymkykalo/railhook
+maintainers:
+  - name: Railhook maintainers
+    url: https://github.com/vadymkykalo/railhook/issues
+# The postgresql (12.x.x), redis (18.x.x) and kafka (26.x.x) Bitnami
+# subchart dependencies that used to live here were removed. Bitnami moved
+# its free catalog to a restricted/"Legacy" tier starting 2025-08-28 (see
+# https://github.com/bitnami/charts/issues/35164) - images referenced by
+# these chart versions stopped receiving updates, the Kafka application was
+# dropped from the catalog outright, and Bitnami's AWS-hosted mirror of the
+# same content is being retired 2026-06-10. Re-pinning to a newer Bitnami
+# chart version just bets on a catalog that is actively shrinking.
+#
+# Rather than take on maintaining alternative community charts for three
+# unrelated technologies, this chart now requires bring-your-own
+# PostgreSQL/Kafka/Redis - see values.yaml's postgresql/kafka/redis
+# `external:` blocks (already how production deployments were documented to
+# work) and the Helm README's Prerequisites section. docker-compose.yml
+# documents the exact images (postgres:16-alpine, apache/kafka:3.7.0,
+# redis:7-alpine - none of them Bitnami) this project is tested against, as
+# a reference for a self-managed in-cluster deployment.
+dependencies: []

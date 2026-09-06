@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "railhook.fullname" . }}-ui
+  labels:
+    {{- include "railhook.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ui
+spec:
+  replicas: {{ .Values.ui.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "railhook.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ui
+  template:
+    metadata:
+      labels:
+        {{- include "railhook.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ui
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "railhook.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml (.Values.ui.podSecurityContext | default .Values.podSecurityContext) | nindent 8 }}
+      containers:
+        - name: ui
+          securityContext:
+            {{- toYaml (.Values.ui.securityContext | default .Values.securityContext) | nindent 12 }}
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
+          ports:
+            # 5173, not 80: the image is nginx serving `listen 5173`
+            # (webhook-platform-ui/nginx.conf) and EXPOSE 5173. While this said
+            # 80 the readiness probe could never pass and the Service pointed at
+            # a closed port, so `helm install` produced a UI that never came up.
+            - name: http
+              containerPort: 5173
+              protocol: TCP
+          livenessProbe:
+            {{- toYaml .Values.ui.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.ui.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.ui.resources | nindent 12 }}
+          # nginx writes its temp dirs and its pid file at startup. As a
+          # non-root user those paths are not writable in the image, so without
+          # these the container exits before it ever serves anything.
+          volumeMounts:
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
