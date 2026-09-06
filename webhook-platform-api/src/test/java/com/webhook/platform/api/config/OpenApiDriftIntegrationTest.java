@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.fail;
  * Fails when the committed {@code openapi.yaml} disagrees semantically with the
  * spec the API actually serves.
  *
- * <p>The committed file is what docs.hookflow.dev's Redoc renderer and the SDK
+ * <p>The committed file is what the published Redoc renderer and the SDK
  * contract suites read, so it must not silently drift from the live one.
  * Springdoc generates the live spec from the {@code @RestController} classes,
  * which makes this a real drift check rather than a rebuild of a hand-maintained

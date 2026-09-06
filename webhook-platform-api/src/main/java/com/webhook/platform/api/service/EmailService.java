@@ -13,7 +13,7 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${app.email.from:noreply@hookflow.dev}")
+    @Value("${app.email.from:noreply@example.com}")
     private String fromAddress;
 
     @Value("${app.base-url:http://localhost:5173}")

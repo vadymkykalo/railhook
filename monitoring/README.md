@@ -152,7 +152,7 @@ All config is via environment variables (defaults in `docker-compose.yml`):
 | `ALERTMANAGER_SLACK_WEBHOOK_URL` | _(unset)_ | Slack incoming-webhook URL |
 | `ALERTMANAGER_SLACK_CHANNEL` | `#hookflow-alerts` | Slack channel |
 | `ALERTMANAGER_WEBHOOK_URL` | _(unset)_ | generic webhook receiver (PagerDuty/Opsgenie/custom) |
-| `ALERTMANAGER_EMAIL_TO` / `_FROM` / `_SMTP_HOST` / `_SMTP_PORT` | _(unset)_ / `alerts@hookflow.dev` / `localhost` / `1025` | email receiver |
+| `ALERTMANAGER_EMAIL_TO` / `_FROM` / `_SMTP_HOST` / `_SMTP_PORT` | _(unset)_ / `alerts@example.com` / `localhost` / `1025` | email receiver |
 | `LOKI_RETENTION_PERIOD` | `336h` (14d) | how long Loki keeps ingested logs |
 
 To override, create a `.env` file in `monitoring/` or pass env vars:

@@ -2,7 +2,7 @@
  * Injects Content-Security-Policy meta tag dynamically based on environment variables.
  *
  * Environment variables (set via VITE_ prefix):
- *   VITE_API_URL          — API origin (e.g. https://api.hookflow.dev). Empty = same origin.
+ *   VITE_API_URL          — API origin (e.g. https://api.example.com). Empty = same origin.
  *   VITE_CSP_EXTRA_CONNECT — additional connect-src origins, space-separated.
  *   VITE_CAPTCHA_SITE_KEY  — presence of this turns the registration challenge on, which is
  *                            what widens script-src and frame-src below.

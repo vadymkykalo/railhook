@@ -34,15 +34,15 @@ class ConfigCommandTest extends CliCommandTestBase {
 
     @Test
     void set_backendUrl_persistsToConfigFile() {
-        int exitCode = run("config", "set", "backend-url", "https://staging.hookflow.dev");
+        int exitCode = run("config", "set", "backend-url", "https://staging.example.com");
 
         assertEquals(0, exitCode);
-        assertTrue(out().contains("✓ Set backend-url = https://staging.hookflow.dev"));
+        assertTrue(out().contains("✓ Set backend-url = https://staging.example.com"));
 
         // Re-running "show" (fresh CliConfigService load) proves it was actually persisted.
         outContent.reset();
         run("config", "show");
-        assertTrue(out().contains("https://staging.hookflow.dev"));
+        assertTrue(out().contains("https://staging.example.com"));
     }
 
     @Test
@@ -79,7 +79,7 @@ class ConfigCommandTest extends CliCommandTestBase {
 
     @Test
     void profile_createAndUse_switchesActiveBackendUrl() {
-        int createExit = run("config", "profile", "create", "staging", "--url", "https://staging.hookflow.dev");
+        int createExit = run("config", "profile", "create", "staging", "--url", "https://staging.example.com");
         assertEquals(0, createExit);
         assertTrue(out().contains("Profile 'staging' created"));
 
@@ -87,11 +87,11 @@ class ConfigCommandTest extends CliCommandTestBase {
         int useExit = run("config", "profile", "use", "staging");
         assertEquals(0, useExit);
         assertTrue(out().contains("Switched to profile: staging"));
-        assertTrue(out().contains("https://staging.hookflow.dev"));
+        assertTrue(out().contains("https://staging.example.com"));
 
         outContent.reset();
         run("config", "show");
-        assertTrue(out().contains("https://staging.hookflow.dev"));
+        assertTrue(out().contains("https://staging.example.com"));
         assertTrue(out().contains("staging"));
     }
 
@@ -116,7 +116,7 @@ class ConfigCommandTest extends CliCommandTestBase {
 
     @Test
     void profile_list_showsDefaultAndCreatedProfiles() {
-        run("config", "profile", "create", "staging", "--url", "https://staging.hookflow.dev");
+        run("config", "profile", "create", "staging", "--url", "https://staging.example.com");
         outContent.reset();
 
         int exitCode = run("config", "profile", "list");
@@ -125,7 +125,7 @@ class ConfigCommandTest extends CliCommandTestBase {
         String output = out();
         assertTrue(output.contains("default"));
         assertTrue(output.contains("staging"));
-        assertTrue(output.contains("https://staging.hookflow.dev"));
+        assertTrue(output.contains("https://staging.example.com"));
     }
 
     @Test

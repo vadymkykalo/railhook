@@ -54,6 +54,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# tsc --build caches, written next to whichever tsconfig was built. Per-machine
+# and regenerated on every run; one of these got staged during a UI typecheck.
+*.tsbuildinfo
+
 # vitest --coverage output (webhook-platform-ui/coverage/, and any SDK's)
 coverage/
 

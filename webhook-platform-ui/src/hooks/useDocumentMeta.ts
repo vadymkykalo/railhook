@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { siteUrl } from '../lib/siteUrl';
+
 /**
  * Per-route title, description, canonical and document language.
  *
@@ -16,7 +18,6 @@ import { useTranslation } from 'react-i18next';
  * `path` is the canonical path, not the current URL — that keeps query strings
  * and a trailing hash out of the canonical, which is the whole point of it.
  */
-const SITE_URL = 'https://hookflow.dev';
 
 function upsertMeta(selector: string, attr: 'name' | 'property', key: string, content: string) {
   let tag = document.head.querySelector<HTMLMetaElement>(selector);
@@ -55,15 +56,16 @@ export function useDocumentMeta({
   const description = t(descriptionKey);
 
   useEffect(() => {
+    const site = siteUrl();
     document.title = title;
     document.documentElement.lang = i18n.language.split('-')[0];
 
     upsertMeta('meta[name="description"]', 'name', 'description', description);
     upsertMeta('meta[property="og:title"]', 'property', 'og:title', title);
     upsertMeta('meta[property="og:description"]', 'property', 'og:description', description);
-    upsertMeta('meta[property="og:url"]', 'property', 'og:url', `${SITE_URL}${path}`);
+    upsertMeta('meta[property="og:url"]', 'property', 'og:url', `${site}${path}`);
     upsertMeta('meta[name="twitter:title"]', 'name', 'twitter:title', title);
     upsertMeta('meta[name="twitter:description"]', 'name', 'twitter:description', description);
-    upsertCanonical(`${SITE_URL}${path === '/' ? '/' : path}`);
+    upsertCanonical(`${site}${path === '/' ? '/' : path}`);
   }, [title, description, path, i18n.language]);
 }

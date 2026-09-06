@@ -96,12 +96,12 @@ section — this is a demo, not a production tenant, so the smallest documented
 tier is enough: 2 vCPU / 4 GB RAM is comfortable for Postgres + Redis + Kafka
 (single broker, `KAFKA_NUM_PARTITIONS` turned down since demo throughput is
 trivial) + API + worker + UI, all in one `docker compose -f
-install.sh | bash --domain demo.hookflow.dev` on a small VPS.
+install.sh | bash --domain demo.example.com` on a small VPS.
 
 ## What would make this "DONE" instead of deferred
 
 1. Deploy the stack above on any reachable host (a $5–10/mo VPS is enough).
-2. Point a subdomain at it (e.g. `demo.hookflow.dev`) and link it from the
+2. Point a subdomain at it (e.g. `demo.example.com`) and link it from the
    README next to `docs/screenshots/deliveries.png`.
 3. Run the cross-tenant check from "Isolation model" above against the live
    instance from a second (real, non-demo) account and paste the result here.

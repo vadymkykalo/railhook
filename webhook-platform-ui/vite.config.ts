@@ -2,8 +2,46 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+/**
+ * Fills `%SITE_URL%` in index.html from VITE_SITE_URL, or removes what it
+ * cannot fill.
+ *
+ * index.html is static, so the absolute URLs a crawler and a link unfurler
+ * read before React mounts — og:url, og:image, the schema.org block — cannot
+ * come from `window.location` the way `src/lib/siteUrl.ts` does at runtime.
+ * They used to be a hardcoded domain this project does not own, which meant
+ * every self-hosted install shipped an og:image hosted by a stranger and a
+ * structured-data record crediting them.
+ *
+ * A build that has not been told its public origin therefore publishes no
+ * absolute self-reference at all. That is the honest answer, and it costs
+ * nothing: the canonical in index.html is relative, and `useDocumentMeta`
+ * rewrites og:* per route as soon as the app mounts. The one case that truly
+ * needs these tags — a public marketing site being unfurled into a chat — is
+ * also the one case that knows its own domain and sets the variable.
+ *
+ * The JSON-LD block goes whole rather than line by line: dropping its `url`
+ * would leave a SoftwareApplication record that names no software, and an
+ * `offers` array emptied of its entries advertises a product with no prices.
+ */
+function siteUrlHtml(): import('vite').Plugin {
+  const LD_JSON = /\n\s*<script type="application\/ld\+json">[\s\S]*?<\/script>/
+  return {
+    name: 'hookflow-site-url-html',
+    transformIndexHtml(html) {
+      const site = (process.env.VITE_SITE_URL || '').trim().replace(/\/+$/, '')
+      if (site) return html.split('%SITE_URL%').join(site)
+      return html
+        .replace(LD_JSON, '')
+        .split('\n')
+        .filter((line) => !line.includes('%SITE_URL%'))
+        .join('\n')
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), siteUrlHtml()],
   server: {
     host: '0.0.0.0',
     port: 5173,

@@ -101,7 +101,7 @@ WEBHOOK
       cat <<EMAIL
     email_configs:
       - to: '${ALERTMANAGER_EMAIL_TO}'
-        from: '${ALERTMANAGER_EMAIL_FROM:-alerts@hookflow.dev}'
+        from: '${ALERTMANAGER_EMAIL_FROM:-alerts@example.com}'
         smarthost: '${ALERTMANAGER_SMTP_HOST:-localhost}:${ALERTMANAGER_SMTP_PORT:-1025}'
         require_tls: false
         send_resolved: true

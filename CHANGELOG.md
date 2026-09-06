@@ -80,6 +80,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The create-event node offers the schema registry's event types** as suggestions. A datalist
   and not a select, because emitting a type that has no schema yet is allowed.
 
+### Fixed
+
+- **The dashboard stopped doing SEO for somebody else's website.** `hookflow.dev` is not this
+  project's domain - it serves an unrelated product - and the shipped UI named it in
+  `rel="canonical"`, `og:url`, `og:image`, `twitter:image` and the schema.org block, listed 23 of
+  its URLs in `public/sitemap.xml`, pointed `robots.txt`'s `Sitemap:` line at it, and offered
+  `sales@` and `support@` there on `/contact`. A canonical is an instruction to a search engine to
+  credit the page it names, so every self-hosted install was issuing that instruction on every
+  page, and anyone who took the support address wrote to a stranger.
+
+  The same constant was the default `EMAIL_FROM` in `.env.dist`, `docker-compose.yml`,
+  `application.yml`, `EmailService`, both Helm values files and the monitoring stack's
+  Alertmanager config. Mail from a domain you do not own fails SPF and DKIM at the receiver, so
+  an operator who turned `EMAIL_ENABLED` on without noticing got verification mail silently
+  refused - and a user staring at a screen telling them to check an inbox nothing would reach.
+
+  Nothing is replaced with a different constant. What a deployment publishes about itself now
+  comes from the deployment:
+
+  - `VITE_SITE_URL` gives the public origin. Unset - the default, and what every private
+    dashboard wants - the canonical follows the browser's own origin and index.html carries no
+    absolute self-reference at all, the JSON-LD block included. `scripts/prerender.mjs` needs the
+    variable set, or it would freeze its throwaway local server's address into the static HTML.
+  - `VITE_CONTACT_DOMAIN` gives the `/contact` mail addresses. Unset, those two cards are not
+    rendered: a deployment someone runs for their own company has no sales desk, and an address
+    that reaches nobody is worse than an absent one. The issues and documentation cards, which
+    are true everywhere, stay.
+  - The sitemap generator takes `SITE_URL`. A sitemap must carry absolute URLs, so the committed
+    copy names `example.com` - IANA-reserved, and unable to become anyone's product - as do every
+    placeholder address and the Helm ingress host.
+
+  One trap for whoever edits `index.html` next: the canonical cannot be written as a relative
+  `"/"`. Vite treats `href` on a `<link>` as an asset reference and reads it, so a root-relative
+  canonical fails the build with `EISDIR` on the public directory. It goes through the same
+  build-time placeholder as the rest.
+
 ### Security
 
 - **Tomcat 11.0.25.** Boot 4.1.1's BOM manages 11.0.24, which carries three CRITICALs -

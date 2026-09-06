@@ -299,7 +299,7 @@ app:
     evaluation-cron: ${ALERTS_EVALUATION_CRON:0 * * * * *}
   email:
     enabled: ${EMAIL_ENABLED:false}
-    from: ${EMAIL_FROM:noreply@hookflow.dev}
+    from: ${EMAIL_FROM:noreply@example.com}
 
 spring.mail:
   host: ${SMTP_HOST:localhost}
