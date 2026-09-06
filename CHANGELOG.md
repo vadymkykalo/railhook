@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Fourteen labels rendered as raw translation keys, and a guard that could not see them.**
+  A verified account's Settings page showed the literal text `settings.emailVerified` where its
+  email status belongs, because only `settings.emailUnverified` was ever added. Thirteen more of
+  exactly the same shape were hiding behind it: `common.selectAll` / `deselectAll` on all four
+  bulk-selection pages, `billing.nearLimit` / `overLimit`, `auditLog.noMatches` /
+  `noMatchesDesc`, and `apiKeys.keyDialog.copied`.
+
+  Every one is `t(cond ? 'a' : 'b')` with a key on one branch only, and every one shows on the
+  branch nobody looks at — the verified account, the copied key, the filter that matches
+  nothing. Nothing in the build could catch them: `t()` takes a `string`, so TypeScript is happy
+  with any spelling; the locale-parity test compares en against uk, and a key missing from both
+  is missing from neither's point of view; `eslint-plugin-i18next` asks whether a string went
+  through `t()`, not whether the key resolves; and `dynamicKeys.test.ts` covers keys built by
+  interpolation from a backend enum, which two plain literals in a ternary are not.
+
+  `staticKeys.test.ts` closes it: every string literal inside a `t(...)` call has to resolve in
+  `en.json`. Worth knowing — the first version of it matched `t('` directly, which finds nothing
+  in `t(cond ? 'a' : 'b')`, so it passed against the very bug it was written for. It reads the
+  whole argument list now. A guard that cannot fail on its motivating case is decoration.
+
 - **A log line that lied about which number was which.** `RetryGovernor`'s AIMD-decrease warning
   was written with `{:.1f}` - Python's format syntax, not SLF4J's. SLF4J substitutes only `{}`,
   so that token printed literally, every argument after it landed one placeholder early, and the
