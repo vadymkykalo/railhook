@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A ratchet on migration checksums.** Flyway validates the checksum of every migration it has
+  applied, over the whole file including comments, so editing one that has already run makes the
+  application refuse to start on every deployment that has it — and it cannot be repaired from
+  the application. Nothing in the build had an opinion about that until now.
+
+  It came up for real: the Railhook rename in this same release rewrote a comment in
+  `V062__endpoint_signature_scheme.sql`. The compiler was happy, all 1666 tests passed and
+  `make ratchets` was green. It was caught by reading a diff, which is not a control.
+
+  `MigrationChecksumTest` holds a committed hash of every migration in
+  `src/test/resources/db/migration-checksums.txt` and fails when one changes, is deleted or is
+  renamed. Adding a migration means regenerating that file and committing it alongside:
+
+  ```bash
+  mvn test -pl webhook-platform-api -am -Dtest=MigrationChecksumTest -Dmigrations.regenerate=true
+  ```
+
+  The two cases read differently on review, which is the point: a new migration adds a line,
+  while an edit to an existing one changes a line and adds nothing.
+
+  The hashes are not Flyway's — Flyway's are CRC32 and internal to it, and reproducing them
+  would pin this test to a Flyway version for no gain, because the question is "did this file
+  change", not "what number does Flyway hold". What *is* reproduced is the one thing Flyway
+  ignores: the hash is taken over lines rather than bytes, so a checkout that normalises line
+  endings is not a change here either. A ratchet that cries wolf gets regenerated on red
+  without being read.
+
 ### Changed
 
 - **Hookflow is now Railhook.** The name was taken on every surface that matters, twice by
