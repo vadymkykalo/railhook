@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The tunnel ingress built a regex out of the URL it was called with.** `TunnelIngressController`
+  stripped the tunnel prefix with `replaceFirst("/tunnel/" + slug, "")`, and `replaceFirst` takes
+  a *regex*. The slug arrives in the path of an endpoint anyone on the internet can call, so a
+  slug carrying regex metacharacters strips the wrong span (a `.` matches any character), throws
+  `PatternSyntaxException` out of a request handler, or lets a stranger choose a pattern that
+  backtracks. The line only ever wanted "drop this prefix", which is plain string work.
+
+  Found by the CodeQL workflow added in this release, on its first run.
+
 - **Fourteen labels rendered as raw translation keys, and a guard that could not see them.**
   A verified account's Settings page showed the literal text `settings.emailVerified` where its
   email status belongs, because only `settings.emailUnverified` was ever added. Thirteen more of

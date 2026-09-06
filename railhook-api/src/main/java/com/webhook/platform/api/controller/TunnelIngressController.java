@@ -70,12 +70,28 @@ public class TunnelIngressController {
                 .type("TUNNEL_REQUEST")
                 .requestId(UUID.randomUUID().toString())
                 .method(request.getMethod())
-                .path(request.getRequestURI().replaceFirst("/tunnel/" + slug, ""))
+                .path(pathAfterSlug(request.getRequestURI(), slug))
                 .queryString(request.getQueryString())
                 .headers(relayableHeaders(request))
                 .body(body)
                 .timestampMs(System.currentTimeMillis())
                 .build();
+    }
+
+    /**
+     * The part of the request URI that belongs to the developer's own service, with this
+     * tunnel's prefix removed.
+     *
+     * <p>Plain string work, not {@code replaceFirst}. That method takes a <em>regex</em>, and
+     * the slug arrives in the path of an endpoint anyone on the internet can call: a slug
+     * carrying regex metacharacters either strips the wrong span (a {@code .} matches any
+     * character), throws {@link java.util.regex.PatternSyntaxException} out of a request
+     * handler, or hands a stranger the ability to choose a pattern that backtracks. None of
+     * that is what the line was for - it only ever wanted "drop this prefix".
+     */
+    private static String pathAfterSlug(String uri, String slug) {
+        String prefix = "/tunnel/" + slug;
+        return uri.startsWith(prefix) ? uri.substring(prefix.length()) : uri;
     }
 
     private Map<String, String> relayableHeaders(HttpServletRequest request) {
