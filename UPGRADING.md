@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v2.12.0
+
 ### Hookflow is now Railhook, and several names you may have scripted changed
 
 The name "Hookflow" was taken on every surface that matters, twice by products
