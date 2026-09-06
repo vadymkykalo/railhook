@@ -13,12 +13,12 @@
 // hand-asserting field-by-field, since it would catch drift at build time
 // rather than only when this suite happens to run. This hand-asserted
 // suite is the accepted fallback until that generation exists.
-import { Hookflow } from '../../src/index';
+import { Railhook } from '../../src/index';
 import { bootstrapContractProject, isApiReachable, BASE_URL, ContractContext } from './support';
 
 let apiReachable = false;
 let ctx: ContractContext;
-let client: Hookflow;
+let client: Railhook;
 
 beforeAll(async () => {
   apiReachable = await isApiReachable();
@@ -31,10 +31,10 @@ beforeAll(async () => {
     return;
   }
   ctx = await bootstrapContractProject('sdk-client');
-  client = new Hookflow({ apiKey: ctx.apiKey, baseUrl: BASE_URL });
+  client = new Railhook({ apiKey: ctx.apiKey, baseUrl: BASE_URL });
 });
 
-describe('Hookflow client contract', () => {
+describe('Railhook client contract', () => {
   test('endpoints.create returns the shape Endpoint declares', async () => {
     if (!apiReachable) return;
     const endpoint = await client.endpoints.create(ctx.projectId, {
@@ -104,7 +104,7 @@ describe('Hookflow client contract', () => {
 
   test('an invalid API key is rejected with a 401-shaped AuthenticationError', async () => {
     if (!apiReachable) return;
-    const badClient = new Hookflow({ apiKey: 'not-a-real-key', baseUrl: BASE_URL });
+    const badClient = new Railhook({ apiKey: 'not-a-real-key', baseUrl: BASE_URL });
     await expect(
       badClient.events.send({ type: 'contract.test.bad_key', data: {} })
     ).rejects.toMatchObject({ status: 401, name: 'AuthenticationError' });

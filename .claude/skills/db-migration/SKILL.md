@@ -7,15 +7,23 @@ description: Change the database schema in this repo — add or alter a table or
 
 ## Where migrations live
 
-Only in `webhook-platform-api/src/main/resources/db/migration`, named `V0NN__snake_case_description.sql`. The API module is the sole owner: `spring.flyway.enabled: true` is set there and the worker has **no Flyway dependency at all**. The worker connects to the same schema and expects it to already be migrated.
+Only in `railhook-api/src/main/resources/db/migration`, named `V0NN__snake_case_description.sql`. The API module is the sole owner: `spring.flyway.enabled: true` is set there and the worker has **no Flyway dependency at all**. The worker connects to the same schema and expects it to already be migrated.
 
-Append the next free number (currently through `V049`); never edit a migration that has been applied anywhere — Flyway records a checksum per version and refuses to start when it changes. To correct an applied migration, add a new one that fixes it forward.
+Append the next free number (currently through `V068`); never edit a migration that has been applied anywhere — Flyway records a checksum per version and refuses to start when it changes. To correct an applied migration, add a new one that fixes it forward.
+
+`MigrationChecksumTest` (a `@Tag("ratchet")` guard) enforces that: it holds a committed hash of every migration and fails when one changes. Adding a migration therefore also means regenerating the manifest and committing it alongside:
+
+```bash
+mvn test -pl railhook-api -am -Dtest=MigrationChecksumTest -Dmigrations.regenerate=true
+```
+
+The two diffs read differently on purpose. A new migration adds a line to `src/test/resources/db/migration-checksums.txt`; an edit to an existing one changes a line and adds nothing — which is the review signal. It exists because a repository-wide rename once changed a comment in an applied migration and every other gate stayed green.
 
 Existing files use plain SQL with a leading comment explaining *why*, and `COMMENT ON TABLE` for non-obvious tables. Follow that.
 
 ## The two-entity rule
 
-`webhook-platform-api` and `webhook-platform-worker` each keep their **own JPA entity and repository copies** of the shared tables — `Event`, `Delivery`, `Endpoint`, `IncomingEvent`, `IncomingSource`, `IncomingDestination`, `IncomingForwardAttempt`, `DeliveryAttempt`, `OrderingCursor`, `Transformation`. They are not shared through `webhook-platform-common`.
+`railhook-api` and `railhook-worker` each keep their **own JPA entity and repository copies** of the shared tables — `Event`, `Delivery`, `Endpoint`, `IncomingEvent`, `IncomingSource`, `IncomingDestination`, `IncomingForwardAttempt`, `DeliveryAttempt`, `OrderingCursor`, `Transformation`. They are not shared through `railhook-common`.
 
 So a schema change is usually **three edits**: the migration, the API entity, and the worker entity. Check both `domain/entity` directories before assuming a table is API-only.
 

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "railhook.fullname" . }}-worker
+  labels:
+    {{- include "railhook.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    # Actuator only — the worker consumes from Kafka and serves no API. The
+    # ServiceMonitor scrapes this port by name.
+    - port: {{ include "railhook.worker.managementPort" . }}
+      targetPort: management
+      protocol: TCP
+      name: management
+  selector:
+    {{- include "railhook.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker

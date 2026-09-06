@@ -39,7 +39,7 @@ jobs:
           cache: 'maven'
 
       - name: Build CLI JAR
-        run: mvn clean package -pl webhook-platform-cli -am -DskipTests -B
+        run: mvn clean package -pl railhook-cli -am -DskipTests -B
 
       - name: Prepare release assets
         env:
@@ -47,29 +47,29 @@ jobs:
         run: |
           VERSION="${TAG#v}"
           echo "TAG=$TAG" >> $GITHUB_ENV
-          cp webhook-platform-cli/target/webhook-platform-cli-*.jar hookflow-cli.jar
+          cp railhook-cli/target/railhook-cli-*.jar railhook-cli.jar
           # install.sh refuses to run a JAR that doesn't match this file (see
-          # verify_checksum() in webhook-platform-cli/install.sh) — table
+          # verify_checksum() in railhook-cli/install.sh) — table
           # stakes for a curl-pipe installer.
-          sha256sum hookflow-cli.jar > SHA256SUMS
+          sha256sum railhook-cli.jar > SHA256SUMS
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
-          name: "Hookflow ${{ inputs.tag || github.ref_name }}"
+          name: "Railhook ${{ inputs.tag || github.ref_name }}"
           body: |
-            ## Hookflow CLI ${{ env.VERSION }}
+            ## Railhook CLI ${{ env.VERSION }}
 
             ### Install
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash
+            curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/railhook-cli/install.sh | bash
             ```
 
-            Or download `hookflow-cli.jar` and run:
+            Or download `railhook-cli.jar` and run:
             ```bash
-            java -jar hookflow-cli.jar --help
+            java -jar railhook-cli.jar --help
             ```
 
             ### Requirements
@@ -81,7 +81,7 @@ jobs:
             sha256sum -c SHA256SUMS
             ```
           files: |
-            hookflow-cli.jar
+            railhook-cli.jar
             SHA256SUMS
           draft: false
           prerelease: false
@@ -142,7 +142,7 @@ jobs:
 
           while :; do
             MISSING=""
-            for image in hookflow-api hookflow-ui hookflow-worker; do
+            for image in railhook-api railhook-ui railhook-worker; do
               tag_exists "$image" || MISSING="${MISSING} ${image}"
             done
             [ -z "$MISSING" ] && break
@@ -161,14 +161,14 @@ jobs:
         run: |
           set -uo pipefail
 
-          npm_version() { npm view @webhook-platform/node version 2>/dev/null || echo ''; }
+          npm_version() { npm view @railhook/node version 2>/dev/null || echo ''; }
           pypi_version() {
-            curl -fsS https://pypi.org/pypi/webhook-platform/json 2>/dev/null \
+            curl -fsS https://pypi.org/pypi/railhook/json 2>/dev/null \
               | python3 -c 'import sys,json; print(json.load(sys.stdin)["info"]["version"])' 2>/dev/null || echo ''
           }
           packagist_version() {
-            curl -fsS https://repo.packagist.org/p2/webhook-platform/php.json 2>/dev/null \
-              | python3 -c 'import sys,json; print(json.load(sys.stdin)["packages"]["webhook-platform/php"][0]["version"].lstrip("v"))' 2>/dev/null || echo ''
+            curl -fsS https://repo.packagist.org/p2/railhook/php.json 2>/dev/null \
+              | python3 -c 'import sys,json; print(json.load(sys.stdin)["packages"]["railhook/php"][0]["version"].lstrip("v"))' 2>/dev/null || echo ''
           }
 
           # Packagist crawls asynchronously after update-package returns, and
@@ -195,8 +195,8 @@ jobs:
               FAILED=1
             fi
           }
-          check "npm @webhook-platform/node" "$NPM"
-          check "PyPI webhook-platform" "$PYPI"
-          check "Packagist webhook-platform/php" "$PACKAGIST"
+          check "npm @railhook/node" "$NPM"
+          check "PyPI railhook" "$PYPI"
+          check "Packagist railhook/php" "$PACKAGIST"
 
           exit $FAILED

@@ -1,6 +1,6 @@
-# Hookflow — Self-Hosted Deployment Guide
+# Railhook — Self-Hosted Deployment Guide
 
-> Complete guide for deploying Hookflow in your own infrastructure.
+> Complete guide for deploying Railhook in your own infrastructure.
 
 ---
 
@@ -73,7 +73,7 @@
 
 ### SSRF Protection
 
-By default in production, Hookflow blocks webhook delivery to private/internal IPs:
+By default in production, Railhook blocks webhook delivery to private/internal IPs:
 
 ```yaml
 WEBHOOK_ALLOW_PRIVATE_IPS: "false"  # Always false in production
@@ -87,7 +87,7 @@ WEBHOOK_ALLOWED_HOSTS: "internal-service.default.svc.cluster.local,10.0.1.50"
 
 ### Reverse Proxy / Trusted Proxies
 
-If Hookflow's API sits behind a reverse proxy, load balancer, or ingress controller
+If Railhook's API sits behind a reverse proxy, load balancer, or ingress controller
 (anything that terminates the client connection and forwards to the API), you **must**
 tell it which peer to trust, or none of `X-Forwarded-For` / `X-Real-IP` is honoured:
 
@@ -166,12 +166,12 @@ have outgrown it.
 ### 4.1 The installer (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh | bash
 ```
 
 It checks the machine first — Docker, Compose (either spelling), memory, disk,
-the port — then writes `~/hookflow` containing a Compose file pinned to the
-latest release, a `.env` with freshly generated secrets, and a small `hookflow`
+the port — then writes `~/railhook` containing a Compose file pinned to the
+latest release, a `.env` with freshly generated secrets, and a small `railhook`
 helper. It verifies the configuration it wrote before starting anything, and
 tells you the URL when the platform answers.
 
@@ -199,7 +199,7 @@ configuration checks against an existing install, `--uninstall` (keeps data) and
 **Day two**, from the install directory:
 
 ```bash
-./hookflow status | logs | stop | start | upgrade | backup | doctor
+./railhook status | logs | stop | start | upgrade | backup | doctor
 ```
 
 `doctor` re-runs every check against what is on disk, which is how a
@@ -224,8 +224,8 @@ because the installer generates real secrets where `.env.dist` hands you the
 public ones from this repository and trusts you to remember to replace them.
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
+curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/railhook/main/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/.env.dist -o .env
 
 # Edit .env — at minimum, replace every one of these with a generated value:
 #   WEBHOOK_ENCRYPTION_KEY, WEBHOOK_ENCRYPTION_SALT, JWT_SECRET
@@ -249,8 +249,8 @@ curl -o /dev/null -w '%{http_code}\n' http://localhost/api/v1/projects   # expec
 this project owns from the working tree instead:
 
 ```bash
-git clone https://github.com/vadymkykalo/webhook-platform.git
-cd webhook-platform
+git clone https://github.com/vadymkykalo/railhook.git
+cd railhook
 make up          # the overlay, the embedded-db profile and the topic creation
 make health
 ```
@@ -280,21 +280,21 @@ The chart is published as an OCI artifact to GHCR on every release, so
 `helm install` works against a clean cluster with **no repo clone**:
 
 ```bash
-kubectl create namespace hookflow
+kubectl create namespace railhook
 
-kubectl -n hookflow create secret generic hookflow-secrets \
+kubectl -n railhook create secret generic railhook-secrets \
   --from-literal=encryption-key=$(openssl rand -hex 16) \
   --from-literal=jwt-secret=$(openssl rand -base64 48)
-kubectl -n hookflow create secret generic hookflow-postgresql-secret --from-literal=password=$DB_PASSWORD
-kubectl -n hookflow create secret generic hookflow-redis-secret --from-literal=password=$REDIS_PASSWORD
+kubectl -n railhook create secret generic railhook-postgresql-secret --from-literal=password=$DB_PASSWORD
+kubectl -n railhook create secret generic railhook-redis-secret --from-literal=password=$REDIS_PASSWORD
 
-helm install hookflow oci://ghcr.io/vadymkykalo/charts/hookflow --version <version> -n hookflow \
+helm install railhook oci://ghcr.io/vadymkykalo/charts/railhook --version <version> -n railhook \
   --set postgresql.external.host=your-postgres.example.com \
   --set kafka.external.bootstrapServers=kafka-1:9092,kafka-2:9092,kafka-3:9092 \
   --set redis.external.host=your-redis.example.com \
-  --set ui.ingress.hosts[0].host=hookflow.yourdomain.com
+  --set ui.ingress.hosts[0].host=railhook.yourdomain.com
 
-kubectl -n hookflow get pods    # no ImagePullBackOff
+kubectl -n railhook get pods    # no ImagePullBackOff
 ```
 
 If you need to customize the chart itself (not just `--set` overrides), clone
@@ -305,31 +305,31 @@ the repo and install the local copy instead — this also picks up
 cd deploy/helm
 
 # Create namespace
-kubectl create namespace hookflow
+kubectl create namespace railhook
 
 # Create required secrets
-kubectl -n hookflow create secret generic hookflow-secrets \
+kubectl -n railhook create secret generic railhook-secrets \
   --from-literal=encryption-key=$(openssl rand -hex 16) \
   --from-literal=jwt-secret=$(openssl rand -base64 48)
 
-kubectl -n hookflow create secret generic hookflow-postgresql-secret \
+kubectl -n railhook create secret generic railhook-postgresql-secret \
   --from-literal=password=$DB_PASSWORD
 
-kubectl -n hookflow create secret generic hookflow-redis-secret \
+kubectl -n railhook create secret generic railhook-redis-secret \
   --from-literal=password=$REDIS_PASSWORD
 
 # Install with external services (recommended for production)
-helm install hookflow ./hookflow -n hookflow \
+helm install railhook ./railhook -n railhook \
   --set postgresql.external.host=your-postgres.example.com \
-  --set postgresql.external.database=hookflow \
+  --set postgresql.external.database=railhook \
   --set postgresql.external.username=webhook_user \
   --set kafka.external.bootstrapServers=kafka-1:9092,kafka-2:9092,kafka-3:9092 \
   --set redis.external.host=your-redis.example.com \
-  --set ui.ingress.hosts[0].host=hookflow.yourdomain.com
+  --set ui.ingress.hosts[0].host=railhook.yourdomain.com
 
 # Verify
-kubectl -n hookflow get pods
-kubectl -n hookflow logs -l app.kubernetes.io/component=api --tail=20
+kubectl -n railhook get pods
+kubectl -n railhook logs -l app.kubernetes.io/component=api --tail=20
 ```
 
 ### Production Values Override
@@ -382,14 +382,14 @@ networkPolicy:
 
 postgresql:
   external:
-    host: hookflow-db.abc123.us-east-1.rds.amazonaws.com
+    host: railhook-db.abc123.us-east-1.rds.amazonaws.com
     port: 5432
-    database: hookflow
-    username: hookflow_app
+    database: railhook
+    username: railhook_app
 ```
 
 ```bash
-helm install hookflow ./hookflow -n hookflow -f values-mycompany.yaml
+helm install railhook ./railhook -n railhook -f values-mycompany.yaml
 ```
 
 ---
@@ -405,7 +405,7 @@ helm install hookflow ./hookflow -n hookflow -f values-mycompany.yaml
 | `JWT_SECRET` | JWT signing secret (min 32 chars) | `super-secret-jwt-key-...` |
 | `DB_HOST` | PostgreSQL host | `postgres.example.com` |
 | `DB_PORT` | PostgreSQL port | `5432` |
-| `DB_NAME` | Database name | `hookflow` |
+| `DB_NAME` | Database name | `railhook` |
 | `DB_USERNAME` | Database user | `webhook_user` |
 | `DB_PASSWORD` | Database password | (from secret) |
 | `KAFKA_BOOTSTRAP_SERVERS` | Kafka brokers | `kafka-1:9092,kafka-2:9092` |
@@ -433,7 +433,7 @@ helm install hookflow ./hookflow -n hookflow -f values-mycompany.yaml
 
 ### Rolling Update (zero-downtime)
 
-Hookflow is designed for rolling updates:
+Railhook is designed for rolling updates:
 
 1. **Database migrations run first** via init container (Flyway with built-in locking — only one pod runs migration)
 2. **API pods update** with rolling strategy (new pods start before old ones terminate)
@@ -441,25 +441,25 @@ Hookflow is designed for rolling updates:
 
 ```bash
 # Update image tags
-helm upgrade hookflow ./hookflow -n hookflow \
+helm upgrade railhook ./railhook -n railhook \
   --set api.image.tag=v1.5.0 \
   --set worker.image.tag=v1.5.0 \
   --set ui.image.tag=v1.5.0
 
 # Monitor rollout
-kubectl -n hookflow rollout status deployment hookflow-api
-kubectl -n hookflow rollout status deployment hookflow-worker
+kubectl -n railhook rollout status deployment railhook-api
+kubectl -n railhook rollout status deployment railhook-worker
 ```
 
 ### Rollback
 
 ```bash
 # Rollback to previous revision
-helm rollback hookflow -n hookflow
+helm rollback railhook -n railhook
 
 # Or to specific revision
-helm history hookflow -n hookflow
-helm rollback hookflow 3 -n hookflow
+helm history railhook -n railhook
+helm rollback railhook 3 -n railhook
 ```
 
 ### Migration Compatibility
@@ -488,22 +488,22 @@ backup:
 
 ```bash
 # PostgreSQL custom format (compressed, supports selective restore)
-pg_dump -h $DB_HOST -U $DB_USERNAME -d $DB_NAME -Fc -f hookflow-$(date +%Y%m%d).dump
+pg_dump -h $DB_HOST -U $DB_USERNAME -d $DB_NAME -Fc -f railhook-$(date +%Y%m%d).dump
 ```
 
 ### Restore
 
 ```bash
 # Stop services first
-kubectl -n hookflow scale deployment hookflow-api hookflow-worker --replicas=0
+kubectl -n railhook scale deployment railhook-api railhook-worker --replicas=0
 
 # Restore
 pg_restore -h $DB_HOST -U $DB_USERNAME -d $DB_NAME \
-  --clean --if-exists --no-owner hookflow-20240115.dump
+  --clean --if-exists --no-owner railhook-20240115.dump
 
 # Restart services
-kubectl -n hookflow scale deployment hookflow-api --replicas=3
-kubectl -n hookflow scale deployment hookflow-worker --replicas=3
+kubectl -n railhook scale deployment railhook-api --replicas=3
+kubectl -n railhook scale deployment railhook-worker --replicas=3
 ```
 
 ### What to Backup
@@ -531,9 +531,9 @@ ui:
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
     tls:
-      - secretName: hookflow-tls
+      - secretName: railhook-tls
         hosts:
-          - hookflow.yourdomain.com
+          - railhook.yourdomain.com
 ```
 
 ### Database SSL
@@ -549,7 +549,7 @@ worker:
 
 ### mTLS for Webhook Delivery
 
-Hookflow supports per-endpoint mTLS for webhook delivery:
+Railhook supports per-endpoint mTLS for webhook delivery:
 
 1. Upload client certificate via API:
    ```bash
@@ -567,7 +567,7 @@ Hookflow supports per-endpoint mTLS for webhook delivery:
 ### Service-to-Service mTLS
 
 For service mesh mTLS (Istio/Linkerd):
-- Hookflow services work with automatic sidecar injection
+- Railhook services work with automatic sidecar injection
 - No application-level changes needed
 - Ensure mesh allows egress to external webhook endpoints
 
@@ -601,17 +601,17 @@ make monitoring-up
 
 # Open Grafana
 #   http://localhost:3001
-#   Login: hookflow / hookflow_monitor_2024
+#   Login: railhook / railhook_monitor_2024
 ```
 
 Four pre-built dashboards are auto-provisioned on first boot:
 
 | Dashboard | What It Shows |
 |-----------|---------------|
-| **Hookflow — Overview** | API health, request rate, 5xx rate, p95 latency, delivery pipeline, queue depth, DLQ, table sizes, billing reconciliation, circuit breaker |
-| **Hookflow — Worker & CB** | Circuit breaker trips/rejects/slow-trips, retry governor pending/batch/failures, queue depths, async thread pool |
-| **Hookflow — JVM & Micrometer** | Heap memory, GC pauses, threads, HTTP status codes & latency percentiles, HikariCP pool, CPU, file descriptors |
-| **Hookflow — Kafka** | Consumer lag by topic/partition, records consumed rate, fetch latency, producer send rate, queue time |
+| **Railhook — Overview** | API health, request rate, 5xx rate, p95 latency, delivery pipeline, queue depth, DLQ, table sizes, billing reconciliation, circuit breaker |
+| **Railhook — Worker & CB** | Circuit breaker trips/rejects/slow-trips, retry governor pending/batch/failures, queue depths, async thread pool |
+| **Railhook — JVM & Micrometer** | Heap memory, GC pauses, threads, HTTP status codes & latency percentiles, HikariCP pool, CPU, file descriptors |
+| **Railhook — Kafka** | Consumer lag by topic/partition, records consumed rate, fetch latency, producer send rate, queue time |
 
 ```bash
 # Stop monitoring
@@ -686,11 +686,11 @@ Worker: http://worker:8081/actuator/prometheus
 
 ```bash
 # API logs
-kubectl -n hookflow logs -l app.kubernetes.io/component=api -f --tail=100
+kubectl -n railhook logs -l app.kubernetes.io/component=api -f --tail=100
 
 # Worker logs (delivery processing)
-kubectl -n hookflow logs -l app.kubernetes.io/component=worker -f --tail=100
+kubectl -n railhook logs -l app.kubernetes.io/component=worker -f --tail=100
 
 # Filter for errors only
-kubectl -n hookflow logs -l app.kubernetes.io/component=api | grep -i error
+kubectl -n railhook logs -l app.kubernetes.io/component=api | grep -i error
 ```

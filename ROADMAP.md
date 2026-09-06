@@ -1,6 +1,6 @@
 # Roadmap
 
-What Hookflow is missing, why it matters, and roughly in what order. Written down because
+What Railhook is missing, why it matters, and roughly in what order. Written down because
 "is this alive, and does the author know what it lacks?" is the first thing anyone evaluating
 a self-hosted platform wants to answer — and because an honest list is more useful than a
 feature grid that quietly omits the gaps.
@@ -30,14 +30,14 @@ gap is what makes the rest of this item the small piece it was always described 
 
 ### An app portal for the customer's own users
 
-Today a Hookflow customer manages their end-users' endpoints on those users' behalf. There is
+Today a Railhook customer manages their end-users' endpoints on those users' behalf. There is
 no view a customer can embed in their own product for their users to register an endpoint,
 see why a delivery failed, and replay it. `SharedDebugLinkController` shares a single event —
 useful, but not a portal.
 
 This is the single largest structural gap against Svix, and it is the thing people pay for:
 it moves webhook support out of the customer's inbox. It needs a scoped session model for a
-non-Hookflow user, an embeddable surface, and enough theming not to look borrowed.
+non-Railhook user, an embeddable surface, and enough theming not to look borrowed.
 
 ## Known gaps, not yet scheduled
 

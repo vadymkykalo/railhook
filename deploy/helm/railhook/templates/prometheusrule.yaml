@@ -1,0 +1,143 @@
+{{- if .Values.monitoring.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "railhook.fullname" . }}
+  labels:
+    {{- include "railhook.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: railhook.retry_backlog
+      rules:
+        - alert: DeliveryPendingBacklogGrowing
+          expr: delta(delivery_queue_depth{status="pending"}[15m]) > 500
+          for: 5m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Delivery pending backlog growing rapidly"
+            description: "Pending deliveries increased by {{`{{ $value | printf \"%.0f\" }}`}} in 15 min."
+        - alert: DeliveryPendingBacklogHigh
+          expr: delivery_queue_depth{status="pending"} > 5000
+          for: 10m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Delivery pending backlog above 5000"
+            description: "{{`{{ $value | printf \"%.0f\" }}`}} deliveries pending for >10 min."
+        - alert: DeliveryPendingBacklogCritical
+          expr: delivery_queue_depth{status="pending"} > 20000
+          for: 5m
+          labels:
+            severity: critical
+            component: worker
+          annotations:
+            summary: "CRITICAL: Delivery pending backlog above 20000"
+            description: "{{`{{ $value | printf \"%.0f\" }}`}} deliveries pending. Immediate investigation required."
+
+    - name: railhook.dlq
+      rules:
+        - alert: DlqDepthGrowing
+          expr: delta(delivery_queue_depth{status="dlq"}[1h]) > 100
+          for: 5m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "DLQ growing: {{`{{ $value | printf \"%.0f\" }}`}} new entries in 1h"
+        - alert: DlqRateHigh
+          expr: |
+            (rate(webhook_delivery_attempts_total{result="error"}[1h]) + rate(webhook_delivery_attempts_total{result="failure"}[1h]))
+            / rate(webhook_delivery_attempts_total[1h]) > 0.1
+          for: 10m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Delivery failure rate above 10%"
+        - alert: IncomingForwardFailureRateHigh
+          expr: |
+            (rate(incoming_forward_attempts_total{result="error"}[1h]) + rate(incoming_forward_attempts_total{result="failure"}[1h]))
+            / rate(incoming_forward_attempts_total[1h]) > 0.1
+          for: 10m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Incoming forward failure rate above 10%"
+
+    - name: railhook.circuit_breaker
+      rules:
+        - alert: CircuitBreakerTripsHigh
+          expr: rate(circuit_breaker_state_transitions_total[5m]) > 1
+          for: 5m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Circuit breakers tripping frequently"
+        - alert: CircuitBreakerRejectionsHigh
+          expr: rate(circuit_breaker_rejected_total[5m]) > 10
+          for: 5m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Circuit breaker rejecting >10 calls/sec"
+        - alert: CircuitBreakerDegraded
+          expr: rate(circuit_breaker_degraded_total[5m]) > 0.1
+          for: 10m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Circuit breaker cannot reach Redis, so it cannot trip"
+
+    - name: railhook.retry_governor
+      rules:
+        - alert: RetryGovernorConsecutiveFailures
+          expr: retry_governor_consecutive_failures > 5
+          for: 2m
+          labels:
+            severity: critical
+            component: worker
+          annotations:
+            summary: "Retry governor {{`{{ $labels.scheduler }}`}}: {{`{{ $value }}`}} consecutive failures"
+
+    - name: railhook.api
+      rules:
+        - alert: ApiErrorRateHigh
+          expr: |
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            / sum(rate(http_server_requests_seconds_count[5m])) > 0.005
+          for: 5m
+          labels:
+            severity: critical
+            component: api
+          annotations:
+            summary: "API 5xx error rate above 0.5%"
+
+    - name: railhook.staleness
+      rules:
+        - alert: OldestPendingDeliveryStale
+          expr: delivery_oldest_pending_age_seconds > 3600
+          for: 5m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Oldest pending delivery is {{`{{ $value | printf \"%.0f\" }}`}}s old"
+        - alert: OldestPendingDeliveryCritical
+          expr: delivery_oldest_pending_age_seconds > 86400
+          for: 5m
+          labels:
+            severity: critical
+            component: worker
+          annotations:
+            summary: "CRITICAL: Pending delivery stuck for >24h"
+{{- end }}

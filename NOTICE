@@ -1,11 +1,11 @@
-Hookflow
+Railhook
 Copyright (c) 2026 Vadym Kykalo
 
-This product is licensed under the MIT License (see LICENSE). Hookflow itself
+This product is licensed under the MIT License (see LICENSE). Railhook itself
 contains no third-party source code that requires reproduction of a separate
 NOTICE beyond what is listed below.
 
-Hookflow depends on, and its Docker images / Helm chart pull in, a number of
+Railhook depends on, and its Docker images / Helm chart pull in, a number of
 third-party open-source components under their own licenses. A generated,
 versioned inventory of every direct and transitive dependency and its license
 is committed at docs/licenses/ (see docs/licenses/README.md) and regenerated
@@ -20,9 +20,9 @@ stack — see the full report for the complete list):
     ISC. The two entries that used to sit here are both gone: MinIO (AGPL-3.0)
     was removed from the Compose file, and the Helm chart's Bitnami subcharts
     were dropped in favour of bring-your-own datastores, so
-    deploy/helm/hookflow/Chart.yaml now declares no dependencies at all.
+    deploy/helm/railhook/Chart.yaml now declares no dependencies at all.
     docs/licenses/DECISIONS.md records both decisions and how they were
     verified.
 
 This NOTICE file is informational and does not modify the terms of the MIT
-LICENSE that governs Hookflow's own source code.
+LICENSE that governs Railhook's own source code.

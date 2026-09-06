@@ -1,9 +1,9 @@
 {
-  "name": "webhook-platform/php",
-  "description": "Official PHP SDK for Hookflow — reliable webhook infrastructure",
+  "name": "railhook/php",
+  "description": "Official PHP SDK for Railhook — reliable webhook infrastructure",
   "type": "library",
   "license": "MIT",
-  "version": "2.11.0",
+  "version": "2.12.0",
   "keywords": [
     "webhook",
     "webhooks",
@@ -28,12 +28,12 @@
   },
   "autoload": {
     "psr-4": {
-      "Hookflow\\": "src/"
+      "Railhook\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "Hookflow\\Tests\\": "tests/"
+      "Railhook\\Tests\\": "tests/"
     }
   },
   "scripts": {

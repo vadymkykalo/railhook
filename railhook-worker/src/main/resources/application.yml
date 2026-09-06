@@ -1,0 +1,199 @@
+server:
+  shutdown: graceful
+
+spring:
+  application:
+    name: railhook-worker
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  task:
+    scheduling:
+      pool:
+        # Spring Boot defaults this to 1, so a single slow @Scheduled job blocks every
+        # other cron on this JVM (e.g. StuckDeliveryRecoveryService waiting behind DlqMonitoringService).
+        size: ${SCHEDULING_POOL_SIZE:8}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:webhook_redis_pass}
+  
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:webhook_platform}
+    username: ${DB_USER:webhook_user}
+    password: ${DB_PASSWORD:webhook_pass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:40}
+      minimum-idle: ${DB_POOL_MIN_IDLE:20}
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT:30000}
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      delivery-concurrency: ${KAFKA_DELIVERY_CONCURRENCY:6}
+      incoming-concurrency: ${KAFKA_INCOMING_CONCURRENCY:3}
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:webhook-worker}
+      incoming-group-id: ${KAFKA_INCOMING_GROUP_ID:incoming-forward-worker}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: ${KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
+      enable-auto-commit: false
+      max-retries: ${KAFKA_CONSUMER_MAX_RETRIES:3}
+      retry-interval-ms: ${KAFKA_CONSUMER_RETRY_INTERVAL_MS:5000}
+      properties:
+        spring.json.trusted.packages: "com.webhook.platform.common.dto"
+    listener:
+      ack-mode: manual
+      observation-enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoint:
+    health:
+      # when-authorized, not always. The aggregate /actuator/health is reachable anonymously
+      # (SecurityConfig permits it) and the UI's nginx proxies it straight through to the
+      # public port, so `always` published component names, the database product and version,
+      # and Redis/Kafka reachability to anyone who asked. Everything that actually consumes
+      # health here — the Compose healthchecks, the Helm probes, `make health`, install.sh's
+      # wait loop — reads the liveness/readiness probe groups, which still return their status
+      # either way.
+      show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  server:
+    port: ${MANAGEMENT_PORT:8081}
+    address: ${MANAGEMENT_ADDRESS:127.0.0.1}
+
+webhook:
+  encryption-key: ${WEBHOOK_ENCRYPTION_KEY}
+  encryption-keys: ${WEBHOOK_ENCRYPTION_KEYS:}
+  encryption-key-active-version: ${WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION:0}
+  encryption-salt: ${WEBHOOK_ENCRYPTION_SALT}
+  url-validation:
+    allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
+    allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
+  max-concurrent-per-endpoint: ${WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT:5}
+  max-concurrent-per-tenant: ${WEBHOOK_MAX_CONCURRENT_PER_TENANT:20}
+  concurrency:
+    permit-lease-seconds: ${WEBHOOK_CONCURRENCY_PERMIT_LEASE_SECONDS:90}
+  project-rate-limit-per-second: ${WEBHOOK_PROJECT_RATE_LIMIT_PER_SECOND:50}
+  outgoing-pool-size: ${WEBHOOK_OUTGOING_POOL_SIZE:50}
+  incoming-pool-size: ${WEBHOOK_INCOMING_POOL_SIZE:20}
+  async-shutdown-timeout-seconds: ${WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS:60}
+  connection-pool:
+    max-connections: ${WEBHOOK_POOL_MAX_CONNECTIONS:200}
+    pending-acquire-timeout-seconds: ${WEBHOOK_POOL_PENDING_ACQUIRE_TIMEOUT_SECONDS:10}
+    max-idle-time-seconds: ${WEBHOOK_POOL_MAX_IDLE_TIME_SECONDS:60}
+
+retry:
+  scheduler:
+    poll-interval-ms: ${RETRY_SCHEDULER_POLL_INTERVAL_MS:10000}
+    batch-size: ${RETRY_SCHEDULER_BATCH_SIZE:100}
+    max-per-endpoint: ${RETRY_SCHEDULER_MAX_PER_ENDPOINT:10}
+    max-per-project: ${RETRY_SCHEDULER_MAX_PER_PROJECT:30}
+    high-watermark: ${RETRY_SCHEDULER_HIGH_WATERMARK:5000}
+    send-timeout-seconds: ${RETRY_SCHEDULER_SEND_TIMEOUT_SECONDS:30}
+    reschedule-delay-seconds: ${RETRY_SCHEDULER_RESCHEDULE_DELAY_SECONDS:60}
+
+dlq:
+  monitoring:
+    interval-ms: ${DLQ_MONITORING_INTERVAL_MS:60000}
+    # Bounds the AdminClient describeTopics/listOffsets calls so a slow/unreachable
+    # broker can't block this scheduler thread indefinitely.
+    admin-client-timeout-seconds: ${DLQ_MONITORING_ADMIN_CLIENT_TIMEOUT_SECONDS:10}
+
+ordering:
+  gap-timeout-seconds: ${ORDERING_GAP_TIMEOUT_SECONDS:60}
+  # Fallback poll interval for a delivery parked behind an outstanding sequence. The fast
+  # path is WebhookDeliveryService#triggerBufferedDeliveries, which republishes buffered
+  # deliveries as soon as the sequence ahead completes; this only covers the case where a
+  # delivery reaches the buffer after that trigger already fired. Lower drains an
+  # out-of-order burst faster at the cost of more DB polling.
+  buffer-reschedule-delay-seconds: ${ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS:5}
+  delivered-seq-ttl-hours: ${ORDERING_DELIVERED_SEQ_TTL_HOURS:24}
+  buffer-ttl-minutes: ${ORDERING_BUFFER_TTL_MINUTES:10}
+  # How often webhook_ordering_buffer_size is resynced against Redis (ms). A SCAN over
+  # seq:buffer:* keys, not a per-call increment -- see OrderingBufferService#resyncBufferSizeGauge.
+  buffer-gauge-resync-ms: ${ORDERING_BUFFER_GAUGE_RESYNC_MS:30000}
+
+circuit-breaker:
+  failure-rate-threshold: ${CIRCUIT_BREAKER_FAILURE_RATE_THRESHOLD:50}
+  minimum-calls: ${CIRCUIT_BREAKER_MINIMUM_CALLS:5}
+  wait-duration-seconds: ${CIRCUIT_BREAKER_WAIT_DURATION_SECONDS:30}
+  window-ttl-seconds: ${CIRCUIT_BREAKER_WINDOW_TTL_SECONDS:120}
+  slow-call-threshold-ms: ${CIRCUIT_BREAKER_SLOW_CALL_THRESHOLD_MS:10000}
+  slow-call-rate-threshold: ${CIRCUIT_BREAKER_SLOW_CALL_RATE_THRESHOLD:80}
+
+queue-depth:
+  metrics:
+    interval-ms: ${QUEUE_DEPTH_METRICS_INTERVAL_MS:900000}
+    retention-days: ${QUEUE_DEPTH_METRICS_RETENTION_DAYS:30}
+
+stuck-delivery:
+  threshold-minutes: ${STUCK_DELIVERY_THRESHOLD_MINUTES:5}
+  stranded-pending-threshold-minutes: ${STUCK_DELIVERY_STRANDED_PENDING_THRESHOLD_MINUTES:60}
+  check-interval-ms: ${STUCK_DELIVERY_CHECK_INTERVAL_MS:60000}
+
+stuck-forward:
+  threshold-minutes: ${STUCK_FORWARD_THRESHOLD_MINUTES:5}
+  stranded-pending-threshold-minutes: ${STUCK_FORWARD_STRANDED_PENDING_THRESHOLD_MINUTES:60}
+  check-interval-ms: ${STUCK_FORWARD_CHECK_INTERVAL_MS:60000}
+
+delivery:
+  escalation:
+    # Raised from 48h to 96h so the hard cap comfortably covers the retry ladder's
+    # worst-case span (~83h with full jitter across the default 7 attempts/6 tiers) — at 48h
+    # the last two retry tiers (the "6h" and "24h" README advertises) never got a chance to
+    # fire before escalation to DLQ. RetrySchedulerService validates this pair fits at startup.
+    hard-cap-hours: ${DELIVERY_ESCALATION_HARD_CAP_HOURS:96}
+    batch-size: ${DELIVERY_ESCALATION_BATCH_SIZE:100}
+    interval-ms: ${DELIVERY_ESCALATION_INTERVAL_MS:300000}
+
+forward:
+  escalation:
+    # Forwards outstanding longer than this are escalated to DLQ regardless of attempt count —
+    # the Incoming counterpart of delivery.escalation above. Its own cap rather than the
+    # delivery one: the incoming retry ladder is deliberately shorter (5 attempts to 6h, ~11h
+    # worst case with jitter), so borrowing the 96h delivery cap would leave a dead Forward
+    # sitting for three days after its ladder was exhausted.
+    hard-cap-hours: ${FORWARD_ESCALATION_HARD_CAP_HOURS:24}
+    batch-size: ${FORWARD_ESCALATION_BATCH_SIZE:100}
+    interval-ms: ${FORWARD_ESCALATION_INTERVAL_MS:300000}
+
+incoming-forward:
+  retry:
+    poll-interval-ms: ${INCOMING_FORWARD_RETRY_POLL_INTERVAL_MS:10000}
+    batch-size: ${INCOMING_FORWARD_RETRY_BATCH_SIZE:50}
+    max-per-destination: ${INCOMING_FORWARD_RETRY_MAX_PER_DEST:10}
+    high-watermark: ${INCOMING_FORWARD_RETRY_HIGH_WATERMARK:3000}
+
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    com.webhook.platform: ${LOG_LEVEL:INFO}

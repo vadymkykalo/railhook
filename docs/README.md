@@ -1,4 +1,4 @@
-# Hookflow documentation
+# Railhook documentation
 
 Two surfaces, split by who is reading. Everything here serves someone evaluating the project or
 running it themselves. Documentation for someone with the product **open** — transformations,
@@ -36,11 +36,11 @@ Nothing is written in both places.
 
 ## Adopting it
 
-- **[How Hookflow compares](./guides/comparison.md)** — a feature-by-feature table
+- **[How Railhook compares](./guides/comparison.md)** — a feature-by-feature table
   against Svix, Hookdeck and Convoy, with the gaps included rather than omitted.
 - **[Migrating from Svix, Hookdeck or Convoy](./guides/migrating-from-other-providers.md)** —
   concept mapping, why your receivers probably do not change, and an honest list of what
-  Hookflow does not have.
+  Railhook does not have.
 - **[`ROADMAP.md`](../ROADMAP.md)** — the gaps, why they matter, and roughly in what order.
 - **[`UPGRADING.md`](../UPGRADING.md)** — breaking changes, per release.
 

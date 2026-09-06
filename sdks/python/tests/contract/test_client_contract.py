@@ -15,8 +15,8 @@ fallback until that generation exists.
 """
 import pytest
 
-from hookflow import (
-    Hookflow,
+from railhook import (
+    Railhook,
     AuthenticationError,
     Event,
     EndpointCreateParams,
@@ -29,8 +29,8 @@ from .support import BASE_URL, ContractContext
 pytestmark = pytest.mark.contract
 
 
-def make_client(ctx: ContractContext) -> Hookflow:
-    return Hookflow(api_key=ctx.api_key, base_url=BASE_URL)
+def make_client(ctx: ContractContext) -> Railhook:
+    return Railhook(api_key=ctx.api_key, base_url=BASE_URL)
 
 
 def test_endpoints_create_returns_the_shape_endpoint_declares(contract_ctx: ContractContext):
@@ -91,7 +91,7 @@ def test_deliveries_list_returns_a_paginated_response(contract_ctx: ContractCont
 
 
 def test_invalid_api_key_is_rejected_as_401(contract_ctx: ContractContext):
-    bad_client = Hookflow(api_key="not-a-real-key", base_url=BASE_URL)
+    bad_client = Railhook(api_key="not-a-real-key", base_url=BASE_URL)
     try:
         bad_client.events.send(Event(type="contract.test.bad_key", data={}))
         assert False, "expected AuthenticationError"

@@ -1,4 +1,4 @@
-# Hookflow
+# Railhook
 
 Self-hosted webhook infrastructure. It carries events out of a customer's system to the
 endpoints their users registered, and carries webhooks from third-party providers into the
@@ -9,13 +9,13 @@ destinations a customer nominated.
 ### The two directions
 
 **Outgoing**:
-The direction in which a customer's own event travels out of Hookflow to an endpoint they
-registered. Hookflow is the sender and signs what it sends.
+The direction in which a customer's own event travels out of Railhook to an endpoint they
+registered. Railhook is the sender and signs what it sends.
 _Avoid_: outbound, egress, publish
 
 **Incoming**:
-The direction in which a third-party provider's webhook travels into Hookflow and on to a
-destination the customer nominated. Hookflow is the receiver and verifies what it receives.
+The direction in which a third-party provider's webhook travels into Railhook and on to a
+destination the customer nominated. Railhook is the receiver and verifies what it receives.
 _Avoid_: inbound, ingress (that is the entry point, not the direction), relay
 
 ### Outgoing
@@ -50,7 +50,7 @@ _Avoid_: integration, pipeline, link, channel
 ### Incoming
 
 **Source**:
-A third-party provider a customer has connected, together with what Hookflow needs to
+A third-party provider a customer has connected, together with what Railhook needs to
 prove that a webhook genuinely came from it.
 _Avoid_: provider (that is the vendor, not the connection), origin, sender
 
@@ -104,7 +104,7 @@ _Avoid_: backoff policy, retry config
 
 **DLQ**:
 Where a Delivery or Forward lands once its Retry Ladder is exhausted: abandoned by
-Hookflow, kept for a human to decide about.
+Railhook, kept for a human to decide about.
 _Avoid_: dead letters, graveyard
 _In the UI_: **Failed Messages**. The term the code and this document use is DLQ; the
 term the product shows an operator is Failed Messages, because "DLQ" is vocabulary you

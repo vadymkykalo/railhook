@@ -1,9 +1,9 @@
 // Shared bootstrap for the node SDK's contract suite. These tests exercise
-// the Hookflow client against a REAL API instance (not stubbed HTTP, unlike
+// the Railhook client against a REAL API instance (not stubbed HTTP, unlike
 // src/__tests__/*) — see tests/contract/README.md for how to run them and
 // what "real instance" means in CI.
 //
-// The Hookflow client itself is API-key scoped (it has no register/login/
+// The Railhook client itself is API-key scoped (it has no register/login/
 // create-project surface — see src/client.ts), so bootstrapping a throwaway
 // tenant needs a couple of raw fetch calls against the JWT-authenticated
 // endpoints before the SDK proper takes over.

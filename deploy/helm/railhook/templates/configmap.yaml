@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "railhook.fullname" . }}-config
+  labels:
+    {{- include "railhook.labels" . | nindent 4 }}
+data:
+  DB_HOST: {{ include "railhook.database.host" . | quote }}
+  DB_PORT: {{ include "railhook.database.port" . | quote }}
+  DB_NAME: {{ .Values.postgresql.auth.database | default .Values.postgresql.external.database | quote }}
+  DB_USER: {{ .Values.postgresql.auth.username | default .Values.postgresql.external.username | quote }}
+  
+  KAFKA_BOOTSTRAP_SERVERS: {{ include "railhook.kafka.bootstrapServers" . | quote }}
+  
+  REDIS_HOST: {{ include "railhook.redis.host" . | quote }}
+  REDIS_PORT: {{ include "railhook.redis.port" . | quote }}
+
+  # The address links in outgoing mail point at, and the origins the browser is
+  # allowed to call the API from. Both default to the UI ingress host - see
+  # railhook.appBaseUrl in _helpers.tpl for why neither may be left to the
+  # application's own localhost default.
+  APP_BASE_URL: {{ include "railhook.appBaseUrl" . | quote }}
+  CORS_ALLOWED_ORIGINS: {{ .Values.app.corsAllowedOrigins | default (include "railhook.appBaseUrl" .) | quote }}
+
+  # SMTP. Read only when EMAIL_ENABLED is true; the password is a Secret, so it
+  # is set on the api Deployment rather than here.
+  EMAIL_ENABLED: {{ .Values.email.enabled | quote }}
+  EMAIL_FROM: {{ .Values.email.from | quote }}
+  SMTP_HOST: {{ .Values.email.smtp.host | quote }}
+  SMTP_PORT: {{ .Values.email.smtp.port | quote }}
+  SMTP_USERNAME: {{ .Values.email.smtp.username | quote }}
+  SMTP_AUTH: {{ .Values.email.smtp.auth | quote }}
+  SMTP_STARTTLS: {{ .Values.email.smtp.starttls | quote }}

@@ -24,7 +24,7 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@webhook-platform/node": ["src/index.ts"]
+      "@railhook/node": ["src/index.ts"]
     }
   },
   "include": ["src/**/*"],

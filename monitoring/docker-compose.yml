@@ -1,4 +1,4 @@
-# Hookflow Monitoring Stack
+# Railhook Monitoring Stack
 # Decoupled from the main platform — connects to the same Docker network.
 #
 # Usage:
@@ -11,7 +11,7 @@
 services:
   prometheus:
     image: prom/prometheus:v2.51.2
-    container_name: hookflow-prometheus
+    container_name: railhook-prometheus
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
@@ -29,7 +29,7 @@ services:
       - alertmanager
     networks:
       - monitoring
-      - hookflow
+      - railhook
     restart: unless-stopped
     deploy:
       resources:
@@ -42,13 +42,13 @@ services:
   # (ALERTMANAGER_* in .env) and the routing/grouping/inhibition design.
   alertmanager:
     image: prom/alertmanager:v0.27.0
-    container_name: hookflow-alertmanager
+    container_name: railhook-alertmanager
     volumes:
       - ./alertmanager/render-config.sh:/etc/alertmanager/render-config.sh:ro
       - alertmanager_data:/alertmanager
     environment:
       ALERTMANAGER_SLACK_WEBHOOK_URL: ${ALERTMANAGER_SLACK_WEBHOOK_URL:-}
-      ALERTMANAGER_SLACK_CHANNEL: ${ALERTMANAGER_SLACK_CHANNEL:-#hookflow-alerts}
+      ALERTMANAGER_SLACK_CHANNEL: ${ALERTMANAGER_SLACK_CHANNEL:-#railhook-alerts}
       ALERTMANAGER_WEBHOOK_URL: ${ALERTMANAGER_WEBHOOK_URL:-}
       ALERTMANAGER_EMAIL_TO: ${ALERTMANAGER_EMAIL_TO:-}
       ALERTMANAGER_EMAIL_FROM: ${ALERTMANAGER_EMAIL_FROM:-alerts@example.com}
@@ -69,7 +69,7 @@ services:
       - "127.0.0.1:9093:9093"
     networks:
       - monitoring
-      - hookflow
+      - railhook
     restart: unless-stopped
     deploy:
       resources:
@@ -78,12 +78,12 @@ services:
 
   grafana:
     image: grafana/grafana:10.4.2
-    container_name: hookflow-grafana
+    container_name: railhook-grafana
     environment:
-      GF_SECURITY_ADMIN_USER: ${GF_ADMIN_USER:-hookflow}
-      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-hookflow_monitor_2024}
+      GF_SECURITY_ADMIN_USER: ${GF_ADMIN_USER:-railhook}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-railhook_monitor_2024}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/hookflow-overview.json
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/railhook-overview.json
       GF_AUTH_ANONYMOUS_ENABLED: "false"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -93,7 +93,7 @@ services:
       - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
     networks:
       - monitoring
-      - hookflow
+      - railhook
     depends_on:
       - prometheus
       - loki
@@ -113,7 +113,7 @@ services:
   # already here.
   loki:
     image: grafana/loki:3.0.0
-    container_name: hookflow-loki
+    container_name: railhook-loki
     command:
       - "-config.file=/etc/loki/loki-config.yml"
       - "-config.expand-env=true"
@@ -126,7 +126,7 @@ services:
       - "127.0.0.1:3100:3100"
     networks:
       - monitoring
-      - hookflow
+      - railhook
     restart: unless-stopped
     deploy:
       resources:
@@ -135,7 +135,7 @@ services:
 
   promtail:
     image: grafana/promtail:3.0.0
-    container_name: hookflow-promtail
+    container_name: railhook-promtail
     command:
       - "-config.file=/etc/promtail/promtail-config.yml"
     volumes:
@@ -143,14 +143,14 @@ services:
       - promtail_positions:/var/lib/promtail
       # Read-only access to the Docker log files + daemon socket (service discovery) —
       # this is why promtail runs outside the `monitoring` network's isolation the same
-      # way prometheus/grafana do: it needs the `hookflow` network to reach `loki`, and
+      # way prometheus/grafana do: it needs the `railhook` network to reach `loki`, and
       # the host's Docker socket to discover api/worker containers regardless of which
       # compose project (directory name) they were started from.
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - monitoring
-      - hookflow
+      - railhook
     depends_on:
       - loki
     restart: unless-stopped
@@ -169,6 +169,6 @@ volumes:
 networks:
   monitoring:
     driver: bridge
-  hookflow:
+  railhook:
     external: true
-    name: webhook-platform_webhook-network
+    name: railhook_webhook-network

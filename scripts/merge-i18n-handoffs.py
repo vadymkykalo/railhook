@@ -18,7 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 HANDOFF_DIR = ROOT / '.claude' / 'tasks'
-LOCALES = ROOT / 'webhook-platform-ui' / 'src' / 'i18n' / 'locales'
+LOCALES = ROOT / 'railhook-ui' / 'src' / 'i18n' / 'locales'
 
 
 def flatten(d, prefix=''):

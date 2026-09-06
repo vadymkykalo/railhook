@@ -26,10 +26,10 @@ pom_version=$(grep -m1 '<version>' pom.xml | sed -E 's/.*<version>([^<]+)<\/vers
 # -SNAPSHOT suffix before comparing so that's not reported as drift.
 pom_compare="${pom_version%-SNAPSHOT}"
 
-chart_version=$(grep -E '^version:' deploy/helm/hookflow/Chart.yaml | awk '{print $2}')
-chart_app_version=$(grep -E '^appVersion:' deploy/helm/hookflow/Chart.yaml | awk '{print $2}' | tr -d '"')
+chart_version=$(grep -E '^version:' deploy/helm/railhook/Chart.yaml | awk '{print $2}')
+chart_app_version=$(grep -E '^appVersion:' deploy/helm/railhook/Chart.yaml | awk '{print $2}' | tr -d '"')
 
-ui_version=$(grep -m1 '"version"' webhook-platform-ui/package.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
+ui_version=$(grep -m1 '"version"' railhook-ui/package.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
 
 node_sdk_version=$(grep -m1 '"version"' sdks/node/package.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
 python_sdk_version=$(grep -m1 -E '^version *=' sdks/python/pyproject.toml | sed -E 's/^version *= *"([^"]+)".*/\1/')
@@ -38,7 +38,7 @@ php_sdk_version=$(grep -m1 '"version"' sdks/php/composer.json | sed -E 's/.*"ver
 echo "pom.xml (reactor):          $pom_version  (compared as $pom_compare)"
 echo "Chart.yaml version:         $chart_version"
 echo "Chart.yaml appVersion:      $chart_app_version"
-echo "webhook-platform-ui:        $ui_version"
+echo "railhook-ui:        $ui_version"
 echo "sdks/node/package.json:     $node_sdk_version"
 echo "sdks/python/pyproject.toml: $python_sdk_version"
 echo "sdks/php/composer.json:     $php_sdk_version"
@@ -57,20 +57,20 @@ check() {
 # they had drifted two minor versions behind the manifests, which is exactly
 # the class of drift this script exists to catch.
 node_sdk_const=$(sed -nE "s/^const SDK_VERSION = '(.*)';/\1/p" sdks/node/src/client.ts)
-python_sdk_const=$(sed -nE 's/^SDK_VERSION = "(.*)"/\1/p' sdks/python/hookflow/client.py)
-python_dunder=$(sed -nE 's/^__version__ = "(.*)"/\1/p' sdks/python/hookflow/__init__.py)
-php_sdk_const=$(sed -nE "s/.*private const SDK_VERSION = '(.*)';/\1/p" sdks/php/src/Hookflow.php)
+python_sdk_const=$(sed -nE 's/^SDK_VERSION = "(.*)"/\1/p' sdks/python/railhook/client.py)
+python_dunder=$(sed -nE 's/^__version__ = "(.*)"/\1/p' sdks/python/railhook/__init__.py)
+php_sdk_const=$(sed -nE "s/.*private const SDK_VERSION = '(.*)';/\1/p" sdks/php/src/Railhook.php)
 
 check "Chart.yaml version" "$chart_version"
 check "Chart.yaml appVersion" "$chart_app_version"
-check "webhook-platform-ui/package.json" "$ui_version"
+check "railhook-ui/package.json" "$ui_version"
 check "sdks/node/package.json" "$node_sdk_version"
 check "sdks/python/pyproject.toml" "$python_sdk_version"
 check "sdks/php/composer.json" "$php_sdk_version"
 check "sdks/node/src/client.ts SDK_VERSION" "$node_sdk_const"
-check "sdks/python/hookflow/client.py SDK_VERSION" "$python_sdk_const"
-check "sdks/python/hookflow/__init__.py __version__" "$python_dunder"
-check "sdks/php/src/Hookflow.php SDK_VERSION" "$php_sdk_const"
+check "sdks/python/railhook/client.py SDK_VERSION" "$python_sdk_const"
+check "sdks/python/railhook/__init__.py __version__" "$python_dunder"
+check "sdks/php/src/Railhook.php SDK_VERSION" "$php_sdk_const"
 
 # If HEAD is exactly on a release tag (vX.Y.Z), that tag must match too —
 # this is what would have caught v2.2.0/v2.2.1 being tagged while every pom

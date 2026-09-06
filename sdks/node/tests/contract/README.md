@@ -1,6 +1,6 @@
 # Node SDK contract tests
 
-Runs the real `Hookflow` client (`src/index.ts`) against a REAL, running API
+Runs the real `Railhook` client (`src/index.ts`) against a REAL, running API
 instance — not the stubbed HTTP mocks `src/__tests__/*` uses. The point is to
 catch drift between this SDK and the API (a field renamed, a status code
 changed, a new required field) that stubbed-response unit tests are

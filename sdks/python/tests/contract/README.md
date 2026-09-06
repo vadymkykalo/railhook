@@ -1,6 +1,6 @@
 # Python SDK contract tests
 
-Runs the real `hookflow.Hookflow` client against a REAL, running API instance
+Runs the real `railhook.Railhook` client against a REAL, running API instance
 — not the stubbed `requests` mocks `tests/test_*.py` uses. The point is to
 catch drift between this SDK and the API (a field renamed, a status code
 changed, a new required field) that stubbed-response unit tests are

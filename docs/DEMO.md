@@ -63,7 +63,7 @@ not proceed until two preconditions are both true:
 - Cross-tenant check to run before calling this live (see Verification
   below): confirm the demo viewer token cannot read/write any project other
   than the seeded demo project — exactly what
-  `webhook-platform-api/src/test/java/com/webhook/platform/api/OrganizationIsolationTest.java`,
+  `railhook-api/src/test/java/com/webhook/platform/api/OrganizationIsolationTest.java`,
   `.../security/ProjectScopeEnforcementIsolationTest.java` and
   `.../TestEndpointIsolationTest.java` already assert for every tenant, so
   the demo token is just one more fixture through the same suite rather than

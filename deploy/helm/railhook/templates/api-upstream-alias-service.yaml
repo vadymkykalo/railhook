@@ -1,0 +1,51 @@
+{{- if .Values.ui.apiUpstreamAlias.enabled }}
+{{- /*
+  The UI image is nginx serving a baked-in railhook-ui/nginx.conf, and
+  that file names its upstream literally: `proxy_pass http://api:8080` (and
+  http://api:8082 for /actuator/health). nginx resolves a literal upstream once,
+  at startup, and refuses to start if it does not resolve —
+  `[emerg] host not found in upstream "api"`.
+
+  Under Compose there is a service called `api` and that works. This chart names
+  its Service {{ include "railhook.fullname" . }}-api, so the same image
+  CrashLooped: the chart's UI could never have come up. Rather than fork the
+  image's config per deployment target, or template a file that ships inside the
+  image, the chart supplies the name the image already asks for.
+
+  The 8082 port is the second half of the same mismatch. The image's nginx
+  proxies /actuator/health to http://api:8082 because Compose splits actuator
+  onto MANAGEMENT_PORT=8082. This chart used to leave MANAGEMENT_PORT unset —
+  so actuator stayed on 8080 — and papered over it here by pointing the 8082
+  port at targetPort 8080. That made the health proxy work and left
+  /actuator/prometheus behind SecurityConfig's authenticated chain, where every
+  Prometheus scrape got a 401. The chart now sets MANAGEMENT_PORT the way
+  Compose does (railhook.api.managementPort), so this port forwards to the real
+  management port and the two deployment paths agree on the number.
+
+  Note this Service has a generic name and so is per-namespace, not per-release:
+  two Railhook releases in one namespace will collide on it. Helm reports that
+  as a clear ownership conflict. Set ui.apiUpstreamAlias.enabled=false and point
+  your own ingress at the -api Service if you need that layout.
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.ui.apiUpstreamAlias.name }}
+  labels:
+    {{- include "railhook.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api-upstream-alias
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: {{ include "railhook.api.managementPort" . }}
+      targetPort: management
+      protocol: TCP
+      name: management
+  selector:
+    {{- include "railhook.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+{{- end }}

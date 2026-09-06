@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.webhook.platform</groupId>
+        <artifactId>railhook</artifactId>
+        <version>2.12.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>railhook-common</artifactId>
+    <name>Webhook Platform Common</name>
+    <description>Shared DTOs, constants, and utilities</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <!--
+          Needed only by SsrfProtectionCustomizer. Deliberately `provided`: the api and worker
+          both already have reactor-netty through spring-boot-starter-webflux, while the CLI
+          depends on this module too and is shipped as a standalone binary with no netty in it.
+          Compile scope would put netty into that binary for a class the CLI never calls.
+        -->
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty-http</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+          SsrfProtectionCustomizer names io.netty.channel.ChannelOption directly, and
+          netty 4.2 (which Boot 4 pins) declares netty-transport as a *runtime* transitive
+          of netty-codec-http rather than a compile one, so it no longer reaches the compile
+          classpath through reactor-netty-http on its own. Declared here at the same
+          `provided` scope and for the same reason as the dependency above: the CLI depends
+          on this module and must not ship netty for a class it never calls.
+        -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-transport</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <!-- See railhook-api/pom.xml for why this was bumped. -->
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.6</version>
+            </plugin>
+            <!--
+              Threshold gate against this module's own merged
+              unit+integration coverage (target/jacoco-merged.exec, built by
+              the jacoco-merge execution in the root pom). Bound to `verify`
+              deliberately - see the root pom's jacoco-merge comment and
+              ci.yml's coverage-report job: CI's two split `mvn test`
+              invocations (unit-only / integration-only filters) never reach
+              `verify`, so this never fires against partial data there; it
+              only runs for real via the dedicated coverage-report job's
+              `mvn verify` and via a developer explicitly running
+              `mvn verify` locally.
+
+              Baseline measured 2026-08-21: INSTRUCTION 45.51% (2420/5317),
+              using ONLY this module's own jacoco-merged.exec (common's own
+              tests, unit + integration). NOTE this is lower than the 60.9%
+              this same class set shows in the cross-module aggregate report
+              (railhook-coverage-report) - that number additionally
+              counts common's classes (e.g. simple enums) getting
+              incidentally exercised while api/worker/cli run THEIR OWN
+              tests, which a per-module check scoped to this module's own
+              exec data correctly does not see - setting this rule to the
+              aggregate 0.55 fails immediately with "instructions covered
+              ratio is 0.45". Set a few points below the real 45.51%, not at
+              it: a gate pinned exactly at the current number goes red on
+              ordinary measurement jitter.
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.40</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

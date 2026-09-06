@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Hookflow installer.
+# Railhook installer.
 #
-#   curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh | bash
 #
 # Creates a directory, writes a Compose file pinned to a release and a .env with
 # freshly generated secrets, then starts the stack. What it leaves behind is an
@@ -15,9 +15,9 @@
 # instead of handing back the repository's.
 set -euo pipefail
 
-REPO="vadymkykalo/webhook-platform"
+REPO="vadymkykalo/railhook"
 RAW="https://raw.githubusercontent.com/${REPO}"
-DEFAULT_DIR="${HOME}/hookflow"
+DEFAULT_DIR="${HOME}/railhook"
 
 INSTALL_DIR=""
 VERSION=""
@@ -42,7 +42,7 @@ die()  { printf '\n  %sx%s %s\n\n' "$RED" "$N" "$*" >&2; exit 1; }
 
 usage() {
     cat <<USAGE
-${B}Hookflow installer${N}
+${B}Railhook installer${N}
 
   curl -fsSL ${RAW}/main/install.sh | bash
 
@@ -62,7 +62,7 @@ ${B}Options${N}
   -h, --help         This text
 
 ${B}Passing options through a pipe${N}
-  curl -fsSL ${RAW}/main/install.sh | bash -s -- --dir /opt/hookflow
+  curl -fsSL ${RAW}/main/install.sh | bash -s -- --dir /opt/railhook
 USAGE
 }
 
@@ -192,7 +192,7 @@ check_system() {
     fi
 
     # Only meaningful before installing. Run against an installation that is
-    # already up — which is what `hookflow doctor` does — the ports are in use
+    # already up — which is what `railhook doctor` does — the ports are in use
     # by the very stack being checked, and calling that a failure would mean
     # doctor can never pass on a healthy install.
     if [ -f "${INSTALL_DIR}/docker-compose.yml" ]; then
@@ -206,7 +206,7 @@ check_system() {
                 say "  ${RED}x${N} Port ${p} is already in use"
                 if [ -n "$DOMAIN" ]; then
                     say "      HTTPS needs 80 and 443. Stop whatever holds it, or put"
-                    say "      Hookflow behind your existing proxy without --domain."
+                    say "      Railhook behind your existing proxy without --domain."
                 else
                     say "      Pick another: ${DIM}--port 8080${N}"
                 fi
@@ -335,13 +335,13 @@ write_files() {
     step "Writing ${INSTALL_DIR}"
     mkdir -p "$INSTALL_DIR"
 
-    if [ -n "${HOOKFLOW_COMPOSE_SRC:-}" ]; then
+    if [ -n "${RAILHOOK_COMPOSE_SRC:-}" ]; then
         # CI, and anyone testing a change: install the Compose file from the
         # working tree instead of the published release, so a PR is tested
         # against its own file rather than the last one that shipped.
-        cp "$HOOKFLOW_COMPOSE_SRC" "${INSTALL_DIR}/docker-compose.yml" \
-            || die "Could not copy ${HOOKFLOW_COMPOSE_SRC}."
-        ok "docker-compose.yml (from ${HOOKFLOW_COMPOSE_SRC})"
+        cp "$RAILHOOK_COMPOSE_SRC" "${INSTALL_DIR}/docker-compose.yml" \
+            || die "Could not copy ${RAILHOOK_COMPOSE_SRC}."
+        ok "docker-compose.yml (from ${RAILHOOK_COMPOSE_SRC})"
     else
         # Pinned to the release tag, not to main. An install that silently
         # changes under you between two `docker compose pull`s is not an install.
@@ -351,8 +351,17 @@ write_files() {
         # docker-compose.yml. Those merged into one canonical docker-compose.yml,
         # so try that first and fall back — this installer has to be able to
         # install a release older than the change.
+        #
+        # The image prefix is matched against both spellings for the same
+        # reason. The product was Hookflow until 2.12.0, so every release before
+        # it pins ghcr.io/vadymkykalo/hookflow-*; matching only the current name
+        # would make this installer unable to install any of them, and the
+        # failure would be the confusing one — a fallback to a
+        # docker-compose.pull.yml that modern releases do not have, then "could
+        # not download the Compose file". The old prefix stays here as long as
+        # those releases are installable at all.
         curl -fsSL "${RAW}/${VERSION}/docker-compose.yml" -o "${INSTALL_DIR}/docker-compose.yml" 2>/dev/null \
-            && grep -q 'ghcr.io/vadymkykalo/hookflow' "${INSTALL_DIR}/docker-compose.yml" \
+            && grep -qE 'ghcr\.io/vadymkykalo/(railhook|hookflow)' "${INSTALL_DIR}/docker-compose.yml" \
             || curl -fsSL "${RAW}/${VERSION}/docker-compose.pull.yml" -o "${INSTALL_DIR}/docker-compose.yml" \
             || die "Could not download the Compose file for ${VERSION}."
         ok "docker-compose.yml (pinned to ${VERSION})"
@@ -360,7 +369,7 @@ write_files() {
 
     # The scheduled-backup sidecar bind-mounts these two. Fetching them is what
     # lets an install have nightly dumps rather than only the on-demand
-    # `./hookflow backup`.
+    # `./railhook backup`.
     mkdir -p "${INSTALL_DIR}/deploy/scripts"
     if curl -fsSL "${RAW}/${VERSION}/deploy/scripts/db-backup.sh" \
             -o "${INSTALL_DIR}/deploy/scripts/db-backup.sh" 2>/dev/null \
@@ -370,7 +379,7 @@ write_files() {
         BACKUP_PROFILE=",backup"
         ok "Scheduled backups"
     else
-        # Not fatal: `./hookflow backup` still works, it is just not automatic.
+        # Not fatal: `./railhook backup` still works, it is just not automatic.
         BACKUP_PROFILE=""
         warn "Could not fetch the backup scripts — scheduled backups are off"
     fi
@@ -385,7 +394,7 @@ write_files() {
 	email {$ACME_EMAIL}
 }
 
-{$HOOKFLOW_DOMAIN} {
+{$RAILHOOK_DOMAIN} {
 	encode gzip zstd
 
 	# One upstream. nginx already separates the dashboard, the API paths, the
@@ -439,7 +448,7 @@ PRODENV
 
     umask 077
     cat > "${INSTALL_DIR}/.env" <<ENVFILE
-# Hookflow — generated by install.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ).
+# Railhook — generated by install.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ).
 #
 # These five secrets were generated for this installation. Back this file up:
 # WEBHOOK_ENCRYPTION_KEY is what every endpoint secret in the database is
@@ -470,12 +479,24 @@ UI_IMAGE_TAG=${image_tag}
 # dashboard and proxies every API path to the api service, so this is the single
 # entry point for everything. With a domain configured, Caddy holds 80/443 in
 # front and this moves to loopback.
-HOOKFLOW_BIND=${BIND}
-HOOKFLOW_PORT=${PORT}
+RAILHOOK_BIND=${BIND}
+RAILHOOK_PORT=${PORT}
 
 # Empty unless you installed with --domain. Setting it alone does nothing; the
 # TLS terminator only runs under the \`tls\` profile, which COMPOSE_PROFILES
 # below turns on.
+RAILHOOK_DOMAIN=${DOMAIN}
+
+# The same three under their pre-2.12.0 names, because this installer can pin
+# any released version and every Compose file published as Hookflow reads these
+# instead. Without them, \`--version v2.11.0\` writes a .env that release cannot
+# read: the published port falls back to its default and the dashboard comes up
+# somewhere other than where you asked for it.
+#
+# Delete these once no supported version reads them. They are duplicates, not
+# separate settings - change one and change the other.
+HOOKFLOW_BIND=${BIND}
+HOOKFLOW_PORT=${PORT}
 HOOKFLOW_DOMAIN=${DOMAIN}
 ACME_EMAIL=${ACME_EMAIL}
 COMPOSE_PROFILES=${PROFILES}${BACKUP_PROFILE}
@@ -503,7 +524,7 @@ ENVFILE
 }
 
 write_helper() {
-    cat > "${INSTALL_DIR}/hookflow" <<'HELPER'
+    cat > "${INSTALL_DIR}/railhook" <<'HELPER'
 #!/usr/bin/env bash
 # Thin wrapper over docker compose, so the everyday commands do not need to be
 # looked up. Anything not listed here is passed straight through.
@@ -528,15 +549,15 @@ case "${1:-help}" in
         f="backup-$(date -u +%Y%m%dT%H%M%SZ).dump"
         compose exec -T postgres pg_dump -U "${POSTGRES_USER:-webhook_user}" -Fc webhook_platform > "$f"
         echo "wrote $f — keep .env with it, or the encrypted columns are unreadable" ;;
-    doctor)  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh \
+    doctor)  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh \
                  | bash -s -- --check --dir "$(pwd)" ;;
     help|-h|--help)
-        echo "hookflow start|stop|restart|status|logs [service]|upgrade|backup|doctor" ;;
+        echo "railhook start|stop|restart|status|logs [service]|upgrade|backup|doctor" ;;
     *)       compose "$@" ;;
 esac
 HELPER
-    chmod +x "${INSTALL_DIR}/hookflow"
-    ok "hookflow helper script"
+    chmod +x "${INSTALL_DIR}/railhook"
+    ok "railhook helper script"
 }
 
 start_stack() {
@@ -558,7 +579,7 @@ start_stack() {
         if [ "$i" = "60" ]; then
             say ""
             say "  ${RED}x${N} It did not come up within 10 minutes."
-            say "      ${DIM}cd ${INSTALL_DIR} && ./hookflow logs${N}"
+            say "      ${DIM}cd ${INSTALL_DIR} && ./railhook logs${N}"
             exit 1
         fi
         sleep 10
@@ -582,14 +603,14 @@ do_uninstall() {
         (cd "$INSTALL_DIR" && compose down)
         ok "Containers removed — the data volumes are untouched"
         say ""
-        say "  Start again with ${B}cd ${INSTALL_DIR} && ./hookflow start${N}"
+        say "  Start again with ${B}cd ${INSTALL_DIR} && ./railhook start${N}"
         say "  To delete the data too: ${DIM}--purge${N}"
     fi
 }
 
 finish() {
     say ""
-    say "  ${GRN}${B}Hookflow is running.${N}"
+    say "  ${GRN}${B}Railhook is running.${N}"
     say ""
     say "    Dashboard   ${B}${BASE_URL}${N}"
     say "    API         ${BASE_URL}/api/v1"
@@ -602,7 +623,7 @@ finish() {
     say "  because no SMTP is configured and there is no verification mail to wait for."
     say ""
     say "  ${B}${INSTALL_DIR}${N}"
-    say "    ./hookflow status | logs | stop | start | backup | doctor"
+    say "    ./railhook status | logs | stop | start | backup | doctor"
     say "    .env holds your secrets. ${B}Back it up.${N}"
     say ""
     say "  Putting this on a server? ${DIM}docs/SELF_HOSTED_GUIDE.md${N} covers TLS,"
@@ -612,7 +633,7 @@ finish() {
 
 main() {
     say ""
-    say "  ${B}Hookflow${N} ${DIM}— self-hosted webhook infrastructure${N}"
+    say "  ${B}Railhook${N} ${DIM}— self-hosted webhook infrastructure${N}"
     say ""
 
     case "$ACTION" in
@@ -645,7 +666,7 @@ main() {
     if [ "$START" = "0" ]; then
         say ""
         say "  Files written, nothing started (--no-start)."
-        say "  ${B}cd ${INSTALL_DIR} && ./hookflow start${N}"
+        say "  ${B}cd ${INSTALL_DIR} && ./railhook start${N}"
         say ""
         exit 0
     fi

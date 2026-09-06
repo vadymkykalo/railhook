@@ -1,0 +1,375 @@
+spring:
+  application:
+    name: railhook-api
+  http:
+    converters:
+      # Spring Boot 4 serializes HTTP through Jackson 3 unless told otherwise, and this is what
+      # tells it otherwise. Not decoration: without it, a request body deserialized into a
+      # Jackson 2 JsonNode field answers 500 with "Type definition error" - EventIngestRequest
+      # .data is one, so that is every event this platform ingests. Serialization happens to
+      # survive without it, which is exactly why it is easy to remove and believe nothing broke.
+      #
+      # Why Jackson 2 at all is on the spring-boot-jackson2 dependency in the pom; briefly, the
+      # other JsonNode DTO is backed by a JSONB column. Deprecated upstream, and held down by
+      # JsonSerializationContractIntegrationTest, which covers both directions for that reason.
+      preferred-json-mapper: jackson2
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  task:
+    scheduling:
+      pool:
+        # Spring Boot defaults this to 1, so a single slow @Scheduled job (e.g. the
+        # materialized-view REFRESH) blocks every other cron on the JVM, including
+        # OutboxPublisherService's 1s dispatch poll - no event reaches Kafka while it runs.
+        size: ${SCHEDULING_POOL_SIZE:8}
+
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:webhook_redis_pass}
+  
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:webhook_platform}
+    username: ${DB_USER:webhook_user}
+    password: ${DB_PASSWORD:webhook_pass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:30}
+      minimum-idle: ${DB_POOL_MIN_IDLE:15}
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT:30000}
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    # Off because it is incompatible with the tenant discriminator. Open Session In
+    # View opens an EntityManager in a HandlerInterceptor's preHandle, before the handler and
+    # before a public path like /ingress or /auth/register has had any chance to discover which
+    # organization it belongs to -- so Hibernate asks for a tenant that does not exist yet and
+    # every unauthenticated request 500s. Spring Boot warns about OSIV on its own merits anyway;
+    # queries now run inside the transaction that needs them.
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+  
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+  
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  tomcat:
+    max-swallow-size: 1MB
+    max-http-form-content-size: 1MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoint:
+    health:
+      # when-authorized, not always. The aggregate /actuator/health is reachable anonymously
+      # (SecurityConfig permits it) and the UI's nginx proxies it straight through to the
+      # public port, so `always` published component names, the database product and version,
+      # and Redis/Kafka reachability to anyone who asked. Everything that actually consumes
+      # health here — the Compose healthchecks, the Helm probes, `make health`, install.sh's
+      # wait loop — reads the liveness/readiness probe groups, which still return their status
+      # either way.
+      show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    mail:
+      # Off, because mail is not what this service is for. Spring registers a
+      # MailHealthIndicator as soon as spring-boot-starter-mail is on the classpath and
+      # app.email.enabled is on, and it opens an SMTP connection on every health check —
+      # so an unreachable or misconfigured relay turned the whole aggregate DOWN and
+      # /actuator/health answered 503 while the API was ingesting and delivering webhooks
+      # perfectly well. The kind smoke test found exactly that.
+      #
+      # The consequence is worse than a red dashboard: anything paging on /actuator/health
+      # pages for an SMTP blip, and an operator who has not configured mail at all (the
+      # shipped default) gets a permanently unhealthy service. Verification, reset and
+      # invite mail failing is real and worth an alert — but it is a degradation of one
+      # feature, not a reason to take the platform out of rotation.
+      enabled: false
+  server:
+    # Defaults to the same port as `server.port` (i.e. no split — actuator
+    # stays behind SecurityConfig's JWT/API-key auth on the main port, same as
+    # before). The Compose deployment overrides MANAGEMENT_PORT to a dedicated
+    # port not exposed to the host, so Prometheus can scrape /actuator/prometheus
+    # without authenticating (see monitoring/README.md "Metrics-scrape auth" and
+    # docker-compose.yml). When management.server.port differs from server.port,
+    # Spring Boot serves actuator from a separate embedded web server that never
+    # passes through the main SecurityFilterChain — do not point this at a port
+    # reachable from outside the trusted docker network.
+    port: ${MANAGEMENT_PORT:${SERVER_PORT:8080}}
+    address: ${MANAGEMENT_ADDRESS:0.0.0.0}
+
+outbox:
+  publisher:
+    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+    retry-interval-ms: ${OUTBOX_RETRY_INTERVAL_MS:30000}
+    cleanup-interval-ms: ${OUTBOX_CLEANUP_INTERVAL_MS:3600000}
+    batch-size: ${OUTBOX_BATCH_SIZE:100}
+    max-retries: ${OUTBOX_MAX_RETRIES:5}
+    dead-retention-days: ${OUTBOX_DEAD_RETENTION_DAYS:90}
+    sending-recovery-seconds: ${OUTBOX_SENDING_RECOVERY_SECONDS:300}
+    batch-send-timeout-seconds: ${OUTBOX_BATCH_SEND_TIMEOUT_SECONDS:30}
+    max-per-project: ${OUTBOX_MAX_PER_PROJECT:30}
+
+data-retention:
+  delivery-attempts-retention-days: ${DATA_RETENTION_ATTEMPTS_DAYS:90}
+  successful-attempts-retention-days: ${DATA_RETENTION_SUCCESSFUL_ATTEMPTS_DAYS:14}
+  incoming-events-retention-days: ${DATA_RETENTION_INCOMING_EVENTS_DAYS:30}
+  events-retention-days: ${DATA_RETENTION_EVENTS_DAYS:90}
+  max-attempts-per-delivery: ${DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY:10}
+  batch-size: ${DATA_RETENTION_BATCH_SIZE:1000}
+  cleanup-cron: ${DATA_RETENTION_CRON:0 0 2 * * *}
+  limit-enforcement-cron: ${DATA_RETENTION_LIMIT_CRON:0 */30 * * * *}
+  burst-cleanup-cron: ${DATA_RETENTION_BURST_CLEANUP_CRON:0 0 */4 * * *}
+  table-metrics-interval-ms: ${DATA_RETENTION_TABLE_METRICS_INTERVAL_MS:900000}
+  tunnel-request-log-retention-days: ${TUNNEL_REQUEST_LOG_RETENTION_DAYS:7}
+
+# Partition maintenance for the declaratively-partitioned high-volume tables
+# (delivery_attempts, tunnel_request_log — see V052/V053 migrations and
+# PartitionMaintenanceService). Creates future partitions ahead of need and drops
+# partitions once fully past the corresponding data-retention.*-retention-days above,
+# replacing DELETE-based retention with O(1) DROP TABLE for those two tables.
+partition-maintenance:
+  enabled: ${PARTITION_MAINTENANCE_ENABLED:true}
+  delivery-attempts-lookahead-months: ${PARTITION_MAINTENANCE_DELIVERY_ATTEMPTS_LOOKAHEAD_MONTHS:3}
+  tunnel-request-log-lookahead-weeks: ${PARTITION_MAINTENANCE_TUNNEL_LOG_LOOKAHEAD_WEEKS:3}
+  cron: ${PARTITION_MAINTENANCE_CRON:0 45 1 * * *}
+
+replay:
+  batch-size: ${REPLAY_BATCH_SIZE:200}
+  batch-delay-ms: ${REPLAY_BATCH_DELAY_MS:50}
+  max-events-per-session: ${REPLAY_MAX_EVENTS_PER_SESSION:500000}
+
+auth:
+  rate-limit:
+    login-per-minute: ${AUTH_RATE_LIMIT_LOGIN_PER_MINUTE:10}
+    register-per-minute: ${AUTH_RATE_LIMIT_REGISTER_PER_MINUTE:5}
+  bcrypt:
+    # BCrypt work factor. Raising it is not a migration: the cost is written into every hash,
+    # so existing passwords keep verifying at the cost they were stored with.
+    strength: ${AUTH_BCRYPT_STRENGTH:12}
+  lockout:
+    # Bounds how many passwords may be guessed against one account, which rate limiting does not.
+    # Held in Postgres, not Redis: the auth rate limiter degrades to a per-instance bucket when
+    # Redis is unavailable, and a lockout with that property is not a lockout.
+    enabled: ${AUTH_LOCKOUT_ENABLED:true}
+    threshold: ${AUTH_LOCKOUT_THRESHOLD:5}
+    initial-seconds: ${AUTH_LOCKOUT_INITIAL_SECONDS:60}
+    max-seconds: ${AUTH_LOCKOUT_MAX_SECONDS:900}
+    failure-window-minutes: ${AUTH_LOCKOUT_FAILURE_WINDOW_MINUTES:60}
+  session:
+    cleanup-interval-ms: ${AUTH_SESSION_CLEANUP_INTERVAL_MS:3600000}
+
+rate-limit:
+  global:
+    requests-per-second: ${GLOBAL_RATE_LIMIT_PER_SECOND:5000}
+    enabled: ${GLOBAL_RATE_LIMIT_ENABLED:true}
+
+event:
+  ingestion:
+    rate-limit-per-second: ${EVENT_INGESTION_RATE_LIMIT_PER_SECOND:100}
+
+platform:
+  admin:
+    # Cluster-operator credential for /api/v1/admin/** (e.g. encryption key rotation).
+    # Independent of org membership/JWT — see PlatformAdminAuthenticationFilter. Leave unset to
+    # keep these endpoints unreachable (fail closed) until an operator explicitly needs them.
+    token: ${PLATFORM_ADMIN_TOKEN:}
+
+webhook:
+  encryption-key: ${WEBHOOK_ENCRYPTION_KEY}
+  encryption-keys: ${WEBHOOK_ENCRYPTION_KEYS:}
+  encryption-key-active-version: ${WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION:0}
+  encryption-salt: ${WEBHOOK_ENCRYPTION_SALT}
+  max-payload-size-bytes: ${WEBHOOK_MAX_PAYLOAD_SIZE_BYTES:262144}
+  payload-compression-threshold-bytes: ${WEBHOOK_PAYLOAD_COMPRESSION_THRESHOLD_BYTES:1024}
+  endpoint-verification-required: ${WEBHOOK_ENDPOINT_VERIFICATION_REQUIRED:false}
+  url-validation:
+    allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
+    allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
+  ingress-base-url: ${WEBHOOK_INGRESS_BASE_URL:http://localhost:8080}
+  ingress:
+    replay-window-minutes: ${WEBHOOK_INGRESS_REPLAY_WINDOW_MINUTES:5}
+  incoming:
+    max-payload-size-bytes: ${WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES:524288}
+    # Applies to a Source that names no limit of its own. Matches
+    # event.ingestion.rate-limit-per-second: an incoming webhook costs the platform what an
+    # ingested event does.
+    rate-limit-per-second: ${WEBHOOK_INCOMING_RATE_LIMIT_PER_SECOND:100}
+  # Trusted reverse-proxy peers, comma-separated IPs and/or CIDR ranges. X-Forwarded-For /
+  # X-Real-IP are honoured ONLY when the direct TCP peer matches one of these — otherwise
+  # ignored. Empty (default) trusts nothing: safe when the app is reachable directly.
+  # If you run behind nginx/an LB/ingress controller, set this to that proxy's address or
+  # your cluster's pod/service CIDR, or requests will be bucketed under the proxy's own IP
+  # for rate limiting and audit logging instead of the real client.
+  trusted-proxies: ${WEBHOOK_TRUSTED_PROXIES:}
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+
+test-endpoint:
+  base-url: ${TEST_ENDPOINT_BASE_URL:http://localhost:8080}
+  max-per-project: ${TEST_ENDPOINT_MAX_PER_PROJECT:10}
+  max-ttl-hours: ${TEST_ENDPOINT_MAX_TTL_HOURS:72}
+  cleanup-interval-ms: ${TEST_ENDPOINT_CLEANUP_INTERVAL_MS:3600000}
+
+workflow:
+  pool:
+    core-size: ${WORKFLOW_POOL_CORE_SIZE:4}
+    max-size: ${WORKFLOW_POOL_MAX_SIZE:8}
+    queue-capacity: ${WORKFLOW_POOL_QUEUE_CAPACITY:50}
+  execution:
+    max-duration-seconds: ${WORKFLOW_MAX_DURATION_SECONDS:600}
+    max-recursion-depth: ${WORKFLOW_MAX_RECURSION_DEPTH:3}
+    stuck-threshold-minutes: ${WORKFLOW_STUCK_THRESHOLD_MINUTES:15}
+    recovery-interval-ms: ${WORKFLOW_RECOVERY_INTERVAL_MS:120000}
+    resume-interval-ms: ${WORKFLOW_RESUME_INTERVAL_MS:5000}
+    resume-batch-size: ${WORKFLOW_RESUME_BATCH_SIZE:50}
+  node-timeout:
+    default-seconds: ${WORKFLOW_NODE_TIMEOUT_DEFAULT_SECONDS:30}
+    http-seconds: ${WORKFLOW_NODE_TIMEOUT_HTTP_SECONDS:60}
+    slack-seconds: ${WORKFLOW_NODE_TIMEOUT_SLACK_SECONDS:60}
+    create-event-seconds: ${WORKFLOW_NODE_TIMEOUT_CREATE_EVENT_SECONDS:30}
+    pool-size: ${WORKFLOW_NODE_TIMEOUT_POOL_SIZE:16}
+  shutdown:
+    await-termination-seconds: ${WORKFLOW_SHUTDOWN_AWAIT_SECONDS:30}
+  trigger-outbox:
+    poll-interval-ms: ${WORKFLOW_TRIGGER_OUTBOX_POLL_INTERVAL_MS:2000}
+    batch-size: ${WORKFLOW_TRIGGER_OUTBOX_BATCH_SIZE:50}
+    max-attempts: ${WORKFLOW_TRIGGER_OUTBOX_MAX_ATTEMPTS:3}
+    max-per-project: ${WORKFLOW_TRIGGER_OUTBOX_MAX_PER_PROJECT:5}
+    max-concurrent-per-project: ${WORKFLOW_TRIGGER_OUTBOX_MAX_CONCURRENT_PER_PROJECT:3}
+    stalled-after-minutes: ${WORKFLOW_TRIGGER_OUTBOX_STALLED_AFTER_MINUTES:15}
+    stalled-sweep-ms: ${WORKFLOW_TRIGGER_OUTBOX_STALLED_SWEEP_MS:300000}
+
+rules:
+  cache-refresh-ms: ${RULES_CACHE_REFRESH_MS:30000}
+  execution-log-retention-days: ${RULES_EXECUTION_LOG_RETENTION_DAYS:7}
+
+app:
+  # Declared explicitly so ${app.env} resolves through a real key rather than relying on
+  # Spring's relaxed binding of the bare APP_ENV environment variable. Both spellings are
+  # in use — ProductionSafetyValidator reads ${APP_ENV}, SecurityConfigValidator and
+  # AuthController read ${app.env} — and AuthController picks the refresh cookie's
+  # Secure/SameSite policy from it, so a resolution that silently fell back to the default
+  # would downgrade cookie security in production without any startup error.
+  env: ${APP_ENV:development}
+  base-url: ${APP_BASE_URL:http://localhost:5173}
+  alerts:
+    notifications-enabled: ${ALERTS_NOTIFICATIONS_ENABLED:false}
+    evaluation-cron: ${ALERTS_EVALUATION_CRON:0 * * * * *}
+  email:
+    enabled: ${EMAIL_ENABLED:false}
+    from: ${EMAIL_FROM:noreply@example.com}
+
+spring.mail:
+  host: ${SMTP_HOST:localhost}
+  port: ${SMTP_PORT:1025}
+  username: ${SMTP_USERNAME:}
+  password: ${SMTP_PASSWORD:}
+  properties:
+    mail.smtp.auth: ${SMTP_AUTH:false}
+    mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
+
+swagger:
+  enabled: ${SWAGGER_ENABLED:true}
+
+springdoc:
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+    path: /swagger-ui.html
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+    path: /v3/api-docs
+
+entitlement:
+  defaults:
+    rate-limit-per-second: ${ENTITLEMENT_DEFAULT_RATE_LIMIT:100}
+    max-fanout-per-event: ${ENTITLEMENT_DEFAULT_MAX_FANOUT:50}
+
+ordering:
+  # How far back SequenceReconciliationService looks for "recently active" ordering-enabled
+  # endpoints when comparing the Redis sequence counter against the durable high-water mark.
+  sequence-reconciliation-lookback-hours: ${ORDERING_SEQUENCE_RECONCILIATION_LOOKBACK_HOURS:48}
+  sequence-reconciliation-interval-ms: ${ORDERING_SEQUENCE_RECONCILIATION_INTERVAL_MS:900000}
+
+captcha:
+  # Empty is the shipped default and means no challenge: a self-hosted registration page has
+  # nobody to challenge, and sending its visitors to a third party would be a worse default.
+  # Setting a secret turns it on. Turnstile and hCaptcha share this siteverify shape, so the
+  # URL is what picks between them.
+  secret-key: ${CAPTCHA_SECRET_KEY:}
+  verify-url: ${CAPTCHA_VERIFY_URL:https://challenges.cloudflare.com/turnstile/v0/siteverify}
+
+organization:
+  # Suspension is asked on the write path of every request, ingest included; this is what
+  # keeps it from being a row read per event. See SuspensionLookup.
+  suspension-cache-ttl-seconds: ${ORGANIZATION_SUSPENSION_CACHE_TTL_SECONDS:60}
+
+billing:
+  enabled: ${BILLING_ENABLED:false}
+  default-provider: ${BILLING_DEFAULT_PROVIDER:noop}
+  reconciliation:
+    cron: ${BILLING_RECONCILIATION_CRON:0 0 */6 * * *}
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY:}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+    price-map: ${STRIPE_PRICE_MAP:}
+  wayforpay:
+    merchant-account: ${WAYFORPAY_MERCHANT_ACCOUNT:}
+    merchant-secret: ${WAYFORPAY_MERCHANT_SECRET:}
+    merchant-domain: ${WAYFORPAY_MERCHANT_DOMAIN:}
+    service-url: ${WAYFORPAY_SERVICE_URL:}
+    plan-prices: ${WAYFORPAY_PLAN_PRICES:}
+
+tunnel:
+  heartbeat-timeout-seconds: ${TUNNEL_HEARTBEAT_TIMEOUT_SECONDS:120}
+  cleanup-interval-ms: ${TUNNEL_CLEANUP_INTERVAL_MS:60000}
+
+device-auth:
+  cleanup-interval-ms: ${DEVICE_AUTH_CLEANUP_INTERVAL_MS:300000}
+
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    com.webhook.platform: ${LOG_LEVEL:INFO}
+    org.springframework.web: INFO

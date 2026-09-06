@@ -1,25 +1,25 @@
 import { RateLimitInfo } from './types';
 
-export class HookflowError extends Error {
+export class RailhookError extends Error {
   public readonly status: number;
   public readonly code?: string;
 
   constructor(message: string, status: number, code?: string) {
     super(message);
-    this.name = 'HookflowError';
+    this.name = 'RailhookError';
     this.status = status;
     this.code = code;
   }
 }
 
-export class AuthenticationError extends HookflowError {
+export class AuthenticationError extends RailhookError {
   constructor(message: string = 'Invalid API key') {
     super(message, 401, 'authentication_error');
     this.name = 'AuthenticationError';
   }
 }
 
-export class RateLimitError extends HookflowError {
+export class RateLimitError extends RailhookError {
   public readonly rateLimitInfo: RateLimitInfo;
 
   constructor(message: string, rateLimitInfo: RateLimitInfo) {
@@ -40,7 +40,7 @@ export class RateLimitError extends HookflowError {
   }
 }
 
-export class ValidationError extends HookflowError {
+export class ValidationError extends RailhookError {
   public readonly fieldErrors: Record<string, string>;
 
   constructor(message: string, fieldErrors: Record<string, string> = {}) {
@@ -50,7 +50,7 @@ export class ValidationError extends HookflowError {
   }
 }
 
-export class NotFoundError extends HookflowError {
+export class NotFoundError extends RailhookError {
   constructor(message: string = 'Resource not found') {
     super(message, 404, 'not_found');
     this.name = 'NotFoundError';

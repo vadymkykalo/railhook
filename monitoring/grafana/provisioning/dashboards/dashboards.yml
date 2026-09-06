@@ -1,9 +1,9 @@
 apiVersion: 1
 
 providers:
-  - name: Hookflow
+  - name: Railhook
     orgId: 1
-    folder: Hookflow
+    folder: Railhook
     type: file
     disableDeletion: false
     editable: true

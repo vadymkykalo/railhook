@@ -1,5 +1,5 @@
 # ============================================================================
-# Hookflow — services, and how they are wired to each other.
+# Railhook — services, and how they are wired to each other.
 # ============================================================================
 # The one Compose file. It is what install.sh downloads, what an installation
 # runs, and — with docker-compose.build.yml layered on top — what `make up`
@@ -14,12 +14,12 @@
 # Get both, with real generated secrets rather than the public ones in
 # .env.dist, by running the installer:
 #
-#   curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh | bash
 #
 # ONE PUBLISHED PORT. The ui service's nginx is the only thing bound to the
 # host; it serves the dashboard and proxies every API path to `api`. Nothing
 # else — not the API, not the actuator, not the datastores — is reachable from
-# outside the Docker network. Set HOOKFLOW_PORT to move it off 80.
+# outside the Docker network. Set RAILHOOK_PORT to move it off 80.
 #
 #   curl -f http://localhost/actuator/health/liveness
 #   curl -f http://localhost/
@@ -82,7 +82,7 @@ services:
     # root-owned directories and the container would then fail to run.
     # install.sh fetches the scripts and turns this profile on;
     # `make up` gets it from the clone. Ad-hoc backups need none of it:
-    # `./hookflow backup` runs pg_dump through `compose exec`.
+    # `./railhook backup` runs pg_dump through `compose exec`.
     profiles: [backup]
     entrypoint: ["bash"]
     command: ["/scripts/db-backup-loop.sh"]
@@ -207,7 +207,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/hookflow}-api:${API_IMAGE_TAG:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/railhook}-api:${API_IMAGE_TAG:-latest}
     container_name: webhook-api
     # Deliberately no host ports. Everything reaches the API through the ui
     # service's nginx, which proxies /api/, /ws/tunnel, /tunnel/, /hook/,
@@ -217,7 +217,7 @@ services:
     # numbers anyone has to remember.
     #
     # Nothing else publishes a host port either — not postgres, kafka or redis.
-    # `docker compose exec` reaches all of them (that is what ./hookflow backup
+    # `docker compose exec` reaches all of them (that is what ./railhook backup
     # uses), and a database listening on a laptop's loopback is a real exposure
     # the moment anything else on that machine is compromised.
     #
@@ -408,7 +408,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/hookflow}-worker:${WORKER_IMAGE_TAG:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/railhook}-worker:${WORKER_IMAGE_TAG:-latest}
     container_name: webhook-worker
     environment:
       DB_HOST: ${DB_HOST:-postgres}
@@ -539,14 +539,20 @@ services:
     restart: unless-stopped
 
   ui:
-    image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/hookflow}-ui:${UI_IMAGE_TAG:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/railhook}-ui:${UI_IMAGE_TAG:-latest}
     container_name: webhook-ui
     ports:
       # The one published port. 80 by default because that is what a browser
       # assumes. With the `tls` profile on, install.sh moves this to
       # 127.0.0.1:8080 and Caddy below takes 80/443 instead — nothing else
       # changes, because Caddy proxies straight to this same nginx.
-      - "${HOOKFLOW_BIND:-0.0.0.0}:${HOOKFLOW_PORT:-80}:5173"
+      # Both spellings, and this is not tidy-uppable. install.sh keeps an
+      # existing .env rather than rewriting it, so a deployment installed before
+      # 2.12.0 still has HOOKFLOW_BIND/HOOKFLOW_PORT in its .env after it
+      # upgrades. Reading only the new names would silently move a dashboard
+      # published on 8080 back to 80 - a regression that starts cleanly, logs
+      # nothing, and is found by a customer.
+      - "${RAILHOOK_BIND:-${HOOKFLOW_BIND:-0.0.0.0}}:${RAILHOOK_PORT:-${HOOKFLOW_PORT:-80}}:5173"
     # No environment block: the UI is a static bundle behind nginx. Vite inlines
     # every VITE_* value at build time, so nothing here could change it — and on
     # a pre-built image there is no build to feed. nginx proxies /api/,
@@ -598,7 +604,7 @@ services:
       # every install that is not using TLS. An empty value reaches the
       # Caddyfile, where Caddy refuses to start with a clear message — and only
       # when this profile is actually on.
-      HOOKFLOW_DOMAIN: ${HOOKFLOW_DOMAIN:-}
+      RAILHOOK_DOMAIN: ${RAILHOOK_DOMAIN:-${HOOKFLOW_DOMAIN:-}}
       ACME_EMAIL: ${ACME_EMAIL:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

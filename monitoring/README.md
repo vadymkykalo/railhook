@@ -1,4 +1,4 @@
-# Hookflow Monitoring Stack
+# Railhook Monitoring Stack
 
 **Prometheus + Alertmanager + Grafana + Loki/Promtail** — fully pre-configured, decoupled from the main platform.
 
@@ -10,7 +10,7 @@ make monitoring-up
 
 # Open Grafana:
 #   http://localhost:3001
-#   Login: hookflow / hookflow_monitor_2024
+#   Login: railhook / railhook_monitor_2024
 ```
 
 ## What's Included
@@ -47,7 +47,7 @@ the incident, which was the state of this repo before Alertmanager was wired up.
   ungrouped at 3am is its own failure mode. See `alertmanager/render-config.sh`
   for the exact rules.
 - **Verified live**: a synthetic `DeliveryPendingBacklogCritical` alert
-  was POSTed to Alertmanager's `/api/v2/alerts`, routed to the `hookflow-critical`
+  was POSTed to Alertmanager's `/api/v2/alerts`, routed to the `railhook-critical`
   receiver, and delivered as a webhook POST to a throwaway HTTP listener —
   payload received, 200 OK. A paired `DeliveryPendingBacklogHigh` (warning, same
   component) was correctly suppressed (`"state":"suppressed","inhibitedBy":[...]`
@@ -72,7 +72,7 @@ listing, cardinality, in worker's case zero auth on `/actuator/env` too if ever
 exposed) becomes reachable to whatever else is on it — that's the residual risk
 to weigh, not "wide open to the internet" (the port still isn't published).
 
-**Kubernetes/Helm:** `deploy/helm/hookflow/templates/servicemonitor.yaml`
+**Kubernetes/Helm:** `deploy/helm/railhook/templates/servicemonitor.yaml`
 scrapes the `management` port by name, which the chart sets to 8082 (API) and
 8081 (worker) — the same split Compose uses. It previously scraped the main
 authenticated port and every scrape 401'd, unnoticed because CI linted the
@@ -122,23 +122,23 @@ into MDC (worker) from the shipped JSON. Both were fixed as part of this change
   a substring filter instead.
 - **Grafana**: a `Loki` datasource is auto-provisioned alongside `Prometheus`
   (`monitoring/grafana/provisioning/datasources/datasource.yml`), and the new
-  **Hookflow — Logs** dashboard below gives a starting point for pivoting on
+  **Railhook — Logs** dashboard below gives a starting point for pivoting on
   `correlationId`/`organizationId`.
 
 ### Grafana Dashboards
 
 | Dashboard | Description |
 |---|---|
-| **Hookflow — Overview** | Events ingested, delivery pipeline, queue depth, DLQ, table sizes, billing reconciliation, error rates |
-| **Hookflow — Worker & Circuit Breaker** | Circuit breaker trips/rejects/slow-trips, retry governor, async pool threads, queue depths |
-| **Hookflow — JVM & Micrometer** | Heap memory, GC pauses, threads, HTTP request rates & latency percentiles, HikariCP pool, CPU |
-| **Hookflow — Kafka** | Consumer lag by topic/partition, records consumed rate, fetch latency, producer queue time |
-| **Hookflow — Logs** | Logs panel + volume-by-level, with `correlation_id`/`organization_id` template variables for pivoting (P3-36b) |
+| **Railhook — Overview** | Events ingested, delivery pipeline, queue depth, DLQ, table sizes, billing reconciliation, error rates |
+| **Railhook — Worker & Circuit Breaker** | Circuit breaker trips/rejects/slow-trips, retry governor, async pool threads, queue depths |
+| **Railhook — JVM & Micrometer** | Heap memory, GC pauses, threads, HTTP request rates & latency percentiles, HikariCP pool, CPU |
+| **Railhook — Kafka** | Consumer lag by topic/partition, records consumed rate, fetch latency, producer queue time |
+| **Railhook — Logs** | Logs panel + volume-by-level, with `correlation_id`/`organization_id` template variables for pivoting (P3-36b) |
 
 ### Auto-provisioned
 - Prometheus + Loki datasources (no manual setup needed)
 - All 5 dashboards loaded on first boot
-- Home dashboard: Hookflow Overview
+- Home dashboard: Railhook Overview
 
 ## Configuration
 
@@ -146,11 +146,11 @@ All config is via environment variables (defaults in `docker-compose.yml`):
 
 | Variable | Default | Description |
 |---|---|---|
-| `GF_ADMIN_USER` | `hookflow` | Grafana admin username |
-| `GF_ADMIN_PASSWORD` | `hookflow_monitor_2024` | Grafana admin password |
+| `GF_ADMIN_USER` | `railhook` | Grafana admin username |
+| `GF_ADMIN_PASSWORD` | `railhook_monitor_2024` | Grafana admin password |
 | `GRAFANA_PORT` | `3001` | Grafana external port |
 | `ALERTMANAGER_SLACK_WEBHOOK_URL` | _(unset)_ | Slack incoming-webhook URL |
-| `ALERTMANAGER_SLACK_CHANNEL` | `#hookflow-alerts` | Slack channel |
+| `ALERTMANAGER_SLACK_CHANNEL` | `#railhook-alerts` | Slack channel |
 | `ALERTMANAGER_WEBHOOK_URL` | _(unset)_ | generic webhook receiver (PagerDuty/Opsgenie/custom) |
 | `ALERTMANAGER_EMAIL_TO` / `_FROM` / `_SMTP_HOST` / `_SMTP_PORT` | _(unset)_ / `alerts@example.com` / `localhost` / `1025` | email receiver |
 | `LOKI_RETENTION_PERIOD` | `336h` (14d) | how long Loki keeps ingested logs |
@@ -188,7 +188,7 @@ curl -s http://localhost:9093/api/v2/alerts | jq .
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │                       Docker Network                            │
-│                webhook-platform_webhook-network                 │
+│                railhook_webhook-network                 │
 │                                                                  │
 │  ┌─────────┐   ┌──────────┐   ┌───────────────┐  ┌────────────┐│
 │  │   API    │   │  Worker   │   │  Prometheus   │  │Alertmanager││
@@ -223,9 +223,9 @@ For Kubernetes deployments, use the Helm chart values or deploy kube-prometheus-
 
 ```bash
 helm install monitoring prometheus-community/kube-prometheus-stack \
-  --set prometheus.prometheusSpec.additionalScrapeConfigs[0].job_name=hookflow-api \
+  --set prometheus.prometheusSpec.additionalScrapeConfigs[0].job_name=railhook-api \
   --set prometheus.prometheusSpec.additionalScrapeConfigs[0].metrics_path=/actuator/prometheus \
-  --set prometheus.prometheusSpec.additionalScrapeConfigs[0].static_configs[0].targets[0]=hookflow-api:8080
+  --set prometheus.prometheusSpec.additionalScrapeConfigs[0].static_configs[0].targets[0]=railhook-api:8080
 ```
 
 The Grafana dashboard JSONs in `monitoring/grafana/dashboards/` can be imported directly into any Grafana instance.

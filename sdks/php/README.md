@@ -1,9 +1,11 @@
-# webhook-platform/php
+# railhook/php
 
-Official PHP SDK for [Hookflow](https://github.com/vadymkykalo/webhook-platform).
+Official PHP SDK for [Railhook](https://github.com/vadymkykalo/railhook).
 
-> The Packagist package is `webhook-platform/php`; the PHP namespace is
-> `Hookflow\`. The two names differ on purpose.
+> The Packagist package is `railhook/php` and the PHP namespace is
+> `Railhook\`. Published as `webhook-platform/php` with the namespace
+> `Hookflow\` before 2.12.0; that package is marked abandoned in favour of
+> this one.
 
 **Scope.** This SDK covers Events, Endpoints, Subscriptions, Deliveries,
 Incoming Sources, Incoming Events, and webhook signature verification —
@@ -22,7 +24,7 @@ SDK grows to cover them.
 ## Installation
 
 ```bash
-composer require webhook-platform/php
+composer require railhook/php
 ```
 
 ## Quick Start
@@ -30,10 +32,10 @@ composer require webhook-platform/php
 ```php
 <?php
 
-use Hookflow\Hookflow;
+use Railhook\Railhook;
 
-$client = new Hookflow(
-    apiKey: getenv('HOOKFLOW_API_KEY'), // e.g. 'Kz1uAIM8VeJUQN7yGSYCst64WxNLabBHfOYbrPlJ1yk'
+$client = new Railhook(
+    apiKey: getenv('RAILHOOK_API_KEY'), // e.g. 'Kz1uAIM8VeJUQN7yGSYCst64WxNLabBHfOYbrPlJ1yk'
     baseUrl: 'http://localhost:8080' // optional
 );
 
@@ -227,8 +229,8 @@ Verify incoming webhooks in your endpoint:
 ```php
 <?php
 
-use Hookflow\Webhook;
-use Hookflow\Exception\HookflowException;
+use Railhook\Webhook;
+use Railhook\Exception\RailhookException;
 
 // Get raw request body
 $payload = file_get_contents('php://input');
@@ -252,7 +254,7 @@ try {
     http_response_code(200);
     echo 'OK';
 
-} catch (HookflowException $e) {
+} catch (RailhookException $e) {
     error_log("Webhook verification failed: {$e->getMessage()}");
     http_response_code(400);
     echo 'Invalid signature';
@@ -261,7 +263,7 @@ try {
 
 ### What lands on your endpoint
 
-Hookflow PUTs the event's **payload** on the wire, not an envelope. This:
+Railhook PUTs the event's **payload** on the wire, not an envelope. This:
 
 ```php
 $client->events->send('order.completed', ['orderId' => 'ord_1']);
@@ -301,8 +303,8 @@ seconds** old — verify against the *raw* body from `php://input`, before any
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Hookflow\Webhook;
-use Hookflow\Exception\HookflowException;
+use Railhook\Webhook;
+use Railhook\Exception\RailhookException;
 
 class WebhookController extends Controller
 {
@@ -322,7 +324,7 @@ class WebhookController extends Controller
             
             return response('OK', 200);
 
-        } catch (HookflowException $e) {
+        } catch (RailhookException $e) {
             return response('Invalid signature', 400);
         }
     }
@@ -338,8 +340,8 @@ namespace App\Controller;
 
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Hookflow\Webhook;
-use Hookflow\Exception\HookflowException;
+use Railhook\Webhook;
+use Railhook\Exception\RailhookException;
 
 class WebhookController
 {
@@ -359,7 +361,7 @@ class WebhookController
 
             return new Response('OK', 200);
 
-        } catch (HookflowException $e) {
+        } catch (RailhookException $e) {
             return new Response('Invalid signature', 400);
         }
     }
@@ -371,10 +373,10 @@ class WebhookController
 ```php
 <?php
 
-use Hookflow\Exception\HookflowException;
-use Hookflow\Exception\RateLimitException;
-use Hookflow\Exception\AuthenticationException;
-use Hookflow\Exception\ValidationException;
+use Railhook\Exception\RailhookException;
+use Railhook\Exception\RateLimitException;
+use Railhook\Exception\AuthenticationException;
+use Railhook\Exception\ValidationException;
 
 try {
     $client->events->send('test', []);
@@ -388,7 +390,7 @@ try {
     echo "Invalid API key\n";
 } catch (ValidationException $e) {
     echo "Validation failed: " . json_encode($e->getFieldErrors()) . "\n";
-} catch (HookflowException $e) {
+} catch (RailhookException $e) {
     echo "Error {$e->getStatusCode()}: {$e->getMessage()}\n";
 }
 ```
@@ -416,14 +418,14 @@ All API errors return a consistent JSON body:
 | HTTP Status | `error` Code | SDK Exception | Description |
 |---|---|---|---|
 | 400 | `validation_error` | `ValidationException` | Invalid request parameters; see `fieldErrors` |
-| 400 | `invalid_request` | `HookflowException` | Malformed or semantically invalid request |
+| 400 | `invalid_request` | `RailhookException` | Malformed or semantically invalid request |
 | 401 | `unauthorized` | `AuthenticationException` | Missing or invalid API key / expired token |
-| 403 | `forbidden` | `HookflowException` | Insufficient permissions for the action |
+| 403 | `forbidden` | `RailhookException` | Insufficient permissions for the action |
 | 404 | `not_found` | `NotFoundException` | Requested resource does not exist |
-| 413 | `payload_too_large` | `HookflowException` | Request body exceeds maximum allowed size |
-| 422 | `unprocessable_entity` | `HookflowException` | Valid syntax but violates business rules |
+| 413 | `payload_too_large` | `RailhookException` | Request body exceeds maximum allowed size |
+| 422 | `unprocessable_entity` | `RailhookException` | Valid syntax but violates business rules |
 | 429 | `rate_limit_exceeded` | `RateLimitException` | Too many requests; check `X-RateLimit-*` headers |
-| 500 | `internal_error` | `HookflowException` | Unexpected server error |
+| 500 | `internal_error` | `RailhookException` | Unexpected server error |
 
 ## Generic Requests
 
@@ -457,8 +459,8 @@ All generic methods use the same authentication, error handling, and rate-limit 
 ## Configuration
 
 ```php
-$client = new Hookflow(
-    apiKey: getenv('HOOKFLOW_API_KEY'), // Required: Your project API key
+$client = new Railhook(
+    apiKey: getenv('RAILHOOK_API_KEY'), // Required: Your project API key
     baseUrl: 'https://api.example.com', // Optional (default: http://localhost:8080)
     timeout: 30                      // Optional: Request timeout in seconds (default: 30)
 );
@@ -466,7 +468,7 @@ $client = new Hookflow(
 
 ### Timeouts and retries
 
-`timeout` is `CURLOPT_TIMEOUT`; hitting it throws `HookflowException` with
+`timeout` is `CURLOPT_TIMEOUT`; hitting it throws `RailhookException` with
 status `0` and a `cURL error: …` message, as does any connection-level failure.
 
 **The client does not retry.** One SDK call is exactly one HTTP request — no

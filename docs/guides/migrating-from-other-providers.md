@@ -2,12 +2,12 @@
 
 Two things decide how hard a webhook platform is to leave: whether your *receivers* have to
 change, and whether your *concepts* survive the move. This guide covers both, honestly — the
-last section lists what Hookflow does not have, because finding that out after the migration is
+last section lists what Railhook does not have, because finding that out after the migration is
 worse than reading it now.
 
 ## The receiver usually does not change
 
-Hookflow implements the
+Railhook implements the
 [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks) convention exactly:
 
 ```
@@ -20,12 +20,12 @@ signed over `{id}.{timestamp}.{body}` with HMAC-SHA256, base64 digest, 300-secon
 tolerance. That is the same construction Svix produces, so **a receiver already using an
 off-the-shelf Standard Webhooks or Svix verification library keeps working**. What it needs is
 the secret in the form those libraries expect — `whsec_` followed by standard base64 — which the
-API returns for you. Do not hand a library the stored secret: Hookflow stores URL-safe base64
+API returns for you. Do not hand a library the stored secret: Railhook stores URL-safe base64
 without padding, a different alphabet, which would either fail to decode or decode to different
 bytes.
 
 Endpoints are created with `signatureScheme = BOTH` by default, so they receive the Standard
-Webhooks headers *and* Hookflow's own `X-Signature: t=…,v1=…` over `<timestamp>.<body>`. Extra
+Webhooks headers *and* Railhook's own `X-Signature: t=…,v1=…` over `<timestamp>.<body>`. Extra
 headers cost a receiver nothing — it verifies the one it knows and ignores the rest — so you can
 migrate receivers one at a time, or never.
 
@@ -38,7 +38,7 @@ migrate receivers one at a time, or never.
 
 ## Concept mapping
 
-| Hookflow | Svix | Hookdeck | Convoy |
+| Railhook | Svix | Hookdeck | Convoy |
 |---|---|---|---|
 | Organization | Environment | Team / Project | Organization |
 | Project | Application | Project | Project |
@@ -53,12 +53,12 @@ migrate receivers one at a time, or never.
 | **Source** (a provider you receive from) | — | Source | Source |
 | **Destination** (where an incoming webhook goes) | — | Destination | — |
 | **Forward** | — | Event delivery | — |
-| **Tunnel** (`hookflow listen`) | Svix Play | Hookdeck CLI | Convoy CLI |
+| **Tunnel** (`railhook listen`) | Svix Play | Hookdeck CLI | Convoy CLI |
 | Rules engine, Transformations | Transformations | Filters, Transformations | Filters, Functions |
 
 Two mappings are worth dwelling on:
 
-**Delivery vs Attempt.** Hookflow separates the *obligation* to get one Event to one Endpoint
+**Delivery vs Attempt.** Railhook separates the *obligation* to get one Event to one Endpoint
 from the individual *tries*. Most platforms conflate them, which is why "how many times was this
 retried" is ambiguous elsewhere and exact here.
 
@@ -67,7 +67,7 @@ Ladder. A replay builds a **new** Delivery from a stored Event, with a new seque
 leaves the original where it is. If you are used to a platform where "replay" re-runs the
 original, expect different — and better — semantics around ordering.
 
-## What Hookflow has that these do not
+## What Railhook has that these do not
 
 Worth knowing before you plan around an absence that is not there:
 
@@ -77,14 +77,14 @@ Worth knowing before you plan around an absence that is not there:
   Delivery cannot block an endpoint forever.
 - **Secret rotation with an overlap window.** Both the current and previous secret sign during
   the grace period (default 24h), so a receiver rotates on its own schedule.
-- **A built-in request bin and tunnel.** Disposable receiving endpoints and `hookflow listen`
+- **A built-in request bin and tunnel.** Disposable receiving endpoints and `railhook listen`
   are part of the product, not a separate service.
 - **A workflow builder** — branch, delay, transform, call HTTP, post to Slack — beyond
   single-step transformations.
 - **Self-hosted with nothing gated.** `BILLING_ENABLED` defaults to `false` and there is no
   licence key. Every feature is in the MIT repository.
 
-## What Hookflow does not have
+## What Railhook does not have
 
 - **No app portal for your customers' own users.** You manage your users' endpoints on their
   behalf. There is a shareable single-event debug link, but nothing embeddable. This is the
@@ -112,9 +112,9 @@ Because a receiver can verify either scheme, the two platforms can run side by s
 3. **Send to both** from your application for as long as you want confidence. Deliveries are
    idempotent from the receiver's point of view if it dedupes on `webhook-id`, which the Standard
    Webhooks convention already asks it to do.
-4. **Watch `delivery_oldest_pending_age_seconds` and the DLQ.** If Hookflow's numbers match the
+4. **Watch `delivery_oldest_pending_age_seconds` and the DLQ.** If Railhook's numbers match the
    old platform's, the migration is done.
 5. **Stop sending to the old platform.** No cutover moment, no window.
 
-Historical Events do not migrate — Hookflow's Time Machine can only replay Events it stored. If
+Historical Events do not migrate — Railhook's Time Machine can only replay Events it stored. If
 you need the old platform's history, export it before you close the account.

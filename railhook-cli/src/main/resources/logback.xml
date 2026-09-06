@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.err</target>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{20} - %msg%n</pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>${RAILHOOK_LOG_LEVEL:-WARN}</level>
+        </filter>
+    </appender>
+
+    <logger name="com.webhook.platform.cli" level="${RAILHOOK_LOG_LEVEL:-INFO}" />
+    <logger name="com.webhook.platform.cli.tunnel" level="${RAILHOOK_LOG_LEVEL:-INFO}" />
+    <logger name="org.glassfish.tyrus" level="WARN" />
+
+    <root level="WARN">
+        <appender-ref ref="STDERR" />
+    </root>
+</configuration>

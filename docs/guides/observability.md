@@ -1,6 +1,6 @@
 # Observability
 
-What Hookflow exports, what each number means, and which of them are worth waking someone up
+What Railhook exports, what each number means, and which of them are worth waking someone up
 for. The vocabulary here is `CONTEXT.md`'s — Delivery, Forward, Attempt, Claim, Deferral,
 Retry Ladder, DLQ.
 
@@ -25,12 +25,12 @@ In Kubernetes the chart wires this for you: `servicemonitor.yaml` targets the na
 port, and `prometheusrule.yaml` ships the alert rules. Locally, `monitoring/` has a full
 Prometheus + Alertmanager + Loki + Promtail + Grafana stack.
 
-Four Grafana dashboards ship in `deploy/helm/hookflow/dashboards/`:
-`hookflow-overview.json`, `hookflow-worker.json`, `jvm-micrometer.json`, `kafka-consumer.json`.
+Four Grafana dashboards ship in `deploy/helm/railhook/dashboards/`:
+`railhook-overview.json`, `railhook-worker.json`, `jvm-micrometer.json`, `kafka-consumer.json`.
 
 ## The numbers that actually matter
 
-Hookflow exports well over a hundred series. These are the ones that tell you whether the
+Railhook exports well over a hundred series. These are the ones that tell you whether the
 platform is healthy, grouped by the question they answer.
 
 ### Is work getting through?
@@ -40,7 +40,7 @@ platform is healthy, grouped by the question they answer.
 | `events_ingested_total` | Accepted Events. The top of the funnel. |
 | `deliveries_created_total` | Obligations produced by fan-out. Divided by the above, this is your average subscriptions-per-event. |
 | `webhook_delivery_attempts_total` | Attempts, tagged by outcome. Attempts far above Deliveries means the Ladder is doing a lot of work. |
-| `webhook_delivery_latency_ms` | Time in the endpoint's hands. A rising p95 here is the endpoint's problem, not Hookflow's. |
+| `webhook_delivery_latency_ms` | Time in the endpoint's hands. A rising p95 here is the endpoint's problem, not Railhook's. |
 | `incoming_events_received_total` / `incoming_forward_attempts_total` | The same pair for the incoming direction. |
 
 ### Is anything piling up?
@@ -85,7 +85,7 @@ the Ladder. A high rate is not an error; it is the platform protecting something
 
 ## Alerts that ship with the chart
 
-`deploy/helm/hookflow/templates/prometheusrule.yaml` defines thirteen rules. They are grouped by
+`deploy/helm/railhook/templates/prometheusrule.yaml` defines thirteen rules. They are grouped by
 what they mean rather than by what they measure:
 
 **The backlog is growing** — `DeliveryPendingBacklogGrowing`, `…High`, `…Critical`,

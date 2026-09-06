@@ -42,7 +42,7 @@ up: init ## Start services (embedded DB, dev mode)
 	@$(MAKE) create-topics
 	@$(MAKE) health
 	@echo ""
-	@echo "$(GREEN)Ready — http://localhost:$${HOOKFLOW_PORT:-8080}$(NC)"
+	@echo "$(GREEN)Ready — http://localhost:$${RAILHOOK_PORT:-8080}$(NC)"
 	@echo "  Dashboard, API, docs and ingress all go through that one port."
 
 up-external-db: init ## Start services (external DB, dev mode)
@@ -84,7 +84,7 @@ up-prod-external: init ## Start services (external DB, production mode)
 	@echo "$(GREEN)Production services started$(NC)"
 	@$(MAKE) health
 
-# Pulls this project's own published images (ghcr.io/vadymkykalo/hookflow-*)
+# Pulls this project's own published images (ghcr.io/vadymkykalo/railhook-*)
 # instead of building from source — no Maven/npm toolchain required. That is
 # just docker-compose.yml on its own: it resolves every service to a published
 # image, and docker-compose.build.yml is the overlay that builds the three we
@@ -92,7 +92,7 @@ up-prod-external: init ## Start services (external DB, production mode)
 DOCKER_COMPOSE_PULL := $(DOCKER_COMPOSE)
 DOCKER_COMPOSE_BUILD := $(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.build.yml
 
-# NOTE: to actually install Hookflow somewhere, use ./install.sh — it generates
+# NOTE: to actually install Railhook somewhere, use ./install.sh — it generates
 # real secrets, where the .env.dist this target falls back to contains the
 # public ones from this repository. This target exists for testing the pull
 # images from a clone.
@@ -108,7 +108,7 @@ up-pull: ## Start pre-built GHCR images from this clone (to install, use ./insta
 	@echo "$(GREEN)Starting services (pull-based, embedded DB/Kafka/Redis)...$(NC)"
 	@$(DOCKER_COMPOSE_PULL) up -d
 	@echo "$(GREEN)Waiting for the platform to answer...$(NC)"
-	@port=$${HOOKFLOW_PORT:-80}; elapsed=0; \
+	@port=$${RAILHOOK_PORT:-80}; elapsed=0; \
 	while [ $$elapsed -lt 300 ]; do \
 		if curl -sf -o /dev/null http://localhost:$$port/actuator/health/liveness 2>/dev/null \
 		   && curl -sf -o /dev/null http://localhost:$$port/ 2>/dev/null; then break; fi; \
@@ -163,7 +163,7 @@ rebuild-external-db: ## Rebuild and restart services (external DB)
 ##@ Development (Fast Rebuilds)
 # Every target below builds through DOCKER_COMPOSE_BUILD *and starts through it
 # too*. The overlay does not only add build contexts — it renames the images
-# (`image: webhook-platform-ui:${UI_IMAGE_TAG:-local}`), so a `build` through the
+# (`image: railhook-ui:${UI_IMAGE_TAG:-local}`), so a `build` through the
 # overlay followed by an `up -d` through the base file built one image and
 # started another: the published ghcr one, silently, with none of your changes.
 # `make dev-ui` looked like it worked and served five-day-old code.
@@ -225,7 +225,7 @@ dev-ui: ## Quick dev: rebuild UI with cache + restart
 
 test-ui: ## Run frontend unit tests (Vitest)
 	@echo "$(GREEN)Running frontend tests...$(NC)"
-	@cd webhook-platform-ui && npm run test:ci
+	@cd railhook-ui && npm run test:ci
 	@echo "$(GREEN)Frontend tests passed$(NC)"
 
 # Enumerates the live set of ratchets instead of asking a doc to list them. Two
@@ -239,13 +239,13 @@ types-check: ## Fail if the UI's generated API types are stale vs openapi.yaml (
 	@scripts/check-types-drift.sh
 
 docs-check: ## Fail if the in-app API reference index is stale vs openapi.yaml (same check CI runs)
-	@cd webhook-platform-ui && npm run docs:api-index:check
+	@cd railhook-ui && npm run docs:api-index:check
 
 seo-check: ## Fail if public/sitemap.xml is stale vs the docs guide list (same check CI runs)
-	@cd webhook-platform-ui && npm run seo:sitemap:check
+	@cd railhook-ui && npm run seo:sitemap:check
 
 prerender: ## Render the public pages to static HTML over an existing dist/ (needs a Chromium)
-	@cd webhook-platform-ui && npm run build && npm run prerender
+	@cd railhook-ui && npm run build && npm run prerender
 
 ##@ Scaling
 scale-worker: ## Scale worker instances (usage: make scale-worker N=3)
@@ -345,7 +345,7 @@ health: ## Check health of all services
 	@echo "Redis:    $$(docker exec webhook-redis redis-cli -a $${REDIS_PASSWORD:-webhook_redis_pass} ping 2>/dev/null | grep -q PONG && echo 'UP' || echo 'DOWN')"
 	@echo "API:      $$($(DOCKER_COMPOSE) exec -T api wget -q -O - http://localhost:8082/actuator/health/liveness 2>/dev/null | jq -r .status 2>/dev/null || echo 'DOWN')"
 	@echo "Worker:   $$($(DOCKER_COMPOSE) exec -T worker wget -q -O - http://localhost:8081/actuator/health/liveness 2>/dev/null | jq -r .status 2>/dev/null || echo 'DOWN')"
-	@echo "Web:      $$(curl -sf -o /dev/null -w '%{http_code}' http://localhost:$${HOOKFLOW_PORT:-8080}/ 2>/dev/null || echo 'DOWN') (dashboard + API, http://localhost:$${HOOKFLOW_PORT:-8080})"
+	@echo "Web:      $$(curl -sf -o /dev/null -w '%{http_code}' http://localhost:$${RAILHOOK_PORT:-8080}/ 2>/dev/null || echo 'DOWN') (dashboard + API, http://localhost:$${RAILHOOK_PORT:-8080})"
 
 ##@ Database
 POSTGRES_USER         ?= webhook_user
@@ -449,7 +449,7 @@ monitoring-up: ## Start monitoring stack (Prometheus + Grafana)
 	@echo "$(GREEN)Monitoring started:$(NC)"
 	@echo "  Prometheus: http://localhost:9090"
 	@echo "  Grafana:    http://localhost:$${GRAFANA_PORT:-3001}"
-	@echo "  Login:      hookflow / hookflow_monitor_2024"
+	@echo "  Login:      railhook / railhook_monitor_2024"
 	@echo ""
 
 monitoring-down: ## Stop monitoring stack
@@ -487,5 +487,5 @@ nuke: ## DESTROY EVERYTHING including volumes (requires CONFIRM=YES)
 	@echo "$(RED)Stopping main platform...$(NC)"
 	@$(DOCKER_COMPOSE) --profile embedded-db down -v --remove-orphans --rmi local 2>/dev/null || true
 	@docker volume rm webhook_pgdata kafka_data redis_data 2>/dev/null || true
-	@docker network rm webhook-platform_webhook-network 2>/dev/null || true
+	@docker network rm railhook_webhook-network 2>/dev/null || true
 	@echo "$(GREEN)Nuclear option complete — platform + monitoring destroyed$(NC)"

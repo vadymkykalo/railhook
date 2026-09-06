@@ -1,12 +1,12 @@
 name: Install Script
 
-# webhook-platform-cli/install.sh is the headline install method
+# railhook-cli/install.sh is the headline install method
 # (README tells users to curl | bash it) but was never exercised in CI. This
 # workflow runs it end to end against a fake "GitHub release" fixture built
 # from the JAR this job compiles — not the real repo's releases — so the run
 # is hermetic and doesn't depend on (or require) a real tagged release to
 # exist. The fixture is served over file:// URLs via install.sh's
-# HOOKFLOW_GITHUB_BASE_URL test hook, which only exists for this purpose and
+# RAILHOOK_GITHUB_BASE_URL test hook, which only exists for this purpose and
 # is not part of the documented user-facing interface.
 
 on:
@@ -16,14 +16,14 @@ on:
       - develop
       - 'release/**'
     paths:
-      - 'webhook-platform-cli/install.sh'
+      - 'railhook-cli/install.sh'
       - '.github/workflows/install-sh-test.yml'
   pull_request:
     branches:
       - main
       - develop
     paths:
-      - 'webhook-platform-cli/install.sh'
+      - 'railhook-cli/install.sh'
       - '.github/workflows/install-sh-test.yml'
 
 concurrency:
@@ -32,10 +32,10 @@ concurrency:
 
 jobs:
   # Core requirement from the task: run the installer end to end on both
-  # Linux and macOS and assert `hookflow --version` works afterward. Java is
+  # Linux and macOS and assert `railhook --version` works afterward. Java is
   # already on PATH here (actions/setup-java, needed to build the fixture
   # JAR), so this run also doubles as the "Java 17 already present" and
-  # "HOOKFLOW_SKIP_JAVA=1 with Java present must succeed" cases.
+  # "RAILHOOK_SKIP_JAVA=1 with Java present must succeed" cases.
   install-sh:
     name: install.sh end-to-end (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -56,36 +56,36 @@ jobs:
           cache: 'maven'
 
       - name: Build CLI JAR
-        run: mvn clean package -pl webhook-platform-cli -am -DskipTests -B
+        run: mvn clean package -pl railhook-cli -am -DskipTests -B
 
       - name: Build fixture release (fake GitHub release, served via file://)
         run: |
           set -euo pipefail
           FIXTURE_ROOT="$RUNNER_TEMP/fixture"
-          FIXTURE="$FIXTURE_ROOT/vadymkykalo/webhook-platform/releases/download/v0.0.0-ci"
+          FIXTURE="$FIXTURE_ROOT/vadymkykalo/railhook/releases/download/v0.0.0-ci"
           mkdir -p "$FIXTURE"
-          cp webhook-platform-cli/target/webhook-platform-cli-*.jar "$FIXTURE/hookflow-cli.jar"
+          cp railhook-cli/target/railhook-cli-*.jar "$FIXTURE/railhook-cli.jar"
           if command -v sha256sum >/dev/null 2>&1; then
-            (cd "$FIXTURE" && sha256sum hookflow-cli.jar > SHA256SUMS)
+            (cd "$FIXTURE" && sha256sum railhook-cli.jar > SHA256SUMS)
           else
-            (cd "$FIXTURE" && shasum -a 256 hookflow-cli.jar > SHA256SUMS)
+            (cd "$FIXTURE" && shasum -a 256 railhook-cli.jar > SHA256SUMS)
           fi
           cat "$FIXTURE/SHA256SUMS"
           {
-            echo "HOOKFLOW_GITHUB_BASE_URL=file://$FIXTURE_ROOT"
-            echo "HOOKFLOW_VERSION=v0.0.0-ci"
-            echo "HOOKFLOW_SKIP_JAVA=1"
+            echo "RAILHOOK_GITHUB_BASE_URL=file://$FIXTURE_ROOT"
+            echo "RAILHOOK_VERSION=v0.0.0-ci"
+            echo "RAILHOOK_SKIP_JAVA=1"
           } >> "$GITHUB_ENV"
 
       - name: Run install.sh
-        run: bash webhook-platform-cli/install.sh
+        run: bash railhook-cli/install.sh
 
-      - name: Assert hookflow --version works
+      - name: Assert railhook --version works
         run: |
           set -euo pipefail
           export PATH="$HOME/.local/bin:$PATH"
-          command -v hookflow
-          hookflow --version
+          command -v railhook
+          railhook --version
 
   # Cases that need a machine WITHOUT a pre-existing Java, and a shell rc
   # file that already mentions .local/bin — GitHub-hosted runners always
@@ -115,21 +115,21 @@ jobs:
           cache: 'maven'
 
       - name: Build CLI JAR
-        run: mvn clean package -pl webhook-platform-cli -am -DskipTests -B
+        run: mvn clean package -pl railhook-cli -am -DskipTests -B
 
       - name: Build fixture release tree (valid + tampered)
         run: |
           set -euo pipefail
           FIXTURE_ROOT="$RUNNER_TEMP/fixture"
-          GOOD="$FIXTURE_ROOT/vadymkykalo/webhook-platform/releases/download/v0.0.0-ci"
-          BAD="$FIXTURE_ROOT/vadymkykalo/webhook-platform/releases/download/v0.0.0-ci-tampered"
+          GOOD="$FIXTURE_ROOT/vadymkykalo/railhook/releases/download/v0.0.0-ci"
+          BAD="$FIXTURE_ROOT/vadymkykalo/railhook/releases/download/v0.0.0-ci-tampered"
           mkdir -p "$GOOD" "$BAD"
 
-          cp webhook-platform-cli/target/webhook-platform-cli-*.jar "$GOOD/hookflow-cli.jar"
-          (cd "$GOOD" && sha256sum hookflow-cli.jar > SHA256SUMS)
+          cp railhook-cli/target/railhook-cli-*.jar "$GOOD/railhook-cli.jar"
+          (cd "$GOOD" && sha256sum railhook-cli.jar > SHA256SUMS)
 
-          cp webhook-platform-cli/target/webhook-platform-cli-*.jar "$BAD/hookflow-cli.jar"
-          echo "0000000000000000000000000000000000000000000000000000000000000000  hookflow-cli.jar" > "$BAD/SHA256SUMS"
+          cp railhook-cli/target/railhook-cli-*.jar "$BAD/railhook-cli.jar"
+          echo "0000000000000000000000000000000000000000000000000000000000000000  railhook-cli.jar" > "$BAD/SHA256SUMS"
 
           echo "FIXTURE_ROOT=$FIXTURE_ROOT" >> "$GITHUB_ENV"
 
@@ -147,12 +147,12 @@ jobs:
           useradd -m tester
           su -s /bin/bash tester -c '
               set -euo pipefail
-              export HOOKFLOW_GITHUB_BASE_URL=file:///fixture
-              export HOOKFLOW_VERSION=v0.0.0-ci
-              export HOOKFLOW_SKIP_JAVA=1
+              export RAILHOOK_GITHUB_BASE_URL=file:///fixture
+              export RAILHOOK_VERSION=v0.0.0-ci
+              export RAILHOOK_SKIP_JAVA=1
               bash /install.sh
               grep -qxF "export PATH=\"$HOME/.local/bin:\$PATH\"" ~/.bashrc
-              test -x "$HOME/.local/bin/hookflow"
+              test -x "$HOME/.local/bin/railhook"
               echo SKIP_JAVA_NO_JAVA_CASE_OK
           '
           EOF
@@ -167,11 +167,11 @@ jobs:
           chmod 0440 /etc/sudoers.d/tester
           su -s /bin/bash tester -c '
               set -euo pipefail
-              export HOOKFLOW_GITHUB_BASE_URL=file:///fixture
-              export HOOKFLOW_VERSION=v0.0.0-ci
+              export RAILHOOK_GITHUB_BASE_URL=file:///fixture
+              export RAILHOOK_VERSION=v0.0.0-ci
               bash /install.sh --with-java
               export PATH="$HOME/.local/bin:$PATH"
-              hookflow --version
+              railhook --version
           '
           EOF
 
@@ -184,11 +184,11 @@ jobs:
           su -s /bin/bash tester -c 'echo "# unrelated: pipx adds \$HOME/.local/bin/pipx-app" > ~/.bashrc'
           su -s /bin/bash tester -c '
               set -euo pipefail
-              export HOOKFLOW_GITHUB_BASE_URL=file:///fixture
-              export HOOKFLOW_VERSION=v0.0.0-ci
+              export RAILHOOK_GITHUB_BASE_URL=file:///fixture
+              export RAILHOOK_VERSION=v0.0.0-ci
               bash /install.sh
               export PATH="$HOME/.local/bin:$PATH"
-              hookflow --version
+              railhook --version
           '
           EOF
 
@@ -200,8 +200,8 @@ jobs:
           useradd -m tester
           set +e
           su -s /bin/bash tester -c '
-              export HOOKFLOW_GITHUB_BASE_URL=file:///fixture
-              export HOOKFLOW_VERSION=v0.0.0-ci-tampered
+              export RAILHOOK_GITHUB_BASE_URL=file:///fixture
+              export RAILHOOK_VERSION=v0.0.0-ci-tampered
               bash /install.sh
           '
           RC=$?
@@ -216,19 +216,19 @@ jobs:
 
           echo "CASES=$CASES" >> "$GITHUB_ENV"
 
-      - name: "Case: HOOKFLOW_SKIP_JAVA=1 with no Java on PATH must skip and still install"
+      - name: "Case: RAILHOOK_SKIP_JAVA=1 with no Java on PATH must skip and still install"
         run: |
           docker run --rm \
             -v "$FIXTURE_ROOT":/fixture:ro \
-            -v "$PWD/webhook-platform-cli/install.sh":/install.sh:ro \
+            -v "$PWD/railhook-cli/install.sh":/install.sh:ro \
             -v "$CASES/skip-java-no-java.sh":/case.sh:ro \
             ubuntu:22.04 bash /case.sh
 
-      - name: "Case: clean machine, no Java, --with-java installs Java and hookflow works"
+      - name: "Case: clean machine, no Java, --with-java installs Java and railhook works"
         run: |
           docker run --rm \
             -v "$FIXTURE_ROOT":/fixture:ro \
-            -v "$PWD/webhook-platform-cli/install.sh":/install.sh:ro \
+            -v "$PWD/railhook-cli/install.sh":/install.sh:ro \
             -v "$CASES/with-java.sh":/case.sh:ro \
             ubuntu:22.04 bash /case.sh
 
@@ -236,7 +236,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$FIXTURE_ROOT":/fixture:ro \
-            -v "$PWD/webhook-platform-cli/install.sh":/install.sh:ro \
+            -v "$PWD/railhook-cli/install.sh":/install.sh:ro \
             -v "$CASES/rcfile-already-has-local-bin.sh":/case.sh:ro \
             ubuntu:22.04 bash /case.sh
 
@@ -244,7 +244,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$FIXTURE_ROOT":/fixture:ro \
-            -v "$PWD/webhook-platform-cli/install.sh":/install.sh:ro \
+            -v "$PWD/railhook-cli/install.sh":/install.sh:ro \
             -v "$CASES/tampered-checksum.sh":/case.sh:ro \
             ubuntu:22.04 bash /case.sh
 
@@ -252,4 +252,4 @@ jobs:
         if: always()
         run: |
           echo "### install.sh Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "Covered: HOOKFLOW_SKIP_JAVA=1 with no Java, clean machine + --with-java, rc file already mentioning .local/bin, tampered checksum refusal." >> $GITHUB_STEP_SUMMARY
+          echo "Covered: RAILHOOK_SKIP_JAVA=1 with no Java, clean machine + --with-java, rc file already mentioning .local/bin, tampered checksum refusal." >> $GITHUB_STEP_SUMMARY

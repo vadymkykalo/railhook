@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hookflow\Exception;
+namespace Railhook\Exception;
 
-class NotFoundException extends HookflowException
+class NotFoundException extends RailhookException
 {
     public function __construct(string $message = 'Resource not found')
     {

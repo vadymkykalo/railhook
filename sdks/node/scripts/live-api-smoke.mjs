@@ -37,7 +37,7 @@ if (!fs.existsSync(distEntry)) {
   process.exit(2);
 }
 
-const { Hookflow, verifySignature, generateSignature, AuthenticationError, NotFoundError, ValidationError, HookflowError } =
+const { Railhook, verifySignature, generateSignature, AuthenticationError, NotFoundError, ValidationError, RailhookError } =
   require(distEntry);
 
 const BASE_URL = process.env.SMOKE_API_BASE_URL || 'http://localhost:8080';
@@ -105,7 +105,7 @@ async function apiIsUp() {
 }
 
 async function main() {
-  console.log(`Hookflow Node SDK — live API smoke check against ${BASE_URL}\n`);
+  console.log(`Railhook Node SDK — live API smoke check against ${BASE_URL}\n`);
 
   if (!(await apiIsUp())) {
     console.error(`${BASE_URL} is not answering. Start the stack with \`make up\` from the repo root.`);
@@ -138,7 +138,7 @@ async function main() {
   );
 
   const projectId = project.id;
-  const client = new Hookflow({ apiKey: apiKey.key, baseUrl: BASE_URL });
+  const client = new Railhook({ apiKey: apiKey.key, baseUrl: BASE_URL });
 
   // ── Endpoints ──
   console.log('\nendpoints:');
@@ -330,7 +330,7 @@ async function main() {
 
   // ── Errors ──
   console.log('\nerrors:');
-  const badClient = new Hookflow({ apiKey: 'not-a-real-key', baseUrl: BASE_URL });
+  const badClient = new Railhook({ apiKey: 'not-a-real-key', baseUrl: BASE_URL });
   await expectRejection(
     'an invalid API key raises AuthenticationError(401)',
     () => badClient.events.send({ type: 'order.completed', data: {} }),
@@ -357,10 +357,10 @@ async function main() {
     }
   );
   await expectRejection(
-    "another project's resources raise a 403 HookflowError",
+    "another project's resources raise a 403 RailhookError",
     () => client.endpoints.list('00000000-0000-0000-0000-000000000000'),
     (err) => {
-      assert(err instanceof HookflowError, `expected HookflowError, got ${err.name}`);
+      assert(err instanceof RailhookError, `expected RailhookError, got ${err.name}`);
       eq(err.status, 403, 'status');
       eq(err.code, 'forbidden', 'code (taken from the envelope\'s "error" field)');
     }

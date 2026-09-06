@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "railhook.fullname" . }}-api
+  labels:
+    {{- include "railhook.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "railhook.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "railhook.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "railhook.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- /*
+        No migration initContainer. There was one, and it could never have
+        worked: it ran the whole api jar with
+        `--spring.main.web-application-type=none --railhook.run-migration-only=true`,
+        and that last flag is not read anywhere in the codebase — nothing
+        makes the context stop after Flyway. So the container had two ways to
+        fail before a migration could matter. It was handed DB_USERNAME (the
+        app reads DB_USER) and none of WEBHOOK_ENCRYPTION_KEY /
+        WEBHOOK_ENCRYPTION_SALT / JWT_SECRET, all of which are required with
+        no default, so the context failed to start; and had it started, the
+        non-daemon scheduling threads would have kept the JVM alive forever
+        with the api pod stuck in Init.
+
+        The api runs its own migrations at startup anyway — application.yml
+        sets `spring.flyway.enabled: true` — and Flyway serialises concurrent
+        starts on a PostgreSQL advisory lock, so replicas coming up together
+        migrate exactly once. That is the same mechanism docker-compose.yml
+        relies on. A separate migration step would need a jar entry point that
+        migrates and exits; there isn't one.
+      */}}
+      containers:
+        - name: api
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            # Actuator, on its own port so a Prometheus scrape does not have to
+            # pass SecurityConfig's authenticated chain on 8080. Same split
+            # docker-compose.yml makes; see railhook.api.managementPort.
+            - name: management
+              containerPort: {{ include "railhook.api.managementPort" . }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "railhook.fullname" . }}-config
+          env:
+            {{- range $key, $value := .Values.api.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.auth.existingSecret | default .Values.postgresql.external.existingSecret }}
+                  key: {{ .Values.postgresql.external.existingSecretPasswordKey | default "password" }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.redis.auth.existingSecret | default .Values.redis.external.existingSecret }}
+                  key: {{ .Values.redis.auth.existingSecretPasswordKey | default .Values.redis.external.existingSecretPasswordKey | default "password" }}
+            - name: WEBHOOK_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.encryptionKey.existingSecret }}
+                  key: {{ .Values.secrets.encryptionKey.key }}
+            # Required, no default (application.yml: `encryption-salt:
+            # ${WEBHOOK_ENCRYPTION_SALT}`). Missing it is a startup failure,
+            # not a degraded mode.
+            - name: WEBHOOK_ENCRYPTION_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.encryptionSalt.existingSecret }}
+                  key: {{ .Values.secrets.encryptionSalt.key }}
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.jwtSecret.existingSecret }}
+                  key: {{ .Values.secrets.jwtSecret.key }}
+            {{- with .Values.email.smtp.existingSecret }}
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.email.smtp.existingSecretPasswordKey | default "smtp-password" }}
+            {{- end }}
+            # After the api.env range above, deliberately: these two are not
+            # knobs. The probes, the UI's health proxy and the ServiceMonitor
+            # all address actuator on this port and expect it bound on every
+            # interface, so a value supplied through api.env would break all
+            # three at once. 0.0.0.0 here means "reachable from other pods",
+            # and this port is not published outside the cluster; setting it to
+            # 127.0.0.1 (which reads as the safer choice) already broke metrics
+            # scraping once in Compose.
+            - name: MANAGEMENT_PORT
+              value: {{ include "railhook.api.managementPort" . | quote }}
+            - name: MANAGEMENT_ADDRESS
+              value: "0.0.0.0"
+          livenessProbe:
+            {{- toYaml .Values.api.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.api.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

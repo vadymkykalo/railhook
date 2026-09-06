@@ -3,7 +3,7 @@
 A recurring request from anyone whose receivers sit behind a corporate firewall: *"what IP will
 your webhooks come from, so we can allowlist it?"*
 
-Hookflow has no application-level setting for this. There is no forward-proxy configuration on
+Railhook has no application-level setting for this. There is no forward-proxy configuration on
 the worker's HTTP client, and setting `HTTP_PROXY` in the environment will not be honoured — the
 delivery client is Reactor Netty and does not read those variables. Anyone telling you otherwise
 has not tried it.
@@ -35,7 +35,7 @@ and every outbound connection presents that address.
 | Azure | NAT Gateway | A static Public IP |
 | Hetzner / DO / bare metal | A router or gateway host | A floating IP, with the worker's default route through it |
 
-This is the option to reach for first. It needs no Hookflow configuration, survives node
+This is the option to reach for first. It needs no Railhook configuration, survives node
 replacement, and gives you one or two addresses to publish.
 
 Two addresses is usually the right number, not one: a single NAT is a single point of failure,
@@ -57,10 +57,10 @@ dashboard traffic, backups and image pulls sharing it.
 If you already run a service mesh or an egress controller (Istio egress gateway, Cilium egress
 gateway, a Squid or Smokescreen host with an iptables redirect), route the worker's traffic
 through it. The application still knows nothing about the proxy — the redirect happens below it,
-which is precisely why this works without a Hookflow setting.
+which is precisely why this works without a Railhook setting.
 
 A side benefit: an egress proxy is a natural place to log or restrict outbound destinations,
-which pairs well with the SSRF protection Hookflow already applies before a request is built.
+which pairs well with the SSRF protection Railhook already applies before a request is built.
 
 ## What to tell your customers
 
@@ -70,10 +70,10 @@ Publish the addresses somewhere they can read without asking, and say two things
 2. **That the list can change**, with how much notice. An allowlist you change silently is an
    outage you caused on someone else's infrastructure.
 
-Note that inbound and outbound are different problems. If your customers send *to* Hookflow —
+Note that inbound and outbound are different problems. If your customers send *to* Railhook —
 the incoming direction — they do not need this at all; they need your ingress URL. And if you
 want to restrict who may reach one of your Endpoints, that is `allowedSourceIps` on the Endpoint,
-which is a separate feature and is enforced by Hookflow rather than by your network.
+which is a separate feature and is enforced by Railhook rather than by your network.
 
 ## Related
 

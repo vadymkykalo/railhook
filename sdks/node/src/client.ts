@@ -2,7 +2,7 @@ import * as https from 'https';
 import * as http from 'http';
 import { URL } from 'url';
 import {
-  HookflowConfig,
+  RailhookConfig,
   Event,
   EventResponse,
   Endpoint,
@@ -29,7 +29,7 @@ import {
   ReplayEventResponse,
 } from './types';
 import {
-  HookflowError,
+  RailhookError,
   AuthenticationError,
   RateLimitError,
   ValidationError,
@@ -38,9 +38,9 @@ import {
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_TIMEOUT = 30000;
-const SDK_VERSION = '2.11.0';
+const SDK_VERSION = '2.12.0';
 
-export class Hookflow {
+export class Railhook {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly timeout: number;
@@ -52,7 +52,7 @@ export class Hookflow {
   public readonly incomingSources: IncomingSources;
   public readonly incomingEvents: IncomingEvents;
 
-  constructor(config: HookflowConfig) {
+  constructor(config: RailhookConfig) {
     if (!config.apiKey) {
       throw new Error('API key is required');
     }
@@ -82,7 +82,7 @@ export class Hookflow {
     const headers: Record<string, string> = {
       'X-API-Key': this.apiKey,
       'Content-Type': 'application/json',
-      'User-Agent': `hookflow-node/${SDK_VERSION}`,
+      'User-Agent': `railhook-node/${SDK_VERSION}`,
     };
 
     if (idempotencyKey) {
@@ -120,18 +120,18 @@ export class Hookflow {
 
             resolve(parsed as T);
           } catch (err) {
-            reject(new HookflowError('Failed to parse response', 500));
+            reject(new RailhookError('Failed to parse response', 500));
           }
         });
       });
 
       req.on('error', (err) => {
-        reject(new HookflowError(err.message, 0, 'network_error'));
+        reject(new RailhookError(err.message, 0, 'network_error'));
       });
 
       req.on('timeout', () => {
         req.destroy();
-        reject(new HookflowError('Request timeout', 0, 'timeout'));
+        reject(new RailhookError('Request timeout', 0, 'timeout'));
       });
 
       if (body) {
@@ -201,7 +201,7 @@ export class Hookflow {
     status: number,
     body: Record<string, unknown>,
     rateLimitInfo?: RateLimitInfo
-  ): HookflowError {
+  ): RailhookError {
     const message = (body.message as string) || 'Unknown error';
 
     switch (status) {
@@ -222,13 +222,13 @@ export class Hookflow {
           (body.fieldErrors as Record<string, string>) || {}
         );
       default:
-        return new HookflowError(message, status, body.error as string);
+        return new RailhookError(message, status, body.error as string);
     }
   }
 }
 
 class Events {
-  constructor(private client: Hookflow) {}
+  constructor(private client: Railhook) {}
 
   async send(event: Event, idempotencyKey?: string): Promise<EventResponse> {
     return this.client.request<EventResponse>(
@@ -241,7 +241,7 @@ class Events {
 }
 
 class Endpoints {
-  constructor(private client: Hookflow) {}
+  constructor(private client: Railhook) {}
 
   async create(projectId: string, params: EndpointCreateParams): Promise<Endpoint> {
     return this.client.request<Endpoint>(
@@ -313,7 +313,7 @@ class Endpoints {
 }
 
 class Subscriptions {
-  constructor(private client: Hookflow) {}
+  constructor(private client: Railhook) {}
 
   async create(projectId: string, params: SubscriptionCreateParams): Promise<Subscription> {
     return this.client.request<Subscription>(
@@ -358,7 +358,7 @@ class Subscriptions {
 }
 
 class Deliveries {
-  constructor(private client: Hookflow) {}
+  constructor(private client: Railhook) {}
 
   async get(deliveryId: string): Promise<Delivery> {
     return this.client.request<Delivery>('GET', `/api/v1/deliveries/${deliveryId}`);
@@ -395,7 +395,7 @@ class Deliveries {
 }
 
 class IncomingSources {
-  constructor(private client: Hookflow) {}
+  constructor(private client: Railhook) {}
 
   async create(projectId: string, params: IncomingSourceCreateParams): Promise<IncomingSource> {
     return this.client.request<IncomingSource>(
@@ -495,7 +495,7 @@ class IncomingSources {
 }
 
 class IncomingEvents {
-  constructor(private client: Hookflow) {}
+  constructor(private client: Railhook) {}
 
   async list(
     projectId: string,

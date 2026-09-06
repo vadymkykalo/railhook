@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Hookflow\Tests\Contract;
+namespace Railhook\Tests\Contract;
 
 /**
  * Shared bootstrap for the PHP SDK's contract suite. Same pattern as
  * sdks/node/tests/contract/support.ts, sdks/python/tests/contract/support.py
- * and load/lib/setup.js: the Hookflow client is API-key scoped only (no
- * register/login/create-project surface — see src/Hookflow.php), so
+ * and load/lib/setup.js: the Railhook client is API-key scoped only (no
+ * register/login/create-project surface — see src/Railhook.php), so
  * bootstrapping a throwaway tenant needs a couple of raw cURL calls against
  * the JWT-authenticated endpoints before the SDK proper takes over.
  */

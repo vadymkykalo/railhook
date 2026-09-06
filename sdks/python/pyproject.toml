@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "webhook-platform"
-version = "2.11.0"
-description = "Official Python SDK for Hookflow — reliable webhook infrastructure"
+name = "railhook"
+version = "2.12.0"
+description = "Official Python SDK for Railhook — reliable webhook infrastructure"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
@@ -38,9 +38,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/vadymkykalo/webhook-platform"
-Repository = "https://github.com/vadymkykalo/webhook-platform"
-Documentation = "https://github.com/vadymkykalo/webhook-platform#readme"
+Homepage = "https://github.com/vadymkykalo/railhook"
+Repository = "https://github.com/vadymkykalo/railhook"
+Documentation = "https://github.com/vadymkykalo/railhook#readme"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -14,31 +14,31 @@ alerting:
         - targets: ["alertmanager:9093"]
 
 scrape_configs:
-  # ── Hookflow API (Spring Boot Actuator / Micrometer) ──────────
+  # ── Railhook API (Spring Boot Actuator / Micrometer) ──────────
   # Port 8082, not 8080 — SecurityConfig requires a JWT/API-key on
   # `/actuator/**` over the main port (8080), which Prometheus can't supply.
   # 8082 is a separate management.server.port that bypasses that filter chain
   # entirely (see application.yml `management.server.*` and SecurityConfig.java).
   # It is not published to the host, only reachable on the private
   # webhook-network this Prometheus container also joins — see docker-compose.yml.
-  - job_name: hookflow-api
+  - job_name: railhook-api
     metrics_path: /actuator/prometheus
     scrape_interval: 10s
     static_configs:
       - targets: ["api:8082"]
         labels:
           service: api
-          component: hookflow
+          component: railhook
 
-  # ── Hookflow Worker (separate management port) ────────────────
-  - job_name: hookflow-worker
+  # ── Railhook Worker (separate management port) ────────────────
+  - job_name: railhook-worker
     metrics_path: /actuator/prometheus
     scrape_interval: 10s
     static_configs:
       - targets: ["worker:8081"]
         labels:
           service: worker
-          component: hookflow
+          component: railhook
 
   # ── Prometheus self-monitoring ────────────────────────────────
   - job_name: prometheus

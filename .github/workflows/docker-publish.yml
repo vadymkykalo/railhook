@@ -23,7 +23,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: vadymkykalo/hookflow
+  IMAGE_NAMESPACE: vadymkykalo/railhook
 
 jobs:
   resolve-version:
@@ -53,11 +53,11 @@ jobs:
       matrix:
         include:
           - service: api
-            dockerfile: webhook-platform-api/Dockerfile
+            dockerfile: railhook-api/Dockerfile
           - service: worker
-            dockerfile: webhook-platform-worker/Dockerfile
+            dockerfile: railhook-worker/Dockerfile
           - service: ui
-            dockerfile: webhook-platform-ui/Dockerfile
+            dockerfile: railhook-ui/Dockerfile
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -130,24 +130,24 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
       - name: Fetch chart dependencies
-        run: helm dependency build deploy/helm/hookflow
+        run: helm dependency build deploy/helm/railhook
 
       - name: Lint chart
-        run: helm lint deploy/helm/hookflow
+        run: helm lint deploy/helm/railhook
 
       - name: Package chart
         run: |
-          helm package deploy/helm/hookflow \
+          helm package deploy/helm/railhook \
             --version "${{ needs.resolve-version.outputs.version }}" \
             --app-version "${{ needs.resolve-version.outputs.version }}" \
             -d /tmp/helm-package
 
       - name: Push chart to GHCR (OCI)
         run: |
-          CHART_FILE=$(ls /tmp/helm-package/hookflow-*.tgz)
+          CHART_FILE=$(ls /tmp/helm-package/railhook-*.tgz)
           helm push "$CHART_FILE" oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
 
       - name: Publish Summary
         run: |
           echo "### Published Helm chart" >> "$GITHUB_STEP_SUMMARY"
-          echo "oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/hookflow --version ${{ needs.resolve-version.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/railhook --version ${{ needs.resolve-version.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"

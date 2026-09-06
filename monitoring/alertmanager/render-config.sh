@@ -5,7 +5,7 @@
 # Why a shell script instead of a static YAML file: the prom/alertmanager image
 # is busybox-based (no apk, no envsubst, no bash) — see monitoring/README.md for
 # the investigation — so this uses only POSIX sh + heredocs. Each of the three
-# receivers (hookflow-critical / hookflow-default / hookflow-info) fans out to
+# receivers (railhook-critical / railhook-default / railhook-info) fans out to
 # whichever sinks (Slack / generic webhook / email) have a non-empty env var, so
 # the rendered config is always valid even with zero secrets configured — alerts
 # just land only in Alertmanager's own UI/API (http://localhost:9093), which is
@@ -20,7 +20,7 @@ global:
   resolve_timeout: 5m
 
 route:
-  receiver: hookflow-default
+  receiver: railhook-default
   group_by: ['alertname', 'component']
   group_wait: 30s
   group_interval: 5m
@@ -29,17 +29,17 @@ route:
     # Critical: page faster, remind more often.
     - match:
         severity: critical
-      receiver: hookflow-critical
+      receiver: railhook-critical
       group_wait: 10s
       group_interval: 5m
       repeat_interval: 1h
     - match:
         severity: warning
-      receiver: hookflow-default
+      receiver: railhook-default
     # Info: informational only (e.g. KafkaDlqTopicNotEmpty) — batch, remind rarely.
     - match:
         severity: info
-      receiver: hookflow-info
+      receiver: railhook-info
       group_wait: 5m
       repeat_interval: 12h
 
@@ -73,14 +73,14 @@ inhibit_rules:
 receivers:
 STATIC
 
-  for name in hookflow-critical hookflow-default hookflow-info; do
+  for name in railhook-critical railhook-default railhook-info; do
     echo "  - name: ${name}"
 
     if [ -n "${ALERTMANAGER_SLACK_WEBHOOK_URL:-}" ]; then
       cat <<SLACK
     slack_configs:
       - api_url: '${ALERTMANAGER_SLACK_WEBHOOK_URL}'
-        channel: '${ALERTMANAGER_SLACK_CHANNEL:-#hookflow-alerts}'
+        channel: '${ALERTMANAGER_SLACK_CHANNEL:-#railhook-alerts}'
         send_resolved: true
         title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }}/{{ .CommonLabels.component }})'
         text: >-
