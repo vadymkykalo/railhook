@@ -141,7 +141,7 @@ to attempt behaviour lands once rather than twice.
 | **Incoming** | Stripe, GitHub, GitLab, Shopify, Slack, Twilio and generic HMAC · deduplication · authenticated forwarding |
 | **Developing** | CLI tunnel to `localhost` · disposable receiving endpoints · transformation preview and delivery dry-run |
 | **Security** | Row-level tenant isolation · AES-256-GCM with key rotation · SSRF protection · mTLS · PII masking · audit log |
-| **Operating** | Prometheus metrics, 4 dashboards, 13 alert rules · configurable retention · GDPR export · CI-tested restore drill |
+| **Operating** | Prometheus metrics, 4 dashboards, 22 alert rules · configurable retention · GDPR export · CI-tested restore drill |
 
 Organizations → Projects → Endpoints, with Owner / Developer / Viewer roles.
 Nothing is gated — see [Is this really MIT?](#is-this-really-mit-what-is-the-billing-code-doing-here)

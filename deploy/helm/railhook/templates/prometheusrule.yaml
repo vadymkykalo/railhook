@@ -10,6 +10,30 @@ metadata:
     {{- end }}
 spec:
   groups:
+    # The first place work can go missing: an Event is written to the outbox in the same
+    # transaction as the work itself, so a row stuck here is a webhook the caller was told
+    # was accepted and which delivery_queue_depth cannot see — it is not a Delivery yet.
+    - name: railhook.outbox
+      rules:
+        # The third of the three signals docs/guides/observability.md tells an operator to
+        # alert on if they alert on nothing else, and the one that had no rule anywhere.
+        - alert: OutboxOldestPendingAgeHigh
+          expr: outbox_oldest_pending_age_seconds > 300
+          for: 5m
+          labels:
+            severity: critical
+            component: api
+          annotations:
+            summary: "Oldest unpublished outbox message is {{`{{ $value | printf \"%.0f\" }}`}}s old"
+        - alert: OutboxSendingStuck
+          expr: outbox_queue_depth{status="sending"} > 0
+          for: 10m
+          labels:
+            severity: warning
+            component: api
+          annotations:
+            summary: "{{`{{ $value | printf \"%.0f\" }}`}} outbox messages stuck SENDING for >10m"
+
     - name: railhook.retry_backlog
       rules:
         - alert: DeliveryPendingBacklogGrowing
@@ -39,6 +63,14 @@ spec:
           annotations:
             summary: "CRITICAL: Delivery pending backlog above 20000"
             description: "{{`{{ $value | printf \"%.0f\" }}`}} deliveries pending. Immediate investigation required."
+        - alert: IncomingForwardPendingBacklogHigh
+          expr: incoming_forward_queue_depth{status="pending"} > 3000
+          for: 10m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Incoming forward pending backlog above 3000"
 
     - name: railhook.dlq
       rules:
@@ -70,6 +102,24 @@ spec:
             component: worker
           annotations:
             summary: "Incoming forward failure rate above 10%"
+        # Deliveries and Forwards still sitting in DLQ status, waiting for a person. Unlike
+        # the Kafka topic counters these return to 0 once retried or purged.
+        - alert: DlqActionableBacklog
+          expr: webhook_dlq_depth > 0
+          for: 30m
+          labels:
+            severity: info
+            component: worker
+          annotations:
+            summary: "{{`{{ $value | printf \"%.0f\" }}`}} deliveries in DLQ status"
+        - alert: IncomingForwardDlqActionableBacklog
+          expr: incoming_forward_dlq_depth > 0
+          for: 30m
+          labels:
+            severity: info
+            component: worker
+          annotations:
+            summary: "{{`{{ $value | printf \"%.0f\" }}`}} forwards in DLQ status"
 
     - name: railhook.circuit_breaker
       rules:
@@ -100,6 +150,14 @@ spec:
 
     - name: railhook.retry_governor
       rules:
+        - alert: RetryGovernorCooldown
+          expr: retry_governor_cooldown_remaining > 0
+          for: 5m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Retry governor {{`{{ $labels.scheduler }}`}} in cooldown"
         - alert: RetryGovernorConsecutiveFailures
           expr: retry_governor_consecutive_failures > 5
           for: 2m
@@ -140,4 +198,37 @@ spec:
             component: worker
           annotations:
             summary: "CRITICAL: Pending delivery stuck for >24h"
+        # The incoming counterpart. The gauge was always exported; only the alert was missing,
+        # so a Forward could sit pending indefinitely while the identical Delivery paged.
+        - alert: OldestPendingForwardStale
+          expr: forward_oldest_pending_age_seconds > 3600
+          for: 5m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Oldest pending forward is {{`{{ $value | printf \"%.0f\" }}`}}s old"
+
+    # Everything above measures what the platform is doing. Nothing measured whether it was
+    # doing anything: a worker that died outright tripped no rule directly, and surfaced only
+    # minutes later as a backlog someone had to interpret. The job label is the Service name,
+    # which is what the Prometheus Operator derives from this chart's ServiceMonitors.
+    - name: railhook.infrastructure
+      rules:
+        - alert: ApiDown
+          expr: up{job="{{ include "railhook.fullname" . }}-api", namespace="{{ .Release.Namespace }}"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: api
+          annotations:
+            summary: "The api is not being scraped — no event can be accepted right now"
+        - alert: WorkerDown
+          expr: up{job="{{ include "railhook.fullname" . }}-worker", namespace="{{ .Release.Namespace }}"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: worker
+          annotations:
+            summary: "The worker is not being scraped — nothing is delivering webhooks"
 {{- end }}
