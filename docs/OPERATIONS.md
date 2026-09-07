@@ -78,10 +78,13 @@ a substituted ladder.
 
 Recorded here rather than left to be discovered during an incident.
 
-**A Postgres restore does not reconcile Kafka and Redis.** A point-in-time or full restore leaves
-in-flight outbox rows, Kafka messages already published for events the restore rolled back, and
-Redis counters that no longer agree with the restored database. There is no written procedure for
-reconciling the three — see [Backup & Restore](#backup--restore) for the detail.
+**A Postgres restore needs Redis flushed, and about an hour to settle.** A restore rolls the
+database back to a point Kafka and Redis have moved past. Neither self-heals instantly: stale
+Kafka messages are declined by the claim step and dropped, and deliveries stranded as `PENDING`
+are picked up by `StuckDeliveryRecoveryService` once they have sat for an hour. Redis has to be
+flushed by hand — everything in it is derived, and stale is worse than empty. The full procedure
+is under [Disaster recovery](#disaster-recovery); it is a sequence to follow, not an automatic
+recovery.
 
 **Delivery is at-least-once.** An Attempt can succeed at the endpoint and fail to record. Receivers
 must dedupe on the delivery id, which the `webhook-id` header carries unchanged across retries.
@@ -304,11 +307,55 @@ database targets — see that job for the exact steps. An untested restore path
 is the most common cause of an unusable backup; this is what turns "we take
 backups" into a guarantee that they're restorable.
 
-**Open question this repo doesn't fully answer yet — Postgres PITR vs.
-Kafka/Redis state:** a point-in-time (or full) Postgres restore leaves
-in-flight outbox rows, Kafka messages already published for events the restore
-rolled back, and Redis counters that no longer agree with the restored DB.
-There is no written procedure for reconciling the three.
+### Disaster recovery
+
+**What you can promise.** With the shipped scheduled backup (`DB_BACKUP_INTERVAL_SECONDS`,
+daily by default) the worst-case data loss is one interval — everything ingested since the last
+dump. Recovery time is however long `pg_restore` takes on your data plus a stack restart; on a
+small installation that is minutes, and it is dominated by the restore, so measure it rather
+than guess. Shortening the interval shortens the loss; Postgres PITR shortens it further and is
+outside what this project ships.
+
+**Restoring onto a new host.** Three things have to come across, and one of them is not the
+database:
+
+1. `.env` — **without it the restore is useless.** `WEBHOOK_ENCRYPTION_KEY` and
+   `WEBHOOK_ENCRYPTION_SALT` are what every endpoint secret in the dump is encrypted with, so a
+   database restored beside a freshly generated `.env` gives you rows nothing can read and
+   deliveries that will never be signed correctly again. There is no recovery from losing it.
+   Back it up separately from the dump, and not next to it.
+2. `docker-compose.yml` — or re-run `install.sh` at the same version, which writes it.
+3. The dump itself.
+
+Then: `install.sh` (or `./railhook start`), stop the stack, `make restore-db FILE=...`, start it.
+
+**Reconciling Postgres, Kafka and Redis.** A restore rolls the database back to a point the
+broker and the cache have already moved past. Each of the three needs something different, and
+two of them need nothing:
+
+- **Redis: flush it.** Everything in it is derived or ephemeral — rate limiters and concurrency
+  permits (both with TTLs and leases), circuit-breaker state (`cb:`), per-endpoint sequence
+  counters (`seq:endpoint:`, which `SequenceReconciliationService` re-derives from the durable
+  high-water mark in `deliveries`), and monthly quota counters (`quota:events:`, which
+  `QuotaCounterService` re-seeds from the database when the key is absent). Nothing there is a
+  system of record, so a stale Redis is worse than an empty one: flush it before starting the
+  worker and let each service rebuild what it needs.
+- **Kafka: leave it alone.** Messages published for deliveries the restore rolled back refer to
+  rows that no longer exist or are no longer `PENDING`, and the claim step declines them —
+  `"delivery already claimed or not PENDING"` — so they are consumed, logged and dropped. You
+  will see a burst of those in the worker's logs after a restore. That is the mechanism working,
+  not a fault. Do not reset consumer offsets: skipping forward would drop the messages that are
+  still legitimate alongside the stale ones.
+- **Postgres: nothing by hand.** The mirror-image case — rows restored as `PENDING` whose Kafka
+  message was consumed before the backup was taken, so nothing will ever pick them up — is what
+  `StuckDeliveryRecoveryService` exists for. It resets stranded `PENDING` deliveries once they
+  have sat with no `next_retry_at` for `stuck-delivery.stranded-pending-threshold-minutes`
+  (default 60) and they re-enter the ladder. Expect the backlog to clear about an hour after the
+  restore rather than immediately, and watch `delivery_oldest_pending_age_seconds` come back down.
+
+**What is genuinely lost.** Events accepted after the dump are gone: the API answered 2xx to a
+caller who will not send them again. If you know the window, the honest thing is to tell the
+customers whose events fell in it — Railhook has no way to ask a sender to replay.
 
 ## Scaling
 
