@@ -7,6 +7,8 @@ import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.dto.OrganizationResponse;
 import com.webhook.platform.api.dto.UpdateOrganizationRequest;
 import com.webhook.platform.api.tenancy.SystemTenant;
+import com.webhook.platform.api.audit.AuditAction;
+import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.tenancy.TenantContext;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
@@ -83,8 +85,14 @@ public class OrganizationService {
      * Relies on ON DELETE CASCADE constraints in the schema:
      * organizations → projects → (api_keys, events, endpoints, subscriptions, deliveries, ...)
      * organizations → memberships
-     * organizations → audit_logs
+     *
+     * <p>The audit log is deliberately <em>not</em> in that list, and never was: {@code audit_log}
+     * carries an {@code organization_id} but no foreign key to organizations, so its rows outlive
+     * the organization they describe. That is what makes auditing this operation meaningful —
+     * a record that vanished along with its subject would answer nobody's question about
+     * whether an erasure was actually carried out, and when.
      */
+    @Auditable(action = AuditAction.ORGANIZATION_DELETED, resourceType = "Organization")
     @Transactional
     public void deleteOrganization() {
         UUID organizationId = TenantContext.require();
@@ -95,6 +103,29 @@ public class OrganizationService {
         organizationRepository.delete(organization);
         entityManager.flush();
         log.info("GDPR DELETE: organization {} deleted successfully", organizationId);
+    }
+
+    /**
+     * The same erasure, for an organization that is not the caller's current tenant.
+     *
+     * <p>{@link #deleteOrganization()} reads the tenant scope, which is right when a customer
+     * deletes their own organization from inside it. Erasing a person is the other case:
+     * {@link AccountErasureService} walks every organization they were alone in, and none of
+     * those is the scope the request arrived with.
+     *
+     * <p>Not exposed over HTTP, and deliberately not annotated {@code @Auditable} — the erasure
+     * that calls it writes one entry for the whole operation, and a second row per organization
+     * would describe the same act twice.
+     */
+    @SystemTenant("erasing a person deletes organizations other than the request's own")
+    @Transactional
+    public void deleteOrganizationById(UUID organizationId) {
+        Organization organization = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new NotFoundException("Organization not found"));
+
+        log.warn("GDPR DELETE: permanently deleting organization {} ('{}')", organizationId, organization.getName());
+        organizationRepository.delete(organization);
+        entityManager.flush();
     }
 
     @Transactional

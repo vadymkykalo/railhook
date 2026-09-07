@@ -22,6 +22,7 @@ import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.captcha.CaptchaVerifier;
 import com.webhook.platform.api.service.AuthService;
 import com.webhook.platform.api.service.SessionOrigin;
+import com.webhook.platform.api.service.AccountErasureService;
 import com.webhook.platform.api.service.UserSessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -50,6 +51,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserSessionService userSessionService;
+    private final AccountErasureService accountErasureService;
     private final AuthRateLimiterService authRateLimiterService;
     private final TrustedProxyResolver trustedProxyResolver;
     private final CaptchaVerifier captchaVerifier;
@@ -59,6 +61,7 @@ public class AuthController {
     public AuthController(
             AuthService authService,
             UserSessionService userSessionService,
+            AccountErasureService accountErasureService,
             AuthRateLimiterService authRateLimiterService,
             TrustedProxyResolver trustedProxyResolver,
             CaptchaVerifier captchaVerifier,
@@ -66,6 +69,7 @@ public class AuthController {
             @Value("${jwt.refresh-token-expiration:86400000}") long refreshTokenExpirationMs) {
         this.authService = authService;
         this.userSessionService = userSessionService;
+        this.accountErasureService = accountErasureService;
         this.authRateLimiterService = authRateLimiterService;
         this.trustedProxyResolver = trustedProxyResolver;
         this.captchaVerifier = captchaVerifier;
@@ -306,6 +310,34 @@ public class AuthController {
     public ResponseEntity<Void> revokeAllSessions(AuthContext auth, HttpServletResponse httpResponse) {
         auth.requireJwt();
         userSessionService.revokeAllSessions(auth.requireUserId());
+        clearRefreshTokenCookie(httpResponse);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(operationId = "eraseOwnAccount", summary = "Erase your account",
+            description = "GDPR Article 17. Permanently removes the personal data on the account and "
+                    + "makes it unusable: the address is replaced with an unroutable one, the name is "
+                    + "dropped, every session is closed and every membership is removed. Any "
+                    + "organization you were the only member of is deleted with it, including every "
+                    + "project, endpoint, event and delivery under it. This cannot be undone.\n\n"
+                    + "Refused with 409 if you are the last owner of an organization that still has "
+                    + "other members: hand it over first, or the people left behind can neither "
+                    + "administer nor delete it.\n\n"
+                    + "The audit log keeps a record that this happened. It names no contact details "
+                    + "and is what lets the erasure be shown to have been carried out.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Account erased"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "409", description = "Last owner of an organization that has other members")
+    })
+    @RequireAccess(AccessLevel.READ)
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> eraseOwnAccount(AuthContext auth, HttpServletResponse httpResponse) {
+        // A JWT only: an API key belongs to a project, has no person behind it, and must not be
+        // able to erase the human who created it.
+        auth.requireJwt();
+        accountErasureService.eraseAccount(auth.requireUserId());
         clearRefreshTokenCookie(httpResponse);
         return ResponseEntity.noContent().build();
     }

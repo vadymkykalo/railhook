@@ -5,8 +5,11 @@ import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.GdprExportDto;
 import com.webhook.platform.api.dto.GdprExportDto.*;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.audit.AuditAction;
+import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -58,6 +61,14 @@ public class GdprExportService {
         this.userRepository = userRepository;
     }
 
+    /**
+     * GDPR Article 20 — everything the organization holds, in one downloadable file.
+     *
+     * <p>Audited despite reading nothing it does not own: the file leaves the platform and is
+     * then wherever whoever asked for it put it, so "who took a copy of all of this, and when"
+     * is a question that gets asked after the fact and has to have an answer.
+     */
+    @Auditable(action = AuditAction.DATA_EXPORTED, resourceType = "Organization")
     @Transactional(readOnly = true)
     public GdprExportDto exportOrganizationData() {
         UUID organizationId = TenantContext.require();
@@ -77,10 +88,13 @@ public class GdprExportService {
 
         List<MemberData> members = exportMembers();
         List<ProjectData> projects = exportProjects();
-        List<AuditLogData> auditLogs = exportAuditLogs();
+        Page<AuditLog> auditLogPage = auditLogPage();
+        List<AuditLogData> auditLogs = toAuditLogData(auditLogPage);
+        boolean auditLogsTruncated = auditLogPage.getTotalElements() > auditLogs.size();
 
-        log.info("GDPR EXPORT: completed for organization {} — {} members, {} projects, {} audit logs",
-                organizationId, members.size(), projects.size(), auditLogs.size());
+        log.info("GDPR EXPORT: completed for organization {} — {} members, {} projects, {} of {} audit logs",
+                organizationId, members.size(), projects.size(), auditLogs.size(),
+                auditLogPage.getTotalElements());
 
         return GdprExportDto.builder()
                 .exportVersion(EXPORT_VERSION)
@@ -89,6 +103,8 @@ public class GdprExportService {
                 .members(members)
                 .projects(projects)
                 .auditLogs(auditLogs)
+                .auditLogsTruncated(auditLogsTruncated)
+                .auditLogsTotal(auditLogPage.getTotalElements())
                 .build();
     }
 
@@ -206,10 +222,21 @@ public class GdprExportService {
                 .toList();
     }
 
-    private List<AuditLogData> exportAuditLogs() {
+    /**
+     * The most recent {@value #AUDIT_LOG_LIMIT} audit entries, and how many there were in all.
+     *
+     * <p>The cap exists because an organization's audit history has no upper bound and this
+     * response is assembled in memory. What it must not do is pass for the whole thing: the
+     * page's total goes into the export so the file says what it is.
+     */
+    private Page<AuditLog> auditLogPage() {
         UUID organizationId = TenantContext.require();
         Pageable limit = PageRequest.of(0, AUDIT_LOG_LIMIT);
-        return auditLogRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId, limit).getContent().stream()
+        return auditLogRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId, limit);
+    }
+
+    private List<AuditLogData> toAuditLogData(Page<AuditLog> page) {
+        return page.getContent().stream()
                 .map(a -> AuditLogData.builder()
                         .action(a.getAction())
                         .resourceType(a.getResourceType())

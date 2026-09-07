@@ -2998,7 +2998,15 @@ export interface paths {
         get: operations["getCurrentUser"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Erase your account
+         * @description GDPR Article 17. Permanently removes the personal data on the account and makes it unusable: the address is replaced with an unroutable one, the name is dropped, every session is closed and every membership is removed. Any organization you were the only member of is deleted with it, including every project, endpoint, event and delivery under it. This cannot be undone.
+         *
+         *     Refused with 409 if you are the last owner of an organization that still has other members: hand it over first, or the people left behind can neither administer nor delete it.
+         *
+         *     The audit log keeps a record that this happened. It names no contact details and is what lets the erasure be shown to have been carried out.
+         */
+        delete: operations["eraseOwnAccount"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5109,6 +5117,9 @@ export interface components {
             members?: components["schemas"]["MemberData"][];
             projects?: components["schemas"]["ProjectData"][];
             auditLogs?: components["schemas"]["AuditLogData"][];
+            auditLogsTruncated?: boolean;
+            /** Format: int64 */
+            auditLogsTotal?: number;
         };
         IncomingDestinationData: {
             /** Format: uuid */
@@ -10690,6 +10701,38 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["CurrentUserResponse"];
                 };
+            };
+        };
+    };
+    eraseOwnAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Account erased */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Last owner of an organization that has other members */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
