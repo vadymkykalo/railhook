@@ -59,7 +59,7 @@ public class ClientErrorController {
         // stronger than any scope it could hold, which is why this handler declares no
         // @RequireScope — see MutatingHandlerScopeDeclarationTest's exemption list.
         auth.requireJwt();
-        clientErrorReportService.record(request, auth.userId(), auth.organizationId());
+        clientErrorReportService.record(request, auth.userId());
         return ResponseEntity.status(HttpStatus.ACCEPTED).build();
     }
 }

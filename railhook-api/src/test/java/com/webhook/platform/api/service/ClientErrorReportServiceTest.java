@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.webhook.platform.api.dto.ClientErrorReportRequest;
+import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,7 +67,7 @@ class ClientErrorReportServiceTest {
         @Test
         @DisplayName("a newline in the message cannot forge a second log entry")
         void newlinesAreStripped() {
-            service.record(report("boom\nERROR c.w.p.Fake - the database is gone"), UUID.randomUUID(), null);
+            service.record(report("boom\nERROR c.w.p.Fake - the database is gone"), UUID.randomUUID());
 
             String logged = loggedText();
             assertFalse(logged.contains("\nERROR"),
@@ -77,7 +78,7 @@ class ClientErrorReportServiceTest {
         @Test
         @DisplayName("carriage returns go too")
         void carriageReturnsAreStripped() {
-            service.record(report("boom\r\nsomething else"), UUID.randomUUID(), null);
+            service.record(report("boom\r\nsomething else"), UUID.randomUUID());
 
             assertFalse(loggedText().contains("\r"), loggedText());
         }
@@ -87,7 +88,7 @@ class ClientErrorReportServiceTest {
         void controlCharactersAreStripped() {
             // A NUL truncates the line for some readers; an escape sequence repaints the
             // terminal of whoever is tailing the log.
-            service.record(report("boom\u0000cut\u001B[31mred"), UUID.randomUUID(), null);
+            service.record(report("boom\u0000cut\u001B[31mred"), UUID.randomUUID());
 
             String logged = loggedText();
             assertFalse(logged.contains("\u0000"), logged);
@@ -106,7 +107,7 @@ class ClientErrorReportServiceTest {
             ClientErrorReportRequest r = report("boom");
             r.setStack("x".repeat(50_000));
 
-            service.record(r, UUID.randomUUID(), null);
+            service.record(r, UUID.randomUUID());
 
             assertTrue(loggedText().length() < 10_000,
                     "one report must not be able to fill a log volume");
@@ -118,7 +119,7 @@ class ClientErrorReportServiceTest {
             ClientErrorReportRequest r = report("boom");
             r.setUrl("https://hooks.example.com/admin/deliveries?token=secret-value&page=2");
 
-            service.record(r, UUID.randomUUID(), null);
+            service.record(r, UUID.randomUUID());
 
             String logged = loggedText();
             assertFalse(logged.contains("secret-value"),
@@ -136,7 +137,7 @@ class ClientErrorReportServiceTest {
         void perUserCap() {
             UUID user = UUID.randomUUID();
             for (int i = 0; i < 20; i++) {
-                service.record(report("boom " + i), user, null);
+                service.record(report("boom " + i), user);
             }
 
             List<ILoggingEvent> events = appender.list;
@@ -149,11 +150,11 @@ class ClientErrorReportServiceTest {
         void capIsPerUser() {
             UUID noisy = UUID.randomUUID();
             for (int i = 0; i < 20; i++) {
-                service.record(report("boom"), noisy, null);
+                service.record(report("boom"), noisy);
             }
             appender.list.clear();
 
-            service.record(report("a different user's problem"), UUID.randomUUID(), null);
+            service.record(report("a different user's problem"), UUID.randomUUID());
 
             assertEquals(1, appender.list.size());
         }
@@ -164,7 +165,7 @@ class ClientErrorReportServiceTest {
     void disabledDropsSilently() {
         ClientErrorReportService disabled = new ClientErrorReportService(false, 5);
 
-        disabled.record(report("boom"), UUID.randomUUID(), null);
+        disabled.record(report("boom"), UUID.randomUUID());
 
         assertTrue(appender.list.isEmpty(), "reporting is off; nothing about the report belongs in the log");
     }
@@ -172,7 +173,7 @@ class ClientErrorReportServiceTest {
     @Test
     @DisplayName("the report is logged at WARN — visible, but not an incident of its own")
     void logsAtWarn() {
-        service.record(report("boom"), UUID.randomUUID(), null);
+        service.record(report("boom"), UUID.randomUUID());
 
         assertEquals(Level.WARN, appender.list.get(0).getLevel());
     }
@@ -180,18 +181,20 @@ class ClientErrorReportServiceTest {
     @Test
     @DisplayName("a report with no message at all is ignored rather than logged empty")
     void blankMessageIsIgnored() {
-        service.record(report("   "), UUID.randomUUID(), null);
+        service.record(report("   "), UUID.randomUUID());
 
         assertTrue(appender.list.isEmpty());
     }
 
     @Test
-    @DisplayName("the organization is on the line, so one tenant's breakage is findable")
-    void organizationIsRecorded() {
+    @DisplayName("the organization is taken from the tenant scope, not from the caller")
+    void organizationComesFromTheScope() {
         UUID org = UUID.randomUUID();
 
-        service.record(report("boom"), UUID.randomUUID(), org);
+        TenantContext.runAs(org, () -> service.record(report("boom"), UUID.randomUUID()));
 
-        assertTrue(loggedText().contains(org.toString()), loggedText());
+        assertTrue(loggedText().contains(org.toString()),
+                "whose organization this is is a property of the request, so it must come off the "
+                        + "scope rather than off an argument a handler could pass wrongly: " + loggedText());
     }
 }

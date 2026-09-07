@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.dto.ClientErrorReportRequest;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -69,8 +70,12 @@ public class ClientErrorReportService {
      * Records one report, or decides not to. Never throws: the caller is a page that has already
      * failed once, and the endpoint answers 202 either way — telling a broken dashboard that its
      * complaint was rate-limited helps nobody.
+     *
+     * <p>The organization comes off the tenant scope rather than off the caller, which is the
+     * rule everywhere in this codebase: whose organization this is is a property of the request,
+     * not an argument a handler can get wrong.
      */
-    public void record(ClientErrorReportRequest report, UUID userId, UUID organizationId) {
+    public void record(ClientErrorReportRequest report, UUID userId) {
         if (!enabled) {
             return;
         }
@@ -83,7 +88,7 @@ public class ClientErrorReportService {
         }
 
         log.warn("Dashboard error [org={} user={} release={}] at {}: {}{}{}",
-                organizationId, userId,
+                TenantContext.current(), userId,
                 clean(report.getRelease(), MAX_RELEASE),
                 pathOf(report.getUrl()),
                 message,
