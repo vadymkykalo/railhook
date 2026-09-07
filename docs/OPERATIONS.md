@@ -328,16 +328,32 @@ kubectl scale deployment railhook-worker --replicas=10
 ## Upgrades
 
 ```bash
-# Docker Compose
+# Docker Compose, on a deployment install.sh created
+./railhook upgrade v2.13.0     # backs up first, then pulls and restarts
+./railhook upgrade             # same, at whatever the tags in .env already say
+
+# Docker Compose, from a clone
 docker compose pull
 make rebuild
 
-# Kubernetes (zero-downtime)
+# Kubernetes
 helm upgrade railhook ./deploy/helm/railhook
 
-# Rollback if needed
+# Rollback — images only, see below
 kubectl rollout undo deployment railhook-api
 ```
+
+**Rolling back is not symmetric, and this is the thing to know before upgrading anything.**
+Both rollbacks above return the *images*. Neither returns the schema: Flyway runs forward-only
+migrations here and there are no down-migrations, so a release that added a column leaves it
+there when you roll its image back. That is usually harmless — the older code ignores a column
+it does not know about — and is not harmless when a migration dropped or retyped something the
+older code still reads.
+
+So the order that works is: take a backup, upgrade, and if it goes wrong decide whether the
+problem is the *code* (roll the images back and carry on) or the *schema* (restore the dump).
+`./railhook upgrade` takes that backup for you and refuses to continue if it fails, because
+continuing is the only genuinely bad option at that point.
 
 **Upgrade drill (CI):** `.github/workflows/ci.yml`'s `upgrade-smoke` job installs the last
 release tag, registers an account, creates a project and an API key, ingests an event, then

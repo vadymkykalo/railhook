@@ -543,16 +543,56 @@ case "${1:-help}" in
     status)  compose ps ;;
     logs)    shift; compose logs -f "$@" ;;
     upgrade)
-        echo "Edit API_IMAGE_TAG / WORKER_IMAGE_TAG / UI_IMAGE_TAG in .env first, then:"
-        compose pull && compose up -d ;;
+        # Takes a backup first, because the thing an upgrade does that cannot be undone is run
+        # migrations: `compose up -d` with an older tag rolls the images back, and rolls nothing
+        # in the database back with them. Flyway has no down-migrations here and never will.
+        # Read before anything is rewritten: this is what the rollback hint has to name, and
+        # after the sed below it would name the version being upgraded *to*.
+        from=$(grep '^API_IMAGE_TAG=' .env | cut -d= -f2- || echo unknown)
+        want="${2:-}"
+        if [ -n "$want" ]; then
+            for v in API_IMAGE_TAG WORKER_IMAGE_TAG UI_IMAGE_TAG; do
+                if grep -q "^${v}=" .env; then sed -i.bak "s|^${v}=.*|${v}=${want}|" .env
+                else echo "${v}=${want}" >> .env; fi
+            done
+            rm -f .env.bak
+            echo "Pinned API/WORKER/UI image tags to ${want}."
+        else
+            echo "No version given, so whatever the tags in .env already say. Pass one to change them:"
+            echo "  ./railhook upgrade v2.13.0"
+        fi
+
+        echo "Backing up before anything changes..."
+        "$0" backup || { echo "Backup failed — not upgrading. Fix that first." >&2; exit 1; }
+
+        compose pull
+        compose up -d
+
+        echo
+        echo "Upgraded. Watch it come up:  ./railhook status"
+        echo "If it does not, the images roll back with:"
+        echo "  sed -i 's|^API_IMAGE_TAG=.*|API_IMAGE_TAG=${from}|' .env   # and WORKER_/UI_"
+        echo "  ./railhook start"
+        echo "The schema does not roll back with them — restore the dump above if a migration"
+        echo "is what went wrong." ;;
     backup)
+        # Reads .env rather than the invoking shell: POSTGRES_USER and POSTGRES_DB live there,
+        # and taking them from the environment meant the defaults below were what actually ran.
+        # shellcheck disable=SC1091
+        set -a; [ -f .env ] && . ./.env; set +a
         f="backup-$(date -u +%Y%m%dT%H%M%SZ).dump"
-        compose exec -T postgres pg_dump -U "${POSTGRES_USER:-webhook_user}" -Fc webhook_platform > "$f"
+        # Same flags as deploy/scripts/db-backup.sh and the chart's CronJob: -Fc to be
+        # restorable with pg_restore at all, --no-owner --no-privileges to restore into a
+        # database whose roles differ from this one's, which is every real recovery.
+        compose exec -T postgres pg_dump -U "${POSTGRES_USER:-webhook_user}" \
+            -d "${POSTGRES_DB:-webhook_platform}" \
+            -Fc --no-owner --no-privileges > "$f"
         echo "wrote $f — keep .env with it, or the encrypted columns are unreadable" ;;
     doctor)  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh \
                  | bash -s -- --check --dir "$(pwd)" ;;
     help|-h|--help)
-        echo "railhook start|stop|restart|status|logs [service]|upgrade|backup|doctor" ;;
+        echo "railhook start|stop|restart|status|logs [service]|upgrade [version]|backup|doctor"
+        echo "  upgrade takes a backup first; it does not roll the schema back afterwards" ;;
     *)       compose "$@" ;;
 esac
 HELPER

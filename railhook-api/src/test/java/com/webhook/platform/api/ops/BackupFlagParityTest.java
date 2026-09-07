@@ -34,6 +34,8 @@ class BackupFlagParityTest {
     private static final Path SCRIPT = Paths.get("..", "deploy", "scripts", "db-backup.sh");
     private static final Path CRONJOB =
             Paths.get("..", "deploy", "helm", "railhook", "templates", "db-backup-cronjob.yaml");
+    /** The `railhook backup` helper install.sh writes into a deployment directory. */
+    private static final Path INSTALLER = Paths.get("..", "install.sh");
 
     /** The flags that decide whether a dump can be restored, and where. */
     private static final Set<String> REQUIRED_FLAGS = Set.of("-Fc", "--no-owner", "--no-privileges");
@@ -87,6 +89,41 @@ class BackupFlagParityTest {
                             + "without --no-owner and --no-privileges a dump will not restore into a database "
                             + "whose roles differ from the source, which is every real recovery.");
         }
+    }
+
+    @Test
+    @DisplayName("the installer's own backup command uses the same flag set")
+    void installerBackupCarriesTheSameFlags() throws IOException {
+        String installer = read(INSTALLER);
+        assertTrue(installer.contains("pg_dump"), INSTALLER + " no longer writes a backup command");
+
+        for (String flag : REQUIRED_FLAGS) {
+            assertTrue(installer.contains(flag),
+                    "the `railhook backup` helper written by install.sh is missing " + flag + ". It is the "
+                            + "backup most operators will actually take — it runs before every `railhook "
+                            + "upgrade` — and a dump without --no-owner --no-privileges will not restore into "
+                            + "a database whose roles differ from the source.");
+        }
+    }
+
+    @Test
+    @DisplayName("the installer takes a backup before it upgrades")
+    void upgradeBacksUpFirst() throws IOException {
+        String installer = read(INSTALLER);
+
+        int upgrade = installer.indexOf("    upgrade)");
+        int backup = installer.indexOf("    backup)");
+        assertTrue(upgrade >= 0 && backup > upgrade,
+                "install.sh's helper no longer has both an upgrade and a backup command in that order");
+
+        String upgradeBlock = installer.substring(upgrade, backup);
+        assertTrue(upgradeBlock.contains("backup"),
+                "`railhook upgrade` does not take a backup first. Migrations are the part of an upgrade "
+                        + "that cannot be undone: rolling the image tags back rolls nothing in the database "
+                        + "back with them, and this project has no down-migrations.");
+        assertTrue(upgradeBlock.contains("exit 1"),
+                "`railhook upgrade` continues even when the backup fails, which is the one case where "
+                        + "carrying on is worse than stopping.");
     }
 
     @Test
