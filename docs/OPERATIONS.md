@@ -351,6 +351,34 @@ breaks the previous release's code while it is still serving — a `NOT NULL` co
 a default, say — would pass this and fail in Kubernetes. See the V056 note below for what that
 looks like in practice.
 
+### Index builds block writes, on the tables where that matters
+
+Twenty-four of the migrations that have shipped build an index on a table that grows without
+bound — `events`, `deliveries`, `delivery_attempts`, `incoming_events`,
+`incoming_forward_attempts`, `outbox_messages`, `tunnel_request_log`, `audit_log`,
+`usage_daily` — and they do it with a plain `CREATE INDEX`, which holds a `SHARE` lock until the
+build finishes. Every write to that table waits. On an installation with real history that is an
+outage for the length of the build, and it presents as "the upgrade hung": the API pod's startup
+probe is waiting on Flyway, and Railhook has stopped accepting webhooks.
+
+They cannot be fixed retroactively. Flyway validates the checksum of every migration it has
+applied, so editing one breaks the next start of every installation that already ran it —
+`MigrationChecksumTest` enforces that, and is right to.
+
+**So: upgrading a large installation across an unapplied migration from that list needs a
+window.** Check which are outstanding before you start:
+
+```sql
+SELECT version, description FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 5;
+```
+
+Anything newer than the last row there is about to be applied.
+
+New migrations do not add to the debt: `MigrationIndexLockingTest` fails the build on a
+`CREATE INDEX` against one of those tables without `CONCURRENTLY`, and on a `CONCURRENTLY`
+without the `-- flyway:executeInTransaction=false` header it needs (PostgreSQL refuses
+`CONCURRENTLY` inside a transaction, and Flyway opens one by default).
+
 ### V056 — the tenant column is not an instant migration
 
 `V056__tenant_organization_id.sql` adds `organization_id` to 31 tables, backfills each one from
