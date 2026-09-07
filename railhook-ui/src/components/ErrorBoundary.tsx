@@ -2,6 +2,7 @@ import { Component, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from './ui/button';
 import i18n from '../i18n';
+import { reportClientError } from '../lib/reportClientError';
 
 interface Props {
   children: ReactNode;
@@ -31,7 +32,20 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    // The console is for whoever has devtools open. This is for everyone else: without it a
+    // screen that throws for every customer looks, from the server, exactly like a screen
+    // nobody opened. The report goes to this installation's own logs and nowhere else, and
+    // reportClientError swallows its own failures — a broken reporter must not become a
+    // second error on top of the one already on screen.
     console.error('ErrorBoundary caught:', error, info.componentStack);
+    try {
+      void reportClientError(error, { componentStack: info.componentStack ?? undefined });
+    } catch {
+      // reportClientError already swallows its own failures, so this catches only the
+      // impossible: a throw on the way in. It is here because this is the last boundary
+      // there is — if componentDidCatch throws, React renders nothing at all and the user
+      // gets a blank page instead of the apology this class exists to show them.
+    }
   }
 
   handleReset = () => {

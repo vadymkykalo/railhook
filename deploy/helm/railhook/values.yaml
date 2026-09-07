@@ -58,6 +58,9 @@ api:
   
   env:
     APP_ENV: production
+    # Dashboard failures come back here and go into this pod's logs. Nothing leaves the
+    # cluster; there is no third party involved.
+    CLIENT_ERROR_REPORTING_ENABLED: "true"
     LOG_LEVEL: INFO
     WEBHOOK_ALLOW_PRIVATE_IPS: "false"
     SWAGGER_ENABLED: "false"
