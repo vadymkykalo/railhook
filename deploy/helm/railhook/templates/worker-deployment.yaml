@@ -22,6 +22,12 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "railhook.serviceAccountName" . }}
+      # 30s to drain the Kafka containers, then the two BoundedAsyncExecutors wait
+      # out their in-flight deliveries in @PreDestroy, one after the other. The
+      # Kubernetes default of 30s cut that short on every rollout and every HPA
+      # scale-down. Keep in step with docker-compose.yml's stop_grace_period —
+      # ShutdownBudgetTest fails the build if they disagree.
+      terminationGracePeriodSeconds: {{ .Values.worker.terminationGracePeriodSeconds }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:

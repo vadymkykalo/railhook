@@ -27,6 +27,9 @@ app:
 
 # API service configuration
 api:
+  # 30s for spring.lifecycle.timeout-per-shutdown-phase to drain the web server,
+  # plus margin. Mirrors docker-compose.yml's stop_grace_period for the api.
+  terminationGracePeriodSeconds: 65
   replicaCount: 2
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
@@ -95,6 +98,12 @@ api:
 
 # Worker service configuration
 worker:
+  # 30s (lifecycle, drains the Kafka containers) + 2 x
+  # WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS (the outgoing and incoming
+  # BoundedAsyncExecutors, which shut down in @PreDestroy after the lifecycle
+  # phase and one after the other) + margin. The Kubernetes default of 30s
+  # SIGKILLed the worker mid-delivery on every rollout and HPA scale-down.
+  terminationGracePeriodSeconds: 155
   replicaCount: 2
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
@@ -154,6 +163,8 @@ worker:
 
 # UI service configuration
 ui:
+  # nginx serves static files; there is nothing in flight worth waiting for.
+  terminationGracePeriodSeconds: 30
   replicaCount: 2
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag

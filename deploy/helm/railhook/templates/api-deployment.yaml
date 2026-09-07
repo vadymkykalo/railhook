@@ -22,6 +22,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "railhook.serviceAccountName" . }}
+      # Smaller than the worker's: the api drains one graceful web server, not two
+      # thread pools waiting on in-flight HTTP deliveries.
+      terminationGracePeriodSeconds: {{ .Values.api.terminationGracePeriodSeconds }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       {{- /*
