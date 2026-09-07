@@ -393,6 +393,16 @@ networkPolicy:
   policyTypes:
     - Ingress
     - Egress
+  # Where PostgreSQL, Kafka and Redis are, when they are not in this namespace — which is
+  # the arrangement this chart expects, since it ships none of the three and
+  # values-production.yaml points all three at managed services. Those live in the
+  # cluster's VPC, so the default is the private ranges; narrow it to your database's own
+  # address if you would rather be precise. Set it to [] only if all three really do run
+  # as pods beside the application, or the policy will deny the connections.
+  dependencyEgressCidrs:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
 
 # Pod Security Context
 podSecurityContext:
