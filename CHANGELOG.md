@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The dashboard reports its own failures.** A render error reached `console.error` in one
+  person's browser and stopped there, so from the server a screen that threw for every customer
+  was indistinguishable from a screen nobody had opened.
+
+  The reports go to a new endpoint in this installation and nowhere else — no third party, no
+  DSN, no account to create. With the `production` profile now activating the JSON appender,
+  a dashboard failure lands in Loki beside the correlation id of whatever request the page was
+  making when it broke, and a self-hosted operator reads it in their own logs like everything
+  else. `CLIENT_ERROR_REPORTING_ENABLED` turns it off.
+
+  That moves the risk rather than removing it, because the string on the log line is now one a
+  browser chose. `ClientErrorReportService` therefore strips every character that could end a
+  line, bounds each field, drops the URL's query string — where a share token would be — and
+  caps how often one user can write, so a component throwing on every render cannot produce a
+  log line per frame. On the client, `reportClientError` never throws, never retries, reports
+  each distinct failure once, and stays quiet with no session.
+
 ### Fixed
 
 - **A response body too large to read turned a delivered webhook into a retry.** `AttemptRunner`
@@ -110,6 +129,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   true instead of deleting the promise: it guards `-Fc`, which makes a dump restorable at all, and
   `--no-owner --no-privileges`, which let it restore into a database whose roles differ from the
   source. That is every real recovery, and a dump taken without them looks fine until it is needed.
+
+### Testing
+
+- **`src/auth` went from 5.9% to 62% covered**, 90% of branches. It is the sign-in path: the one
+  place where a bug does not degrade the product but locks people out of it, and where nobody
+  who hits it has a session to work around it with. The cases guard what costs the most — that
+  `ProtectedRoute` treats a user whose role is missing as the *least* privileged rather than the
+  most, that both `LoginPage` and `RegisterPage` put the token on the http client before asking
+  who the user is, and that neither the password reset nor the invite acceptance calls a backend
+  when the URL it was reached with is incomplete.
 
 ## [2.12.0] - 2026-09-07
 
