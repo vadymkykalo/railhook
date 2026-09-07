@@ -3831,16 +3831,6 @@
     "language": "Language",
     "newPassword": "New password",
     "newPasswordHint": "Min 8 characters, must include uppercase, lowercase, digit, and special character",
-    "notifications": {
-      "browser": "Browser Notifications",
-      "browserDesc": "Push notifications in your browser (requires permission)",
-      "description": "Choose how you want to receive notifications",
-      "email": "Email Notifications",
-      "emailDesc": "Receive important alerts via email",
-      "inApp": "In-App Notifications",
-      "inAppDesc": "Show notifications within the application",
-      "title": "Notification Preferences"
-    },
     "orgId": "Organization ID",
     "orgName": "Organization Name",
     "organization": "Organization",

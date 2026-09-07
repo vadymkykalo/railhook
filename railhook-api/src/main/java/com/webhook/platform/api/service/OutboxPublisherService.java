@@ -95,7 +95,7 @@ public class OutboxPublisherService {
 
         // SENDING was previously invisible to outbox_queue_depth entirely, so a batch
         // of messages stuck SENDING (in-flight past batch-send-timeout-seconds) produced no
-        // metric signal at all — see deploy/prometheus/alerts.yml's OutboxSendingStuck alert.
+        // metric signal at all. The OutboxSendingStuck alert is what reads this tag.
         Gauge.builder("outbox_queue_depth", outboxMessageRepository,
                         repo -> repo.countByStatus(OutboxStatus.SENDING))
                 .description("Number of outbox messages by status")

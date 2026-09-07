@@ -2,6 +2,12 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'ax
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+/** Long enough for any ordinary call, short enough that a hung backend surfaces as an error. */
+export const DEFAULT_TIMEOUT_MS = 30_000;
+
+/** Exports stream a whole dataset; they are the one call that may legitimately outlast the rest. */
+export const EXPORT_TIMEOUT_MS = 120_000;
+
 type OnRefreshedCallback = (token: string) => void;
 type OnLogoutCallback = () => void;
 
@@ -19,6 +25,11 @@ class HttpClient {
         'Content-Type': 'application/json',
       },
       withCredentials: true, // Send cookies with requests
+      // Without this a request that never answers never settles, and the page it belongs to
+      // spins until someone reloads: no error state, no retry, nothing for react-query to
+      // catch. 30s is generous for an ordinary call and still finite. getBlob raises it —
+      // an export is the one thing here that legitimately takes longer.
+      timeout: DEFAULT_TIMEOUT_MS,
     });
 
     this.client.interceptors.request.use((config) => {
@@ -99,7 +110,7 @@ class HttpClient {
   }
 
   async getBlob(url: string): Promise<Blob> {
-    const response = await this.client.get(url, { responseType: 'blob' });
+    const response = await this.client.get(url, { responseType: 'blob', timeout: EXPORT_TIMEOUT_MS });
     return response.data;
   }
 

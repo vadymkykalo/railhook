@@ -253,7 +253,7 @@ auth" for the full rationale. The Helm chart splits the port the same way, and
 its `ServiceMonitor` scrapes the management port by name.
 
 Alerting: `make monitoring-up` also starts Alertmanager (`:9093`), which routes
-the 14 rules in `deploy/prometheus/alerts.yml` to Slack/webhook/email via the
+the rules in `monitoring/prometheus/alerts.yml` to Slack/webhook/email via the
 `ALERTMANAGER_*` env vars (`.env.dist`). See `monitoring/README.md` "Alerting".
 
 **Kubernetes (closed):** the chart sets `MANAGEMENT_PORT` on both deployments

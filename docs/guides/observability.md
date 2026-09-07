@@ -83,24 +83,43 @@ the Ladder. A high rate is not an error; it is the platform protecting something
 `rules_matched_total`, `rules_drop_total`, `events_duplicate_total` (idempotency working),
 `events_fanout_limited_total` (an Event matched more subscriptions than the fan-out cap allows).
 
-## Alerts that ship with the chart
+## Alerts
 
-`deploy/helm/railhook/templates/prometheusrule.yaml` defines thirteen rules. They are grouped by
-what they mean rather than by what they measure:
+The same set ships twice, because a deployment reads one or the other and never both:
+`monitoring/prometheus/alerts.yml` for Compose, and the PrometheusRule the chart renders from
+`deploy/helm/railhook/templates/prometheusrule.yaml` for Kubernetes. They are held identical by
+`AlertRuleParityTest`, a ratchet — they had drifted before it existed, and a Kubernetes operator
+was watching four fewer conditions than a Compose one without either knowing.
+
+Grouped by what they mean rather than by what they measure:
+
+**Work was accepted but never announced** — `OutboxOldestPendingAgeHigh`, `OutboxSendingStuck`.
+The earliest thing that can go wrong, and the only one invisible to every other rule here: an
+Event sitting in the outbox is not a Delivery yet, so no queue-depth metric counts it.
 
 **The backlog is growing** — `DeliveryPendingBacklogGrowing`, `…High`, `…Critical`,
-`OldestPendingDeliveryStale`, `OldestPendingDeliveryCritical`. Three severities on depth plus
-two on age, because depth and age fail differently: a big steady backlog that drains is fine,
-and a small backlog whose oldest member is four days old is not.
+`IncomingForwardPendingBacklogHigh`, `OldestPendingDeliveryStale`,
+`OldestPendingDeliveryCritical`, `OldestPendingForwardStale`. Severities on depth plus alerts on
+age, because depth and age fail differently: a big steady backlog that drains is fine, and a
+small backlog whose oldest member is four days old is not.
 
 **Obligations are being abandoned** — `DlqDepthGrowing`, `DlqRateHigh`,
-`IncomingForwardFailureRateHigh`.
+`IncomingForwardFailureRateHigh`, `DlqActionableBacklog`,
+`IncomingForwardDlqActionableBacklog`. The last two are the ones that need a person: they count
+what is sitting in DLQ status waiting to be retried or purged, and they return to zero when
+someone does it.
 
 **A protection is engaging, or has stopped protecting** — `CircuitBreakerTripsHigh`,
 `CircuitBreakerRejectionsHigh`, and `CircuitBreakerDegraded`. Note the third is the odd one out:
 the first two mean the breaker is working, the third means it is **not** because Redis is gone.
 
-**The platform itself is unwell** — `RetryGovernorConsecutiveFailures`, `ApiErrorRateHigh`.
+**The platform itself is unwell** — `RetryGovernorCooldown`,
+`RetryGovernorConsecutiveFailures`, `ApiErrorRateHigh`.
+
+**It is not running at all** — `ApiDown`, `WorkerDown`, on `up == 0`. Everything above measures
+what the platform is doing; these two say whether it is doing anything. Without them a process
+that died outright tripped nothing directly and surfaced minutes later as a backlog somebody had
+to interpret.
 
 ## If you only alert on three things
 

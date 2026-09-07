@@ -9,7 +9,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import PageHeader from '../components/PageHeader';
-import StatusBadge, { type StatusKind } from '../components/StatusBadge';
+import StatusBadge, { kindOfInvoiceStatus, type StatusKind } from '../components/StatusBadge';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import { ErrorState } from '../components/EmptyState';
 import { FormSection, SaveControl } from './SettingsPage';
@@ -512,7 +512,7 @@ export default function BillingPage() {
                           </TableCell>
                           <TableCell>
                             <StatusBadge
-                              kind={inv.status === 'paid' ? 'ok' : 'idle'}
+                              kind={kindOfInvoiceStatus(inv.status)}
                               icon={false}
                               label={t(`billing.invoiceStatuses.${inv.status}`, { defaultValue: inv.status })}
                             />

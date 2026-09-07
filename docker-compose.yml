@@ -391,6 +391,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    # 30s lifecycle + margin. Smaller than the worker's on purpose: the api drains
+    # one graceful web server, not two @PreDestroy thread pools waiting on in-flight
+    # HTTP deliveries.
     stop_grace_period: 65s
     logging:
       driver: json-file
@@ -445,6 +448,7 @@ services:
       WEBHOOK_OUTGOING_POOL_SIZE: ${WEBHOOK_OUTGOING_POOL_SIZE:-50}
       WEBHOOK_INCOMING_POOL_SIZE: ${WEBHOOK_INCOMING_POOL_SIZE:-20}
       WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS: ${WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS:-60}
+      WEBHOOK_MAX_RESPONSE_BODY_BYTES: ${WEBHOOK_MAX_RESPONSE_BODY_BYTES:-1048576}
       WEBHOOK_POOL_MAX_CONNECTIONS: ${WEBHOOK_POOL_MAX_CONNECTIONS:-200}
       WEBHOOK_POOL_PENDING_ACQUIRE_TIMEOUT_SECONDS: ${WEBHOOK_POOL_PENDING_ACQUIRE_TIMEOUT_SECONDS:-10}
       WEBHOOK_POOL_MAX_IDLE_TIME_SECONDS: ${WEBHOOK_POOL_MAX_IDLE_TIME_SECONDS:-60}
@@ -522,7 +526,15 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    stop_grace_period: 35s
+    # 30s (spring.lifecycle.timeout-per-shutdown-phase, which drains the Kafka
+    # containers) + 2 x WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS + margin. The two
+    # are the outgoing and incoming BoundedAsyncExecutors (ExecutorConfig); they
+    # shut down in @PreDestroy, which runs after the lifecycle phase and does not
+    # share its timeout, and Spring runs them one after the other. At 35s Docker
+    # sent SIGKILL while the first pool was still waiting on in-flight deliveries.
+    # Raise this whenever WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS goes up —
+    # ShutdownBudgetTest fails the build if the two disagree.
+    stop_grace_period: 155s
     logging:
       driver: json-file
       options:

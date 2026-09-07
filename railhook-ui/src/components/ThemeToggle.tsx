@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { getTheme, setTheme } from '../lib/theme';
+import { isDarkApplied, toggleTheme } from '../lib/theme';
 
 interface ThemeToggleProps {
   variant?: 'icon' | 'full';
@@ -10,14 +10,9 @@ interface ThemeToggleProps {
 
 export default function ThemeToggle({ variant = 'icon', className }: ThemeToggleProps) {
   const { t } = useTranslation();
-  const [, setToggle] = useState(false);
-  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+  const [isDark, setIsDark] = useState(() => typeof document !== 'undefined' && isDarkApplied());
 
-  const toggle = () => {
-    const next = getTheme() === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    setToggle(p => !p);
-  };
+  const toggle = () => setIsDark(toggleTheme() === 'dark');
 
   if (variant === 'full') {
     return (

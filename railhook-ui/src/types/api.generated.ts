@@ -2123,7 +2123,7 @@ export interface paths {
         head?: never;
         /**
          * Change member role
-         * @description Updates a member's role (OWNER, ADMIN, MEMBER, VIEWER)
+         * @description Updates a member's role to DEVELOPER or VIEWER. OWNER cannot be assigned here (409); API_KEY is not a human role and is never granted to a member.
          */
         patch: operations["changeMemberRole"];
         trace?: never;

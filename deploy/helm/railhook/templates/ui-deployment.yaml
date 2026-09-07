@@ -22,6 +22,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "railhook.serviceAccountName" . }}
+      terminationGracePeriodSeconds: {{ .Values.ui.terminationGracePeriodSeconds }}
       securityContext:
         {{- toYaml (.Values.ui.podSecurityContext | default .Values.podSecurityContext) | nindent 8 }}
       containers:

@@ -4,6 +4,15 @@ server:
 spring:
   application:
     name: railhook-worker
+  # Activated from APP_ENV, which is the switch every deployment already sets. Nothing in
+  # this codebase is annotated @Profile and there is no application-<profile>.yml, so the only
+  # thing a profile selects is the logback appender: logback-spring.xml emits LogstashEncoder
+  # JSON under `production` and human-readable lines otherwise. Without this line
+  # SPRING_PROFILES_ACTIVE was never set anywhere — not by compose, not by the chart, not by
+  # install.sh — so `production` never matched and every deployment logged plain text while
+  # promtail's json stage sat there parsing nothing.
+  profiles:
+    active: ${APP_ENV:development}
   lifecycle:
     timeout-per-shutdown-phase: 30s
   task:
@@ -106,6 +115,7 @@ webhook:
   outgoing-pool-size: ${WEBHOOK_OUTGOING_POOL_SIZE:50}
   incoming-pool-size: ${WEBHOOK_INCOMING_POOL_SIZE:20}
   async-shutdown-timeout-seconds: ${WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS:60}
+  max-response-body-bytes: ${WEBHOOK_MAX_RESPONSE_BODY_BYTES:1048576}
   connection-pool:
     max-connections: ${WEBHOOK_POOL_MAX_CONNECTIONS:200}
     pending-acquire-timeout-seconds: ${WEBHOOK_POOL_PENDING_ACQUIRE_TIMEOUT_SECONDS:10}
