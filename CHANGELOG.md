@@ -7,6 +7,110 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A response body too large to read turned a delivered webhook into a retry.** `AttemptRunner`
+  read the receiver's response with the WebClient codec default of 256 KiB. A receiver that
+  accepted the webhook and answered `200 OK` with a larger body threw `DataBufferLimitException`,
+  the throw was caught as "the request failed", and the whole retry ladder then ran against an
+  endpoint that already had the event.
+
+  The status line arrives before the body does, so by the time a read can fail the outcome is
+  already decided — that is now the sixth invariant in the class javadoc, beside the five that
+  each cost a duplicate before it. The limit is also declared rather than inherited:
+  `WEBHOOK_MAX_RESPONSE_BODY_BYTES` (1 MiB) applies through a `WebClientCustomizer`, so it reaches
+  the mTLS client too, which built its own builder and would otherwise have kept the default.
+
+- **The worker was killed part-way through its own graceful shutdown.** Stopping it takes 30s to
+  drain the Kafka containers and then, per `BoundedAsyncExecutor`, up to
+  `WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS` waiting out in-flight deliveries. There are two such
+  pools and they shut down in `@PreDestroy` — after the lifecycle phase, not sharing its timeout,
+  one after the other. The budget is 150s. Docker granted 35s; the Helm chart set nothing at all,
+  so Kubernetes applied its default of 30s on every rollout and every HPA scale-down. Both
+  SIGKILLed deliveries mid-flight, invisibly, because the ladder re-sent them later.
+
+  `ShutdownBudgetTest` derives the budget from `application.yml` and from the number of pools
+  `ExecutorConfig` actually builds, so raising the timeout — or adding a third pool — fails the
+  build rather than quietly eating the margin.
+
+- **The chart's own production configuration could not start.** `values-production.yaml` enables
+  the NetworkPolicy and points PostgreSQL, Kafka and Redis at managed services, which is the
+  arrangement the chart requires since it ships none of the three. The policy had no DNS rule at
+  all — and an egress section denies what it does not list — so on any CNI that enforces policy
+  the stack failed at name resolution. The dependency ports were then allowed only to pods in the
+  same namespace, so an RDS endpoint on 5432 matched nothing either. The kind smoke test never
+  saw it: kindnet does not enforce NetworkPolicy, and it stands the dependencies up in-namespace.
+
+- **The worker validated its production config after its consumers had started.** It ran from
+  `ApplicationReadyEvent`; the api moved off that trigger deliberately, because it leaves a window
+  where an insecure configuration is already reachable. For the worker the window is worse — what
+  is running by then is the Kafka listeners, so a worker started with a placeholder encryption key
+  and the SSRF guard off delivers webhooks before the check throws. Now `@PostConstruct`, with the
+  tests the worker's validator never had.
+
+- **Production logs were never actually JSON.** `logback-spring.xml` selects `LogstashEncoder`
+  under the `production` Spring profile, in both services, and nothing ever activated that
+  profile: `APP_ENV=production` is an ordinary property, and `SPRING_PROFILES_ACTIVE` appeared
+  nowhere in the repository. So every deployment logged plain text, promtail's `json` stage parsed
+  nothing, and the `level` label the observability guide promises never reached Loki. The profile
+  is now activated from `APP_ENV`, which is safe to do this way: there is no `@Profile` anywhere
+  in main and no `application-<profile>.yml`, so a profile selects the appender and nothing else.
+
+- **Three alert conditions nobody was watching, and two rule sets that had drifted.** The rules
+  lived in three files — one of them, `deploy/prometheus/alerts.yml`, mounted by nobody while
+  looking authoritative enough that a rule kept there appeared deployed. The two live sets were
+  four rules apart, so a Kubernetes operator watched fewer conditions than a Compose one.
+
+  Missing from all three: `outbox_oldest_pending_age_seconds`, which the observability guide names
+  as the third of the three signals to alert on if you alert on nothing else, and which no other
+  rule can stand in for — an Event in the outbox is not a Delivery yet, so no queue-depth metric
+  counts it; `forward_oldest_pending_age_seconds`, exported all along, while the identical
+  Delivery condition paged; and `up == 0` for either service, so a process that died outright
+  tripped nothing directly and surfaced minutes later as a backlog someone had to interpret.
+
+  The unmounted copy is deleted, the two survivors are identical at 22 rules, and
+  `AlertRuleParityTest` keeps them that way.
+
+- **Four things in the dashboard that the user saw and we did not.** A paid invoice always
+  rendered grey — the badge compared `inv.status` against `'paid'` while `InvoiceStatus` is upper
+  case — and the label was right, which is what kept it quiet. The theme toggle ignored the first
+  click, because it inverted the *stored* theme and the stored theme is `system` until someone
+  picks one. A 404 inside the dashboard offered the marketing site as the way back, having read a
+  `localStorage` key nothing writes. And a request that never answered never settled: the axios
+  client had no timeout, so a hung backend left the page spinning with no error state and nothing
+  for react-query to catch.
+
+### Removed
+
+- **The three notification switches in Settings.** They wrote to `localStorage` and nothing ever
+  read it; `Notification.requestPermission()` is called nowhere. A control that looks like a
+  feature and is not costs more trust than the absent feature does. Their translation keys went
+  with them.
+
+- **`deploy/prometheus/alerts.yml`** — a third copy of the alert rules that no deployment mounted.
+  See above.
+
+### Changed
+
+- **The member-role endpoint advertised two roles that have never existed.** Its OpenAPI
+  description said "OWNER, ADMIN, MEMBER, VIEWER"; `MembershipRole` is OWNER, DEVELOPER, VIEWER,
+  API_KEY, and this endpoint grants neither OWNER (409) nor API_KEY (not a human role). It was
+  public — `openapi.yaml` carried it and so did the generated in-app API reference.
+
+- **`SECURITY.md`'s supported-versions table** stopped at 2.10.x, two minors behind the release.
+
+- **The Helm README's rollout block** claimed Flyway runs in an init container and the worker HPA
+  scales on Kafka lag. The same file explains at length that the init container was removed and
+  could never have worked, and `worker-hpa.yaml` scales on CPU. Replaced with what happens, and
+  with the advice that block should have carried: take a backup, because `helm rollback` returns
+  the images and not the schema.
+
+- **`deploy/scripts/db-backup.sh` promised a check that did not exist** — `make
+  verify-backup-parity`, absent from the Makefile and from CI. `BackupFlagParityTest` makes it
+  true instead of deleting the promise: it guards `-Fc`, which makes a dump restorable at all, and
+  `--no-owner --no-privileges`, which let it restore into a database whose roles differ from the
+  source. That is every real recovery, and a dump taken without them looks fine until it is needed.
+
 ## [2.12.0] - 2026-09-07
 
 ### Fixed
