@@ -212,6 +212,12 @@ rate-limit:
   global:
     requests-per-second: ${GLOBAL_RATE_LIMIT_PER_SECOND:5000}
     enabled: ${GLOBAL_RATE_LIMIT_ENABLED:true}
+  # One organization's share of the control-plane API. Off by default: on a self-hosted
+  # installation every tenant is the operator's own, so there is no neighbour to be noisy, and
+  # the check costs a Redis round trip per request. Turn it on where tenants are strangers.
+  per-organization:
+    enabled: ${ORG_RATE_LIMIT_ENABLED:false}
+    requests-per-second: ${ORG_RATE_LIMIT_PER_SECOND:200}
 
 event:
   ingestion:

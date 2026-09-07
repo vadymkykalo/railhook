@@ -64,6 +64,13 @@ class ServiceTenantParameterTest {
             // evict the cache for an organization they are processing, not one they are "in".
             // forCurrentTenant and the no-argument overloads are the request-facing ones and read
             // the tenant scope.
+            // Not data access at all: the organization is a key in Redis, the way projectId and
+            // sourceId are for the sibling limiters on this class. The caller is
+            // OrganizationRateLimitInterceptor, which reads TenantContext itself and refuses to
+            // charge the system tenant — entering a scope here would buy nothing, because there
+            // are no rows to scope.
+            "RedisRateLimiterService.tryAcquireForOrganization",
+
             // Erasing a person deletes every organization they were the only member of. Those
             // are read off their membership rows, not off the request — the caller's own scope
             // is at most one of them, and may be none. AccountErasureService is @SystemTenant
