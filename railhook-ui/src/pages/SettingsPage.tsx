@@ -32,26 +32,6 @@ const COMMON_TIMEZONES = [
   'Australia/Sydney', 'Pacific/Auckland',
 ];
 
-const NOTIF_STORAGE_KEY = 'railhook_notification_prefs';
-
-interface NotificationPrefs {
-  inApp: boolean;
-  email: boolean;
-  browser: boolean;
-}
-
-function getNotifPrefs(): NotificationPrefs {
-  try {
-    const stored = localStorage.getItem(NOTIF_STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch { /* ignore parse errors */ }
-  return { inApp: true, email: true, browser: false };
-}
-
-function setNotifPrefs(prefs: NotificationPrefs) {
-  localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(prefs));
-}
-
 /**
  * One titled section of a settings form: what it is on the left, the fields on
  * the right, and — when the section can be saved — its control on the same
@@ -141,7 +121,6 @@ export default function SettingsPage() {
   const [passwordSaved, setPasswordSaved] = useState(false);
 
   const [selectedTz, setSelectedTz] = useState(getStoredTimezone);
-  const [notifPrefs, setNotifPrefsState] = useState<NotificationPrefs>(getNotifPrefs);
   const [showGettingStarted, setShowGettingStarted] = useState(() => !isAnyDismissed());
 
   useEffect(() => {
@@ -370,32 +349,6 @@ export default function SettingsPage() {
               </Select>
               <p className="text-xs text-muted-foreground">{t('settings.timezone.hint', { tz: selectedTz })}</p>
             </div>
-          </FormSection>
-
-          <FormSection
-            title={t('settings.notifications.title')}
-            description={t('settings.notifications.description')}
-          >
-            <div className="divide-y divide-rail">
-              {(['inApp', 'email', 'browser'] as const).map((channel) => (
-                <label key={channel} className="flex cursor-pointer items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium">{t(`settings.notifications.${channel}`)}</span>
-                    <span className="block text-xs text-muted-foreground">{t(`settings.notifications.${channel}Desc`)}</span>
-                  </span>
-                  <Switch
-                    checked={notifPrefs[channel]}
-                    onCheckedChange={(checked) => {
-                      const updated = { ...notifPrefs, [channel]: checked };
-                      setNotifPrefsState(updated);
-                      setNotifPrefs(updated);
-                    }}
-                    aria-label={t(`settings.notifications.${channel}`)}
-                  />
-                </label>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">{t('settings.deviceOnly')}</p>
           </FormSection>
 
           <FormSection

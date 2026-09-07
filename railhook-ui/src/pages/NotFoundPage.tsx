@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Compass } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/button';
+import { useAuth } from '../auth/auth.store';
 
 /**
  * Reached from inside the admin shell and from the open web, so it never
@@ -11,7 +12,10 @@ export default function NotFoundPage() {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
-  const isLoggedIn = !!localStorage.getItem('auth_token');
+  // Was reading localStorage['auth_token'], a key nothing in this codebase ever writes —
+  // the session is auth_user plus a token held in memory. So this was always false, and a
+  // signed-in user who mistyped a path inside the dashboard was offered the marketing site.
+  const { isAuthenticated } = useAuth();
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center p-4 lg:p-6">
@@ -28,9 +32,9 @@ export default function NotFoundPage() {
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
           <Button asChild>
-            <Link to={isLoggedIn ? '/admin/dashboard' : '/'}>
+            <Link to={isAuthenticated ? '/admin/dashboard' : '/'}>
               <ArrowLeft className="h-4 w-4" aria-hidden />
-              {isLoggedIn ? t('notFound.backToDashboard') : t('notFound.backToHome')}
+              {isAuthenticated ? t('notFound.backToDashboard') : t('notFound.backToHome')}
             </Link>
           </Button>
           <Button variant="outline" onClick={() => navigate(-1)}>

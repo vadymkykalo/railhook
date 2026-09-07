@@ -21,6 +21,22 @@ const ICON = {
   idle: CircleDashed,
 } as const;
 
+/**
+ * Where an invoice stands. Matches InvoiceStatus on the backend, which is upper case —
+ * BillingPage used to compare against 'paid' and so painted every paid invoice grey.
+ * The label was right, which is what kept it quiet.
+ */
+export function kindOfInvoiceStatus(status: string): StatusKind {
+  switch (status) {
+    case 'PAID':
+      return 'ok';
+    case 'PAST_DUE':
+      return 'halt';
+    default:
+      return 'idle';
+  }
+}
+
 /** Delivery and Forward share the attempt lifecycle, so they share this mapping. */
 export function kindOfDeliveryStatus(status: string): StatusKind {
   switch (status) {

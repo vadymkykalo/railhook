@@ -10,7 +10,7 @@ import { cn } from '../lib/utils';
 import { usePermissions } from '../auth/usePermissions';
 import { showApiError, showSuccess } from '../lib/toast';
 import { CommandPalette } from '../components/CommandPalette';
-import { getTheme, setTheme } from '../lib/theme';
+import { isDarkApplied, toggleTheme } from '../lib/theme';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import ProtectedRoute from '../auth/ProtectedRoute';
 import Sidebar from './Sidebar';
@@ -30,7 +30,7 @@ export default function AppLayout() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === '1');
-  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
+  const [isDark, setIsDark] = useState(isDarkApplied);
   const [resending, setResending] = useState(false);
 
   const routeProjectId = params.projectId || location.pathname.match(/\/admin\/projects\/([^/]+)/)?.[1];
@@ -171,11 +171,7 @@ export default function AppLayout() {
                 className="text-muted-foreground"
                 title={t('nav.toggleTheme')}
                 aria-label={t('nav.toggleTheme')}
-                onClick={() => {
-                  const next = getTheme() === 'dark' ? 'light' : 'dark';
-                  setTheme(next);
-                  setIsDark(next === 'dark');
-                }}
+                onClick={() => setIsDark(toggleTheme() === 'dark')}
               >
                 {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
