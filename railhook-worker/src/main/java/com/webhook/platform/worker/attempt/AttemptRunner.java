@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -34,6 +35,9 @@ import java.util.Map;
  *       before the request is built.</li>
  *   <li>A failed transformation never lets the raw payload out.</li>
  *   <li>A Deferral is not an Attempt: it consumes nothing and advances no Ladder.</li>
+ *   <li>Failing to read a response is never failing to deliver. The status line arrives before
+ *       the body does, so once a status is in hand the outcome is decided; a body that will not
+ *       buffer costs us the body and nothing else.</li>
  * </ol>
  */
 @Component
@@ -228,7 +232,14 @@ public class AttemptRunner {
                     String headers = serialiseHeaders(response.headers().asHttpHeaders());
                     return response.bodyToMono(String.class)
                             .defaultIfEmpty("")
-                            .map(responseBody -> new Response(status, responseBody, headers));
+                            .map(responseBody -> new Response(status, responseBody, headers))
+                            // Invariant 6. A receiver that answers 2xx with a body larger than
+                            // the codec will buffer used to throw here, be caught as "the
+                            // request failed", and send the whole ladder at an endpoint that
+                            // already had the event. The status above is what decides the
+                            // Attempt; this keeps it.
+                            .onErrorResume(e -> Mono.just(new Response(
+                                    status, "[response body unreadable: " + e.getMessage() + "]", headers)));
                 })
                 .timeout(Duration.ofSeconds(ctx.timeoutSeconds()))
                 .block();

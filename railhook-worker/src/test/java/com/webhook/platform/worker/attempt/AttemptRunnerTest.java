@@ -217,6 +217,26 @@ class AttemptRunnerTest {
         }
 
         @Test
+        @DisplayName("a 2xx whose body is larger than the codec limit is still a success")
+        void oversizedSuccessBodyIsStillASuccess() {
+            // The receiver took the webhook and answered 200 — with a body larger than the
+            // WebClient codec will buffer. Reading it threw DataBufferLimitException, the
+            // throw was caught as "the request failed", and the full ladder then ran against
+            // an endpoint that already had the event. One delivery, seven arrivals.
+            //
+            // The status is read before the body is, so an outcome that big is a failure to
+            // read a response, never a failure to deliver.
+            respond(200, "x".repeat(2 * 1024 * 1024));
+            FakeStore store = new FakeStore(baseUrl);
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.Succeeded.class, store.finalizations.get(0));
+            assertEquals(1, store.succeededCalls);
+            assertEquals(200, store.records.get(0).statusCode());
+        }
+
+        @Test
         @DisplayName("a non-retryable status fails terminally rather than burning the ladder")
         void nonRetryableIsTerminal() {
             respond(400, "bad request");
