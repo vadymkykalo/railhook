@@ -85,6 +85,12 @@ class MutatingHandlerScopeDeclarationTest {
             "AuthController.revokeAllSessions",
             "AuthController.switchOrganization",
 
+            // Reports a failure in the dashboard, which is a browser with a session. Gated on
+            // auth.requireJwt(): an API key is a program and has no dashboard to break, so
+            // rejecting it outright is stronger than any scope it could hold. Changes no
+            // state — it appends to this installation's own log.
+            "ClientErrorController.report",
+
             // Owner-level org and billing operations: gated on requireOwnerAccess(), which is
             // strictly stronger than any API-key scope (API keys never hold OWNER).
             "BillingController.updateBillingInfo",

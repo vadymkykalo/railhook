@@ -1624,6 +1624,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/client-errors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report a dashboard error
+         * @description Records a failure the dashboard could not recover from, in this installation's own logs. Always answers 202, whether or not the report was kept.
+         */
+        post: operations["reportClientError"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/webhook/{providerCode}": {
         parameters: {
             query?: never;
@@ -4326,6 +4346,28 @@ export interface components {
             totalMatched?: number;
             hasMore?: boolean;
             message?: string;
+        };
+        /** @description A failure the dashboard could not recover from, reported by the browser */
+        ClientErrorReportRequest: {
+            /**
+             * @description The error message
+             * @example Cannot read properties of undefined
+             */
+            message: string;
+            /** @description The JavaScript stack trace, if the browser provided one */
+            stack?: string;
+            /** @description React's component stack, which names the component that threw */
+            componentStack?: string;
+            /**
+             * @description The page the failure happened on. Its query string is discarded on arrival.
+             * @example https://hooks.example.com/admin/deliveries
+             */
+            url?: string;
+            /**
+             * @description The dashboard build that produced the error
+             * @example 2.13.0
+             */
+            release?: string;
         };
         CheckoutRequest: {
             planName: string;
@@ -8653,6 +8695,28 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["BulkReplayResponse"];
                 };
+            };
+        };
+    };
+    reportClientError: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientErrorReportRequest"];
+            };
+        };
+        responses: {
+            /** @description Report accepted. Whether it was kept depends on the operator's configuration and the per-user rate limit; a page that has already failed can do nothing useful with the difference. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

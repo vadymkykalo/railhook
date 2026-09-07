@@ -294,6 +294,12 @@ rules:
   cache-refresh-ms: ${RULES_CACHE_REFRESH_MS:30000}
   execution-log-retention-days: ${RULES_EXECUTION_LOG_RETENTION_DAYS:7}
 
+# Failures the dashboard could not recover from, reported by the browser and written to this
+# installation's own logs. Nothing is sent anywhere else.
+client-errors:
+  enabled: ${CLIENT_ERROR_REPORTING_ENABLED:true}
+  per-user-per-minute: ${CLIENT_ERROR_REPORTS_PER_USER_PER_MINUTE:20}
+
 app:
   # Declared explicitly so ${app.env} resolves through a real key rather than relying on
   # Spring's relaxed binding of the bare APP_ENV environment variable. Both spellings are

@@ -1,7 +1,7 @@
 {
   "title": "Railhook API",
   "version": "1.0.0",
-  "operationCount": 207,
+  "operationCount": 208,
   "security": [
     {
       "id": "bearerAuth",
@@ -1209,6 +1209,35 @@
             }
           ],
           "description": "Returns invoice history from the billing provider. Empty when billing is disabled (self-hosted)."
+        }
+      ]
+    },
+    {
+      "id": "client-errors",
+      "name": "Client Errors",
+      "description": "Failures reported by the dashboard",
+      "operations": [
+        {
+          "id": "reportClientError",
+          "method": "POST",
+          "path": "/api/v1/client-errors",
+          "summary": "Report a dashboard error",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [],
+          "responses": [
+            {
+              "status": "202",
+              "description": "Report accepted. Whether it was kept depends on the operator's configuration and the per-user rate limit; a page that has already failed can do nothing useful with the difference."
+            }
+          ],
+          "description": "Records a failure the dashboard could not recover from, in this installation's own logs. Always answers 202, whether or not the report was kept.",
+          "body": {
+            "contentType": "application/json",
+            "type": "ClientErrorReportRequest",
+            "required": true
+          }
         }
       ]
     },
@@ -7840,6 +7869,38 @@
         "required": false
       }
     ],
+    "ClientErrorReportRequest": [
+      {
+        "name": "message",
+        "type": "string",
+        "required": true,
+        "description": "The error message"
+      },
+      {
+        "name": "stack",
+        "type": "string",
+        "required": false,
+        "description": "The JavaScript stack trace, if the browser provided one"
+      },
+      {
+        "name": "componentStack",
+        "type": "string",
+        "required": false,
+        "description": "React's component stack, which names the component that threw"
+      },
+      {
+        "name": "url",
+        "type": "string",
+        "required": false,
+        "description": "The page the failure happened on. Its query string is discarded on arrival."
+      },
+      {
+        "name": "release",
+        "type": "string",
+        "required": false,
+        "description": "The dashboard build that produced the error"
+      }
+    ],
     "CurrentUserResponse": [
       {
         "name": "user",
@@ -13655,6 +13716,13 @@
       "cancelUrl": "string",
       "providerCode": "string",
       "billingInterval": "string"
+    },
+    "ClientErrorReportRequest": {
+      "message": "Cannot read properties of undefined",
+      "stack": "string",
+      "componentStack": "string",
+      "url": "https://hooks.example.com/admin/deliveries",
+      "release": "2.13.0"
     },
     "CurrentUserResponse": {
       "user": {
