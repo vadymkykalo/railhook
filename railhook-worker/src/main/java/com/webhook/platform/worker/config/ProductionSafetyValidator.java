@@ -1,15 +1,26 @@
 package com.webhook.platform.worker.config;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Refuses to run the worker on a development configuration. In production mode
+ * (APP_ENV=production), placeholder secrets and unsafe settings fail startup rather than
+ * being served.
+ *
+ * <p>Runs from {@link PostConstruct} rather than {@code ApplicationReadyEvent}. The api made
+ * the same move because the later event fires after its connector is already bound; for the
+ * worker the window is worse, because what is already running by then is the Kafka listeners.
+ * A worker that starts on a placeholder encryption key and an SSRF guard turned off does not
+ * merely sit there being reachable — it delivers webhooks. The check has to be ahead of that,
+ * not alongside it.
+ */
 @Component
 @Slf4j
 public class ProductionSafetyValidator {
@@ -38,7 +49,7 @@ public class ProductionSafetyValidator {
     @Value("${spring.kafka.bootstrap-servers:}")
     private String kafkaBootstrapServers;
 
-    @EventListener(ApplicationReadyEvent.class)
+    @PostConstruct
     public void validateProductionConfig() {
         if (!"production".equalsIgnoreCase(appEnv)) {
             log.info("APP_ENV={} — skipping production safety checks", appEnv);
