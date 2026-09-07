@@ -25,6 +25,7 @@ import org.springframework.util.backoff.FixedBackOff;
 import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 
 @Configuration
@@ -111,6 +112,24 @@ public class KafkaConsumerConfig {
         return factory;
     }
 
+    /**
+     * Where a record goes when it has failed for the last time.
+     *
+     * <p>The partition is left to the broker rather than copied from the source record. Copying
+     * it assumes the DLQ has at least as many partitions as the topic it shadows, which is true
+     * today only because docker-compose.yml creates every topic in one loop with the same
+     * KAFKA_NUM_PARTITIONS. Repartition the main topic upward — the ordinary way to scale a
+     * consumer — and every dead letter from a partition the DLQ does not have fails to publish.
+     * A message that cannot be retried and cannot be parked is a message that is gone.
+     *
+     * <p>Nothing is lost by giving it up: the record keeps its key, so the broker's default
+     * partitioner puts every dead letter for one delivery in the same partition anyway, which is
+     * the only ordering anyone here depends on.
+     */
+    static TopicPartition dlqDestination(String dlqTopic, ConsumerRecord<?, ?> record) {
+        return new TopicPartition(dlqTopic, -1);
+    }
+
     private <K, V> void configureFactory(ConcurrentKafkaListenerContainerFactory<K, V> factory, int concurrency, String dlqTopic) {
         factory.setConcurrency(concurrency);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
@@ -126,8 +145,7 @@ public class KafkaConsumerConfig {
 
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
                 deadLetterKafkaTemplate,
-                (record, exception) -> new TopicPartition(dlqTopic, record.partition())
-        );
+                (record, exception) -> dlqDestination(dlqTopic, record));
         
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
             recoverer,

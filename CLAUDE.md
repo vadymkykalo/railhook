@@ -2,7 +2,7 @@
 
 Guidance for Claude Code working in this repository.
 
-Java 17 + Spring Boot 3.5 (Maven reactor: `common`, `api`, `worker`, `cli`), React + Vite +
+Java 17 + Spring Boot 4.1 (Maven reactor: `common`, `api`, `worker`, `cli`), React + Vite +
 TypeScript in `railhook-ui`. `api` owns all Flyway migrations.
 `docs/ARCHITECTURE.md` has the architecture and the sequence diagrams for both pipelines.
 

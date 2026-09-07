@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.domain.repository.ProjectRepository.ProjectRef;
 import com.webhook.platform.api.domain.repository.UsageDailyRepository;
 import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +24,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -210,13 +212,23 @@ class UsageDailyAggregatorTest {
         verify(txManager, never()).commit(any());
     }
 
+    /** A page of the sweep, as the repository hands it over. */
+    private static ProjectRef ref(UUID id) {
+        return new ProjectRef() {
+            @Override public UUID getId() {
+                return id;
+            }
+            @Override public UUID getOrganizationId() {
+                return ORG_ID;
+            }
+        };
+    }
+
     @Test
     void aggregateYesterday_continuesToNextProjectAfterOneFails() {
         UUID projectA = UUID.randomUUID();
         UUID projectB = UUID.randomUUID();
-        when(projectRepository.findAll()).thenReturn(List.of(
-                Project.builder().id(projectA).organizationId(ORG_ID).build(),
-                Project.builder().id(projectB).organizationId(ORG_ID).build()));
+        when(projectRepository.findLiveRefs(any())).thenReturn(List.of(ref(projectA), ref(projectB)), List.of());
 
         LocalDate yesterday = LocalDate.now().minusDays(1);
         when(usageDailyRepository.findByProjectIdAndDate(eq(projectA), eq(yesterday)))
@@ -230,5 +242,43 @@ class UsageDailyAggregatorTest {
         // Project A's failure must not prevent project B from being processed.
         verify(usageDailyRepository).findByProjectIdAndDate(projectA, yesterday);
         verify(usageDailyRepository).findByProjectIdAndDate(projectB, yesterday);
+    }
+
+    @Test
+    void aggregateYesterday_walksTheProjectsInPagesRatherThanLoadingThemAll() {
+        // findAll() put every project on the platform in memory at once, under a lock with a
+        // deadline. On a few thousand projects that is a heap the scheduler does not need, and
+        // the failure mode is the whole nightly run dying rather than one project's numbers
+        // being wrong.
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        when(usageDailyRepository.findByProjectIdAndDate(any(), eq(yesterday)))
+                .thenReturn(Optional.of(UsageDaily.builder().date(yesterday).build()));
+
+        // A full page means there may be more; the short one after it ends the walk.
+        List<ProjectRef> fullPage = new ArrayList<>();
+        for (int i = 0; i < UsageDailyAggregator.BATCH_SIZE; i++) {
+            fullPage.add(ref(UUID.randomUUID()));
+        }
+        UUID onTheSecondPage = UUID.randomUUID();
+        when(projectRepository.findLiveRefs(any()))
+                .thenReturn(fullPage, List.of(ref(onTheSecondPage)));
+
+        aggregator.aggregateYesterday();
+
+        // Every project on both pages was visited, and nothing was held in memory but a page.
+        verify(usageDailyRepository).findByProjectIdAndDate(fullPage.get(0).getId(), yesterday);
+        verify(usageDailyRepository).findByProjectIdAndDate(onTheSecondPage, yesterday);
+        verify(projectRepository, times(2)).findLiveRefs(any());
+    }
+
+    @Test
+    void aggregateYesterday_stopsWhenAPageComesBackShort() {
+        // A page smaller than the batch size is the last one; asking again would be a wasted
+        // round trip on every single nightly run.
+        when(projectRepository.findLiveRefs(any())).thenReturn(List.of());
+
+        aggregator.aggregateYesterday();
+
+        verify(projectRepository, times(1)).findLiveRefs(any());
     }
 }
