@@ -1,6 +1,15 @@
 spring:
   application:
     name: railhook-api
+  # Activated from APP_ENV, which is the switch every deployment already sets. Nothing in
+  # this codebase is annotated @Profile and there is no application-<profile>.yml, so the only
+  # thing a profile selects is the logback appender: logback-spring.xml emits LogstashEncoder
+  # JSON under `production` and human-readable lines otherwise. Without this line
+  # SPRING_PROFILES_ACTIVE was never set anywhere — not by compose, not by the chart, not by
+  # install.sh — so `production` never matched and every deployment logged plain text while
+  # promtail's json stage sat there parsing nothing.
+  profiles:
+    active: ${APP_ENV:development}
   http:
     converters:
       # Spring Boot 4 serializes HTTP through Jackson 3 unless told otherwise, and this is what
