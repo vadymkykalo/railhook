@@ -6063,6 +6063,26 @@ paths:
                 $ref: "#/components/schemas/CurrentUserResponse"
       security:
       - bearerAuth: []
+    delete:
+      tags:
+      - Authentication
+      summary: Erase your account
+      description: |-
+        GDPR Article 17. Permanently removes the personal data on the account and makes it unusable: the address is replaced with an unroutable one, the name is dropped, every session is closed and every membership is removed. Any organization you were the only member of is deleted with it, including every project, endpoint, event and delivery under it. This cannot be undone.
+
+        Refused with 409 if you are the last owner of an organization that still has other members: hand it over first, or the people left behind can neither administer nor delete it.
+
+        The audit log keeps a record that this happened. It names no contact details and is what lets the erasure be shown to have been carried out.
+      operationId: eraseOwnAccount
+      responses:
+        "204":
+          description: Account erased
+        "401":
+          description: Not authenticated
+        "409":
+          description: Last owner of an organization that has other members
+      security:
+      - bearerAuth: []
   /api/v1/audit-log:
     get:
       tags:
@@ -9765,6 +9785,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AuditLogData"
+        auditLogsTruncated:
+          type: boolean
+        auditLogsTotal:
+          type: integer
+          format: int64
     IncomingDestinationData:
       type: object
       properties:

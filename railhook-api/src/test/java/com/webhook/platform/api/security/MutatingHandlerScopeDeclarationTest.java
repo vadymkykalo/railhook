@@ -85,6 +85,11 @@ class MutatingHandlerScopeDeclarationTest {
             "AuthController.revokeAllSessions",
             "AuthController.switchOrganization",
 
+            // Erasing your own account. Gated on auth.requireJwt(): an API key belongs to a
+            // project and has no person behind it, so it must never be able to erase the human
+            // who created it. Rejecting it outright is stronger than any scope it could hold.
+            "AuthController.eraseOwnAccount",
+
             // Reports a failure in the dashboard, which is a browser with a session. Gated on
             // auth.requireJwt(): an API key is a program and has no dashboard to break, so
             // rejecting it outright is stronger than any scope it could hold. Changes no

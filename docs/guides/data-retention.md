@@ -70,17 +70,44 @@ assume a plan is trimming them for you.
 
 ## Export and erasure
 
-`GdprExportService` produces a complete export of one Organization's data as a single document —
-the Organization, its Projects, Endpoints, Subscriptions, Sources, Destinations, Events,
-Deliveries and Attempts. It is exposed through the API, is scoped by `@TenantId` like everything
-else, and therefore cannot return another tenant's rows even if asked to.
+`GdprExportService` exports one Organization's **configuration and its audit history** as a
+single document: the Organization, its Members, Projects, Endpoints, Subscriptions, Sources,
+Destinations, API keys, and audit entries. It is exposed through the API, is scoped by
+`@TenantId` like everything else, and therefore cannot return another tenant's rows even if
+asked to.
 
-Erasure is the same mechanism as retention, narrowed: deleting an Organization cascades through
-the rows that hang off it.
+**Events, Deliveries and Attempts are not in it** — which is to say the payloads are not. That
+is a real limit and worth stating plainly to anyone answering a subject-access request with
+this file: those tables are the largest by orders of magnitude, they are partitioned and aged
+out on the schedule above, and assembling them into one in-memory document is not something
+this endpoint can do safely. Audit entries are capped at 10,000; when the cap bites, the export
+says so in `auditLogsTruncated` and gives the real count in `auditLogsTotal`, rather than
+looking complete.
 
-For a request that names a single data subject rather than a whole tenant, there is no
-field-level erasure tool — the honest answer is that retention is what removes the payload, on
-the schedule above. **Do not reach for PII masking here.** Masking is applied when a payload is
+Erasure comes in two sizes.
+
+**A whole Organization** — `DELETE /api/v1/organizations/{id}`, which cascades through every
+row that hangs off it. The audit log is the deliberate exception: `audit_log` carries an
+`organization_id` but no foreign key, so the entry recording the erasure outlives the
+organization it describes. That is what lets an erasure be shown to have been carried out.
+
+**One person** — `DELETE /api/v1/auth/me`. The account's identifying data is replaced and the
+account is made permanently unusable: an unroutable `.invalid` address, no name, a password
+hash nobody holds, every session closed and every membership removed. Any Organization the
+person was the only member of is deleted with them, since otherwise their data would remain
+with nobody able to reach or erase it. It is refused with `409` if they are the last owner of
+an Organization other people still belong to — that has to be handed over first, or everyone
+left behind is stranded with an Organization nobody can administer or delete.
+
+The row itself survives, anonymised, for two reasons: `shared_debug_links.created_by`
+references `users(id)` without a cascade, so deleting it outright fails for anyone who ever
+shared a debug link; and `audit_log.user_id` has no foreign key, so what someone did outlives
+them, which is the point of an audit log and a legitimate basis for retention under
+Article 17(3)(b). Both erasures and the export are themselves audited.
+
+For a request that names a single data subject *inside* a tenant's payloads rather than the
+account itself, there is no field-level erasure tool — the honest answer is that retention is
+what removes the payload, on the schedule above. **Do not reach for PII masking here.** Masking is applied when a payload is
 *displayed* — in the dashboard, in an event diff, through a shared debug link — and changes
 neither what is stored nor what is delivered. It limits who sees a value; it does not stop the
 value being kept. If a field must never be stored, the place to drop it is before the Event is

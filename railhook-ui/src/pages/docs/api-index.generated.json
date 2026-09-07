@@ -1,7 +1,7 @@
 {
   "title": "Railhook API",
   "version": "1.0.0",
-  "operationCount": 208,
+  "operationCount": 209,
   "security": [
     {
       "id": "bearerAuth",
@@ -958,6 +958,31 @@
             }
           ],
           "description": "Returns information about the authenticated user"
+        },
+        {
+          "id": "eraseOwnAccount",
+          "method": "DELETE",
+          "path": "/api/v1/auth/me",
+          "summary": "Erase your account",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [],
+          "responses": [
+            {
+              "status": "204",
+              "description": "Account erased"
+            },
+            {
+              "status": "401",
+              "description": "Not authenticated"
+            },
+            {
+              "status": "409",
+              "description": "Last owner of an organization that has other members"
+            }
+          ],
+          "description": "GDPR Article 17. Permanently removes the personal data on the account and makes it unusable: the address is replaced with an unroutable one, the name is dropped, every session is closed and every membership is removed. Any organization you were the only member of is deleted with it, including every project, endpoint, event and delivery under it. This cannot be undone.\n\nRefused with 409 if you are the last owner of an organization that still has other members: hand it over first, or the people left behind can neither administer nor delete it.\n\nThe audit log keeps a record that this happened. It names no contact details and is what lets the erasure be shown to have been carried out."
         },
         {
           "id": "revokeSession",
@@ -9109,6 +9134,16 @@
         "name": "auditLogs",
         "type": "AuditLogData[]",
         "required": false
+      },
+      {
+        "name": "auditLogsTruncated",
+        "type": "boolean",
+        "required": false
+      },
+      {
+        "name": "auditLogsTotal",
+        "type": "integer (int64)",
+        "required": false
       }
     ],
     "Group": [],
@@ -14107,7 +14142,9 @@
           "clientIp": "string",
           "createdAt": "2026-01-01T12:00:00Z"
         }
-      ]
+      ],
+      "auditLogsTruncated": true,
+      "auditLogsTotal": 0
     },
     "Group": {},
     "IncidentCountsResponse": {

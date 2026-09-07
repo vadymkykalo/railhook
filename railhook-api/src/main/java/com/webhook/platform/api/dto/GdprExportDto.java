@@ -15,7 +15,18 @@ public record GdprExportDto(
         OrganizationData organization,
         List<MemberData> members,
         List<ProjectData> projects,
-        List<AuditLogData> auditLogs
+        List<AuditLogData> auditLogs,
+
+        /**
+         * Whether {@code auditLogs} is the whole history or the most recent page of it. The
+         * export caps audit rows, and a subject-access response that is quietly short is worse
+         * than one that is openly partial: nothing in the file told the recipient, so nobody
+         * answering for it later could tell either.
+         */
+        boolean auditLogsTruncated,
+
+        /** How many audit entries exist, however many of them the file carries. */
+        long auditLogsTotal
 ) {
 
     @Builder

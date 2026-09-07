@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A person can erase their own account** — `DELETE /api/v1/auth/me`, and a Danger zone in
+  Settings to reach it from. The platform could erase a whole customer and could not erase one
+  human being: an individual who is a member of somebody else's organization had no way to
+  remove their own record, which is the half of Article 17 that individuals actually exercise.
+
+  The identifying data goes and the account is made permanently unusable — an unroutable
+  `.invalid` address, no name, a password hash nobody holds, every session closed and every
+  membership removed. The row itself survives, anonymised, because the schema decides it:
+  `shared_debug_links.created_by` references `users(id)` with no cascade, so deleting the row
+  outright fails for anyone who ever shared a debug link, and `audit_log.user_id` has no foreign
+  key at all, so what someone did outlives them — the point of an audit log, and a legitimate
+  basis under 17(3)(b).
+
+  An organization the person was alone in is deleted with them, because otherwise erasure leaves
+  every event and delivery it owned in the database with nobody able to reach or erase it. The
+  last owner of an organization that still has other members is refused with `409` and told to
+  hand it over first: leaving it ownerless would strand everyone else.
+
+- **Both erasures and the export are audited.** `deleteOrganization` carries a javadoc citing
+  Article 17 and destroys every row a customer has; it left behind a log line, which is on a
+  retention clock of its own. `exportOrganizationData` puts every member, project, endpoint and
+  key into one file that somebody then carries around. Neither had an audit entry.
+  `GdprOperationsAreAuditedTest` keeps it that way — an explicit list, because "this is a data
+  subject's right" is a judgement about the law rather than something a signature carries.
+
 - **The dashboard reports its own failures.** A render error reached `console.error` in one
   person's browser and stopped there, so from the server a screen that threw for every customer
   was indistinguishable from a screen nobody had opened.
@@ -27,6 +52,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each distinct failure once, and stays quiet with no session.
 
 ### Fixed
+
+- **The GDPR export was quietly short, and the guide described data it does not contain.** It
+  caps audit entries at 10,000 and said nothing about it, so a subject-access response could be
+  incomplete and look whole; it now carries `auditLogsTruncated` and `auditLogsTotal`. And
+  `docs/guides/data-retention.md` promised the export included Events, Deliveries and Attempts.
+  It never has — those are the payload tables, and they are aged out by retention instead. The
+  guide says so now, along with what each of the two erasures actually does.
+
+- **A javadoc claimed the audit log was deleted along with its organization.** `audit_log`
+  carries an `organization_id` and no foreign key, so its rows outlive the organization they
+  describe — which is exactly what makes auditing an erasure meaningful.
 
 - **A response body too large to read turned a delivered webhook into a retry.** `AttemptRunner`
   read the receiver's response with the WebClient codec default of 256 KiB. A receiver that
