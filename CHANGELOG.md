@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`railhook upgrade [version]` takes a backup first**, pins the image tags, and refuses to
+  continue if the backup fails. It used to print "edit the tags in .env first, then:" and run
+  pull. Rolling back is not symmetric and now says so: the images go back, the schema does not —
+  Flyway is forward-only here — so the backup is what makes the difference between a bad release
+  and a bad migration recoverable. `railhook backup` was also quietly wrong: it hardcoded the
+  database name and read the user from the invoking shell rather than from `.env`, which it never
+  sourced.
+
+- **A disaster-recovery procedure**, in `docs/OPERATIONS.md`. Most of it already existed in the
+  code and had never been written down — the document said twice that there was no procedure for
+  reconciling Postgres, Kafka and Redis after a restore, while `SequenceReconciliationService`,
+  `QuotaCounterService` and `StuckDeliveryRecoveryService` between them handle all but one step
+  of it. That step is flushing Redis. Also: what the shipped backup schedule buys as RPO and RTO,
+  and that restoring onto a new host needs `.env` more than it needs the dump.
+
+- **A per-organization API rate limit**, off by default. `GlobalRateLimitFilter` holds one bucket
+  for the whole platform, so on a shared installation one tenant looping over their deliveries
+  spends everyone's budget. Off by default because on a self-hosted installation every tenant is
+  the operator's own and the check costs a Redis round trip per request.
+
 - **A person can erase their own account** — `DELETE /api/v1/auth/me`, and a Danger zone in
   Settings to reach it from. The platform could erase a whole customer and could not erase one
   human being: an individual who is a member of somebody else's organization had no way to
@@ -52,6 +72,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each distinct failure once, and stays quiet with no session.
 
 ### Fixed
+
+- **The nightly usage sweep loaded every project on the platform into memory at once.**
+  `findAll()` inside a scheduled job holding a lock with a deadline; it walks pages of 500 now,
+  and takes a projection rather than the entity. It also did not exclude soft-deleted projects,
+  so every deleted project was counted and written a usage row every night, forever.
+
+- **The dead-letter recoverer copied the source partition onto the DLQ topic**, which is correct
+  only while the DLQ is at least as wide as the topic it shadows. Repartition a main topic upward
+  to scale its consumers — the ordinary thing to do — and every dead letter from a partition the
+  DLQ does not have fails to publish. The broker picks now; the record keeps its key, so ordering
+  per delivery is unchanged.
+
+- **The README badge and CLAUDE.md said Spring Boot 3.5**, months after the upgrade to 4.1. The
+  badge is the first thing an evaluator reads. `DeclaredStackVersionTest` ties both to the pom.
 
 - **The GDPR export was quietly short, and the guide described data it does not contain.** It
   caps audit entries at 10,000 and said nothing about it, so a subject-access response could be
@@ -167,6 +201,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   source. That is every real recovery, and a dump taken without them looks fine until it is needed.
 
 ### Testing
+
+- **`MigrationIndexLockingTest`** fails the build on a new migration that builds an index on an
+  unbounded table without `CONCURRENTLY`, or that uses `CONCURRENTLY` without the
+  `-- flyway:executeInTransaction=false` header it requires. Twenty-four shipped migrations do
+  block — they cannot be fixed, since Flyway validates checksums — so the list is frozen and
+  `docs/OPERATIONS.md` tells operators which upgrades need a window.
 
 - **`src/auth` went from 5.9% to 62% covered**, 90% of branches. It is the sign-in path: the one
   place where a bug does not degrade the product but locks people out of it, and where nobody
