@@ -11,7 +11,7 @@
 # the Makefile/Compose paths (which are NOT packaged/shipped) can use it without
 # duplicating it into the chart. Keep the pg_dump flags identical
 # (`-Fc --no-owner --no-privileges`) in both places if either one changes —
-# `make verify-backup-parity` checks this.
+# BackupFlagParityTest (`make ratchets`) fails the build if they diverge.
 #
 # Produces a custom-format (`-Fc`) dump, restorable with pg_restore / db-restore.sh.
 #
