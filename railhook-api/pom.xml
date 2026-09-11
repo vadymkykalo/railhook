@@ -166,7 +166,7 @@
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>3.1.0</version>
+            <version>3.1.1</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -241,7 +241,7 @@
         <dependency>
             <groupId>net.javacrumbs.shedlock</groupId>
             <artifactId>shedlock-provider-jdbc-template</artifactId>
-            <version>7.9.0</version>
+            <version>7.10.1</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -326,7 +326,7 @@
                   junit-platform-launcher jars") instead of failing loudly.
                 -->
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.6</version>
+                <version>3.6.0</version>
             </plugin>
             <!--
               See the matching comment in railhook-common's
