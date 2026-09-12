@@ -1,0 +1,134 @@
+# Puts a released version on the production host.
+#
+# Manual on purpose. The repository is public, so anything that fires on a tag or a
+# release fires on something a stranger can see coming and nobody has looked at twice.
+# Deploying is the one action here that is not reversible by reverting a commit — it
+# runs migrations, and Flyway is forward-only in this project.
+#
+# Three gates, none of which is the workflow trusting itself:
+#   - workflow_dispatch, which only someone with write access can start;
+#   - the `production` environment, which requires a named reviewer to approve the run
+#     before any secret is readable;
+#   - and the key at the far end, which is forced to /usr/local/bin/railhook-deploy and
+#     can run `deploy <vX.Y.Z>` and `status` and nothing else. It cannot read .env, it
+#     cannot open a shell, and a version that is not a plain tag is refused before the
+#     host acts on it.
+name: Deploy to production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Released tag to deploy, e.g. v2.15.0. Must already be published.'
+        required: true
+        type: string
+
+concurrency:
+  # Two deploys at once would race each other's migrations. Queue rather than cancel:
+  # a half-applied upgrade is worse than a slow one.
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.version }}
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://railhook.io
+    steps:
+      - name: Refuse anything that is not a published release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$VERSION' is not a vX.Y.Z tag."
+            exit 1
+          fi
+          # Deploying a tag whose images were never published leaves the host pulling
+          # something that does not exist, after it has already taken its backup.
+          if ! gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::$VERSION has no GitHub release. Publish it first."
+            exit 1
+          fi
+          echo "$VERSION is released."
+
+      - name: Check the images are actually on the registry
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          tag="${VERSION#v}"
+          for image in api worker ui; do
+            ref="ghcr.io/vadymkykalo/railhook-${image}:${tag}"
+            if ! docker manifest inspect "$ref" >/dev/null 2>&1; then
+              echo "::error::$ref is missing. Wait for Docker Publish to finish."
+              exit 1
+            fi
+            echo "found $ref"
+          done
+
+      - name: Open an SSH session the far end has already constrained
+        env:
+          KEY: ${{ secrets.PROD_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PROD_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          # Pinned rather than accept-new: this runs unattended, so there is nobody to
+          # notice a host key that changed.
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          HOST: ${{ secrets.PROD_HOST }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          # The command is ignored by the host — it is forced — so this string is only
+          # ever read as an argument by railhook-deploy. It takes a backup before it
+          # migrates, and refuses to continue if that backup fails.
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes \
+              "root@${HOST}" "deploy ${VERSION}"
+
+      - name: Prove it came back up
+        env:
+          HOST: ${{ secrets.PROD_HOST }}
+        run: |
+          set -euo pipefail
+          echo "--- containers ---"
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes "root@${HOST}" status
+
+          # From the outside, over the real certificate, because that is what a customer
+          # gets. A deploy that leaves the stack healthy behind a broken proxy is not a
+          # deploy that worked.
+          for attempt in $(seq 1 30); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 https://railhook.io/ || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "https://railhook.io answered 200 after ${attempt} attempt(s)"
+              exit 0
+            fi
+            echo "attempt ${attempt}: ${code}"
+            sleep 10
+          done
+          echo "::error::railhook.io never answered 200. The host may be mid-rollback — check ./railhook status."
+          exit 1
+
+      - name: Say what is running now
+        if: always()
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          {
+            echo "### Deployed \`${VERSION}\`"
+            echo
+            echo "- Host: production (Hetzner CX33, hel1)"
+            echo "- URL: https://railhook.io"
+            echo "- A backup was taken before the migrations ran; the schema does not roll back with the images."
+          } >> "$GITHUB_STEP_SUMMARY"
