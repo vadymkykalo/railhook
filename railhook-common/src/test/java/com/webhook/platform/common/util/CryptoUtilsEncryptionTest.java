@@ -1,7 +1,11 @@
 package com.webhook.platform.common.util;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -94,5 +98,62 @@ class CryptoUtilsEncryptionTest {
 
         String decrypted = CryptoUtils.decryptSecret(data.getCiphertext(), data.getIv(), KEY, SALT);
         assertEquals(unicode, decrypted);
+    }
+
+    /**
+     * The key derivation, and what it costs.
+     *
+     * <p>PBKDF2 at 65,536 iterations is deliberately expensive — that is what it is for. What it
+     * is not for is running on every single encrypt and decrypt, which is what happened: the salt
+     * is one process-wide value, so the derived key is the same bytes every time, recomputed from
+     * scratch thousands of times a second.
+     *
+     * <p>That made it a workload anyone could book. {@code /ingress/{token}} decrypts the source's
+     * HMAC secret to check a signature, so the derivation runs <em>before</em> the request is known
+     * to be genuine — an unauthenticated caller who knows the token spends tens of milliseconds of
+     * CPU per request, bounded only by the per-source rate limit.
+     */
+    @Nested
+    @DisplayName("key derivation")
+    class KeyDerivation {
+
+        @Test
+        @DisplayName("a derived key is reused, not recomputed, for the same master key and salt")
+        void derivationIsNotRepeated() {
+            // Not a benchmark — a floor. Uncached, 200 derivations are 200 x ~30-50ms, so six
+            // seconds at the optimistic end. The bound below sits an order of magnitude under
+            // that and two above anything a cache hit can cost, so it cannot fail for being on
+            // a slow machine, only for deriving again.
+            CryptoUtils.EncryptedData data = CryptoUtils.encryptSecret("payload", KEY, SALT);
+            CryptoUtils.decryptSecret(data.getCiphertext(), data.getIv(), KEY, SALT); // warm
+
+            Instant start = Instant.now();
+            for (int i = 0; i < 200; i++) {
+                assertEquals("payload",
+                        CryptoUtils.decryptSecret(data.getCiphertext(), data.getIv(), KEY, SALT));
+            }
+            Duration elapsed = Duration.between(start, Instant.now());
+
+            assertTrue(elapsed.toMillis() < 2_000,
+                    "200 decrypts took " + elapsed.toMillis() + "ms — the key is being derived each time");
+        }
+
+        @Test
+        @DisplayName("the cache is keyed by both halves, so a different master key cannot read it")
+        void adifferentMasterKeyDerivesADifferentKey() {
+            CryptoUtils.EncryptedData data = CryptoUtils.encryptSecret("payload", KEY, SALT);
+
+            assertThrows(RuntimeException.class, () -> CryptoUtils.decryptSecret(
+                    data.getCiphertext(), data.getIv(), "another_master_key_32_chars_xxx", SALT));
+        }
+
+        @Test
+        @DisplayName("and a different salt likewise")
+        void aDifferentSaltDerivesADifferentKey() {
+            CryptoUtils.EncryptedData data = CryptoUtils.encryptSecret("payload", KEY, SALT);
+
+            assertThrows(RuntimeException.class, () -> CryptoUtils.decryptSecret(
+                    data.getCiphertext(), data.getIv(), KEY, "a_different_salt"));
+        }
     }
 }

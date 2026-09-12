@@ -22,6 +22,9 @@ public class EmailService {
     @Value("${app.email.enabled:false}")
     private boolean emailEnabled;
 
+    @Value("${app.env:development}")
+    private String appEnv;
+
     public EmailService(@Autowired(required = false) JavaMailSender mailSender) {
         this.mailSender = mailSender;
     }
@@ -37,10 +40,35 @@ public class EmailService {
         return emailEnabled;
     }
 
+    /**
+     * Whether a short-lived, single-use link may stand in for the mail that could not be sent.
+     *
+     * <p>On a workstation it must: with {@code app.email.enabled=false} — the shipped default —
+     * the log is the only place a password reset can be completed from, and
+     * {@link #sendTemporaryPasswordEmail} sets out why a token that expires in an hour and burns
+     * on first use is a reasonable thing to print there.
+     *
+     * <p>Neither half of that reasoning survives a move to production. The expiry does not slow
+     * down somebody already reading the log, and single-use means they get there first. So the
+     * affordance stays exactly what it was meant to be, and stops at the environment boundary.
+     */
+    private boolean mayLogLinkInstead() {
+        return !"production".equalsIgnoreCase(appEnv);
+    }
+
+    private void explainWithheldLink(String what, String to) {
+        log.warn("{} for {} was not sent and will not be logged: APP_ENV=production with "
+                + "EMAIL_ENABLED=false. Configure SMTP, or the link cannot reach anyone.", what, to);
+    }
+
     public void sendVerificationEmail(String to, String token) {
         String verifyUrl = baseUrl + "/verify-email?token=" + token;
 
         if (!emailEnabled) {
+            if (!mayLogLinkInstead()) {
+                explainWithheldLink("An email verification link", to);
+                return;
+            }
             log.info("========== EMAIL VERIFICATION ==========");
             log.info("To: {}", to);
             log.info("Verify URL: {}", verifyUrl);
@@ -58,8 +86,10 @@ public class EmailService {
             mailSender.send(message);
             log.info("Verification email sent to {}", to);
         } catch (Exception e) {
+            // No fallback to the log. This branch only runs with app.email.enabled=true — a
+            // deployment that configured SMTP and had it blink. It did not ask for links in its
+            // log, and one refused relay is not a reason to put one there.
             log.error("Failed to send verification email to {}: {}", to, e.getMessage());
-            log.info("Fallback — Verify URL: {}", verifyUrl);
         }
     }
 
@@ -67,6 +97,10 @@ public class EmailService {
         String resetUrl = baseUrl + "/reset-password?token=" + token;
 
         if (!emailEnabled) {
+            if (!mayLogLinkInstead()) {
+                explainWithheldLink("A password reset link", to);
+                return;
+            }
             log.info("========== PASSWORD RESET ==========");
             log.info("To: {}", to);
             log.info("Reset URL: {}", resetUrl);
@@ -85,7 +119,6 @@ public class EmailService {
             log.info("Password reset email sent to {}", to);
         } catch (Exception e) {
             log.error("Failed to send password reset email to {}: {}", to, e.getMessage());
-            log.info("Fallback — Reset URL: {}", resetUrl);
         }
     }
 
@@ -103,6 +136,10 @@ public class EmailService {
         String inviteUrl = inviteUrl(orgId, inviteToken);
 
         if (!emailEnabled) {
+            if (!mayLogLinkInstead()) {
+                explainWithheldLink("An invite link", to);
+                return;
+            }
             log.info("========== MEMBER INVITE ==========");
             log.info("To: {}", to);
             log.info("Invite URL: {}", inviteUrl);
@@ -120,8 +157,9 @@ public class EmailService {
             mailSender.send(message);
             log.info("Invite email sent to {}", to);
         } catch (Exception e) {
+            // inviteUrl() hands the same link back to the inviting owner, so a copy here buys
+            // nothing and leaves it in the least controlled place there is.
             log.error("Failed to send invite email to {}: {}", to, e.getMessage());
-            log.info("Fallback — Invite URL: {}", inviteUrl);
         }
     }
 

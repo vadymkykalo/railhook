@@ -26,13 +26,12 @@ import java.io.BufferedReader;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 
 @Service
 @Slf4j
@@ -53,6 +52,8 @@ public class TestEndpointService {
 
     @Value("${test-endpoint.max-ttl-hours:72}")
     private int maxTtlHours;
+
+    private static final ObjectMapper HEADER_JSON = new ObjectMapper();
 
     private static final String SLUG_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
     private static final int SLUG_LENGTH = 8;
@@ -163,7 +164,11 @@ public class TestEndpointService {
     private CapturedRequestResponse captureWithinTenant(TestEndpoint endpoint, HttpServletRequest request) {
 
         String body = readBody(request);
-        String headers = extractHeaders(request);
+        // The same masking the ingress capture applies, rather than a second copy of the loop
+        // without it. This one stored Authorization and Cookie verbatim and then rendered them
+        // in the dashboard; masking at the write, because the dashboard is not the only reader
+        // of these rows.
+        String headers = HeaderSanitizer.toJson(request, HEADER_JSON);
 
         CapturedRequest captured = CapturedRequest.builder()
                 .testEndpointId(endpoint.getId())
@@ -240,20 +245,6 @@ public class TestEndpointService {
         } catch (Exception e) {
             log.warn("Failed to read request body: {}", e.getMessage());
             return "";
-        }
-    }
-
-    private String extractHeaders(HttpServletRequest request) {
-        Map<String, String> headers = new HashMap<>();
-        Enumeration<String> headerNames = request.getHeaderNames();
-        while (headerNames.hasMoreElements()) {
-            String name = headerNames.nextElement();
-            headers.put(name, request.getHeader(name));
-        }
-        try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(headers);
-        } catch (Exception e) {
-            return "{}";
         }
     }
 

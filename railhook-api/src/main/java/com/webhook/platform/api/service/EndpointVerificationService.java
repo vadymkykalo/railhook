@@ -22,15 +22,29 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @Slf4j
 public class EndpointVerificationService {
 
     private final EndpointRepository endpointRepository;
-    private final WebClient.Builder webClientBuilder;
-    private final boolean allowPrivateIps;
-    private final java.util.List<String> allowedHosts;
+
+    /**
+     * A TransactionTemplate rather than {@code @Transactional} on the two helpers, for the reason
+     * {@code OutboxPublisherService} gives: {@code verify} calls them on itself, and a
+     * self-invocation never goes through the proxy, so the annotation would be decoration. The
+     * same trap that makes it easy to *think* the wait is outside a transaction.
+     */
+    private final TransactionTemplate txTemplate;
+
+    /**
+     * Built once. {@code HttpClient.create()} with no provider hands every invocation its own
+     * connection pool, which nothing reuses and nothing reclaims on a schedule the caller
+     * controls - one per verification, for as long as the process lives.
+     */
+    private final WebClient webClient;
 
     private static final int VERIFICATION_TIMEOUT_SECONDS = 10;
 
@@ -38,11 +52,16 @@ public class EndpointVerificationService {
             EndpointRepository endpointRepository,
             WebClient.Builder webClientBuilder,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts) {
+            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts,
+            PlatformTransactionManager transactionManager) {
         this.endpointRepository = endpointRepository;
-        this.webClientBuilder = webClientBuilder;
-        this.allowPrivateIps = allowPrivateIps;
-        this.allowedHosts = allowedHosts;
+        this.txTemplate = new TransactionTemplate(transactionManager);
+        this.webClient = webClientBuilder
+                .clientConnector(new ReactorClientHttpConnector(
+                        SsrfProtectionCustomizer.apply(
+                                HttpClient.create(), allowPrivateIps, allowedHosts)))
+                .defaultHeader("User-Agent", "WebhookPlatform/1.0 Verification")
+                .build();
     }
 
     public String generateVerificationToken() {
@@ -59,33 +78,30 @@ public class EndpointVerificationService {
         return endpointRepository.save(endpoint);
     }
 
-    @Transactional
+    /**
+     * Sends the challenge and records what came back.
+     *
+     * <p>Deliberately not {@code @Transactional}. The wait here is up to ten seconds against a
+     * URL the customer chose, and it used to sit inside a transaction that had already dirtied
+     * the entity - so every call held a Hikari connection and a row lock on {@code endpoints}
+     * for its whole duration. It is reachable from a user-facing endpoint, so a handful of
+     * concurrent verifications against slow targets drained the pool for the entire instance.
+     *
+     * <p>Three steps instead: a short transaction to claim the attempt, the call with nothing
+     * held, and a short transaction to write the verdict.
+     */
     public VerificationResult verify(UUID endpointId) {
-        Endpoint endpoint = endpointRepository.findById(endpointId)
-                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+        Endpoint endpoint = beginVerificationAttempt(endpointId);
 
         if (endpoint.getVerificationStatus() == VerificationStatus.VERIFIED) {
             return new VerificationResult(true, "Already verified", endpoint);
         }
 
-        if (endpoint.getVerificationToken() == null) {
-            endpoint.setVerificationToken(generateVerificationToken());
-        }
-
-        endpoint.setVerificationAttemptedAt(Instant.now());
-        endpointRepository.save(endpoint);
-
+        String token = endpoint.getVerificationToken();
         try {
-            WebClient webClient = webClientBuilder
-                    .clientConnector(new ReactorClientHttpConnector(
-                            SsrfProtectionCustomizer.apply(
-                                    HttpClient.create(), allowPrivateIps, allowedHosts)))
-                    .defaultHeader("User-Agent", "WebhookPlatform/1.0 Verification")
-                    .build();
-
             Map<String, Object> challengePayload = Map.of(
                     "type", "webhook.verification",
-                    "challenge", endpoint.getVerificationToken(),
+                    "challenge", token,
                     "timestamp", Instant.now().toString());
 
             String response = webClient.post()
@@ -97,27 +113,59 @@ public class EndpointVerificationService {
                     .timeout(Duration.ofSeconds(VERIFICATION_TIMEOUT_SECONDS))
                     .block();
 
-            boolean verified = verifyChallengeResponse(response, endpoint.getVerificationToken());
-
-            if (verified) {
-                endpoint.setVerificationStatus(VerificationStatus.VERIFIED);
-                endpoint.setVerificationCompletedAt(Instant.now());
-                endpointRepository.save(endpoint);
+            if (verifyChallengeResponse(response, token)) {
                 log.info("Endpoint {} verified successfully", endpointId);
-                return new VerificationResult(true, "Verification successful", endpoint);
-            } else {
-                endpoint.setVerificationStatus(VerificationStatus.FAILED);
-                endpointRepository.save(endpoint);
-                log.warn("Endpoint {} verification failed - challenge not returned", endpointId);
-                return new VerificationResult(false, "Challenge token not found in response", endpoint);
+                return new VerificationResult(true, "Verification successful",
+                        recordVerificationOutcome(endpointId, VerificationStatus.VERIFIED));
             }
+            log.warn("Endpoint {} verification failed - challenge not returned", endpointId);
+            return new VerificationResult(false, "Challenge token not found in response",
+                    recordVerificationOutcome(endpointId, VerificationStatus.FAILED));
 
         } catch (Exception e) {
-            endpoint.setVerificationStatus(VerificationStatus.FAILED);
-            endpointRepository.save(endpoint);
             log.error("Endpoint {} verification failed: {}", endpointId, e.getMessage());
-            return new VerificationResult(false, "Verification request failed: " + e.getMessage(), endpoint);
+            return new VerificationResult(false, "Verification request failed: " + e.getMessage(),
+                    recordVerificationOutcome(endpointId, VerificationStatus.FAILED));
         }
+    }
+
+    /**
+     * Claims the attempt: stamps when it started and mints a token if there is not one already.
+     * Short, and over before anything is sent.
+     */
+    public Endpoint beginVerificationAttempt(UUID endpointId) {
+        return txTemplate.execute(tx -> {
+            Endpoint endpoint = endpointRepository.findById(endpointId)
+                    .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+
+            if (endpoint.getVerificationStatus() == VerificationStatus.VERIFIED) {
+                return endpoint;
+            }
+
+            if (endpoint.getVerificationToken() == null) {
+                endpoint.setVerificationToken(generateVerificationToken());
+            }
+            endpoint.setVerificationAttemptedAt(Instant.now());
+            return endpointRepository.save(endpoint);
+        });
+    }
+
+    /**
+     * Writes the verdict. Re-reads rather than saving the detached instance the call started
+     * with: the row may have been touched while the request was in flight, which is the cost of
+     * not holding it - and the cheaper half of the trade.
+     */
+    public Endpoint recordVerificationOutcome(UUID endpointId, VerificationStatus status) {
+        return txTemplate.execute(tx -> {
+            Endpoint endpoint = endpointRepository.findById(endpointId)
+                    .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+
+            endpoint.setVerificationStatus(status);
+            if (status == VerificationStatus.VERIFIED) {
+                endpoint.setVerificationCompletedAt(Instant.now());
+            }
+            return endpointRepository.save(endpoint);
+        });
     }
 
     @Transactional

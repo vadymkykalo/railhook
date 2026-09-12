@@ -30,7 +30,7 @@ public interface WorkflowTriggerOutboxRepository extends JpaRepository<WorkflowT
             FOR UPDATE SKIP LOCKED
         )
         UPDATE workflow_trigger_outbox
-        SET status = 'PROCESSING', attempts = attempts + 1
+        SET status = 'PROCESSING', attempts = attempts + 1, claimed_at = NOW()
         WHERE id IN (SELECT id FROM locked)
         RETURNING *
         """, nativeQuery = true)
@@ -48,13 +48,22 @@ public interface WorkflowTriggerOutboxRepository extends JpaRepository<WorkflowT
      *
      * <p>Attempts is deliberately not incremented: being abandoned is not an attempt, and
      * charging for it would retire a row that has never actually run.</p>
+     *
+     * <p>Staleness is measured from {@code claimedAt}, not {@code createdAt}. A row is held in
+     * PENDING for as long as its project is at its concurrency ceiling — {@code deferToNextPoll}
+     * puts it back on every poll, which is what stops one project taking the whole pool — so a
+     * busy project's rows are routinely older than the threshold before they are claimed at all.
+     * Measuring from ingestion therefore returned rows to PENDING while a live executor was
+     * running them, and the workflow ran concurrently with itself. A null {@code claimedAt} is a
+     * row from before this column existed: left alone, and collected by the daily cleanup.</p>
      */
     @Modifying
     @Query("""
         UPDATE WorkflowTriggerOutbox w
            SET w.status = com.webhook.platform.api.domain.enums.WorkflowTriggerOutboxStatus.PENDING
          WHERE w.status = com.webhook.platform.api.domain.enums.WorkflowTriggerOutboxStatus.PROCESSING
-           AND w.createdAt < :before
+           AND w.claimedAt IS NOT NULL
+           AND w.claimedAt < :before
         """)
     int reclaimStalledRows(@Param("before") Instant before);
 

@@ -52,7 +52,18 @@ public class DeliveryDryRunService {
         this.encryptionKeyRegistry = encryptionKeyRegistry;
     }
 
-    public DeliveryDryRunResponse dryRun(DeliveryDryRunRequest request) {
+    /**
+     * @param projectId the project in the request path, which the caller has already been shown to
+     *                  have access to. It has to be threaded down here because the endpoint this
+     *                  signs for arrives in the request <em>body</em>: {@code @TenantId} confines
+     *                  the lookup to the organization and {@code ScopeEnforcementInterceptor}
+     *                  confines the path variable, and an id in the body is outside both. An
+     *                  organization with two projects is the ordinary case, and this is the one
+     *                  read path that hands back a working signature rather than a description of
+     *                  one — so a sibling project's endpoint leaked both a forgeable
+     *                  {@code X-Signature} and the URL to aim it at.
+     */
+    public DeliveryDryRunResponse dryRun(UUID projectId, DeliveryDryRunRequest request) {
         List<String> errors = new ArrayList<>();
         String transformedPayload = null;
         String transformationName = null;
@@ -125,7 +136,11 @@ public class DeliveryDryRunService {
 
         // 5. Compute HMAC signature if endpoint provided
         if (request.getEndpointId() != null) {
-            Optional<Endpoint> endpointOpt = endpointRepository.findById(request.getEndpointId());
+            Optional<Endpoint> endpointOpt = endpointRepository.findById(request.getEndpointId())
+                    // Deliberately folded into "not found": that is the answer @TenantId already
+                    // gives for another organization's row, and distinguishing the two here would
+                    // make the dry-run a way to enumerate endpoint ids.
+                    .filter(e -> projectId.equals(e.getProjectId()));
             if (endpointOpt.isEmpty()) {
                 errors.add("Endpoint not found: " + request.getEndpointId());
             } else {

@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.Executor;
+import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 
 /**
  * Carries one public request through a developer's tunnel to their machine, and records what it
@@ -126,10 +127,13 @@ public class TunnelIngressService {
                             .method(request.getMethod())
                             .path(request.getPath())
                             .queryString(request.getQueryString())
-                            .requestHeaders(request.getHeaders())
+                            // Relayed verbatim — the developer's local service needs the real
+                            // Authorization — but not written down that way.
+                            .requestHeaders(HeaderSanitizer.sanitize(request.getHeaders()))
                             .requestBodySize(requestSize)
                             .responseStatus(response != null ? response.getStatusCode() : null)
-                            .responseHeaders(response != null ? response.getHeaders() : null)
+                            .responseHeaders(response != null
+                                    ? HeaderSanitizer.sanitize(response.getHeaders()) : null)
                             .responseBodySize(responseSize)
                             .durationMs(durationMs)
                             .error(response != null ? response.getError() : "timeout")

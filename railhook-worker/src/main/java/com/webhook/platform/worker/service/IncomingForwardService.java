@@ -54,7 +54,32 @@ public class IncomingForwardService {
         this.metrics = metrics;
     }
 
+    /**
+     * Runs one Forward, and never throws.
+     *
+     * <p>This is called on a {@code BoundedAsyncExecutor} pool thread, and that executor reads a
+     * throw as "do not ack" — deliberately, because an unacked record is re-polled rather than
+     * lost. With {@code asyncAcks} on, though, an unacked offset holds up every commit for its
+     * partition, so a single transient {@code SQLException} here stopped every later incoming
+     * event on that partition until somebody restarted the worker.
+     *
+     * <p>Reprocessing is driven by the retry ladder and the stuck sweep, not by Kafka
+     * redelivery — the row is still PENDING or PROCESSING and both of those have an owner. So
+     * acking is right and the partition keeps moving, which is what
+     * {@code WebhookDeliveryService.processDelivery} has always done on the outgoing side. The
+     * asymmetry was an omission rather than a decision.
+     */
     public void processForward(IncomingForwardMessage message) {
+        try {
+            runForward(message);
+        } catch (Exception e) {
+            log.error("Unexpected error forwarding eventId={}, destId={}: {} — acking so the "
+                            + "partition keeps moving; the retry ladder and the stuck sweep own the row",
+                    message.getIncomingEventId(), message.getDestinationId(), e.getMessage(), e);
+        }
+    }
+
+    private void runForward(IncomingForwardMessage message) {
         UUID eventId = message.getIncomingEventId();
         UUID destinationId = message.getDestinationId();
         int attemptNumber = resolveAttemptNumber(message);
