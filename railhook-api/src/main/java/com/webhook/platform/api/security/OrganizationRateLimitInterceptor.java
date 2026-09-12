@@ -2,6 +2,7 @@ package com.webhook.platform.api.security;
 
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.tenancy.TenantContext;
+import com.webhook.platform.common.util.LogSanitizer;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -71,8 +72,14 @@ public class OrganizationRateLimitInterceptor implements HandlerInterceptor {
             return true;
         }
 
+        // Method and URI are the caller's own text, and the caller is by definition one that is
+        // hammering us. Through LogSanitizer so a newline in the path cannot end this entry and
+        // open a second one that reads like ours.
         log.warn("Organization {} exceeded its API rate limit ({}/sec) on {} {}",
-                organizationId, requestsPerSecond, request.getMethod(), request.getRequestURI());
+                organizationId,
+                requestsPerSecond,
+                LogSanitizer.forLog(request.getMethod()),
+                LogSanitizer.forLog(request.getRequestURI()));
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType("application/json");
         // Seconds, because the limiter refills once a second — telling a client to come back

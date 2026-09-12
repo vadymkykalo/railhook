@@ -5,6 +5,8 @@ import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.function.BiFunction;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,10 +27,16 @@ class DlqDestinationTest {
         return new ConsumerRecord<>("deliveries", partition, 0L, "delivery-key", "payload");
     }
 
+    private static TopicPartition resolve(String dlqTopic, int sourcePartition) {
+        BiFunction<ConsumerRecord<?, ?>, Exception, TopicPartition> resolver =
+                KafkaConsumerConfig.dlqDestination(dlqTopic);
+        return resolver.apply(recordOnPartition(sourcePartition), new IllegalStateException("failed for the last time"));
+    }
+
     @Test
     @DisplayName("the broker picks the partition, so a smaller DLQ cannot swallow a dead letter")
     void partitionIsLeftToTheBroker() {
-        TopicPartition destination = KafkaConsumerConfig.dlqDestination("deliveries.dlq", recordOnPartition(11));
+        TopicPartition destination = resolve("deliveries.dlq", 11);
 
         assertEquals("deliveries.dlq", destination.topic());
         assertTrue(destination.partition() < 0,
@@ -39,8 +47,8 @@ class DlqDestinationTest {
     @Test
     @DisplayName("the source partition is not carried over, whichever it was")
     void sourcePartitionIsIgnored() {
-        int high = KafkaConsumerConfig.dlqDestination("deliveries.dlq", recordOnPartition(47)).partition();
-        int low = KafkaConsumerConfig.dlqDestination("deliveries.dlq", recordOnPartition(0)).partition();
+        int high = resolve("deliveries.dlq", 47).partition();
+        int low = resolve("deliveries.dlq", 0).partition();
 
         assertEquals(low, high, "the destination must not depend on where the record came from");
     }
@@ -48,7 +56,6 @@ class DlqDestinationTest {
     @Test
     @DisplayName("each direction still parks in its own topic")
     void topicIsPreserved() {
-        assertEquals("incoming.forward.dlq",
-                KafkaConsumerConfig.dlqDestination("incoming.forward.dlq", recordOnPartition(3)).topic());
+        assertEquals("incoming.forward.dlq", resolve("incoming.forward.dlq", 3).topic());
     }
 }

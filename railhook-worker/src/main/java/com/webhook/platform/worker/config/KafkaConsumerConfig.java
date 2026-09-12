@@ -25,6 +25,7 @@ import org.springframework.util.backoff.FixedBackOff;
 import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiFunction;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 
@@ -125,9 +126,14 @@ public class KafkaConsumerConfig {
      * <p>Nothing is lost by giving it up: the record keeps its key, so the broker's default
      * partitioner puts every dead letter for one delivery in the same partition anyway, which is
      * the only ordering anyone here depends on.
+     *
+     * <p>The resolver therefore never looks at the record it is handed. It is built once per
+     * topic and returns the same destination for every failure, which is what keeps the old
+     * behaviour from creeping back: there is no source partition in scope to copy.
      */
-    static TopicPartition dlqDestination(String dlqTopic, ConsumerRecord<?, ?> record) {
-        return new TopicPartition(dlqTopic, -1);
+    static BiFunction<ConsumerRecord<?, ?>, Exception, TopicPartition> dlqDestination(String dlqTopic) {
+        TopicPartition destination = new TopicPartition(dlqTopic, -1);
+        return (record, exception) -> destination;
     }
 
     private <K, V> void configureFactory(ConcurrentKafkaListenerContainerFactory<K, V> factory, int concurrency, String dlqTopic) {
@@ -145,7 +151,7 @@ public class KafkaConsumerConfig {
 
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
                 deadLetterKafkaTemplate,
-                (record, exception) -> dlqDestination(dlqTopic, record));
+                dlqDestination(dlqTopic));
         
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
             recoverer,

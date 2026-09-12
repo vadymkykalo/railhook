@@ -1,6 +1,9 @@
 package com.webhook.platform.api.security;
 
 import com.webhook.platform.api.service.RedisRateLimiterService;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.webhook.platform.api.tenancy.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -14,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -123,5 +127,38 @@ class OrganizationRateLimitInterceptorTest {
         assertTrue(interceptor(true, 200).preHandle(request, response, new Object()));
 
         verify(rateLimiterService, never()).tryAcquireForOrganization(any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("a caller cannot forge a log line out of the path it asked for")
+    void refusalLogsOneLinePerRequest() throws IOException {
+        UUID org = UUID.randomUUID();
+        TenantContext.set(org);
+        when(rateLimiterService.tryAcquireForOrganization(org, 200)).thenReturn(false);
+
+        Logger logger = (Logger) LoggerFactory.getLogger(OrganizationRateLimitInterceptor.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            // The URI is whatever the caller typed. Logged raw, a newline in it ends our entry
+            // and opens one the caller wrote — which is how a rate-limit warning becomes
+            // evidence of an operator action that never happened.
+            MockHttpServletRequest forged = new MockHttpServletRequest(
+                    "GET", "/api/v1/deliveries\nWARN  Organization deleted by operator");
+
+            assertFalse(interceptor(true, 200).preHandle(forged, response, new Object()));
+
+            String entry = appender.list.stream()
+                    .map(ILoggingEvent::getFormattedMessage)
+                    .filter(m -> m.contains("exceeded its API rate limit"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("the refusal was not logged at all"));
+            assertFalse(entry.contains("\n"), "one request must not be able to write two log lines");
+            assertTrue(entry.contains("/api/v1/deliveries_WARN"),
+                    "the path still has to be readable — neutralised, not dropped");
+        } finally {
+            logger.detachAppender(appender);
+        }
     }
 }
