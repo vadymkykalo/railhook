@@ -50,6 +50,15 @@ public class IngressController {
             @ApiResponse(responseCode = "429", description = "Rate limit or monthly event quota exceeded",
                     content = @Content(schema = @Schema(implementation = IngressResponse.class)))
     })
+    // Described as a plain string, not as what springdoc infers from byte[]. It would write
+    // `format: byte`, which in OpenAPI means base64 — and a provider reading that would encode a
+    // payload nobody asked them to encode. The parameter is byte[] so the signature is checked
+    // against what was sent; the wire format is unchanged and the documentation has to keep
+    // saying so.
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            description = "The provider's payload, exactly as they send it. Signatures are "
+                    + "verified over these bytes, so nothing re-encodes them in transit.",
+            content = @Content(mediaType = "application/json", schema = @Schema(type = "string")))
     @PostMapping("/{token}")
     public ResponseEntity<IngressResponse> receiveWebhook(
             @PathVariable("token") String token,
