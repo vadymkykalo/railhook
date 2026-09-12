@@ -46,6 +46,21 @@ public class OutboxPublisherService {
     private final int maxPerProject;
 
     /**
+     * How many rows sharing one Kafka key - that is, bound for one endpoint - may go in a batch.
+     *
+     * <p>The per-endpoint announcement ceiling, and it binds harder than it looks: at the default
+     * poll interval of 1s this is ten events a second for a single hot endpoint, whatever
+     * {@code batch-size} says. {@code load/ingest.js} drains at exactly that rate against one
+     * endpoint.
+     *
+     * <p>The fairness is the point - one endpoint's burst must not stall every other endpoint's
+     * announcement - so the default stays where it was. It was a literal in the two call sites
+     * while the bounds either side of it were both configurable, which meant an operator with one
+     * busy endpoint had a ceiling they could neither see nor move.
+     */
+    private final int maxPerKey;
+
+    /**
      * Sampled by the publisher poll, read by the gauge.
      *
      * <p>The gauge used to run {@code findOldestPendingCreatedAt()} inside its own lambda, so
@@ -71,7 +86,8 @@ public class OutboxPublisherService {
             @Value("${outbox.publisher.dead-retention-days:90}") int deadRetentionDays,
             @Value("${outbox.publisher.sending-recovery-seconds:300}") long sendingRecoverySeconds,
             @Value("${outbox.publisher.batch-send-timeout-seconds:30}") long batchSendTimeoutSeconds,
-            @Value("${outbox.publisher.max-per-project:30}") int maxPerProject) {
+            @Value("${outbox.publisher.max-per-project:30}") int maxPerProject,
+            @Value("${outbox.publisher.max-per-key:10}") int maxPerKey) {
         this.outboxMessageRepository = outboxMessageRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
@@ -81,6 +97,7 @@ public class OutboxPublisherService {
         this.sendingRecoverySeconds = sendingRecoverySeconds;
         this.batchSendTimeoutSeconds = batchSendTimeoutSeconds;
         this.maxPerProject = maxPerProject;
+        this.maxPerKey = maxPerKey;
         this.txTemplate = new TransactionTemplate(txManager);
 
         this.publishLatency = Timer.builder("outbox_publish_latency")
@@ -139,7 +156,7 @@ public class OutboxPublisherService {
         // Phase 1: fast claim — SELECT FOR UPDATE + mark SENDING, commit immediately
         List<OutboxMessage> claimed = txTemplate.execute(status -> {
             List<OutboxMessage> batch = outboxMessageRepository
-                    .findPendingBatchForUpdate(OutboxStatus.PENDING.name(), batchSize, 10, maxPerProject);
+                    .findPendingBatchForUpdate(OutboxStatus.PENDING.name(), batchSize, maxPerKey, maxPerProject);
             for (OutboxMessage msg : batch) {
                 msg.setStatus(OutboxStatus.SENDING);
             }
@@ -170,7 +187,7 @@ public class OutboxPublisherService {
         // Phase 1: claim inside short transaction — SELECT FOR UPDATE + mark SENDING, commit immediately
         List<OutboxMessage> messagesToRetry = txTemplate.execute(status -> {
             List<OutboxMessage> failedMessages = outboxMessageRepository
-                    .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), maxRetries, batchSize, 10, maxPerProject);
+                    .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), maxRetries, batchSize, maxPerKey, maxPerProject);
 
             if (failedMessages.isEmpty()) {
                 return List.<OutboxMessage>of();
@@ -291,7 +308,7 @@ public class OutboxPublisherService {
                             if (ex != null) {
                                 log.error("Failed to publish outbox message {}: {}",
                                         message.getId(), ex.getMessage());
-                                failedMap.put(message.getId(), ex.getMessage());
+                                failedMap.put(message.getId(), describe(ex));
                             } else {
                                 publishedIds.add(message.getId());
                                 if (isRetry) {
@@ -304,7 +321,7 @@ public class OutboxPublisherService {
                 completionFutures.add(done);
             } catch (Exception e) {
                 log.error("Failed to prepare outbox message {}: {}", message.getId(), e.getMessage());
-                failedMap.put(message.getId(), e.getMessage());
+                failedMap.put(message.getId(), describe(e));
             }
         }
 
@@ -323,18 +340,40 @@ public class OutboxPublisherService {
         }
 
         // ── Batch DB updates (2-3 queries instead of N individual saves) ──
-        batchUpdateResults(publishedIds, failedMap, isRetry);
+        // A snapshot, taken under the list's own monitor. Handing the live collector to the
+        // repository means Spring Data iterates it to bind the IN clause without holding that
+        // monitor, while a callback that arrived after the wait above may still be adding to it.
+        List<UUID> settled;
+        synchronized (publishedIds) {
+            settled = new ArrayList<>(publishedIds);
+        }
+        batchUpdateResults(settled, failedMap, isRetry);
 
         sample.stop(publishLatency);
+    }
+
+    /**
+     * An error message that is safe to put in a map.
+     *
+     * <p>{@code ConcurrentHashMap} refuses a null value and {@code Throwable.getMessage()} is
+     * null for plenty of what turns up here - an NPE inside a serializer most of all. In the
+     * send callback that NPE completed the future exceptionally and was then swallowed one level
+     * up as the benign "did not fully complete", leaving the row SENDING to be published again
+     * 300s later. In the preparation catch it propagated out of the poll cycle altogether and
+     * abandoned every row claimed in that batch.
+     */
+    private static String describe(Throwable t) {
+        String message = t.getMessage();
+        return message != null ? message : t.getClass().getName();
     }
 
     private void batchUpdateResults(List<UUID> publishedIds, Map<UUID, String> failedMap, boolean isRetry) {
         Instant now = Instant.now();
         try {
             if (!publishedIds.isEmpty()) {
-                txTemplate.executeWithoutResult(status ->
+                Integer settled = txTemplate.execute(status ->
                         outboxMessageRepository.batchMarkPublished(publishedIds, now));
-                log.debug("Batch-marked {} outbox messages as PUBLISHED", publishedIds.size());
+                reportStragglers("PUBLISHED", publishedIds.size(), settled);
             }
         } catch (Exception e) {
             log.error("Failed to batch-mark {} messages as PUBLISHED: {}", publishedIds.size(), e.getMessage());
@@ -348,16 +387,38 @@ public class OutboxPublisherService {
                 byError.computeIfAbsent(entry.getValue(), k -> new ArrayList<>()).add(entry.getKey());
             }
             try {
-                txTemplate.executeWithoutResult(status -> {
+                Integer settled = txTemplate.execute(status -> {
+                    int rows = 0;
                     for (Map.Entry<String, List<UUID>> group : byError.entrySet()) {
-                        outboxMessageRepository.batchMarkFailed(group.getValue(), group.getKey(), now);
+                        rows += outboxMessageRepository.batchMarkFailed(group.getValue(), group.getKey(), now);
                     }
+                    return rows;
                 });
-                log.debug("Batch-marked {} outbox messages as FAILED ({} distinct errors)",
-                        failedMap.size(), byError.size());
+                reportStragglers("FAILED", failedMap.size(), settled);
             } catch (Exception e) {
                 log.error("Failed to batch-mark {} messages as FAILED: {}", failedMap.size(), e.getMessage());
             }
+        }
+    }
+
+    /**
+     * Says so when the status guard refused a row.
+     *
+     * <p>A shortfall means a callback outlived the batch that started it: by the time it was
+     * settled the row had been recovered and re-claimed, and the guard in
+     * {@code batchMarkPublished} / {@code batchMarkFailed} declined to stamp a stale outcome over
+     * a live one. That is the guard working, but it is also the only visible sign that the send
+     * timeout is tuned below what the broker actually takes — silent, it would just look like a
+     * queue that will not drain.
+     */
+    private void reportStragglers(String outcome, int attempted, Integer settled) {
+        int applied = settled != null ? settled : 0;
+        if (applied < attempted) {
+            log.warn("Batch-marked {} of {} outbox messages as {} — {} had been reclaimed since "
+                            + "this batch claimed them; their callbacks outlived the {}s send timeout",
+                    applied, attempted, outcome, attempted - applied, batchSendTimeoutSeconds);
+        } else {
+            log.debug("Batch-marked {} outbox messages as {}", applied, outcome);
         }
     }
 

@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The dashboard's render errors only ever reached the browser console, so nobody here saw them.
@@ -125,6 +126,23 @@ class ClientErrorReportServiceTest {
             assertFalse(logged.contains("secret-value"),
                     "a query string is where a token ends up; the path is what identifies the screen");
             assertTrue(logged.contains("/admin/deliveries"), logged);
+        }
+
+        @Test
+        @DisplayName("the throttle's bookkeeping does not outlive the throttle")
+        void windowsDoNotAccumulateForEveryUserEver() {
+            // A window lasts a minute; the map entry used to last the life of the process, one
+            // per user who ever loaded the dashboard. A few dozen bytes each, which is exactly
+            // why it went unnoticed — what was missing is any bound on the count.
+            ClientErrorReportService bounded = new ClientErrorReportService(true, 20);
+
+            for (int i = 0; i < 200_000; i++) {
+                bounded.record(report("something broke"), UUID.randomUUID());
+            }
+
+            assertThat(bounded.trackedWindows())
+                    .as("bounded, rather than one entry per user who has ever visited")
+                    .isLessThanOrEqualTo(50_000L);
         }
     }
 

@@ -11,8 +11,37 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.security.spec.KeySpec;
 import java.util.Base64;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import java.time.Duration;
 
 public class CryptoUtils {
+
+    /**
+     * Derived keys, kept because deriving them is the expensive part and the answer never changes.
+     *
+     * <p>PBKDF2 at {@link #PBKDF2_ITERATIONS} iterations is meant to cost something — that is the
+     * whole point of it, applied once, when a key is established. It was being applied on every
+     * encrypt and every decrypt instead, against a salt that is one process-wide configuration
+     * value, so the same bytes were recomputed from scratch thousands of times a second for no
+     * result that differed.
+     *
+     * <p>It also made the cost bookable by a stranger: the ingress path decrypts a source's HMAC
+     * secret in order to check the signature, so the derivation ran before the request had been
+     * shown to be genuine.
+     *
+     * <p>Bounded and expiring, though the live population is the handful of configured key
+     * versions: a map that can only grow is a map that eventually matters. Holding derived keys
+     * in memory adds no exposure — the master key they come from is already there.
+     */
+    private static final Cache<DerivationKey, SecretKey> DERIVED_KEYS = Caffeine.newBuilder()
+            .maximumSize(64)
+            .expireAfterAccess(Duration.ofHours(1))
+            .build();
+
+    /** Both halves, kept apart: concatenating them lets one pair spell another. */
+    private record DerivationKey(String masterKey, String salt) {
+    }
 
     private static final String AES_ALGORITHM = "AES/GCM/NoPadding";
     private static final int GCM_TAG_LENGTH = 128;
@@ -82,11 +111,20 @@ public class CryptoUtils {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    private static SecretKey deriveKey(String masterKey, String salt) throws Exception {
-        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        KeySpec spec = new PBEKeySpec(masterKey.toCharArray(), salt.getBytes(StandardCharsets.UTF_8), PBKDF2_ITERATIONS, AES_KEY_LENGTH_BITS);
-        SecretKey tmp = factory.generateSecret(spec);
-        return new SecretKeySpec(tmp.getEncoded(), "AES");
+    private static SecretKey deriveKey(String masterKey, String salt) {
+        return DERIVED_KEYS.get(new DerivationKey(masterKey, salt), CryptoUtils::derive);
+    }
+
+    private static SecretKey derive(DerivationKey key) {
+        try {
+            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            KeySpec spec = new PBEKeySpec(key.masterKey().toCharArray(),
+                    key.salt().getBytes(StandardCharsets.UTF_8), PBKDF2_ITERATIONS, AES_KEY_LENGTH_BITS);
+            SecretKey tmp = factory.generateSecret(spec);
+            return new SecretKeySpec(tmp.getEncoded(), "AES");
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to derive encryption key", e);
+        }
     }
 
     public static class EncryptedData {

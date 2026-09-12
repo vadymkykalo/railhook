@@ -37,6 +37,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 /**
@@ -761,5 +762,44 @@ class IncomingForwardServiceTest {
                 .isEqualTo(ForwardAttemptStatus.PROCESSING);
         verify(attemptRepository, never()).save(argThat(a ->
                 a != null && a.getAttemptNumber() == 2));
+    }
+
+    // -- A database blip is not a reason to stop the partition --
+
+    @Test
+    void aFailedLookupDoesNotEscapeOntoTheConsumerThread() {
+        // processForward ran on a BoundedAsyncExecutor pool thread, and that executor treats a
+        // throw as "do not ack" on purpose — the work is not lost, it is re-polled. But with
+        // asyncAcks on, an unacked offset holds up every commit for its partition, so one
+        // transient SQLException stopped every *later* incoming event on that partition until
+        // somebody restarted the worker.
+        //
+        // The outgoing direction never had this: WebhookDeliveryService.processDelivery catches
+        // and logs, the record is acked, and the row is left to the stuck sweep and the retry
+        // ladder, which is what actually drives reprocessing here. The asymmetry was not a
+        // decision, it was an omission.
+        when(eventRepository.findById(eventId))
+                .thenThrow(new org.springframework.dao.QueryTimeoutException("statement timeout"));
+
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(0).replay(false)
+                .build();
+
+        assertThatNoException().isThrownBy(() -> service.processForward(message));
+    }
+
+    @Test
+    void aFailedAttemptRunDoesNotEscapeEither() {
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
+        when(destinationRepository.findById(destinationId))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("pool exhausted"));
+
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(0).replay(false)
+                .build();
+
+        assertThatNoException().isThrownBy(() -> service.processForward(message));
     }
 }

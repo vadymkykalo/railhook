@@ -8,10 +8,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 
 /**
  * Where a failure in the dashboard ends up.
@@ -57,7 +57,21 @@ public class ClientErrorReportService {
 
     private final boolean enabled;
     private final int reportsPerUserPerMinute;
-    private final Map<UUID, Window> windows = new ConcurrentHashMap<>();
+    /**
+     * One window per user, for a minute at a time.
+     *
+     * <p>Expiring, because a plain map here only ever grows: a window lasts a minute and the
+     * entry lasted the life of the process, one per user who ever loaded the dashboard. Small
+     * each, unbounded together — which is the shape of every slow leak. Bounded as well as
+     * expiring, so a burst of distinct users cannot outrun the eviction.
+     *
+     * <p>Caffeine rather than a scheduled sweep, the way
+     * {@code RedisConcurrencyControlService} and {@code MtlsWebClientFactory} already do it.
+     */
+    private final Cache<UUID, Window> windows = Caffeine.newBuilder()
+            .maximumSize(50_000)
+            .expireAfterWrite(WINDOW.multipliedBy(2))
+            .build();
 
     public ClientErrorReportService(
             @Value("${client-errors.enabled:true}") boolean enabled,
@@ -96,13 +110,19 @@ public class ClientErrorReportService {
                 suffix(" | component: ", clean(report.getComponentStack(), MAX_COMPONENT_STACK)));
     }
 
+    /** How many windows are being tracked. Visible so the bound can be asserted, not a metric. */
+    long trackedWindows() {
+        windows.cleanUp();
+        return windows.estimatedSize();
+    }
+
     /** One counter per user per window. Absent users are admitted and start a window. */
     private boolean admit(UUID userId) {
         if (userId == null) {
             return true;
         }
         Instant now = Instant.now();
-        Window window = windows.compute(userId, (key, existing) ->
+        Window window = windows.asMap().compute(userId, (key, existing) ->
                 existing == null || existing.startedBefore(now.minus(WINDOW))
                         ? new Window(now)
                         : existing);

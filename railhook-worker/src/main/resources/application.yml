@@ -52,6 +52,13 @@ spring:
   
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      # Everything a producer actually runs on is built in KafkaProducerConfig, which assembles
+      # its own property map - so acks and retries written here were never read by anything. The
+      # two below are, through @Value on that class, and they are the two an operator has reason
+      # to move: how long a send may keep trying, and how long it may block the caller.
+      delivery-timeout-ms: ${KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS:120000}
+      max-block-ms: ${KAFKA_PRODUCER_MAX_BLOCK_MS:10000}
     consumer:
       delivery-concurrency: ${KAFKA_DELIVERY_CONCURRENCY:6}
       incoming-concurrency: ${KAFKA_INCOMING_CONCURRENCY:3}

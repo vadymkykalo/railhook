@@ -82,10 +82,12 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      acks: all
-      retries: 3
+      # Everything a producer actually runs on is built in KafkaProducerConfig, which assembles
+      # its own property map - so acks and retries written here were never read by anything. The
+      # two below are, through @Value on that class, and they are the two an operator has reason
+      # to move: how long a send may keep trying, and how long it may block the caller.
+      delivery-timeout-ms: ${KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS:120000}
+      max-block-ms: ${KAFKA_PRODUCER_MAX_BLOCK_MS:10000}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -158,6 +160,9 @@ outbox:
     sending-recovery-seconds: ${OUTBOX_SENDING_RECOVERY_SECONDS:300}
     batch-send-timeout-seconds: ${OUTBOX_BATCH_SEND_TIMEOUT_SECONDS:30}
     max-per-project: ${OUTBOX_MAX_PER_PROJECT:30}
+    # Rows sharing one Kafka key — one endpoint — per batch. With the 1s poll above this is the
+    # per-endpoint announcement ceiling: ten events a second, whatever batch-size says.
+    max-per-key: ${OUTBOX_MAX_PER_KEY:10}
 
 data-retention:
   delivery-attempts-retention-days: ${DATA_RETENTION_ATTEMPTS_DAYS:90}
