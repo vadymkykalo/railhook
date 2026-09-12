@@ -15,7 +15,7 @@ public class GitHubVerifier implements WebhookVerificationStrategy {
     private static final String PREFIX = "sha256=";
 
     @Override
-    public VerificationResult verify(String secret, String body, HttpServletRequest request) {
+    public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {
         String header = request.getHeader(HEADER);
         if (header == null || header.isBlank()) {
             return VerificationResult.failure("Missing header: " + HEADER);

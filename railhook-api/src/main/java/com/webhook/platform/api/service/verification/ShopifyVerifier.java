@@ -18,7 +18,7 @@ public class ShopifyVerifier implements WebhookVerificationStrategy {
     private static final String HEADER = "X-Shopify-Hmac-SHA256";
 
     @Override
-    public VerificationResult verify(String secret, String body, HttpServletRequest request) {
+    public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {
         String header = request.getHeader(HEADER);
         if (header == null || header.isBlank()) {
             return VerificationResult.failure("Missing header: " + HEADER);
@@ -28,7 +28,7 @@ public class ShopifyVerifier implements WebhookVerificationStrategy {
             Mac mac = Mac.getInstance("HmacSHA256");
             SecretKeySpec keySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             mac.init(keySpec);
-            byte[] hash = mac.doFinal(body != null ? body.getBytes(StandardCharsets.UTF_8) : new byte[0]);
+            byte[] hash = mac.doFinal(body != null ? body : new byte[0]);
             String computed = Base64.getEncoder().encodeToString(hash);
 
             boolean valid = MessageDigest.isEqual(

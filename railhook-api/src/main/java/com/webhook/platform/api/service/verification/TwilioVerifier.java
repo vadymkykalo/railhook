@@ -48,7 +48,7 @@ public class TwilioVerifier implements WebhookVerificationStrategy {
     }
 
     @Override
-    public VerificationResult verify(String secret, String body, HttpServletRequest request) {
+    public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {
         String signature = request.getHeader(SIGNATURE_HEADER);
         if (signature == null || signature.isBlank()) {
             return VerificationResult.failure("Missing header: " + SIGNATURE_HEADER);
@@ -96,7 +96,14 @@ public class TwilioVerifier implements WebhookVerificationStrategy {
     }
 
     /** Sorted by parameter name, each name immediately followed by its decoded value. */
-    private static String concatenatedParameters(String body) {
+    /**
+     * Only reached for {@code application/x-www-form-urlencoded}, where the body is
+     * percent-encoded and therefore ASCII by definition — so decoding it as UTF-8 is a fact
+     * about the encoding rather than an assumption about the sender. The other branch hashes
+     * the bytes without decoding them at all.
+     */
+    private static String concatenatedParameters(byte[] rawBody) {
+        String body = rawBody != null ? new String(rawBody, StandardCharsets.UTF_8) : null;
         Map<String, String> sorted = new TreeMap<>();
         if (body != null && !body.isBlank()) {
             for (String pair : body.split("&")) {
@@ -131,11 +138,10 @@ public class TwilioVerifier implements WebhookVerificationStrategy {
         return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 
-    private static String sha256Hex(String body) {
+    private static String sha256Hex(byte[] body) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(
-                    digest.digest(body != null ? body.getBytes(StandardCharsets.UTF_8) : new byte[0]));
+            return HexFormat.of().formatHex(digest.digest(body != null ? body : new byte[0]));
         } catch (Exception e) {
             throw new RuntimeException("Failed to compute SHA-256", e);
         }
