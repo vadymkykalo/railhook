@@ -26,6 +26,9 @@ public final class HeaderSanitizer {
     }
 
     public static boolean isSensitiveHeader(String headerName) {
+        if (headerName == null) {
+            return false;
+        }
         String lower = headerName.toLowerCase();
         if (SENSITIVE_HEADERS_EXACT.contains(lower)) {
             return true;

@@ -56,6 +56,6 @@ public class TransformPreviewController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(deliveryDryRunService.dryRun(request));
+        return ResponseEntity.ok(deliveryDryRunService.dryRun(projectId, request));
     }
 }
