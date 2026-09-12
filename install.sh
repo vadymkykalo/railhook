@@ -534,8 +534,77 @@ cd "$(dirname "$(readlink -f "$0")")"
 if docker compose version >/dev/null 2>&1; then COMPOSE_CMD="docker compose"
 elif docker-compose version >/dev/null 2>&1; then COMPOSE_CMD="docker-compose"
 else echo "Docker Compose is not available (tried 'docker compose' and 'docker-compose')." >&2; exit 1; fi
+RAW="https://raw.githubusercontent.com/vadymkykalo/railhook"
 # shellcheck disable=SC2086
 compose() { $COMPOSE_CMD "$@"; }
+
+# Replaces the API containers one at a time, so nothing is asked for work while it
+# is still starting.
+#
+# With one replica there is nothing to roll behind and this is an ordinary restart —
+# about twenty seconds of 502, which is the JVM booting and not something a proxy can
+# paper over. Set API_REPLICAS=2 in .env and it becomes seamless.
+#
+# The part that is not obvious: Docker's embedded DNS publishes a container's address
+# the moment the container exists and does not withhold it while the healthcheck is
+# still failing. So simply scaling up hands nginx a share of live traffic for a cold
+# JVM. The replacement is therefore created stopped, attached under a throwaway alias,
+# started, waited for, and only then given the name nginx resolves.
+roll_api() {
+    local ids target net new before after
+    ids=$(compose ps -q api || true)
+    target=$(printf '%s\n' "$ids" | grep -c . || true)
+
+    if [ "${target:-0}" -le 1 ]; then
+        compose up -d --no-deps api
+        return
+    fi
+
+    net=$(docker network ls --format '{{.Name}}' | grep -E 'webhook-network$' | head -1)
+    if [ -z "$net" ]; then
+        echo "Could not find the webhook network; restarting the API instead of rolling it."
+        compose up -d --no-deps api
+        return
+    fi
+
+    for old in $ids; do
+        before=$(compose ps -aq api | sort)
+        compose create --no-recreate --scale api=$((target + 1)) api >/dev/null 2>&1
+        after=$(compose ps -aq api | sort)
+        new=$(comm -13 <(echo "$before") <(echo "$after") | head -1)
+        [ -n "$new" ] || { echo "Compose created no replacement; leaving the API alone."; return 1; }
+
+        docker network disconnect "$net" "$new" >/dev/null 2>&1 || true
+        docker network connect --alias api-warming "$net" "$new"
+        docker start "$new" >/dev/null
+        echo "  warming ${new:0:12} — out of rotation until it answers"
+
+        local waited=0
+        while [ "$waited" -lt 180 ]; do
+            case "$(docker inspect -f '{{.State.Health.Status}}' "$new" 2>/dev/null || echo gone)" in
+                healthy) break ;;
+                unhealthy) echo "  ${new:0:12} came up unhealthy — stopping here, the old one is still serving"; return 1 ;;
+            esac
+            sleep 3; waited=$((waited + 3))
+        done
+        [ "$waited" -lt 180 ] || { echo "  ${new:0:12} never became healthy — the old one is still serving"; return 1; }
+
+        # An alias is fixed at connect time, so this is a reconnect. Safe precisely
+        # because nothing is routed to it yet.
+        docker network disconnect "$net" "$new"
+        docker network connect --alias api "$net" "$new"
+        echo "  ${new:0:12} is serving"
+
+        # Long enough for nginx to have re-resolved before the old one stops answering.
+        sleep 8
+
+        # SIGTERM: server.shutdown=graceful drains what is in flight, and nginx has
+        # already stopped sending it anything new.
+        docker stop "$old" >/dev/null 2>&1 || true
+        docker rm -f "$old" >/dev/null 2>&1 || true
+        echo "  drained and removed ${old:0:12}"
+    done
+}
 case "${1:-help}" in
     start)   compose up -d ;;
     stop)    compose stop ;;
@@ -565,8 +634,39 @@ case "${1:-help}" in
         echo "Backing up before anything changes..."
         "$0" backup || { echo "Backup failed — not upgrading. Fix that first." >&2; exit 1; }
 
+        # Refresh the deployment file for the release being installed.
+        #
+        # Without this an upgrade only ever moved the image tags, so anything a
+        # release changed *about* the topology — a new service, a memory limit, the
+        # replica count that makes this very rolling path possible — never reached an
+        # installation that already existed. It reached new installs only, which is
+        # the kind of difference that surfaces as "it works on a fresh box".
+        #
+        # The previous file is kept beside it. If you have edited yours, diff the two:
+        # this replaces it rather than merging, because a merge that got it wrong
+        # would be discovered at the worst moment.
+        if curl -fsSL "${RAW}/${want:-$from}/docker-compose.yml" -o docker-compose.yml.new 2>/dev/null; then
+            if ! cmp -s docker-compose.yml docker-compose.yml.new; then
+                cp docker-compose.yml docker-compose.yml.previous
+                mv docker-compose.yml.new docker-compose.yml
+                echo "docker-compose.yml updated for ${want:-$from} (previous kept as docker-compose.yml.previous)"
+            else
+                rm -f docker-compose.yml.new
+            fi
+        else
+            rm -f docker-compose.yml.new
+            echo "Could not fetch docker-compose.yml for ${want:-$from}; keeping the one on disk."
+        fi
+
         compose pull
-        compose up -d
+
+        # Everything except the API first. The worker is invisible to a customer
+        # while it restarts — a Delivery is durable in Postgres and Kafka and comes
+        # back to the ladder — and nginx, Caddy and the data services are seconds.
+        compose up -d --no-deps postgres kafka redis ui caddy worker 2>/dev/null || compose up -d
+
+        # The API is the one a customer notices, because it is what accepts webhooks.
+        roll_api
 
         echo
         echo "Upgraded. Watch it come up:  ./railhook status"

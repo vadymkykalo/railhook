@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-09-12
+
+An upgrade no longer stops the API to replace it. Measured on a production host, same probe
+before and after: **32 seconds of 502, then none**.
+
+### Fixed
+
+- **`railhook upgrade` rolls the API instead of restarting it.** Three things were wrong and
+  only the third was expensive.
+
+  nginx resolves a name in a literal `proxy_pass` once, at startup, and keeps that address for
+  the life of the process — so a recreated container came back on a new one and nginx went on
+  posting to an address that no longer answered. Resolving through a variable makes it look the
+  name up per request. Worth about seven seconds of the thirty-two; the rest was the JVM
+  starting, which no proxy setting shortens.
+
+  So the API has to be *replaced* rather than restarted, and it could not be: `container_name`
+  pins a service to one container and Compose refuses to scale it at all. Removed, with
+  `API_REPLICAS` defaulting to 1 — the smallest supported host has room for one JVM here — and
+  2 for anyone who would rather not have the gap.
+
+  And the part that makes scaling alone insufficient: **Docker's embedded DNS publishes a
+  container's address the moment it exists and does not withhold it while the healthcheck is
+  still failing.** Simply scaling up therefore hands nginx a share of live traffic for a cold
+  JVM — turning a total outage into a half one. The replacement is now created stopped, attached
+  under a throwaway alias, started, waited for, and only then given the name nginx resolves. The
+  container it replaces is drained a resolver TTL later with `SIGTERM`, so Spring's graceful
+  shutdown finishes what is in flight after nginx has stopped sending it work.
+
+- **`railhook upgrade` refreshes `docker-compose.yml`.** It moved the image tags and nothing
+  else, so anything a release changed about the topology reached new installations only —
+  including the replica count the rolling path above depends on. The previous file is kept
+  beside it rather than merged, because a merge that got it wrong would surface at the worst
+  moment.
+
+### Changed
+
+- `docker logs webhook-api` no longer resolves — the API has no fixed container name so that it
+  can be rolled. Use `docker compose logs api`, which works for one replica or several. Every
+  other service is unchanged.
+
 ## [2.15.0] - 2026-09-12
 
 Four faults that each made the system quietly do the wrong thing rather than fail visibly, plus
