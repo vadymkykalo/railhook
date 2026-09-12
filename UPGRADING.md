@@ -2,6 +2,77 @@
 
 ## Unreleased
 
+## v2.14.0
+
+Nothing in this release requires action. It is bug fixes, one additive migration, and two new
+optional settings. Compatible in both directions with 2.13.0 — the schema change is a nullable
+column, so a rollback of the images does not need a rollback of the schema.
+
+### `V069` adds a nullable column, and does not backfill it
+
+`workflow_trigger_outbox.claimed_at`. The stalled-row sweep used to measure from `created_at` —
+when the event was ingested — which is not a property of the run: a row waits in PENDING for as
+long as its project is at its concurrency ceiling, so on a busy project rows were already stale
+by that measure before anyone had claimed them. The sweep then returned them to PENDING while a
+live executor was running them, and the workflow ran twice.
+
+Rows that are already PROCESSING when you upgrade have no honest value for the new column and
+are not given one. The sweep reads a null `claimed_at` as "not yet claimed" and leaves them
+alone; the daily cleanup collects them. Nothing to do.
+
+### Two new settings, both defaulted to today's behaviour
+
+```bash
+# How long one Kafka send may keep retrying. The producer is idempotent, so retries are
+# unbounded in count and bounded by this instead — a leader election or a rolling broker
+# restart is now ridden out rather than failed.
+KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS=120000
+
+# How long send() may block waiting for cluster metadata. The outbox publisher calls it on a
+# scheduled thread, and the api shares eight of those across every scheduled job it has, so
+# Kafka's own 60s default took them out one per poll.
+KAFKA_PRODUCER_MAX_BLOCK_MS=10000
+```
+
+`OUTBOX_MAX_PER_KEY` is also new, and `OUTBOX_MAX_PER_PROJECT` now actually reaches the
+container — it was documented in `.env.dist` and never plumbed through `docker-compose.yml`, so
+setting it did nothing. Both default to what was hardcoded before, so neither changes anything
+until you move it.
+
+`OUTBOX_MAX_PER_KEY` is worth knowing about even if you leave it alone: it caps how many rows
+bound for **one endpoint** go in a batch, so with the default 1s poll it is a ceiling of ten
+events a second to any single endpoint, whatever `OUTBOX_BATCH_SIZE` says. That was true before
+this release too; it just was not a number you could see. Raise it if you have one very busy
+endpoint and few others. Leave it if you have many, because what it buys is that one endpoint's
+burst cannot stall everyone else's announcement.
+
+### `spring.kafka.producer.*` in `application.yml` never did anything
+
+Both `KafkaProducerConfig` classes build their own property map, so `acks` and `retries` written
+there were read by nothing. If you had overridden them expecting an effect, you did not get one.
+They are gone, replaced by the two keys above, which are read.
+
+### A password reset link is no longer logged in production
+
+With `EMAIL_ENABLED=false` the log was the only place a reset could be completed from, and a
+short-lived single-use token is a reasonable thing to print on a workstation. Neither half of
+that holds in production, so with `APP_ENV=production` the link is withheld and the log says
+what to configure instead.
+
+**If you run production without SMTP, set it up before upgrading**, or nobody will be able to
+reset a password. The separate `Fallback — ... URL:` lines, which fired on an SMTP failure even
+with email enabled, are gone entirely.
+
+### Three dependency advisories remain, all `vitest`, all devDependencies
+
+Closing them needs vitest 3 → 5, whose v8 coverage provider counts branches differently enough
+to take the frontend coverage gate from 58% to 36% — the same instrumentation shift
+`vite.config.ts` already documents happening once before. The advisory is a path traversal
+reachable over the vitest *dev server's* WebSocket, and this repository only ever runs
+`vitest run`, one-shot, with no dev server to reach. It will be done as its own change rather
+than as a side effect of a version bump.
+
+
 ## v2.12.0
 
 ### Hookflow is now Railhook, and several names you may have scripted changed

@@ -7,6 +7,142 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-09-12
+
+Reliability work ahead of the first production deployment. Sixteen faults, each reproduced with
+a failing test before it was touched. No new features, no API changes.
+
+### Fixed
+
+#### A webhook arriving twice at a receiver that already had it
+
+- **A 2xx whose body arrives after the timeout is a success.** The timeout sat on the outer
+  reactive chain, so firing during the body read *cancelled* the inner chain rather than failing
+  it — and the `onErrorResume` written for `AttemptRunner`'s invariant 6 never saw it. The
+  `TimeoutException` surfaced as "the request failed" and the whole ladder ran against an
+  endpoint that had taken the event. The status is now stashed as the response head lands, so
+  the outcome is decided by the status however the body ends.
+
+- **A database that blinks while writing down a delivered webhook no longer re-sends it.**
+  `recordAttempt` and `finalise` sat inside the same `try` that catches request failures. Worse
+  on the failure paths, where `fail()` recorded a second time, threw a second time and escaped
+  the Runner entirely — the consumer then acked the record and left the row `PROCESSING` with
+  nothing saying why. Recording is observability; the finalisation is the ownership transfer.
+
+- **A transformation that cannot run now costs a rung.** The rung was spent in `attemptStarting`,
+  which ran *after* `buildBody`, so nothing that threw on the way to the wire advanced the
+  ladder. `isExhausted` never became true and the delivery retried at the same rung every minute
+  until the 96h cap — roughly 5,700 attempt rows for one delivery nothing was going to send.
+
+- **An outbox callback that outlives its batch can no longer settle a reclaimed row.**
+  `batchMarkPublished` and `batchMarkFailed` matched on id alone, so a straggler stamped a stale
+  outcome over whatever the next cycle was doing. Guarded on `status = 'SENDING'`, and the
+  shortfall is reported — it is the only visible sign that the send timeout is tuned below what
+  the broker takes.
+
+#### Work that stopped getting done
+
+- **One `SQLException` no longer holds up a Kafka partition until restart.** `processForward` had
+  no catch, and `BoundedAsyncExecutor` reads a throw as "do not ack" on purpose; with async acks
+  an unacked offset blocks every commit for its partition. The outgoing direction always caught
+  and acked — the asymmetry was an omission.
+
+- **Stuck-claim recovery no longer depends on the Redis that is down.** `ExclusiveSweep` caught
+  only `InterruptedException`, so a Redisson failure escaped the `@Scheduled` method and neither
+  stuck-delivery nor stuck-forward recovery ran during a Redis outage — which is exactly when
+  workers restart and Claims are lost. It now sweeps without the lock and counts it, the way the
+  circuit breaker already fails open.
+
+- **An outbox row that never gets a callback can now reach `DEAD`.**
+  `recoverStuckSendingMessages` did not increment `retry_count`, and `promoteExhaustedToDead`
+  only looks at `FAILED`, so such a row cycled `PENDING → SENDING → PENDING` for ever. The
+  default send timeout is 30s against Kafka's own 120s, so this was the common path.
+
+- **A null error message no longer kills the publish cycle.** `ConcurrentHashMap` refuses a null
+  value and `Throwable.getMessage()` is null often enough — an NPE inside a serializer is the
+  ordinary case. In the send callback it left the row `SENDING`; in the preparation catch it
+  propagated out and abandoned every row the cycle had claimed.
+
+- **`publishedIds` is snapshotted before the repository iterates it.** A `synchronizedList`
+  handed straight to Spring Data is iterated without its monitor while late callbacks may still
+  be adding.
+
+#### Secrets that were not meant to leave
+
+- **The delivery dry-run no longer mints a signature for another project's endpoint.**
+  `@TenantId` confines the lookup to the organization and the interceptor confines the
+  `{projectId}` in the URI, but the endpoint id arrives in the request *body*, outside both — so
+  an API key issued against one project could obtain a valid `X-Signature` over a body of its
+  choosing for a sibling project's endpoint, plus the URL to aim it at.
+
+- **Password reset links are no longer logged in production.** The dev affordance stays — with
+  no SMTP it is the only way to complete a reset on a workstation — and stops at the environment
+  boundary. The `Fallback` logs go entirely: that branch only runs with email *enabled*, and one
+  refused relay is not a reason to put a reset link in a log file.
+
+- **Test-endpoint captures and tunnel request logs mask credentials.** Both reimplemented the
+  header loop without the masking the other three capture paths apply, so `Authorization` and
+  `Cookie` landed in the database and were rendered in the dashboard. Masked at the write, not
+  at the display.
+
+- **The encryption key is derived once, not on every encrypt and decrypt.** PBKDF2 at 65,536
+  iterations was being paid per call against a process-wide salt, so the same bytes were
+  recomputed thousands of times a second. `/ingress/{token}` decrypts the source's HMAC secret
+  *before* the signature is checked, making that cost bookable by anyone who knows the token —
+  measured at ~15ms per call.
+
+#### One tenant taking what belonged to the others
+
+- **Endpoint verification no longer waits on a customer's server inside a transaction.** Up to
+  ten seconds holding a Hikari connection and a row lock, reachable from a user-facing endpoint;
+  a handful of concurrent verifications against slow targets drained the pool for the whole
+  instance. It also built a fresh connection pool per call.
+
+- **The per-project workflow ceiling now holds.** Admission and increment were two statements and
+  the map entry was evicted at zero, so a thread could increment an `AtomicInteger` no longer
+  reachable from the map, after which the count and reality diverged permanently.
+
+- **The client-error throttle's bookkeeping no longer outlives the throttle** — one map entry per
+  user for the life of the process, for a window that lasts a minute.
+
+#### Measured rather than read
+
+- **A workflow no longer runs concurrently with itself.** `reclaimStalledRows` compared
+  `created_at`, the moment the event was ingested, and there was no column recording when the row
+  was claimed. A row is deliberately held in PENDING while its project is at its ceiling, so on a
+  busy project rows were `created_at`-stale before they were ever claimed — the sweep returned
+  them to PENDING while a live executor was running them. `V069` adds `claimed_at`.
+
+- **The per-endpoint announcement ceiling is visible and movable.** `load/ingest.js` at 50 rps
+  against one endpoint drained the outbox at exactly ten rows a second: `maxPerKey` was a literal
+  `10` where the bounds either side of it were both configurable. The default does not move — the
+  fairness it buys is real — but an operator with one busy endpoint can now see it and raise it.
+  `OUTBOX_MAX_PER_PROJECT` also turned out to be documented and never plumbed through Compose.
+
+### Changed
+
+- **Kafka producer retries are bounded by time, not by count.** `retries=3` on an idempotent
+  producer is roughly 300ms of patience, so an ordinary leader election failed sends the default
+  would have ridden out. `delivery.timeout.ms` and `max.block.ms` are now declared and
+  configurable; the inert `spring.kafka.producer.*` keys in `application.yml` are replaced with
+  the two that are actually read.
+
+### Added
+
+- **A backup round-trip test.** `BackupFlagParityTest` compared `pg_dump` flags across the three
+  places that run it and said nothing about whether the output restores or whether what comes
+  back still works. This dumps, restores into a separate database, and proves the round-tripped
+  ciphertext still decrypts, that an in-flight Delivery comes back `PROCESSING` holding its fence
+  token, and that the stuck sweep is what moves it.
+
+### Security
+
+- Five of eight dependency advisories closed: `js-yaml`, `minimatch`,
+  `postcss-selector-parser`, and `puppeteer-core` (which carried the two unfixable `extract-zip`
+  advisories). All eight were devDependencies and none reaches the browser bundle;
+  `npm audit --omit=dev` was clean before and after. The remaining three are `vitest` — see
+  `UPGRADING.md`.
+
 ## [2.13.0] - 2026-09-07
 
 ### Added

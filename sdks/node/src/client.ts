@@ -38,7 +38,7 @@ import {
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_TIMEOUT = 30000;
-const SDK_VERSION = '2.13.0';
+const SDK_VERSION = '2.14.0';
 
 export class Railhook {
   private readonly apiKey: string;
