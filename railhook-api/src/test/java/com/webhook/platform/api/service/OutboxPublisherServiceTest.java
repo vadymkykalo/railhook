@@ -304,4 +304,84 @@ class OutboxPublisherServiceTest {
         message.setCreatedAt(Instant.now());
         return message;
     }
+
+    @Test
+    void shouldMarkAsFailedWhenTheKafkaErrorCarriesNoMessage() throws Exception {
+        // ConcurrentHashMap refuses a null value, and Throwable.getMessage() is null often
+        // enough — an NPE inside a serializer is the ordinary case. The put() then threw inside
+        // the send callback, the callback completed exceptionally, allOf().get() raised, and the
+        // whole thing was caught one level up as the benign "did not fully complete within Ns".
+        // The row was left SENDING with nothing recorded against it, to be recovered 300s later
+        // and published a second time.
+        OutboxMessage message = createTestMessage();
+        DeliveryMessage deliveryMessage = DeliveryMessage.builder()
+                .deliveryId(UUID.randomUUID())
+                .build();
+
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(List.of(message));
+        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
+                .thenReturn(deliveryMessage);
+
+        CompletableFuture<SendResult<String, Object>> future = new CompletableFuture<>();
+        future.completeExceptionally(new NullPointerException());   // getMessage() == null
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(future);
+
+        service.publishPendingMessages();
+
+        verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
+    }
+
+    @Test
+    void shouldSurviveAPreparationErrorThatCarriesNoMessage() throws Exception {
+        // The same null, reached from the other side: this put() sits inside a catch block, so
+        // the NPE propagated out of publishBatchAsync and out of the scheduled method. Every row
+        // claimed in that cycle was abandoned in SENDING, and the poll loop took the exception.
+        OutboxMessage message = createTestMessage();
+
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(List.of(message));
+        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
+                .thenThrow(new NullPointerException());
+
+        assertThatNoException().isThrownBy(() -> service.publishPendingMessages());
+
+        verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
+    }
+
+    @Test
+    void shouldNotHandTheRepositoryAListStillBeingWrittenTo() throws Exception {
+        // publishedIds is a synchronizedList, and passing it straight to the repository means
+        // Spring Data iterates it to bind the IN clause without holding its monitor — while a
+        // straggler callback may still be adding. The javadoc for synchronizedList is explicit
+        // that this is a ConcurrentModificationException, and it was caught one level up and
+        // left those rows SENDING.
+        OutboxMessage first = createTestMessage();
+        OutboxMessage second = createTestMessage();
+        DeliveryMessage deliveryMessage = DeliveryMessage.builder()
+                .deliveryId(UUID.randomUUID())
+                .build();
+
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(List.of(first, second));
+        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
+                .thenReturn(deliveryMessage);
+
+        @SuppressWarnings("unchecked")
+        SendResult<String, Object> sendResult = mock(SendResult.class);
+        when(kafkaTemplate.send(any(ProducerRecord.class)))
+                .thenReturn(CompletableFuture.completedFuture(sendResult));
+
+        service.publishPendingMessages();
+
+        ArgumentCaptor<List<UUID>> published = ArgumentCaptor.forClass(List.class);
+        verify(outboxMessageRepository).batchMarkPublished(published.capture(), any(Instant.class));
+        assertThat(published.getValue().getClass().getName())
+                .as("the repository must be handed a snapshot, not the live collector")
+                .doesNotContain("Synchronized");
+        assertThat(published.getValue()).hasSize(2);
+    }
 }

@@ -55,16 +55,35 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
     @Query(value = "SELECT MIN(created_at) FROM outbox_messages WHERE status = 'PENDING'", nativeQuery = true)
     Instant findOldestPendingCreatedAt();
 
+    /**
+     * Hands a row nobody ever answered for back to the queue, and counts it.
+     *
+     * <p>The count is the part that was missing. Recovery is the only way out of SENDING,
+     * {@code promoteExhaustedToDead} only ever looks at FAILED, and nothing else touches
+     * retry_count — so without the increment a message that never gets a callback inside
+     * {@code batchSendTimeoutSeconds} cycles PENDING -> SENDING -> PENDING for ever, never
+     * reaches DEAD, and shows up nowhere except a queue-depth gauge. The window is not narrow:
+     * that timeout defaults to 30s and Kafka's own delivery.timeout.ms to 120s.
+     */
     @Modifying
-    @Query(value = "UPDATE outbox_messages SET status = 'PENDING' WHERE status = 'SENDING' AND updated_at < :cutoff", nativeQuery = true)
+    @Query(value = "UPDATE outbox_messages SET status = 'PENDING', retry_count = retry_count + 1, updated_at = NOW() WHERE status = 'SENDING' AND updated_at < :cutoff", nativeQuery = true)
     int recoverStuckSendingMessages(@Param("cutoff") Instant cutoff);
 
+    /**
+     * Settles the rows this batch is still holding.
+     *
+     * <p>{@code AND status = 'SENDING'} is load-bearing. A Kafka callback that arrives after the
+     * batch wait is not thrown away — it lands in a later cycle's update — and by then its row
+     * may have been recovered to PENDING and re-claimed by somebody else. Without the guard the
+     * straggler stamps its stale outcome over whatever that cycle was doing.
+     */
     @Modifying
-    @Query(value = "UPDATE outbox_messages SET status = 'PUBLISHED', published_at = :now, updated_at = :now WHERE id IN :ids", nativeQuery = true)
+    @Query(value = "UPDATE outbox_messages SET status = 'PUBLISHED', published_at = :now, updated_at = :now WHERE id IN :ids AND status = 'SENDING'", nativeQuery = true)
     int batchMarkPublished(@Param("ids") List<UUID> ids, @Param("now") Instant now);
 
+    /** Same guard, same reason — see {@link #batchMarkPublished}. */
     @Modifying
-    @Query(value = "UPDATE outbox_messages SET status = 'FAILED', retry_count = retry_count + 1, error_message = :error, last_attempt_at = :now, updated_at = :now WHERE id IN :ids", nativeQuery = true)
+    @Query(value = "UPDATE outbox_messages SET status = 'FAILED', retry_count = retry_count + 1, error_message = :error, last_attempt_at = :now, updated_at = :now WHERE id IN :ids AND status = 'SENDING'", nativeQuery = true)
     int batchMarkFailed(@Param("ids") List<UUID> ids, @Param("error") String error, @Param("now") Instant now);
 
     @Modifying
