@@ -55,6 +55,32 @@ describe('nginx upstream resolution', () => {
     expect(Number(valid![1])).toBeLessThanOrEqual(30);
   });
 
+  it('resolves the upstream by a name its own resolver can answer', () => {
+    // nginx's resolver speaks DNS itself, and a raw query carries no search list. So the
+    // bare `api` that Docker's embedded DNS answers is NXDOMAIN under Kubernetes, where
+    // the name is only reachable as api.<namespace>.svc.cluster.local — and the chart's
+    // UI served 502 for every proxied path while nginx itself was perfectly healthy.
+    // A literal proxy_pass did not have this problem, because it resolves once through
+    // libc, which does apply `search`. The entrypoint has to close that gap.
+    const entrypoint = read('railhook-ui/docker-entrypoint.d/15-resolver.sh');
+    expect(entrypoint, 'the search list has to be read').toMatch(/\^search/);
+    expect(entrypoint, 'a candidate has to be probed through libc').toMatch(/getent hosts/);
+    // And the result has to reach nginx, which means overriding the defaults below.
+    // Backslash-escaped in the script: the heredoc is unquoted so that ${API_HOST}
+    // expands, which means nginx's own $ has to survive the shell.
+    expect(entrypoint).toMatch(/set \\\$api_backend/);
+    expect(entrypoint).toMatch(/set \\\$api_actuator/);
+  });
+
+  it('keeps working defaults if the generated file says nothing about the upstream', () => {
+    // The include has to come after them, or the defaults win and the override is dead
+    // code — which is exactly how this would regress.
+    const defaultAt = conf.search(/^\s*set \$api_backend\s/m);
+    const includeAt = conf.search(/^\s*include\s+\/tmp\/railhook-resolver\.conf;/m);
+    expect(defaultAt, 'nginx fails to start on an undefined variable').toBeGreaterThan(-1);
+    expect(includeAt).toBeGreaterThan(defaultAt);
+  });
+
   it('never names the API directly in a proxy_pass', () => {
     // A literal is what gets cached. The variable is the whole mechanism.
     const literals = [...conf.matchAll(/proxy_pass\s+https?:\/\/(?!\$)([^\s;]+)/g)].map((m) => m[1]);
@@ -101,6 +127,23 @@ describe('the API can be rolled', () => {
     expect(installer).toMatch(/--alias api-warming/);
     expect(installer).toMatch(/--alias api\b/);
     expect(installer).toMatch(/State\.Health\.Status/);
+  });
+
+  it('rolls a one-replica host too, by borrowing a second only for the upgrade', () => {
+    // Running two API containers around the clock to buy a seamless upgrade is a bad
+    // trade on the box this ships for — the second one costs memory every hour of the
+    // day to save thirty seconds a month. So one is the default, and the roll scales to
+    // two for the length of the swap and back down again.
+    //
+    // The regression this guards is the early return: `-le 1` sent exactly the default
+    // installation down the restart-in-place path, which is the downtime the roll exists
+    // to remove. Only an API that is not running at all has nothing to roll.
+    const roll = installer.slice(installer.indexOf('roll_api() {'));
+    const guard = roll.match(/\$\{target:-0\}" (-le|-lt|-eq) ([0-9]+)/);
+    expect(guard, 'roll_api still has to decide when there is nothing to roll').not.toBeNull();
+    expect(`${guard![1]} ${guard![2]}`, 'one replica must still be rolled').not.toBe('-le 1');
+    // And the scale-up has to be one more than whatever is there, not a fixed 2.
+    expect(roll).toMatch(/--scale api=\$\(\(target \+ 1\)\)/);
   });
 
   it('and drains the one it replaces rather than killing it', () => {
