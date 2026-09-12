@@ -65,6 +65,13 @@ class NativeQueryTenantPredicateTest {
      * {@code TenantContext.runAsSystem}. Getting that wrong is a cross-tenant read.
      */
     private static final Set<String> SYSTEM_PATHS = new TreeSet<>(Set.of(
+            // SequenceReconciliationService is @SystemTenant and sweeps every organization by
+            // design: it looks for ordered Deliveries whose post-commit sequence backfill never
+            // happened because the ingest process died. Those rows belong to whichever tenant
+            // was unlucky, and there is no request to take an organization from — confining the
+            // sweep to one would mean it only ever repaired the tenant that happened to be
+            // ingesting when the sweep ran.
+            "DeliveryRepository.findOrderedDeliveriesMissingASequence",
             // Retention: DataRetentionService's five @SystemTenant schedulers delete by age
             // across the whole table. A tenant predicate would leave every other organization's
             // rows behind and the table would grow without bound.
@@ -142,6 +149,31 @@ class NativeQueryTenantPredicateTest {
     }
 
     @Test
+    @DisplayName("a repository that reaches past Hibernate writes its own tenant predicate")
+    void jdbcTemplateRepositoriesConfineThemselves() throws IOException {
+        // The sibling test above scans @Query(nativeQuery = true), which is every way *into*
+        // Hibernate. It is not every way into the database. MaterializedViewRepository held raw
+        // SQL on a JdbcTemplate: no session, so no @TenantId, and no annotation, so nothing here
+        // saw it either. It was confined only because both of its callers happened to load the
+        // Project under tenant scope first — a convention kept in two places and written down in
+        // none, one new caller away from leaking another organization's counts.
+        //
+        // A class that holds a JdbcTemplate has opted out of the mechanism that does this for
+        // everyone else, so it has to do it by hand, and it has to be visible that it did.
+        for (Path file : repositorySourceFiles()) {
+            String source = Files.readString(file);
+            if (!source.contains("JdbcTemplate")) {
+                continue;
+            }
+            assertTrue(source.contains("TenantContext"),
+                    file.getFileName() + " runs SQL outside Hibernate, so @TenantId does not "
+                            + "reach it. Confine every query in it with organization_id taken "
+                            + "from TenantContext.require() — not from a parameter, which is a "
+                            + "second mechanism that will eventually disagree with the first.");
+        }
+    }
+
+    @Test
     @DisplayName("the system-path list has no stale entries")
     void systemPathsAreAllStillUnconfinedNativeQueries() throws Exception {
         Set<String> unconfined = new TreeSet<>();
@@ -160,6 +192,14 @@ class NativeQueryTenantPredicateTest {
         assertEquals(Set.of(), stale,
                 "These entries are no longer needed — the query gained its predicate, was renamed "
                         + "or was removed. Drop them so the list keeps meaning something.");
+    }
+
+    private List<Path> repositorySourceFiles() throws IOException {
+        try (Stream<Path> files = Files.list(SOURCE_DIR)) {
+            return files.filter(p -> p.getFileName().toString().endsWith("Repository.java"))
+                    .sorted()
+                    .toList();
+        }
     }
 
     private List<Class<?>> repositoryInterfaces() throws IOException {
