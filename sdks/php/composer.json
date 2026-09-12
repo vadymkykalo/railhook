@@ -3,7 +3,7 @@
   "description": "Official PHP SDK for Railhook — reliable webhook infrastructure",
   "type": "library",
   "license": "MIT",
-  "version": "2.16.1",
+  "version": "2.16.2",
   "keywords": [
     "webhook",
     "webhooks",

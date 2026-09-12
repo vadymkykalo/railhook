@@ -555,7 +555,13 @@ roll_api() {
     ids=$(compose ps -q api || true)
     target=$(printf '%s\n' "$ids" | grep -c . || true)
 
-    if [ "${target:-0}" -le 1 ]; then
+    # Only an API that is not running has nothing to roll. One replica is the default and
+    # the common case, and it is rolled the same way as any other count: the loop below
+    # borrows a second container for the length of the swap and removes the old one after,
+    # so the host is back to one when it finishes. Returning early here instead — which is
+    # what `-le 1` did — sent exactly the default installation down the restart-in-place
+    # path, which is the downtime this function exists to remove.
+    if [ "${target:-0}" -lt 1 ]; then
         compose up -d --no-deps api
         return
     fi
