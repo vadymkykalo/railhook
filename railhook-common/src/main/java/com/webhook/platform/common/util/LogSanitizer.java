@@ -1,5 +1,7 @@
 package com.webhook.platform.common.util;
 
+import java.util.regex.Pattern;
+
 /**
  * Neutralises control characters in a value before it is written to the log.
  *
@@ -19,7 +21,7 @@ public final class LogSanitizer {
      * Exactly what {@link Character#isISOControl} covers: the C0 range and DEL, which
      * {@code \p{Cntrl}} gives, plus the C1 range above it, which it does not.
      */
-    private static final String CONTROL_CHARACTERS = "[\\p{Cntrl}\\u0080-\\u009F]";
+    private static final Pattern CONTROL_CHARACTERS = Pattern.compile("[\\p{Cntrl}\\u0080-\\u009F]");
 
     private LogSanitizer() {
     }
@@ -31,12 +33,6 @@ public final class LogSanitizer {
      * turning it into the word here would hide the difference between an absent value and the
      * literal text.
      *
-     * <p>The regex is handed to {@link String#replaceAll} rather than a hoisted {@code Pattern},
-     * and that is not an oversight. Static analysis treats {@code String}'s own replace methods
-     * as the point where tainted text stops being tainted, and does not follow the same
-     * substitution through {@code Matcher} — hoist the pattern for the compile it saves and the
-     * log-injection finding comes straight back on every caller. The callers are a refused
-     * request and an operator suspending a tenant, so there is no compile worth saving here.
      */
     public static String forLog(String value) {
         if (value == null) {
@@ -44,6 +40,6 @@ public final class LogSanitizer {
         }
         // No match means the same instance back, so the ordinary value — which is every value
         // that is not an attack — allocates nothing.
-        return value.replaceAll(CONTROL_CHARACTERS, "_");
+        return CONTROL_CHARACTERS.matcher(value).replaceAll("_");
     }
 }
