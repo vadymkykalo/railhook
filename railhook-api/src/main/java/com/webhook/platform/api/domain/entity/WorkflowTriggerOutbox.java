@@ -53,6 +53,16 @@ public class WorkflowTriggerOutbox {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /**
+     * When {@code claimBatch} handed this row to an executor; null until then.
+     *
+     * <p>{@code reclaimStalledRows} measures staleness from here rather than from
+     * {@code createdAt}: a row waiting on its project's concurrency ceiling can be hours old
+     * before anyone claims it, and that is not a stalled run.
+     */
+    @Column(name = "claimed_at")
+    private Instant claimedAt;
+
     @Column(name = "processed_at")
     private Instant processedAt;
 }
