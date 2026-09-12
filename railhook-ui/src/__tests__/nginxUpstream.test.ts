@@ -154,6 +154,39 @@ describe('the API can be rolled', () => {
     expect(roll).toMatch(/--scale api=\$\(\(target \+ 1\)\)/);
   });
 
+  it('upgrade replaces the helper before it uses it', () => {
+    // The helper is written once, at install time, and `upgrade` refreshed
+    // docker-compose.yml but never itself. So a release that changed the helper —
+    // this rolling path, for one — reached an existing host only on the deploy
+    // *after* the one that shipped it, and the deploy that was supposed to prove the
+    // fix restarted the API in place instead. Measured on the 2.16.2 deploy, which
+    // logged "Container railhook-api-9 Recreated" with the roll already released.
+    //
+    // So it fetches its own replacement first and re-execs, rather than editing the
+    // file bash is still reading line by line.
+    expect(installer).toMatch(/--write-helper/);
+    const roll = installer.slice(installer.indexOf('upgrade)'));
+    expect(roll, 'the new helper has to be the one that runs').toMatch(/exec "\$0"/);
+    expect(roll, 'and only once, or it re-execs for ever').toMatch(
+      /RAILHOOK_HELPER_REFRESHED/,
+    );
+    // --write-helper has to exist on the other side, or the fetch is a no-op that
+    // reports success.
+    expect(installer).toMatch(/ACTION="write-helper"/);
+    expect(installer).toMatch(/write-helper\)/);
+  });
+
+  it('a UI restart is a slow request, not a 502', () => {
+    // Caddy is the front door and proxies everything — the dashboard, /hook, /ingress
+    // — to one upstream, the UI's nginx. That container cannot be rolled the way the
+    // API is, because it publishes a host port and two replicas cannot bind it. So
+    // the gap is closed at the proxy instead: Caddy retries a refused dial for a few
+    // seconds rather than answering 502 immediately. Nothing has been sent when a
+    // dial fails, so the retry is safe for any method.
+    expect(installer).toMatch(/lb_try_duration/);
+    expect(installer).toMatch(/lb_try_interval/);
+  });
+
   it('and drains the one it replaces rather than killing it', () => {
     // docker stop sends SIGTERM, which Spring's graceful shutdown uses to finish what is
     // in flight. Going straight to rm would drop those requests on the floor.

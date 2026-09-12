@@ -76,6 +76,11 @@ while [ $# -gt 0 ]; do
         --no-start)  START=0; shift ;;
         --yes|-y)    ASSUME_YES=1; shift ;;
         --check)     ACTION="check"; shift ;;
+        # Rewrites only the helper script, for an installation that already exists.
+        # `railhook upgrade` calls this on itself so that a release which changes the
+        # helper reaches an existing host on the deploy that ships it, rather than the
+        # one after.
+        --write-helper) ACTION="write-helper"; shift ;;
         --uninstall) ACTION="uninstall"; shift ;;
         --purge)     ACTION="purge"; shift ;;
         -h|--help)   usage; exit 0 ;;
@@ -401,6 +406,13 @@ write_files() {
 	# tunnel WebSocket and the two allow-listed actuator paths.
 	reverse_proxy ui:5173 {
 		header_up X-Forwarded-Proto https
+		# The UI container is the only upstream, and it is replaced whenever its
+		# image changes — a few seconds during which a dial is refused and every
+		# path, /hook and /ingress included, answered 502. Retrying turns that
+		# into a slow request instead. Safe for any method: a refused dial means
+		# nothing was written, so there is nothing to send twice.
+		lb_try_duration 20s
+		lb_try_interval 250ms
 		# The CLI tunnel holds a WebSocket open for the length of a developer's
 		# session, so it must not be cut off at the default idle timeout.
 		transport http {
@@ -625,6 +637,29 @@ case "${1:-help}" in
         # after the sed below it would name the version being upgraded *to*.
         from=$(grep '^API_IMAGE_TAG=' .env | cut -d= -f2- || echo unknown)
         want="${2:-}"
+
+        # This file is written once, at install time, and nothing replaced it. So a
+        # release that changed the helper — the rolling upgrade below, for one —
+        # reached an existing host only on the deploy *after* the one that shipped it,
+        # and the deploy meant to prove the fix restarted the API in place instead.
+        #
+        # Fetched and re-exec'd rather than edited in place: bash reads a script as it
+        # runs it, so rewriting the file underneath itself runs half of one version and
+        # half of the other. The guard stops the new copy doing this again.
+        #
+        # A failed fetch is not a reason to refuse an upgrade — it carries on with the
+        # helper it has, and says so.
+        if [ -z "${RAILHOOK_HELPER_REFRESHED:-}" ] && [ -n "$want" ]; then
+            echo "Updating the helper for ${want} before upgrading..."
+            if curl -fsSL "${RAW}/v${want#v}/install.sh" \
+                 | bash -s -- --write-helper --dir "$(pwd)" >/dev/null 2>&1; then
+                echo "Helper updated. Continuing with it."
+            else
+                echo "Could not fetch the helper for ${want}; continuing with this one." >&2
+            fi
+            RAILHOOK_HELPER_REFRESHED=1 export RAILHOOK_HELPER_REFRESHED
+            exec "$0" upgrade "$want"
+        fi
         if [ -n "$want" ]; then
             # Releases are tagged v2.16.0 in git and the images are published as 2.16.0 —
             # docker/metadata-action writes the version, not the ref. Writing the git tag
@@ -800,6 +835,10 @@ main() {
             exit 0 ;;
         uninstall|purge)
             do_uninstall
+            exit 0 ;;
+        write-helper)
+            [ -d "$INSTALL_DIR" ] || die "${INSTALL_DIR} does not exist — nothing to update."
+            write_helper
             exit 0 ;;
     esac
 
