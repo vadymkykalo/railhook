@@ -22,6 +22,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 /**
  * Unit coverage for StuckForwardRecoveryService: the incoming-forward analogue
@@ -45,7 +46,7 @@ class StuckForwardRecoveryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StuckForwardRecoveryService(attemptRepository, new ExclusiveSweep(redissonClient));
+        service = new StuckForwardRecoveryService(attemptRepository, new ExclusiveSweep(redissonClient, new SimpleMeterRegistry()));
         ReflectionTestUtils.setField(service, "thresholdMinutes", THRESHOLD_MINUTES);
         ReflectionTestUtils.setField(service, "strandedPendingThresholdMinutes", STRANDED_THRESHOLD_MINUTES);
         when(redissonClient.getLock("lock:stuck-forward-recovery")).thenReturn(lock);

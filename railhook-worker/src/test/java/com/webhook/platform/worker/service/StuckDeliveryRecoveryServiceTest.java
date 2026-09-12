@@ -22,6 +22,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 /**
  * Unit coverage for StuckDeliveryRecoveryService: rows are recovered exactly
@@ -46,7 +47,7 @@ class StuckDeliveryRecoveryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StuckDeliveryRecoveryService(deliveryRepository, new ExclusiveSweep(redissonClient));
+        service = new StuckDeliveryRecoveryService(deliveryRepository, new ExclusiveSweep(redissonClient, new SimpleMeterRegistry()));
         ReflectionTestUtils.setField(service, "thresholdMinutes", THRESHOLD_MINUTES);
         ReflectionTestUtils.setField(service, "strandedPendingThresholdMinutes", STRANDED_THRESHOLD_MINUTES);
         when(redissonClient.getLock("lock:stuck-delivery-recovery")).thenReturn(lock);
