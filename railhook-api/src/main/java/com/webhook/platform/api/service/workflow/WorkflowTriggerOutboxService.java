@@ -19,9 +19,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Polls {@code workflow_trigger_outbox} and executes workflow triggers durably.
@@ -44,8 +42,8 @@ public class WorkflowTriggerOutboxService {
     private final int maxConcurrentPerProject;
     private final int stalledAfterMinutes;
 
-    /** Per-project in-flight workflow counter. Prevents one project from consuming all executor threads. */
-    private final ConcurrentHashMap<UUID, AtomicInteger> projectInFlight = new ConcurrentHashMap<>();
+    /** One project's share of the shared executor pool, so it cannot take everybody else's. */
+    private final ProjectConcurrencyLimiter projectConcurrency;
 
     public WorkflowTriggerOutboxService(
             WorkflowTriggerOutboxRepository outboxRepository,
@@ -66,6 +64,7 @@ public class WorkflowTriggerOutboxService {
         this.maxPerProject = maxPerProject;
         this.maxConcurrentPerProject = maxConcurrentPerProject;
         this.stalledAfterMinutes = stalledAfterMinutes;
+        this.projectConcurrency = new ProjectConcurrencyLimiter(maxConcurrentPerProject);
     }
 
     @SystemTenant
@@ -79,9 +78,8 @@ public class WorkflowTriggerOutboxService {
 
         for (WorkflowTriggerOutbox row : batch) {
             UUID projectId = row.getProjectId();
-            AtomicInteger inFlight = projectInFlight.computeIfAbsent(projectId, k -> new AtomicInteger(0));
 
-            if (inFlight.get() >= maxConcurrentPerProject) {
+            if (!projectConcurrency.tryAdmit(projectId)) {
                 // Project already at max concurrent workflows — defer to next poll
                 log.debug("Project {} at max concurrent workflows ({}), deferring outbox row: id={}",
                         projectId, maxConcurrentPerProject, row.getId());
@@ -89,19 +87,16 @@ public class WorkflowTriggerOutboxService {
                 continue;
             }
 
-            inFlight.incrementAndGet();
             try {
                 workflowTaskExecutor.execute(() -> {
                     try {
                         processRow(row);
                     } finally {
-                        projectInFlight.computeIfPresent(projectId, (k, v) ->
-                                v.decrementAndGet() <= 0 ? null : v);
+                        projectConcurrency.release(projectId);
                     }
                 });
             } catch (TaskRejectedException e) {
-                projectInFlight.computeIfPresent(projectId, (k, v) ->
-                        v.decrementAndGet() <= 0 ? null : v);
+                projectConcurrency.release(projectId);
                 log.warn("Workflow executor full, deferring outbox row: id={}, eventId={}",
                         row.getId(), row.getEventId());
                 deferToNextPoll(row);
