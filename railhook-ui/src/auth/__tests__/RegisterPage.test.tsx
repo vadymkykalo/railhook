@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -22,10 +22,10 @@ const USER = {
  * generic summary told people "Invalid request parameters" and nothing they could act on.
  */
 describe('RegisterPage', () => {
-  let login: ReturnType<typeof vi.fn>;
+  let login: Mock<AuthState['login']>;
 
   function renderRegister() {
-    login = vi.fn();
+    login = vi.fn<AuthState['login']>();
     const authState: AuthState = {
       user: null,
       token: null,
