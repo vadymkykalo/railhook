@@ -20,24 +20,30 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Owns what happens during one Attempt, and in what order. Both directions run this; what
  * differs is behind {@link AttemptStore}.
  *
- * <p>Five invariants, each of which was once correct on one direction and wrong on the other:
+ * <p>Six invariants, each of which was once correct on one direction and wrong on the other:
  *
  * <ol>
  *   <li>No DB, Redis or Kafka work inside the reactive chain — a write there can trip the
- *       HTTP timeout and drive the failure path over a SUCCESS already written.</li>
+ *       HTTP timeout and drive the failure path over a SUCCESS already written. The same rule
+ *       applies after the chain: once a 2xx is in hand, nothing that goes wrong while writing
+ *       it down may reclassify it as something to retry.</li>
  *   <li>No successor Attempt unless {@link AttemptStore#finalise} reports it wrote.</li>
  *   <li>Every path that takes a concurrency permit releases it, including those that throw
  *       before the request is built.</li>
  *   <li>A failed transformation never lets the raw payload out.</li>
- *   <li>A Deferral is not an Attempt: it consumes nothing and advances no Ladder.</li>
+ *   <li>A Deferral is not an Attempt: it consumes nothing and advances no Ladder. The
+ *       converse binds too — an Attempt that was really made costs a rung even when it failed
+ *       before the request existed, or it retries at the same rung until the hard cap.</li>
  *   <li>Failing to read a response is never failing to deliver. The status line arrives before
  *       the body does, so once a status is in hand the outcome is decided; a body that will not
- *       buffer costs us the body and nothing else.</li>
+ *       buffer — or will not arrive before the timeout — costs us the body and nothing else.</li>
  * </ol>
  */
 @Component
@@ -98,7 +104,7 @@ public class AttemptRunner {
         } catch (UrlValidator.InvalidUrlException e) {
             String reason = "SSRF_PROTECTION: " + e.getMessage();
             log.error("{}: {}", ctx.description(), reason);
-            store.recordAttempt(claim, errorRecord(null, null, reason, elapsed(startedAt)));
+            recordQuietly(store, claim, ctx, errorRecord(null, null, reason, elapsed(startedAt)));
             terminallyFail(store, claim, reason);
             return;
         }
@@ -111,13 +117,19 @@ public class AttemptRunner {
         String requestHeaders = null;
         String body = null;
         try {
+            // The rung is spent here, ahead of everything that can throw on the way to the wire.
+            // It used to be spent after the request was built, so a transformation that had been
+            // deleted, or an mTLS client that would not build, left the attempt number where it
+            // was: isExhausted never became true and the delivery retried at the same rung every
+            // minute until the 96h hard cap cut it off — thousands of attempt rows for one
+            // delivery nothing was ever going to send. Invariant 5's converse.
+            store.attemptStarting(claim);
+
             // Outgoing signs exactly these bytes, so the body comes before the request.
             body = store.buildBody(claim);
 
             RequestSpec spec = store.buildRequest(claim, body);
             requestHeaders = spec.recordedHeaders();
-
-            store.attemptStarting(claim);
 
             Response response = send(spec, ctx, body);
 
@@ -166,7 +178,7 @@ public class AttemptRunner {
     private <C> boolean admit(AttemptStore<C> store, C claim, AttemptContext ctx) {
         if (!circuitBreaker.isCallPermitted(ctx.targetKey())) {
             // Recorded though nothing was sent: a quiet target should show the breaker.
-            store.recordAttempt(claim, errorRecord(null, null, "CIRCUIT_BREAKER_OPEN", 0));
+            recordQuietly(store, claim, ctx, errorRecord(null, null, "CIRCUIT_BREAKER_OPEN", 0));
             return defer(store, claim, ctx, "circuit breaker open", Instant.now().plusSeconds(30));
         }
 
@@ -225,24 +237,47 @@ public class AttemptRunner {
         WebClient.RequestBodySpec request = spec.client().post().uri(ctx.url());
         spec.headers().accept(request);
 
+        // Invariant 6 needs the status to outlive the chain that produced it. Reading the body
+        // can end three ways — it arrives, it is too big to buffer, or it does not arrive in
+        // time — and only the first two are visible from inside the exchange. The timeout below
+        // has to bound the whole call, so when it fires during the body read it *cancels* the
+        // inner chain rather than failing it, and no onErrorResume in there ever sees it. So
+        // the status is stashed the moment the response head lands, and read back out here.
+        AtomicInteger statusSeen = new AtomicInteger(-1);
+        AtomicReference<String> headersSeen = new AtomicReference<>("{}");
+
         // Invariant 1: the mono produces the raw HTTP outcome and nothing else.
-        return request.bodyValue(body != null ? body : "")
+        Mono<Response> exchange = request.bodyValue(body != null ? body : "")
                 .exchangeToMono(response -> {
                     int status = response.statusCode().value();
                     String headers = serialiseHeaders(response.headers().asHttpHeaders());
+                    statusSeen.set(status);
+                    headersSeen.set(headers);
                     return response.bodyToMono(String.class)
                             .defaultIfEmpty("")
                             .map(responseBody -> new Response(status, responseBody, headers))
-                            // Invariant 6. A receiver that answers 2xx with a body larger than
-                            // the codec will buffer used to throw here, be caught as "the
-                            // request failed", and send the whole ladder at an endpoint that
-                            // already had the event. The status above is what decides the
-                            // Attempt; this keeps it.
-                            .onErrorResume(e -> Mono.just(new Response(
-                                    status, "[response body unreadable: " + e.getMessage() + "]", headers)));
+                            .onErrorResume(e -> Mono.just(unreadableBody(status, headers, e.getMessage())));
                 })
-                .timeout(Duration.ofSeconds(ctx.timeoutSeconds()))
-                .block();
+                .timeout(Duration.ofSeconds(ctx.timeoutSeconds()));
+
+        try {
+            return exchange.block();
+        } catch (RuntimeException e) {
+            int status = statusSeen.get();
+            if (status < 0) {
+                // Nothing ever came back. This one really is a failure to deliver.
+                throw e;
+            }
+            // A receiver that answers 2xx and then dawdles over the body used to collect the
+            // whole ladder — one delivery, seven arrivals. The status is the outcome.
+            log.warn("{}: HTTP {} received, but the response body did not: {}",
+                    ctx.description(), status, e.getMessage());
+            return unreadableBody(status, headersSeen.get(), e.getMessage());
+        }
+    }
+
+    private Response unreadableBody(int status, String headers, String why) {
+        return new Response(status, "[response body unreadable: " + why + "]", headers);
     }
 
     private <C> void classify(AttemptStore<C> store, AttemptMetrics metrics, C claim,
@@ -254,15 +289,23 @@ public class AttemptRunner {
         if (status >= 200 && status < 300) {
             metrics.success(status, durationMs);
             circuitBreaker.recordSuccess(ctx.targetKey(), durationMs);
-            store.recordAttempt(claim, record);
-            if (store.finalise(claim, new Finalization.Succeeded())) {
-                store.onSucceeded(claim);
+            // Both writes used to sit inside the caller's catch-all, so a database that blinked
+            // while writing down a delivered webhook sent it again. The receiver has it; from
+            // here on the only question is how much of that we manage to write down.
+            recordQuietly(store, claim, ctx, record);
+            try {
+                if (store.finalise(claim, new Finalization.Succeeded())) {
+                    store.onSucceeded(claim);
+                }
+            } catch (Exception e) {
+                log.error("{}: delivered, but the success would not finalise: {} — the obligation "
+                        + "stays claimed and the stuck sweep owns it", ctx.description(), e.getMessage(), e);
             }
             return;
         }
 
         metrics.failure(status, durationMs);
-        store.recordAttempt(claim, record);
+        recordQuietly(store, claim, ctx, record);
 
         if (RetryPolicy.isRetryable(status)) {
             circuitBreaker.recordFailure(ctx.targetKey(), new RuntimeException("HTTP " + status));
@@ -277,7 +320,7 @@ public class AttemptRunner {
             String errorMessage, String requestHeaders, String body, int durationMs) {
         metrics.error(durationMs);
         circuitBreaker.recordFailure(ctx.targetKey(), new RuntimeException(String.valueOf(errorMessage)));
-        store.recordAttempt(claim, errorRecord(requestHeaders, body, errorMessage, durationMs));
+        recordQuietly(store, claim, ctx, errorRecord(requestHeaders, body, errorMessage, durationMs));
         retryOrAbandon(store, claim, ctx, errorMessage);
     }
 
@@ -299,6 +342,23 @@ public class AttemptRunner {
         } else {
             log.warn("{}: finalisation did not apply — the obligation is owned by another "
                     + "attempt now, so no successor was queued", ctx.description());
+        }
+    }
+
+    /**
+     * Writes the Attempt down, and treats not managing to as what it is.
+     *
+     * <p>Recording is observability; the finalisation is the ownership transfer. Letting a failed
+     * insert propagate put the caller's catch-all in charge of an outcome that had already
+     * happened on the wire — and, on the failure paths, re-entered {@code fail()}, which records
+     * again, throws again, and escapes the Runner entirely. The record is worth losing; the
+     * outcome is not.
+     */
+    private <C> void recordQuietly(AttemptStore<C> store, C claim, AttemptContext ctx, AttemptRecord record) {
+        try {
+            store.recordAttempt(claim, record);
+        } catch (Exception e) {
+            log.error("{}: the attempt could not be recorded: {}", ctx.description(), e.getMessage(), e);
         }
     }
 

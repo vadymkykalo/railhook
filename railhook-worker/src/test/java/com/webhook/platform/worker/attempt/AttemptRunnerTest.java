@@ -89,6 +89,27 @@ class AttemptRunnerTest {
         server.stop(0);
     }
 
+    /**
+     * Answers the status line immediately, then holds the body back. The status is what decides
+     * the Attempt; everything after it is a body this receiver is slow about.
+     */
+    private void respondThenStallBody(int status, long stallMillis, String body) {
+        server.createContext("/hook", exchange -> {
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, bytes.length);
+            try {
+                Thread.sleep(stallMillis);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(bytes);
+            } catch (IOException ignored) {
+                // The client gave up on the body; that is the point of the test.
+            }
+        });
+    }
+
     private void respond(int status, String body) {
         server.createContext("/hook", exchange -> {
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
@@ -234,6 +255,53 @@ class AttemptRunnerTest {
             assertInstanceOf(Finalization.Succeeded.class, store.finalizations.get(0));
             assertEquals(1, store.succeededCalls);
             assertEquals(200, store.records.get(0).statusCode());
+        }
+
+        @Test
+        @DisplayName("a 2xx whose body arrives after the timeout is still a success")
+        void stalledSuccessBodyIsStillASuccess() {
+            // The sibling above covers a body too big to buffer, which arrives as an onError
+            // inside the exchange and is caught there. A body that simply does not arrive in
+            // time is not: the timeout sits on the outer chain, so it cancels the inner one
+            // rather than failing it, and no onErrorResume inside ever sees it. The
+            // TimeoutException then surfaced as "the request failed" and the whole ladder ran
+            // against an endpoint that had already taken the event.
+            //
+            // Invariant 6 does not distinguish between the two. Once a status is in hand the
+            // outcome is decided, however the body ends.
+            FakeStore store = new FakeStore(baseUrl);
+            store.timeoutSeconds = 1;
+            respondThenStallBody(200, 3_000, "late");
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.Succeeded.class, store.finalizations.get(0));
+            assertEquals(1, store.succeededCalls);
+            assertEquals(200, store.records.get(0).statusCode());
+        }
+
+        @Test
+        @DisplayName("a store that cannot persist a 2xx does not turn it into a retry")
+        void unpersistableSuccessIsNotRetried() {
+            // recordAttempt and finalise are DB writes, and they sat inside the same try that
+            // catches "the request failed". A database blip while writing down a delivered
+            // webhook therefore re-sent it — invariant 1's failure mode, reached through the
+            // persistence call rather than through the reactive chain.
+            //
+            // Failing to write down a success is not failing to deliver. Recording is
+            // observability; the finalisation is the ownership transfer, and it still runs — so
+            // a lost audit row costs an audit row rather than a second webhook.
+            respond(200, "ok");
+            FakeStore store = new FakeStore(baseUrl);
+            store.recordAttemptFailure = new IllegalStateException("connection pool exhausted");
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.Succeeded.class, store.finalizations.get(0),
+                    "the receiver has the event; losing the audit row does not change that");
+            assertEquals(1, store.succeededCalls);
+            assertEquals(1, metrics.successes);
+            assertEquals(0, store.abandonedCalls);
         }
 
         @Test
@@ -461,10 +529,33 @@ class AttemptRunnerTest {
 
             assertInstanceOf(Finalization.Retry.class, store.finalizations.get(0));
             assertEquals(1, metrics.transformFailures);
-            assertEquals(0, store.attemptStartingCalls, "nothing may be sent");
+            assertEquals(0, metrics.successes, "nothing may be sent");
             assertNull(store.records.get(0).requestBody(),
                     "the raw payload must not be recorded as if it had been sent");
             assertTrue(store.records.get(0).errorMessage().contains("TRANSFORM_FAILED"));
+        }
+
+        @Test
+        @DisplayName("a failed transformation still consumes a rung")
+        void aFailedTransformationStillConsumesARung() {
+            // attemptStarting is where the outgoing store consumes a rung, and it used to run
+            // *after* buildBody. So every failure that threw before the request existed — a
+            // transformation that has been deleted or disabled, an mTLS client that will not
+            // build — left the attempt number where it was. isExhausted never became true, and
+            // the delivery retried at the same rung every 60s for the full 96h hard cap:
+            // roughly 5,700 attempt rows for one delivery that was never going to be sent.
+            //
+            // A Deferral consumes nothing (invariant 5). This is the opposite case: an Attempt
+            // that was really made and really failed, and it has to cost what one costs. The
+            // incoming direction never had the bug — its attempt number comes off the row.
+            respond(200, "ok");
+            FakeStore store = new FakeStore(baseUrl);
+            store.bodyFailure = new PayloadTransformException("template gone");
+
+            runner.run(store, metrics);
+
+            assertEquals(1, store.attemptStartingCalls,
+                    "a transformation that cannot run is a spent attempt, not a free one");
         }
     }
 
@@ -518,6 +609,8 @@ class AttemptRunnerTest {
         int attemptNumber = 1;
         boolean finaliseApplies = true;
         PayloadTransformException bodyFailure;
+        int timeoutSeconds = 5;
+        RuntimeException recordAttemptFailure;
 
         final List<Finalization> finalizations = new ArrayList<>();
         final List<AttemptRecord> records = new ArrayList<>();
@@ -537,7 +630,7 @@ class AttemptRunnerTest {
             }
             return new ClaimResult.Claimed<>("claim-1", new AttemptContext(
                     "fake attempt", tenantKey, targetKey, null,
-                    attemptNumber, ladder, url, 5));
+                    attemptNumber, ladder, url, timeoutSeconds));
         }
 
         @Override
@@ -562,6 +655,9 @@ class AttemptRunnerTest {
         @Override
         public void recordAttempt(String claim, AttemptRecord record) {
             records.add(record);
+            if (recordAttemptFailure != null) {
+                throw recordAttemptFailure;
+            }
         }
 
         @Override
