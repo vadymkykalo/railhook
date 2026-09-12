@@ -15,7 +15,11 @@ package com.webhook.platform.common.util;
  */
 public final class LogSanitizer {
 
-    private static final char REPLACEMENT = '_';
+    /**
+     * Exactly what {@link Character#isISOControl} covers: the C0 range and DEL, which
+     * {@code \p{Cntrl}} gives, plus the C1 range above it, which it does not.
+     */
+    private static final String CONTROL_CHARACTERS = "[\\p{Cntrl}\\u0080-\\u009F]";
 
     private LogSanitizer() {
     }
@@ -27,32 +31,19 @@ public final class LogSanitizer {
      * turning it into the word here would hide the difference between an absent value and the
      * literal text.
      *
-     * <p>A value with nothing to neutralise is returned as-is, so the ordinary request — which is
-     * every request that is not an attack — allocates nothing.
+     * <p>The regex is handed to {@link String#replaceAll} rather than a hoisted {@code Pattern},
+     * and that is not an oversight. Static analysis treats {@code String}'s own replace methods
+     * as the point where tainted text stops being tainted, and does not follow the same
+     * substitution through {@code Matcher} — hoist the pattern for the compile it saves and the
+     * log-injection finding comes straight back on every caller. The callers are a refused
+     * request and an operator suspending a tenant, so there is no compile worth saving here.
      */
     public static String forLog(String value) {
         if (value == null) {
             return null;
         }
-        int first = indexOfControl(value);
-        if (first < 0) {
-            return value;
-        }
-        char[] out = value.toCharArray();
-        for (int i = first; i < out.length; i++) {
-            if (Character.isISOControl(out[i])) {
-                out[i] = REPLACEMENT;
-            }
-        }
-        return new String(out);
-    }
-
-    private static int indexOfControl(String value) {
-        for (int i = 0; i < value.length(); i++) {
-            if (Character.isISOControl(value.charAt(i))) {
-                return i;
-            }
-        }
-        return -1;
+        // No match means the same instance back, so the ordinary value — which is every value
+        // that is not an attack — allocates nothing.
+        return value.replaceAll(CONTROL_CHARACTERS, "_");
     }
 }
