@@ -1,6 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Loader2, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Check, Loader2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
 import { usePermissions } from '../auth/usePermissions';
 import { authApi } from '../api/auth.api';
@@ -13,6 +13,7 @@ import StatusBadge from '../components/StatusBadge';
 import { RoleCard } from '../components/PermissionGate';
 import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
 import ActiveSessions from '../components/ActiveSessions';
+import DangerConfirmDialog from '../components/DangerConfirmDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -31,26 +32,6 @@ const COMMON_TIMEZONES = [
   'Asia/Dubai', 'Asia/Kolkata', 'Asia/Shanghai', 'Asia/Tokyo', 'Asia/Seoul',
   'Australia/Sydney', 'Pacific/Auckland',
 ];
-
-const NOTIF_STORAGE_KEY = 'railhook_notification_prefs';
-
-interface NotificationPrefs {
-  inApp: boolean;
-  email: boolean;
-  browser: boolean;
-}
-
-function getNotifPrefs(): NotificationPrefs {
-  try {
-    const stored = localStorage.getItem(NOTIF_STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch { /* ignore parse errors */ }
-  return { inApp: true, email: true, browser: false };
-}
-
-function setNotifPrefs(prefs: NotificationPrefs) {
-  localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(prefs));
-}
 
 /**
  * One titled section of a settings form: what it is on the left, the fields on
@@ -141,7 +122,6 @@ export default function SettingsPage() {
   const [passwordSaved, setPasswordSaved] = useState(false);
 
   const [selectedTz, setSelectedTz] = useState(getStoredTimezone);
-  const [notifPrefs, setNotifPrefsState] = useState<NotificationPrefs>(getNotifPrefs);
   const [showGettingStarted, setShowGettingStarted] = useState(() => !isAnyDismissed());
 
   useEffect(() => {
@@ -373,32 +353,6 @@ export default function SettingsPage() {
           </FormSection>
 
           <FormSection
-            title={t('settings.notifications.title')}
-            description={t('settings.notifications.description')}
-          >
-            <div className="divide-y divide-rail">
-              {(['inApp', 'email', 'browser'] as const).map((channel) => (
-                <label key={channel} className="flex cursor-pointer items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium">{t(`settings.notifications.${channel}`)}</span>
-                    <span className="block text-xs text-muted-foreground">{t(`settings.notifications.${channel}Desc`)}</span>
-                  </span>
-                  <Switch
-                    checked={notifPrefs[channel]}
-                    onCheckedChange={(checked) => {
-                      const updated = { ...notifPrefs, [channel]: checked };
-                      setNotifPrefsState(updated);
-                      setNotifPrefs(updated);
-                    }}
-                    aria-label={t(`settings.notifications.${channel}`)}
-                  />
-                </label>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">{t('settings.deviceOnly')}</p>
-          </FormSection>
-
-          <FormSection
             title={t('settings.gettingStarted.title')}
             description={t('settings.gettingStarted.description')}
           >
@@ -450,8 +404,77 @@ export default function SettingsPage() {
               ))}
             </ul>
           </FormSection>
+
+          <EraseAccount />
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The right to erasure, where the person exercising it can reach it. The API had it before this
+ * did, which meant the answer to "delete my account" was "write to support" — and a right you
+ * have to ask a human for is one most people never exercise.
+ *
+ * <p>Confirmation runs through DangerConfirmDialog like every other irreversible action here, so
+ * the ritual is the one the user has already seen. The 409 — last owner of an organization other
+ * people still belong to — is shown as the backend words it, because it names the thing they
+ * have to do first.
+ */
+function EraseAccount() {
+  const { t } = useTranslation();
+  const { user, logout } = useAuth();
+  const [confirming, setConfirming] = useState(false);
+  const [erasing, setErasing] = useState(false);
+
+  const email = user?.user?.email ?? '';
+
+  const handleErase = async () => {
+    setErasing(true);
+    try {
+      await authApi.eraseOwnAccount();
+      showSuccess(t('settings.erase.success'));
+      logout();
+    } catch (err: unknown) {
+      showApiError(err, 'settings.erase.failed');
+    } finally {
+      setErasing(false);
+    }
+  };
+
+  return (
+    <section className="rounded-xl border border-halt/30 bg-halt-soft/50 p-5">
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 text-halt" aria-hidden />
+        <h3 className="text-[15px] font-medium text-halt">{t('settings.erase.title')}</h3>
+      </div>
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 max-w-lg">
+          <p className="text-sm font-medium">{t('settings.erase.action')}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t('settings.erase.description')}</p>
+        </div>
+        <Button variant="destructive" size="sm" onClick={() => setConfirming(true)}>
+          {t('settings.erase.action')}
+        </Button>
+      </div>
+
+      <DangerConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={t('settings.erase.action')}
+        description={t('settings.erase.description')}
+        confirmName={email}
+        impact={[
+          t('settings.erase.impactIdentity'),
+          t('settings.erase.impactSessions'),
+          t('settings.erase.impactSoleOrgs'),
+          t('settings.erase.impactIrreversible'),
+        ]}
+        onConfirm={handleErase}
+        loading={erasing}
+        confirmLabel={t('settings.erase.confirmButton')}
+      />
+    </section>
   );
 }

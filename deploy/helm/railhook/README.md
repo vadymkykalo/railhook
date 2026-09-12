@@ -255,9 +255,12 @@ Topics are created automatically via a post-install/post-upgrade Helm hook job.
 # Pull new images
 helm upgrade railhook ./railhook
 
-# Zero-downtime rollout
-# Flyway migrations run in init container before API starts
-# Worker HPA scales based on Kafka consumer lag
+# Rolling update. Flyway runs inside the API pod at startup, before it reports
+# ready — see "Database Migrations" above; replicas serialise on Flyway's own
+# advisory lock. Both HPAs scale on CPU.
+#
+# Take a backup first: `helm rollback` returns the chart and the images, not the
+# schema, and migrations do not roll back.
 ```
 
 ## Monitoring

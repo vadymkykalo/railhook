@@ -1,7 +1,7 @@
 {
   "title": "Railhook API",
   "version": "1.0.0",
-  "operationCount": 207,
+  "operationCount": 209,
   "security": [
     {
       "id": "bearerAuth",
@@ -960,6 +960,31 @@
           "description": "Returns information about the authenticated user"
         },
         {
+          "id": "eraseOwnAccount",
+          "method": "DELETE",
+          "path": "/api/v1/auth/me",
+          "summary": "Erase your account",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [],
+          "responses": [
+            {
+              "status": "204",
+              "description": "Account erased"
+            },
+            {
+              "status": "401",
+              "description": "Not authenticated"
+            },
+            {
+              "status": "409",
+              "description": "Last owner of an organization that has other members"
+            }
+          ],
+          "description": "GDPR Article 17. Permanently removes the personal data on the account and makes it unusable: the address is replaced with an unroutable one, the name is dropped, every session is closed and every membership is removed. Any organization you were the only member of is deleted with it, including every project, endpoint, event and delivery under it. This cannot be undone.\n\nRefused with 409 if you are the last owner of an organization that still has other members: hand it over first, or the people left behind can neither administer nor delete it.\n\nThe audit log keeps a record that this happened. It names no contact details and is what lets the erasure be shown to have been carried out."
+        },
+        {
           "id": "revokeSession",
           "method": "DELETE",
           "path": "/api/v1/auth/sessions/{sessionId}",
@@ -1209,6 +1234,35 @@
             }
           ],
           "description": "Returns invoice history from the billing provider. Empty when billing is disabled (self-hosted)."
+        }
+      ]
+    },
+    {
+      "id": "client-errors",
+      "name": "Client Errors",
+      "description": "Failures reported by the dashboard",
+      "operations": [
+        {
+          "id": "reportClientError",
+          "method": "POST",
+          "path": "/api/v1/client-errors",
+          "summary": "Report a dashboard error",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [],
+          "responses": [
+            {
+              "status": "202",
+              "description": "Report accepted. Whether it was kept depends on the operator's configuration and the per-user rate limit; a page that has already failed can do nothing useful with the difference."
+            }
+          ],
+          "description": "Records a failure the dashboard could not recover from, in this installation's own logs. Always answers 202, whether or not the report was kept.",
+          "body": {
+            "contentType": "application/json",
+            "type": "ClientErrorReportRequest",
+            "required": true
+          }
         }
       ]
     },
@@ -4501,7 +4555,7 @@
               "type": "MemberResponse"
             }
           ],
-          "description": "Updates a member's role (OWNER, ADMIN, MEMBER, VIEWER)",
+          "description": "Updates a member's role to DEVELOPER or VIEWER. OWNER cannot be assigned here (409); API_KEY is not a human role and is never granted to a member.",
           "body": {
             "contentType": "application/json",
             "type": "ChangeMemberRoleRequest",
@@ -7840,6 +7894,38 @@
         "required": false
       }
     ],
+    "ClientErrorReportRequest": [
+      {
+        "name": "message",
+        "type": "string",
+        "required": true,
+        "description": "The error message"
+      },
+      {
+        "name": "stack",
+        "type": "string",
+        "required": false,
+        "description": "The JavaScript stack trace, if the browser provided one"
+      },
+      {
+        "name": "componentStack",
+        "type": "string",
+        "required": false,
+        "description": "React's component stack, which names the component that threw"
+      },
+      {
+        "name": "url",
+        "type": "string",
+        "required": false,
+        "description": "The page the failure happened on. Its query string is discarded on arrival."
+      },
+      {
+        "name": "release",
+        "type": "string",
+        "required": false,
+        "description": "The dashboard build that produced the error"
+      }
+    ],
     "CurrentUserResponse": [
       {
         "name": "user",
@@ -9047,6 +9133,16 @@
       {
         "name": "auditLogs",
         "type": "AuditLogData[]",
+        "required": false
+      },
+      {
+        "name": "auditLogsTruncated",
+        "type": "boolean",
+        "required": false
+      },
+      {
+        "name": "auditLogsTotal",
+        "type": "integer (int64)",
         "required": false
       }
     ],
@@ -13656,6 +13752,13 @@
       "providerCode": "string",
       "billingInterval": "string"
     },
+    "ClientErrorReportRequest": {
+      "message": "Cannot read properties of undefined",
+      "stack": "string",
+      "componentStack": "string",
+      "url": "https://hooks.example.com/admin/deliveries",
+      "release": "2.13.0"
+    },
     "CurrentUserResponse": {
       "user": {
         "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -14039,7 +14142,9 @@
           "clientIp": "string",
           "createdAt": "2026-01-01T12:00:00Z"
         }
-      ]
+      ],
+      "auditLogsTruncated": true,
+      "auditLogsTotal": 0
     },
     "Group": {},
     "IncidentCountsResponse": {

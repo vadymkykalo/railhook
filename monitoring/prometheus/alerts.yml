@@ -23,8 +23,56 @@
 #   - circuit_breaker_rejected_total
 #   - circuit_breaker_degraded_total
 #   - http_server_requests_seconds_count{status=~"5.."}
+#   - outbox_queue_depth{status=pending|sending|failed|dead}  (OutboxPublisherService, api)
+#   - outbox_oldest_pending_age_seconds                       (OutboxPublisherService, api)
+#   - delivery_oldest_pending_age_seconds                     (StaleDeliveryEscalationService)
+#   - forward_oldest_pending_age_seconds                      (StaleForwardEscalationService)
+#   - up{job=railhook-api|railhook-worker}                    (Prometheus itself)
 
 groups:
+  # ── Outbox ───────────────────────────────────────────────────
+  # The first place work can go missing. An Event is written to the outbox in the same
+  # transaction as the work itself, so a row stuck here is a webhook the caller was told
+  # was accepted and which no per-endpoint metric will ever show you: it has not become a
+  # Delivery yet, so delivery_queue_depth cannot see it either.
+  - name: railhook.outbox
+    rules:
+      # Accepted but unannounced. This is the third of the three signals
+      # docs/guides/observability.md tells an operator to alert on if they alert on nothing
+      # else — and until now it was the only one of the three with no rule behind it.
+      - alert: OutboxOldestPendingAgeHigh
+        expr: |
+          outbox_oldest_pending_age_seconds > 300
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Oldest unpublished outbox message is {{ $value | printf \"%.0f\" }}s old"
+          description: |
+            An event has been accepted and written to the outbox but not published to Kafka
+            for over 5 minutes. The publisher polls every second, so this means it is not
+            running, not keeping up, or failing to reach the broker. Nothing downstream can
+            see this backlog: the work has not become a Delivery yet.
+
+      # SENDING is a transient state the publisher recovers from after
+      # outbox.publisher.sending-recovery-seconds (default 300s). A sustained depth means
+      # recovery is not keeping up, or is failing outright.
+      - alert: OutboxSendingStuck
+        expr: |
+          outbox_queue_depth{status="sending"} > 0
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "{{ $value | printf \"%.0f\" }} outbox messages stuck SENDING for >10m"
+          description: |
+            Outbox messages have been SENDING for longer than
+            outbox.publisher.sending-recovery-seconds (default 300s) plus the 30s retry-cycle
+            poll — recovery back to PENDING should already have happened. Check API logs for
+            recoverStuckSendingMessages() and Kafka broker health.
+
   # ── Retry Backlog ────────────────────────────────────────────
   - name: railhook.retry_backlog
     rules:
@@ -299,3 +347,52 @@ groups:
           description: |
             A delivery has been in PENDING state for {{ $value | printf "%.0f" }}s.
             Hard-cap escalation should have moved this to DLQ. Investigate immediately.
+
+      # The incoming counterpart. StaleForwardEscalationService exports the gauge exactly as
+      # its outgoing twin does; only the alert was missing, so a Forward could sit pending
+      # indefinitely while the identical Delivery condition paged someone.
+      - alert: OldestPendingForwardStale
+        expr: |
+          forward_oldest_pending_age_seconds > 3600
+        for: 5m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: "Oldest pending forward is {{ $value | printf \"%.0f\" }}s old"
+          description: |
+            An incoming forward has been pending for over 1 hour.
+            This may indicate a stuck forward or scheduler issue.
+
+  # ── Is it running at all ─────────────────────────────────────
+  # Everything above measures what the platform is doing. Nothing measured whether it was
+  # doing anything: a worker that died outright tripped no rule directly, and only showed up
+  # five to ten minutes later as a backlog someone had to interpret.
+  - name: railhook.infrastructure
+    rules:
+      - alert: ApiDown
+        expr: |
+          up{job="railhook-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "The api is not being scraped"
+          description: |
+            Prometheus cannot reach the api's management port. Either the process is down,
+            or it is up and unreachable — both mean no event can be accepted right now.
+
+      - alert: WorkerDown
+        expr: |
+          up{job="railhook-worker"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: worker
+        annotations:
+          summary: "The worker is not being scraped"
+          description: |
+            Prometheus cannot reach the worker's management port. Nothing is delivering
+            webhooks. Queue-depth alerts will follow in several minutes; this one is the
+            direct signal.

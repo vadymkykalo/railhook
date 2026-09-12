@@ -10,6 +10,7 @@ import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.service.billing.BillingOverviewService;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
+import com.webhook.platform.common.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -94,21 +95,9 @@ public class PlatformAdminService {
 
         log.warn("Organization {} suspended by operator ({}): {}",
                 organizationId,
-                sanitizeForLog(suspendedBy),
-                sanitizeForLog(reason));
+                LogSanitizer.forLog(suspendedBy),
+                LogSanitizer.forLog(reason));
         return toResponse(organization);
-    }
-
-    private String sanitizeForLog(String value) {
-        if (value == null) {
-            return null;
-        }
-        return value
-                .replace('\n', '_')
-                .replace('\r', '_')
-                .chars()
-                .mapToObj(c -> Character.isISOControl(c) ? "_" : String.valueOf((char) c))
-                .reduce("", String::concat);
     }
 
     @SystemTenant("lifting a suspension is an operator action on a tenant, taken from outside it")

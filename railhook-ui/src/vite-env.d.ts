@@ -12,3 +12,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/** The dashboard build, injected by vite.config.ts from package.json. */
+declare const __APP_VERSION__: string

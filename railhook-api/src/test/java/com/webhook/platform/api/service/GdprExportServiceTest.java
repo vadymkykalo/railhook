@@ -282,6 +282,45 @@ class GdprExportServiceTest {
     }
 
     @Test
+    @DisplayName("an export that hit the audit-log cap says so, instead of looking complete")
+    void exportOrganizationData_saysWhenAuditLogsWereTruncated() {
+        // The export caps audit rows. A subject-access response that is quietly short is worse
+        // than one that is openly partial: the recipient has no way to tell, and neither has
+        // whoever answers for it later.
+        when(organizationRepository.findById(orgId)).thenReturn(Optional.of(buildOrg()));
+        when(membershipRepository.findMembersWithUsers(orgId)).thenReturn(Collections.emptyList());
+        when(projectRepository.findByOrganizationIdAndDeletedAtIsNull(orgId)).thenReturn(Collections.emptyList());
+
+        AuditLog row = AuditLog.builder()
+                .action("CREATE").resourceType("Endpoint")
+                .resourceId(UUID.randomUUID()).status("SUCCESS")
+                .createdAt(Instant.now())
+                .build();
+        // One page returned, far more available.
+        when(auditLogRepository.findByOrganizationIdOrderByCreatedAtDesc(eq(orgId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(row), Pageable.ofSize(1), 42_000));
+
+        GdprExportDto export = service.exportOrganizationData();
+
+        assertThat(export.auditLogsTruncated()).isTrue();
+        assertThat(export.auditLogsTotal()).isEqualTo(42_000L);
+    }
+
+    @Test
+    @DisplayName("an export that fits says nothing was left out")
+    void exportOrganizationData_notMarkedTruncatedWhenComplete() {
+        when(organizationRepository.findById(orgId)).thenReturn(Optional.of(buildOrg()));
+        when(membershipRepository.findMembersWithUsers(orgId)).thenReturn(Collections.emptyList());
+        when(projectRepository.findByOrganizationIdAndDeletedAtIsNull(orgId)).thenReturn(Collections.emptyList());
+        when(auditLogRepository.findByOrganizationIdOrderByCreatedAtDesc(eq(orgId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
+
+        GdprExportDto export = service.exportOrganizationData();
+
+        assertThat(export.auditLogsTruncated()).isFalse();
+    }
+
+    @Test
     void exportOrganizationData_noSecretsExposed() {
         stubEmptyOrg();
 

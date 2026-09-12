@@ -8,7 +8,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/vadymkykalo/railhook?label=release)](https://github.com/vadymkykalo/railhook/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java 17](https://img.shields.io/badge/Java-17-orange)](https://openjdk.org/projects/jdk/17/)
-[![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-green)](https://spring.io/projects/spring-boot)
+[![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-green)](https://spring.io/projects/spring-boot)
 [![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Frailhook-blue?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=railhook)
 
@@ -86,10 +86,13 @@ unsafe configuration rather than running with it.
 
 ```bash
 cd ~/railhook
-./railhook status | logs | stop | start | backup | doctor
+./railhook status | logs | stop | start | upgrade | backup | doctor
 ```
 
-`doctor` re-runs the machine and configuration checks against what is on disk,
+`upgrade` takes a backup before it changes anything and stops if that fails — migrations are
+the part of an upgrade that does not roll back, and there are no down-migrations here.
+`./railhook upgrade v2.13.0` pins the version; with no argument it pulls whatever the tags in
+`.env` already say. `doctor` re-runs the machine and configuration checks against what is on disk,
 so a hand-edited `.env` gets caught before it becomes a support question. `.env`
 holds your secrets — **back it up**: `WEBHOOK_ENCRYPTION_KEY` is what every
 endpoint secret in the database is encrypted with, and a database backup
@@ -141,7 +144,7 @@ to attempt behaviour lands once rather than twice.
 | **Incoming** | Stripe, GitHub, GitLab, Shopify, Slack, Twilio and generic HMAC · deduplication · authenticated forwarding |
 | **Developing** | CLI tunnel to `localhost` · disposable receiving endpoints · transformation preview and delivery dry-run |
 | **Security** | Row-level tenant isolation · AES-256-GCM with key rotation · SSRF protection · mTLS · PII masking · audit log |
-| **Operating** | Prometheus metrics, 4 dashboards, 13 alert rules · configurable retention · GDPR export · CI-tested restore drill |
+| **Operating** | Prometheus metrics, 4 dashboards, 22 alert rules · configurable retention · GDPR export · CI-tested restore drill |
 
 Organizations → Projects → Endpoints, with Owner / Developer / Viewer roles.
 Nothing is gated — see [Is this really MIT?](#is-this-really-mit-what-is-the-billing-code-doing-here)

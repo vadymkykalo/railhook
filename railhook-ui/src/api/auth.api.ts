@@ -69,6 +69,16 @@ export const authApi = {
   },
 
   /**
+   * GDPR Article 17, for the signed-in person. Irreversible: the account's personal data is
+   * replaced, every session is closed, and any organization they were the only member of is
+   * deleted with it. Answers 409 when they are the last owner of an organization that still
+   * has other members.
+   */
+  eraseOwnAccount: (): Promise<void> => {
+    return http.delete<void>('/api/v1/auth/me');
+  },
+
+  /**
    * Re-issues an access token scoped to another organization. Returns only an access token:
    * the refresh cookie is deliberately untouched, so switching invalidates nothing and a
    * double-click is the same operation twice rather than a token-reuse alarm.

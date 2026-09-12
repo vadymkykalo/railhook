@@ -6,7 +6,7 @@ global:
 rule_files:
   - alerts.yml
 
-# Without this, the 14 rules in alerts.yml evaluate but never notify
+# Without this, the rules in alerts.yml evaluate but never notify
 # anyone — see monitoring/README.md "Alerting".
 alerting:
   alertmanagers:

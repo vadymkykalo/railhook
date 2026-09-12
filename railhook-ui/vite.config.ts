@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import pkg from './package.json' with { type: 'json' }
 
 /**
  * Fills `%SITE_URL%` in index.html from VITE_SITE_URL, or removes what it
@@ -42,6 +43,12 @@ function siteUrlHtml(): import('vite').Plugin {
 
 export default defineConfig({
   plugins: [react(), siteUrlHtml()],
+  define: {
+    // Which build an error came from. package.json's version is one of the seven places
+    // `make version-set` writes and `make version-check` verifies, so this cannot drift from
+    // the release it belongs to.
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,

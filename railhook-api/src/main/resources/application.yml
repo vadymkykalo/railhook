@@ -1,6 +1,15 @@
 spring:
   application:
     name: railhook-api
+  # Activated from APP_ENV, which is the switch every deployment already sets. Nothing in
+  # this codebase is annotated @Profile and there is no application-<profile>.yml, so the only
+  # thing a profile selects is the logback appender: logback-spring.xml emits LogstashEncoder
+  # JSON under `production` and human-readable lines otherwise. Without this line
+  # SPRING_PROFILES_ACTIVE was never set anywhere — not by compose, not by the chart, not by
+  # install.sh — so `production` never matched and every deployment logged plain text while
+  # promtail's json stage sat there parsing nothing.
+  profiles:
+    active: ${APP_ENV:development}
   http:
     converters:
       # Spring Boot 4 serializes HTTP through Jackson 3 unless told otherwise, and this is what
@@ -203,6 +212,12 @@ rate-limit:
   global:
     requests-per-second: ${GLOBAL_RATE_LIMIT_PER_SECOND:5000}
     enabled: ${GLOBAL_RATE_LIMIT_ENABLED:true}
+  # One organization's share of the control-plane API. Off by default: on a self-hosted
+  # installation every tenant is the operator's own, so there is no neighbour to be noisy, and
+  # the check costs a Redis round trip per request. Turn it on where tenants are strangers.
+  per-organization:
+    enabled: ${ORG_RATE_LIMIT_ENABLED:false}
+    requests-per-second: ${ORG_RATE_LIMIT_PER_SECOND:200}
 
 event:
   ingestion:
@@ -284,6 +299,12 @@ workflow:
 rules:
   cache-refresh-ms: ${RULES_CACHE_REFRESH_MS:30000}
   execution-log-retention-days: ${RULES_EXECUTION_LOG_RETENTION_DAYS:7}
+
+# Failures the dashboard could not recover from, reported by the browser and written to this
+# installation's own logs. Nothing is sent anywhere else.
+client-errors:
+  enabled: ${CLIENT_ERROR_REPORTING_ENABLED:true}
+  per-user-per-minute: ${CLIENT_ERROR_REPORTS_PER_USER_PER_MINUTE:20}
 
 app:
   # Declared explicitly so ${app.env} resolves through a real key rather than relying on

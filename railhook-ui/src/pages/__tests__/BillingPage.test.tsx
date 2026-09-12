@@ -153,6 +153,19 @@ describe('BillingPage', () => {
       expect(document.body.textContent).toMatch(/29[.,]00|\$29|2900/));
   });
 
+  it('shows a paid invoice as paid, not as neither-here-nor-there', async () => {
+    // The badge compared inv.status against 'paid' while InvoiceStatus is upper case, so
+    // every paid invoice rendered in the idle (grey) style. The label came from a translation
+    // key that *did* handle the case, which is exactly why nobody noticed: the row read
+    // "Paid" in the colour of an invoice nobody had settled.
+    vi.mocked(billingApi.listInvoices).mockResolvedValue([INVOICE]);
+    renderBilling();
+
+    const paid = await screen.findByText('Paid');
+    const badge = paid.closest('[class*="bg-ok"], [class*="text-ok"], [data-kind]');
+    expect(badge, 'a PAID invoice must not be badged as idle').not.toBeNull();
+  });
+
   it('survives an organization whose billing call fails', async () => {
     // A self-hosted deployment with BILLING_ENABLED=false is the common case, and this page
     // must not be a white screen there.

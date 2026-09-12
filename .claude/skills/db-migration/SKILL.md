@@ -34,3 +34,31 @@ Both services run `spring.jpa.hibernate.ddl-auto: validate`. Hibernate compares 
 - Adding a `NOT NULL` column without a default breaks **currently running** instances of both services during a rolling deploy, since the old code inserts without it. Add nullable (or with a default), backfill, tighten in a later migration.
 - Updating only the API entity leaves the worker fine, but updating only the worker entity — or renaming a column — takes down whichever service was missed on its next restart, with a validation error rather than a runtime error.
 - A dropped column fails validation in any service still mapping it, so drops need the entity removed and deployed first.
+
+## Adding an index to a table that grows
+
+`CREATE INDEX` holds a `SHARE` lock until the build finishes, so every write to that table waits.
+Fine on a configuration table; on one of these it is an outage for the length of the build:
+
+`events` · `deliveries` · `delivery_attempts` · `incoming_events` · `incoming_forward_attempts` ·
+`outbox_messages` · `tunnel_request_log` · `audit_log` · `usage_daily`
+
+For those, two things go together and neither works alone:
+
+```sql
+-- flyway:executeInTransaction=false
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_deliveries_something ON deliveries(...);
+```
+
+PostgreSQL refuses `CONCURRENTLY` inside a transaction and Flyway opens one by default, so the
+header is not optional. `MigrationIndexLockingTest` fails the build on either half being missing.
+
+Two consequences of `CONCURRENTLY` worth knowing before you reach for it: the statement is not
+transactional, so a failure leaves an **invalid** index behind that has to be dropped by hand
+(`DROP INDEX CONCURRENTLY`), and it scans the table twice, so it is slower — it just does not
+stop anyone else while it runs.
+
+The twenty-four migrations that already shipped without it cannot be fixed: Flyway validates
+checksums, so editing an applied migration breaks the next start of every installation that ran
+it. They are frozen in the test's list, and `docs/OPERATIONS.md` tells operators which upgrades
+need a window because of them.

@@ -36,5 +36,21 @@ public enum AuditAction {
     // Operator actions. Not a tenant's own doing, which is exactly why they are worth a row:
     // the audit log is where a customer's "why did this stop working" gets answered.
     ORGANIZATION_SUSPENDED,
-    ORGANIZATION_REINSTATED
+    ORGANIZATION_REINSTATED,
+
+    /*
+     * The data-protection rights, which have to be answerable to someone who was not there:
+     * who asked, when, and did it work. ORGANIZATION_DELETED is Article 17 and destroys every
+     * row a customer has; DATA_EXPORTED is Article 20 and puts them all into one file that
+     * somebody then carries around. Both were invisible — the erasure left only a log line,
+     * and a log line is on a retention clock of its own.
+     */
+    ORGANIZATION_DELETED,
+    DATA_EXPORTED,
+
+    /**
+     * Article 17 again, for one person rather than a whole customer. The row survives with no
+     * person attached to it, so this entry is the only thing that says the erasure happened.
+     */
+    USER_ERASED
 }

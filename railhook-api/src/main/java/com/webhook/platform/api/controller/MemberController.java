@@ -64,7 +64,9 @@ public class MemberController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "Change member role", description = "Updates a member's role (OWNER, ADMIN, MEMBER, VIEWER)")
+    @Operation(summary = "Change member role",
+            description = "Updates a member's role to DEVELOPER or VIEWER. OWNER cannot be assigned here "
+                    + "(409); API_KEY is not a human role and is never granted to a member.")
     @RequireOrgAccess
     @PatchMapping("/{userId}")
     public ResponseEntity<MemberResponse> changeMemberRole(

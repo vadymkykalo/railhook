@@ -47,6 +47,8 @@ tags:
   description: Organization management
 - name: Schema Registry
   description: Event type catalog and schema versioning
+- name: Client Errors
+  description: Failures reported by the dashboard
 - name: Device Authentication
   description: Device code flow for CLI authentication
 - name: Rules
@@ -3819,6 +3821,28 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/client-errors:
+    post:
+      tags:
+      - Client Errors
+      summary: Report a dashboard error
+      description: "Records a failure the dashboard could not recover from, in this\
+        \ installation's own logs. Always answers 202, whether or not the report was\
+        \ kept."
+      operationId: reportClientError
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientErrorReportRequest"
+        required: true
+      responses:
+        "202":
+          description: Report accepted. Whether it was kept depends on the operator's
+            configuration and the per-user rate limit; a page that has already failed
+            can do nothing useful with the difference.
+      security:
+      - bearerAuth: []
   /api/v1/billing/webhook/{providerCode}:
     post:
       tags:
@@ -4495,7 +4519,9 @@ paths:
       tags:
       - Organizations
       summary: Change member role
-      description: "Updates a member's role (OWNER, ADMIN, MEMBER, VIEWER)"
+      description: Updates a member's role to DEVELOPER or VIEWER. OWNER cannot be
+        assigned here (409); API_KEY is not a human role and is never granted to a
+        member.
       operationId: changeMemberRole
       parameters:
       - name: orgId
@@ -6035,6 +6061,26 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CurrentUserResponse"
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Authentication
+      summary: Erase your account
+      description: |-
+        GDPR Article 17. Permanently removes the personal data on the account and makes it unusable: the address is replaced with an unroutable one, the name is dropped, every session is closed and every membership is removed. Any organization you were the only member of is deleted with it, including every project, endpoint, event and delivery under it. This cannot be undone.
+
+        Refused with 409 if you are the last owner of an organization that still has other members: hand it over first, or the people left behind can neither administer nor delete it.
+
+        The audit log keeps a record that this happened. It names no contact details and is what lets the erasure be shown to have been carried out.
+      operationId: eraseOwnAccount
+      responses:
+        "204":
+          description: Account erased
+        "401":
+          description: Not authenticated
+        "409":
+          description: Last owner of an organization that has other members
       security:
       - bearerAuth: []
   /api/v1/audit-log:
@@ -8371,6 +8417,42 @@ components:
           type: boolean
         message:
           type: string
+    ClientErrorReportRequest:
+      type: object
+      description: "A failure the dashboard could not recover from, reported by the\
+        \ browser"
+      properties:
+        message:
+          type: string
+          description: The error message
+          example: Cannot read properties of undefined
+          maxLength: 2000
+          minLength: 0
+        stack:
+          type: string
+          description: "The JavaScript stack trace, if the browser provided one"
+          maxLength: 20000
+          minLength: 0
+        componentStack:
+          type: string
+          description: "React's component stack, which names the component that threw"
+          maxLength: 20000
+          minLength: 0
+        url:
+          type: string
+          description: The page the failure happened on. Its query string is discarded
+            on arrival.
+          example: https://hooks.example.com/admin/deliveries
+          maxLength: 2000
+          minLength: 0
+        release:
+          type: string
+          description: The dashboard build that produced the error
+          example: 2.13.0
+          maxLength: 100
+          minLength: 0
+      required:
+      - message
     CheckoutRequest:
       type: object
       properties:
@@ -9703,6 +9785,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AuditLogData"
+        auditLogsTruncated:
+          type: boolean
+        auditLogsTotal:
+          type: integer
+          format: int64
     IncomingDestinationData:
       type: object
       properties:

@@ -41,6 +41,20 @@ spec:
         - protocol: TCP
           port: {{ include "railhook.api.managementPort" . }}
   egress:
+    # DNS. Without this rule nothing else here works: every address below is a name
+    # first, and kube-dns lives in another namespace, so a podSelector cannot reach it.
+    # A policy with an egress section denies everything it does not list, and this was
+    # not listed — on any CNI that enforces policy the whole stack failed at resolution
+    # before it failed at anything interesting. kind's kindnet does not enforce, which
+    # is why the smoke test never saw it.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # PostgreSQL, Kafka and Redis inside this namespace — a self-managed StatefulSet.
     - to:
         - podSelector: {}
       ports:
@@ -50,6 +64,27 @@ spec:
           port: 9092
         - protocol: TCP
           port: 6379
+    # The same three ports outside the namespace, which is where the chart expects them:
+    # it ships none of the three, and values-production.yaml turns all three off in favour
+    # of a managed RDS / MSK / ElastiCache. Those sit in the cluster's own VPC, so the
+    # default here is the private ranges the rule below deliberately excludes. Narrow it
+    # to your database's address, or widen it, with networkPolicy.dependencyEgressCidrs.
+    {{- with .Values.networkPolicy.dependencyEgressCidrs }}
+    - to:
+        {{- range . }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 6379
+    {{- end }}
+    # Delivery itself: customer endpoints on the public internet, private ranges excluded
+    # to match the SSRF guard.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -86,6 +121,20 @@ spec:
         - protocol: TCP
           port: {{ include "railhook.worker.managementPort" . }}
   egress:
+    # DNS. Without this rule nothing else here works: every address below is a name
+    # first, and kube-dns lives in another namespace, so a podSelector cannot reach it.
+    # A policy with an egress section denies everything it does not list, and this was
+    # not listed — on any CNI that enforces policy the whole stack failed at resolution
+    # before it failed at anything interesting. kind's kindnet does not enforce, which
+    # is why the smoke test never saw it.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # PostgreSQL, Kafka and Redis inside this namespace — a self-managed StatefulSet.
     - to:
         - podSelector: {}
       ports:
@@ -95,6 +144,27 @@ spec:
           port: 9092
         - protocol: TCP
           port: 6379
+    # The same three ports outside the namespace, which is where the chart expects them:
+    # it ships none of the three, and values-production.yaml turns all three off in favour
+    # of a managed RDS / MSK / ElastiCache. Those sit in the cluster's own VPC, so the
+    # default here is the private ranges the rule below deliberately excludes. Narrow it
+    # to your database's address, or widen it, with networkPolicy.dependencyEgressCidrs.
+    {{- with .Values.networkPolicy.dependencyEgressCidrs }}
+    - to:
+        {{- range . }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 6379
+    {{- end }}
+    # Delivery itself: customer endpoints on the public internet, private ranges excluded
+    # to match the SSRF guard.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0

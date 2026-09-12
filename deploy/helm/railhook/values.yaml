@@ -27,6 +27,9 @@ app:
 
 # API service configuration
 api:
+  # 30s for spring.lifecycle.timeout-per-shutdown-phase to drain the web server,
+  # plus margin. Mirrors docker-compose.yml's stop_grace_period for the api.
+  terminationGracePeriodSeconds: 65
   replicaCount: 2
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
@@ -55,6 +58,9 @@ api:
   
   env:
     APP_ENV: production
+    # Dashboard failures come back here and go into this pod's logs. Nothing leaves the
+    # cluster; there is no third party involved.
+    CLIENT_ERROR_REPORTING_ENABLED: "true"
     LOG_LEVEL: INFO
     WEBHOOK_ALLOW_PRIVATE_IPS: "false"
     SWAGGER_ENABLED: "false"
@@ -95,6 +101,12 @@ api:
 
 # Worker service configuration
 worker:
+  # 30s (lifecycle, drains the Kafka containers) + 2 x
+  # WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS (the outgoing and incoming
+  # BoundedAsyncExecutors, which shut down in @PreDestroy after the lifecycle
+  # phase and one after the other) + margin. The Kubernetes default of 30s
+  # SIGKILLed the worker mid-delivery on every rollout and HPA scale-down.
+  terminationGracePeriodSeconds: 155
   replicaCount: 2
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
@@ -154,6 +166,8 @@ worker:
 
 # UI service configuration
 ui:
+  # nginx serves static files; there is nothing in flight worth waiting for.
+  terminationGracePeriodSeconds: 30
   replicaCount: 2
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
@@ -382,6 +396,16 @@ networkPolicy:
   policyTypes:
     - Ingress
     - Egress
+  # Where PostgreSQL, Kafka and Redis are, when they are not in this namespace — which is
+  # the arrangement this chart expects, since it ships none of the three and
+  # values-production.yaml points all three at managed services. Those live in the
+  # cluster's VPC, so the default is the private ranges; narrow it to your database's own
+  # address if you would rather be precise. Set it to [] only if all three really do run
+  # as pods beside the application, or the policy will deny the connections.
+  dependencyEgressCidrs:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
 
 # Pod Security Context
 podSecurityContext:

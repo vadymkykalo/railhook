@@ -1624,6 +1624,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/client-errors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report a dashboard error
+         * @description Records a failure the dashboard could not recover from, in this installation's own logs. Always answers 202, whether or not the report was kept.
+         */
+        post: operations["reportClientError"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/webhook/{providerCode}": {
         parameters: {
             query?: never;
@@ -2123,7 +2143,7 @@ export interface paths {
         head?: never;
         /**
          * Change member role
-         * @description Updates a member's role (OWNER, ADMIN, MEMBER, VIEWER)
+         * @description Updates a member's role to DEVELOPER or VIEWER. OWNER cannot be assigned here (409); API_KEY is not a human role and is never granted to a member.
          */
         patch: operations["changeMemberRole"];
         trace?: never;
@@ -2978,7 +2998,15 @@ export interface paths {
         get: operations["getCurrentUser"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Erase your account
+         * @description GDPR Article 17. Permanently removes the personal data on the account and makes it unusable: the address is replaced with an unroutable one, the name is dropped, every session is closed and every membership is removed. Any organization you were the only member of is deleted with it, including every project, endpoint, event and delivery under it. This cannot be undone.
+         *
+         *     Refused with 409 if you are the last owner of an organization that still has other members: hand it over first, or the people left behind can neither administer nor delete it.
+         *
+         *     The audit log keeps a record that this happened. It names no contact details and is what lets the erasure be shown to have been carried out.
+         */
+        delete: operations["eraseOwnAccount"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4327,6 +4355,28 @@ export interface components {
             hasMore?: boolean;
             message?: string;
         };
+        /** @description A failure the dashboard could not recover from, reported by the browser */
+        ClientErrorReportRequest: {
+            /**
+             * @description The error message
+             * @example Cannot read properties of undefined
+             */
+            message: string;
+            /** @description The JavaScript stack trace, if the browser provided one */
+            stack?: string;
+            /** @description React's component stack, which names the component that threw */
+            componentStack?: string;
+            /**
+             * @description The page the failure happened on. Its query string is discarded on arrival.
+             * @example https://hooks.example.com/admin/deliveries
+             */
+            url?: string;
+            /**
+             * @description The dashboard build that produced the error
+             * @example 2.13.0
+             */
+            release?: string;
+        };
         CheckoutRequest: {
             planName: string;
             successUrl: string;
@@ -5067,6 +5117,9 @@ export interface components {
             members?: components["schemas"]["MemberData"][];
             projects?: components["schemas"]["ProjectData"][];
             auditLogs?: components["schemas"]["AuditLogData"][];
+            auditLogsTruncated?: boolean;
+            /** Format: int64 */
+            auditLogsTotal?: number;
         };
         IncomingDestinationData: {
             /** Format: uuid */
@@ -8656,6 +8709,28 @@ export interface operations {
             };
         };
     };
+    reportClientError: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientErrorReportRequest"];
+            };
+        };
+        responses: {
+            /** @description Report accepted. Whether it was kept depends on the operator's configuration and the per-user rate limit; a page that has already failed can do nothing useful with the difference. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     handleWebhook: {
         parameters: {
             query?: never;
@@ -10626,6 +10701,38 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["CurrentUserResponse"];
                 };
+            };
+        };
+    };
+    eraseOwnAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Account erased */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Last owner of an organization that has other members */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -36,7 +36,7 @@ services:
         limits:
           memory: 512m
 
-  # The 14 rules in prometheus/alerts.yml evaluate correctly but, without
+  # The rules in prometheus/alerts.yml evaluate correctly but, without
   # this, route nowhere — no receiver, just a red square on a dashboard nobody
   # is watching. See monitoring/README.md "Alerting" for receiver setup
   # (ALERTMANAGER_* in .env) and the routing/grouping/inhibition design.

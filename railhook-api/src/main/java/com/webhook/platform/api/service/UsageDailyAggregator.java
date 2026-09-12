@@ -2,13 +2,14 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.*;
+import com.webhook.platform.api.domain.repository.ProjectRepository.ProjectRef;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -35,30 +36,62 @@ public class UsageDailyAggregator {
     // EventIngestService / EncryptionKeyRotationService in this codebase.
     private final TransactionTemplate transactionTemplate;
 
+    /**
+     * How many projects are held in memory at once. The sweep visits every project on the
+     * platform; it used to load them all first, which on a large installation is a heap the
+     * scheduler does not need and a failure that takes the whole night's run with it rather
+     * than one project's numbers.
+     */
+    static final int BATCH_SIZE = 500;
+
+    /**
+     * Yesterday's usage, for every live project.
+     *
+     * <p>{@code lockAtMostFor} is the deadline after which ShedLock assumes this instance died
+     * and lets another take over. It has to exceed the longest honest run: crossing it while
+     * still working means two instances sweeping at once, which the {@code upsertIfAbsent}
+     * below makes harmless but not free.
+     */
     @SystemTenant
     @Scheduled(cron = "0 5 0 * * *")
-    @SchedulerLock(name = "usage-daily-aggregator", lockAtLeastFor = "PT1M", lockAtMostFor = "PT30M")
+    @SchedulerLock(name = "usage-daily-aggregator", lockAtLeastFor = "PT1M", lockAtMostFor = "PT2H")
     public void aggregateYesterday() {
         LocalDate yesterday = LocalDate.now().minusDays(1);
         log.info("Starting daily usage aggregation for {}", yesterday);
 
-        List<Project> projects = projectRepository.findAll();
         int count = 0;
+        int failed = 0;
+        int page = 0;
 
-        for (Project project : projects) {
-            try {
-                // The scheduler walks every organization, so it has no ambient one — enter each
-                // project's before touching its rows, and outside the transaction below, since
-                // Hibernate reads the tenant when it opens the session.
-                TenantContext.runAs(project.getOrganizationId(),
-                        () -> aggregateForProject(project.getId(), yesterday));
-                count++;
-            } catch (Exception e) {
-                log.error("Failed to aggregate usage for project {} on {}", project.getId(), yesterday, e);
+        while (true) {
+            List<ProjectRef> batch = projectRepository.findLiveRefs(PageRequest.of(page, BATCH_SIZE));
+            for (ProjectRef project : batch) {
+                try {
+                    // The scheduler walks every organization, so it has no ambient one — enter each
+                    // project's before touching its rows, and outside the transaction below, since
+                    // Hibernate reads the tenant when it opens the session.
+                    TenantContext.runAs(project.getOrganizationId(),
+                            () -> aggregateForProject(project.getId(), yesterday));
+                    count++;
+                } catch (Exception e) {
+                    failed++;
+                    log.error("Failed to aggregate usage for project {} on {}", project.getId(), yesterday, e);
+                }
             }
+            // A short page is the last one. Asking again would be a wasted round trip on every
+            // nightly run, and on an empty platform it is the only round trip there is.
+            if (batch.size() < BATCH_SIZE) {
+                break;
+            }
+            page++;
         }
 
-        log.info("Daily usage aggregation complete: {} projects processed for {}", count, yesterday);
+        if (failed > 0) {
+            log.warn("Daily usage aggregation complete for {}: {} projects processed, {} failed",
+                    yesterday, count, failed);
+        } else {
+            log.info("Daily usage aggregation complete: {} projects processed for {}", count, yesterday);
+        }
     }
 
     /** Aggregates one project's day. Must be called inside that project's organization scope. */

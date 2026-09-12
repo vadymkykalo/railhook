@@ -7,6 +7,217 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-09-07
+
+### Added
+
+- **`railhook upgrade [version]` takes a backup first**, pins the image tags, and refuses to
+  continue if the backup fails. It used to print "edit the tags in .env first, then:" and run
+  pull. Rolling back is not symmetric and now says so: the images go back, the schema does not —
+  Flyway is forward-only here — so the backup is what makes the difference between a bad release
+  and a bad migration recoverable. `railhook backup` was also quietly wrong: it hardcoded the
+  database name and read the user from the invoking shell rather than from `.env`, which it never
+  sourced.
+
+- **A disaster-recovery procedure**, in `docs/OPERATIONS.md`. Most of it already existed in the
+  code and had never been written down — the document said twice that there was no procedure for
+  reconciling Postgres, Kafka and Redis after a restore, while `SequenceReconciliationService`,
+  `QuotaCounterService` and `StuckDeliveryRecoveryService` between them handle all but one step
+  of it. That step is flushing Redis. Also: what the shipped backup schedule buys as RPO and RTO,
+  and that restoring onto a new host needs `.env` more than it needs the dump.
+
+- **A per-organization API rate limit**, off by default. `GlobalRateLimitFilter` holds one bucket
+  for the whole platform, so on a shared installation one tenant looping over their deliveries
+  spends everyone's budget. Off by default because on a self-hosted installation every tenant is
+  the operator's own and the check costs a Redis round trip per request.
+
+- **A person can erase their own account** — `DELETE /api/v1/auth/me`, and a Danger zone in
+  Settings to reach it from. The platform could erase a whole customer and could not erase one
+  human being: an individual who is a member of somebody else's organization had no way to
+  remove their own record, which is the half of Article 17 that individuals actually exercise.
+
+  The identifying data goes and the account is made permanently unusable — an unroutable
+  `.invalid` address, no name, a password hash nobody holds, every session closed and every
+  membership removed. The row itself survives, anonymised, because the schema decides it:
+  `shared_debug_links.created_by` references `users(id)` with no cascade, so deleting the row
+  outright fails for anyone who ever shared a debug link, and `audit_log.user_id` has no foreign
+  key at all, so what someone did outlives them — the point of an audit log, and a legitimate
+  basis under 17(3)(b).
+
+  An organization the person was alone in is deleted with them, because otherwise erasure leaves
+  every event and delivery it owned in the database with nobody able to reach or erase it. The
+  last owner of an organization that still has other members is refused with `409` and told to
+  hand it over first: leaving it ownerless would strand everyone else.
+
+- **Both erasures and the export are audited.** `deleteOrganization` carries a javadoc citing
+  Article 17 and destroys every row a customer has; it left behind a log line, which is on a
+  retention clock of its own. `exportOrganizationData` puts every member, project, endpoint and
+  key into one file that somebody then carries around. Neither had an audit entry.
+  `GdprOperationsAreAuditedTest` keeps it that way — an explicit list, because "this is a data
+  subject's right" is a judgement about the law rather than something a signature carries.
+
+- **The dashboard reports its own failures.** A render error reached `console.error` in one
+  person's browser and stopped there, so from the server a screen that threw for every customer
+  was indistinguishable from a screen nobody had opened.
+
+  The reports go to a new endpoint in this installation and nowhere else — no third party, no
+  DSN, no account to create. With the `production` profile now activating the JSON appender,
+  a dashboard failure lands in Loki beside the correlation id of whatever request the page was
+  making when it broke, and a self-hosted operator reads it in their own logs like everything
+  else. `CLIENT_ERROR_REPORTING_ENABLED` turns it off.
+
+  That moves the risk rather than removing it, because the string on the log line is now one a
+  browser chose. `ClientErrorReportService` therefore strips every character that could end a
+  line, bounds each field, drops the URL's query string — where a share token would be — and
+  caps how often one user can write, so a component throwing on every render cannot produce a
+  log line per frame. On the client, `reportClientError` never throws, never retries, reports
+  each distinct failure once, and stays quiet with no session.
+
+### Fixed
+
+- **The nightly usage sweep loaded every project on the platform into memory at once.**
+  `findAll()` inside a scheduled job holding a lock with a deadline; it walks pages of 500 now,
+  and takes a projection rather than the entity. It also did not exclude soft-deleted projects,
+  so every deleted project was counted and written a usage row every night, forever.
+
+- **The dead-letter recoverer copied the source partition onto the DLQ topic**, which is correct
+  only while the DLQ is at least as wide as the topic it shadows. Repartition a main topic upward
+  to scale its consumers — the ordinary thing to do — and every dead letter from a partition the
+  DLQ does not have fails to publish. The broker picks now; the record keeps its key, so ordering
+  per delivery is unchanged.
+
+- **The README badge and CLAUDE.md said Spring Boot 3.5**, months after the upgrade to 4.1. The
+  badge is the first thing an evaluator reads. `DeclaredStackVersionTest` ties both to the pom.
+
+- **The GDPR export was quietly short, and the guide described data it does not contain.** It
+  caps audit entries at 10,000 and said nothing about it, so a subject-access response could be
+  incomplete and look whole; it now carries `auditLogsTruncated` and `auditLogsTotal`. And
+  `docs/guides/data-retention.md` promised the export included Events, Deliveries and Attempts.
+  It never has — those are the payload tables, and they are aged out by retention instead. The
+  guide says so now, along with what each of the two erasures actually does.
+
+- **A javadoc claimed the audit log was deleted along with its organization.** `audit_log`
+  carries an `organization_id` and no foreign key, so its rows outlive the organization they
+  describe — which is exactly what makes auditing an erasure meaningful.
+
+- **A response body too large to read turned a delivered webhook into a retry.** `AttemptRunner`
+  read the receiver's response with the WebClient codec default of 256 KiB. A receiver that
+  accepted the webhook and answered `200 OK` with a larger body threw `DataBufferLimitException`,
+  the throw was caught as "the request failed", and the whole retry ladder then ran against an
+  endpoint that already had the event.
+
+  The status line arrives before the body does, so by the time a read can fail the outcome is
+  already decided — that is now the sixth invariant in the class javadoc, beside the five that
+  each cost a duplicate before it. The limit is also declared rather than inherited:
+  `WEBHOOK_MAX_RESPONSE_BODY_BYTES` (1 MiB) applies through a `WebClientCustomizer`, so it reaches
+  the mTLS client too, which built its own builder and would otherwise have kept the default.
+
+- **The worker was killed part-way through its own graceful shutdown.** Stopping it takes 30s to
+  drain the Kafka containers and then, per `BoundedAsyncExecutor`, up to
+  `WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS` waiting out in-flight deliveries. There are two such
+  pools and they shut down in `@PreDestroy` — after the lifecycle phase, not sharing its timeout,
+  one after the other. The budget is 150s. Docker granted 35s; the Helm chart set nothing at all,
+  so Kubernetes applied its default of 30s on every rollout and every HPA scale-down. Both
+  SIGKILLed deliveries mid-flight, invisibly, because the ladder re-sent them later.
+
+  `ShutdownBudgetTest` derives the budget from `application.yml` and from the number of pools
+  `ExecutorConfig` actually builds, so raising the timeout — or adding a third pool — fails the
+  build rather than quietly eating the margin.
+
+- **The chart's own production configuration could not start.** `values-production.yaml` enables
+  the NetworkPolicy and points PostgreSQL, Kafka and Redis at managed services, which is the
+  arrangement the chart requires since it ships none of the three. The policy had no DNS rule at
+  all — and an egress section denies what it does not list — so on any CNI that enforces policy
+  the stack failed at name resolution. The dependency ports were then allowed only to pods in the
+  same namespace, so an RDS endpoint on 5432 matched nothing either. The kind smoke test never
+  saw it: kindnet does not enforce NetworkPolicy, and it stands the dependencies up in-namespace.
+
+- **The worker validated its production config after its consumers had started.** It ran from
+  `ApplicationReadyEvent`; the api moved off that trigger deliberately, because it leaves a window
+  where an insecure configuration is already reachable. For the worker the window is worse — what
+  is running by then is the Kafka listeners, so a worker started with a placeholder encryption key
+  and the SSRF guard off delivers webhooks before the check throws. Now `@PostConstruct`, with the
+  tests the worker's validator never had.
+
+- **Production logs were never actually JSON.** `logback-spring.xml` selects `LogstashEncoder`
+  under the `production` Spring profile, in both services, and nothing ever activated that
+  profile: `APP_ENV=production` is an ordinary property, and `SPRING_PROFILES_ACTIVE` appeared
+  nowhere in the repository. So every deployment logged plain text, promtail's `json` stage parsed
+  nothing, and the `level` label the observability guide promises never reached Loki. The profile
+  is now activated from `APP_ENV`, which is safe to do this way: there is no `@Profile` anywhere
+  in main and no `application-<profile>.yml`, so a profile selects the appender and nothing else.
+
+- **Three alert conditions nobody was watching, and two rule sets that had drifted.** The rules
+  lived in three files — one of them, `deploy/prometheus/alerts.yml`, mounted by nobody while
+  looking authoritative enough that a rule kept there appeared deployed. The two live sets were
+  four rules apart, so a Kubernetes operator watched fewer conditions than a Compose one.
+
+  Missing from all three: `outbox_oldest_pending_age_seconds`, which the observability guide names
+  as the third of the three signals to alert on if you alert on nothing else, and which no other
+  rule can stand in for — an Event in the outbox is not a Delivery yet, so no queue-depth metric
+  counts it; `forward_oldest_pending_age_seconds`, exported all along, while the identical
+  Delivery condition paged; and `up == 0` for either service, so a process that died outright
+  tripped nothing directly and surfaced minutes later as a backlog someone had to interpret.
+
+  The unmounted copy is deleted, the two survivors are identical at 22 rules, and
+  `AlertRuleParityTest` keeps them that way.
+
+- **Four things in the dashboard that the user saw and we did not.** A paid invoice always
+  rendered grey — the badge compared `inv.status` against `'paid'` while `InvoiceStatus` is upper
+  case — and the label was right, which is what kept it quiet. The theme toggle ignored the first
+  click, because it inverted the *stored* theme and the stored theme is `system` until someone
+  picks one. A 404 inside the dashboard offered the marketing site as the way back, having read a
+  `localStorage` key nothing writes. And a request that never answered never settled: the axios
+  client had no timeout, so a hung backend left the page spinning with no error state and nothing
+  for react-query to catch.
+
+### Removed
+
+- **The three notification switches in Settings.** They wrote to `localStorage` and nothing ever
+  read it; `Notification.requestPermission()` is called nowhere. A control that looks like a
+  feature and is not costs more trust than the absent feature does. Their translation keys went
+  with them.
+
+- **`deploy/prometheus/alerts.yml`** — a third copy of the alert rules that no deployment mounted.
+  See above.
+
+### Changed
+
+- **The member-role endpoint advertised two roles that have never existed.** Its OpenAPI
+  description said "OWNER, ADMIN, MEMBER, VIEWER"; `MembershipRole` is OWNER, DEVELOPER, VIEWER,
+  API_KEY, and this endpoint grants neither OWNER (409) nor API_KEY (not a human role). It was
+  public — `openapi.yaml` carried it and so did the generated in-app API reference.
+
+- **`SECURITY.md`'s supported-versions table** stopped at 2.10.x, two minors behind the release.
+
+- **The Helm README's rollout block** claimed Flyway runs in an init container and the worker HPA
+  scales on Kafka lag. The same file explains at length that the init container was removed and
+  could never have worked, and `worker-hpa.yaml` scales on CPU. Replaced with what happens, and
+  with the advice that block should have carried: take a backup, because `helm rollback` returns
+  the images and not the schema.
+
+- **`deploy/scripts/db-backup.sh` promised a check that did not exist** — `make
+  verify-backup-parity`, absent from the Makefile and from CI. `BackupFlagParityTest` makes it
+  true instead of deleting the promise: it guards `-Fc`, which makes a dump restorable at all, and
+  `--no-owner --no-privileges`, which let it restore into a database whose roles differ from the
+  source. That is every real recovery, and a dump taken without them looks fine until it is needed.
+
+### Testing
+
+- **`MigrationIndexLockingTest`** fails the build on a new migration that builds an index on an
+  unbounded table without `CONCURRENTLY`, or that uses `CONCURRENTLY` without the
+  `-- flyway:executeInTransaction=false` header it requires. Twenty-four shipped migrations do
+  block — they cannot be fixed, since Flyway validates checksums — so the list is frozen and
+  `docs/OPERATIONS.md` tells operators which upgrades need a window.
+
+- **`src/auth` went from 5.9% to 62% covered**, 90% of branches. It is the sign-in path: the one
+  place where a bug does not degrade the product but locks people out of it, and where nobody
+  who hits it has a session to work around it with. The cases guard what costs the most — that
+  `ProtectedRoute` treats a user whose role is missing as the *least* privileged rather than the
+  most, that both `LoginPage` and `RegisterPage` put the token on the http client before asking
+  who the user is, and that neither the password reset nor the invite acceptance calls a backend
+  when the URL it was reached with is incomplete.
+
 ## [2.12.0] - 2026-09-07
 
 ### Fixed

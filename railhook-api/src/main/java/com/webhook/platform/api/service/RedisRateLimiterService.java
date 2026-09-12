@@ -27,6 +27,7 @@ public class RedisRateLimiterService {
 
     private static final String KEY_PREFIX = "rate_limiter:project:";
     private static final String SOURCE_KEY_PREFIX = "rate_limiter:source:";
+    private static final String ORGANIZATION_KEY_PREFIX = "rate_limiter:org:";
     private static final Duration KEY_TTL = Duration.ofHours(24);
 
     private final RedissonClient redissonClient;
@@ -135,6 +136,23 @@ public class RedisRateLimiterService {
 
     public boolean tryAcquireForSource(UUID sourceId, int ratePerSecond) {
         return doTryAcquire(SOURCE_KEY_PREFIX + sourceId, sourceId, ratePerSecond);
+    }
+
+    /**
+     * One organization's share of the control-plane API — the dashboard's own calls, not event
+     * ingestion, which {@link #tryAcquire(UUID)} already bounds per project.
+     *
+     * <p>Exists because {@code GlobalRateLimitFilter} holds a single bucket for the whole
+     * platform: one tenant looping over the deliveries list can spend it and every other tenant
+     * gets 429s for something they did not do. That is nobody's problem on a self-hosted
+     * installation, where every tenant is the operator's own, and is the first thing a shared
+     * installation runs into.
+     *
+     * <p>Fail-open, like its per-project sibling: a Redis outage must not take the dashboard
+     * down with it.
+     */
+    public boolean tryAcquireForOrganization(UUID organizationId, int ratePerSecond) {
+        return doTryAcquire(ORGANIZATION_KEY_PREFIX + organizationId, organizationId, ratePerSecond);
     }
 
     /**

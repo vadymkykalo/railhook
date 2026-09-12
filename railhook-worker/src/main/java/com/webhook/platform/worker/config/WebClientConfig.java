@@ -4,6 +4,7 @@ import com.webhook.platform.common.http.SsrfProtectionCustomizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.webclient.WebClientCustomizer;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
@@ -11,6 +12,25 @@ import reactor.netty.resources.ConnectionProvider;
 
 @Configuration
 public class WebClientConfig {
+
+    /**
+     * How much of a response body to buffer before giving up on reading it.
+     *
+     * <p>Declared rather than inherited. Spring's default is 256 KiB, and a receiver that
+     * answers 2xx with more than that used to turn a delivered webhook into a failed one —
+     * {@code AttemptRunner} no longer lets a read decide an Attempt, but the limit still
+     * belongs somewhere a person can see it. There is no reason to buffer much: both stores
+     * truncate the body to 10 KiB before it reaches the database.
+     *
+     * <p>Applied as a {@link WebClientCustomizer} so it reaches every injected
+     * {@code WebClient.Builder} — the two clients below and {@code MtlsWebClientFactory}'s,
+     * which builds its own and would otherwise keep the default.
+     */
+    @Bean
+    public WebClientCustomizer responseBodyBufferLimit(
+            @Value("${webhook.max-response-body-bytes:1048576}") int maxResponseBodyBytes) {
+        return builder -> builder.codecs(codecs -> codecs.defaultCodecs().maxInMemorySize(maxResponseBodyBytes));
+    }
 
     @Bean
     public ConnectionProvider webhookConnectionProvider(
