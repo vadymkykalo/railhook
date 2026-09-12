@@ -157,4 +157,108 @@ class EmailServiceTest {
             assertThat(loggedText()).doesNotContain("tok-invite");
         }
     }
+
+    /**
+     * What actually leaves the building.
+     *
+     * These were HTML-only, with the link reachable solely through a styled anchor. Two
+     * consequences, and the first is the one that costs you the message entirely: a mail with
+     * no {@code text/plain} alternative scores worse with every spam filter that looks, and a
+     * password reset is precisely the message that must not be filtered. The second is that a
+     * client which does not render the button — or a person who would rather copy the address
+     * than click a button in an email, which is the advice everyone is given — had nothing to
+     * copy.
+     */
+    @Nested
+    @DisplayName("the message itself")
+    class Content {
+
+        private MimeMessage captured() throws Exception {
+            MimeMessage message = new jakarta.mail.internet.MimeMessage((jakarta.mail.Session) null);
+            when(mailSender.createMimeMessage()).thenReturn(message);
+            return message;
+        }
+
+        /**
+         * Reads the message as it would go on the wire.
+         *
+         * <p>Walking the part tree needs a DataContentHandler for each type, and outside a
+         * container there is none registered for text/html — the part comes back as a stream,
+         * or as a wrapper that claims text/plain because it has no Content-Type of its own.
+         * Serialising sidesteps all of it and asserts the thing that actually matters: what a
+         * receiving server is handed.
+         */
+        private String wire(MimeMessage message) throws Exception {
+            var out = new java.io.ByteArrayOutputStream();
+            message.writeTo(out);
+            return out.toString(java.nio.charset.StandardCharsets.UTF_8);
+        }
+
+        @Test
+        @DisplayName("a reset carries a plain-text alternative as well as the HTML")
+        void resetIsMultipart() throws Exception {
+            emailEnabled(true);
+            environment("production");
+            MimeMessage message = captured();
+
+            service.sendPasswordResetEmail("real@railhook.test", "tok-multipart");
+
+            String sent = wire(message);
+            assertThat(sent)
+                    .as("no text/plain part is a deliverability problem, not a styling one")
+                    .contains("text/plain")
+                    .contains("text/html")
+                    .contains("multipart/alternative");
+            assertThat(sent).contains("tok-multipart");
+        }
+
+        @Test
+        @DisplayName("and shows the address, not only a button pointing at it")
+        void resetShowsTheLinkAsText() throws Exception {
+            emailEnabled(true);
+            environment("production");
+            MimeMessage message = captured();
+
+            service.sendPasswordResetEmail("real@railhook.test", "tok-visible");
+
+            // Three times at least: the plain part, the button's href, and the address
+            // written out underneath it for someone who would rather copy than click.
+            String sent = wire(message);
+            assertThat(sent.split("tok-visible", -1).length - 1)
+                    .as("the URL has to appear as readable text, not only inside an href")
+                    .isGreaterThanOrEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("verification and invite say the same thing the same way")
+        void theOtherTwoMatch() throws Exception {
+            emailEnabled(true);
+            environment("production");
+
+            MimeMessage verify = captured();
+            service.sendVerificationEmail("real@railhook.test", "tok-verify");
+            assertThat(wire(verify)).contains("text/plain").contains("tok-verify");
+
+            MimeMessage invite = captured();
+            service.sendInviteEmail("real@railhook.test", "org-1", "tok-invite");
+            assertThat(wire(invite)).contains("text/plain").contains("tok-invite");
+        }
+
+        @Test
+        @DisplayName("the temporary password is not repeated in plain text")
+        void theTemporaryPasswordStaysInOnePlace() throws Exception {
+            // The one exception. This password grants full, non-expiring access until it is
+            // changed, and sendTemporaryPasswordEmail already refuses to log it for that
+            // reason — putting a second copy in a text part would widen the same exposure.
+            emailEnabled(true);
+            environment("production");
+            MimeMessage message = captured();
+
+            service.sendTemporaryPasswordEmail("real@railhook.test", "TempPw!12345");
+
+            // Exactly one copy, in the HTML body. A text alternative here would widen the
+            // same exposure sendTemporaryPasswordEmail already refuses to widen by logging.
+            assertThat(wire(message).split("TempPw!12345", -1).length - 1).isEqualTo(1);
+        }
+    }
 }
