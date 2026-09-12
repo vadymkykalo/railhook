@@ -84,7 +84,16 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          queries: security-and-quality
+          # security-extended, not security-and-quality. The quality half is a
+          # style opinion — "this parameter is unused", "this variable could be
+          # final" — and it does not answer the taint question this workflow
+          # exists to ask. It produced twenty-odd findings nobody triaged and a
+          # round of edits to a release branch whose only purpose was to quiet
+          # the bot: a DLQ resolver had to stop taking the record it
+          # deliberately ignores. A rule that changes code without changing
+          # behaviour has not earned a place in the pipeline. security-extended
+          # keeps every vulnerability query, the lower-precision ones included.
+          queries: security-extended
 
       # build-mode: manual rather than autobuild. Autobuild guesses at a Maven
       # reactor and its guess here would be `mvn package`, which runs the tests
