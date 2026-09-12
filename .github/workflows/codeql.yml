@@ -84,9 +84,16 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          # The default security suite: high-precision vulnerability queries and
-          # nothing else. The two sets either side of it were both tried here
-          # and both cost more than they returned.
+          # No `queries:` at all, deliberately. That is how you ask for the
+          # default security suite — high-precision vulnerability queries and
+          # nothing else. `queries: security` reads like the obvious way to say
+          # it and is not: the input takes suite names and pack references, and
+          # there is no pack called `security`, so every run died at
+          # `database init` with "Query pack security cannot be found". CodeQL
+          # was therefore not running at all between that change and this one.
+          #
+          # The two sets either side of the default were both tried here and
+          # both cost more than they returned.
           #
           # security-and-quality adds the quality queries, which are style
           # opinions — "this parameter is unused", "this variable could be
@@ -101,7 +108,6 @@ jobs:
           # marginal difference: java/log-injection went from 3 findings to 59
           # on the same commit. Fifty-six new comments on the rule that had
           # already wedged one release is the opposite of the fix.
-          queries: security
 
       # build-mode: manual rather than autobuild. Autobuild guesses at a Maven
       # reactor and its guess here would be `mvn package`, which runs the tests
