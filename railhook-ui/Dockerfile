@@ -51,6 +51,23 @@ ENV VITE_CAPTCHA_SCRIPT_URL=$VITE_CAPTCHA_SCRIPT_URL
 RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
+# A sitemap has to carry absolute URLs, so unlike everything else in this build it cannot
+# be origin-neutral. The committed copy names example.com — IANA reserves it precisely so
+# that a self-hosted image does not ship a list of pages asking a crawler to go and index
+# a stranger's site.
+#
+# A deployment that has a domain says so in VITE_SITE_URL, and then the sitemap and the
+# Sitemap: line in robots.txt have to name it or they point a crawler somewhere else
+# entirely. Regenerated here, before the build copies public/ into dist, and only when
+# the domain is actually set.
+RUN if [ -n "$VITE_SITE_URL" ]; then \
+        SITE_URL="$VITE_SITE_URL" npm run seo:sitemap && \
+        sed -i "s|^Sitemap: .*|Sitemap: ${VITE_SITE_URL%/}/sitemap.xml|" public/robots.txt && \
+        echo "sitemap and robots.txt point at $VITE_SITE_URL"; \
+    else \
+        echo "no VITE_SITE_URL — sitemap keeps its example.com placeholder"; \
+    fi
+
 # Build, then render the public pages to static HTML. Without the second step nginx serves
 # `<div id="root"></div>` for every URL, and the titles, canonicals and sitemap all point at
 # pages whose body is empty until React mounts.
@@ -66,6 +83,13 @@ COPY --from=build /app/dist /usr/share/nginx/html
 
 # Copy nginx config
 COPY railhook-ui/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Runs before nginx starts — the base image's entrypoint executes
+# /docker-entrypoint.d/*.sh in order. Fills in the resolver address from
+# /etc/resolv.conf, which is the only thing that is right under both Compose and
+# Kubernetes.
+COPY railhook-ui/docker-entrypoint.d/15-resolver.sh /docker-entrypoint.d/15-resolver.sh
+RUN chmod +x /docker-entrypoint.d/15-resolver.sh
 
 EXPOSE 5173
 

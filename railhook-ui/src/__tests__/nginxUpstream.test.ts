@@ -21,16 +21,72 @@ const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 describe('nginx upstream resolution', () => {
   const conf = read('railhook-ui/nginx.conf');
 
-  it('resolves through Docker DNS rather than caching for ever', () => {
-    expect(conf).toMatch(/^\s*resolver\s+127\.0\.0\.11\b/m);
+  it('does not hardcode whose DNS, and does not try to patch itself', () => {
+    // Two ways this went wrong. Hardcoding Docker's 127.0.0.11 made every lookup fail
+    // under Helm, because Kubernetes has no such address. Substituting it into this file
+    // at startup then failed too: the chart runs the pod with a read-only root
+    // filesystem, so `sed -i` returns "Permission denied" and nginx starts on a config it
+    // cannot parse. The address is written to /tmp and included from there.
+    expect(conf).toMatch(/^\s*include\s+\/tmp\/railhook-resolver\.conf;/m);
+    expect(conf, 'the resolver address must not be hardcoded').not.toMatch(
+      /^\s*resolver\s+\d+\.\d+\.\d+\.\d+/m,
+    );
+  });
+
+  it('the included file is written before nginx starts, from resolv.conf', () => {
+    const entrypoint = read('railhook-ui/docker-entrypoint.d/15-resolver.sh');
+    expect(entrypoint).toMatch(/\/tmp\/railhook-resolver\.conf/);
+    expect(entrypoint).toMatch(/\/etc\/resolv\.conf/);
+    expect(entrypoint, 'writing into /etc/nginx fails on a read-only root filesystem')
+      .not.toMatch(/sed -i[^\n]*\/etc\/nginx/);
+    // The base image runs /docker-entrypoint.d/*.sh before nginx; without the copy the
+    // include names a file that does not exist and nginx refuses to start.
+    expect(read('railhook-ui/Dockerfile')).toMatch(
+      /COPY .*docker-entrypoint\.d\/15-resolver\.sh \/docker-entrypoint\.d\//,
+    );
   });
 
   it('bounds how long a resolved address is kept', () => {
-    // Docker publishes a 600s TTL. Inheriting it would restore the old behaviour with
-    // extra steps, so the window is set here rather than taken from the record.
-    const valid = conf.match(/^\s*resolver\s+127\.0\.0\.11[^\n;]*valid=(\d+)s/m);
-    expect(valid, 'resolver must set valid=').not.toBeNull();
+    // Docker publishes a 600s TTL. Inheriting it would restore the cached-forever
+    // behaviour with extra steps, so the window is set rather than taken from the record.
+    const entrypoint = read('railhook-ui/docker-entrypoint.d/15-resolver.sh');
+    const valid = entrypoint.match(/resolver \$\{RESOLVER\} valid=(\d+)s/);
+    expect(valid, 'the generated resolver line must set valid=').not.toBeNull();
     expect(Number(valid![1])).toBeLessThanOrEqual(30);
+  });
+
+  it('resolves the upstream by a name its own resolver can answer', () => {
+    // nginx's resolver speaks DNS itself, and a raw query carries no search list. So the
+    // bare `api` that Docker's embedded DNS answers is NXDOMAIN under Kubernetes, where
+    // the name is only reachable as api.<namespace>.svc.cluster.local — and the chart's
+    // UI served 502 for every proxied path while nginx itself was perfectly healthy.
+    // A literal proxy_pass did not have this problem, because it resolves once through
+    // libc, which does apply `search`. The entrypoint has to close that gap.
+    const entrypoint = read('railhook-ui/docker-entrypoint.d/15-resolver.sh');
+    expect(entrypoint, 'the search list has to be read').toMatch(/\^search/);
+    // And the qualified candidate has to be tried FIRST. Probing the bare name and only
+    // falling back to a suffix is the shape that looks right and does nothing: libc
+    // applies the search list itself, so `getent hosts api` succeeds inside the pod and
+    // the bare name — the one nginx cannot resolve — is what gets written.
+    const probes = [...entrypoint.matchAll(/getent hosts "([^"]+)"/g)].map((m) => m[1]);
+    expect(probes.length, 'a candidate has to be probed through libc').toBeGreaterThan(0);
+    expect(probes[0], 'the suffixed name must be probed before the bare one').toContain(
+      '${suffix}',
+    );
+    // And the result has to reach nginx, which means overriding the defaults below.
+    // Backslash-escaped in the script: the heredoc is unquoted so that ${API_HOST}
+    // expands, which means nginx's own $ has to survive the shell.
+    expect(entrypoint).toMatch(/set \\\$api_backend/);
+    expect(entrypoint).toMatch(/set \\\$api_actuator/);
+  });
+
+  it('keeps working defaults if the generated file says nothing about the upstream', () => {
+    // The include has to come after them, or the defaults win and the override is dead
+    // code — which is exactly how this would regress.
+    const defaultAt = conf.search(/^\s*set \$api_backend\s/m);
+    const includeAt = conf.search(/^\s*include\s+\/tmp\/railhook-resolver\.conf;/m);
+    expect(defaultAt, 'nginx fails to start on an undefined variable').toBeGreaterThan(-1);
+    expect(includeAt).toBeGreaterThan(defaultAt);
   });
 
   it('never names the API directly in a proxy_pass', () => {
@@ -79,6 +135,23 @@ describe('the API can be rolled', () => {
     expect(installer).toMatch(/--alias api-warming/);
     expect(installer).toMatch(/--alias api\b/);
     expect(installer).toMatch(/State\.Health\.Status/);
+  });
+
+  it('rolls a one-replica host too, by borrowing a second only for the upgrade', () => {
+    // Running two API containers around the clock to buy a seamless upgrade is a bad
+    // trade on the box this ships for — the second one costs memory every hour of the
+    // day to save thirty seconds a month. So one is the default, and the roll scales to
+    // two for the length of the swap and back down again.
+    //
+    // The regression this guards is the early return: `-le 1` sent exactly the default
+    // installation down the restart-in-place path, which is the downtime the roll exists
+    // to remove. Only an API that is not running at all has nothing to roll.
+    const roll = installer.slice(installer.indexOf('roll_api() {'));
+    const guard = roll.match(/\$\{target:-0\}" (-le|-lt|-eq) ([0-9]+)/);
+    expect(guard, 'roll_api still has to decide when there is nothing to roll').not.toBeNull();
+    expect(`${guard![1]} ${guard![2]}`, 'one replica must still be rolled').not.toBe('-le 1');
+    // And the scale-up has to be one more than whatever is there, not a fixed 2.
+    expect(roll).toMatch(/--scale api=\$\(\(target \+ 1\)\)/);
   });
 
   it('and drains the one it replaces rather than killing it', () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -21,10 +21,10 @@ const USER = {
  * call goes out unauthenticated and a correct password looks like a failed sign-in.
  */
 describe('LoginPage', () => {
-  let login: ReturnType<typeof vi.fn>;
+  let login: Mock<AuthState['login']>;
 
   function renderLogin(state: Partial<AuthState> = {}) {
-    login = vi.fn();
+    login = vi.fn<AuthState['login']>();
     const authState: AuthState = {
       user: null,
       token: null,
@@ -127,7 +127,7 @@ describe('LoginPage', () => {
   it('returns the user to the page that sent them to sign in', async () => {
     vi.spyOn(authApi, 'login').mockResolvedValue({ accessToken: 'the-token' } as never);
     vi.spyOn(authApi, 'getCurrentUser').mockResolvedValue(USER);
-    login = vi.fn();
+    login = vi.fn<AuthState['login']>();
 
     render(
       <AuthContext.Provider
