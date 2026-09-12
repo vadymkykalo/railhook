@@ -64,13 +64,24 @@ jobs:
         run: |
           set -euo pipefail
           tag="${VERSION#v}"
+          # Asked of the registry directly rather than through `docker manifest inspect`.
+          # That command answers "no such manifest" for an image that is plainly there
+          # whenever the daemon has no credentials for the host — indistinguishable, from
+          # here, from the image genuinely being missing. This step exists to tell those
+          # two apart before the host is touched, so it must not be the thing that
+          # confuses them.
           for image in api worker ui; do
-            ref="ghcr.io/vadymkykalo/railhook-${image}:${tag}"
-            if ! docker manifest inspect "$ref" >/dev/null 2>&1; then
-              echo "::error::$ref is missing. Wait for Docker Publish to finish."
+            repo="vadymkykalo/railhook-${image}"
+            token=$(curl -fsSL "https://ghcr.io/token?scope=repository:${repo}:pull&service=ghcr.io" | jq -r .token)
+            code=$(curl -sS -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer ${token}" \
+              -H 'Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.docker.distribution.manifest.v2+json' \
+              "https://ghcr.io/v2/${repo}/manifests/${tag}")
+            if [ "$code" != "200" ]; then
+              echo "::error::ghcr.io/${repo}:${tag} answered ${code}. Wait for Docker Publish to finish."
               exit 1
             fi
-            echo "found $ref"
+            echo "found ghcr.io/${repo}:${tag}"
           done
 
       - name: Open an SSH session the far end has already constrained
