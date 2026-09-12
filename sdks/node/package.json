@@ -1,6 +1,6 @@
 {
   "name": "@railhook/node",
-  "version": "2.16.0",
+  "version": "2.16.1",
   "description": "Official Node.js SDK for Railhook — reliable webhook infrastructure",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

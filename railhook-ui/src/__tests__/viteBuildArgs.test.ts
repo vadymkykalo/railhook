@@ -76,3 +76,29 @@ describe('content-security-policy ownership', () => {
     expect(nginxConf).toMatch(/add_header\s+Referrer-Policy/i);
   });
 });
+
+/**
+ * A deployment with a domain gets a sitemap that names it.
+ *
+ * The committed sitemap says example.com, and has to: IANA reserves that name so a
+ * self-hosted image does not ship a list of pages asking a crawler to go index a stranger.
+ * But nothing regenerated it at build time, so a deployment that set VITE_SITE_URL got
+ * correct canonical tags and a sitemap still pointing at example.com — which is worse than
+ * having none, because it is an instruction to a crawler rather than an omission.
+ */
+describe('sitemap follows the configured origin', () => {
+  const dockerfile = readFileSync(join(repoRoot, 'railhook-ui/Dockerfile'), 'utf8');
+
+  it('the image regenerates the sitemap when a domain is configured', () => {
+    expect(dockerfile).toMatch(/SITE_URL="\$VITE_SITE_URL"\s+npm run seo:sitemap/);
+  });
+
+  it("and points robots.txt's Sitemap: line at the same origin", () => {
+    // A sitemap a crawler is never told about is a file nobody reads.
+    expect(dockerfile).toMatch(/robots\.txt/);
+  });
+
+  it('but leaves the placeholder alone when there is no domain', () => {
+    expect(dockerfile).toMatch(/if \[ -n "\$VITE_SITE_URL" \]/);
+  });
+});
