@@ -1550,6 +1550,8 @@ paths:
         schema:
           type: string
       requestBody:
+        description: "The provider's payload, exactly as they send it. Signatures\
+          \ are verified over these bytes, so nothing re-encodes them in transit."
         content:
           application/json:
             schema:

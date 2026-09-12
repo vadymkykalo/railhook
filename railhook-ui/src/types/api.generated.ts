@@ -6855,6 +6855,7 @@ export interface operations {
             };
             cookie?: never;
         };
+        /** @description The provider's payload, exactly as they send it. Signatures are verified over these bytes, so nothing re-encodes them in transit. */
         requestBody?: {
             content: {
                 "application/json": string;

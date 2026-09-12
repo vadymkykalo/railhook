@@ -217,4 +217,29 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     @Query("UPDATE Delivery d SET d.sequenceNumber = :sequenceNumber WHERE d.id = :id")
     int updateSequenceNumber(@Param("id") UUID id, @Param("sequenceNumber") long sequenceNumber);
 
+    /**
+     * Ordered Deliveries that were committed and never got their Sequence Number.
+     *
+     * <p>The number is assigned after the transaction commits, on purpose — it comes from Redis
+     * and must not be able to fail an ingest that has already been accepted. The in-process
+     * failure path degrades gracefully and says so. What it cannot cover is the process not
+     * being there any more: a pod that dies between the commit and the backfill leaves the row
+     * with a null sequence for ever, and the worker skips ordering for any Delivery in that
+     * state, silently.
+     *
+     * <p>{@code :before} keeps this off the rows whose backfill is still in flight — without it
+     * the sweep would race the ingest it is meant to be repairing after.
+     */
+    @Query(value = """
+        SELECT * FROM deliveries d
+        WHERE d.ordering_enabled = true
+          AND d.sequence_number IS NULL
+          AND d.status IN ('PENDING', 'PROCESSING')
+          AND d.created_at < :before
+        ORDER BY d.created_at ASC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<Delivery> findOrderedDeliveriesMissingASequence(@Param("before") Instant before,
+            @Param("limit") int limit);
+
 }

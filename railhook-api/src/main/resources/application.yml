@@ -357,6 +357,11 @@ ordering:
   # endpoints when comparing the Redis sequence counter against the durable high-water mark.
   sequence-reconciliation-lookback-hours: ${ORDERING_SEQUENCE_RECONCILIATION_LOOKBACK_HOURS:48}
   sequence-reconciliation-interval-ms: ${ORDERING_SEQUENCE_RECONCILIATION_INTERVAL_MS:900000}
+  # How old an ordered Delivery with no sequence number has to be before the reconciler treats
+  # it as stranded rather than still in flight. Below this it would race the ingest it exists
+  # to repair after.
+  stranded-sequence-after-seconds: ${ORDERING_STRANDED_SEQUENCE_AFTER_SECONDS:120}
+  stranded-sequence-batch-size: ${ORDERING_STRANDED_SEQUENCE_BATCH_SIZE:500}
 
 captcha:
   # Empty is the shipped default and means no challenge: a self-hosted registration page has

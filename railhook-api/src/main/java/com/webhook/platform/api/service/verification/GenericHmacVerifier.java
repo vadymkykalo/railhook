@@ -41,7 +41,7 @@ public class GenericHmacVerifier implements WebhookVerificationStrategy {
     }
 
     @Override
-    public VerificationResult verify(String secret, String body, HttpServletRequest request) {
+    public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {
         String signatureHeader = request.getHeader(headerName);
         if (signatureHeader == null || signatureHeader.isBlank()) {
             return VerificationResult.failure("Missing signature header: " + headerName);
@@ -66,12 +66,34 @@ public class GenericHmacVerifier implements WebhookVerificationStrategy {
         return valid ? VerificationResult.success(signatureHeader) : VerificationResult.failure("Signature mismatch");
     }
 
-    static String computeHmacSha256(String secret, String body) {
+    /**
+     * HMAC over an ASCII prefix followed by the body's own bytes.
+     *
+     * <p>Stripe signs {@code "<timestamp>.<body>"} and Slack {@code "v0:<timestamp>:<body>"}.
+     * Both used to be built by string concatenation, which forces the body through a decode and
+     * a re-encode before it is ever hashed. The prefix is ASCII and the body is whatever the
+     * sender sent, so the two are joined as bytes and neither is reinterpreted.
+     */
+    static String computeHmacSha256(String secret, String prefix, byte[] body) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             SecretKeySpec keySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             mac.init(keySpec);
-            byte[] hash = mac.doFinal(body != null ? body.getBytes(StandardCharsets.UTF_8) : new byte[0]);
+            mac.update(prefix.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = mac.doFinal(body != null ? body : new byte[0]);
+            return HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to compute HMAC-SHA256", e);
+        }
+    }
+
+    /** @param body the bytes as they arrived; the sender signed those, not a re-encoding. */
+    static String computeHmacSha256(String secret, byte[] body) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec keySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            mac.init(keySpec);
+            byte[] hash = mac.doFinal(body != null ? body : new byte[0]);
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
             throw new RuntimeException("Failed to compute HMAC-SHA256", e);

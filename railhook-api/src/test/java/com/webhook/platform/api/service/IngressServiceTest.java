@@ -56,6 +56,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import java.nio.charset.StandardCharsets;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -175,7 +176,7 @@ class IngressServiceTest {
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
         stubHttpRequest();
 
-        IncomingEvent event = service.receiveWebhook("validtoken", "{\"test\":true}", httpRequest);
+        IncomingEvent event = service.receiveWebhook("validtoken", "{\"test\":true}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(event.getId()).isEqualTo(eventId);
         assertThat(event.getIncomingSourceId()).isEqualTo(sourceId);
@@ -209,7 +210,7 @@ class IngressServiceTest {
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of(dest));
         stubHttpRequest();
 
-        IncomingEvent event = service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest);
+        IncomingEvent event = service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(event.getId()).isEqualTo(eventId);
 
@@ -232,7 +233,7 @@ class IngressServiceTest {
     void receiveWebhook_invalidToken_throws() {
         when(sourceRepository.findByIngressPathToken("invalid")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.receiveWebhook("invalid", "{}", httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("invalid", "{}".getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(SourceNotFoundException.class);
     }
 
@@ -242,7 +243,7 @@ class IngressServiceTest {
         source.setStatus(IncomingSourceStatus.DISABLED);
         when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}", httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(SourceDisabledException.class);
     }
 
@@ -254,7 +255,7 @@ class IngressServiceTest {
         // Service configured with maxPayloadSizeBytes=524288, create larger body
         String hugeBody = "x".repeat(600000);
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", hugeBody, httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", hugeBody.getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(PayloadTooLargeException.class)
                 .hasMessageContaining("524288");
     }
@@ -285,7 +286,7 @@ class IngressServiceTest {
         stubHttpRequest();
         when(httpRequest.getHeader("X-Signature")).thenReturn(expectedHmac);
 
-        IncomingEvent event = service.receiveWebhook("validtoken", body, httpRequest);
+        IncomingEvent event = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(event.getVerified()).isTrue();
         assertThat(event.getVerificationError()).isNull();
@@ -312,7 +313,7 @@ class IngressServiceTest {
         stubHttpRequest();
         when(httpRequest.getHeader("X-Signature")).thenReturn("wrong-signature");
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"test\":true}", httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"test\":true}".getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(SignatureVerificationFailedException.class)
                 .hasMessageContaining("Signature mismatch");
 
@@ -352,7 +353,7 @@ class IngressServiceTest {
         stubHttpRequest();
         when(httpRequest.getHeader("X-Signature")).thenReturn("bad-sig");
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(SignatureVerificationFailedException.class);
 
         // Event is NOT persisted — rejected before dedup/save to prevent dedup poisoning
@@ -385,7 +386,7 @@ class IngressServiceTest {
         when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_target");
         when(httpRequest.getHeader("X-Signature")).thenReturn("attacker-bad-sig");
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", body, httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(SignatureVerificationFailedException.class);
 
         // Attacker's event must NOT be persisted
@@ -403,7 +404,7 @@ class IngressServiceTest {
         });
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
 
-        IncomingEvent result = service.receiveWebhook("validtoken", body, httpRequest);
+        IncomingEvent result = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
 
         // Legitimate webhook is accepted and persisted
         assertThat(result.getId()).isEqualTo(eventId);
@@ -434,7 +435,7 @@ class IngressServiceTest {
         // ReplayDetectionService says this signature was already seen
         when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(true);
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", body, httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(SignatureVerificationFailedException.class)
                 .hasMessageContaining("Replay attack detected");
 
@@ -470,7 +471,7 @@ class IngressServiceTest {
         // First time — not a replay
         when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(false);
 
-        IncomingEvent event = service.receiveWebhook("validtoken", body, httpRequest);
+        IncomingEvent event = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(event.getVerified()).isTrue();
         verify(eventRepository).save(any(IncomingEvent.class));
@@ -488,7 +489,7 @@ class IngressServiceTest {
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
         stubHttpRequest();
 
-        IncomingEvent event = service.receiveWebhook("validtoken", null, httpRequest);
+        IncomingEvent event = service.receiveWebhook("validtoken", (byte[]) null, httpRequest);
 
         assertThat(event.getBodyRaw()).isNull();
         assertThat(event.getBodySha256()).isNull();
@@ -510,7 +511,7 @@ class IngressServiceTest {
         // trusted proxy actually saw as its peer, and therefore the real client.
         when(httpRequest.getHeader("X-Forwarded-For")).thenReturn("203.0.113.50, 70.41.3.18");
 
-        IncomingEvent event = service.receiveWebhook("validtoken", "{}", httpRequest);
+        IncomingEvent event = service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(event.getClientIp()).isEqualTo("70.41.3.18");
     }
@@ -531,7 +532,7 @@ class IngressServiceTest {
         when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_123"))
                 .thenReturn(Optional.of(existing));
 
-        IncomingEvent result = service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest);
+        IncomingEvent result = service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(result.getId()).isEqualTo(eventId);
         // No new event saved, no forwarding
@@ -554,7 +555,7 @@ class IngressServiceTest {
         stubHttpRequest();
         when(httpRequest.getHeader("Stripe-Webhook-Id")).thenReturn("evt_stripe_456");
 
-        IncomingEvent result = service.receiveWebhook("validtoken", "{}", httpRequest);
+        IncomingEvent result = service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(result.getProviderEventId()).isEqualTo("evt_stripe_456");
     }
@@ -580,7 +581,7 @@ class IngressServiceTest {
         when(eventRepository.save(any(IncomingEvent.class)))
                 .thenThrow(new DataIntegrityViolationException("Unique index violation"));
 
-        IncomingEvent result = service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest);
+        IncomingEvent result = service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(result.getId()).isEqualTo(eventId);
         assertThat(result.getProviderEventId()).isEqualTo("evt_race");
@@ -597,7 +598,7 @@ class IngressServiceTest {
         when(eventRepository.save(any(IncomingEvent.class)))
                 .thenThrow(new DataIntegrityViolationException("Unique index violation"));
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -614,8 +615,8 @@ class IngressServiceTest {
         stubHttpRequest();
 
         // Two events with identical body but no provider event ID header — both must be saved
-        IncomingEvent first = service.receiveWebhook("validtoken", "{\"status\":\"active\"}", httpRequest);
-        IncomingEvent second = service.receiveWebhook("validtoken", "{\"status\":\"active\"}", httpRequest);
+        IncomingEvent first = service.receiveWebhook("validtoken", "{\"status\":\"active\"}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent second = service.receiveWebhook("validtoken", "{\"status\":\"active\"}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(first.getId()).isNotEqualTo(second.getId());
         assertThat(first.getProviderEventId()).isNull();
@@ -641,7 +642,7 @@ class IngressServiceTest {
         when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "Ev0PV52K25"))
                 .thenReturn(Optional.of(existing));
 
-        IncomingEvent result = service.receiveWebhook("validtoken", slackBody, httpRequest);
+        IncomingEvent result = service.receiveWebhook("validtoken", slackBody.getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(result.getId()).isEqualTo(eventId);
         assertThat(result.getProviderEventId()).isEqualTo("Ev0PV52K25");
@@ -664,7 +665,7 @@ class IngressServiceTest {
         when(httpRequest.getHeader("X-Slack-Request-Timestamp")).thenReturn("1531420618");
 
         String challengeBody = "{\"type\":\"url_verification\",\"challenge\":\"abc\"}";
-        IncomingEvent result = service.receiveWebhook("validtoken", challengeBody, httpRequest);
+        IncomingEvent result = service.receiveWebhook("validtoken", challengeBody.getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(result.getProviderEventId()).isNull();
         verify(eventRepository).save(any(IncomingEvent.class));
@@ -712,7 +713,7 @@ class IngressServiceTest {
     void receiveWebhook_invalidToken_rejectedWithoutOpeningTransaction() {
         when(sourceRepository.findByIngressPathToken("invalid")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.receiveWebhook("invalid", "{}", httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("invalid", "{}".getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(SourceNotFoundException.class);
 
         // An invalid-token request must never hold a Hikari connection -- no transaction
@@ -726,7 +727,7 @@ class IngressServiceTest {
         source.setStatus(IncomingSourceStatus.DISABLED);
         when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}", httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(SourceDisabledException.class);
 
         verify(transactionManager, never()).getTransaction(any());
@@ -748,7 +749,7 @@ class IngressServiceTest {
         stubHttpRequest();
         when(httpRequest.getHeader("X-Signature")).thenReturn("wrong-signature");
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"test\":true}", httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"test\":true}".getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(SignatureVerificationFailedException.class);
 
         // Verification (and its Redis round trips) must complete before any DB transaction for
@@ -786,7 +787,7 @@ class IngressServiceTest {
         when(eventRepository.save(any(IncomingEvent.class)))
                 .thenThrow(new DataIntegrityViolationException("some other constraint violation"));
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", body, httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(DataIntegrityViolationException.class);
 
         // The marker this exact request set must be released -- not burned for an event that
@@ -830,7 +831,7 @@ class IngressServiceTest {
         when(eventRepository.save(any(IncomingEvent.class)))
                 .thenThrow(new DataIntegrityViolationException("Unique index violation"));
 
-        IncomingEvent result = service.receiveWebhook("validtoken", body, httpRequest);
+        IncomingEvent result = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(result.getId()).isEqualTo(eventId);
         verify(replayDetectionService, never()).unmark(any(), any());
@@ -862,7 +863,7 @@ class IngressServiceTest {
         when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
         when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(false);
 
-        IncomingEvent event = service.receiveWebhook("validtoken", body, httpRequest);
+        IncomingEvent event = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(event.getId()).isEqualTo(eventId);
         verify(replayDetectionService, never()).unmark(any(), any());
@@ -890,7 +891,7 @@ class IngressServiceTest {
         doThrow(new QuotaExceededException("events_per_month", 1000, 1000, "Free"))
                 .when(entitlementService).checkEventQuota();
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}", httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(QuotaExceededException.class);
 
         verify(eventRepository, never()).save(any());
@@ -904,7 +905,7 @@ class IngressServiceTest {
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
         when(eventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        service.receiveWebhook("validtoken", "{}", httpRequest);
+        service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         verify(entitlementService).checkEventQuota();
         verify(quotaCounterService).increment();
@@ -922,7 +923,7 @@ class IngressServiceTest {
         when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "gh-1"))
                 .thenReturn(Optional.of(IncomingEvent.builder().id(eventId).incomingSourceId(sourceId).build()));
 
-        service.receiveWebhook("validtoken", "{}", httpRequest);
+        service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         verify(eventRepository, never()).save(any());
         verify(quotaCounterService, never()).increment();
@@ -940,7 +941,7 @@ class IngressServiceTest {
         when(eventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(rateLimiterService.tryAcquireForSourceFailClosed(sourceId, DEFAULT_RATE_LIMIT)).thenReturn(true);
 
-        service.receiveWebhook("validtoken", "{}", httpRequest);
+        service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         verify(rateLimiterService).tryAcquireForSourceFailClosed(sourceId, DEFAULT_RATE_LIMIT);
     }
@@ -955,7 +956,7 @@ class IngressServiceTest {
         when(eventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(rateLimiterService.tryAcquireForSourceFailClosed(sourceId, 7)).thenReturn(true);
 
-        service.receiveWebhook("validtoken", "{}", httpRequest);
+        service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         verify(rateLimiterService).tryAcquireForSourceFailClosed(sourceId, 7);
     }
@@ -968,7 +969,7 @@ class IngressServiceTest {
         stubHttpRequest();
         when(rateLimiterService.tryAcquireForSourceFailClosed(sourceId, DEFAULT_RATE_LIMIT)).thenReturn(false);
 
-        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}", httpRequest))
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest))
                 .isInstanceOf(RateLimitExceededException.class);
         verify(eventRepository, never()).save(any());
     }

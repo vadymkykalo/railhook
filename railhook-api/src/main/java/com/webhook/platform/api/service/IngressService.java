@@ -117,7 +117,7 @@ public class IngressService {
      * or rate-limited request held a Hikari connection for the duration of two Redis calls that
      * never wrote anything (a cheap DoS on the connection pool).
      */
-    public IncomingEvent receiveWebhook(String token, String body, HttpServletRequest request) {
+    public IncomingEvent receiveWebhook(String token, byte[] body, HttpServletRequest request) {
         // Ingress has a tenant but no caller. Nothing has authenticated, so TenantContextFilter
         // left the scope unset and the path token in the URL is the only thing that names an
         // organization -- which means the lookup that finds it has to run without one. Everything
@@ -127,7 +127,7 @@ public class IngressService {
         return TenantContext.callAs(source.getOrganizationId(), () -> receiveVerifiedWebhook(source, body, request));
     }
 
-    private IncomingEvent receiveVerifiedWebhook(IncomingSource source, String body, HttpServletRequest request) {
+    private IncomingEvent receiveVerifiedWebhook(IncomingSource source, byte[] body, HttpServletRequest request) {
         enforceRateLimit(source);
         enforcePayloadSize(body);
         // An Incoming Event is an Event the Organization is charged for, same as one it posts to
@@ -150,8 +150,11 @@ public class IngressService {
             throw new SignatureVerificationFailedException("Signature verification failed: " + reason);
         }
 
-        // Extract provider event ID for dedup (well-known headers only, no body hash fallback)
-        String providerEventId = ProviderEventIdExtractor.extract(request, body);
+        // Extract provider event ID for dedup (well-known headers only, no body hash fallback).
+        // The decoded copy from extractMetadata, so the body is turned into a String exactly
+        // once: this reads JSON out of it, which needs characters, and nothing here has to
+        // agree with the sender byte for byte the way the signature does.
+        String providerEventId = ProviderEventIdExtractor.extract(request, meta.body());
 
         // Dedup: if same source + same provider event ID already exists, return existing
         // (idempotent). Plain read, no explicit transaction needed.
@@ -231,9 +234,9 @@ public class IngressService {
         }
     }
 
-    private void enforcePayloadSize(String body) {
-        // Enforce size limit (measure in bytes, not characters — multi-byte UTF-8 matters)
-        if (body != null && body.getBytes(StandardCharsets.UTF_8).length > maxPayloadSizeBytes) {
+    private void enforcePayloadSize(byte[] body) {
+        // Bytes were always the right unit here; now they are also what we are holding.
+        if (body != null && body.length > maxPayloadSizeBytes) {
             throw new PayloadTooLargeException("Payload exceeds maximum allowed size of " + maxPayloadSizeBytes + " bytes");
         }
     }
@@ -243,7 +246,15 @@ public class IngressService {
                                     String headersJson, String bodySha256, String body) {
     }
 
-    private RequestMetadata extractMetadata(String body, HttpServletRequest request) {
+    /**
+     * Decodes the body once, here, for the copy that is stored and shown to an operator.
+     *
+     * <p>Everything that has to agree with the sender byte for byte — the signature and the
+     * digest — is computed from {@code body} itself and never from this String. A body that is
+     * not valid UTF-8 is stored with replacement characters, which is a lossy record of a
+     * request that was still verified correctly; the digest beside it is over the real bytes.
+     */
+    private RequestMetadata extractMetadata(byte[] body, HttpServletRequest request) {
         String requestId = UUID.randomUUID().toString();
         String method = request.getMethod();
         String path = request.getRequestURI();
@@ -255,8 +266,9 @@ public class IngressService {
                 ? rawUserAgent.substring(0, 512) : rawUserAgent;
         String headersJson = HeaderSanitizer.toJson(request, objectMapper);
         String bodySha256 = computeSha256(body);
+        String storedBody = body != null ? new String(body, StandardCharsets.UTF_8) : null;
         return new RequestMetadata(requestId, method, path, queryParams, contentType, clientIp, userAgent,
-                headersJson, bodySha256, body);
+                headersJson, bodySha256, storedBody);
     }
 
     private record VerificationOutcome(Boolean verified, String verificationError, String replayKey) {
@@ -274,7 +286,7 @@ public class IngressService {
      * supposed to follow never commits, the caller must release this mark via
      * {@link #releaseReplayMarkerAfterFailedPersist}.
      */
-    private VerificationOutcome verifyAndCheckReplay(IncomingSource source, String body, HttpServletRequest request) {
+    private VerificationOutcome verifyAndCheckReplay(IncomingSource source, byte[] body, HttpServletRequest request) {
         Boolean verified = null;
         String verificationError = null;
         String replayKey = null;
@@ -402,13 +414,14 @@ public class IngressService {
         );
     }
 
-    private String computeSha256(String body) {
-        if (body == null || body.isEmpty()) {
+    /** Over the bytes that arrived, so the stored digest is of the request and not of our copy. */
+    private String computeSha256(byte[] body) {
+        if (body == null || body.length == 0) {
             return null;
         }
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(body.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(body);
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
             log.warn("Failed to compute SHA-256: {}", e.getMessage());

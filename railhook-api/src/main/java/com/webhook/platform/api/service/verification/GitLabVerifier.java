@@ -34,7 +34,7 @@ public class GitLabVerifier implements WebhookVerificationStrategy {
     private static final String EVENT_UUID_HEADER = "X-Gitlab-Event-UUID";
 
     @Override
-    public VerificationResult verify(String secret, String body, HttpServletRequest request) {
+    public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {
         String token = request.getHeader(TOKEN_HEADER);
         if (token == null || token.isBlank()) {
             return VerificationResult.failure("Missing header: " + TOKEN_HEADER);

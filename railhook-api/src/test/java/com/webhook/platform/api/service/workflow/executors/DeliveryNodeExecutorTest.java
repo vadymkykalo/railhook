@@ -14,6 +14,8 @@ import com.webhook.platform.api.service.workflow.StepResult;
 import com.webhook.platform.api.service.DeliveryDispatch;
 import com.webhook.platform.common.constants.KafkaTopics;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -27,6 +29,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 @ExtendWith(MockitoExtension.class)
 class DeliveryNodeExecutorTest {
@@ -40,11 +44,14 @@ class DeliveryNodeExecutorTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private DeliveryNodeExecutor executor;
+    private PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void setUp() {
+        transactionManager = mock(PlatformTransactionManager.class);
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
         executor = new DeliveryNodeExecutor(endpointRepository, deliveryRepository, mapper,
-                new DeliveryDispatch(outboxMessageRepository, mapper));
+                new DeliveryDispatch(outboxMessageRepository, mapper), transactionManager);
     }
 
     private JsonNode json(String raw) throws Exception {
@@ -177,5 +184,38 @@ class DeliveryNodeExecutorTest {
 
         assertThat(result.status()).isEqualTo(StepStatus.FAILED);
         assertThat(result.errorMessage()).contains("Delivery error");
+    }
+
+    @Test
+    @DisplayName("the Delivery and its announcement are one transaction, or neither")
+    void theDeliveryAndItsOutboxRowCommitTogether() throws Exception {
+        // DeliveryDispatch's whole contract is that the Outbox row is written in the same
+        // transaction as the Delivery, so the two cannot disagree about whether the work exists.
+        // This node had neither an annotation nor a template, and WorkflowEngine runs it on its
+        // own pool, so there was no ambient transaction to inherit either: two auto-commits with
+        // a window between them. A failure in that window left a PENDING Delivery with no Outbox
+        // row and next_retry_at NULL — which nothing dispatches, and which waits an hour for the
+        // stranded-PENDING sweep to notice.
+        UUID endpointId = UUID.randomUUID();
+        Endpoint endpoint = new Endpoint();
+        endpoint.setId(endpointId);
+        endpoint.setProjectId(UUID.randomUUID());
+        endpoint.setUrl("https://receiver.example.test/hook");
+        endpoint.setEnabled(true);
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(deliveryRepository.save(any(Delivery.class))).thenAnswer(call -> {
+            Delivery d = call.getArgument(0);
+            d.setId(UUID.randomUUID());
+            return d;
+        });
+        when(outboxMessageRepository.save(any()))
+                .thenThrow(new DataIntegrityViolationException("outbox insert failed"));
+
+        StepResult result = executor.execute(json("{\"endpointId\":\"" + endpointId + "\"}"), json("{}"));
+
+        assertThat(result.status())
+                .as("the node reports the failure rather than claiming a delivery nobody will make")
+                .isNotEqualTo(com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus.SUCCESS);
+        verify(transactionManager).rollback(any());
     }
 }
