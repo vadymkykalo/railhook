@@ -84,16 +84,24 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          # security-extended, not security-and-quality. The quality half is a
-          # style opinion — "this parameter is unused", "this variable could be
-          # final" — and it does not answer the taint question this workflow
-          # exists to ask. It produced twenty-odd findings nobody triaged and a
-          # round of edits to a release branch whose only purpose was to quiet
-          # the bot: a DLQ resolver had to stop taking the record it
-          # deliberately ignores. A rule that changes code without changing
-          # behaviour has not earned a place in the pipeline. security-extended
-          # keeps every vulnerability query, the lower-precision ones included.
-          queries: security-extended
+          # The default security suite: high-precision vulnerability queries and
+          # nothing else. The two sets either side of it were both tried here
+          # and both cost more than they returned.
+          #
+          # security-and-quality adds the quality queries, which are style
+          # opinions — "this parameter is unused", "this variable could be
+          # final". They do not answer the taint question this workflow exists
+          # to ask. Ninety-one went untriaged, and one of them held a release
+          # branch until a DLQ resolver was rewritten to stop taking the record
+          # it deliberately ignores: a change with no behaviour in it, made to
+          # quiet a bot.
+          #
+          # security-extended keeps the vulnerability queries but adds the
+          # lower-precision variants, and on this codebase that is not a
+          # marginal difference: java/log-injection went from 3 findings to 59
+          # on the same commit. Fifty-six new comments on the rule that had
+          # already wedged one release is the opposite of the fix.
+          queries: security
 
       # build-mode: manual rather than autobuild. Autobuild guesses at a Maven
       # reactor and its guess here would be `mvn package`, which runs the tests
