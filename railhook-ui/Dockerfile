@@ -32,10 +32,18 @@ ARG VITE_API_URL=""
 ARG VITE_CSP_EXTRA_CONNECT=""
 ARG VITE_SITE_URL=""
 ARG VITE_CONTACT_DOMAIN=""
+# The registration challenge. Build-time like every other VITE_ value, and the
+# site key's presence is also what src/lib/csp.ts keys the widened script-src
+# and frame-src off — so an image built without it cannot show a challenge even
+# if the API is configured to demand one.
+ARG VITE_CAPTCHA_SITE_KEY=""
+ARG VITE_CAPTCHA_SCRIPT_URL=""
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_CSP_EXTRA_CONNECT=$VITE_CSP_EXTRA_CONNECT
 ENV VITE_SITE_URL=$VITE_SITE_URL
 ENV VITE_CONTACT_DOMAIN=$VITE_CONTACT_DOMAIN
+ENV VITE_CAPTCHA_SITE_KEY=$VITE_CAPTCHA_SITE_KEY
+ENV VITE_CAPTCHA_SCRIPT_URL=$VITE_CAPTCHA_SCRIPT_URL
 
 # Chromium for the prerender step. Alpine's package rather than a Puppeteer download:
 # puppeteer-core ships no browser, and the musl builds Puppeteer fetches do not run here.
