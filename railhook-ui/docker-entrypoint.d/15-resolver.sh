@@ -52,15 +52,23 @@ echo "15-resolver: nginx will resolve through ${RESOLVER}"
 # to nginx as a name its own resolver can answer. Under Compose nothing changes: Docker's
 # embedded DNS answers the bare name, so the first probe succeeds and that is what is
 # written.
+# The qualified candidate is tried first, and that order is the whole point. Probing the
+# bare name and only falling back to a suffix looks right and does nothing: libc applies
+# the search list itself, so `getent hosts api` succeeds inside the pod and the bare name
+# — the one nginx cannot resolve — is what gets written. Under Compose no suffix matches
+# and the bare name is kept, which is what Docker's embedded DNS answers.
 API_HOST="${RAILHOOK_API_HOST:-api}"
-if ! getent hosts "$API_HOST" >/dev/null 2>&1; then
-    for suffix in $(awk '/^search[[:space:]]/ { $1 = ""; print; exit }' /etc/resolv.conf 2>/dev/null); do
-        if getent hosts "${API_HOST}.${suffix}" >/dev/null 2>&1; then
-            API_HOST="${API_HOST}.${suffix}"
-            break
-        fi
-    done
-fi
+case "$API_HOST" in
+    *.*) ;;  # already qualified
+    *)
+        for suffix in $(awk '/^search[[:space:]]/ { $1 = ""; print; exit }' /etc/resolv.conf 2>/dev/null); do
+            if getent hosts "${API_HOST}.${suffix}" >/dev/null 2>&1; then
+                API_HOST="${API_HOST}.${suffix}"
+                break
+            fi
+        done
+        ;;
+esac
 
 # Overrides the defaults in nginx.conf, which is why the include sits after them. If the
 # name never resolved, this writes it back unchanged and nginx behaves as it did before.

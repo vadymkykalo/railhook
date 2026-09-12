@@ -64,7 +64,15 @@ describe('nginx upstream resolution', () => {
     // libc, which does apply `search`. The entrypoint has to close that gap.
     const entrypoint = read('railhook-ui/docker-entrypoint.d/15-resolver.sh');
     expect(entrypoint, 'the search list has to be read').toMatch(/\^search/);
-    expect(entrypoint, 'a candidate has to be probed through libc').toMatch(/getent hosts/);
+    // And the qualified candidate has to be tried FIRST. Probing the bare name and only
+    // falling back to a suffix is the shape that looks right and does nothing: libc
+    // applies the search list itself, so `getent hosts api` succeeds inside the pod and
+    // the bare name — the one nginx cannot resolve — is what gets written.
+    const probes = [...entrypoint.matchAll(/getent hosts "([^"]+)"/g)].map((m) => m[1]);
+    expect(probes.length, 'a candidate has to be probed through libc').toBeGreaterThan(0);
+    expect(probes[0], 'the suffixed name must be probed before the bare one').toContain(
+      '${suffix}',
+    );
     // And the result has to reach nginx, which means overriding the defaults below.
     // Backslash-escaped in the script: the heredoc is unquoted so that ${API_HOST}
     // expands, which means nginx's own $ has to survive the shell.
