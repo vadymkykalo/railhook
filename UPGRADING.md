@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+## v2.15.0
+
+Bug fixes and one additive migration. Nothing requires action unless you use the CAPTCHA.
+
+### `V070` rebuilds two materialized views
+
+`mv_delivery_stats` and `mv_incoming_stats` gain `organization_id`, so the queries over them can
+be confined the way every other query here is. A materialized view's columns come from its
+query, so this is a DROP and CREATE rather than an ALTER — it runs once, over 30-day rollups on
+indexed tables. Nothing reads them during the migration, and the refresh job repopulates them on
+its normal schedule.
+
+### If you set a CAPTCHA site key and it did nothing, this is why
+
+`VITE_CAPTCHA_SITE_KEY` and `VITE_CAPTCHA_SCRIPT_URL` were documented and never passed to the
+UI build. They are now. Two things follow:
+
+- These are **build-time**. Vite inlines them, so setting them in `.env` is half the job and
+  `make rebuild-ui` is the other half. If you installed with `install.sh` or the Helm chart you
+  are running published images, built with these empty, and the site key cannot take effect
+  until you build your own UI image.
+- Turn both halves on together. `CAPTCHA_SECRET_KEY` on the API with no site key in the bundle
+  means the page sends no token and every registration is refused.
+
+### nginx no longer sends its own Content-Security-Policy
+
+The app writes one as a meta tag, and it is the only one of the two that knows what the image
+was built with — it widens `script-src` and `frame-src` to the CAPTCHA's origin when one is
+configured. A browser given both enforces the intersection, so the static header cancelled that.
+`X-Frame-Options` stays in nginx, because `frame-ancestors` is ignored in a meta tag.
+
+If you had edited `nginx.conf` to add origins of your own, move them to `VITE_CSP_EXTRA_CONNECT`
+or they will be lost on the next image build.
+
+### New settings, both defaulted to today's behaviour
+
+```bash
+# How old an ordered Delivery with no sequence number must be before the reconciler treats it
+# as stranded rather than still in flight. Below a few seconds this races the ingest it exists
+# to repair after.
+ORDERING_STRANDED_SEQUENCE_AFTER_SECONDS=120
+ORDERING_STRANDED_SEQUENCE_BATCH_SIZE=500
+```
+
+Watch `webhook_sequence_stranded_total`. Anything but zero means ingest processes are dying
+mid-request, which is worth knowing for its own sake.
+
+
 ## v2.14.0
 
 Nothing in this release requires action. It is bug fixes, one additive migration, and two new

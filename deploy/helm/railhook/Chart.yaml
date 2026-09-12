@@ -2,8 +2,8 @@ apiVersion: v2
 name: railhook
 description: Self-hosted webhook infrastructure platform
 type: application
-version: 2.14.0
-appVersion: "2.14.0"
+version: 2.15.0
+appVersion: "2.15.0"
 keywords:
   - webhooks
   - event-delivery

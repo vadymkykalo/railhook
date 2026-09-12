@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-09-12
+
+Four faults that each made the system quietly do the wrong thing rather than fail visibly, plus
+the CAPTCHA wiring that made a security setting impossible to turn on.
+
+### Fixed
+
+- **A webhook is verified against the bytes that arrived.** The controller took the body as a
+  `String`, which Spring builds by decoding with whatever charset the `Content-Type` declared,
+  and every verifier then encoded it back as UTF-8 before computing the HMAC. For a sender that
+  used anything else those are different bytes, so a **genuine webhook failed verification** —
+  and nothing in the request explained it, because the signature really did not match the thing
+  being hashed. Stripe's and Slack's timestamp prefixes are now joined to the body at the byte
+  level for the same reason. `bodySha256` is over the arrived bytes too, so the stored digest is
+  of the request rather than of our copy of it.
+
+- **An ordered Delivery no longer loses its ordering permanently.** The sequence number is
+  assigned just after the ingest transaction commits, deliberately — it comes from Redis, and a
+  Delivery the customer was told about must not be undone because a counter was unreachable.
+  What no catch block covered was the process ending: a pod dying in that window left the row
+  with a null sequence for ever, and the worker then delivered it unordered without telling
+  anyone. `SequenceReconciliationService` now sweeps and backfills those, and
+  `webhook_sequence_stranded_total` counts them — anything but zero means ingest processes are
+  dying mid-request.
+
+- **A workflow's delivery node writes the Delivery and its announcement in one transaction.**
+  It had neither an annotation nor a template, and the workflow engine runs nodes on their own
+  pool, so there was no ambient transaction to inherit: two auto-commits with a window between
+  them that left a `PENDING` Delivery with no Outbox row and `next_retry_at` NULL. Nothing
+  dispatches such a row; it waited an hour for the stranded-PENDING sweep.
+
+- **The dashboard rollups are confined by the query rather than by convention.**
+  `MaterializedViewRepository` is raw JdbcTemplate, so `@TenantId` never reached it, and the
+  views carried only `project_id` — there was not even a column to filter on. It was safe only
+  because both callers load the `Project` under tenant scope first. `V070` rebuilds both views
+  with `organization_id` and the predicate comes from `TenantContext.require()`. An unreferenced
+  method that took a list of ids with no ownership check at all is deleted.
+
+- **The CAPTCHA can be turned on.** `VITE_CAPTCHA_SITE_KEY` was documented, read by the CSP
+  builder, and passed by nobody — no `ARG`, no build arg. Setting it did nothing, and the
+  failure was worse than inert: with the API's secret set and no site key in the bundle, the
+  page sends no token and **every registration is refused**. Underneath it, nginx sent a second,
+  static CSP whose `script-src 'self'` would have blocked the widget anyway, since a browser
+  enforces the intersection of header and meta policies.
+
+### Changed
+
+- `NativeQueryTenantPredicateTest` also fails a repository that holds a `JdbcTemplate` without
+  mentioning `TenantContext`. It scanned `@Query(nativeQuery = true)`, which is every way into
+  Hibernate but not every way into the database.
+- A test asserts that every `VITE_` variable in `.env.dist` reaches the build as an `ARG`, an
+  `ENV` and a Compose build arg — the class of fault, rather than the one instance of it.
+
 ## [2.14.0] - 2026-09-12
 
 Reliability work ahead of the first production deployment. Sixteen faults, each reproduced with
