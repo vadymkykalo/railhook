@@ -620,12 +620,22 @@ case "${1:-help}" in
         from=$(grep '^API_IMAGE_TAG=' .env | cut -d= -f2- || echo unknown)
         want="${2:-}"
         if [ -n "$want" ]; then
+            # Releases are tagged v2.16.0 in git and the images are published as 2.16.0 —
+            # docker/metadata-action writes the version, not the ref. Writing the git tag
+            # into *_IMAGE_TAG therefore asked the registry for something that has never
+            # existed, and `compose pull` failed with "not found" on a release that was
+            # sitting right there. The help text below says `./railhook upgrade v2.13.0`,
+            # so the documented usage was the broken one.
+            #
+            # Accept either spelling and write the one the registry knows.
+            image_tag="${want#v}"
+            git_ref="v${image_tag}"
             for v in API_IMAGE_TAG WORKER_IMAGE_TAG UI_IMAGE_TAG; do
-                if grep -q "^${v}=" .env; then sed -i.bak "s|^${v}=.*|${v}=${want}|" .env
-                else echo "${v}=${want}" >> .env; fi
+                if grep -q "^${v}=" .env; then sed -i.bak "s|^${v}=.*|${v}=${image_tag}|" .env
+                else echo "${v}=${image_tag}" >> .env; fi
             done
             rm -f .env.bak
-            echo "Pinned API/WORKER/UI image tags to ${want}."
+            echo "Pinned API/WORKER/UI image tags to ${image_tag}."
         else
             echo "No version given, so whatever the tags in .env already say. Pass one to change them:"
             echo "  ./railhook upgrade v2.13.0"
@@ -645,17 +655,17 @@ case "${1:-help}" in
         # The previous file is kept beside it. If you have edited yours, diff the two:
         # this replaces it rather than merging, because a merge that got it wrong
         # would be discovered at the worst moment.
-        if curl -fsSL "${RAW}/${want:-$from}/docker-compose.yml" -o docker-compose.yml.new 2>/dev/null; then
+        if curl -fsSL "${RAW}/${git_ref:-v${from#v}}/docker-compose.yml" -o docker-compose.yml.new 2>/dev/null; then
             if ! cmp -s docker-compose.yml docker-compose.yml.new; then
                 cp docker-compose.yml docker-compose.yml.previous
                 mv docker-compose.yml.new docker-compose.yml
-                echo "docker-compose.yml updated for ${want:-$from} (previous kept as docker-compose.yml.previous)"
+                echo "docker-compose.yml updated for ${git_ref:-v${from#v}} (previous kept as docker-compose.yml.previous)"
             else
                 rm -f docker-compose.yml.new
             fi
         else
             rm -f docker-compose.yml.new
-            echo "Could not fetch docker-compose.yml for ${want:-$from}; keeping the one on disk."
+            echo "Could not fetch docker-compose.yml for ${git_ref:-v${from#v}}; keeping the one on disk."
         fi
 
         compose pull

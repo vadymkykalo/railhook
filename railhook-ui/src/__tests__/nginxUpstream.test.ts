@@ -21,15 +21,37 @@ const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 describe('nginx upstream resolution', () => {
   const conf = read('railhook-ui/nginx.conf');
 
-  it('resolves through Docker DNS rather than caching for ever', () => {
-    expect(conf).toMatch(/^\s*resolver\s+127\.0\.0\.11\b/m);
+  it('does not hardcode whose DNS, and does not try to patch itself', () => {
+    // Two ways this went wrong. Hardcoding Docker's 127.0.0.11 made every lookup fail
+    // under Helm, because Kubernetes has no such address. Substituting it into this file
+    // at startup then failed too: the chart runs the pod with a read-only root
+    // filesystem, so `sed -i` returns "Permission denied" and nginx starts on a config it
+    // cannot parse. The address is written to /tmp and included from there.
+    expect(conf).toMatch(/^\s*include\s+\/tmp\/railhook-resolver\.conf;/m);
+    expect(conf, 'the resolver address must not be hardcoded').not.toMatch(
+      /^\s*resolver\s+\d+\.\d+\.\d+\.\d+/m,
+    );
+  });
+
+  it('the included file is written before nginx starts, from resolv.conf', () => {
+    const entrypoint = read('railhook-ui/docker-entrypoint.d/15-resolver.sh');
+    expect(entrypoint).toMatch(/\/tmp\/railhook-resolver\.conf/);
+    expect(entrypoint).toMatch(/\/etc\/resolv\.conf/);
+    expect(entrypoint, 'writing into /etc/nginx fails on a read-only root filesystem')
+      .not.toMatch(/sed -i[^\n]*\/etc\/nginx/);
+    // The base image runs /docker-entrypoint.d/*.sh before nginx; without the copy the
+    // include names a file that does not exist and nginx refuses to start.
+    expect(read('railhook-ui/Dockerfile')).toMatch(
+      /COPY .*docker-entrypoint\.d\/15-resolver\.sh \/docker-entrypoint\.d\//,
+    );
   });
 
   it('bounds how long a resolved address is kept', () => {
-    // Docker publishes a 600s TTL. Inheriting it would restore the old behaviour with
-    // extra steps, so the window is set here rather than taken from the record.
-    const valid = conf.match(/^\s*resolver\s+127\.0\.0\.11[^\n;]*valid=(\d+)s/m);
-    expect(valid, 'resolver must set valid=').not.toBeNull();
+    // Docker publishes a 600s TTL. Inheriting it would restore the cached-forever
+    // behaviour with extra steps, so the window is set rather than taken from the record.
+    const entrypoint = read('railhook-ui/docker-entrypoint.d/15-resolver.sh');
+    const valid = entrypoint.match(/resolver \$\{RESOLVER\} valid=(\d+)s/);
+    expect(valid, 'the generated resolver line must set valid=').not.toBeNull();
     expect(Number(valid![1])).toBeLessThanOrEqual(30);
   });
 
