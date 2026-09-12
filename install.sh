@@ -80,7 +80,10 @@ while [ $# -gt 0 ]; do
         # `railhook upgrade` calls this on itself so that a release which changes the
         # helper reaches an existing host on the deploy that ships it, rather than the
         # one after.
-        --write-helper) ACTION="write-helper"; shift ;;
+        # --write-helper is the name the helper released in 2.16.3 asks for, and it
+        # keeps working: dropping it would leave every host running that helper
+        # falling through to "could not fetch" for ever.
+        --refresh|--write-helper) ACTION="refresh"; shift ;;
         --uninstall) ACTION="uninstall"; shift ;;
         --purge)     ACTION="purge"; shift ;;
         -h|--help)   usage; exit 0 ;;
@@ -390,43 +393,7 @@ write_files() {
     fi
 
     if [ -n "$DOMAIN" ]; then
-        cat > "${INSTALL_DIR}/Caddyfile" <<'CADDY'
-# Caddy obtains and renews the certificate on its own — there is no cron entry
-# to add and no renewal hook to forget. It terminates TLS and hands everything
-# to the dashboard's nginx, which still does all the routing; adding HTTPS did
-# not move the decision about what is public.
-{
-	email {$ACME_EMAIL}
-}
-
-{$RAILHOOK_DOMAIN} {
-	encode gzip zstd
-
-	# One upstream. nginx already separates the dashboard, the API paths, the
-	# tunnel WebSocket and the two allow-listed actuator paths.
-	reverse_proxy ui:5173 {
-		header_up X-Forwarded-Proto https
-		# The UI container is the only upstream, and it is replaced whenever its
-		# image changes — a few seconds during which a dial is refused and every
-		# path, /hook and /ingress included, answered 502. Retrying turns that
-		# into a slow request instead. Safe for any method: a refused dial means
-		# nothing was written, so there is nothing to send twice.
-		lb_try_duration 20s
-		lb_try_interval 250ms
-		# The CLI tunnel holds a WebSocket open for the length of a developer's
-		# session, so it must not be cut off at the default idle timeout.
-		transport http {
-			read_timeout 3600s
-			write_timeout 3600s
-		}
-	}
-
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		-Server
-	}
-}
-CADDY
+        write_caddyfile
         ok "Caddyfile for ${DOMAIN}"
     fi
 
@@ -533,6 +500,51 @@ EMAIL_ENABLED=false
 ${PROD_SETTINGS}
 ENVFILE
     ok ".env with newly generated secrets"
+}
+
+# Written by both the install and the refresh paths. The refresh exists because this
+# file, like the helper, was written once at install time and never replaced — so a
+# release that changed it reached only new installations. The `lb_try_duration` that
+# stops a UI restart answering 502 shipped in 2.16.3 and was still absent from the
+# production Caddyfile after deploying it.
+write_caddyfile() {
+cat > "${INSTALL_DIR}/Caddyfile" <<'CADDY'
+# Caddy obtains and renews the certificate on its own — there is no cron entry
+# to add and no renewal hook to forget. It terminates TLS and hands everything
+# to the dashboard's nginx, which still does all the routing; adding HTTPS did
+# not move the decision about what is public.
+{
+	email {$ACME_EMAIL}
+}
+
+{$RAILHOOK_DOMAIN} {
+	encode gzip zstd
+
+	# One upstream. nginx already separates the dashboard, the API paths, the
+	# tunnel WebSocket and the two allow-listed actuator paths.
+	reverse_proxy ui:5173 {
+		header_up X-Forwarded-Proto https
+		# The UI container is the only upstream, and it is replaced whenever its
+		# image changes — a few seconds during which a dial is refused and every
+		# path, /hook and /ingress included, answered 502. Retrying turns that
+		# into a slow request instead. Safe for any method: a refused dial means
+		# nothing was written, so there is nothing to send twice.
+		lb_try_duration 20s
+		lb_try_interval 250ms
+		# The CLI tunnel holds a WebSocket open for the length of a developer's
+		# session, so it must not be cut off at the default idle timeout.
+		transport http {
+			read_timeout 3600s
+			write_timeout 3600s
+		}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}
+CADDY
 }
 
 write_helper() {
@@ -652,7 +664,7 @@ case "${1:-help}" in
         if [ -z "${RAILHOOK_HELPER_REFRESHED:-}" ] && [ -n "$want" ]; then
             echo "Updating the helper for ${want} before upgrading..."
             if curl -fsSL "${RAW}/v${want#v}/install.sh" \
-                 | bash -s -- --write-helper --dir "$(pwd)" >/dev/null 2>&1; then
+                 | bash -s -- --refresh --dir "$(pwd)" >/dev/null 2>&1; then
                 echo "Helper updated. Continuing with it."
             else
                 echo "Could not fetch the helper for ${want}; continuing with this one." >&2
@@ -836,9 +848,15 @@ main() {
         uninstall|purge)
             do_uninstall
             exit 0 ;;
-        write-helper)
+        refresh)
             [ -d "$INSTALL_DIR" ] || die "${INSTALL_DIR} does not exist — nothing to update."
             write_helper
+            # Only if one is already there. An installation with no domain never had a
+            # Caddyfile and must not acquire one from an upgrade.
+            if [ -f "${INSTALL_DIR}/Caddyfile" ]; then
+                write_caddyfile
+                ok "Caddyfile refreshed"
+            fi
             exit 0 ;;
     esac
 
