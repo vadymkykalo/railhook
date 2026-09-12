@@ -55,7 +55,7 @@ class OutboxPublisherServiceTest {
 
         service = new OutboxPublisherService(
                 outboxMessageRepository, kafkaTemplate, objectMapper,
-                new SimpleMeterRegistry(), txManager, 100, 5, 90, 300, 1, 30);
+                new SimpleMeterRegistry(), txManager, 100, 5, 90, 300, 1, 30, 10);
     }
 
     @Test
@@ -77,6 +77,27 @@ class OutboxPublisherServiceTest {
 
         // Verify fair batching: 3rd arg is maxPerKey=10, 4th arg is maxPerProject=30
         verify(outboxMessageRepository).findPendingBatchForUpdate("PENDING", 100, 10, 30);
+    }
+
+    @Test
+    void maxPerKeyIsConfigurableLikeTheOtherTwoBoundsAreThe() {
+        // It was a literal 10 in both call sites while batch-size and max-per-project next to it
+        // were both @Value. That literal is the per-endpoint announcement ceiling: one Kafka key
+        // gets at most this many rows per poll, so with the 1s default a single hot endpoint is
+        // capped at ten events a second however large the batch. Measured at exactly that under
+        // load/ingest.js, which is the first time anyone had run it.
+        //
+        // The default does not move — the fairness it buys is real. What changes is that an
+        // operator who has one busy endpoint can now see the bound and raise it.
+        OutboxPublisherService tuned = new OutboxPublisherService(
+                outboxMessageRepository, kafkaTemplate, objectMapper,
+                new SimpleMeterRegistry(), txManager, 100, 5, 90, 300, 1, 30, 40);
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(Collections.emptyList());
+
+        tuned.publishPendingMessages();
+
+        verify(outboxMessageRepository).findPendingBatchForUpdate("PENDING", 100, 40, 30);
     }
 
     @Test

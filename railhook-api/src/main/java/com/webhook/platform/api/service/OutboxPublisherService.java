@@ -46,6 +46,21 @@ public class OutboxPublisherService {
     private final int maxPerProject;
 
     /**
+     * How many rows sharing one Kafka key - that is, bound for one endpoint - may go in a batch.
+     *
+     * <p>The per-endpoint announcement ceiling, and it binds harder than it looks: at the default
+     * poll interval of 1s this is ten events a second for a single hot endpoint, whatever
+     * {@code batch-size} says. {@code load/ingest.js} drains at exactly that rate against one
+     * endpoint.
+     *
+     * <p>The fairness is the point - one endpoint's burst must not stall every other endpoint's
+     * announcement - so the default stays where it was. It was a literal in the two call sites
+     * while the bounds either side of it were both configurable, which meant an operator with one
+     * busy endpoint had a ceiling they could neither see nor move.
+     */
+    private final int maxPerKey;
+
+    /**
      * Sampled by the publisher poll, read by the gauge.
      *
      * <p>The gauge used to run {@code findOldestPendingCreatedAt()} inside its own lambda, so
@@ -71,7 +86,8 @@ public class OutboxPublisherService {
             @Value("${outbox.publisher.dead-retention-days:90}") int deadRetentionDays,
             @Value("${outbox.publisher.sending-recovery-seconds:300}") long sendingRecoverySeconds,
             @Value("${outbox.publisher.batch-send-timeout-seconds:30}") long batchSendTimeoutSeconds,
-            @Value("${outbox.publisher.max-per-project:30}") int maxPerProject) {
+            @Value("${outbox.publisher.max-per-project:30}") int maxPerProject,
+            @Value("${outbox.publisher.max-per-key:10}") int maxPerKey) {
         this.outboxMessageRepository = outboxMessageRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
@@ -81,6 +97,7 @@ public class OutboxPublisherService {
         this.sendingRecoverySeconds = sendingRecoverySeconds;
         this.batchSendTimeoutSeconds = batchSendTimeoutSeconds;
         this.maxPerProject = maxPerProject;
+        this.maxPerKey = maxPerKey;
         this.txTemplate = new TransactionTemplate(txManager);
 
         this.publishLatency = Timer.builder("outbox_publish_latency")
@@ -139,7 +156,7 @@ public class OutboxPublisherService {
         // Phase 1: fast claim — SELECT FOR UPDATE + mark SENDING, commit immediately
         List<OutboxMessage> claimed = txTemplate.execute(status -> {
             List<OutboxMessage> batch = outboxMessageRepository
-                    .findPendingBatchForUpdate(OutboxStatus.PENDING.name(), batchSize, 10, maxPerProject);
+                    .findPendingBatchForUpdate(OutboxStatus.PENDING.name(), batchSize, maxPerKey, maxPerProject);
             for (OutboxMessage msg : batch) {
                 msg.setStatus(OutboxStatus.SENDING);
             }
@@ -170,7 +187,7 @@ public class OutboxPublisherService {
         // Phase 1: claim inside short transaction — SELECT FOR UPDATE + mark SENDING, commit immediately
         List<OutboxMessage> messagesToRetry = txTemplate.execute(status -> {
             List<OutboxMessage> failedMessages = outboxMessageRepository
-                    .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), maxRetries, batchSize, 10, maxPerProject);
+                    .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), maxRetries, batchSize, maxPerKey, maxPerProject);
 
             if (failedMessages.isEmpty()) {
                 return List.<OutboxMessage>of();
