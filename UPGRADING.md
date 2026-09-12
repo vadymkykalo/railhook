@@ -2,6 +2,49 @@
 
 ## Unreleased
 
+## v2.16.0
+
+One breaking change, and it is a name.
+
+### `docker logs webhook-api` stops working
+
+The API no longer has a fixed container name, because `container_name` pins a service to a
+single container and Compose then refuses to scale it — which is what made every upgrade a
+twenty-second outage: the only way to put a new API in place was to stop the one that was
+serving.
+
+```bash
+docker logs webhook-api        # gone
+docker compose logs api        # works, for one replica or several
+```
+
+Every other service keeps its name. If you have scripts or alerts that name the API container,
+this is the line to change.
+
+### Turning the gap off entirely
+
+Upgrades are seamless with two API containers and not with one, because with one there is
+nothing to carry the traffic while the replacement warms up:
+
+```bash
+API_REPLICAS=2
+```
+
+Costs roughly another 600MB. Measured on a 4 vCPU / 8GB host: 32 seconds of 502 per upgrade at
+one replica, none at all at two. One remains the default because the smallest supported host has
+room for exactly one JVM here.
+
+### An upgrade now updates docker-compose.yml
+
+Previously it moved the image tags and nothing else, so anything a release changed about the
+topology never reached an installation that already existed. It now fetches the file for the
+release being installed and keeps your previous one as `docker-compose.yml.previous`.
+
+**If you have edited your `docker-compose.yml`, diff the two after upgrading.** It replaces
+rather than merges, deliberately: a merge that got it wrong would be discovered at the worst
+possible moment.
+
+
 ## v2.15.0
 
 Bug fixes and one additive migration. Nothing requires action unless you use the CAPTCHA.
