@@ -208,7 +208,15 @@ services:
 
   api:
     image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/railhook}-api:${API_IMAGE_TAG:-latest}
-    container_name: webhook-api
+    # No container_name, and no scale: 1 either. A fixed name pins the service to one
+    # container and Compose refuses to scale it at all, which is what made a deploy a
+    # twenty-second outage: the only way to replace the API was to stop the one that
+    # was serving. With the name gone it can be rolled — `railhook upgrade` brings the
+    # replacement up, waits for it, and drains the old one, so nothing is ever asked
+    # for work by nginx while it is still starting.
+    #
+    # The cost is that `docker logs webhook-api` no longer resolves. Use
+    # `docker compose logs api`, which works for one replica or several.
     # Deliberately no host ports. Everything reaches the API through the ui
     # service's nginx, which proxies /api/, /ws/tunnel, /tunnel/, /hook/,
     # /ingress/ and the two safe actuator paths. One published port is one URL
@@ -411,6 +419,12 @@ services:
         max-size: "50m"
         max-file: "5"
     deploy:
+      # More than one makes `railhook upgrade` a rolling replacement rather than a
+      # restart: the new container warms up out of rotation while the old one keeps
+      # serving, so there is no gap. One is the default because the smallest supported
+      # host has room for exactly one JVM here and a second is another ~600MB — set it
+      # to 2 if you would rather not have a twenty-second outage on every upgrade.
+      replicas: ${API_REPLICAS:-1}
       resources:
         limits:
           memory: "${API_MEMORY_LIMIT:-768m}"
