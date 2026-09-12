@@ -29,6 +29,8 @@ class WebhookVerifierTest {
 
     private static final String SECRET = "whsec_test_secret_key";
     private static final String BODY = "{\"event\":\"push\",\"ref\":\"refs/heads/main\"}";
+    /** The same body as bytes: verifiers sign what arrived, not a re-encoding of it. */
+    private static final byte[] BODY_BYTES = BODY.getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
     // ======================== GenericHmacVerifier ========================
 
@@ -38,7 +40,7 @@ class WebhookVerifierTest {
         String hmac = hmacSha256Hex(SECRET, BODY);
         when(request.getHeader("X-Signature")).thenReturn(hmac);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isTrue();
         assertThat(result.error()).isNull();
@@ -51,7 +53,7 @@ class WebhookVerifierTest {
         String hmac = hmacSha256Hex(SECRET, BODY);
         when(request.getHeader("X-Sig")).thenReturn("sha256=" + hmac);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isTrue();
     }
@@ -61,7 +63,7 @@ class WebhookVerifierTest {
         GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "");
         when(request.getHeader("X-Signature")).thenReturn(null);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("Missing signature header");
@@ -72,7 +74,7 @@ class WebhookVerifierTest {
         GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "");
         when(request.getHeader("X-Signature")).thenReturn("wrong_signature");
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("Signature mismatch");
@@ -86,7 +88,7 @@ class WebhookVerifierTest {
         String hmac = hmacSha256Hex(SECRET, BODY);
         when(request.getHeader("X-Hub-Signature-256")).thenReturn("sha256=" + hmac);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isTrue();
         assertThat(result.replayKey()).isEqualTo("sha256=" + hmac);
@@ -97,7 +99,7 @@ class WebhookVerifierTest {
         GitHubVerifier verifier = new GitHubVerifier();
         when(request.getHeader("X-Hub-Signature-256")).thenReturn(null);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("Missing header");
@@ -108,7 +110,7 @@ class WebhookVerifierTest {
         GitHubVerifier verifier = new GitHubVerifier();
         when(request.getHeader("X-Hub-Signature-256")).thenReturn("md5=abcdef");
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("missing sha256= prefix");
@@ -119,7 +121,7 @@ class WebhookVerifierTest {
         GitHubVerifier verifier = new GitHubVerifier();
         when(request.getHeader("X-Hub-Signature-256")).thenReturn("sha256=0000000000");
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("mismatch");
@@ -136,7 +138,7 @@ class WebhookVerifierTest {
         String header = "t=" + timestamp + ",v1=" + hmac;
         when(request.getHeader("Stripe-Signature")).thenReturn(header);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isTrue();
         assertThat(result.replayKey()).isEqualTo(header);
@@ -150,7 +152,7 @@ class WebhookVerifierTest {
         String hmac = hmacSha256Hex(SECRET, signedPayload);
         when(request.getHeader("Stripe-Signature")).thenReturn("t=" + oldTimestamp + ",v1=" + hmac);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("tolerance");
@@ -161,7 +163,7 @@ class WebhookVerifierTest {
         StripeVerifier verifier = new StripeVerifier();
         when(request.getHeader("Stripe-Signature")).thenReturn(null);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("Missing header");
@@ -172,7 +174,7 @@ class WebhookVerifierTest {
         StripeVerifier verifier = new StripeVerifier();
         when(request.getHeader("Stripe-Signature")).thenReturn("garbage");
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("missing t or v1");
@@ -184,7 +186,7 @@ class WebhookVerifierTest {
         long ts = Instant.now().getEpochSecond();
         when(request.getHeader("Stripe-Signature")).thenReturn("t=" + ts + ",v1=wrong");
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("mismatch");
@@ -203,7 +205,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-Slack-Signature")).thenReturn(sig);
         when(request.getHeader("X-Slack-Request-Timestamp")).thenReturn(ts);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isTrue();
         assertThat(result.replayKey()).isEqualTo(sig + "|" + ts);
@@ -218,7 +220,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-Slack-Signature")).thenReturn("v0=" + hmac);
         when(request.getHeader("X-Slack-Request-Timestamp")).thenReturn(String.valueOf(oldTs));
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("tolerance");
@@ -230,7 +232,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-Slack-Signature")).thenReturn(null);
         when(request.getHeader("X-Slack-Request-Timestamp")).thenReturn("12345");
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("Missing header: X-Slack-Signature");
@@ -242,7 +244,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-Slack-Signature")).thenReturn("v0=abc");
         when(request.getHeader("X-Slack-Request-Timestamp")).thenReturn(null);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("Missing header: X-Slack-Request-Timestamp");
@@ -256,7 +258,7 @@ class WebhookVerifierTest {
         String hmacBase64 = hmacSha256Base64(SECRET, BODY);
         when(request.getHeader("X-Shopify-Hmac-SHA256")).thenReturn(hmacBase64);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isTrue();
         assertThat(result.replayKey()).isEqualTo(hmacBase64);
@@ -267,7 +269,7 @@ class WebhookVerifierTest {
         ShopifyVerifier verifier = new ShopifyVerifier();
         when(request.getHeader("X-Shopify-Hmac-SHA256")).thenReturn(null);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("Missing header");
@@ -278,7 +280,7 @@ class WebhookVerifierTest {
         ShopifyVerifier verifier = new ShopifyVerifier();
         when(request.getHeader("X-Shopify-Hmac-SHA256")).thenReturn("wrongBase64==");
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("mismatch");
@@ -363,7 +365,7 @@ class WebhookVerifierTest {
         when(request.getQueryString()).thenReturn(null);
         when(request.getContentType()).thenReturn("application/x-www-form-urlencoded");
 
-        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, body, request);
+        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, body.getBytes(java.nio.charset.StandardCharsets.UTF_8), request);
 
         assertThat(result.error()).isNull();
         assertThat(result.verified()).isTrue();
@@ -381,7 +383,7 @@ class WebhookVerifierTest {
         when(request.getContentType()).thenReturn("application/x-www-form-urlencoded");
 
         var result = new TwilioVerifier(TWILIO_URL)
-                .verify(SECRET, "To=%2B15550000000&Body=hi+there", request);
+                .verify(SECRET, "To=%2B15550000000&Body=hi+there".getBytes(java.nio.charset.StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
     }
@@ -390,7 +392,7 @@ class WebhookVerifierTest {
     void twilio_missingHeader() {
         when(request.getHeader("X-Twilio-Signature")).thenReturn(null);
 
-        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, "To=x", request);
+        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, "To=x".getBytes(java.nio.charset.StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("X-Twilio-Signature");
@@ -407,7 +409,7 @@ class WebhookVerifierTest {
         when(request.getQueryString()).thenReturn(query);
         when(request.getContentType()).thenReturn("application/json");
 
-        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, body, request);
+        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, body.getBytes(java.nio.charset.StandardCharsets.UTF_8), request);
 
         assertThat(result.error()).isNull();
         assertThat(result.verified()).isTrue();
@@ -423,7 +425,7 @@ class WebhookVerifierTest {
         when(request.getQueryString()).thenReturn(query);
         when(request.getContentType()).thenReturn("application/json");
 
-        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, "{\"kind\":\"other\"}", request);
+        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, "{\"kind\":\"other\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("bodySHA256");
@@ -504,7 +506,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-Gitlab-Token")).thenReturn(SECRET);
         when(request.getHeader("X-Gitlab-Event-UUID")).thenReturn("d9c1f0a2-1111-2222-3333-444455556666");
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isTrue();
         assertThat(result.error()).isNull();
@@ -516,7 +518,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-Gitlab-Token")).thenReturn(SECRET);
         when(request.getHeader("X-Gitlab-Event-UUID")).thenReturn("event-uuid-1");
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         /* The token is identical on every GitLab request by design. Returning it as the
            replay key would make the second webhook GitLab ever sent look like a replay of
@@ -531,7 +533,7 @@ class WebhookVerifierTest {
         when(request.getHeader("X-Gitlab-Token")).thenReturn(SECRET);
         when(request.getHeader("X-Gitlab-Event-UUID")).thenReturn(null);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         // Nothing on the request distinguishes two identical deliveries, so a null key —
         // which IngressService reads as "do not run replay detection" — is the honest answer.
@@ -544,7 +546,7 @@ class WebhookVerifierTest {
         GitLabVerifier verifier = new GitLabVerifier();
         when(request.getHeader("X-Gitlab-Token")).thenReturn("someone-elses-token");
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("mismatch");
@@ -555,7 +557,7 @@ class WebhookVerifierTest {
         GitLabVerifier verifier = new GitLabVerifier();
         when(request.getHeader("X-Gitlab-Token")).thenReturn(null);
 
-        var result = verifier.verify(SECRET, BODY, request);
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("X-Gitlab-Token");
@@ -566,7 +568,7 @@ class WebhookVerifierTest {
         GitLabVerifier verifier = new GitLabVerifier();
         when(request.getHeader("X-Gitlab-Token")).thenReturn("anything");
 
-        var result = verifier.verify(null, BODY, request);
+        var result = verifier.verify(null, BODY_BYTES, request);
 
         // Must not pass by comparing an empty secret to an empty token.
         assertThat(result.verified()).isFalse();

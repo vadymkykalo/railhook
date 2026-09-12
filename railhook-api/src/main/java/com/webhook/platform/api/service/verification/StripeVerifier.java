@@ -18,7 +18,7 @@ public class StripeVerifier implements WebhookVerificationStrategy {
     private static final long TOLERANCE_SECONDS = 300;
 
     @Override
-    public VerificationResult verify(String secret, String body, HttpServletRequest request) {
+    public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {
         String header = request.getHeader(HEADER);
         if (header == null || header.isBlank()) {
             return VerificationResult.failure("Missing header: " + HEADER);
@@ -53,9 +53,8 @@ public class StripeVerifier implements WebhookVerificationStrategy {
             return VerificationResult.failure("Invalid Stripe timestamp: " + timestamp);
         }
 
-        // Stripe signs: "<timestamp>.<body>"
-        String signedPayload = timestamp + "." + (body != null ? body : "");
-        String computed = GenericHmacVerifier.computeHmacSha256(secret, signedPayload);
+        // Stripe signs: "<timestamp>.<body>" — joined as bytes, so the body is not re-encoded.
+        String computed = GenericHmacVerifier.computeHmacSha256(secret, timestamp + ".", body);
 
         boolean valid = MessageDigest.isEqual(
                 computed.getBytes(StandardCharsets.UTF_8),

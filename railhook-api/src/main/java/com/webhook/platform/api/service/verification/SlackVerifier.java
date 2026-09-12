@@ -22,7 +22,7 @@ public class SlackVerifier implements WebhookVerificationStrategy {
     private static final long TOLERANCE_SECONDS = 300;
 
     @Override
-    public VerificationResult verify(String secret, String body, HttpServletRequest request) {
+    public VerificationResult verify(String secret, byte[] body, HttpServletRequest request) {
         String signatureHeader = request.getHeader(SIGNATURE_HEADER);
         String timestampHeader = request.getHeader(TIMESTAMP_HEADER);
 
@@ -51,9 +51,9 @@ public class SlackVerifier implements WebhookVerificationStrategy {
         }
         String signature = signatureHeader.substring(prefix.length());
 
-        // Slack signs: "v0:<timestamp>:<body>"
-        String signedPayload = VERSION + ":" + timestampHeader + ":" + (body != null ? body : "");
-        String computed = GenericHmacVerifier.computeHmacSha256(secret, signedPayload);
+        // Slack signs: "v0:<timestamp>:<body>" — joined as bytes, so the body is not re-encoded.
+        String computed = GenericHmacVerifier.computeHmacSha256(
+                secret, VERSION + ":" + timestampHeader + ":", body);
 
         boolean valid = MessageDigest.isEqual(
                 computed.getBytes(StandardCharsets.UTF_8),

@@ -53,7 +53,11 @@ public class IngressController {
     @PostMapping("/{token}")
     public ResponseEntity<IngressResponse> receiveWebhook(
             @PathVariable("token") String token,
-            @RequestBody(required = false) String body,
+            // byte[], not String. Spring decodes a String parameter with whatever charset the
+            // Content-Type declares, and every verifier then encoded it back as UTF-8 — so a
+            // sender that used anything else had its genuine signature rejected, with nothing in
+            // the request to say why. The bytes are what was signed.
+            @RequestBody(required = false) byte[] body,
             HttpServletRequest request) {
         IncomingEvent event = ingressService.receiveWebhook(token, body, request);
         return ResponseEntity.status(HttpStatus.ACCEPTED)
