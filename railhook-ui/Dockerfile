@@ -67,6 +67,13 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # Copy nginx config
 COPY railhook-ui/nginx.conf /etc/nginx/conf.d/default.conf
 
+# Runs before nginx starts — the base image's entrypoint executes
+# /docker-entrypoint.d/*.sh in order. Fills in the resolver address from
+# /etc/resolv.conf, which is the only thing that is right under both Compose and
+# Kubernetes.
+COPY railhook-ui/docker-entrypoint.d/15-resolver.sh /docker-entrypoint.d/15-resolver.sh
+RUN chmod +x /docker-entrypoint.d/15-resolver.sh
+
 EXPOSE 5173
 
 CMD ["nginx", "-g", "daemon off;"]

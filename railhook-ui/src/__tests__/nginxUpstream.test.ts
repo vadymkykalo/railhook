@@ -21,14 +21,32 @@ const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 describe('nginx upstream resolution', () => {
   const conf = read('railhook-ui/nginx.conf');
 
-  it('resolves through Docker DNS rather than caching for ever', () => {
-    expect(conf).toMatch(/^\s*resolver\s+127\.0\.0\.11\b/m);
+  it('resolves rather than caching for ever, and does not hardcode whose DNS', () => {
+    // Hardcoding Docker's 127.0.0.11 made every lookup fail under Helm — Kubernetes has
+    // no such address, so nginx answered 502 for everything and the chart's smoke test
+    // caught it. The address is filled in at container start from /etc/resolv.conf,
+    // which is the one place that is right in both.
+    expect(conf).toMatch(/^\s*resolver\s+__NGINX_RESOLVER__\b/m);
+    expect(conf, 'the resolver address must not be hardcoded').not.toMatch(
+      /^\s*resolver\s+\d+\.\d+\.\d+\.\d+/m,
+    );
+  });
+
+  it('the placeholder is actually substituted before nginx starts', () => {
+    const entrypoint = read('railhook-ui/docker-entrypoint.d/15-resolver.sh');
+    expect(entrypoint).toMatch(/__NGINX_RESOLVER__/);
+    expect(entrypoint).toMatch(/\/etc\/resolv\.conf/);
+    // The base image runs /docker-entrypoint.d/*.sh before nginx; if it is not copied
+    // in, the placeholder reaches nginx verbatim and it refuses to start at all.
+    expect(read('railhook-ui/Dockerfile')).toMatch(
+      /COPY .*docker-entrypoint\.d\/15-resolver\.sh \/docker-entrypoint\.d\//,
+    );
   });
 
   it('bounds how long a resolved address is kept', () => {
     // Docker publishes a 600s TTL. Inheriting it would restore the old behaviour with
     // extra steps, so the window is set here rather than taken from the record.
-    const valid = conf.match(/^\s*resolver\s+127\.0\.0\.11[^\n;]*valid=(\d+)s/m);
+    const valid = conf.match(/^\s*resolver\s+\S+[^\n;]*valid=(\d+)s/m);
     expect(valid, 'resolver must set valid=').not.toBeNull();
     expect(Number(valid![1])).toBeLessThanOrEqual(30);
   });
