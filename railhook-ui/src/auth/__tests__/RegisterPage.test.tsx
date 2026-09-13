@@ -145,6 +145,28 @@ describe('RegisterPage', () => {
     expect(http.getToken()).toBeNull();
   });
 
+  it('says which password rule is still missing instead of a silently disabled button', async () => {
+    // Seen on production: a password with everything but a special character left the button
+    // disabled, the missing rule drawn as a faint grey cross, and the person with no idea why.
+    const user = userEvent.setup();
+    renderRegister();
+    await user.type(screen.getByLabelText(/^password/i), 'Abcdefgh12');
+
+    expect(screen.getByRole('button', { name: /create|register|sign up/i })).toBeDisabled();
+    const missing = screen.getByRole('status');
+    expect(missing).toHaveTextContent(/special character/i);
+    expect(missing).not.toHaveTextContent(/uppercase|lowercase|number|8 characters/i);
+    expect(missing.className).toMatch(/text-halt/);
+  });
+
+  it('drops the hint once the password meets every rule', async () => {
+    const user = userEvent.setup();
+    renderRegister();
+    await user.type(screen.getByLabelText(/^password/i), 'Abcdefgh12!');
+
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
   it('lets the person try again after a failure', async () => {
     vi.spyOn(authApi, 'register').mockRejectedValue(new Error('Network Error'));
 

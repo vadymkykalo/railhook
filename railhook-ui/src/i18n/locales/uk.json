@@ -2408,11 +2408,12 @@
   "passwordStrength": {
     "fair": "Середній",
     "good": "Добрий",
+    "missing": "Ще потрібно: {{rules}}",
     "rules": {
       "digit": "Цифра",
       "lowercase": "Мала літера",
       "minLength": "Мінімум 8 символів",
-      "special": "Спецсимвол",
+      "special": "Спецсимвол (! ? # …)",
       "uppercase": "Велика літера"
     },
     "strong": "Надійний",
