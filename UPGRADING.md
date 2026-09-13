@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+## v2.17.1
+
+### The published UI image serves your domain and your CAPTCHA — no UI build of your own
+
+The site URL and the CAPTCHA site key were Vite build arguments, so a deployment that wanted
+either had to build its own UI image and pin it, usually in a `docker-compose.override.yml`.
+`railhook upgrade` never rebuilt that image: the API and worker moved to the new release and the
+site stayed on the old one. The UI container now reads both when it starts, and the build
+arguments are gone — an image built with them ignores them.
+
+```bash
+sed -i 's/^VITE_CAPTCHA_SITE_KEY=/CAPTCHA_SITE_KEY=/; s/^VITE_CAPTCHA_SCRIPT_URL=/CAPTCHA_SCRIPT_URL=/' .env
+sed -i '/^VITE_SITE_URL=/d' .env   # the public origin now comes from APP_BASE_URL
+```
+
+If a `docker-compose.override.yml` points `ui` at an image you built (`image: …:local`,
+`pull_policy: never`), delete that `ui:` block, then:
+
+```bash
+./railhook upgrade v2.17.1
+```
+
+On Helm, set `ui.captcha.siteKey` (and `ui.captcha.scriptUrl` for hCaptcha); the site URL
+follows `app.baseUrl`.
+
 ## v2.17.0
 
 ### `HOOKFLOW_BIND`, `HOOKFLOW_PORT` and `HOOKFLOW_DOMAIN` are no longer read

@@ -38,9 +38,10 @@ const sidebar = [
 ];
 
 export default defineConfig({
-  // The public origin, from the image's VITE_SITE_URL. Unset — every self-hosted image — there is
-  // no sitemap, rather than one that sends crawlers to railhook.io.
-  site: process.env.VITE_SITE_URL || undefined,
+  // A placeholder origin, not an address: the image is built once for every deployment. nginx
+  // rewrites it to the UI container's RAILHOOK_SITE_URL (or to nothing, a relative URL) when it
+  // serves the pages and the sitemap.
+  site: 'https://site-url.railhook.invalid',
   base: '/docs',
   trailingSlash: 'always',
   integrations: [

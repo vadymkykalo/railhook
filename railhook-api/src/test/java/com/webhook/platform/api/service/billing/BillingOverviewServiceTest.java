@@ -7,6 +7,7 @@ import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.dto.PlanResponse;
 import com.webhook.platform.api.dto.UsageResponse;
 import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
@@ -21,6 +22,7 @@ import org.mockito.quality.Strictness;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -84,6 +86,45 @@ class BillingOverviewServiceTest {
         assertThat(usage.getEvents().getCurrent()).isEqualTo(40);
         assertThat(usage.getEvents().getLimit()).isEqualTo(100);
         assertThat(usage.getEvents().getPercentUsed()).isEqualTo(40.0);
+    }
+
+    /**
+     * A hosted deployment with no payment provider runs the free plan and nothing else. Listing
+     * Starter at $29 there would be a price nobody can pay and a button that cannot work.
+     */
+    @Test
+    void withoutAPaymentProviderTheCatalogOffersOnlyWhatCostsNothing() {
+        when(billingService.getDefaultProviderCode()).thenReturn("noop");
+        when(billingService.listActivePlans()).thenReturn(catalogRows());
+
+        assertThat(serviceAt("2026-01-15T12:00:00Z").catalog())
+                .extracting(PlanResponse::getName)
+                .containsExactly("free");
+    }
+
+    @Test
+    void withAPaymentProviderPaidAndCustomPlansAreOffered() {
+        when(billingService.getDefaultProviderCode()).thenReturn("stripe");
+        when(billingService.listActivePlans()).thenReturn(catalogRows());
+
+        assertThat(serviceAt("2026-01-15T12:00:00Z").catalog())
+                .extracting(PlanResponse::getName)
+                .containsExactlyInAnyOrder("free", "starter", "enterprise");
+    }
+
+    private List<Plan> catalogRows() {
+        return List.of(
+                priced("enterprise", -1),
+                priced("free", 0),
+                priced("self_hosted", 0),
+                priced("starter", 2900));
+    }
+
+    private Plan priced(String name, int monthlyCents) {
+        return Plan.builder().id(UUID.randomUUID()).name(name).displayName(name)
+                .maxEventsPerMonth(100).maxEndpointsPerProject(10).maxProjects(5).maxMembers(3)
+                .rateLimitPerSecond(50).maxRetentionDays(30)
+                .priceMonthlyCents(monthlyCents).priceYearlyCents(monthlyCents).build();
     }
 
     private BillingOverviewService serviceAt(String instant) {

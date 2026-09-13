@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.1] - 2026-09-13
+
+### Fixed
+
+- **The published UI image serves any domain.** The site URL (`APP_BASE_URL`) and the CAPTCHA
+  site key (`CAPTCHA_SITE_KEY`, `CAPTCHA_SCRIPT_URL`) are read by the UI container at startup
+  instead of being baked in at build time, so no deployment needs a UI image of its own — and
+  `railhook upgrade` can no longer leave the site on the previous release behind a pinned one.
+  `VITE_SITE_URL`, `VITE_CAPTCHA_SITE_KEY` and `VITE_CAPTCHA_SCRIPT_URL` are gone; see
+  UPGRADING.md.
+- **`railhook upgrade` replaces the UI in a step of its own.** Recreated in one call with the
+  data services, Caddy and the worker, the UI was down for about 45 seconds and the site answered
+  502. Caddy's retry window is also 30 seconds now.
+- **The production deploy checks the version the site serves**, not only that it answers 200.
+- **A hosted deployment can enforce the free plan without a payment provider.** `BILLING_ENABLED=true`
+  with `BILLING_DEFAULT_PROVIDER=noop` used to be refused at startup, so a cloud with no paid plans
+  had to run with billing off — and billing off means no quotas at all. It is now the free-plan-only
+  mode: quotas are enforced, the plan catalog lists nothing priced, checkout is refused, and the
+  billing page shows no plan picker with nothing in it.
+
 ## [2.17.0] - 2026-09-13
 
 A new site, docs you can navigate, and one install command on the project's own domain.
@@ -1740,7 +1760,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.17.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.17.1...HEAD
+[2.17.1]: https://github.com/vadymkykalo/railhook/compare/v2.17.0...v2.17.1
 [2.17.0]: https://github.com/vadymkykalo/railhook/compare/v2.16.6...v2.17.0
 [2.10.0]: https://github.com/vadymkykalo/railhook/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/vadymkykalo/railhook/compare/v2.9.0...v2.9.1

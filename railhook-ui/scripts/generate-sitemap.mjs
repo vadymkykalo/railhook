@@ -25,22 +25,15 @@ const here = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(here, '../public/sitemap.xml');
 
 /**
- * A sitemap has to carry absolute URLs — the spec allows nothing else — so
- * this file cannot be origin-neutral the way the rest of the build now is.
+ * A sitemap has to carry absolute URLs — the spec allows nothing else — but the
+ * image is built once for every deployment and cannot know its origin.
  *
- * The committed copy therefore names example.com, which IANA reserves for
- * exactly this and which can never become somebody's product. It used to name
- * a real domain this project does not own, and shipped in every self-hosted
- * image: a sitemap is a list of pages you are asking a crawler to index, and
- * that one asked it to go index a stranger.
- *
- * The deployment that has a domain sets SITE_URL and regenerates:
- *
- *   SITE_URL=https://example.org npm run seo:sitemap
- *
- * Keep `public/robots.txt`'s `Sitemap:` line pointing at the same origin.
+ * So the committed copy names the placeholder origin, and nginx replaces it with
+ * the container's RAILHOOK_SITE_URL when serving the file — the same substitution
+ * the HTML and robots.txt get. `.invalid` is reserved: if the placeholder ever
+ * escaped, it would send a crawler nowhere rather than to a stranger's site.
  */
-const SITE = (process.env.SITE_URL || 'https://example.com').replace(/\/+$/, '');
+const SITE = 'https://site-url.railhook.invalid';
 
 function urlEntry({ path, priority, changefreq }) {
   return [
