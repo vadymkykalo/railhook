@@ -2,21 +2,25 @@ import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '../../components/ui/button';
 import { useAuth } from '../../auth/auth.store';
+import HeroBackdrop from './HeroBackdrop';
 import InstallCommand from './InstallCommand';
 import RailMap from './RailMap';
 import { WRAP } from './primitives';
 
 /**
  * The outcome as the headline, both ways to get it as the two buttons, and the install command
- * right there for the reader who has already decided. The map underneath shows the headline
- * happening: one delivery fails, waits, and still arrives.
+ * right there for the reader who has already decided. Behind them, quietly, deliveries travel the
+ * rails; the map underneath shows the headline happening: one delivery fails, waits, and still
+ * arrives.
  */
 export default function HeroSection() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
 
   return (
-    <section aria-labelledby="hero-title" className="pt-14 sm:pt-[76px]">
+    <section aria-labelledby="hero-title">
+      <div className="relative isolate overflow-hidden pb-11 pt-14 sm:pt-[76px]">
+      <HeroBackdrop />
       <div className={`${WRAP} text-center`}>
         <h1
           id="hero-title"
@@ -44,10 +48,11 @@ export default function HeroSection() {
 
         <InstallCommand label id="install" className="mt-10" />
       </div>
+      </div>
 
       {/* Not on a phone: at that width the map is either a sideways scroll or unreadably small,
           and the directions cards directly below say the same thing in words. */}
-      <div className="mt-11 hidden border-t border-rail bg-gradient-to-b from-background to-muted pb-8 pt-6 sm:block">
+      <div className="hidden border-t border-rail bg-gradient-to-b from-background to-muted pb-8 pt-6 sm:block">
         <div className={WRAP}>
           <RailMap />
         </div>

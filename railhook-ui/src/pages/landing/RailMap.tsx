@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Globe, Server, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { RAILHOOK_MARK } from '../../components/icons/RailhookIcon';
 
@@ -45,14 +46,29 @@ const FLIGHTS: { path: keyof typeof PATHS; dur: string; begin: string }[] = [
   { path: 'out2', dur: '2.3s', begin: '-0.2s' },
 ];
 
-function Chip({ x, y, name, sub }: { x: number; y: number; name: string; sub: string }) {
+/**
+ * A place events come from or go to. Third parties carry their own full-colour logo from
+ * `/logos/brand` — the same files the architecture diagram and the directions scenes use — and
+ * our own or generic places a neutral icon in the same slot, so every chip lines up.
+ */
+function Chip({ x, y, name, sub, logo, icon: Icon, mono = false }: {
+  x: number;
+  y: number;
+  name: string;
+  sub: string;
+  logo?: string;
+  icon?: LucideIcon;
+  mono?: boolean;
+}) {
   return (
     <g>
       <rect x={x} y={y} width="150" height="48" rx="10" fill={C.chip} stroke={C.rail} strokeWidth="1" />
-      <text x={x + 16} y={y + 20} fill={C.ink} fontSize="14" fontWeight="600" className="font-sans">
+      {logo && <image href={`/logos/brand/${logo}.svg`} x={x + 12} y={y + 13} width="22" height="22" className={mono ? 'dark:invert' : undefined} />}
+      {Icon && <Icon x={x + 12} y={y + 13} width={22} height={22} color={C.slate} strokeWidth={1.75} />}
+      <text x={x + 44} y={y + 20} fill={C.ink} fontSize="14" fontWeight="600" className="font-sans">
         {name}
       </text>
-      <text x={x + 16} y={y + 38} fill={C.slate} fontSize="11" className="font-mono">
+      <text x={x + 44} y={y + 38} fill={C.slate} fontSize="11" className="font-mono">
         {sub}
       </text>
     </g>
@@ -106,9 +122,9 @@ export default function RailMap() {
             {t('landing.map.retryLabel')}
           </text>
 
-          <Chip x={40} y={46} name="Stripe" sub="invoice.paid" />
-          <Chip x={40} y={146} name="GitHub" sub="push" />
-          <Chip x={40} y={246} name="Shopify" sub="orders/create" />
+          <Chip x={40} y={46} name="Stripe" sub="invoice.paid" logo="stripe" />
+          <Chip x={40} y={146} name="GitHub" sub="push" logo="github" mono />
+          <Chip x={40} y={246} name="Shopify" sub="orders/create" logo="shopify" />
 
           <rect x="490" y="120" width="100" height="100" rx="24" fill={C.accent} />
           <g transform="translate(510 140) scale(3)" fill="none" stroke={C.onAccent} strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
@@ -120,9 +136,9 @@ export default function RailMap() {
             Railhook
           </text>
 
-          <Chip x={890} y={46} name={t('landing.map.yourService')} sub="api.acme.com" />
-          <Chip x={890} y={146} name="Slack" sub="hooks.slack.com" />
-          <Chip x={890} y={246} name={t('landing.map.customer')} sub="hooks.northwind.io" />
+          <Chip x={890} y={46} name={t('landing.map.yourService')} sub="api.acme.com" icon={Server} />
+          <Chip x={890} y={146} name="Slack" sub="hooks.slack.com" logo="slack" />
+          <Chip x={890} y={246} name={t('landing.map.customer')} sub="northwind.io" icon={Globe} />
 
           {FLIGHTS.map((f) => (
             <circle key={f.path} r="5" fill={C.accent}>

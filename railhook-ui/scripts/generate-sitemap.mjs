@@ -2,7 +2,7 @@
 /**
  * Derives public/sitemap.xml from the routes the app actually serves.
  *
- * The public surface is the landing page, pricing and contact, listed once in
+ * The public surface is the landing page and contact, listed once in
  * `scripts/public-routes.mjs`. The docs are a separate site with a sitemap of their own
  * (/docs/sitemap-index.xml), so they are not repeated here.
  *

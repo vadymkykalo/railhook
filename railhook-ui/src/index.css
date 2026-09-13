@@ -339,6 +339,17 @@
   .dev-band-arc, .dev-glow::before, .dev-caret { animation: none; }
 }
 
+/* The hero's delivery backdrop (HeroBackdrop.tsx). The mask clears an ellipse over the headline,
+   the buttons and the install command, so the rails only show at the edges and fade out before
+   the map below. On a phone the text spans the width, so the whole layer is quieter still. */
+.hero-backdrop {
+  -webkit-mask-image: radial-gradient(ellipse 50% 58% at 50% 46%, transparent 0 42%, rgba(0, 0, 0, 0.45) 66%, #000 92%);
+  mask-image: radial-gradient(ellipse 50% 58% at 50% 46%, transparent 0 42%, rgba(0, 0, 0, 0.45) 66%, #000 92%);
+}
+@media (max-width: 639px) {
+  .hero-backdrop { opacity: 0.55; }
+}
+
 /* ── The architecture diagram ────────────────────────────────────────────
    One grid, two layouts, the same area names transposed. On a phone the flow
    runs down the first column and the shared services sit beside the API and

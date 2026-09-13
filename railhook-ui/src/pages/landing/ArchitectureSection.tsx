@@ -29,6 +29,9 @@ import { cn } from '../../lib/utils';
 
 const CAPTION = 'arch-cap px-1 py-1 text-center text-[13px] leading-snug';
 
+/** The tile behind a black vendor mark in the dark theme, so the mark stays as the vendor ships it. */
+const LIGHT_TILE = 'dark:border-transparent dark:bg-[#F5F7FA]';
+
 function Tile({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <span className={cn('grid h-[42px] w-[42px] place-items-center rounded-[10px] border border-rail bg-card shadow-card', className)}>
@@ -37,7 +40,11 @@ function Tile({ children, className }: { children: ReactNode; className?: string
   );
 }
 
-/** A bundled brand logo. `mono` marks are near-black, so they turn light with the theme. */
+/**
+ * A bundled brand logo. `mono` marks are near-black and the vendor ships a light version of them
+ * (GitHub), so they turn light with the theme. A black mark with no light version (Kafka) keeps its
+ * colours and sits on a light tile instead — see `LIGHT_TILE`.
+ */
 function Logo({ name, mono = false }: { name: string; mono?: boolean }) {
   return (
     <img
@@ -112,7 +119,8 @@ function Connector({ area, cross = false, retry = false }: { area: string; cross
 
 function ArchitectureDiagram() {
   const { t } = useTranslation();
-  const glyph = 'h-5 w-5 text-muted-foreground';
+  // Our own and generic nodes carry an icon the size and weight of the logos beside them.
+  const glyph = 'h-6 w-6 text-foreground';
 
   return (
     <figure className="arch-wash m-0 rounded-2xl border border-rail p-3 sm:p-5">
@@ -149,8 +157,8 @@ function ArchitectureDiagram() {
 
         <Connector area="c2" />
         <Cell area="kfk" caption="Kafka">
-          <Tile>
-            <Logo name="apachekafka" mono />
+          <Tile className={LIGHT_TILE}>
+            <Logo name="apachekafka" />
           </Tile>
         </Cell>
 
