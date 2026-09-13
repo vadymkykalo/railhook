@@ -81,6 +81,11 @@ Environments → production**, a variable named `DOTENV_<NAME>` becomes `NAME=va
 sensitive (`DOTENV_SMTP_PASSWORD`, `DOTENV_CAPTCHA_SECRET_KEY`). A secret wins over a variable
 of the same name.
 
+Secrets are passed to the deploy step by name, not as the whole secrets context, so a new
+sensitive setting needs one more line: add `DOTENV_<NAME>: ${{ secrets.DOTENV_<NAME> }}` to the
+`env:` of **Collect the production settings** in `.github/workflows/deploy-prod.yml`. Variables
+need no such line.
+
 To change a setting, edit it there and run **Deploy to production** again — redeploying the
 version that is already live is fine and applies the change. The deploy log lists the names it
 sent, never the values.
