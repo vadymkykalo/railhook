@@ -29,6 +29,7 @@ import com.webhook.platform.api.service.verification.WebhookVerificationStrategy
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +59,7 @@ public class IngressService {
     private final ObjectMapper objectMapper;
     private final ForwardDispatch forwardDispatch;
     private final MeterRegistry meterRegistry;
+    private final Counter incomingEventsIngestedCounter;
     private final WebhookVerifierFactory verifierFactory;
     private final ReplayDetectionService replayDetectionService;
     private final RedisRateLimiterService rateLimiterService;
@@ -96,6 +98,10 @@ public class IngressService {
         this.objectMapper = objectMapper;
         this.forwardDispatch = forwardDispatch;
         this.meterRegistry = meterRegistry;
+        // The same counter the /events path increments, so one series answers "how many events did
+        // we take in". Registered now, so a deployment that has not received a webhook exports 0.
+        this.incomingEventsIngestedCounter = Counter.builder("events_ingested_total").tag("direction", "incoming")
+                .description("Events accepted, by the direction they travel").register(meterRegistry);
         this.verifierFactory = verifierFactory;
         this.replayDetectionService = replayDetectionService;
         this.rateLimiterService = rateLimiterService;
@@ -172,6 +178,7 @@ public class IngressService {
             IncomingEvent stored = transactionTemplate.execute(status ->
                     persistEventAndForwardAttempts(source, meta, providerEventId, verification));
             chargeQuotaPostCommit();
+            incomingEventsIngestedCounter.increment();
             return stored;
         } catch (DataIntegrityViolationException e) {
             IncomingEvent recovered = handleDuplicateRace(source, providerEventId, e);

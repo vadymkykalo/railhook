@@ -415,4 +415,18 @@ class EventIngestServiceTest {
 
         assertThat(response.getEventId()).isEqualTo(eventId);
     }
+
+    /**
+     * A counter first registered on its first increment has no series until then, so a
+     * dashboard asking for it on a quiet deployment answered "No data" instead of 0.
+     */
+    @Test
+    void everyIngestCounterExistsAtZeroBeforeTheFirstEvent() {
+        org.assertj.core.api.Assertions.assertThat(
+                meterRegistry.get("events_ingested_total").tag("direction", "outgoing").counter().count()).isZero();
+        for (String name : java.util.List.of("events_duplicate_total", "events_fanout_limited_total",
+                "rules_matched_total", "rules_drop_total", "deliveries_total")) {
+            org.assertj.core.api.Assertions.assertThat(meterRegistry.get(name).counter().count()).as(name).isZero();
+        }
+    }
 }

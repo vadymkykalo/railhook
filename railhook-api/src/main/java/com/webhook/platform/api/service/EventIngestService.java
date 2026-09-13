@@ -43,6 +43,12 @@ public class EventIngestService {
     private final ObjectMapper objectMapper;
     private final DeliveryDispatch deliveryDispatch;
     private final MeterRegistry meterRegistry;
+    private final Counter eventsIngestedCounter;
+    private final Counter duplicateEventsCounter;
+    private final Counter fanoutLimitedCounter;
+    private final Counter rulesMatchedCounter;
+    private final Counter rulesDroppedCounter;
+    private final Counter deliveriesCreatedCounter;
     private final SequenceGeneratorService sequenceGeneratorService;
     private final SchemaValidationGate schemaValidationGate;
     private final ProjectRepository projectRepository;
@@ -79,6 +85,18 @@ public class EventIngestService {
         this.objectMapper = objectMapper;
         this.deliveryDispatch = deliveryDispatch;
         this.meterRegistry = meterRegistry;
+        // Registered here rather than on first use: a counter that does not exist until its first
+        // increment has no series, and a quiet deployment's dashboard read "No data" instead of 0.
+        this.eventsIngestedCounter = Counter.builder("events_ingested_total").tag("direction", "outgoing")
+                .description("Events accepted, by the direction they travel").register(meterRegistry);
+        this.duplicateEventsCounter = Counter.builder("events_duplicate_total").register(meterRegistry);
+        this.fanoutLimitedCounter = Counter.builder("events_fanout_limited_total").register(meterRegistry);
+        this.rulesMatchedCounter = Counter.builder("rules_matched_total").register(meterRegistry);
+        this.rulesDroppedCounter = Counter.builder("rules_drop_total").register(meterRegistry);
+        // Not deliveries_created_total: Prometheus drops a trailing "_created" from a counter's name,
+        // so that name was exported as deliveries_total and the dashboard asking for it found nothing.
+        this.deliveriesCreatedCounter = Counter.builder("deliveries_total")
+                .description("Deliveries created for accepted events").register(meterRegistry);
         this.sequenceGeneratorService = sequenceGeneratorService;
         this.schemaValidationGate = schemaValidationGate;
         this.projectRepository = projectRepository;
@@ -114,7 +132,7 @@ public class EventIngestService {
                 var existingEvent = eventRepository.findByProjectIdAndIdempotencyKey(projectId, idempotencyKey);
                 if (existingEvent.isPresent()) {
                     log.info("Idempotency race resolved, returning existing event: {}", existingEvent.get().getId());
-                    Counter.builder("events_duplicate_total").register(meterRegistry).increment();
+                    duplicateEventsCounter.increment();
                     return buildResponse(existingEvent.get(), 0);
                 }
             }
@@ -191,7 +209,7 @@ public class EventIngestService {
             if (existingEvent.isPresent()) {
                 Event event = existingEvent.get();
                 log.info("Duplicate event detected, returning existing event: {}", event.getId());
-                Counter.builder("events_duplicate_total").register(meterRegistry).increment();
+                duplicateEventsCounter.increment();
                 return buildResponse(event, 0);
             }
         }
@@ -200,7 +218,7 @@ public class EventIngestService {
 
         Event event = createEvent(projectId, request, idempotencyKey);
         event = eventRepository.saveAndFlush(event);
-        Counter.builder("events_ingested_total").register(meterRegistry).increment();
+        eventsIngestedCounter.increment();
         // Recorded here, charged after the commit — see chargeQuotaPostCommit.
         if (project != null) {
             organizationToCharge.set(project.getOrganizationId());
@@ -216,7 +234,7 @@ public class EventIngestService {
             JsonNode eventJson = objectMapper.readTree(event.getDecompressedPayload());
             ruleMatches = ruleEngineService.evaluate(projectId, request.getType(), eventJson, event.getId());
             if (!ruleMatches.isEmpty()) {
-                Counter.builder("rules_matched_total").register(meterRegistry).increment(ruleMatches.size());
+                rulesMatchedCounter.increment(ruleMatches.size());
             }
         } catch (Exception e) {
             log.warn("Rules engine evaluation failed for event {}: {} — proceeding without rules",
@@ -238,13 +256,13 @@ public class EventIngestService {
         } catch (IllegalArgumentException e) {
             log.warn("Fanout limit exceeded for event type '{}' in project {}: {}",
                     request.getType(), projectId, e.getMessage());
-            Counter.builder("events_fanout_limited_total").register(meterRegistry).increment();
+            fanoutLimitedCounter.increment();
             throw e;
         }
 
         if (plan.dropped()) {
             log.info("Rule DROP action — skipping deliveries for event {}", event.getId());
-            Counter.builder("rules_drop_total").register(meterRegistry).increment();
+            rulesDroppedCounter.increment();
             return buildResponse(event, 0, schemaWarnings);
         }
 
@@ -268,7 +286,7 @@ public class EventIngestService {
         outboxMessageRepository.saveAll(outboxMessages);
 
         int deliveriesCreated = savedDeliveries.size();
-        Counter.builder("deliveries_created_total").register(meterRegistry).increment(deliveriesCreated);
+        deliveriesCreatedCounter.increment(deliveriesCreated);
 
         log.info("Created {} deliveries for event: {} (rules matched: {})",
                 deliveriesCreated, event.getId(), ruleMatches.size());

@@ -1,6 +1,10 @@
 spring:
   application:
     name: railhook-api
+  # The ASCII-art banner reaches the log as bare lines before logging starts: noise in every
+  # container log and in Loki, where it is the first thing shown after each restart.
+  main:
+    banner-mode: "off"
   # Activated from APP_ENV, which is the switch every deployment already sets. Nothing in
   # this codebase is annotated @Profile and there is no application-<profile>.yml, so the only
   # thing a profile selects is the logback appender: logback-spring.xml emits LogstashEncoder
@@ -105,6 +109,13 @@ management:
     metrics:
       export:
         enabled: true
+  metrics:
+    distribution:
+      # Latency buckets for every HTTP request, or histogram_quantile has nothing to read and every
+      # percentile panel says "No data". Service-level boundaries rather than percentiles-histogram:
+      # ten buckets per URI and status instead of seventy.
+      slo:
+        "[http.server.requests]": 10ms,25ms,50ms,100ms,250ms,500ms,1s,2500ms,5s,10s
   endpoint:
     health:
       # when-authorized, not always. The aggregate /actuator/health is reachable anonymously

@@ -66,7 +66,9 @@ public class DataRetentionService {
         this.eventsRetentionDays = eventsRetentionDays;
         this.batchSize = batchSize;
         
-        Gauge.builder("delivery_attempts_total", totalAttemptsCount, AtomicLong::get)
+        // Not delivery_attempts_total: Prometheus reserves the suffix for counters and exports a gauge
+        // without it, so the dashboard asking for the name written here found nothing.
+        Gauge.builder("delivery_attempts_stored", totalAttemptsCount, AtomicLong::get)
                 .description("Total number of delivery attempts in storage")
                 .register(meterRegistry);
         Gauge.builder("delivery_attempts_table_rows", deliveryAttemptsEstimatedRows, AtomicLong::get)
@@ -83,6 +85,13 @@ public class DataRetentionService {
         Gauge.builder("deliveries_table_rows", deliveriesEstimatedRows, AtomicLong::get)
                 .description("Estimated row count in deliveries table")
                 .register(meterRegistry);
+        // Registered now rather than on the first deletion, so retention that has had nothing to
+        // delete yet exports 0 instead of no series.
+        for (String type : new String[] {"success_age_based", "limit_based", "burst_success"}) {
+            Counter.builder("delivery_attempts_cleanup_total").tag("type", type).register(meterRegistry);
+        }
+        Counter.builder("incoming_events_cleanup_total").register(meterRegistry);
+        Counter.builder("events_cleanup_total").register(meterRegistry);
         
         log.info("Data retention configured: attempts={}d (success={}d), incoming={}d, tunnelLog={}d, events={}, maxPerDelivery={}, batchSize={}",
                 deliveryAttemptsRetentionDays, successfulAttemptsRetentionDays, incomingEventsRetentionDays, tunnelRequestLogRetentionDays,

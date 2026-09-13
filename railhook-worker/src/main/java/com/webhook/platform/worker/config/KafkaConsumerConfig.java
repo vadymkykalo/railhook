@@ -4,6 +4,7 @@ import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.worker.service.ShutdownRejectedException;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -16,6 +17,7 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaOperations;
+import org.springframework.kafka.core.MicrometerConsumerListener;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
@@ -35,9 +37,12 @@ import org.apache.kafka.common.TopicPartition;
 public class KafkaConsumerConfig {
 
     private final KafkaOperations<String, Object> deadLetterKafkaTemplate;
+    private final MeterRegistry meterRegistry;
 
-    public KafkaConsumerConfig(@Qualifier("deadLetterKafkaTemplate") KafkaOperations<String, Object> deadLetterKafkaTemplate) {
+    public KafkaConsumerConfig(@Qualifier("deadLetterKafkaTemplate") KafkaOperations<String, Object> deadLetterKafkaTemplate,
+                               MeterRegistry meterRegistry) {
         this.deadLetterKafkaTemplate = deadLetterKafkaTemplate;
+        this.meterRegistry = meterRegistry;
     }
 
     @Value("${spring.kafka.bootstrap-servers}")
@@ -92,7 +97,11 @@ public class KafkaConsumerConfig {
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, valueType.getName());
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10);
         props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 300000);
-        return new DefaultKafkaConsumerFactory<>(props);
+        DefaultKafkaConsumerFactory<String, T> factory = new DefaultKafkaConsumerFactory<>(props);
+        // Spring times the listener call only. Consumer lag, records and bytes consumed, fetch
+        // latency and connections reach Prometheus through this listener or not at all.
+        factory.addListener(new MicrometerConsumerListener<>(meterRegistry));
+        return factory;
     }
 
     @Bean

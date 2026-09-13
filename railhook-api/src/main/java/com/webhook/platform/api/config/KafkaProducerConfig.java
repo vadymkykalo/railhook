@@ -1,5 +1,6 @@
 package com.webhook.platform.api.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -7,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.MicrometerProducerListener;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 
@@ -15,6 +17,12 @@ import java.util.Map;
 
 @Configuration
 public class KafkaProducerConfig {
+
+    private final MeterRegistry meterRegistry;
+
+    public KafkaProducerConfig(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
@@ -45,7 +53,11 @@ public class KafkaProducerConfig {
         // shared by every scheduled method in the service, so an unreachable broker took them
         // out one per poll.
         configProps.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, maxBlockMs);
-        return new DefaultKafkaProducerFactory<>(configProps);
+        DefaultKafkaProducerFactory<String, Object> factory = new DefaultKafkaProducerFactory<>(configProps);
+        // Spring times the template call only. The client's own metrics — send rate, queue time,
+        // batch size, connections — reach Prometheus through this listener or not at all.
+        factory.addListener(new MicrometerProducerListener<>(meterRegistry));
+        return factory;
     }
 
     @Bean
