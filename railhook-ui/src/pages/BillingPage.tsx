@@ -278,7 +278,10 @@ export default function BillingPage() {
                           {price(plan.priceMonthlyCents)}{t('billing.perMonth')}
                         </span>
                       ) : (
-                        <span className="font-mono text-sm text-muted-foreground">{t('billing.free')}</span>
+                        // The price, not the word "Free": next to a plan named Free that read "Free Free".
+                        <span className="font-mono text-sm text-muted-foreground">
+                          {price(0)}{t('billing.perMonth')}
+                        </span>
                       )}
                     </div>
                     {!isSelfHosted && billing.billingStatus && (

@@ -24,6 +24,8 @@ data:
   # Incoming-source and tunnel URLs handed to providers and the CLI. Without it the API
   # falls back to http://localhost:8080 for tunnels, which nobody outside the pod can reach.
   WEBHOOK_INGRESS_BASE_URL: {{ .Values.app.ingressBaseUrl | default (include "railhook.appBaseUrl" .) | trimSuffix "/" | quote }}
+  # Test endpoint capture URLs people copy; without it the API fell back to localhost:8080.
+  TEST_ENDPOINT_BASE_URL: {{ include "railhook.appBaseUrl" . | trimSuffix "/" | quote }}
 
   # SMTP. Read only when EMAIL_ENABLED is true; the password is a Secret, so it
   # is set on the api Deployment rather than here.

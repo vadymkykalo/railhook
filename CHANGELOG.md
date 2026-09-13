@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.2] - 2026-09-13
+
+### Fixed
+
+- **Test endpoint URLs are public.** They were built from `TEST_ENDPOINT_BASE_URL`, which Compose
+  defaulted to `http://api:8080` — the API's name inside the Docker network — so production showed
+  `http://api:8080/hook/…`, a URL nothing outside could reach. It now defaults to `APP_BASE_URL`,
+  and the Helm chart passes the public origin too. Existing test endpoints show the right URL at
+  once: it is built per request, not stored.
+- **The free plan has every feature.** Workflows, rules, replay and mTLS were off on free with
+  "Please upgrade" as the only way on, while no paid plan can be bought. Free is now bounded by its
+  quotas alone (migration V072). The billing page ticks the features from the plan the API returns,
+  and shows the free plan's price as `$0/mo` instead of a second "Free" next to its name.
+
 ## [2.19.1] - 2026-09-13
 
 ### Fixed
@@ -1845,7 +1859,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.19.1...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.19.2...HEAD
+[2.19.2]: https://github.com/vadymkykalo/railhook/compare/v2.19.1...v2.19.2
 [2.19.1]: https://github.com/vadymkykalo/railhook/compare/v2.19.0...v2.19.1
 [2.19.0]: https://github.com/vadymkykalo/railhook/compare/v2.18.1...v2.19.0
 [2.18.1]: https://github.com/vadymkykalo/railhook/compare/v2.18.0...v2.18.1

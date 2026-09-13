@@ -1091,6 +1091,10 @@ jobs:
           # the compose default they pointed at localhost:8080, a port nothing publishes.
           docker compose config | grep -qE 'WEBHOOK_INGRESS_BASE_URL: "?https://hooks.example.com"?$' \
             || { echo "::error::ingress URLs are not on the domain"; docker compose config | grep WEBHOOK_INGRESS_BASE_URL; exit 1; }
+          # Test endpoint URLs are copied into curl and provider dashboards; the compose default
+          # used to be http://api:8080, an address only the Docker network can reach.
+          docker compose config | grep -qE 'TEST_ENDPOINT_BASE_URL: "?https://hooks.example.com"?$' \
+            || { echo "::error::test endpoint URLs are not on the domain"; docker compose config | grep TEST_ENDPOINT_BASE_URL; exit 1; }
           test -f Caddyfile || { echo "::error::no Caddyfile"; exit 1; }
 
       - name: A proxy install is production on the domain, with no TLS terminator of its own

@@ -88,9 +88,20 @@ class SeededPlanIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("the feature ladder is the three rows the pricing table shows, and no SSO")
+    @DisplayName("free carries every feature: there is no paid plan to upgrade to, so quotas are its only limit")
+    void freePlanCarriesEveryFeature() {
+        // Production showed "Feature 'workflows' is not available on your current plan. Please
+        // upgrade" to a cloud user who could not buy anything — a dead end. Until paid plans are
+        // sold, free is bounded by its quotas (events, projects, retention), not by features.
+        Plan free = plan("free");
+        for (String feature : new String[] { "workflows", "rules", "replay", "mTLS", "tunnels" }) {
+            assertThat(free.hasFeature(feature)).as(feature).isTrue();
+        }
+    }
+
+    @Test
+    @DisplayName("the paid feature ladder is the rows the pricing table shows, and no SSO")
     void featureLadderMatchesThePricingTable() {
-        assertThat(plan("free").hasFeature("workflows")).isFalse();
         assertThat(plan("starter").hasFeature("workflows")).isTrue();
 
         /* The seed and every @RequireFeature spell it "mTLS", not "mtls". A
