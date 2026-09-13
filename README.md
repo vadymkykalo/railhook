@@ -11,11 +11,10 @@ from any provider, with every delivery on record.**
 [![Latest release](https://img.shields.io/github/v/release/vadymkykalo/railhook?label=release)](https://github.com/vadymkykalo/railhook/releases/latest)
 [![CI](https://github.com/vadymkykalo/railhook/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/railhook/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-1D4BFF.svg)](./LICENSE)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-1D4BFF)](https://spring.io/projects/spring-boot)
 [![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Frailhook-1D4BFF?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=railhook)
 
 [Website](https://railhook.io) · [Docs](https://railhook.io/docs/) ·
-[API reference](https://railhook.io/docs/api-reference/) · [Changelog](./CHANGELOG.md)
+[API reference](https://railhook.io/docs/api-reference/) · [Railhook Cloud](https://railhook.io/register) · [Changelog](./CHANGELOG.md)
 
 <img src="docs/screenshots/deliveries.png" alt="Deliveries: every attempt and the response it got" width="100%">
 
@@ -125,5 +124,4 @@ the branch to target (`develop`) and the checks CI runs. Report vulnerabilities 
 ## License
 
 [MIT](./LICENSE) © Vadym Kykalo. Self-hosted gets every feature — no licence key, no paid tier.
-`BILLING_ENABLED` defaults to `false`, and with it off nothing is gated; the billing code serves
-Railhook Cloud. Third-party attributions: [`NOTICE`](./NOTICE), [`docs/licenses/`](docs/licenses/).
+Third-party attributions: [`NOTICE`](./NOTICE), [`docs/licenses/`](docs/licenses/).
