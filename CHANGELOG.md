@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.0] - 2026-09-13
+
+### Added
+
+- **The landing page shows delivery happening.** The send and receive cards carry live scenes —
+  an event fanning out to three endpoints, one answering 503 and succeeding on retry; Stripe,
+  GitHub and Shopify requests verified and a forged one rejected — each with a running delivery
+  log. A quiet delivery backdrop sits behind the hero. Motion pauses offscreen and in a hidden tab,
+  and `prefers-reduced-motion` gets a static final frame.
+- **Vendor logos on the maps.** The hero map and the architecture diagram use each vendor's own
+  mark, Slack included.
+
+### Fixed
+
+- **Unknown URLs answer 404.** They used to return 200 with the landing page and a canonical to
+  `/`. The app's own routes still get the app shell, now with `X-Robots-Tag: noindex`, and a test
+  fails when the router gains a top-level route nginx does not know.
+- **`/pricing` redirects** (301) instead of serving a duplicate of the landing page, and is gone from
+  the sitemap.
+- **The docs carry a social image and a `lastmod` per page** in their sitemap.
+
 ## [2.17.2] - 2026-09-13
 
 ### Added
@@ -1771,7 +1792,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.17.2...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.18.0...HEAD
+[2.18.0]: https://github.com/vadymkykalo/railhook/compare/v2.17.2...v2.18.0
 [2.17.2]: https://github.com/vadymkykalo/railhook/compare/v2.17.1...v2.17.2
 [2.17.1]: https://github.com/vadymkykalo/railhook/compare/v2.17.0...v2.17.1
 [2.17.0]: https://github.com/vadymkykalo/railhook/compare/v2.16.6...v2.17.0
