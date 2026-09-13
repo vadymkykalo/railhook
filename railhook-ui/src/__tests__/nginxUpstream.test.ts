@@ -170,10 +170,32 @@ describe('the API can be rolled', () => {
     expect(roll, 'and only once, or it re-execs for ever').toMatch(
       /RAILHOOK_HELPER_REFRESHED/,
     );
-    // --write-helper has to exist on the other side, or the fetch is a no-op that
-    // reports success.
-    expect(installer).toMatch(/ACTION="write-helper"/);
-    expect(installer).toMatch(/write-helper\)/);
+    // The flag the helper asks for has to be one install.sh accepts, or the fetch is
+    // a no-op that reports success. Read the flag out of the helper rather than
+    // naming it here, so renaming it in one place and not the other fails.
+    const asked = roll.match(/bash -s -- (--[a-z-]+) --dir/);
+    expect(asked, 'the helper has to ask for something').not.toBeNull();
+    expect(installer, `install.sh must accept ${asked?.[1]}`).toMatch(
+      new RegExp(`\\|?\\${asked![1]}[|)]`),
+    );
+  });
+
+  it('and the retry actually reaches a host that already exists', () => {
+    // The Caddyfile is written once, at install time, exactly like the helper was —
+    // and `upgrade` refreshed neither. So the retry above shipped in 2.16.3 and the
+    // production Caddyfile still had no lb_try_duration after deploying it. Same
+    // failure as the helper, one file over.
+    //
+    // So the refresh covers both, and only rewrites a Caddyfile that is already
+    // there: an installation without a domain never had one and must not gain one.
+    expect(installer).toMatch(/write_caddyfile/);
+    const refresh = installer.slice(installer.indexOf('refresh)'));
+    expect(refresh.slice(0, 400)).toMatch(/write_helper/);
+    expect(refresh.slice(0, 400)).toMatch(/Caddyfile/);
+    // The helper released in 2.16.3 asks for --write-helper by that name. Dropping it
+    // would make every host already running that helper fall through to "could not
+    // fetch" for ever.
+    expect(installer, '--write-helper has to keep working').toMatch(/--write-helper\)/);
   });
 
   it('a UI restart is a slow request, not a 502', () => {
