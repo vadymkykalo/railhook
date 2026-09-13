@@ -16,7 +16,7 @@ Start here, from the install directory:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Port 80 is already in use` | Another service holds the port | Stop it, or install with `--port 8080`. With `--domain`, both 80 and 443 must be free |
+| `Port 80 is already in use` | Another service holds the port | Stop it, or install with `--port 8080`. With `--domain`, both 80 and 443 must be free. If your own reverse proxy holds them, add `--behind-proxy` |
 | `Docker is installed but the daemon is not reachable` | The daemon is stopped, or your user is not in the `docker` group | Start Docker, or `sudo usermod -aG docker $USER && newgrp docker` |
 | The installer stops on RAM | Less than 2 GiB of memory | Use a bigger host. About 4 GiB is comfortable |
 | `Could not reach the GitHub API` | No access to `api.github.com` | Pass a release explicitly: `--version v2.16.6` |

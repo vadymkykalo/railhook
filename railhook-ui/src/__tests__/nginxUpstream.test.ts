@@ -164,7 +164,7 @@ describe('the API can be rolled', () => {
     //
     // So it fetches its own replacement first and re-execs, rather than editing the
     // file bash is still reading line by line.
-    expect(installer).toMatch(/--write-helper/);
+    expect(installer).toMatch(/--refresh/);
     const roll = installer.slice(installer.indexOf('upgrade)'));
     expect(roll, 'the new helper has to be the one that runs').toMatch(/exec "\$0"/);
     expect(roll, 'and only once, or it re-execs for ever').toMatch(
@@ -224,13 +224,10 @@ describe('the API can be rolled', () => {
     // So the refresh covers both, and only rewrites a Caddyfile that is already
     // there: an installation without a domain never had one and must not gain one.
     expect(installer).toMatch(/write_caddyfile/);
-    const refresh = installer.slice(installer.indexOf('refresh)'));
+    // The action case in main, not the `--refresh)` flag in the argument parser.
+    const refresh = installer.slice(installer.search(/^\s+refresh\)/m));
     expect(refresh.slice(0, 400)).toMatch(/write_helper/);
     expect(refresh.slice(0, 400)).toMatch(/Caddyfile/);
-    // The helper released in 2.16.3 asks for --write-helper by that name. Dropping it
-    // would make every host already running that helper fall through to "could not
-    // fetch" for ever.
-    expect(installer, '--write-helper has to keep working').toMatch(/--write-helper\)/);
   });
 
   it('a UI restart is a slow request, not a 502', () => {

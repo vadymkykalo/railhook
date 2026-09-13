@@ -16,7 +16,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 | Симптом | Причина | Виправлення |
 |---|---|---|
-| `Port 80 is already in use` | Порт зайнятий іншим сервісом | Зупиніть його або встановіть із `--port 8080`. З `--domain` мають бути вільні і 80, і 443 |
+| `Port 80 is already in use` | Порт зайнятий іншим сервісом | Зупиніть його або встановіть із `--port 8080`. З `--domain` мають бути вільні і 80, і 443. Якщо їх тримає ваш власний зворотний проксі, додайте `--behind-proxy` |
 | `Docker is installed but the daemon is not reachable` | Демон зупинено або ваш користувач не в групі `docker` | Запустіть Docker або виконайте `sudo usermod -aG docker $USER && newgrp docker` |
 | Інсталятор зупиняється через RAM | Менше ніж 2 ГіБ пам'яті | Візьміть більший хост. Комфортно — близько 4 ГіБ |
 | `Could not reach the GitHub API` | Немає доступу до `api.github.com` | Вкажіть реліз явно: `--version v2.16.6` |

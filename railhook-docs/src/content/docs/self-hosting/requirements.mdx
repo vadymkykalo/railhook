@@ -33,6 +33,7 @@ The stack runs two JVMs, a broker, a database and a cache. These are the default
 |---|---|
 | `80` | Without a domain. Change it with `--port` if something else already holds it |
 | `80` and `443` | With `--domain`. Both must be free, because the TLS terminator takes them |
+| `8080` on `127.0.0.1` | With `--domain --behind-proxy`. Your proxy keeps 80 and 443. Change it with `--port` |
 
 Nothing else is published to the host.
 

@@ -94,7 +94,7 @@ Smallest viable footprint per the hardware sizing in
 tier is enough: 2 vCPU / 4 GB RAM is comfortable for Postgres + Redis + Kafka
 (single broker, `KAFKA_NUM_PARTITIONS` turned down since demo throughput is
 trivial) + API + worker + UI, all in one `docker compose -f
-install.sh | bash --domain demo.example.com` on a small VPS.
+install.sh | bash -s -- --domain demo.example.com` on a small VPS.
 
 ## What would make this "DONE" instead of deferred
 

@@ -42,31 +42,17 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
   <TabItem label="Власний проксі">
     <Steps>
 
-    1. **Встановіть без домену, прив'язавши до loopback**
+    1. **Встановіть із доменом за вашим проксі**
 
        ```bash
-       curl -fsSL https://railhook.io/install.sh | bash -s -- --port 8080
+       curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --behind-proxy
        ```
 
-       Потім задайте в `~/railhook/.env`:
+       Ви отримуєте всі налаштування з таблиці вбудованого HTTPS, крім TLS-термінатора. Caddy не запускається, а сертифікат лишається у вашого проксі. nginx панелі слухає на `127.0.0.1:8080`. Щоб вибрати інший loopback-порт, скористайтеся `--port`.
 
-       ```bash title="~/railhook/.env"
-       RAILHOOK_BIND=127.0.0.1
-       APP_ENV=production
-       APP_BASE_URL=https://hooks.example.com
-       CORS_ALLOWED_ORIGINS=https://hooks.example.com
-       WEBHOOK_TRUSTED_PROXIES=172.16.0.0/12   # the address your proxy connects from
-       ```
+    2. **Проксуйте все на 127.0.0.1:8080**
 
-    2. **Проксуйте все на цей один порт**
-
-       Надсилайте всі шляхи на `http://127.0.0.1:8080`. nginx усередині вже маршрутизує панель, `/api/`, `/ingress/`, `/hook/`, `/tunnel/` і `/ws/tunnel`. Шлях `/ws/tunnel` — це WebSocket, відкритий упродовж усієї сесії CLI, тож передавайте заголовки upgrade і задайте довгий тайм-аут читання (вбудований Caddy використовує одну годину).
-
-    3. **Застосуйте**
-
-       ```bash
-       cd ~/railhook && ./railhook up -d && ./railhook doctor
-       ```
+       Надсилайте всі шляхи домену на `http://127.0.0.1:8080`. nginx усередині вже маршрутизує панель, `/api/`, `/ingress/`, `/hook/`, `/tunnel/` і `/ws/tunnel`. Шлях `/ws/tunnel` — це WebSocket, відкритий упродовж усієї сесії CLI, тож передавайте заголовки upgrade і задайте довгий тайм-аут читання (вбудований Caddy використовує одну годину).
 
     </Steps>
   </TabItem>

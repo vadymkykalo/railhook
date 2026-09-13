@@ -948,6 +948,8 @@ jobs:
           # database and the backup sidecar are behind profiles, so a run that
           # ignored it would come up with no database at all.
           grep -q '^COMPOSE_PROFILES=.*embedded-db' .env || { echo "::error::installer did not enable embedded-db"; exit 1; }
+          # Pre-rename variable names are gone for good; nothing reads them.
+          ! grep -q '^HOOKFLOW_' .env || { echo "::error::installer still writes HOOKFLOW_* variables"; exit 1; }
           docker compose up -d
 
       - name: Wait for the platform
@@ -1034,6 +1036,44 @@ jobs:
           docker compose config | grep -qE 'WEBHOOK_INGRESS_BASE_URL: "?https://hooks.example.com"?$' \
             || { echo "::error::ingress URLs are not on the domain"; docker compose config | grep WEBHOOK_INGRESS_BASE_URL; exit 1; }
           test -f Caddyfile || { echo "::error::no Caddyfile"; exit 1; }
+
+      - name: A proxy install is production on the domain, with no TLS terminator of its own
+        env:
+          RAILHOOK_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
+        run: |
+          # The operator already runs nginx, Traefik or a load balancer that holds the
+          # certificate. One command has to produce the same production settings as
+          # --domain, with the dashboard on loopback for that proxy and no Caddy.
+          ./install.sh --dir "$HOME/railhook-proxy" --version v0.0.0-ci \
+            --domain hooks.example.com --behind-proxy --no-start --yes
+          cd "$HOME/railhook-proxy"
+          ! docker compose config --services | grep -qx caddy || { echo "::error::caddy runs behind someone else's proxy"; exit 1; }
+          test ! -e Caddyfile || { echo "::error::a Caddyfile was written for a proxy install"; exit 1; }
+          docker compose config | grep -q "host_ip: 127.0.0.1" || { echo "::error::dashboard not on loopback"; exit 1; }
+          docker compose config | grep -qE 'published: "?8080"?$' || { echo "::error::dashboard not on 8080"; exit 1; }
+          grep -qx 'APP_ENV=production' .env || { echo "::error::APP_ENV not production"; exit 1; }
+          grep -q '^APP_BASE_URL=https://hooks.example.com$' .env || { echo "::error::APP_BASE_URL not on the domain"; exit 1; }
+          grep -q '^CORS_ALLOWED_ORIGINS=https://hooks.example.com$' .env || { echo "::error::CORS not on the domain"; exit 1; }
+          grep -q '^WEBHOOK_TRUSTED_PROXIES=' .env || { echo "::error::proxy not trusted"; exit 1; }
+          docker compose config | grep -qE 'WEBHOOK_INGRESS_BASE_URL: "?https://hooks.example.com"?$' \
+            || { echo "::error::ingress URLs are not on the domain"; docker compose config | grep WEBHOOK_INGRESS_BASE_URL; exit 1; }
+          cd "$GITHUB_WORKSPACE"
+          ./install.sh --check --dir "$HOME/railhook-proxy"
+
+      - name: The installer refuses what it cannot install
+        run: |
+          # A proxy install still needs to know the public URL.
+          if out=$(./install.sh --dir "$HOME/railhook-noproxy" --behind-proxy --no-start --yes 2>&1); then
+            echo "::error::--behind-proxy without --domain was accepted"; exit 1
+          fi
+          echo "$out" | grep -q -- '--domain' || { echo "::error::no explanation: $out"; exit 1; }
+          # Releases before 2.12.0 are unsupported (SECURITY.md) and published under another
+          # name; refused before anything is written or fetched.
+          if out=$(./install.sh --dir "$HOME/railhook-old" --version v2.11.0 --no-start --yes 2>&1); then
+            echo "::error::--version v2.11.0 was accepted"; exit 1
+          fi
+          echo "$out" | grep -q '2\.12\.0' || { echo "::error::no explanation: $out"; exit 1; }
+          test ! -e "$HOME/railhook-old" || { echo "::error::files were written for a refused version"; exit 1; }
 
       - name: Dump logs on failure
         if: failure()

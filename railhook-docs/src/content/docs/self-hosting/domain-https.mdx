@@ -42,31 +42,17 @@ Before your instance faces the internet, give it a domain and HTTPS. The install
   <TabItem label="Your own proxy">
     <Steps>
 
-    1. **Install without a domain, bound to loopback**
+    1. **Install with the domain, behind your proxy**
 
        ```bash
-       curl -fsSL https://railhook.io/install.sh | bash -s -- --port 8080
+       curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --behind-proxy
        ```
 
-       Then set these in `~/railhook/.env`:
+       You get every setting from the built-in HTTPS table except the TLS terminator. No Caddy runs, and your proxy keeps the certificate. The dashboard's nginx listens on `127.0.0.1:8080`. Use `--port` to pick another loopback port.
 
-       ```bash title="~/railhook/.env"
-       RAILHOOK_BIND=127.0.0.1
-       APP_ENV=production
-       APP_BASE_URL=https://hooks.example.com
-       CORS_ALLOWED_ORIGINS=https://hooks.example.com
-       WEBHOOK_TRUSTED_PROXIES=172.16.0.0/12   # the address your proxy connects from
-       ```
+    2. **Proxy everything to 127.0.0.1:8080**
 
-    2. **Proxy everything to that one port**
-
-       Send every path to `http://127.0.0.1:8080`. nginx inside already routes the dashboard, `/api/`, `/ingress/`, `/hook/`, `/tunnel/` and `/ws/tunnel`. The `/ws/tunnel` path is a WebSocket held open for a whole CLI session, so pass the upgrade headers and use a long read timeout (the built-in Caddy uses one hour).
-
-    3. **Apply**
-
-       ```bash
-       cd ~/railhook && ./railhook up -d && ./railhook doctor
-       ```
+       Send every path for the domain to `http://127.0.0.1:8080`. nginx inside already routes the dashboard, `/api/`, `/ingress/`, `/hook/`, `/tunnel/` and `/ws/tunnel`. The `/ws/tunnel` path is a WebSocket held open for a whole CLI session, so pass the upgrade headers and use a long read timeout (the built-in Caddy uses one hour).
 
     </Steps>
   </TabItem>

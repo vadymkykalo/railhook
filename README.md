@@ -33,6 +33,8 @@ On a server with a domain pointed at it, get HTTPS in the same step:
 curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --email ops@example.com
 ```
 
+Already running a reverse proxy? Add `--behind-proxy` instead of `--email`. Then point the proxy at `127.0.0.1:8080`.
+
 Open **http://localhost** and register — the first account is active immediately.
 
 - Checks the machine first: Docker with Compose v2, about 4 GiB of RAM, 5 GiB of disk, a free port.

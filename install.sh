@@ -21,9 +21,15 @@ DEFAULT_DIR="${HOME}/railhook"
 
 INSTALL_DIR=""
 VERSION=""
-PORT="80"
+PORT=""
 DOMAIN=""
 ACME_EMAIL=""
+BEHIND_PROXY=0
+# The oldest release this installer can install. Earlier ones are unsupported
+# (SECURITY.md) and were published as Hookflow, under image and variable names
+# this installer no longer writes.
+MIN_MAJOR=2
+MIN_MINOR=12
 START=1
 ASSUME_YES=0
 ACTION="install"
@@ -44,15 +50,18 @@ usage() {
     cat <<USAGE
 ${B}Railhook installer${N}
 
-  curl -fsSL ${RAW}/main/install.sh | bash
+  curl -fsSL https://railhook.io/install.sh | bash
 
 ${B}Options${N}
   --dir <path>       Where to install          (default: ${DEFAULT_DIR})
-  --version <tag>    Release to pin            (default: the latest release)
-  --port <port>      The one published port    (default: ${PORT})
+  --version <tag>    Release to pin, v${MIN_MAJOR}.${MIN_MINOR}.0 or newer (default: the latest release)
+  --port <port>      The one published port    (default: 80; 8080 with --behind-proxy)
   --domain <host>    Serve on this domain over HTTPS. Turns on a TLS
                      terminator that obtains and renews the certificate
                      itself, and switches the platform to production mode.
+  --behind-proxy     With --domain: your own reverse proxy terminates TLS.
+                     Same production settings, no built-in TLS terminator;
+                     the dashboard listens on 127.0.0.1:<port> for your proxy.
   --email <address>  Where Let's Encrypt should send expiry warnings
   --no-start         Write the files, do not start anything
   --yes              Do not ask before reusing a non-empty directory
@@ -62,7 +71,7 @@ ${B}Options${N}
   -h, --help         This text
 
 ${B}Passing options through a pipe${N}
-  curl -fsSL ${RAW}/main/install.sh | bash -s -- --dir /opt/railhook
+  curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --behind-proxy
 USAGE
 }
 
@@ -73,6 +82,7 @@ while [ $# -gt 0 ]; do
         --port)      PORT="${2:?--port needs a port}"; shift 2 ;;
         --domain)    DOMAIN="${2:?--domain needs a hostname}"; shift 2 ;;
         --email)     ACME_EMAIL="${2:?--email needs an address}"; shift 2 ;;
+        --behind-proxy) BEHIND_PROXY=1; shift ;;
         --no-start)  START=0; shift ;;
         --yes|-y)    ASSUME_YES=1; shift ;;
         --check)     ACTION="check"; shift ;;
@@ -80,10 +90,7 @@ while [ $# -gt 0 ]; do
         # `railhook upgrade` calls this on itself so that a release which changes the
         # helper reaches an existing host on the deploy that ships it, rather than the
         # one after.
-        # --write-helper is the name the helper released in 2.16.3 asks for, and it
-        # keeps working: dropping it would leave every host running that helper
-        # falling through to "could not fetch" for ever.
-        --refresh|--write-helper) ACTION="refresh"; shift ;;
+        --refresh)   ACTION="refresh"; shift ;;
         --uninstall) ACTION="uninstall"; shift ;;
         --purge)     ACTION="purge"; shift ;;
         -h|--help)   usage; exit 0 ;;
@@ -92,18 +99,51 @@ while [ $# -gt 0 ]; do
 done
 INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_DIR}"
 
-# With a domain, Caddy owns 80 and 443 and the dashboard's nginx moves to
-# loopback behind it. Without one, nginx is the only thing listening.
+# Refused here, before anything is checked, written or fetched.
+require_supported_version() {
+    local v="${VERSION#v}"
+    [[ "$v" =~ ^([0-9]+)\.([0-9]+)\.[0-9]+$ ]] \
+        || die "--version ${VERSION} is not a release tag. Pass one like v${MIN_MAJOR}.${MIN_MINOR}.0, or leave it out for the latest."
+    local major="${BASH_REMATCH[1]}" minor="${BASH_REMATCH[2]}"
+    if [ "$major" -lt "$MIN_MAJOR" ] || { [ "$major" -eq "$MIN_MAJOR" ] && [ "$minor" -lt "$MIN_MINOR" ]; }; then
+        die "${VERSION} is older than v${MIN_MAJOR}.${MIN_MINOR}.0, the oldest release this installer supports. Pass v${MIN_MAJOR}.${MIN_MINOR}.0 or newer, or leave --version out for the latest."
+    fi
+}
+# RAILHOOK_COMPOSE_SRC installs a working tree's Compose file rather than a
+# release's, so --version there only names the image tag being tested.
+if [ -n "$VERSION" ] && [ -z "${RAILHOOK_COMPOSE_SRC:-}" ]; then
+    require_supported_version
+fi
+
+if [ "$BEHIND_PROXY" = "1" ]; then
+    [ -n "$DOMAIN" ] || die "--behind-proxy needs --domain: the public hostname your proxy serves. Every link the platform builds uses it."
+    [ -z "$ACME_EMAIL" ] || die "--email is for the built-in certificate. Behind your own proxy, the proxy holds the certificate — drop --email."
+fi
+
+# Three shapes, one per flag combination:
+#   no domain                  nginx is the only thing listening, on every interface.
+#   --domain                   Caddy owns 80 and 443; nginx moves to loopback behind it.
+#   --domain --behind-proxy    the operator's proxy terminates TLS; nginx on loopback
+#                              for it, and no Caddy.
 # embedded-db is what runs Postgres in the stack. Leaving it out is how you
 # point the platform at a managed database instead.
+TLS=0
 if [ -n "$DOMAIN" ]; then
     BASE_URL="https://${DOMAIN}"
     BIND="127.0.0.1"
-    PORT="8080"
     APP_ENV="production"
-    PROFILES="embedded-db,tls"
-    CHECK_PORTS="80 443"
+    if [ "$BEHIND_PROXY" = "1" ]; then
+        PORT="${PORT:-8080}"
+        PROFILES="embedded-db"
+        CHECK_PORTS="$PORT"
+    else
+        TLS=1
+        PORT="8080"
+        PROFILES="embedded-db,tls"
+        CHECK_PORTS="80 443"
+    fi
 else
+    PORT="${PORT:-80}"
     # Port 80 is implicit in a URL, and a URL with ":80" in it looks wrong to
     # everyone who reads it.
     if [ "$PORT" = "80" ]; then BASE_URL="http://localhost"; else BASE_URL="http://localhost:${PORT}"; fi
@@ -212,9 +252,11 @@ check_system() {
         for p in $CHECK_PORTS; do
             if port_in_use "$p"; then
                 say "  ${RED}x${N} Port ${p} is already in use"
-                if [ -n "$DOMAIN" ]; then
-                    say "      HTTPS needs 80 and 443. Stop whatever holds it, or put"
-                    say "      Railhook behind your existing proxy without --domain."
+                if [ "$TLS" = "1" ]; then
+                    say "      HTTPS needs 80 and 443. Stop whatever holds it, or, if that is"
+                    say "      your own reverse proxy, add ${DIM}--behind-proxy${N} and point it at 127.0.0.1:8080."
+                elif [ "$BEHIND_PROXY" = "1" ]; then
+                    say "      Pick another loopback port for your proxy: ${DIM}--port 8081${N}"
                 else
                     say "      Pick another: ${DIM}--port 8080${N}"
                 fi
@@ -353,25 +395,11 @@ write_files() {
     else
         # Pinned to the release tag, not to main. An install that silently
         # changes under you between two `docker compose pull`s is not an install.
-        #
-        # Two names: releases up to 2.5.0 called the deployment file
-        # docker-compose.pull.yml, alongside a build-from-source
-        # docker-compose.yml. Those merged into one canonical docker-compose.yml,
-        # so try that first and fall back — this installer has to be able to
-        # install a release older than the change.
-        #
-        # The image prefix is matched against both spellings for the same
-        # reason. The product was Hookflow until 2.12.0, so every release before
-        # it pins ghcr.io/vadymkykalo/hookflow-*; matching only the current name
-        # would make this installer unable to install any of them, and the
-        # failure would be the confusing one — a fallback to a
-        # docker-compose.pull.yml that modern releases do not have, then "could
-        # not download the Compose file". The old prefix stays here as long as
-        # those releases are installable at all.
-        curl -fsSL "${RAW}/${VERSION}/docker-compose.yml" -o "${INSTALL_DIR}/docker-compose.yml" 2>/dev/null \
-            && grep -qE 'ghcr\.io/vadymkykalo/(railhook|hookflow)' "${INSTALL_DIR}/docker-compose.yml" \
-            || curl -fsSL "${RAW}/${VERSION}/docker-compose.pull.yml" -o "${INSTALL_DIR}/docker-compose.yml" \
-            || die "Could not download the Compose file for ${VERSION}."
+        # The image check catches a 200 that is not a Compose file at all.
+        if ! curl -fsSL "${RAW}/${VERSION}/docker-compose.yml" -o "${INSTALL_DIR}/docker-compose.yml" \
+           || ! grep -q 'ghcr\.io/vadymkykalo/railhook' "${INSTALL_DIR}/docker-compose.yml"; then
+            die "Could not download the Compose file for ${VERSION}."
+        fi
         ok "docker-compose.yml (pinned to ${VERSION})"
     fi
 
@@ -392,7 +420,7 @@ write_files() {
         warn "Could not fetch the backup scripts — scheduled backups are off"
     fi
 
-    if [ -n "$DOMAIN" ]; then
+    if [ "$TLS" = "1" ]; then
         write_caddyfile
         ok "Caddyfile for ${DOMAIN}"
     fi
@@ -418,8 +446,8 @@ write_files() {
 DB_SSL_MODE=require
 # INFO on a public endpoint is a lot of disk and a lot of payload metadata.
 LOG_LEVEL=WARN
-# The Docker bridge range, so X-Forwarded-For from the TLS terminator in front
-# is trusted and client IPs in the audit log are real.
+# The Docker bridge range, so X-Forwarded-For from the proxy in front — the
+# built-in Caddy, or your own — is trusted and client IPs in the audit log are real.
 WEBHOOK_TRUSTED_PROXIES=172.16.0.0/12
 PRODENV
 )
@@ -456,41 +484,30 @@ UI_IMAGE_TAG=${image_tag}
 
 # The port and interface the dashboard's nginx binds to. It serves the
 # dashboard and proxies every API path to the api service, so this is the single
-# entry point for everything. With a domain configured, Caddy holds 80/443 in
-# front and this moves to loopback.
+# entry point for everything. With a domain, TLS is terminated in front — by
+# the built-in Caddy on 80/443, or by your own proxy with --behind-proxy — and
+# this is loopback.
 RAILHOOK_BIND=${BIND}
 RAILHOOK_PORT=${PORT}
 
-# Empty unless you installed with --domain. Setting it alone does nothing; the
-# TLS terminator only runs under the \`tls\` profile, which COMPOSE_PROFILES
-# below turns on.
-RAILHOOK_DOMAIN=${DOMAIN}
-
-# The same three under their pre-2.12.0 names, because this installer can pin
-# any released version and every Compose file published as Hookflow reads these
-# instead. Without them, \`--version v2.11.0\` writes a .env that release cannot
-# read: the published port falls back to its default and the dashboard comes up
-# somewhere other than where you asked for it.
-#
-# Delete these once no supported version reads them. They are duplicates, not
-# separate settings - change one and change the other.
-HOOKFLOW_BIND=${BIND}
-HOOKFLOW_PORT=${PORT}
-HOOKFLOW_DOMAIN=${DOMAIN}
+# For the built-in TLS terminator only, so empty without --domain and with
+# --behind-proxy. Setting it alone does nothing; the terminator only runs under
+# the \`tls\` profile, which COMPOSE_PROFILES below turns on.
+RAILHOOK_DOMAIN=$([ "$TLS" = "1" ] && printf '%s' "$DOMAIN")
 ACME_EMAIL=${ACME_EMAIL}
 COMPOSE_PROFILES=${PROFILES}${BACKUP_PROFILE}
 
 # The URL people will actually type. Verification, invite and reset links are
-# built from it, so it has to be reachable from their browser — change it to
-# https://your.domain before this leaves your machine.
+# built from it, so it has to be reachable from their browser. --domain sets it
+# to https://<domain>.
 APP_BASE_URL=${BASE_URL}
 CORS_ALLOWED_ORIGINS=${BASE_URL}
 
 # production turns on ProductionSafetyValidator, which refuses to start on
 # unsafe configuration rather than running with it: shipped-default secrets,
 # SSRF protection disabled, Swagger exposed, localhost left in CORS. Installing
-# with --domain sets it, because at that point this is reachable from the
-# internet.
+# with --domain sets it, with or without --behind-proxy, because at that point
+# this is reachable from the internet.
 APP_ENV=${APP_ENV}
 
 # With email off, accounts are created already verified — there would be no way
@@ -863,8 +880,20 @@ finish() {
     say "    ./railhook status | logs | stop | start | backup | doctor"
     say "    .env holds your secrets. ${B}Back it up.${N}"
     say ""
-    say "  Putting this on a server? ${DIM}https://railhook.io/docs/self-hosting/overview/${N} covers TLS,"
-    say "  APP_ENV=production and what to change before it faces the internet."
+    if [ "$BEHIND_PROXY" = "1" ]; then
+        proxy_hint
+    elif [ -z "$DOMAIN" ]; then
+        say "  Putting this on a server? Install with ${DIM}--domain <host>${N} for built-in HTTPS,"
+        say "  or ${DIM}--domain <host> --behind-proxy${N} behind a reverse proxy you already run."
+        say ""
+    fi
+}
+
+# What is left for the operator after a --behind-proxy install: the proxy itself.
+proxy_hint() {
+    say "  ${B}Point your proxy at it.${N} Every path for ${DOMAIN} goes to ${B}http://127.0.0.1:${PORT}${N};"
+    say "  /ws/tunnel is a WebSocket, so pass the upgrade headers and use a long read timeout."
+    say "  Until then the dashboard answers only on http://127.0.0.1:${PORT}."
     say ""
 }
 
@@ -916,6 +945,7 @@ main() {
         say "  Files written, nothing started (--no-start)."
         say "  ${B}cd ${INSTALL_DIR} && ./railhook start${N}"
         say ""
+        [ "$BEHIND_PROXY" = "0" ] || proxy_hint
         exit 0
     fi
 

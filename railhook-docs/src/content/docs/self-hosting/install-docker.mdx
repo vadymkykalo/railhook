@@ -39,9 +39,10 @@ Both methods run the same `docker-compose.yml`. The installer also generates rea
     | Option | Effect |
     |---|---|
     | `--dir <path>` | Where to install. Default `~/railhook` |
-    | `--version <tag>` | Release to pin. Default: the latest release |
-    | `--port <port>` | The one published port. Default `80` |
+    | `--version <tag>` | Release to pin, `v2.12.0` or newer. Default: the latest release |
+    | `--port <port>` | The one published port. Default `80`, or `8080` with `--behind-proxy` |
     | `--domain <host>` | Serve on this domain over HTTPS. See [Domain and HTTPS](/docs/self-hosting/domain-https/) |
+    | `--behind-proxy` | With `--domain`: your own reverse proxy terminates TLS, and the dashboard listens on `127.0.0.1` for it |
     | `--email <address>` | Where Let's Encrypt sends expiry warnings |
     | `--no-start` | Write the files, start nothing |
     | `--yes` | Do not ask before reusing a non-empty directory |
