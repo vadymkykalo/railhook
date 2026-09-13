@@ -297,6 +297,12 @@
           "default": "",
           "example": null,
           "description": "Platform-admin operator credential for cluster-wide operator endpoints\n(/api/v1/admin/**): the back-office — list and search every organization, see its plan,\nbilling status and counts, and suspend or reinstate it — plus encryption key rotation\nacross ALL tenants.\nDeliberately independent of any org/JWT — org OWNER does NOT grant this.\nPresented via the X-Platform-Admin-Token header. Leave empty to keep the\nadmin endpoints unreachable entirely (fail closed) until an operator needs them.\nCHANGE/SET THIS IN PRODUCTION before using the admin endpoints!"
+        },
+        {
+          "name": "PLATFORM_ADMIN_EMAILS",
+          "default": "",
+          "example": null,
+          "description": "People who may open the platform admin panel (Platform admin in the dashboard's sidebar,\n/admin/platform) with their ordinary sign-in: a comma-separated list of email addresses.\nBeing listed is not enough on its own — the address must be verified, the account active,\nand the sign-in less than 12 hours old; every admin request is rate-limited and written to\nthe audit log. An organization OWNER is not a platform admin unless listed here. Encryption\nkey rotation stays on PLATFORM_ADMIN_TOKEN only.\nEmpty means nobody: no panel, and the admin API refuses every signed-in user.\nExample: PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com"
         }
       ]
     },

@@ -28,4 +28,11 @@ public class CurrentUserResponse {
      * password needs the current one, so the settings page offers "Forgot password" instead.
      */
     private boolean hasPassword;
+
+    /**
+     * Whether to offer this person the platform admin panel: a verified, active account whose
+     * address is in {@code PLATFORM_ADMIN_EMAILS}. Only decides what the dashboard shows — every
+     * admin request is checked again on the server, including how recent the sign-in is.
+     */
+    private boolean platformAdmin;
 }

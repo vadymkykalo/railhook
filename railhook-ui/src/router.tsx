@@ -36,6 +36,11 @@ const DlqPage = lazy(() => import('./pages/DlqPage'));
 const IncomingDlqPage = lazy(() => import('./pages/IncomingDlqPage'));
 const TestEndpointsPage = lazy(() => import('./pages/TestEndpointsPage'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
+const PlatformAdminGate = lazy(() => import('./components/PlatformAdminGate'));
+const PlatformOverviewPage = lazy(() => import('./pages/PlatformOverviewPage'));
+const PlatformOrganizationsPage = lazy(() => import('./pages/PlatformOrganizationsPage'));
+const PlatformOrganizationDetailPage = lazy(() => import('./pages/PlatformOrganizationDetailPage'));
+const PlatformUsersPage = lazy(() => import('./pages/PlatformUsersPage'));
 const IncomingSourcesPage = lazy(() => import('./pages/IncomingSourcesPage'));
 const IncomingSourceDetailPage = lazy(() => import('./pages/IncomingSourceDetailPage'));
 const IncomingEventsPage = lazy(() => import('./pages/IncomingEventsPage'));
@@ -299,6 +304,25 @@ export const router = createBrowserRouter([
       {
         path: 'billing',
         element: <S><BillingPage /></S>,
+      },
+      /* The platform admin panel: for the people who run the deployment, not an organization
+         role. The gate reads `platformAdmin` from /auth/me; the API checks it again, with the
+         sign-in's age, on every request. */
+      {
+        path: 'platform',
+        element: <S><PlatformAdminGate><PlatformOverviewPage /></PlatformAdminGate></S>,
+      },
+      {
+        path: 'platform/organizations',
+        element: <S><PlatformAdminGate><PlatformOrganizationsPage /></PlatformAdminGate></S>,
+      },
+      {
+        path: 'platform/organizations/:organizationId',
+        element: <S><PlatformAdminGate><PlatformOrganizationDetailPage /></PlatformAdminGate></S>,
+      },
+      {
+        path: 'platform/users',
+        element: <S><PlatformAdminGate><PlatformUsersPage /></PlatformAdminGate></S>,
       },
       {
         path: '*',

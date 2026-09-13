@@ -15,6 +15,10 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     long countByOrganizationIdAndDeletedAtIsNull(UUID organizationId);
 
+    /** The scope's live projects, a page at a time. */
+    @Query("SELECT p FROM Project p WHERE p.deletedAt IS NULL")
+    org.springframework.data.domain.Page<Project> findLive(Pageable pageable);
+
     /**
      * Just enough of a project to bill it: its id, and the organization whose scope has to be
      * entered before its rows can be read.

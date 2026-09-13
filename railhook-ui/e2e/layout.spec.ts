@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { EVENT_ID, PROJECT_ID, mockApi, mockNewOrganization } from './fixtures';
+import { EVENT_ID, PLATFORM_ORG_ID, PROJECT_ID, mockApi, mockNewOrganization } from './fixtures';
 
 /**
  * Every page fits its screen.
@@ -23,6 +23,10 @@ const ADMIN = [
   '/admin/members',
   '/admin/settings',
   '/admin/billing',
+  '/admin/platform',
+  '/admin/platform/organizations',
+  `/admin/platform/organizations/${PLATFORM_ORG_ID}`,
+  '/admin/platform/users',
 ];
 
 /** Elements that stick out past the right edge and are not inside something that scrolls or clips. */

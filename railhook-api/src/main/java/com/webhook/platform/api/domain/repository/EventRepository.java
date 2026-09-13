@@ -20,6 +20,20 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     List<Event> findByProjectId(UUID projectId);
     List<Event> findByProjectIdAndEventTypeContainingIgnoreCase(UUID projectId, String eventType);
     Page<Event> findByProjectId(UUID projectId, Pageable pageable);
+
+    long countByCreatedAtGreaterThanEqual(Instant since);
+
+    /** {@code [organizationId, count]} over a half-open window, for every organization in scope. */
+    @Query("SELECT e.organizationId, COUNT(e) FROM Event e "
+            + "WHERE e.createdAt >= :from AND e.createdAt < :to GROUP BY e.organizationId")
+    List<Object[]> countPerOrganizationBetween(@Param("from") Instant from, @Param("to") Instant to);
+
+    /** As {@link #countPerOrganizationBetween}, for the given organizations only. */
+    @Query("SELECT e.organizationId, COUNT(e) FROM Event e WHERE e.organizationId IN :organizationIds "
+            + "AND e.createdAt >= :from AND e.createdAt < :to GROUP BY e.organizationId")
+    List<Object[]> countForOrganizationsBetween(
+            @Param("organizationIds") java.util.Collection<UUID> organizationIds,
+            @Param("from") Instant from, @Param("to") Instant to);
     Page<Event> findByProjectIdAndEventTypeContainingIgnoreCase(UUID projectId, String eventType, Pageable pageable);
     boolean existsByProjectId(UUID projectId);
 

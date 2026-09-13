@@ -21,6 +21,8 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     Page<Delivery> findByEventId(UUID eventId, Pageable pageable);
     Page<Delivery> findByEventIdIn(List<UUID> eventIds, Pageable pageable);
 
+    long countByStatusInAndCreatedAtGreaterThanEqual(java.util.Collection<DeliveryStatus> statuses, Instant since);
+
     @Query("SELECT COUNT(d) FROM Delivery d WHERE d.event.projectId = :projectId AND d.createdAt BETWEEN :from AND :to")
     long countByProjectIdAndCreatedAtBetween(@Param("projectId") UUID projectId, @Param("from") Instant from, @Param("to") Instant to);
 

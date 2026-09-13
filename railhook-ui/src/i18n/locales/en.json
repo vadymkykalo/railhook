@@ -2361,6 +2361,10 @@
     "uploadKey": "Upload .pem/.key"
   },
   "nav": {
+    "platformAdmin": "Platform admin",
+    "platformOrganizations": "Organizations",
+    "platformOverview": "Overview",
+    "platformUsers": "Users",
     "alerts": "Alerts",
     "allDeliveries": "All deliveries",
     "allProjects": "All projects",
@@ -2615,6 +2619,131 @@
       "updated": "Masking rule updated"
     },
     "type": "Type"
+  },
+  "platformAdmin": {
+    "columns": {
+      "account": "Account",
+      "action": "Action",
+      "actor": "Actor",
+      "address": "IP address",
+      "created": "Created",
+      "eventsThisMonth": "Events this month",
+      "lastSeen": "Last active",
+      "members": "Members",
+      "membership": "Membership",
+      "organization": "Organization",
+      "organizations": "Organizations",
+      "owner": "Owner",
+      "plan": "Plan",
+      "projects": "Projects",
+      "result": "Result",
+      "role": "Role",
+      "signIn": "Sign-in",
+      "status": "Status",
+      "time": "Time",
+      "verified": "Email"
+    },
+    "denied": {
+      "description": "This panel is for the people who run this deployment. Owning an organization does not make you one: an operator lists their addresses in PLATFORM_ADMIN_EMAILS.",
+      "title": "Not a platform admin"
+    },
+    "detail": {
+      "auditLog": "Recent audit log",
+      "back": "All organizations",
+      "eyebrow": "Plan {{plan}} · created {{created}}",
+      "members": "Members",
+      "noAudit": "Nothing recorded yet.",
+      "noOwner": "No active owner",
+      "noProjects": "No projects.",
+      "owner": "Owner {{email}}",
+      "projects": "Projects",
+      "reinstate": "Reinstate",
+      "suspend": "Suspend",
+      "suspendedSince": "Suspended {{time}} by {{by}}",
+      "usage": "Usage this month",
+      "usageEndpoints": "Endpoints per project",
+      "usageEvents": "Events",
+      "usageMembers": "Members",
+      "usageOf": "{{current}} of {{limit}}",
+      "usageProjects": "Projects"
+    },
+    "eyebrow": "Platform admin",
+    "loadFailed": "Could not load platform admin data",
+    "organizations": {
+      "all": "All organizations",
+      "count": "Organizations · {{count}}",
+      "description": "Every organization on this deployment. Search by name or by a member's email.",
+      "empty": "No organizations match",
+      "emptyDesc": "Try another name or email.",
+      "search": "Search by name or member email",
+      "statusFilter": "Status",
+      "suspendedOnly": "Suspended only"
+    },
+    "overview": {
+      "description": "Everything on this deployment, across every organization.",
+      "generatedAt": "As of {{time}}",
+      "kpi": {
+        "activeTunnels": "Active tunnels",
+        "deliveriesFailed": "Deliveries failed, 24h",
+        "deliveriesFailedHint": "Still retrying or given up",
+        "deliveriesSucceeded": "Deliveries succeeded, 24h",
+        "events30d": "{{total}} in 30 days",
+        "eventsToday": "Events today",
+        "nearQuota": "Near event limit",
+        "nearQuotaHint": "At 80% or more of this month's plan limit",
+        "organizations": "Organizations",
+        "signupsPeriods": "{{week}} in 7 days · {{month}} in 30 days",
+        "signupsToday": "Sign-ups today",
+        "suspended": "{{count}} suspended",
+        "users": "Accounts"
+      },
+      "noSignups": "No accounts yet",
+      "recentSignups": "Recent sign-ups"
+    },
+    "reauth": {
+      "action": "Sign in again",
+      "description": "The platform admin panel needs a sign-in from the last 12 hours.",
+      "title": "Sign in again to continue"
+    },
+    "signIn": {
+      "google": "Google",
+      "password": "Password"
+    },
+    "status": {
+      "active": "Active",
+      "pastDue": "Past due",
+      "suspended": "Suspended"
+    },
+    "suspendDialog": {
+      "confirmReinstate": "Reinstate organization",
+      "confirmSuspend": "Suspend organization",
+      "failed": "Could not change the suspension",
+      "reason": "Reason",
+      "reinstateDescription": "Lifts the suspension: the organization can make changes and ingest events again.",
+      "reinstateReasonHint": "Kept in the organization's audit log.",
+      "reinstateTitle": "Reinstate {{name}}?",
+      "reinstated": "{{name}} is reinstated",
+      "suspendDescription": "Members can still sign in and read, but nothing changes — event ingestion included — until the organization is reinstated.",
+      "suspendReasonHint": "Shown to the organization's members.",
+      "suspendTitle": "Suspend {{name}}?",
+      "suspended": "{{name}} is suspended",
+      "typeName": "Type {{name}} to confirm"
+    },
+    "unverified": "Not verified",
+    "userStatus": {
+      "active": "Active",
+      "disabled": "Disabled",
+      "pending": "Awaiting verification"
+    },
+    "users": {
+      "count": "Accounts · {{count}}",
+      "description": "Every account on this deployment, newest first.",
+      "empty": "No accounts match",
+      "emptyDesc": "Try another email or name.",
+      "noOrganization": "No organization",
+      "search": "Search by email or name"
+    },
+    "verified": "Verified"
   },
   "projects": {
     "copyIdOf": "Copy the ID of {{name}}",

@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.PlatformAdminAuthenticationToken;
+import com.webhook.platform.api.security.PlatformAdminUserAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -45,7 +46,11 @@ public class TenantContextFilter extends OncePerRequestFilter {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         java.util.UUID previous = TenantContext.current();
-        if (authentication instanceof JwtAuthenticationToken jwt) {
+        if (authentication instanceof PlatformAdminUserAuthenticationToken) {
+            // Before the JWT branch it extends: acting as the platform admin, the organization
+            // on the token is only where the person happens to be a member.
+            TenantContext.set(TenantContext.SYSTEM);
+        } else if (authentication instanceof JwtAuthenticationToken jwt) {
             TenantContext.set(jwt.getOrganizationId());
         } else if (authentication instanceof ApiKeyAuthenticationToken apiKey) {
             TenantContext.set(apiKey.getOrganizationId());

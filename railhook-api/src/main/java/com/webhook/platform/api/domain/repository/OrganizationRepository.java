@@ -27,6 +27,12 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
     @Query("SELECT o FROM Organization o JOIN FETCH o.plan WHERE o.id = :id")
     Optional<Organization> findByIdWithPlan(@Param("id") UUID id);
 
+    long countBySuspendedAtIsNotNull();
+
+    /** {@code [organizationId, maxEventsPerMonth]} of each given organization's plan. */
+    @Query("SELECT o.id, p.maxEventsPerMonth FROM Organization o JOIN o.plan p WHERE o.id IN :organizationIds")
+    java.util.List<Object[]> findEventLimits(@Param("organizationIds") java.util.Collection<UUID> organizationIds);
+
     /**
      * The operator's listing: every organization, newest first, optionally narrowed by name.
      *
@@ -38,7 +44,12 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
      * organization of its own.
      */
     @Query("SELECT o FROM Organization o JOIN FETCH o.plan "
-            + "WHERE (:search IS NULL OR LOWER(o.name) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))) "
+            + "WHERE (:search IS NULL OR LOWER(o.name) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) "
+            // Or by a member's address: "which organization is ops@customer.com in" is the
+            // question a support ticket arrives with, and it names a person, not an organization.
+            + "OR EXISTS (SELECT 1 FROM Membership m JOIN User u ON m.userId = u.id "
+            + "WHERE m.organizationId = o.id "
+            + "AND LOWER(u.email) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))) "
             + "AND (:suspendedOnly = FALSE OR o.suspendedAt IS NOT NULL)")
     Page<Organization> searchForOperator(@Param("search") String search,
             @Param("suspendedOnly") boolean suspendedOnly,

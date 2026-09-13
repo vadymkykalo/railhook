@@ -15,6 +15,8 @@ const FAKE_USER: CurrentUserResponse = {
   // renders the "nothing was sent" wording the majority of installs see.
   emailDeliveryEnabled: false,
   hasPassword: true,
+  // An organization OWNER is not a platform admin, which is the case nearly every page is in.
+  platformAdmin: false,
 };
 
 const FAKE_AUTH_STATE: AuthState = {

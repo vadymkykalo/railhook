@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, ChevronsLeft, LogOut, Settings, X } from 'lucide-react';
+import { BookOpen, ChevronsLeft, LogOut, Settings, ShieldCheck, X } from 'lucide-react';
 import { RailhookIcon } from '../components/icons/RailhookIcon';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
@@ -8,7 +8,7 @@ import { docsUrl } from '../lib/docsUrl';
 import { hasMinRole, type Role } from '../auth/ProtectedRoute';
 import ProjectSwitcher from '../components/ProjectSwitcher';
 import OrganizationSwitcher from '../components/OrganizationSwitcher';
-import { PROJECT_SECTIONS, SETTINGS_SECTION, segmentOf, type NavSection } from './nav.config';
+import { PLATFORM_SECTION, PROJECT_SECTIONS, SETTINGS_SECTION, segmentOf, type NavSection } from './nav.config';
 import type { CurrentUserResponse } from '../types/api.types';
 
 interface SidebarProps {
@@ -143,6 +143,27 @@ export default function Sidebar({
           <Settings className="h-4 w-4 flex-shrink-0" />
           {!narrow && <span>{t('nav.settings')}</span>}
         </Link>
+        {/* Only for the people who run the deployment. Hiding it is a courtesy, not the
+            control: the pages refuse without `platformAdmin`, and the API refuses anyone
+            not listed in PLATFORM_ADMIN_EMAILS whatever this renders. */}
+        {user.platformAdmin && (
+          <Link
+            to={PLATFORM_SECTION.path()}
+            onClick={isMobile ? onNavigate : undefined}
+            aria-current={PLATFORM_SECTION.owns.includes(segment) ? 'page' : undefined}
+            title={narrow ? t('nav.platformAdmin') : undefined}
+            className={cn(
+              'relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors',
+              narrow && 'justify-center px-2',
+              PLATFORM_SECTION.owns.includes(segment)
+                ? 'bg-secondary font-medium text-foreground'
+                : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+            )}
+          >
+            <ShieldCheck className="h-4 w-4 flex-shrink-0" />
+            {!narrow && <span>{t('nav.platformAdmin')}</span>}
+          </Link>
+        )}
       </div>
 
       <div className="border-t border-rail p-2">

@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Network, Radio, Send, GitBranch, BarChart3, Wrench,
   Webhook, Bell, ArrowDownToLine, Repeat2, FileJson2, Shield, Activity,
   AlertTriangle, History, GitCompare, Play, TestTube, Cable, Users, Key,
-  FileText, Building2, CreditCard, Settings,
+  FileText, Building2, CreditCard, Settings, ShieldCheck,
 } from 'lucide-react';
 import type { Role } from '../auth/ProtectedRoute';
 
@@ -163,6 +163,31 @@ export const SETTINGS_SECTION: NavSection = {
   ],
 };
 
+/**
+ * The platform admin panel, for the people who run the deployment — reached from the sidebar
+ * footer, and only offered when `/auth/me` says `platformAdmin`.
+ *
+ * Deliberately no `requiredRole`: an organization role has nothing to do with it, and an OWNER
+ * is not a platform admin. The pages check `platformAdmin` themselves, and the server checks it
+ * again — with the sign-in's age — on every request.
+ */
+export const PLATFORM_SECTION: NavSection = {
+  nameKey: 'nav.platformAdmin',
+  path: () => '/admin/platform',
+  icon: ShieldCheck,
+  owns: ['platform', 'platform-organizations', 'platform-users'],
+  tabs: [
+    { nameKey: 'nav.platformOverview', path: () => '/admin/platform', icon: LayoutDashboard, owns: ['platform'] },
+    {
+      nameKey: 'nav.platformOrganizations',
+      path: () => '/admin/platform/organizations',
+      icon: Building2,
+      owns: ['platform-organizations'],
+    },
+    { nameKey: 'nav.platformUsers', path: () => '/admin/platform/users', icon: Users, owns: ['platform-users'] },
+  ],
+};
+
 /** API keys live per project, so they hang off the project rail's settings tab. */
 export const PROJECT_SETTINGS_TABS: NavEntry[] = [tab('nav.apiKeys', 'api-keys', Key)];
 
@@ -172,12 +197,16 @@ export function segmentOf(pathname: string): string {
   const parts = afterAdmin.split('/').filter(Boolean);
   if (parts[0] === 'projects' && parts.length >= 3) return parts[2];
   if (parts[0] === 'start' && parts.length >= 2) return parts[1];
+  // The panel's views are one level deeper, so each is named for its second segment: otherwise
+  // Overview, Organizations and Users would all be "platform", and every tab would be current.
+  if (parts[0] === 'platform') return parts[1] ? `platform-${parts[1]}` : 'platform';
   return parts[0] ?? '';
 }
 
 export function sectionFor(pathname: string): NavSection | undefined {
   const segment = segmentOf(pathname);
   if (SETTINGS_SECTION.owns.includes(segment)) return SETTINGS_SECTION;
+  if (PLATFORM_SECTION.owns.includes(segment)) return PLATFORM_SECTION;
   return PROJECT_SECTIONS.find((s) => s.owns.includes(segment));
 }
 

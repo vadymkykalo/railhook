@@ -26,6 +26,8 @@ public class AuthRateLimiterService {
     private static final String LOGIN_EMAIL_KEY_PREFIX = "rate_limiter:auth:login:email:";
     private static final String LOGIN_TOKEN_KEY_PREFIX = "rate_limiter:auth:login:token:";
     private static final String REGISTER_KEY_PREFIX = "rate_limiter:auth:register:";
+    private static final String PLATFORM_ADMIN_KEY_PREFIX = "rate_limiter:platform_admin:";
+    static final int PLATFORM_ADMIN_PER_MINUTE = 120;
     private static final Duration KEY_TTL = Duration.ofMinutes(5);
 
     private final RedissonClient redissonClient;
@@ -94,6 +96,15 @@ public class AuthRateLimiterService {
             return tryAcquire(LOGIN_TOKEN_KEY_PREFIX + CryptoUtils.hashApiKey(token), loginRateLimit);
         }
         return true;
+    }
+
+    /**
+     * The platform admin API, per admin user (or per address for the operator token). Generous
+     * for a person clicking through the panel — a screen is a handful of requests — and a hard
+     * stop for a script walking every organization with a stolen session.
+     */
+    public boolean allowPlatformAdmin(String caller) {
+        return tryAcquire(PLATFORM_ADMIN_KEY_PREFIX + caller, PLATFORM_ADMIN_PER_MINUTE);
     }
 
     private boolean tryAcquire(String key, int ratePerMinute) {

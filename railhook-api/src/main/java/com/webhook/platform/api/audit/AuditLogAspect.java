@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.entity.AuditLog;
 import com.webhook.platform.api.domain.repository.AuditLogRepository;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
+import com.webhook.platform.api.security.PlatformAdminUserAuthenticationToken;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.api.tenancy.TenantPropagatingTaskDecorator;
@@ -86,7 +87,11 @@ public class AuditLogAspect {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof JwtAuthenticationToken jwtAuth) {
             userId = jwtAuth.getUserId();
-            orgId = jwtAuth.getOrganizationId();
+            // A platform admin's token still names the organization they are a member of, which
+            // is not the one they are acting on — that is the handler's organizationId, read
+            // below. Recording it against their own would put a suspension of someone else into
+            // the admin's organization's log and leave the suspended tenant's log without it.
+            orgId = auth instanceof PlatformAdminUserAuthenticationToken ? null : jwtAuth.getOrganizationId();
         } else if (auth instanceof ApiKeyAuthenticationToken apiKeyAuth) {
             orgId = apiKeyAuth.getOrganizationId();
         }
@@ -118,6 +123,17 @@ public class AuditLogAspect {
             executor.execute(() -> saveAuditLog(action, resourceType, resourceId, uid, oid, "FAILURE", errorMsg, durationMs, ip, details));
             throw ex;
         }
+    }
+
+    /**
+     * Records a row that no single annotated method describes — the platform admin filter's
+     * request log — on the same ordered writer as everything else.
+     */
+    public void recordAsync(String action, String resourceType, UUID resourceId,
+                            UUID userId, UUID orgId, String status, String errorMessage,
+                            int durationMs, String clientIp, String details) {
+        executor.execute(() -> saveAuditLog(action, resourceType, resourceId, userId, orgId, status, errorMessage,
+                durationMs, clientIp, details));
     }
 
     public void saveAuditLog(String action, String resourceType, UUID resourceId,

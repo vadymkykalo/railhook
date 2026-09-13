@@ -24,6 +24,10 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
 
     Optional<UserSession> findByIdAndUserId(UUID id, UUID userId);
 
+    /** {@code [userId, lastSeenAt]}: the latest activity on any session of each given account. */
+    @Query("SELECT s.userId, MAX(s.lastSeenAt) FROM UserSession s WHERE s.userId IN :userIds GROUP BY s.userId")
+    List<Object[]> findLastSeenOfUsers(@Param("userIds") java.util.Collection<UUID> userIds);
+
     List<UserSession> findByUserIdAndRevokedAtIsNullAndExpiresAtAfterOrderByLastSeenAtDesc(
             UUID userId, Instant now);
 

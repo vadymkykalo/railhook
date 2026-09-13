@@ -234,6 +234,10 @@ platform:
     # Independent of org membership/JWT — see PlatformAdminAuthenticationFilter. Leave unset to
     # keep these endpoints unreachable (fail closed) until an operator explicitly needs them.
     token: ${PLATFORM_ADMIN_TOKEN:}
+    # Verified addresses of the people who may open the platform admin panel with an ordinary
+    # sign-in (comma-separated). Empty means nobody — see PlatformAdminAccessService for the
+    # checks a listed address still has to pass.
+    emails: ${PLATFORM_ADMIN_EMAILS:}
 
 webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY}

@@ -39,6 +39,8 @@ tags:
   description: Incoming webhook source configuration
 - name: Transformations
   description: Reusable payload transformation templates
+- name: Organization Admin
+  description: "Operator view of every tenant, and suspension (platform admin only)"
 - name: Events
   description: Event history and test events
 - name: Events
@@ -65,11 +67,10 @@ tags:
   description: "User registration, login, and session management"
 - name: Endpoints
   description: Webhook endpoint configuration
-- name: Organization Admin
-  description: "Operator view of every tenant, and suspension (platform-admin operator\
-    \ credential only)"
 - name: Incoming Destinations
   description: Incoming webhook forwarding destinations
+- name: Platform Admin
+  description: Deployment-wide overview and accounts (platform admin only)
 - name: Encryption Admin
   description: Encryption key management and rotation (platform-admin operator credential
     only)
@@ -4335,7 +4336,8 @@ paths:
       summary: Suspend an organization
       description: "Stops the organization changing anything — ingest included — until\
         \ it is reinstated. Reads keep working, so the tenant can sign in and be shown\
-        \ why. Independent of billing status, so a payment does not lift it."
+        \ why. Independent of billing status, so a payment does not lift it. A signed-in\
+        \ platform admin's own address is recorded as suspendedBy."
       operationId: adminSuspendOrganization
       parameters:
       - name: organizationId
@@ -4364,7 +4366,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminOrganizationResponse"
         "403":
-          description: Forbidden — requires the platform-admin operator credential
+          description: Forbidden — requires the platform admin
           content:
             '*/*':
               schema:
@@ -4376,6 +4378,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminOrganizationResponse"
       security:
+      - bearerAuth: []
       - platformAdminToken: []
   /api/v1/admin/organizations/{organizationId}/reinstate:
     post:
@@ -4383,7 +4386,7 @@ paths:
       - Organization Admin
       summary: Reinstate an organization
       description: Lifts a suspension. Reinstating one that is not suspended is a
-        no-op.
+        no-op. The optional reason is kept in the organization's audit log.
       operationId: adminReinstateOrganization
       parameters:
       - name: organizationId
@@ -4392,6 +4395,11 @@ paths:
         schema:
           type: string
           format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReinstateOrganizationRequest"
       responses:
         "200":
           description: Reinstated
@@ -4400,7 +4408,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminOrganizationResponse"
         "403":
-          description: Forbidden — requires the platform-admin operator credential
+          description: Forbidden — requires the platform admin
           content:
             '*/*':
               schema:
@@ -4412,6 +4420,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminOrganizationResponse"
       security:
+      - bearerAuth: []
       - platformAdminToken: []
   /api/v1/admin/encryption/rotate:
     post:
@@ -6295,13 +6304,86 @@ paths:
       responses:
         "200":
           description: OK
+  /api/v1/admin/users:
+    get:
+      tags:
+      - Platform Admin
+      summary: List accounts
+      description: "Every account on this deployment, newest first, optionally narrowed\
+        \ by address or name: verification, status, sign-in methods, organizations\
+        \ and last activity. Never carries a password hash or any token."
+      operationId: adminListUsers
+      parameters:
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: pageable
+        in: query
+        required: true
+        schema:
+          $ref: "#/components/schemas/Pageable"
+      responses:
+        "200":
+          description: A page of accounts
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminUserResponse"
+        "403":
+          description: Forbidden — requires the platform admin
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminUserResponse"
+        "429":
+          description: Too many platform admin requests
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminUserResponse"
+      security:
+      - bearerAuth: []
+      - platformAdminToken: []
+  /api/v1/admin/overview:
+    get:
+      tags:
+      - Platform Admin
+      summary: Deployment overview
+      description: "Organizations, accounts and sign-ups, event and delivery volume,\
+        \ active tunnels, organizations at 80% or more of their monthly event limit,\
+        \ and the most recent sign-ups. Counts only."
+      operationId: adminGetOverview
+      responses:
+        "200":
+          description: The overview
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PlatformOverviewResponse"
+        "403":
+          description: Forbidden — requires the platform admin
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PlatformOverviewResponse"
+        "429":
+          description: Too many platform admin requests
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PlatformOverviewResponse"
+      security:
+      - bearerAuth: []
+      - platformAdminToken: []
   /api/v1/admin/organizations:
     get:
       tags:
       - Organization Admin
       summary: List organizations
       description: "Every organization on this deployment, newest first. Optionally\
-        \ narrowed by name, or to those currently suspended. Requires X-Platform-Admin-Token."
+        \ narrowed by name or a member's address, or to those currently suspended."
       operationId: adminListOrganizations
       parameters:
       - name: search
@@ -6328,19 +6410,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/PageAdminOrganizationResponse"
         "403":
-          description: Forbidden — requires the platform-admin operator credential
+          description: Forbidden — requires the platform admin
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PageAdminOrganizationResponse"
       security:
+      - bearerAuth: []
       - platformAdminToken: []
   /api/v1/admin/organizations/{organizationId}:
     get:
       tags:
       - Organization Admin
       summary: Get one organization
-      description: "Plan, billing status, project and member counts, and any suspension."
+      description: "Plan, billing status, owner, project and member counts, events\
+        \ this month, and any suspension."
       operationId: adminGetOrganization
       parameters:
       - name: organizationId
@@ -6357,7 +6441,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminOrganizationResponse"
         "403":
-          description: Forbidden — requires the platform-admin operator credential
+          description: Forbidden — requires the platform admin
           content:
             '*/*':
               schema:
@@ -6369,6 +6453,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminOrganizationResponse"
       security:
+      - bearerAuth: []
       - platformAdminToken: []
   /api/v1/admin/organizations/{organizationId}/usage:
     get:
@@ -6395,7 +6480,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UsageResponse"
         "403":
-          description: Forbidden — requires the platform-admin operator credential
+          description: Forbidden — requires the platform admin
           content:
             '*/*':
               schema:
@@ -6407,6 +6492,133 @@ paths:
               schema:
                 $ref: "#/components/schemas/UsageResponse"
       security:
+      - bearerAuth: []
+      - platformAdminToken: []
+  /api/v1/admin/organizations/{organizationId}/projects:
+    get:
+      tags:
+      - Organization Admin
+      summary: Projects of one organization
+      description: "The organization's live projects: name and creation time, nothing\
+        \ they contain."
+      operationId: adminListOrganizationProjects
+      parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: pageable
+        in: query
+        required: true
+        schema:
+          $ref: "#/components/schemas/Pageable"
+      responses:
+        "200":
+          description: A page of projects
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminProjectResponse"
+        "403":
+          description: Forbidden — requires the platform admin
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminProjectResponse"
+        "404":
+          description: No such organization
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminProjectResponse"
+      security:
+      - bearerAuth: []
+      - platformAdminToken: []
+  /api/v1/admin/organizations/{organizationId}/members:
+    get:
+      tags:
+      - Organization Admin
+      summary: Members of one organization
+      description: "Each member's address, role, membership and account status, sign-in\
+        \ methods, and when they joined and were last active."
+      operationId: adminListOrganizationMembers
+      parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: pageable
+        in: query
+        required: true
+        schema:
+          $ref: "#/components/schemas/Pageable"
+      responses:
+        "200":
+          description: A page of members
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminMemberResponse"
+        "403":
+          description: Forbidden — requires the platform admin
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminMemberResponse"
+        "404":
+          description: No such organization
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminMemberResponse"
+      security:
+      - bearerAuth: []
+      - platformAdminToken: []
+  /api/v1/admin/organizations/{organizationId}/audit-log:
+    get:
+      tags:
+      - Organization Admin
+      summary: Audit log of one organization
+      description: "Who did what in the organization, newest first: action, resource,\
+        \ actor, outcome, address. Without request bodies."
+      operationId: adminListOrganizationAuditLog
+      parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: pageable
+        in: query
+        required: true
+        schema:
+          $ref: "#/components/schemas/Pageable"
+      responses:
+        "200":
+          description: A page of audit entries
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminAuditEntryResponse"
+        "403":
+          description: Forbidden — requires the platform admin
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminAuditEntryResponse"
+        "404":
+          description: No such organization
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminAuditEntryResponse"
+      security:
+      - bearerAuth: []
       - platformAdminToken: []
   /api/v1/admin/encryption/status:
     get:
@@ -8788,10 +9000,18 @@ components:
         createdAt:
           type: string
           format: date-time
+        ownerEmail:
+          type: string
         projectCount:
           type: integer
           format: int64
         memberCount:
+          type: integer
+          format: int64
+        eventsThisMonth:
+          type: integer
+          format: int64
+        eventsLimit:
           type: integer
           format: int64
         suspendedAt:
@@ -8801,6 +9021,13 @@ components:
           type: string
         suspendedBy:
           type: string
+    ReinstateOrganizationRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          minLength: 0
     EncryptionRotationResponse:
       type: object
       properties:
@@ -8912,8 +9139,6 @@ components:
           format: int64
         sort:
           $ref: "#/components/schemas/SortObject"
-        unpaged:
-          type: boolean
         paged:
           type: boolean
         pageNumber:
@@ -8922,14 +9147,16 @@ components:
         pageSize:
           type: integer
           format: int32
+        unpaged:
+          type: boolean
     SortObject:
       type: object
       properties:
         empty:
           type: boolean
-        unsorted:
-          type: boolean
         sorted:
+          type: boolean
+        unsorted:
           type: boolean
     TunnelRequestLog:
       type: object
@@ -10506,6 +10733,8 @@ components:
           type: boolean
         hasPassword:
           type: boolean
+        platformAdmin:
+          type: boolean
     AuditLogResponse:
       type: object
       properties:
@@ -10588,6 +10817,161 @@ components:
           type: array
           items:
             type: string
+    AdminUserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        fullName:
+          type: string
+        emailVerified:
+          type: boolean
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - PENDING_VERIFICATION
+          - DISABLED
+        signInMethods:
+          type: array
+          items:
+            type: string
+        organizations:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizationMembership"
+        createdAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+    OrganizationMembership:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          type: string
+          enum:
+          - OWNER
+          - DEVELOPER
+          - VIEWER
+          - API_KEY
+    PageAdminUserResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUserResponse"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    AdminSignupResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+        fullName:
+          type: string
+        emailVerified:
+          type: boolean
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - PENDING_VERIFICATION
+          - DISABLED
+        signInMethods:
+          type: array
+          items:
+            type: string
+        organizationId:
+          type: string
+          format: uuid
+        organizationName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    PlatformOverviewResponse:
+      type: object
+      properties:
+        organizations:
+          type: integer
+          format: int64
+        suspendedOrganizations:
+          type: integer
+          format: int64
+        users:
+          type: integer
+          format: int64
+        signupsToday:
+          type: integer
+          format: int64
+        signups7d:
+          type: integer
+          format: int64
+        signups30d:
+          type: integer
+          format: int64
+        eventsToday:
+          type: integer
+          format: int64
+        events30d:
+          type: integer
+          format: int64
+        deliveriesSucceeded24h:
+          type: integer
+          format: int64
+        deliveriesFailed24h:
+          type: integer
+          format: int64
+        activeTunnels:
+          type: integer
+          format: int64
+        organizationsNearQuota:
+          type: integer
+          format: int64
+        recentSignups:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSignupResponse"
+        generatedAt:
+          type: string
+          format: date-time
     PageAdminOrganizationResponse:
       type: object
       properties:
@@ -10604,6 +10988,176 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AdminOrganizationResponse"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    AdminProjectResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    PageAdminProjectResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminProjectResponse"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    AdminMemberResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+          enum:
+          - OWNER
+          - DEVELOPER
+          - VIEWER
+          - API_KEY
+        membershipStatus:
+          type: string
+          enum:
+          - INVITED
+          - ACTIVE
+          - DISABLED
+        emailVerified:
+          type: boolean
+        userStatus:
+          type: string
+          enum:
+          - ACTIVE
+          - PENDING_VERIFICATION
+          - DISABLED
+        signInMethods:
+          type: array
+          items:
+            type: string
+        joinedAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+    PageAdminMemberResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminMemberResponse"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    AdminAuditEntryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        resourceType:
+          type: string
+        resourceId:
+          type: string
+          format: uuid
+        actorEmail:
+          type: string
+        status:
+          type: string
+        clientIp:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    PageAdminAuditEntryResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminAuditEntryResponse"
         number:
           type: integer
           format: int32
