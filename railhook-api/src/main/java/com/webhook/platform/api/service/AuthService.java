@@ -51,6 +51,7 @@ public class AuthService {
     private final UserSessionService userSessionService;
     private final AccountLockoutService accountLockoutService;
     private final EmailService emailService;
+    private final ProjectService projectService;
     private final boolean billingEnabled;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -67,6 +68,7 @@ public class AuthService {
             UserSessionService userSessionService,
             AccountLockoutService accountLockoutService,
             EmailService emailService,
+            ProjectService projectService,
             @Value("${billing.enabled:false}") boolean billingEnabled) {
         this.userRepository = userRepository;
         this.organizationRepository = organizationRepository;
@@ -81,6 +83,7 @@ public class AuthService {
         this.userSessionService = userSessionService;
         this.accountLockoutService = accountLockoutService;
         this.emailService = emailService;
+        this.projectService = projectService;
         this.billingEnabled = billingEnabled;
     }
 
@@ -168,7 +171,8 @@ public class AuthService {
      * The organization a new account starts in, on the plan this deployment gives new
      * organizations, with the account as its owner. Shared by password registration and by
      * {@link ExternalSignInService}, so an account created through Google lands on exactly the
-     * plan a registered one does. Runs inside the caller's system scope and transaction.
+     * plan — and the first project — a registered one does. Runs inside the caller's system scope
+     * and transaction.
      */
     public Organization createOrganizationOwnedBy(User owner, String organizationName) {
         String defaultPlanName = billingEnabled ? "free" : "self_hosted";
@@ -186,6 +190,10 @@ public class AuthService {
                 .organizationId(organization.getId())
                 .role(MembershipRole.OWNER)
                 .build());
+
+        // Every dashboard section is scoped to a project; an organization without one opens onto
+        // a navigation where nothing leads anywhere yet.
+        projectService.createFirstProject(organization);
         return organization;
     }
 

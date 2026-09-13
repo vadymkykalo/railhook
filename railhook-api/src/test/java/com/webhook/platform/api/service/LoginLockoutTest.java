@@ -74,7 +74,8 @@ class LoginLockoutTest {
         lockout = new AccountLockoutService(userRepository, true, 3, 60, 900, 60);
         authService = new AuthService(userRepository, organizationRepository, membershipRepository,
                 planRepository, jwtUtil, encoder, tokenBlacklistService, userSessionService,
-                lockout, emailService, false);
+                lockout, emailService,
+                org.mockito.Mockito.mock(ProjectService.class), false);
 
         user = User.builder()
                 .id(UUID.randomUUID())

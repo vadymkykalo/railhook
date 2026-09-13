@@ -59,13 +59,15 @@ describe('the rail without a project in the URL', () => {
     expect(screen.queryByText(/Select project/i)).toBeNull();
   });
 
-  it('sends you to make one when the account has none', async () => {
-    // With nothing to fall back to, '/admin/projects' is the honest destination.
+  it('sends each entry to its own setup screen when the account has none', async () => {
+    // '/admin/projects' for every entry was six links to one page — on production a brand-new
+    // account read it as a rail it could not click. Each section now opens a screen that says
+    // what it is for and creates the project that unlocks it.
     vi.mocked(projectsApi.list).mockResolvedValue([]);
     renderAt('/admin/dashboard');
 
     const deliveries = await screen.findByRole('link', { name: /Deliveries/i });
-    expect(deliveries).toHaveAttribute('href', '/admin/projects');
+    expect(deliveries).toHaveAttribute('href', '/admin/start/deliveries');
   });
 
   it('leaves the project in the URL alone', async () => {
