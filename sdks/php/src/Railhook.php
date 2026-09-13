@@ -13,7 +13,7 @@ use Railhook\Api\IncomingEvents;
 
 class Railhook
 {
-    private const SDK_VERSION = '2.20.1';
+    private const SDK_VERSION = '2.20.0';
 
     private string $apiKey;
     private string $baseUrl;
