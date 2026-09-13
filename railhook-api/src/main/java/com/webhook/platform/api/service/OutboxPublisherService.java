@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.tenancy.SystemTenant;
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
@@ -105,7 +106,7 @@ public class OutboxPublisherService {
                 .register(meterRegistry);
 
         Gauge.builder("outbox_queue_depth", outboxMessageRepository,
-                        repo -> repo.countByStatus(OutboxStatus.PENDING))
+                        repo -> countAcrossOrganizations(repo, OutboxStatus.PENDING))
                 .description("Number of outbox messages by status")
                 .tag("status", "pending")
                 .register(meterRegistry);
@@ -114,19 +115,19 @@ public class OutboxPublisherService {
         // of messages stuck SENDING (in-flight past batch-send-timeout-seconds) produced no
         // metric signal at all. The OutboxSendingStuck alert is what reads this tag.
         Gauge.builder("outbox_queue_depth", outboxMessageRepository,
-                        repo -> repo.countByStatus(OutboxStatus.SENDING))
+                        repo -> countAcrossOrganizations(repo, OutboxStatus.SENDING))
                 .description("Number of outbox messages by status")
                 .tag("status", "sending")
                 .register(meterRegistry);
 
         Gauge.builder("outbox_queue_depth", outboxMessageRepository,
-                        repo -> repo.countByStatus(OutboxStatus.FAILED))
+                        repo -> countAcrossOrganizations(repo, OutboxStatus.FAILED))
                 .description("Number of outbox messages by status")
                 .tag("status", "failed")
                 .register(meterRegistry);
 
         Gauge.builder("outbox_queue_depth", outboxMessageRepository,
-                        repo -> repo.countByStatus(OutboxStatus.DEAD))
+                        repo -> countAcrossOrganizations(repo, OutboxStatus.DEAD))
                 .description("Number of outbox messages by status")
                 .tag("status", "dead")
                 .register(meterRegistry);
@@ -134,6 +135,15 @@ public class OutboxPublisherService {
         Gauge.builder("outbox_oldest_pending_age_seconds", oldestPendingAgeSeconds, AtomicLong::doubleValue)
                 .description("Age in seconds of the oldest PENDING outbox message")
                 .register(meterRegistry);
+    }
+
+    /**
+     * The outbox belongs to no organization, and a gauge is read on the scraping request's
+     * thread, which no tenant filter has entered. Without the system scope the count is refused,
+     * Micrometer exports NaN, and the alerts on this gauge can never fire.
+     */
+    private static double countAcrossOrganizations(OutboxMessageRepository repo, OutboxStatus status) {
+        return TenantContext.callAsSystem(() -> repo.countByStatus(status));
     }
 
     /** Best-effort: a stale gauge reading is better than a poll that fails over a metric. */
