@@ -12,9 +12,11 @@ import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import AttemptRail from '../components/AttemptRail';
+import RetryJitterNote from '../components/RetryJitterNote';
 import { ladderTicks } from './ConnectionSetupPage';
+import { PROVIDER_SIGNATURE_HEADERS } from '../lib/publicSnippets';
 import type {
-  IncomingDestinationResponse, IncomingDestinationRequest, IncomingAuthType,
+  IncomingDestinationResponse, IncomingDestinationRequest, IncomingAuthType, IncomingSourceResponse, ProviderType,
 } from '../types/api.types';
 import { transformApi } from '../api/transform.api';
 import {
@@ -50,6 +52,31 @@ import ConfirmDialog from '../components/ConfirmDialog';
  */
 
 const AUTH_TYPES: IncomingAuthType[] = ['NONE', 'BEARER', 'BASIC', 'CUSTOM_HEADER'];
+
+const PROVIDER_NAMES: Record<ProviderType, string> = {
+  GENERIC: 'Generic', GITHUB: 'GitHub', GITLAB: 'GitLab', STRIPE: 'Stripe', SHOPIFY: 'Shopify', SLACK: 'Slack', TWILIO: 'Twilio',
+};
+
+/**
+ * The header a request to this source has to be signed in. A provider-verified source is checked
+ * against that provider's own header — Stripe-Signature, not the generic X-Signature the source row
+ * also carries, which is what this card used to show for a Stripe source.
+ */
+function signatureHeaderOf(source: IncomingSourceResponse): string | undefined {
+  if (source.verificationMode === 'NONE') return undefined;
+  if (source.verificationMode === 'PROVIDER') {
+    const header = PROVIDER_SIGNATURE_HEADERS[source.providerType];
+    if (header) return header;
+  }
+  return source.hmacHeaderName || 'X-Signature';
+}
+
+function ingressCurl(source: IncomingSourceResponse, header: string | undefined): string {
+  const lines = [`curl -X POST ${source.ingressUrl} \\`, '  -H "Content-Type: application/json" \\'];
+  if (header) lines.push(`  -H "${header}: ${source.hmacSignaturePrefix ?? ''}<hmac-sha256-hex-of-body>" \\`);
+  lines.push(`  -d '{"event": "test", "data": {}}'`);
+  return lines.join('\n');
+}
 
 // `key` maps to incomingDestinations.retryPresets.<key>.{label,desc}.
 const RETRY_PRESETS: { key: string; delays: string; attempts: string }[] = [
@@ -277,7 +304,7 @@ export default function IncomingSourceDetailPage() {
   return (
     <div className="p-4 lg:p-6">
       <PageHeader
-        eyebrow={`${source.providerType} · ${source.slug}`}
+        eyebrow={`${PROVIDER_NAMES[source.providerType] ?? source.providerType} · ${source.slug}`}
         title={source.name}
         description={t('incomingSources.detailDescription', 'Webhooks arriving at this URL are verified, then forwarded to every destination below.')}
         actions={newDestinationButton}
@@ -303,12 +330,27 @@ export default function IncomingSourceDetailPage() {
               </Button>
             </div>
             <div>
-              <div className="mono-label mb-1.5">{t('incomingSources.howToSend.curlExample')}</div>
-              <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-rail bg-secondary/40 p-3 font-mono text-[11px] text-muted-foreground">
-{`curl -X POST ${source.ingressUrl} \\
-  -H "Content-Type: application/json" \\
-  -d '{"event": "test", "data": {}}'`}
-              </pre>
+              {source.verificationMode === 'PROVIDER' && PROVIDER_SIGNATURE_HEADERS[source.providerType] ? (
+                // An unsigned cURL to a provider-verified source only ever produces a 401.
+                <p className="rounded-md border border-rail bg-secondary/40 p-3 text-xs text-muted-foreground">
+                  {t('incomingSources.howToSend.signedByProvider', {
+                    provider: PROVIDER_NAMES[source.providerType],
+                    header: signatureHeaderOf(source),
+                  })}
+                </p>
+              ) : (
+                <>
+                  <div className="mono-label mb-1.5">{t('incomingSources.howToSend.curlExample')}</div>
+                  <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-rail bg-secondary/40 p-3 font-mono text-[11px] text-muted-foreground">
+                    {ingressCurl(source, signatureHeaderOf(source))}
+                  </pre>
+                  {signatureHeaderOf(source) && (
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      {t('incomingSources.howToSend.signedCurl', { header: signatureHeaderOf(source) })}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -332,7 +374,7 @@ export default function IncomingSourceDetailPage() {
               </div>
               <div className="flex items-center justify-between gap-4">
                 <dt className="text-muted-foreground">{t('incomingSources.createDialog.verificationMode')}</dt>
-                <dd className="font-mono text-xs">{source.verificationMode}</dd>
+                <dd className="text-xs">{t(`incomingSources.verificationModes.${source.verificationMode}`)}</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
                 <dt className="text-muted-foreground">{t('incomingSources.createDialog.hmacSecret')}</dt>
@@ -345,10 +387,10 @@ export default function IncomingSourceDetailPage() {
                   />
                 </dd>
               </div>
-              {source.hmacHeaderName && (
+              {signatureHeaderOf(source) && (
                 <div className="flex items-center justify-between gap-4">
                   <dt className="text-muted-foreground">{t('incomingSources.createDialog.hmacHeaderName')}</dt>
-                  <dd className="font-mono text-xs">{source.hmacHeaderName}</dd>
+                  <dd className="font-mono text-xs">{signatureHeaderOf(source)}</dd>
                 </div>
               )}
               <div className="flex items-center justify-between gap-4">
@@ -603,6 +645,7 @@ export default function IncomingSourceDetailPage() {
                     size="full"
                     ariaLabel={t('incomingDestinations.ladderLabel', 'Retry ladder: {{count}} attempts', { count: parseInt(destMaxAttempts) || 1 })}
                   />
+                  <RetryJitterNote className="mt-2" />
                 </div>
               </div>
 

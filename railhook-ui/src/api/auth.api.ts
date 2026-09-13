@@ -1,5 +1,7 @@
 import { http } from './http';
-import type { RegisterRequest, LoginRequest, AuthResponse, CurrentUserResponse } from '../types/api.types';
+import type {
+  RegisterRequest, LoginRequest, AuthResponse, CurrentUserResponse, ChangeEmailRequest, EmailChangeResponse,
+} from '../types/api.types';
 
 /** One signed-in device, as the sessions list shows it. Carries no token material. */
 export interface SessionResponse {
@@ -51,6 +53,36 @@ export const authApi = {
 
   resendVerification: (email: string): Promise<void> => {
     return http.post<void>(`/api/v1/auth/resend-verification?email=${encodeURIComponent(email)}`);
+  },
+
+  /** The account's address and the change waiting for confirmation, if any. */
+  getEmailChange: (): Promise<EmailChangeResponse> => {
+    return http.get<EmailChangeResponse>('/api/v1/auth/email-change');
+  },
+
+  /**
+   * An unverified account moves at once (answering the CAPTCHA when one is configured); a verified
+   * one sends its password and waits for the new address to confirm.
+   */
+  requestEmailChange: (data: ChangeEmailRequest): Promise<EmailChangeResponse> => {
+    return http.post<EmailChangeResponse>('/api/v1/auth/email-change', data);
+  },
+
+  resendEmailChange: (): Promise<EmailChangeResponse> => {
+    return http.post<EmailChangeResponse>('/api/v1/auth/email-change/resend', {});
+  },
+
+  cancelEmailChange: (): Promise<void> => {
+    return http.delete<void>('/api/v1/auth/email-change');
+  },
+
+  confirmEmailChange: (token: string): Promise<void> => {
+    return http.post<void>(`/api/v1/auth/email-change/confirm?token=${encodeURIComponent(token)}`);
+  },
+
+  /** "This wasn't me", from the notice sent to the old address. */
+  cancelEmailChangeByToken: (token: string): Promise<void> => {
+    return http.post<void>(`/api/v1/auth/email-change/cancel?token=${encodeURIComponent(token)}`);
   },
 
   changePassword: (currentPassword: string, newPassword: string): Promise<void> => {

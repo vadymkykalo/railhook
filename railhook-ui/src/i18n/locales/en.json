@@ -294,6 +294,10 @@
       "CONFIGURE_MTLS": "Configure mTLS",
       "CREATE": "Create",
       "DELETE": "Delete",
+      "EMAIL_CHANGED": "Email Changed",
+      "EMAIL_CHANGE_CANCELLED": "Email Change Cancelled",
+      "EMAIL_CHANGE_REQUESTED": "Email Change Requested",
+      "EMAIL_RATE_LIMITED": "Email Limit Reached",
       "INVITE_ACCEPTED": "Invite Accepted",
       "LOGIN": "Login",
       "LOGOUT": "Logout",
@@ -442,6 +446,7 @@
       "feature3": "Full delivery transparency",
       "forgotPassword": "Forgot password?",
       "noAccount": "Don't have an account?",
+      "originRejected": "The server refused sign-in from this address: the page's origin is not on its allowed list. If you run this Railhook, add this address to CORS_ALLOWED_ORIGINS and restart the API.",
       "password": "Password",
       "submit": "Sign in",
       "submitting": "Signing in...",
@@ -507,6 +512,8 @@
     },
     "verification": {
       "banner": "Please verify your email <strong>{{email}}</strong> to unlock all features.",
+      "changeAddress": "Wrong address? Change it",
+      "changed": "Address changed. A new verification link is on its way to {{email}}.",
       "failed": "Failed to resend",
       "gateTooltip": "Verify your email to unlock this action",
       "resend": "Resend email",
@@ -662,6 +669,10 @@
     "disable": "Disable",
     "disabled": "Disabled",
     "edit": "Edit",
+    "emailSuggestion": {
+      "didYouMean": "Did you mean <suggestion>{{email}}</suggestion>?",
+      "impossible": "This address cannot receive mail."
+    },
     "enable": "Enable",
     "enabled": "Enabled",
     "error": "An unexpected error occurred",
@@ -681,6 +692,7 @@
     "pageSize": "Rows per page",
     "previous": "Previous",
     "retry": "Retry",
+    "retryJitterNote": "Each wait is jittered between 50% and 150% of its step, so retries do not arrive in lockstep: a 60s step fires anywhere from 30s to 90s.",
     "retrying": "Retrying...",
     "save": "Save",
     "saving": "Saving...",
@@ -1274,6 +1286,38 @@
     },
     "totalItems": "Total Items",
     "unknownError": "Unknown error"
+  },
+  "emailChange": {
+    "cancelPending": "Cancel change",
+    "cancelled": "Email change cancelled.",
+    "change": "Change email",
+    "currentPassword": "Current password",
+    "failed": "Could not change your email.",
+    "googleReauth": "Your account signs in with Google. Sign in with Google again, then change your email within 10 minutes.",
+    "links": {
+      "cancelErrorTitle": "Could not cancel the change",
+      "cancelFailed": "The link may be invalid, or the change was already settled.",
+      "cancelledDesc": "Your email stays as it was, and every session was signed out. If you did not ask for this change, set a new password now.",
+      "cancelledTitle": "Change cancelled",
+      "cancelling": "Cancelling the email change…",
+      "confirmErrorTitle": "Could not change your email",
+      "confirmFailed": "The link may be invalid, used or expired.",
+      "confirmedDesc": "Sign in with your new address. Every session was signed out.",
+      "confirmedTitle": "Email changed",
+      "confirming": "Confirming your new email…",
+      "noToken": "This link has no token in it.",
+      "resetPassword": "Reset password"
+    },
+    "newEmail": "New email address",
+    "pending": "Waiting for confirmation at <strong>{{email}}</strong>.",
+    "pendingHint": "Your current address keeps working until the link is opened. It expires {{expires}}.",
+    "requested": "Check {{email}} for a confirmation link.",
+    "resend": "Resend link",
+    "resent": "Confirmation link sent again.",
+    "submit": "Send confirmation link",
+    "submitUnverified": "Save and send link",
+    "unverifiedHint": "The address changes now. It stays unverified until you open the link we send to it.",
+    "verifiedHint": "Nothing changes until you open the link we send to the new address. Your current address gets a notice."
   },
   "endpoints": {
     "actions": "Actions",
@@ -1926,6 +1970,8 @@
       "copy": "Copy URL",
       "curlExample": "Example cURL request:",
       "description": "Configure your provider to send webhooks to the ingress URL below:",
+      "signedByProvider": "{{provider}} signs every webhook in the {{header}} header. Send a test event from {{provider}}'s dashboard: an unsigned request, such as a plain cURL, is rejected with 401.",
+      "signedCurl": "Replace the placeholder with the HMAC-SHA256 of the exact body, signed with this source's secret. Without a valid {{header}} the request is rejected with 401.",
       "title": "How to send webhooks"
     },
     "ingressUrl": "Ingress URL",
@@ -1957,6 +2003,11 @@
       "urlCopied": "Ingress URL copied to clipboard"
     },
     "verification": "Verification",
+    "verificationModes": {
+      "HMAC_GENERIC": "HMAC (generic)",
+      "NONE": "None",
+      "PROVIDER": "Provider signature"
+    },
     "viewDetails": "View details"
   },
   "invite": {
@@ -3649,7 +3700,7 @@
     "lastHeartbeat": "Last heartbeat",
     "localPort": "Local port",
     "noTunnels": "No active tunnels",
-    "noTunnelsDesc": "Start a tunnel from the CLI with `railhook listen --port 3000` to forward requests to your local machine.",
+    "noTunnelsDesc": "Start a tunnel from the CLI with `railhook listen 3000` to forward requests to your local machine. Install the CLI with `curl -fsSL https://railhook.io/install-cli.sh | bash` and sign in with `railhook login` first.",
     "openCount": "Open · {{count}}",
     "refresh": "Refresh",
     "stats": {

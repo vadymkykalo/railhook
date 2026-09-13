@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import AuthLayout from './AuthLayout';
 import GoogleSignInButton from './GoogleSignInButton';
 import { useTranslation } from 'react-i18next';
-import { showApiError, showSuccess } from '../lib/toast';
+import { showApiError, showError, showSuccess } from '../lib/toast';
 import { authApi } from '../api/auth.api';
 import { http } from '../api/http';
 import { useAuth } from './auth.store';
@@ -36,9 +36,19 @@ export default function LoginPage() {
       showSuccess(t('auth.login.welcomeBack'));
       navigate(redirectTo);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || t('auth.login.failed');
+      // A 403 with no message of ours is Spring refusing this page's Origin (CORS_ALLOWED_ORIGINS).
+      // The generic toast for 403 says "no permission", which is wrong about a person who has not
+      // signed in yet and says nothing an operator could fix.
+      const originRejected = err.response?.status === 403 && typeof err.response?.data?.message !== 'string';
+      const errorMessage = originRejected
+        ? t('auth.login.originRejected')
+        : err.response?.data?.message || t('auth.login.failed');
       setError(errorMessage);
-      showApiError(err, 'auth.login.failed');
+      if (originRejected) {
+        showError(errorMessage);
+      } else {
+        showApiError(err, 'auth.login.failed');
+      }
     } finally {
       setLoading(false);
     }

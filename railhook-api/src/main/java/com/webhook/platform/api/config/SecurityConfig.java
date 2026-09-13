@@ -132,6 +132,10 @@ public class SecurityConfig {
                                                                         "/api/v1/auth/refresh",
                                                                         "/api/v1/auth/verify-email",
                                                                         "/api/v1/auth/resend-verification",
+                                                                        // Opened from mail: the link is the proof,
+                                                                        // and the old address may have no session.
+                                                                        "/api/v1/auth/email-change/confirm",
+                                                                        "/api/v1/auth/email-change/cancel",
                                                                         "/api/v1/auth/forgot-password",
                                                                         "/api/v1/auth/reset-password",
                                                                         "/api/v1/auth/device/code",

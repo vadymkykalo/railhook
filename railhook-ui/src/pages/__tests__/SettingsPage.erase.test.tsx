@@ -19,6 +19,7 @@ vi.mock('../../api/auth.api', () => ({
     switchOrganization: vi.fn(),
     getCurrentUser: vi.fn(),
     eraseOwnAccount: vi.fn(),
+    getEmailChange: vi.fn().mockResolvedValue({ email: 'owner@example.com', applied: false }),
   },
 }));
 

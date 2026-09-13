@@ -1,5 +1,7 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.api.dto.validation.DeliverableEmail;
+
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -16,6 +18,7 @@ import lombok.NoArgsConstructor;
 public class AddMemberRequest {
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
+    @DeliverableEmail
     private String email;
 
     @NotNull(message = "Role is required")

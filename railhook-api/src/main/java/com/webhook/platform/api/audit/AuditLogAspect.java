@@ -136,6 +136,18 @@ public class AuditLogAspect {
                 durationMs, clientIp, details));
     }
 
+    /**
+     * An entry for work whose record cannot come from an annotation: one person's action recorded
+     * against each organization they belong to, or a refusal whose request rolls back. Written on
+     * the same writer thread as everything else, so it survives that rollback and keeps its order.
+     */
+    public void record(AuditAction action, String resourceType, UUID userId, UUID organizationId,
+                       String status, String errorMessage, String details) {
+        String ip = resolveClientIp();
+        executor.execute(() -> saveAuditLog(action.name(), resourceType, null, userId, organizationId,
+                status, errorMessage, 0, ip, details));
+    }
+
     public void saveAuditLog(String action, String resourceType, UUID resourceId,
                               UUID userId, UUID orgId, String status, String errorMessage,
                               int durationMs, String clientIp, String details) {

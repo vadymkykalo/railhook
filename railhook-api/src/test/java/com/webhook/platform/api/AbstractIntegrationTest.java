@@ -97,6 +97,9 @@ public abstract class AbstractIntegrationTest {
         // related to password-reset hashing, just needed so PasswordResetIntegrationTest can run at all).
         when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
         when(authRateLimiterService.allowPlatformAdmin(anyString())).thenReturn(true);
+        // Session refresh has its own budget (allowRefresh); unstubbed it is false and every
+        // refresh in an integration test answers 429.
+        when(authRateLimiterService.allowRefresh(anyString(), any())).thenReturn(true);
         when(tokenBlacklistService.isBlacklisted(any())).thenReturn(false);
         when(tokenBlacklistService.isTokenRevokedByEpoch(any(), any())).thenReturn(false);
     }

@@ -103,6 +103,22 @@ describe('LoginPage', () => {
     expect(screen.queryByText('the projects screen')).not.toBeInTheDocument();
   });
 
+  it('says the page\'s address was refused, not that the person lacks permission, on a 403', async () => {
+    // Spring answers a sign-in from an origin missing from CORS_ALLOWED_ORIGINS with a bare
+    // 403 "Invalid CORS request". It read as "You don't have permission" — to someone who has
+    // not signed in yet, about an account that is fine.
+    vi.spyOn(authApi, 'login').mockRejectedValue({
+      response: { status: 403, data: 'Invalid CORS request' },
+    });
+
+    renderLogin();
+    await signIn();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/CORS_ALLOWED_ORIGINS/);
+    expect(alert).not.toHaveTextContent(/permission/i);
+  });
+
   it('still says something when the server said nothing useful', async () => {
     vi.spyOn(authApi, 'login').mockRejectedValue(new Error('Network Error'));
 

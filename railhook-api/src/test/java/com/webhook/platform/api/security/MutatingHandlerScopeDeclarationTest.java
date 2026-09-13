@@ -88,6 +88,16 @@ class MutatingHandlerScopeDeclarationTest {
             "AuthController.revokeAllSessions",
             "AuthController.switchOrganization",
 
+            // Changing the address the caller signs in with. request/resend/cancel act on the
+            // caller's own account and resolve it with auth.requireUserId(), which rejects an API
+            // key outright; confirm and cancelByToken are public paths in SecurityConfig where the
+            // mailed single-use token is the credential, so no key reaches them with a scope.
+            "EmailChangeController.request",
+            "EmailChangeController.resend",
+            "EmailChangeController.cancel",
+            "EmailChangeController.confirm",
+            "EmailChangeController.cancelByToken",
+
             // Erasing your own account. Gated on auth.requireJwt(): an API key belongs to a
             // project and has no person behind it, so it must never be able to erase the human
             // who created it. Rejecting it outright is stronger than any scope it could hold.

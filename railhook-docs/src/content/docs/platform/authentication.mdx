@@ -64,7 +64,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | Access token | 15 minutes |
 | Refresh token | 24 hours |
 
-`POST /api/v1/auth/refresh` reads the `refresh_token` cookie, or a `refreshToken` field in the JSON body if there is no cookie. It returns a new access token and sets a new refresh cookie. The refresh token you spent is blacklisted.
+`POST /api/v1/auth/refresh` reads the `refresh_token` cookie, or a `refreshToken` field in the JSON body if there is no cookie. It returns a new access token and sets a new refresh cookie. The refresh token you spent is blacklisted. The dashboard retries a refresh that fails with `429` or a `5xx` and signs out only when the session itself is rejected.
 
 <Aside type="caution" title="A reused refresh token ends every session">
 Presenting a refresh token that was already spent revokes every token that user holds. A replayed refresh token is what a stolen one looks like, so Railhook treats it that way.
@@ -79,6 +79,8 @@ Sign-in is rate limited and repeated failures lock the account for a while. Both
 | Variable | Default | Meaning |
 |---|---|---|
 | `AUTH_RATE_LIMIT_LOGIN_PER_MINUTE` | `10` | Sign-in attempts per IP and per email, per minute. Past it the API answers `429`. |
+| `AUTH_RATE_LIMIT_REFRESH_PER_TOKEN_PER_MINUTE` | `30` | Session refreshes per refresh token, per minute. Refresh has its own budget and never spends the sign-in one. |
+| `AUTH_RATE_LIMIT_REFRESH_PER_IP_PER_MINUTE` | `600` | Session refreshes per IP, per minute |
 | `AUTH_LOCKOUT_ENABLED` | `true` | Turns lockout on or off |
 | `AUTH_LOCKOUT_THRESHOLD` | `5` | Consecutive failures before the first lockout |
 | `AUTH_LOCKOUT_INITIAL_SECONDS` | `60` | First lockout. Doubles with each further failure. |
@@ -134,6 +136,23 @@ Rotation never extends the old key: if it was already due to expire sooner, that
 `PLATFORM_ADMIN_TOKEN` is the credential for the operator endpoints under `/api/v1/admin/**`. It is independent of organizations: an organization `OWNER` does not get it. Leave it empty and the admin endpoints stay unreachable. Set it only when an operator needs them, and send it in the `X-Platform-Admin-Token` header.
 
 The request and response shapes for every auth endpoint are in the [API reference](/docs/api-reference/).
+
+## Change the email address
+
+Open **Settings → Profile → Change email**. What happens depends on whether the account has verified the address it has now.
+
+- **Not verified yet.** The address changes at once, and a new verification link goes to it. The link sent to the old address stops working. The account stays unverified, with the same restrictions, until the new address is verified. When the deployment has a CAPTCHA, the change asks for it, as registration does. The banner that asks you to verify offers the same form under **Wrong address? Change it**.
+- **Verified.** Enter your password. An account that signs in only with Google has no password: sign in with Google again, then change the address within 10 minutes. Nothing changes until someone opens the link sent to the new address. The old address gets a notice with a **This wasn't me** link that cancels the change. Until then, Settings shows the address waiting for confirmation, with **Resend link** and **Cancel change**.
+
+Confirming the change, or cancelling it from the old address, signs out every session. Links work once and expire after 24 hours. An address that already belongs to an account is refused with the same answer registration gives. `EMAIL_SUPPORT_ADDRESS` sets the contact the notice to the old address gives; see the [configuration reference](/docs/self-hosting/configuration/).
+
+<Aside type="caution" title="Daily limits">
+An account can change its address 3 times a day and be sent 5 verification or confirmation emails a day, counted across registration, resend and change.
+</Aside>
+
+The organization, its plan and its usage stay as they are, and a linked Google account stays linked. Each request, confirmation, cancellation and limit hit is written to the audit log of every organization the person belongs to, so an owner sees a member's address change.
+
+Registration, member invites and the billing email refuse an address whose ending cannot receive mail, such as `gmail.con`, and offer the address that was probably meant.
 
 ## Sign in with Google
 

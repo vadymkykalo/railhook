@@ -55,6 +55,8 @@ Retry `429` and `5xx` with backoff. Never retry other `4xx` errors unchanged: th
 
 ## Rate limits
 
+These are the defaults of a self-hosted deployment. Railhook Cloud has its own limits, [listed below](#railhook-cloud-limits).
+
 | Limit | Applies to | Default | On a 429 |
 |---|---|---|---|
 | Event ingestion | `POST /api/v1/events`, per project | 100 per second | `rate_limit_exceeded` with budget headers |
@@ -62,6 +64,7 @@ Retry `429` and `5xx` with backoff. Never retry other `4xx` errors unchanged: th
 | Platform | All traffic, per API instance | 5000 per second (`GLOBAL_RATE_LIMIT_PER_SECOND`) | `platform_rate_limit` |
 | Ingress URL | Webhooks received at `/ingress/…`, per source | 100 per second (`WEBHOOK_INCOMING_RATE_LIMIT_PER_SECOND`), unless the source sets its own | `Retry-After: 1` |
 | Sign-in | Per IP and per email | 10 per minute (`AUTH_RATE_LIMIT_LOGIN_PER_MINUTE`) | `429` |
+| Session refresh | Per refresh token, and per IP | 30 per minute per token (`AUTH_RATE_LIMIT_REFRESH_PER_TOKEN_PER_MINUTE`), 600 per minute per IP (`AUTH_RATE_LIMIT_REFRESH_PER_IP_PER_MINUTE`) | `429` |
 
 Every response from `POST /api/v1/events` carries the project's current budget:
 
@@ -71,6 +74,23 @@ Every response from `POST /api/v1/events` carries the project's current budget:
 | `X-RateLimit-Remaining` | Requests left in it |
 | `X-RateLimit-Reset` | Unix timestamp when the window resets |
 | `Retry-After` | On a `429` only: seconds to wait |
+
+## Railhook Cloud limits
+
+Railhook Cloud at railhook.io runs every organization on the Free plan. Every feature is included, workflows, rules, replay and mTLS among them; only volume is limited. Its limits take the place of the self-hosted defaults above:
+
+| Limit | Free plan |
+|---|---|
+| API requests | 10 per second |
+| Events | 10,000 per month |
+| Projects | 3 |
+| Endpoints | 5 per project |
+| Members | 5 per organization |
+| Event retention | 7 days |
+| Active tunnels | 1 |
+| Deliveries per event (fan-out) | 100 |
+
+A self-hosted deployment has no plan limits. Only the defaults in the tables on this page apply.
 
 ## Size and fan-out limits
 

@@ -14,6 +14,17 @@ public enum AuditAction {
     PASSWORD_RESET_REQUESTED,
     PASSWORD_RESET,
     PASSWORD_CHANGED,
+
+    /*
+     * The address an account signs in with. Recorded against every organization the person
+     * belongs to, so an owner sees a member's address change — pending, done or called off —
+     * and sees an account hammering the caps, which is what an abuse of the feature looks like.
+     */
+    EMAIL_CHANGE_REQUESTED,
+    EMAIL_CHANGED,
+    EMAIL_CHANGE_CANCELLED,
+    EMAIL_RATE_LIMITED,
+
     MEMBER_INVITED,
     MEMBER_ROLE_CHANGED,
     MEMBER_REMOVED,

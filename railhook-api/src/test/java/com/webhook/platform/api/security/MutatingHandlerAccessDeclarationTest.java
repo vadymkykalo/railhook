@@ -68,6 +68,10 @@ class MutatingHandlerAccessDeclarationTest {
             "AuthController.resendVerification",
             "AuthController.forgotPassword",
             "AuthController.resetPassword",
+            // Opened from a mailed link, possibly with no session at all: the single-use token
+            // sent to the new (confirm) or old (cancel) address is what authorises the call.
+            "EmailChangeController.confirm",
+            "EmailChangeController.cancelByToken",
             "DeviceAuthController.initiateDeviceAuth",
             "DeviceAuthController.pollDeviceToken",
             "BillingController.handleWebhook",
@@ -77,6 +81,12 @@ class MutatingHandlerAccessDeclarationTest {
             // is not the right question: a Viewer may change their own password.
             "AuthController.changePassword",
             "AuthController.updateProfile",
+            // A Viewer may change their own sign-in address, and an unverified account must be
+            // able to — it is how a mistyped address gets fixed. The service asks for the
+            // password, the CAPTCHA or a recent sign-in instead of a role.
+            "EmailChangeController.request",
+            "EmailChangeController.resend",
+            "EmailChangeController.cancel",
             "DeviceAuthController.approveDeviceCode",
             "DeviceAuthController.denyDeviceCode",
             "MemberController.acceptInvite",

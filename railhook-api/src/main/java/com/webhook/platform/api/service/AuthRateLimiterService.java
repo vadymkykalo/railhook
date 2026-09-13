@@ -28,11 +28,15 @@ public class AuthRateLimiterService {
     private static final String REGISTER_KEY_PREFIX = "rate_limiter:auth:register:";
     private static final String PLATFORM_ADMIN_KEY_PREFIX = "rate_limiter:platform_admin:";
     static final int PLATFORM_ADMIN_PER_MINUTE = 120;
+    private static final String REFRESH_IP_KEY_PREFIX = "rate_limiter:auth:refresh:ip:";
+    private static final String REFRESH_TOKEN_KEY_PREFIX = "rate_limiter:auth:refresh:token:";
     private static final Duration KEY_TTL = Duration.ofMinutes(5);
 
     private final RedissonClient redissonClient;
     private final int loginRateLimit;
     private final int registerRateLimit;
+    private final int refreshPerTokenRateLimit;
+    private final int refreshPerIpRateLimit;
     private final Counter authRateLimitFallback;
 
     /**
@@ -47,10 +51,14 @@ public class AuthRateLimiterService {
             RedissonClient redissonClient,
             MeterRegistry meterRegistry,
             @Value("${auth.rate-limit.login-per-minute:10}") int loginRateLimit,
-            @Value("${auth.rate-limit.register-per-minute:5}") int registerRateLimit) {
+            @Value("${auth.rate-limit.register-per-minute:5}") int registerRateLimit,
+            @Value("${auth.rate-limit.refresh-per-token-per-minute:30}") int refreshPerTokenRateLimit,
+            @Value("${auth.rate-limit.refresh-per-ip-per-minute:600}") int refreshPerIpRateLimit) {
         this.redissonClient = redissonClient;
         this.loginRateLimit = loginRateLimit;
         this.registerRateLimit = registerRateLimit;
+        this.refreshPerTokenRateLimit = refreshPerTokenRateLimit;
+        this.refreshPerIpRateLimit = refreshPerIpRateLimit;
 
         this.localFallbackBuckets = Caffeine.newBuilder()
                 .maximumSize(10_000)
@@ -105,6 +113,28 @@ public class AuthRateLimiterService {
      */
     public boolean allowPlatformAdmin(String caller) {
         return tryAcquire(PLATFORM_ADMIN_KEY_PREFIX + caller, PLATFORM_ADMIN_PER_MINUTE);
+    }
+
+    /**
+     * Session refresh, on a budget of its own.
+     *
+     * <p>Refresh used to go through {@link #allowTokenAction}, which spends the per-IP sign-in
+     * bucket. A dashboard refreshes its session on page loads, so ten of them in a minute logged a
+     * signed-in person out with a 429 — and everyone behind one office NAT shared those ten.
+     *
+     * <p>A refresh presents a token the server issued, so the useful bound is per token: enough
+     * for a busy person with several tabs, low enough that a stolen cookie cannot be spun freely.
+     * The per-IP ceiling sits far above normal browsing and only stops one peer cycling through
+     * many different tokens. The sign-in bucket is not touched.
+     */
+    public boolean allowRefresh(String ip, String token) {
+        if (!tryAcquire(REFRESH_IP_KEY_PREFIX + ip, refreshPerIpRateLimit)) {
+            return false;
+        }
+        if (token != null && !token.isBlank()) {
+            return tryAcquire(REFRESH_TOKEN_KEY_PREFIX + CryptoUtils.hashApiKey(token), refreshPerTokenRateLimit);
+        }
+        return true;
     }
 
     private boolean tryAcquire(String key, int ratePerMinute) {

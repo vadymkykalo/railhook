@@ -77,7 +77,8 @@ class SuspendedMembershipDeniesAccessTest {
     void setUp() {
         authService = new AuthService(userRepository, organizationRepository, membershipRepository,
                 planRepository, jwtUtil, new BCryptPasswordEncoder(4), tokenBlacklistService,
-                userSessionService, accountLockoutService, emailService, false);
+                userSessionService, accountLockoutService, emailService,
+                org.mockito.Mockito.mock(VerificationMailBudget.class), false);
 
         user = new User();
         user.setId(UUID.randomUUID());

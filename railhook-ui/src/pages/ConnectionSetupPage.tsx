@@ -10,6 +10,7 @@ import { subscriptionsApi } from '../api/subscriptions.api';
 import { useEventTypes, useProject, queryKeys } from '../api/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import AttemptRail, { type RailAttempt } from '../components/AttemptRail';
+import RetryJitterNote from '../components/RetryJitterNote';
 import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import { ErrorState } from '../components/EmptyState';
@@ -509,6 +510,7 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
                 span: formatLadderDelay(Math.round((ticks[ticks.length - 1]?.delayMinutes ?? 0) * 60)),
               })}
             />
+            <RetryJitterNote className="mt-2" />
           </div>
           {chosenTypes.length > 0 && (
             <p className="text-xs text-muted-foreground">

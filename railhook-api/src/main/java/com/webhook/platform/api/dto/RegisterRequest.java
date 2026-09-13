@@ -1,5 +1,7 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.api.dto.validation.DeliverableEmail;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -16,6 +18,7 @@ import lombok.NoArgsConstructor;
 public class RegisterRequest {
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
+    @DeliverableEmail
     private String email;
 
     @NotBlank(message = "Password is required")

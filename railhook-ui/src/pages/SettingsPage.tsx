@@ -14,6 +14,7 @@ import StatusBadge from '../components/StatusBadge';
 import { RoleCard } from '../components/PermissionGate';
 import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
 import ActiveSessions from '../components/ActiveSessions';
+import EmailAddressSection from '../components/EmailAddressSection';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -242,6 +243,7 @@ export default function SettingsPage() {
                 {user?.organization?.name}
               </FactRow>
             </div>
+            <EmailAddressSection />
           </FormSection>
 
           <FormSection
