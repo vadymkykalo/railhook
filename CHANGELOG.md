@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.2] - 2026-09-13
+
+### Added
+
+- **Production settings are sent with the deploy.** `deploy-prod.yml` turns every `DOTENV_<NAME>`
+  variable and secret of the GitHub `production` environment into `NAME=value` and pipes them into
+  the deploy; `./railhook upgrade` applies them to `.env` before it changes anything. Changing a
+  setting is an edit in GitHub and a redeploy, not a root shell on the host. The helper's new
+  `./railhook settings < file` does the same by hand. Neither prints a value, and both refuse the
+  encryption key and salt, `JWT_SECRET`, the database and Redis passwords and the image tags.
+
 ## [2.17.1] - 2026-09-13
 
 ### Fixed
@@ -1760,7 +1771,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.17.1...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.17.2...HEAD
+[2.17.2]: https://github.com/vadymkykalo/railhook/compare/v2.17.1...v2.17.2
 [2.17.1]: https://github.com/vadymkykalo/railhook/compare/v2.17.0...v2.17.1
 [2.17.0]: https://github.com/vadymkykalo/railhook/compare/v2.16.6...v2.17.0
 [2.10.0]: https://github.com/vadymkykalo/railhook/compare/v2.9.1...v2.10.0

@@ -682,6 +682,68 @@ roll_api() {
         echo "  drained and removed ${old:0:12}"
     done
 }
+
+# Applies KEY=VALUE lines from stdin to .env: how a deploy hands this host its settings, so
+# nobody edits .env over a root shell. All or nothing — one refused line and nothing is written.
+#
+# Values are never printed and never pass through sed, so a password with | & / or $ in it
+# is written exactly as sent.
+#
+# Never from a deploy: the encryption key and salt, because a new one leaves every encrypted
+# column unreadable; the JWT and database passwords, which this host generated and Postgres
+# and Redis already hold; and the image tags, which belong to the version being upgraded to.
+apply_settings() {
+    local line key lineno=0 current status tmp
+    local -A wanted=()
+    local -a order=()
+    while IFS= read -r line || [ -n "$line" ]; do
+        lineno=$((lineno + 1))
+        line="${line%$'\r'}"
+        case "$line" in ''|'#'*) continue ;; esac
+        key="${line%%=*}"
+        if [ "$key" = "$line" ] || [[ ! "$key" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
+            echo "settings: line ${lineno} is not NAME=value — nothing applied" >&2
+            return 1
+        fi
+        case "$key" in
+            WEBHOOK_ENCRYPTION_KEY|WEBHOOK_ENCRYPTION_SALT|JWT_SECRET|POSTGRES_PASSWORD|DB_PASSWORD|REDIS_PASSWORD|API_IMAGE_TAG|WORKER_IMAGE_TAG|UI_IMAGE_TAG)
+                echo "settings: ${key} cannot be set by a deploy — nothing applied" >&2
+                return 1 ;;
+        esac
+        [ -n "${wanted[$key]+set}" ] || order+=("$key")
+        wanted[$key]="${line#*=}"
+    done
+    [ "${#order[@]}" -gt 0 ] || { echo "settings: none sent"; return 0; }
+
+    tmp=$(mktemp ./.env.settings.XXXXXX)
+    local -A seen=()
+    if [ -f .env ]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            key="${line%%=*}"
+            if [ "$key" != "$line" ] && [ -n "${wanted[$key]+set}" ] && [ -z "${seen[$key]+set}" ]; then
+                seen[$key]="${line#*=}"
+                printf '%s=%s\n' "$key" "${wanted[$key]}"
+            else
+                printf '%s\n' "$line"
+            fi
+        done < .env > "$tmp"
+        chmod --reference=.env "$tmp"
+    else
+        chmod 600 "$tmp"
+    fi
+    for key in "${order[@]}"; do
+        if [ -z "${seen[$key]+set}" ]; then
+            printf '%s=%s\n' "$key" "${wanted[$key]}" >> "$tmp"
+            status="added"
+        else
+            current="${seen[$key]}"
+            if [ "$current" = "${wanted[$key]}" ]; then status="unchanged"; else status="changed"; fi
+        fi
+        echo "settings: ${key} ${status}"
+    done
+    mv -f "$tmp" .env
+}
+
 case "${1:-help}" in
     start)   compose up -d ;;
     stop)    compose stop ;;
@@ -724,6 +786,15 @@ case "${1:-help}" in
             RAILHOOK_HELPER_REFRESHED=1 export RAILHOOK_HELPER_REFRESHED
             exec "$0" upgrade "$want"
         fi
+
+        # Settings sent with the deploy (deploy-prod.yml pipes them into the SSH session),
+        # applied by the refreshed helper before anything else changes. The refresh above
+        # reads nothing from this stdin: bash -s takes its script, and its children their
+        # input, from the curl pipe. An operator at a terminal sends none.
+        if [ ! -t 0 ]; then
+            apply_settings || { echo "Settings refused — not upgrading, nothing has changed." >&2; exit 1; }
+        fi
+
         if [ -n "$want" ]; then
             # Releases are tagged v2.16.0 in git and the images are published as 2.16.0 —
             # docker/metadata-action writes the version, not the ref. Writing the git tag
@@ -815,11 +886,13 @@ case "${1:-help}" in
             -d "${POSTGRES_DB:-webhook_platform}" \
             -Fc --no-owner --no-privileges > "$f"
         echo "wrote $f — keep .env with it, or the encrypted columns are unreadable" ;;
+    settings) apply_settings ;;
     doctor)  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh \
                  | bash -s -- --check --dir "$(pwd)" ;;
     help|-h|--help)
-        echo "railhook start|stop|restart|status|logs [service]|upgrade [version]|backup|doctor"
-        echo "  upgrade takes a backup first; it does not roll the schema back afterwards" ;;
+        echo "railhook start|stop|restart|status|logs [service]|upgrade [version]|settings < file|backup|doctor"
+        echo "  upgrade takes a backup first; it does not roll the schema back afterwards"
+        echo "  settings applies NAME=value lines to .env; upgrade reads them from stdin too" ;;
     *)       compose "$@" ;;
 esac
 HELPER

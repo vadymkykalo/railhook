@@ -114,6 +114,19 @@ making it for them.
 With `APP_ENV=production` and `BILLING_ENABLED=true`, the API refuses to start without both.
 Neither is required, or wanted, for self-hosting.
 
+## Changing settings on a Compose install
+
+`./railhook settings < file` applies `NAME=value` lines to `.env` in one step: existing names are
+replaced in place, new ones appended, and the names are printed with `changed`, `unchanged` or
+`added` — never the values. `./railhook upgrade` reads the same lines from stdin, so an
+automated deploy can send settings and a release together: that is how `railhook.io` is
+configured (GitHub environment `production`, `DOTENV_<NAME>` variables and secrets — see
+`docs/RELEASING.md`).
+
+Refused, with nothing written: the encryption key and salt, `JWT_SECRET`, the Postgres and Redis
+passwords, and the image tags. The first four were generated on the host and are already in use
+by the database and Redis; the tags belong to the version argument of `upgrade`.
+
 ## The operator back-office
 
 Everything under `/api/v1/admin/**` takes the `X-Platform-Admin-Token` header and nothing else —
