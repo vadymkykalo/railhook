@@ -207,7 +207,15 @@ export default function RegisterPage() {
           {loading ? t('auth.register.submitting') : t('auth.register.submit')}
         </Button>
 
-        <p className="text-xs text-muted-foreground">{t('auth.register.terms')}</p>
+        <p className="text-xs text-muted-foreground">
+          <Trans
+            i18nKey="auth.register.terms"
+            components={{
+              terms: <Link to="/terms" className="font-medium text-foreground underline-offset-2 hover:underline" />,
+              privacy: <Link to="/privacy" className="font-medium text-foreground underline-offset-2 hover:underline" />,
+            }}
+          />
+        </p>
       </form>
     </AuthLayout>
   );

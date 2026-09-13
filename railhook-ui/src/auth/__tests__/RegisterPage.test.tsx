@@ -145,6 +145,13 @@ describe('RegisterPage', () => {
     expect(http.getToken()).toBeNull();
   });
 
+  it('links the terms and the privacy policy it asks people to agree to', () => {
+    renderRegister();
+
+    expect(screen.getByRole('link', { name: /terms of service/i })).toHaveAttribute('href', '/terms');
+    expect(screen.getByRole('link', { name: /privacy policy/i })).toHaveAttribute('href', '/privacy');
+  });
+
   it('lets the person try again after a failure', async () => {
     vi.spyOn(authApi, 'register').mockRejectedValue(new Error('Network Error'));
 

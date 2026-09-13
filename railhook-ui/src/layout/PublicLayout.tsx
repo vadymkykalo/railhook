@@ -157,6 +157,8 @@ export function Footer() {
           </Column>
           <Column title={t('footer.contact')}>
             <RouteLink to="/contact">{t('footer.talkToUs')}</RouteLink>
+            <RouteLink to="/privacy">{t('footer.privacy')}</RouteLink>
+            <RouteLink to="/terms">{t('footer.terms')}</RouteLink>
           </Column>
         </div>
         <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-rail pt-6">
