@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.1] - 2026-09-13
+
+### Fixed
+
+- **Railhook on a phone.** Below the `sm` breakpoint the product has a layout of its own instead of
+  a shrunken desktop; desktop is unchanged.
+  - Landing: a one-line install command with an icon copy button, mobile versions of the send and
+    receive scenes with legible labels, a readable crop of the product screenshot that opens full
+    size, a two-column footer, and 40px tap targets throughout.
+  - Dashboard: record lists (deliveries, events, endpoints, connections, dead letters, audit log
+    and the rest) render as cards with labelled values, filters fold behind a Filters button, and
+    buttons, tabs, pagination and selection are 40px targets.
+  - Docs: the language tabs over code samples scroll instead of running off the page.
+- **Link previews show the current design.** The social card is the new hero, published under a new
+  file name so services that cache images by URL fetch it.
+
+### Added
+
+- **Browser layout tests.** A Playwright job checks public, auth and dashboard pages at phone and
+  desktop sizes: nothing wider than the screen, headings in view, 16px form fields and 40px targets
+  on phones.
+
 ## [2.19.0] - 2026-09-13
 
 ### Added
@@ -1823,7 +1845,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.19.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.19.1...HEAD
+[2.19.1]: https://github.com/vadymkykalo/railhook/compare/v2.19.0...v2.19.1
 [2.19.0]: https://github.com/vadymkykalo/railhook/compare/v2.18.1...v2.19.0
 [2.18.1]: https://github.com/vadymkykalo/railhook/compare/v2.18.0...v2.18.1
 [2.18.0]: https://github.com/vadymkykalo/railhook/compare/v2.17.2...v2.18.0

@@ -347,7 +347,63 @@
   mask-image: radial-gradient(ellipse 50% 58% at 50% 46%, transparent 0 42%, rgba(0, 0, 0, 0.45) 66%, #000 92%);
 }
 @media (max-width: 639px) {
-  .hero-backdrop { opacity: 0.55; }
+  /* Stronger than it used to be: at 0.55 the rails were all but invisible on a phone, and the
+     hero read as a blank page with a headline. The mask still keeps the words clear. */
+  .hero-backdrop { opacity: 0.85; }
+}
+
+/* ── Tables on a phone ─────────────────────────────────────────────────────
+   Below sm a list table is a stack of cards: each row a card, each cell a line with its column
+   name (data-label, copied from the header by Table) in front of the value. A desktop table
+   swiped sideways at 390px showed one column at a time and hid what a row was about. Cells
+   already hidden at this width (`hidden lg:table-cell`) stay hidden, so each page's own choice of
+   secondary columns carries over. Desktop is untouched: everything here is inside the query. */
+@media (max-width: 639px) {
+  .rh-table-stack { overflow: visible; }
+  .rh-table-stack > table,
+  .rh-table-stack > table > tbody { display: block; width: 100%; }
+  .rh-table-stack > table > thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  .rh-table-stack > table > tbody > tr {
+    position: relative; display: flex; flex-direction: column; gap: 0.25rem;
+    padding: 0.75rem 1rem;
+  }
+  .rh-table-stack > table > tbody > tr:has(> td[data-cell="select"]) { padding-right: 3.25rem; }
+  .rh-table-stack > table > tbody > tr > td:not(.hidden) {
+    display: flex; min-width: 0; align-items: center; justify-content: space-between;
+    gap: 0.75rem; min-height: 2.5rem; padding: 0; text-align: right; overflow-wrap: anywhere;
+  }
+  .rh-table-stack > table > tbody > tr > td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0; max-width: 40%; text-align: left;
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase; color: hsl(var(--muted-foreground));
+  }
+  .rh-table-stack > table > tbody > tr > td[data-label] > * { min-width: 0; max-width: 100%; }
+  /* A cell that holds several blocks (an endpoint's URL, then its description and badges) keeps
+     them stacked under one another beside the label, instead of squeezing them onto one line. */
+  .rh-table-stack > table > tbody > tr > td[data-label]:has(> :nth-child(2)) {
+    display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 0.75rem; row-gap: 0.125rem;
+  }
+  .rh-table-stack > table > tbody > tr > td[data-label]:has(> :nth-child(2))::before {
+    grid-column: 1; grid-row: 1 / span 9; align-self: center; max-width: none; white-space: nowrap;
+  }
+  .rh-table-stack > table > tbody > tr > td[data-label]:has(> :nth-child(2)) > * {
+    grid-column: 2; justify-self: end;
+  }
+  .rh-table-stack > table > tbody > tr > td[data-label=""]::before { content: none; }
+  .rh-table-stack > table > tbody > tr > td[data-cell="select"] {
+    position: absolute; top: 0.5rem; right: 0.5rem; width: 2.5rem; height: 2.5rem;
+    justify-content: center;
+  }
+  .rh-table-stack > table > tbody > tr > td[data-cell="select"] input[type="checkbox"] {
+    width: 1.25rem; height: 1.25rem;
+  }
+  .rh-table-stack > table > tbody > tr > td[data-cell="actions"] { justify-content: flex-end; }
+  .rh-table-stack > table > tbody > tr > td[data-cell="wide"] { display: block; text-align: left; }
+  .rh-table-stack > table > tbody > tr > td a { display: inline-flex; min-height: 2.5rem; align-items: center; }
 }
 
 /* ── The architecture diagram ────────────────────────────────────────────

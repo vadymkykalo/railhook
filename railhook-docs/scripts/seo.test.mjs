@@ -11,8 +11,8 @@ import { SITE_PLACEHOLDER, socialImageHead, pageFileFor, lastmodFor } from './se
 
 test('every page names an absolute social image on the placeholder origin nginx rewrites', () => {
   const metas = Object.fromEntries(socialImageHead.map((e) => [e.attrs.property ?? e.attrs.name, e.attrs.content]));
-  assert.equal(metas['og:image'], `${SITE_PLACEHOLDER}/og-image.png`);
-  assert.equal(metas['twitter:image'], `${SITE_PLACEHOLDER}/og-image.png`);
+  assert.equal(metas['og:image'], `${SITE_PLACEHOLDER}/social-card.png`);
+  assert.equal(metas['twitter:image'], `${SITE_PLACEHOLDER}/social-card.png`);
   for (const entry of socialImageHead) assert.equal(entry.tag, 'meta');
 });
 

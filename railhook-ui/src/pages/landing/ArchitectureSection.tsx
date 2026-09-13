@@ -211,7 +211,7 @@ export default function ArchitectureSection() {
     <Band id="architecture" labelledBy="architecture-title">
       <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,8fr)] lg:gap-12">
         <div>
-          <SectionHeading id="architecture-title" title={t('landing.architecture.title')} className="mb-0" />
+          <SectionHeading id="architecture-title" title={t('landing.architecture.title')} className="mb-0 max-sm:mb-0" />
           <div className="mt-4 grid gap-2 text-[1.05rem] text-muted-foreground">
             <p>{t('landing.architecture.stored')}</p>
             <p>{t('landing.architecture.survives')}</p>

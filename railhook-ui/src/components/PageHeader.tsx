@@ -33,7 +33,7 @@ export default function PageHeader({
           <p className={cn('max-w-2xl text-sm text-muted-foreground', title && 'mt-1')}>{description}</p>
         )}
       </div>
-      {actions && <div className="flex flex-shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-shrink-0 flex-wrap items-center gap-2 max-sm:w-full">{actions}</div>}
     </div>
   );
 }

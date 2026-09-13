@@ -1,7 +1,7 @@
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Copy, Search, X } from 'lucide-react';
+import { Copy, Search, SlidersHorizontal, X } from 'lucide-react';
 import AttemptRail, { type RailAttempt } from '../components/AttemptRail';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -55,10 +55,11 @@ export function CopyId({
       ) : (
         <code className="font-mono text-[13px] text-muted-foreground" title={value}>{short}</code>
       )}
+      {/* Hover reveals it on a desktop; a phone has no hover, so there it is always shown. */}
       <Button
         variant="ghost"
         size="icon-sm"
-        className="h-6 w-6 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/id:opacity-100 group-hover/row:opacity-100"
+        className="h-6 w-6 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/id:opacity-100 group-hover/row:opacity-100 max-sm:opacity-100"
         onClick={(e) => {
           e.stopPropagation();
           navigator.clipboard.writeText(value);
@@ -73,11 +74,30 @@ export function CopyId({
   );
 }
 
-/** The filter row. Above the table, on the page ground — never inside a card. */
+/**
+ * The filter row. Above the table, on the page ground — never inside a card.
+ *
+ * On a phone four full-width fields pushed the first record below the fold, so there the row
+ * folds behind a Filters button; from `sm` it is the same row it always was.
+ */
 export function FilterBar({ children, className }: { children: ReactNode; className?: string }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
   return (
-    <div className={cn('mb-4 flex flex-wrap items-end gap-x-3 gap-y-2', className)}>
-      {children}
+    <div className={cn('mb-4', className)}>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full sm:hidden"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <SlidersHorizontal className="h-4 w-4" aria-hidden />
+        {t(open ? 'common.hideFilters' : 'common.filters')}
+      </Button>
+      <div className={cn('flex flex-wrap items-end gap-x-3 gap-y-2 max-sm:flex-col max-sm:items-stretch', open ? 'max-sm:mt-3' : 'max-sm:hidden')}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -91,7 +111,7 @@ export function FilterField({
   className?: string;
 }) {
   return (
-    <div className={cn('flex min-w-[9rem] flex-col gap-1.5', className)}>
+    <div className={cn('flex min-w-[9rem] flex-col gap-1.5 max-sm:w-full max-sm:min-w-0', className)}>
       <Label htmlFor={id} className="mono-label">{label}</Label>
       {children}
     </div>

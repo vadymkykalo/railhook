@@ -19,6 +19,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '../components/ui/table';
 import { TablePagination } from '../components/ui/table-pagination';
+import { FilterBar } from './tableParts';
 
 const ALL_ACTIONS = [
   'CREATE', 'UPDATE', 'DELETE', 'ROTATE_SECRET', 'REVOKE',
@@ -118,7 +119,7 @@ export default function AuditLogPage() {
         ) : undefined}
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <FilterBar>
         <Select
           value={actionFilter}
           onChange={applyFilter(setActionFilter)}
@@ -164,7 +165,7 @@ export default function AuditLogPage() {
             <X className="h-3.5 w-3.5" aria-hidden /> {t('auditLog.filters.clear')}
           </Button>
         )}
-      </div>
+      </FilterBar>
 
       {isError ? (
         <ErrorState error={error} fallbackKey="auditLog.loadFailed" onRetry={() => refetch()} retrying={isRefetching} />

@@ -43,17 +43,24 @@ export default function InstallCommand({ label = false, id, className }: { label
       )}
       <div className="surface-ink overflow-hidden rounded-xl border border-rail">
         <div className="flex items-center gap-3 py-3 pl-4 pr-3">
-          <pre className="min-w-0 flex-1 whitespace-pre-wrap py-1 font-mono text-[13px] leading-relaxed [overflow-wrap:anywhere] before:select-none before:text-muted-foreground before:content-['$_'] sm:overflow-x-auto sm:whitespace-pre sm:text-sm sm:[overflow-wrap:normal]">
+          {/* One line at every width, scrolling sideways when the screen is narrower than the
+              command. Wrapped, a phone broke it inside the URL (`…/instal` / `l.sh | bash`),
+              which reads as a different command and copies by hand as a broken one. */}
+          <pre
+            data-testid="install-command"
+            className="min-w-0 flex-1 overflow-x-auto whitespace-pre py-1 font-mono text-[13px] leading-relaxed [scrollbar-width:thin] before:select-none before:text-muted-foreground before:content-['$_'] sm:text-sm"
+          >
             <code>{INSTALL_COMMAND}</code>
           </pre>
           <button
             type="button"
             onClick={onCopy}
             aria-label={t('landing.install.copyAria')}
-            className="inline-flex flex-none items-center gap-1.5 rounded-lg border border-rail px-2.5 py-1.5 text-[12.5px] font-medium text-foreground transition-colors hover:border-muted-foreground"
+            className="inline-flex flex-none items-center gap-1.5 rounded-lg border border-rail px-2.5 py-1.5 text-[12.5px] font-medium text-foreground transition-colors hover:border-muted-foreground max-sm:h-10 max-sm:w-10 max-sm:justify-center max-sm:px-0"
           >
-            {copy === 'copied' ? <Check className="h-3.5 w-3.5 text-ok" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
-            <span aria-live="polite">
+            {copy === 'copied' ? <Check className="h-3.5 w-3.5 text-ok max-sm:h-4 max-sm:w-4" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5 max-sm:h-4 max-sm:w-4" aria-hidden="true" />}
+            {/* On a phone the button is the icon alone, so the command keeps the width. */}
+            <span aria-live="polite" className="max-sm:sr-only">
               {copy === 'copied' ? t('landing.install.copied') : copy === 'failed' ? t('landing.install.copyFailed') : t('landing.install.copy')}
             </span>
           </button>

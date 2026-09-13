@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RAILHOOK_MARK } from '../../components/icons/RailhookIcon';
 import { cn } from '../../lib/utils';
@@ -70,6 +70,29 @@ const during = (time: number | null, from: number, to: number): time is number =
 /** True once the loop has passed `at` — and always in the finished picture. */
 const since = (time: number | null, at: number) => time === null || time >= at;
 
+const PHONE = '(max-width: 639px)';
+
+/**
+ * Below sm each scene is drawn again for the width rather than shrunk: the desktop drawing is
+ * 460 units wide, and squeezed into a phone card its labels came out around 9px. The phone
+ * drawing has fewer nodes and larger type on a 340-unit canvas. Desktop is untouched; without
+ * matchMedia (the prerender, jsdom) the desktop drawing is what renders.
+ */
+function usePhone(): boolean {
+  const [phone, setPhone] = useState(
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(PHONE).matches,
+  );
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const query = window.matchMedia(PHONE);
+    const update = () => setPhone(query.matches);
+    update();
+    query.addEventListener?.('change', update);
+    return () => query.removeEventListener?.('change', update);
+  }, []);
+  return phone;
+}
+
 function Packet({ curve, time, from, to, color = C.accent }: { curve: Curve; time: number | null; from: number; to: number; color?: string }) {
   if (!during(time, from, to)) return null;
   const [x, y] = pointOn(curve, progress(time, from, to));
@@ -122,7 +145,7 @@ const CHIP: Record<Kind, string> = {
 
 function Chip({ kind, children }: { kind: Kind; children: ReactNode }) {
   return (
-    <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-semibold', CHIP[kind])}>
+    <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-semibold max-sm:text-[11px]', CHIP[kind])}>
       <i className="h-1.5 w-1.5 rounded-full bg-current" />
       {children}
     </span>
@@ -155,7 +178,7 @@ function Scene({ sceneRef, motion, summary, drawing, log }: {
       <p className="sr-only">{summary}</p>
       <div aria-hidden="true" className="grid gap-3">
         {drawing}
-        <ol className="grid gap-1.5 font-mono text-[11.5px]">{log}</ol>
+        <ol className="grid gap-1.5 font-mono text-[11.5px] max-sm:text-[12px]">{log}</ol>
       </div>
     </div>
   );
@@ -177,9 +200,29 @@ const ENDPOINTS: readonly { host: string; cy: number; down?: boolean }[] = [
 const SEND_IN = between([SEND_APP.x + SEND_APP.w, 118], [SEND_HUB[0] - 27, 118]);
 const SEND_OUT = ENDPOINTS.map((e) => between([SEND_HUB[0] + 27, 118], [EP.x, e.cy]));
 
+/** The phone drawing: two customers, one of them down, on a 340×184 canvas. */
+const PHONE_SEND = (() => {
+  const app = { x: 2, w: 120, cy: 92 };
+  const hub: Pt = [172, 92];
+  const ep = { x: 216, w: 122 };
+  const endpoints: readonly { host: string; cy: number; down?: boolean }[] = [
+    { host: 'acme.com', cy: 44 },
+    { host: 'crm.dev', cy: 140, down: true },
+  ];
+  return {
+    app,
+    hub,
+    ep,
+    endpoints,
+    in: between([app.x + app.w, app.cy], [hub[0] - 27, hub[1]]),
+    out: endpoints.map((e) => between([hub[0] + 27, hub[1]], [ep.x, e.cy])),
+  };
+})();
+
 export function SendScene() {
   const { t } = useTranslation();
   const { ref, motion, time } = useSceneClock<HTMLDivElement>(SEND_LOOP);
+  const phone = usePhone();
   const s = (key: string, options?: Record<string, unknown>) => t(`landing.directions.scene.${key}`, options);
 
   const status = (down: boolean): { kind: Kind | 'wait'; code: string; label: string } => {
@@ -188,6 +231,92 @@ export function SendScene() {
     return { kind: 'ok', code: '200', label: s('delivered') };
   };
   const tone = { wait: C.slate, ok: C.ok, halt: C.halt, retry: C.retry };
+
+  if (phone) {
+    const P = PHONE_SEND;
+    const retrying = (e: (typeof P.endpoints)[number]) => Boolean(e.down) && during(time, SEND.arrive, SEND.retry);
+    const drawing = (
+      <svg viewBox="0 0 340 184" className="block h-auto w-full">
+        <path d={pathOf(P.in)} fill="none" stroke={C.line} strokeWidth="2" />
+        <Ping cx={P.ep.x} cy={P.endpoints[0].cy} time={time} at={SEND.arrive} color={C.ok} />
+        <Ping cx={P.ep.x} cy={P.endpoints[1].cy} time={time} at={SEND.arrive} color={C.halt} />
+        <Ping cx={P.ep.x} cy={P.endpoints[1].cy} time={time} at={SEND.retried} color={C.ok} />
+        {P.out.map((curve, i) => (
+          <path
+            key={P.endpoints[i].host}
+            d={pathOf(curve)}
+            fill="none"
+            stroke={retrying(P.endpoints[i]) ? C.retry : C.line}
+            strokeDasharray={retrying(P.endpoints[i]) ? '3 5' : undefined}
+            strokeWidth="2"
+          />
+        ))}
+
+        <Node x={P.app.x} cy={P.app.cy} w={P.app.w} h={56}>
+          <text x={P.app.x + 12} y={P.app.cy - 4} fill={C.ink} fontSize="13.5" fontWeight="600" className="font-sans">{t('landing.directions.yourApp')}</text>
+          <text x={P.app.x + 12} y={P.app.cy + 15} fill={C.accent} fontSize="12" className="font-mono">order.paid</text>
+        </Node>
+
+        <Hub cx={P.hub[0]} cy={P.hub[1]} ring={during(time, SEND.atHub - 80, SEND.atHub + 500) ? C.accent : undefined} />
+
+        {P.endpoints.map((e) => {
+          const st = status(Boolean(e.down));
+          const dot: Pt = [P.ep.x + P.ep.w - 14, e.cy - 9];
+          return (
+            <Node key={e.host} x={P.ep.x} cy={e.cy} w={P.ep.w} h={58}>
+              <text x={P.ep.x + 12} y={e.cy - 5} fill={C.ink} fontSize="13.5" fontWeight="600" className="font-mono">{e.host}</text>
+              {/* The code alone while it is down: the ring beside the dot is the countdown. */}
+              <text x={P.ep.x + 12} y={e.cy + 15} fontSize="12" className="font-mono">
+                <tspan fill={tone[st.kind]} fontWeight="700">{st.code}</tspan>
+                {st.kind === 'ok' && <tspan fill={C.slate} dx="6">{st.label}</tspan>}
+              </text>
+              <circle cx={dot[0]} cy={dot[1]} r="4" fill={tone[st.kind]} />
+              {retrying(e) && time !== null && (
+                <circle
+                  cx={dot[0]}
+                  cy={dot[1]}
+                  r="8.5"
+                  fill="none"
+                  stroke={C.retry}
+                  strokeWidth="2"
+                  strokeDasharray={`${53.4 * progress(time, SEND.arrive, SEND.retry)} 53.4`}
+                  transform={`rotate(-90 ${dot[0]} ${dot[1]})`}
+                />
+              )}
+            </Node>
+          );
+        })}
+
+        <Packet curve={P.in} time={time} from={SEND.emit} to={SEND.atHub} />
+        {P.out.map((curve, i) => (
+          <Packet key={P.endpoints[i].host} curve={curve} time={time} from={SEND.atHub} to={SEND.arrive} />
+        ))}
+        <Packet curve={P.out[1]} time={time} from={SEND.retry} to={SEND.retried} color={C.retry} />
+      </svg>
+    );
+
+    const log = (
+      <>
+        <LogRow shown={since(time, SEND.arrive)}>
+          <span className="truncate text-foreground">acme.com</span>
+          <Chip kind="ok">{s('delivered')}</Chip>
+          <span className="text-muted-foreground">{s('attempt', { n: 1 })}</span>
+        </LogRow>
+        <LogRow shown={since(time, SEND.arrive)}>
+          <span className="truncate text-foreground">crm.dev</span>
+          <Chip kind="retry">{s('retrying')}</Chip>
+          <span className="text-muted-foreground">{s('attempt', { n: 1 })}</span>
+        </LogRow>
+        <LogRow shown={since(time, SEND.retried)}>
+          <span className="truncate text-foreground">crm.dev</span>
+          <Chip kind="ok">{s('delivered')}</Chip>
+          <span className="text-muted-foreground">{s('attempt', { n: 2 })}</span>
+        </LogRow>
+      </>
+    );
+
+    return <Scene sceneRef={ref} motion={motion} summary={s('sendSummary')} drawing={drawing} log={log} />;
+  }
 
   const drawing = (
     <svg viewBox="0 0 460 246" className="block h-auto w-full">
@@ -297,15 +426,122 @@ const RECEIVE_IN = SOURCES.map((src) => between([SRC.x + SRC.w, src.cy], [RECEIV
 const RECEIVE_OUT = between([RECEIVE_HUB[0] + 27, RECEIVE_HUB[1]], [RECEIVE_APP.x, RECEIVE_APP.cy]);
 const DROP: Curve = [[RECEIVE_HUB[0], RECEIVE_HUB[1] + 27], [RECEIVE_HUB[0], RECEIVE_HUB[1] + 50], [RECEIVE_HUB[0] + 4, RECEIVE_HUB[1] + 70], [RECEIVE_HUB[0] + 10, RECEIVE_HUB[1] + 96]];
 
+/**
+ * The phone drawing: Stripe, the forged request and Shopify on a 340×214 canvas, with the verdict
+ * across the top so it never sits on a sender.
+ */
+const PHONE_RECEIVE = (() => {
+  const src = { x: 2, w: 128 };
+  const hub: Pt = [180, 120];
+  const app = { x: 222, w: 116, cy: 120 };
+  const sources = [SOURCES[0], { ...SOURCES[2], cy: 120 }, { ...SOURCES[3], cy: 184 }].map((source, i) =>
+    i === 0 ? { ...source, cy: 56 } : source,
+  );
+  return {
+    src,
+    hub,
+    app,
+    sources,
+    in: sources.map((source) => between([src.x + src.w, source.cy], [hub[0] - 27, hub[1]])),
+    out: between([hub[0] + 27, hub[1]], [app.x, app.cy]),
+    drop: [[hub[0], hub[1] + 27], [hub[0], hub[1] + 48], [hub[0] + 4, hub[1] + 66], [hub[0] + 10, hub[1] + 90]] as Curve,
+  };
+})();
+
 export function ReceiveScene() {
   const { t } = useTranslation();
   const { ref, motion, time } = useSceneClock<HTMLDivElement>(RECEIVE_LOOP);
+  const phone = usePhone();
   const s = (key: string, options?: Record<string, unknown>) => t(`landing.directions.scene.${key}`, options);
 
   // What the badge over the hub says: the most recent arrival within its display window.
-  const current = [...SOURCES].reverse().find((src) => during(time, src.at, src.at + 1400));
+  const drawn = phone ? PHONE_RECEIVE.sources : SOURCES;
+  const current = [...drawn].reverse().find((src) => during(time, src.at, src.at + 1400));
   const verdict: 'ok' | 'halt' | null = time === null ? 'ok' : current ? ('forged' in current ? 'halt' : 'ok') : null;
-  const appFlash = time === null || SOURCES.some((src) => !('forged' in src) && during(time, src.at + FORWARD, src.at + FORWARD + 900));
+  const appFlash = time === null || drawn.some((src) => !('forged' in src) && during(time, src.at + FORWARD, src.at + FORWARD + 900));
+
+  if (phone) {
+    const P = PHONE_RECEIVE;
+    const drawing = (
+      <svg viewBox="0 0 340 214" className="block h-auto w-full">
+        {P.in.map((curve, i) => (
+          <path key={P.sources[i].id} d={pathOf(curve)} fill="none" stroke={C.line} strokeWidth="2" strokeDasharray={'forged' in P.sources[i] ? '3 5' : undefined} />
+        ))}
+        <path d={pathOf(P.out)} fill="none" stroke={C.line} strokeWidth="2" />
+        {P.sources.filter((src) => !('forged' in src)).map((src) => (
+          <Ping key={src.id} cx={P.app.x} cy={P.app.cy} time={time} at={src.at + FORWARD} color={C.ok} />
+        ))}
+
+        {P.sources.map((src) => (
+          <Node key={src.id} x={P.src.x} cy={src.cy} w={P.src.w} h={52} dashed={'forged' in src}>
+            {src.logo ? (
+              <image href={src.logo} x={P.src.x + 10} y={src.cy - 9} width="18" height="18" />
+            ) : (
+              <g>
+                <circle cx={P.src.x + 19} cy={src.cy} r="9" fill="none" stroke={C.slate} strokeDasharray="2 2.5" />
+                <text x={P.src.x + 19} y={src.cy + 4} textAnchor="middle" fill={C.slate} fontSize="11" fontWeight="700" className="font-sans">?</text>
+              </g>
+            )}
+            <text x={P.src.x + 34} y={src.cy - 3} fill={src.name ? C.ink : C.slate} fontSize="13.5" fontWeight="600" className="font-sans">
+              {src.name ?? s('unknownSender')}
+            </text>
+            <text x={P.src.x + 34} y={src.cy + 14} fill={C.slate} fontSize="11" className="font-mono">{src.event}</text>
+          </Node>
+        ))}
+
+        <Hub
+          cx={P.hub[0]}
+          cy={P.hub[1]}
+          ring={time !== null && current && during(time, current.at - 60, current.at + 500) ? ('forged' in current ? C.halt : C.accent) : undefined}
+        />
+
+        {verdict && (
+          <g>
+            <rect x={P.hub[0] - 84} y="4" width="168" height="26" rx="13" fill={verdict === 'ok' ? C.okSoft : C.haltSoft} />
+            {verdict === 'ok' ? (
+              <path d={`M${P.hub[0] - 72} 17 l3.5 3.5 l6.5 -7`} fill="none" stroke={C.ok} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            ) : (
+              <path d={`M${P.hub[0] - 72} 13.5 l7 7 m0 -7 l-7 7`} fill="none" stroke={C.halt} strokeWidth="2" strokeLinecap="round" />
+            )}
+            <text x={P.hub[0] - 58} y="21.5" fill={verdict === 'ok' ? C.ok : C.halt} fontSize="12" fontWeight="600" className="font-mono">
+              {verdict === 'ok' ? s('signatureOk') : s('invalidSignature')}
+            </text>
+          </g>
+        )}
+
+        <Node x={P.app.x} cy={P.app.cy} w={P.app.w} h={58}>
+          <text x={P.app.x + 12} y={P.app.cy - 5} fill={C.ink} fontSize="13.5" fontWeight="600" className="font-sans">{t('landing.directions.yourApp')}</text>
+          <text x={P.app.x + 12} y={P.app.cy + 15} fontSize="12" fontWeight={appFlash ? 700 : 400} fill={appFlash ? C.ok : C.slate} className="font-mono">
+            {appFlash ? '200 OK' : 'POST /hooks'}
+          </text>
+        </Node>
+
+        {P.sources.map((src, i) => (
+          <Packet key={src.id} curve={P.in[i]} time={time} from={src.at - TRAVEL} to={src.at} />
+        ))}
+        {P.sources.map((src) =>
+          'forged' in src ? (
+            <Packet key={src.id} curve={P.drop} time={time} from={src.at} to={src.at + 700} color={C.halt} />
+          ) : (
+            <Packet key={src.id} curve={P.out} time={time} from={src.at} to={src.at + FORWARD} />
+          ),
+        )}
+      </svg>
+    );
+
+    const log = P.sources.map((src) => (
+      <LogRow key={src.id} shown={since(time, src.at)}>
+        <span className="truncate text-foreground">
+          <span className="text-muted-foreground">{src.name ?? s('unknownSender')} · </span>
+          {src.event}
+        </span>
+        {'forged' in src ? <Chip kind="halt">{s('rejected')}</Chip> : <Chip kind="ok">{s('verified')}</Chip>}
+        <span className="text-muted-foreground">{'forged' in src ? '401' : '→ 200'}</span>
+      </LogRow>
+    ));
+
+    return <Scene sceneRef={ref} motion={motion} summary={s('receiveSummary')} drawing={drawing} log={log} />;
+  }
 
   const drawing = (
     <svg viewBox="0 0 460 246" className="block h-auto w-full">

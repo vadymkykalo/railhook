@@ -1,6 +1,6 @@
 {
   "name": "railhook-ui",
-  "version": "2.19.0",
+  "version": "2.19.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,8 @@
     "prerender": "node scripts/prerender.mjs",
     "test": "vitest",
     "test:ci": "vitest run --reporter=verbose",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -48,6 +49,7 @@
     "tailwind-merge": "^2.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.5",

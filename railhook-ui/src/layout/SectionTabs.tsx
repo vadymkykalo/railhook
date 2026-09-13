@@ -42,7 +42,7 @@ export default function SectionTabs({ projectId, role }: { projectId?: string; r
               to={tab.path(projectId)}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'flex items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-[13px] transition-colors',
+                'flex items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-[13px] transition-colors max-sm:min-h-11',
                 active
                   ? 'border-primary font-medium text-foreground'
                   : 'border-transparent text-muted-foreground hover:border-rail hover:text-foreground'

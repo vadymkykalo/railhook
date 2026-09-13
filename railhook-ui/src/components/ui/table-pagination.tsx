@@ -26,7 +26,7 @@ export function TablePagination({
   if (totalElements === 0) return null;
 
   return (
-    <div className="flex items-center justify-between mt-4">
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-3">
         <p className="text-xs text-muted-foreground">
           {t('common.showing', {
@@ -36,7 +36,7 @@ export function TablePagination({
           })}
         </p>
         <Select
-          className="w-20 h-8 text-xs"
+          className="h-8 w-20 text-xs max-sm:h-10 max-sm:w-24"
           value={pageSize.toString()}
           onChange={(e) => {
             onPageSizeChange(Number(e.target.value));
