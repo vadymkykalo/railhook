@@ -180,6 +180,20 @@ describe('the API can be rolled', () => {
     );
   });
 
+  it('and says so where the operator is looking', () => {
+    // The refresh writes the helper, rewrites the Caddyfile and reloads Caddy, and
+    // every word of that went to /dev/null. A deploy log therefore could not answer
+    // "did the Caddyfile update" or "did the reload fail" — the only way to know was
+    // to ssh in and read Caddy's own logs, which is exactly what this whole chain
+    // exists to stop anyone having to do.
+    const roll = installer.slice(installer.indexOf('upgrade)'));
+    const refresh = roll.slice(roll.indexOf('bash -s -- --refresh'));
+    expect(
+      refresh.slice(0, 120),
+      'the refresh has to report what it did, not swallow it',
+    ).not.toMatch(/>\/dev\/null/);
+  });
+
   it('and a rewritten Caddyfile is actually the one Caddy is serving', () => {
     // The Caddyfile is a bind mount, so `compose up -d` sees no change in it and does
     // not recreate the container — Caddy goes on serving the config it parsed at

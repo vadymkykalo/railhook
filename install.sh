@@ -692,8 +692,13 @@ case "${1:-help}" in
         # helper it has, and says so.
         if [ -z "${RAILHOOK_HELPER_REFRESHED:-}" ] && [ -n "$want" ]; then
             echo "Updating the helper for ${want} before upgrading..."
+            # Not silenced. The refresh writes the helper, rewrites the Caddyfile and
+            # reloads Caddy, and all of it used to go to /dev/null — so a deploy log
+            # could not answer "did the Caddyfile update" or "did the reload fail", and
+            # the only way to find out was to ssh in and read Caddy's own logs. Which is
+            # the thing this chain exists to stop anyone having to do.
             if curl -fsSL "${RAW}/v${want#v}/install.sh" \
-                 | bash -s -- --refresh --dir "$(pwd)" >/dev/null 2>&1; then
+                 | bash -s -- --refresh --dir "$(pwd)"; then
                 echo "Helper updated. Continuing with it."
             else
                 echo "Could not fetch the helper for ${want}; continuing with this one." >&2
