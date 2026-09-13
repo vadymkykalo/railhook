@@ -1,6 +1,8 @@
-import { useLayoutEffect, type ReactNode } from 'react';
+import { useId, useLayoutEffect, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Github, Mail, type LucideIcon } from 'lucide-react';
+import { contactDomain } from '../lib/runtimeConfig';
 import { RailhookIcon } from '../components/icons/RailhookIcon';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import ThemeToggle from '../components/ThemeToggle';
@@ -78,6 +80,45 @@ function PageLink({ href, external = false, children }: { href: string; external
 }
 
 /**
+ * Only accounts that exist: the repository always, support mail only where the deployment has a
+ * contact domain — the same rule as the contact page, since a self-hosted install has no support
+ * desk. Another account is one more entry in `links`.
+ */
+function ConnectWithUs() {
+  const { t } = useTranslation();
+  const captionId = useId();
+  const domain = contactDomain();
+  const links: { key: string; href: string; label: string; icon: LucideIcon; external: boolean }[] = [
+    { key: 'github', href: REPO_URL, label: t('footer.connectGithub'), icon: Github, external: true },
+    ...(domain
+      ? [{ key: 'email', href: `mailto:support@${domain}`, label: t('footer.connectEmail'), icon: Mail, external: false }]
+      : []),
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <p id={captionId} className="text-sm text-muted-foreground">
+        {t('footer.connect')}
+      </p>
+      <ul aria-labelledby={captionId} className="-ml-2 flex items-center gap-1">
+        {links.map(({ key, href, label, icon: Icon, external }) => (
+          <li key={key}>
+            <a
+              href={href}
+              aria-label={label}
+              title={label}
+              className="grid h-9 w-9 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+              {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+            >
+              <Icon className="h-5 w-5" aria-hidden="true" />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
  * The language and theme switches live here rather than in the header: they are set once, and
  * the header is kept to the places a reader goes.
  */
@@ -119,7 +160,10 @@ export function Footer() {
           </Column>
         </div>
         <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-rail pt-6">
-          <p className="font-mono text-xs text-muted-foreground">{t('footer.copyright', { year: new Date().getFullYear() })}</p>
+          <div className="flex flex-col gap-3">
+            <ConnectWithUs />
+            <p className="font-mono text-xs text-muted-foreground">{t('footer.copyright', { year: new Date().getFullYear() })}</p>
+          </div>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
             <ThemeToggle className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" />

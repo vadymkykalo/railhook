@@ -41,8 +41,10 @@ accident.
    that silent failure into a message.
 
 4. **The domain** — production is `https://railhook.io`, deployed by
-   `.github/workflows/deploy-prod.yml`. Set `VITE_SITE_URL` and
-   `VITE_CONTACT_DOMAIN` on the public build to match, and regenerate the sitemap:
+   `.github/workflows/deploy-prod.yml`. Set `VITE_SITE_URL` on the public build to
+   match, set `RAILHOOK_CONTACT_DOMAIN=railhook.io` in the production host's `.env`
+   (read by the UI container at startup, so the published image stays neutral),
+   and regenerate the sitemap:
 
    ```bash
    cd railhook-ui && SITE_URL=https://railhook.io npm run seo:sitemap

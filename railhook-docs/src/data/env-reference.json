@@ -385,10 +385,10 @@
           "description": "Public origin this deployment is served from, e.g. https://hooks.example.com.\n\nOnly affects what the app publishes *about itself*: the canonical link, og:url\nand og:image, and the schema.org block in index.html. Leave it empty and the\napp derives the canonical from the browser's own origin and omits the absolute\ntags entirely — correct for a private dashboard, which nobody is unfurling into\na chat or asking Google to index.\n\nSet it for a public marketing site. It is also what `npm run prerender` bakes\ninto the static HTML; without it the prerender would freeze the throwaway local\nserver's address into the canonical of every public page."
         },
         {
-          "name": "VITE_CONTACT_DOMAIN",
+          "name": "RAILHOOK_CONTACT_DOMAIN",
           "default": "",
           "example": null,
-          "description": "Domain behind the sales@ and support@ cards on /contact, e.g. example.com.\n\nEmpty means those two cards are not rendered at all. That is the right default:\na deployment someone runs for their own company has no sales desk, and an\naddress that reaches nobody is worse than an absent one. The GitHub issues and\ndocumentation cards are shown either way, because they are true everywhere."
+          "description": "Domain behind the sales@ and support@ addresses on /contact and in the footer,\ne.g. example.com.\n\nNot a VITE_ value: the UI container reads it when it starts, so it works on the\npublished images and takes effect when the ui container is recreated\n(docker compose up -d ui), with no rebuild.\n\nEmpty means no mail addresses are offered at all. That is the right default for\na self-hosted install: a deployment someone runs for their own company has no\nsales desk, and an address that reaches nobody is worse than an absent one. The\nGitHub issues and documentation cards are shown either way, because they are\ntrue everywhere. The hosted cloud sets its own domain here."
         }
       ]
     },

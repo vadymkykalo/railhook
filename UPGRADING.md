@@ -16,6 +16,20 @@ sed -i 's/^HOOKFLOW_\(BIND\|PORT\|DOMAIN\)=/RAILHOOK_\1=/' .env   # only if no R
 An `.env` written by the installer since 2.12.0 has both spellings; the `HOOKFLOW_` lines are
 then simply unused and can be deleted.
 
+### `VITE_CONTACT_DOMAIN` is now `RAILHOOK_CONTACT_DOMAIN`, read at runtime
+
+The domain behind the sales@ / support@ addresses on `/contact` was a build argument, so it only
+ever took effect on a UI image you built yourself. The UI container now reads it when it starts,
+and the build argument is gone: an image built with `VITE_CONTACT_DOMAIN` shows no addresses.
+Move the value to the container's environment:
+
+```bash
+sed -i 's/^VITE_CONTACT_DOMAIN=/RAILHOOK_CONTACT_DOMAIN=/' .env   # only if no RAILHOOK_CONTACT_DOMAIN line exists yet
+docker compose up -d ui
+```
+
+On Helm, set `ui.contactDomain`. Left empty, no mail addresses are offered, as before.
+
 ### Incoming-source and tunnel URLs follow your public address
 
 With `TUNNEL_INGRESS_BASE_URL` unset they are now built from `APP_BASE_URL` instead of

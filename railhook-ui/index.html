@@ -61,6 +61,13 @@
         ]
       }
     </script>
+    <!--
+      Settings that belong to the running container rather than to the image
+      (window.__RAILHOOK__), written when the container starts. A classic
+      script, so it has run before the deferred app module reads it. The copy
+      in public/ is an empty placeholder for the dev server and the prerender.
+    -->
+    <script src="/config.js"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -5,6 +5,7 @@ import { cn } from '../lib/utils';
 import { REPO_URL } from './landing/plans';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { docsUrl } from '../lib/docsUrl';
+import { contactDomain } from '../lib/runtimeConfig';
 
 /**
  * The route that replaces a mailto to a personal Gmail address.
@@ -18,10 +19,15 @@ import { docsUrl } from '../lib/docsUrl';
  * into the markup, which stops the cheapest scrapers without hiding anything
  * from a reader or a screen reader.
  *
- * The domain comes from VITE_CONTACT_DOMAIN and there is no default. It was a
- * constant naming a domain this project does not own, so every self-hosted
- * install invited its users to write to a stranger about a product that
- * stranger has never heard of.
+ * The domain comes from RAILHOOK_CONTACT_DOMAIN on the UI container and there
+ * is no default. It was once a constant naming a domain this project does not
+ * own, so every self-hosted install invited its users to write to a stranger
+ * about a product that stranger has never heard of.
+ *
+ * It is read at runtime, not inlined at build: the published image is the same
+ * one the hosted cloud runs and every self-hosted install pulls. As a build
+ * argument the choice was between no addresses on the cloud's own site or the
+ * cloud's addresses on everyone's deployment.
  *
  * With the variable unset the two mail cards are not rendered at all, rather
  * than falling back to the repository. A deployment someone runs for their own
@@ -29,10 +35,8 @@ import { docsUrl } from '../lib/docsUrl';
  * an absent one — the reader who needs a human still has the issues card and
  * the docs card, which are true everywhere.
  */
-const CONTACT_DOMAIN = (import.meta.env.VITE_CONTACT_DOMAIN as string | undefined)?.trim();
-
-function mailto(mailbox: string): string {
-  return `mailto:${mailbox}@${CONTACT_DOMAIN}`;
+function mailto(mailbox: string, domain: string): string {
+  return `mailto:${mailbox}@${domain}`;
 }
 
 function Card({
@@ -61,6 +65,7 @@ const LINK = 'text-sm font-medium text-primary hover:underline';
 export default function ContactPage() {
   const { t, i18n } = useTranslation();
   useDocumentMeta({ titleKey: 'meta.contact.title', descriptionKey: 'meta.contact.description', path: '/contact' });
+  const domain = contactDomain();
 
   return (
     <Section ruled={false}>
@@ -74,7 +79,7 @@ export default function ContactPage() {
       </Reveal>
 
       <div className="mt-10 grid gap-4 sm:grid-cols-2">
-        {CONTACT_DOMAIN && (
+        {domain && (
           <>
             <Reveal className="h-full">
               <Card
@@ -82,8 +87,8 @@ export default function ContactPage() {
                 title={t('contact.salesTitle')}
                 body={t('contact.salesBody')}
                 action={
-                  <a href={mailto('sales')} className={LINK}>
-                    {`sales@${CONTACT_DOMAIN}`}
+                  <a href={mailto('sales', domain)} className={LINK}>
+                    {`sales@${domain}`}
                   </a>
                 }
               />
@@ -94,8 +99,8 @@ export default function ContactPage() {
                 title={t('contact.supportTitle')}
                 body={t('contact.supportBody')}
                 action={
-                  <a href={mailto('support')} className={LINK}>
-                    {`support@${CONTACT_DOMAIN}`}
+                  <a href={mailto('support', domain)} className={LINK}>
+                    {`support@${domain}`}
                   </a>
                 }
               />

@@ -29,6 +29,15 @@ A new site, docs you can navigate, and one install command on the project's own 
   serves it next to `/install.sh`.
 - **`scripts/seed-demo.sh`** seeds a believable demo project — endpoints, subscriptions, sources,
   delivered, retrying and failed traffic — through the public API only.
+- **"Connect with us" in the public footer**: the GitHub repository, and support mail when the
+  deployment has a contact domain.
+
+### Changed
+
+- **The contact page's mail domain is set at runtime.** `RAILHOOK_CONTACT_DOMAIN` on the UI
+  container (`ui.contactDomain` on Helm) decides the sales@ / support@ addresses, so the
+  published image can offer them; empty, as on a self-hosted install, offers none.
+  `VITE_CONTACT_DOMAIN` is gone — see UPGRADING.md.
 
 ### Fixed
 

@@ -591,11 +591,16 @@ services:
       # operator's own proxy with --behind-proxy. Nothing else changes, because
       # either one proxies straight to this same nginx.
       - "${RAILHOOK_BIND:-0.0.0.0}:${RAILHOOK_PORT:-80}:5173"
-    # No environment block: the UI is a static bundle behind nginx. Vite inlines
-    # every VITE_* value at build time, so nothing here could change it — and on
-    # a pre-built image there is no build to feed. nginx proxies /api/,
-    # /ws/tunnel, /hook/ and /ingress/ to the api service, so the bundle talks
-    # to its own origin and needs no API URL at all.
+    # The UI is a static bundle behind nginx. Vite inlines every VITE_* value at
+    # build time, so none of those belong here — on a pre-built image there is
+    # no build to feed. nginx proxies /api/, /ws/tunnel, /hook/ and /ingress/ to
+    # the api service, so the bundle talks to its own origin and needs no API URL.
+    #
+    # What is here is read by the container when it starts and handed to the page
+    # as /config.js, because it has to differ between deployments of one image.
+    environment:
+      # Domain behind the sales@ / support@ addresses. Empty: none are offered.
+      RAILHOOK_CONTACT_DOMAIN: ${RAILHOOK_CONTACT_DOMAIN:-}
     depends_on:
       - api
     logging:

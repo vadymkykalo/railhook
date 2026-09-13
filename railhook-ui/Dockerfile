@@ -38,7 +38,6 @@ COPY railhook-ui/ .
 ARG VITE_API_URL=""
 ARG VITE_CSP_EXTRA_CONNECT=""
 ARG VITE_SITE_URL=""
-ARG VITE_CONTACT_DOMAIN=""
 # The registration challenge. Build-time like every other VITE_ value, and the
 # site key's presence is also what src/lib/csp.ts keys the widened script-src
 # and frame-src off — so an image built without it cannot show a challenge even
@@ -48,7 +47,6 @@ ARG VITE_CAPTCHA_SCRIPT_URL=""
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_CSP_EXTRA_CONNECT=$VITE_CSP_EXTRA_CONNECT
 ENV VITE_SITE_URL=$VITE_SITE_URL
-ENV VITE_CONTACT_DOMAIN=$VITE_CONTACT_DOMAIN
 ENV VITE_CAPTCHA_SITE_KEY=$VITE_CAPTCHA_SITE_KEY
 ENV VITE_CAPTCHA_SCRIPT_URL=$VITE_CAPTCHA_SCRIPT_URL
 
@@ -118,7 +116,10 @@ COPY railhook-ui/nginx-security-headers.conf /etc/nginx/snippets/security-header
 # /etc/resolv.conf, which is the only thing that is right under both Compose and
 # Kubernetes.
 COPY railhook-ui/docker-entrypoint.d/15-resolver.sh /docker-entrypoint.d/15-resolver.sh
-RUN chmod +x /docker-entrypoint.d/15-resolver.sh
+# Writes /tmp/railhook-config.js (served as /config.js) from the container's own
+# environment: the settings that must differ between deployments of one image.
+COPY railhook-ui/docker-entrypoint.d/20-runtime-config.sh /docker-entrypoint.d/20-runtime-config.sh
+RUN chmod +x /docker-entrypoint.d/15-resolver.sh /docker-entrypoint.d/20-runtime-config.sh
 
 EXPOSE 5173
 

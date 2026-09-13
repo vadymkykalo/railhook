@@ -32,8 +32,19 @@ describe('VITE_ build arguments', () => {
 
   it('finds the variables it is meant to be checking', () => {
     // If this ever empties out, every assertion below passes vacuously.
-    expect(documented.length).toBeGreaterThanOrEqual(6);
+    expect(documented.length).toBeGreaterThanOrEqual(5);
     expect(documented).toContain('VITE_CAPTCHA_SITE_KEY');
+  });
+
+  it('has no build-time contact domain: it is a runtime setting of the UI container', () => {
+    // Baked into the published image, a contact domain would put one deployment's mail
+    // addresses on every install of that image. RAILHOOK_CONTACT_DOMAIN replaced it, and
+    // nothing is kept for the old name.
+    const vite = read('railhook-ui/vite.config.ts');
+    const viteEnv = read('railhook-ui/src/vite-env.d.ts');
+    for (const [file, text] of Object.entries({ envDist, dockerfile, composeBuild, vite, viteEnv })) {
+      expect(text, file).not.toMatch(/VITE_CONTACT_DOMAIN/);
+    }
   });
 
   it.each(documented)('%s is declared as an ARG in the Dockerfile', (name) => {

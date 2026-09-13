@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import '../../i18n';
 import { renderPage } from '../../test/renderPage';
+import ContactPage from '../ContactPage';
 
 /**
  * The two mail cards used to be hardcoded to a domain this project does not
@@ -12,44 +13,72 @@ import { renderPage } from '../../test/renderPage';
  * absent rather than pointing somewhere — while the issues and documentation
  * cards, which are true on every deployment, stay.
  *
- * The page is re-imported per test because VITE_CONTACT_DOMAIN is read when the
- * module is evaluated.
+ * The domain is a property of the container, not of the image: the published
+ * image is the same on railhook.io and on every self-hosted install, so it is
+ * read from `window.__RAILHOOK__` (written by the UI container at startup) when
+ * the page renders. The page is imported once, above, which is what proves it
+ * is read at render time and not frozen when the module is evaluated.
  */
-async function renderContact() {
-  vi.resetModules();
-  const { default: ContactPage } = await import('../ContactPage');
+function withRuntimeConfig(config: Window['__RAILHOOK__']) {
+  window.__RAILHOOK__ = config;
+}
+
+function renderContact() {
   renderPage(<ContactPage />, { path: '/contact', initialEntry: '/contact' });
+}
+
+function mailtoHrefs() {
+  return Array.from(document.querySelectorAll('a[href^="mailto:"]')).map((a) => a.getAttribute('href'));
 }
 
 describe('ContactPage', () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    delete window.__RAILHOOK__;
   });
 
-  it('offers no mail addresses when no contact domain is configured', async () => {
-    vi.stubEnv('VITE_CONTACT_DOMAIN', '');
+  it('offers no mail addresses when the runtime config is missing', () => {
+    renderContact();
 
-    await renderContact();
-
-    expect(document.querySelectorAll('a[href^="mailto:"]')).toHaveLength(0);
+    expect(mailtoHrefs()).toHaveLength(0);
   });
 
-  it('still points at the issue tracker with no contact domain, because that is always true', async () => {
-    vi.stubEnv('VITE_CONTACT_DOMAIN', '');
+  it('offers no mail addresses when the contact domain is empty', () => {
+    withRuntimeConfig({ contactDomain: '' });
 
-    await renderContact();
+    renderContact();
+
+    expect(mailtoHrefs()).toHaveLength(0);
+  });
+
+  it('treats a blank contact domain as empty', () => {
+    withRuntimeConfig({ contactDomain: '   ' });
+
+    renderContact();
+
+    expect(mailtoHrefs()).toHaveLength(0);
+  });
+
+  it('still points at the issue tracker with no contact domain, because that is always true', () => {
+    renderContact();
 
     expect(screen.getByRole('link', { name: /issue/i })).toBeInTheDocument();
   });
 
-  it('offers sales and support on the configured domain, and only that domain', async () => {
-    vi.stubEnv('VITE_CONTACT_DOMAIN', 'example.com');
+  it('offers sales and support on the configured domain, and only that domain', () => {
+    withRuntimeConfig({ contactDomain: 'example.org' });
 
-    await renderContact();
+    renderContact();
 
-    const mails = Array.from(document.querySelectorAll('a[href^="mailto:"]')).map((a) =>
-      a.getAttribute('href'),
-    );
-    expect(mails).toEqual(['mailto:sales@example.com', 'mailto:support@example.com']);
+    expect(mailtoHrefs()).toEqual(['mailto:sales@example.org', 'mailto:support@example.org']);
+    expect(screen.getByRole('link', { name: 'sales@example.org' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'support@example.org' })).toBeInTheDocument();
+  });
+
+  it('trims the configured domain', () => {
+    withRuntimeConfig({ contactDomain: ' example.org ' });
+
+    renderContact();
+
+    expect(mailtoHrefs()).toEqual(['mailto:sales@example.org', 'mailto:support@example.org']);
   });
 });

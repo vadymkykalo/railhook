@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { fireEvent, screen, within } from '@testing-library/react';
 import LandingPage from '../LandingPage';
 import LandingNav from '../landing/LandingNav';
@@ -278,5 +278,35 @@ describe('Footer', () => {
       '/contact',
     ]));
     expect(hrefs).not.toContain('/pricing');
+  });
+
+  describe('connect with us', () => {
+    afterEach(() => {
+      delete window.__RAILHOOK__;
+    });
+
+    function connectRow() {
+      renderPage(<Footer />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
+      return screen.getByRole('list', { name: en.footer.connect });
+    }
+
+    it('always links to the repository, in a new tab', () => {
+      const github = within(connectRow()).getByRole('link', { name: en.footer.connectGithub });
+      expect(github).toHaveAttribute('href', 'https://github.com/vadymkykalo/railhook');
+      expect(github).toHaveAttribute('target', '_blank');
+      expect(github.getAttribute('rel')).toContain('noopener');
+    });
+
+    it('offers support mail on the configured domain', () => {
+      window.__RAILHOOK__ = { contactDomain: 'example.org' };
+      const email = within(connectRow()).getByRole('link', { name: en.footer.connectEmail });
+      expect(email).toHaveAttribute('href', 'mailto:support@example.org');
+    });
+
+    it('offers no mail without a contact domain, as the contact page does not', () => {
+      const row = connectRow();
+      expect(within(row).queryByRole('link', { name: en.footer.connectEmail })).toBeNull();
+      expect(row.querySelector('a[href^="mailto:"]')).toBeNull();
+    });
   });
 });
