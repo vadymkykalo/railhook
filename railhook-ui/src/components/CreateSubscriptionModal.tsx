@@ -11,6 +11,7 @@ import { Label } from './ui/label';
 import { Select } from './ui/select';
 import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
+import RetryJitterNote from './RetryJitterNote';
 import {
   Dialog,
   DialogContent,
@@ -362,6 +363,7 @@ export default function CreateSubscriptionModal({
                           {retryDelays.trim() ? formatRetryDelaysHuman(retryDelays) : t('createSubscription.fields.retryDelaysHint')}
                         </p>
                       )}
+                      <RetryJitterNote />
                     </div>
                   </div>
 

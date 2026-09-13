@@ -3,16 +3,41 @@
 # (see .env.dist "ALERTING" section) at container start.
 #
 # Why a shell script instead of a static YAML file: the prom/alertmanager image
-# is busybox-based (no apk, no envsubst, no bash) — see monitoring/README.md for
-# the investigation — so this uses only POSIX sh + heredocs. Each of the three
-# receivers (railhook-critical / railhook-default / railhook-info) fans out to
-# whichever sinks (Slack / generic webhook / email) have a non-empty env var, so
-# the rendered config is always valid even with zero secrets configured — alerts
-# just land only in Alertmanager's own UI/API (http://localhost:9093), which is
-# the documented "you haven't wired a receiver yet" state, not a crash.
+# is busybox-based (no apk, no envsubst, no bash), so this uses only POSIX sh +
+# heredocs. Each of the three receivers (railhook-critical / railhook-default /
+# railhook-info) fans out to whichever sinks (Slack / generic webhook / email /
+# Telegram) are configured, so the rendered config is always valid even with
+# zero secrets configured — alerts then land only in Alertmanager's own API and
+# in Grafana's Alerting pages, not in a crash.
+#
+# The rendered file carries the SMTP password and the Telegram token, so it is
+# never printed: the log names which sinks are on, nothing more.
 set -eu
 
-OUT=/etc/alertmanager/alertmanager.yml
+OUT="${ALERTMANAGER_CONFIG_OUT:-/etc/alertmanager/alertmanager.yml}"
+
+# A value inside single quotes in YAML: a quote is written twice.
+q() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g")"; }
+
+smtp_host="${ALERTMANAGER_SMTP_HOST:-localhost}"
+smtp_port="${ALERTMANAGER_SMTP_PORT:-1025}"
+# TLS unless told otherwise, except for a local capture server (mailpit, mailhog), which
+# has none. Port 465 is implicit TLS and Alertmanager handles it on its own.
+require_tls="${ALERTMANAGER_SMTP_REQUIRE_TLS:-}"
+if [ -z "$require_tls" ]; then
+  case "$smtp_host" in
+    localhost|127.0.0.1|mailpit|mailhog) require_tls=false ;;
+    *) require_tls=true ;;
+  esac
+fi
+
+telegram_chat="${ALERTMANAGER_TELEGRAM_CHAT_ID:-}"
+if [ -n "$telegram_chat" ] && ! printf '%s' "$telegram_chat" | grep -Eq '^-?[0-9]+$'; then
+  echo "[alertmanager-render] ALERTMANAGER_TELEGRAM_CHAT_ID must be a number — Telegram is off" >&2
+  telegram_chat=""
+fi
+
+sinks=""
 
 {
   cat <<'STATIC'
@@ -26,6 +51,14 @@ route:
   group_interval: 5m
   repeat_interval: 4h
   routes:
+    # The dead man's switch (prometheus/host-alerts.yml). Never mailed: it goes only to the
+    # heartbeat URL, whose silence is the alert.
+    - match:
+        alertname: Watchdog
+      receiver: railhook-heartbeat
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
     # Critical: page faster, remind more often.
     - match:
         severity: critical
@@ -62,6 +95,22 @@ inhibit_rules:
     target_match:
       alertname: OldestPendingDeliveryStale
     equal: ['component']
+  # Host tiers (prometheus/host-alerts.yml).
+  - source_match:
+      alertname: HostDiskCritical
+    target_match:
+      alertname: HostDiskAlmostFull
+    equal: ['device']
+  - source_match:
+      alertname: TlsCertificateExpiryImminent
+    target_match:
+      alertname: TlsCertificateExpiringSoon
+    equal: ['instance']
+  # The UI down inside the network explains every public probe failing.
+  - source_match:
+      alertname: UiDown
+    target_match_re:
+      alertname: 'PublicEndpoint(Down|Slow)'
   # Generic fallback: any future rule that reuses one alertname across
   # severities (via a templated threshold) gets this for free.
   - source_match:
@@ -79,8 +128,8 @@ STATIC
     if [ -n "${ALERTMANAGER_SLACK_WEBHOOK_URL:-}" ]; then
       cat <<SLACK
     slack_configs:
-      - api_url: '${ALERTMANAGER_SLACK_WEBHOOK_URL}'
-        channel: '${ALERTMANAGER_SLACK_CHANNEL:-#railhook-alerts}'
+      - api_url: $(q "$ALERTMANAGER_SLACK_WEBHOOK_URL")
+        channel: $(q "${ALERTMANAGER_SLACK_CHANNEL:-#railhook-alerts}")
         send_resolved: true
         title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }}/{{ .CommonLabels.component }})'
         text: >-
@@ -92,7 +141,7 @@ SLACK
     if [ -n "${ALERTMANAGER_WEBHOOK_URL:-}" ]; then
       cat <<WEBHOOK
     webhook_configs:
-      - url: '${ALERTMANAGER_WEBHOOK_URL}'
+      - url: $(q "$ALERTMANAGER_WEBHOOK_URL")
         send_resolved: true
 WEBHOOK
     fi
@@ -100,15 +149,44 @@ WEBHOOK
     if [ -n "${ALERTMANAGER_EMAIL_TO:-}" ]; then
       cat <<EMAIL
     email_configs:
-      - to: '${ALERTMANAGER_EMAIL_TO}'
-        from: '${ALERTMANAGER_EMAIL_FROM:-alerts@example.com}'
-        smarthost: '${ALERTMANAGER_SMTP_HOST:-localhost}:${ALERTMANAGER_SMTP_PORT:-1025}'
-        require_tls: false
+      - to: $(q "$ALERTMANAGER_EMAIL_TO")
+        from: $(q "${ALERTMANAGER_EMAIL_FROM:-alerts@example.com}")
+        smarthost: $(q "${smtp_host}:${smtp_port}")
+        require_tls: ${require_tls}
         send_resolved: true
 EMAIL
+      if [ -n "${ALERTMANAGER_SMTP_USERNAME:-}" ]; then
+        cat <<AUTH
+        auth_username: $(q "$ALERTMANAGER_SMTP_USERNAME")
+        auth_password: $(q "${ALERTMANAGER_SMTP_PASSWORD:-}")
+AUTH
+      fi
+    fi
+
+    if [ -n "${ALERTMANAGER_TELEGRAM_BOT_TOKEN:-}" ] && [ -n "$telegram_chat" ]; then
+      cat <<TELEGRAM
+    telegram_configs:
+      - bot_token: $(q "$ALERTMANAGER_TELEGRAM_BOT_TOKEN")
+        chat_id: ${telegram_chat}
+        parse_mode: HTML
+        send_resolved: true
+TELEGRAM
     fi
   done
+
+  echo "  - name: railhook-heartbeat"
+  if [ -n "${ALERTMANAGER_HEARTBEAT_URL:-}" ]; then
+    cat <<HEARTBEAT
+    webhook_configs:
+      - url: $(q "$ALERTMANAGER_HEARTBEAT_URL")
+        send_resolved: false
+HEARTBEAT
+  fi
 } > "$OUT"
 
-echo "[alertmanager-render] wrote ${OUT}:"
-cat "$OUT"
+[ -n "${ALERTMANAGER_SLACK_WEBHOOK_URL:-}" ] && sinks="$sinks slack"
+[ -n "${ALERTMANAGER_WEBHOOK_URL:-}" ] && sinks="$sinks webhook"
+[ -n "${ALERTMANAGER_EMAIL_TO:-}" ] && sinks="$sinks email(${smtp_host}:${smtp_port}, tls=${require_tls})"
+[ -n "${ALERTMANAGER_TELEGRAM_BOT_TOKEN:-}" ] && [ -n "$telegram_chat" ] && sinks="$sinks telegram"
+[ -n "${ALERTMANAGER_HEARTBEAT_URL:-}" ] && sinks="$sinks heartbeat"
+echo "[alertmanager-render] wrote ${OUT}; receivers:${sinks:- none — alerts stay in Alertmanager and Grafana}"

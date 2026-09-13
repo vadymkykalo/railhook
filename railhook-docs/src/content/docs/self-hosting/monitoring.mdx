@@ -1,10 +1,10 @@
 ---
 title: Monitoring
-description: Health checks, Prometheus metrics, the bundled Grafana stack, and the signals worth alerting on.
+description: Health checks, Prometheus metrics, the bundled Grafana stack with host, container, uptime and log alerts, and the signals worth alerting on.
 ---
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Railhook exposes health checks on its public port and Prometheus metrics on internal ports. The repository ships a ready monitoring stack you can start next to it.
+Railhook exposes health checks on its public port and Prometheus metrics on internal ports. The repository ships an optional monitoring stack — Grafana, Prometheus, Alertmanager, Loki and exporters for the host, the containers and uptime — that you start next to it with one command.
 
 ## Health checks
 
@@ -30,34 +30,122 @@ They are deliberately not proxied to the public port: metrics would reveal endpo
 
 ## The bundled stack
 
-The `monitoring/` directory of the repository contains Prometheus, Alertmanager, Grafana, Loki and Promtail, preconfigured.
+`monitoring/` in the repository is a second Compose project: Grafana, Prometheus, Alertmanager, Loki and Promtail, node-exporter, cAdvisor and blackbox-exporter. It is off until you start it, and its memory limits add up to 1.5 GB.
+
+Only Grafana publishes a port, on `127.0.0.1:3001`. Prometheus, Alertmanager and Loki are reachable only inside the stack's network; Grafana's Explore and Alerting pages read all three.
+
+### On a server installed with install.sh
 
 <Steps>
 
-1. **Start Railhook first**, from a clone with `make up`.
+1. **Set a Grafana password.** There is no default: Grafana refuses to start without one, or with fewer than 16 characters.
 
-2. **Start the monitoring stack**
+   ```bash
+   cd /opt/railhook
+   echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
+   ```
+
+2. **Say where alerts go.** Email goes through the relay the platform already uses (`EMAIL_FROM`, `SMTP_*`) unless you set the `ALERTMANAGER_SMTP_*` variables.
+
+   ```bash
+   echo "ALERTMANAGER_EMAIL_TO=you@example.com" >> .env
+   ```
+
+   Slack (`ALERTMANAGER_SLACK_WEBHOOK_URL`), a generic webhook (`ALERTMANAGER_WEBHOOK_URL`) and Telegram (`ALERTMANAGER_TELEGRAM_BOT_TOKEN`, `ALERTMANAGER_TELEGRAM_CHAT_ID`) work the same way.
+
+3. **Start it.**
+
+   ```bash
+   ./railhook monitoring up
+   ```
+
+   The first run downloads `monitoring/` for the release the server runs. `./railhook upgrade` refreshes it and restarts the stack if it was running.
+
+4. **Open Grafana** through an SSH tunnel, and sign in as `admin` with the password from `.env`:
+
+   ```bash
+   ssh -L 3001:127.0.0.1:3001 root@your-server
+   ```
+
+   Then open `http://localhost:3001`.
+
+</Steps>
+
+`./railhook monitoring status` lists the containers and the health of every Prometheus target. `./railhook monitoring logs [service]` follows the logs. `./railhook monitoring down` stops the stack and keeps its metrics and logs.
+
+### Grafana on its own domain
+
+Set `MONITORING_DOMAIN=grafana.example.com` in `.env`, point that name at the server, and run `./railhook monitoring up` again. It adds the name to the Caddyfile and reloads Caddy, which obtains a certificate the same way it did for the platform. With `--behind-proxy`, point your own proxy at `127.0.0.1:3001` instead.
+
+<Aside type="caution">
+Put an identity-aware proxy such as Cloudflare Access in front of that name. Grafana's login should not be the only thing between the internet and your logs. If the proxy covers every path, exempt `/.well-known/acme-challenge/`, or Caddy cannot renew the certificate.
+
+Some proxies stop Let's Encrypt from reaching the name at all: Cloudflare with Always Use HTTPS sends the challenge to HTTPS, where there is no certificate yet. Give Caddy one instead, such as a Cloudflare origin certificate for that name. Copy the certificate and key into the Caddy data volume, name them in `.env`, and run `./railhook monitoring up` again:
+
+```bash
+docker exec webhook-caddy mkdir -p /data/certs
+docker cp grafana.pem webhook-caddy:/data/certs/grafana.example.com.pem
+docker cp grafana.key webhook-caddy:/data/certs/grafana.example.com.key
+printf '%s\n' MONITORING_TLS_CERT=/data/certs/grafana.example.com.pem \
+  MONITORING_TLS_KEY=/data/certs/grafana.example.com.key | ./railhook settings
+```
+</Aside>
+
+### From a clone
+
+<Steps>
+
+1. Start Railhook with `make up`, then add `GRAFANA_ADMIN_PASSWORD` to `.env`.
+
+2. Start the stack:
 
    ```bash
    make monitoring-up
    ```
 
-3. **Open Grafana** at `http://localhost:3001` and sign in as `railhook` / `railhook_monitor_2024`. Change the password with `GF_ADMIN_PASSWORD=... make monitoring-up`.
+3. Open Grafana at `http://localhost:3001`.
 
 </Steps>
 
-| Service | Address (loopback only) |
+`make monitoring-down` stops it; `make monitoring-logs` follows its logs.
+
+### Dashboards
+
+| Dashboard | What it shows |
 |---|---|
-| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) |
-| Prometheus | `127.0.0.1:9090` |
-| Alertmanager | `127.0.0.1:9093` |
-| Loki | `127.0.0.1:3100` |
+| Railhook — Overview | Whether the public site is up, firing alerts, disk, memory, CPU and backup age, then events, deliveries, queues and the DLQ |
+| Alerts | Every firing and pending alert, whether the alerting pipeline itself works, alert history, and links to silence one |
+| Errors | Error and warning log lines by service, the most frequent error messages, API and nginx 4xx and 5xx, 401/403/429, failed deliveries and DLQ growth |
+| Logs | Lines from the API, worker, UI's nginx, Caddy, Postgres and backups, filtered by service, level, text, correlation ID or organization ID |
+| Host | Node Exporter Full: CPU, memory, disks, network, file systems |
+| Containers | CPU, memory against the Compose limit, network and restarts per container |
+| Uptime | Probe status, uptime over the range, response time, TLS days left, backups |
+| Worker & Circuit Breaker, JVM & Micrometer, Kafka | The platform's internals |
 
-Grafana comes with dashboards for the overview, the worker and circuit breaker, JVM, Kafka, and logs. Alertmanager sends the bundled alert rules to Slack, a generic webhook or email once you set the `ALERTMANAGER_*` variables.
+### Alerts it sends
 
-<Aside type="caution">
-The stack joins the Docker network `railhook_webhook-network`, so the Railhook Compose project must be named `railhook`. `.env.dist` sets `COMPOSE_PROJECT_NAME=railhook`. If Prometheus shows no targets, check this first.
+The platform's rules are the same set the Helm chart ships. On top of them, for the server:
+
+| Alert | Fires when |
+|---|---|
+| `HostDiskAlmostFull`, `HostDiskCritical` | A file system is over 85%, or over 95% |
+| `HostMemoryHigh`, `HostOomKill` | Memory is over 90% for 10 minutes, or the kernel killed a process |
+| `HostLoadHigh` | The 15-minute load is over 1.5 times the CPU count |
+| `ContainerRestarting`, `ContainerOomKilled`, `ContainerMemoryNearLimit` | A container restarted twice in 15 minutes, hit its memory limit, or is above 90% of it |
+| `PublicEndpointDown`, `PublicEndpointSlow` | A public URL fails, or takes over 3 seconds, from outside |
+| `UiDown`, `CaddyDown` | The UI's nginx or Caddy stops answering inside the network |
+| `TlsCertificateExpiringSoon`, `TlsCertificateExpiryImminent` | A certificate expires in under 14 days, or under 3 |
+| `ErrorLogSpike`, `EdgeServerErrorSpike` | A service logs more than 10 errors a minute, or nginx answers more than 5 5xx a minute |
+| `BackupStale`, `BackupMissing` | The newest scheduled backup is over 26 hours old, or there is none |
+| `Watchdog` | Always. It is sent only to `ALERTMANAGER_HEARTBEAT_URL` |
+
+The probes request `https://RAILHOOK_DOMAIN/`, `/docs/` and `/actuator/health`; set `MONITORING_PROBE_URLS` to probe other URLs.
+
+<Aside type="tip">
+Every other alert is sent from the server it describes, so none of them can tell you that server is down. Point `ALERTMANAGER_HEARTBEAT_URL` at a heartbeat service such as healthchecks.io: it receives the `Watchdog` every minute and alerts you when it stops arriving.
 </Aside>
+
+The stack finds the platform's Docker network by its Compose label. If it picks the wrong one, set `RAILHOOK_NETWORK`. Every variable is in the [configuration reference](/docs/self-hosting/configuration/).
 
 ## What to alert on
 

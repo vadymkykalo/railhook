@@ -365,7 +365,7 @@ export default function IncomingSourcesPage() {
                     }}
                     disabled={saving}
                   >
-                    {VERIFICATION_MODES.map((v) => <option key={v} value={v}>{v}</option>)}
+                    {VERIFICATION_MODES.map((v) => <option key={v} value={v}>{t(`incomingSources.verificationModes.${v}`)}</option>)}
                   </Select>
                 </div>
               </div>

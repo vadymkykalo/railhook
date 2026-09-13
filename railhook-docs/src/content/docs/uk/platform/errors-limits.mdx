@@ -55,6 +55,8 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## Ліміти частоти
 
+Це типові значення для власного розгортання. Railhook Cloud має власні ліміти, [наведені нижче](#ліміти-railhook-cloud).
+
 | Ліміт | Стосується | За замовчуванням | При 429 |
 |---|---|---|---|
 | Приймання подій | `POST /api/v1/events`, на проєкт | 100 на секунду | `rate_limit_exceeded` із заголовками бюджету |
@@ -62,6 +64,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 | Платформа | Увесь трафік, на один інстанс API | 5000 на секунду (`GLOBAL_RATE_LIMIT_PER_SECOND`) | `platform_rate_limit` |
 | Ingress-адреса | Вебхуки, отримані на `/ingress/…`, на джерело | 100 на секунду (`WEBHOOK_INCOMING_RATE_LIMIT_PER_SECOND`), якщо джерело не задає власного | `Retry-After: 1` |
 | Вхід | На IP і на email | 10 на хвилину (`AUTH_RATE_LIMIT_LOGIN_PER_MINUTE`) | `429` |
+| Оновлення сесії | На токен оновлення і на IP | 30 на хвилину на токен (`AUTH_RATE_LIMIT_REFRESH_PER_TOKEN_PER_MINUTE`), 600 на хвилину на IP (`AUTH_RATE_LIMIT_REFRESH_PER_IP_PER_MINUTE`) | `429` |
 
 Кожна відповідь `POST /api/v1/events` несе поточний бюджет проєкту:
 
@@ -71,6 +74,23 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 | `X-RateLimit-Remaining` | Скільки з них залишилося |
 | `X-RateLimit-Reset` | Unix-час, коли вікно скидається |
 | `Retry-After` | Лише при `429`: скільки секунд чекати |
+
+## Ліміти Railhook Cloud
+
+Railhook Cloud на railhook.io працює для кожної організації на плані Free. Доступні всі можливості, зокрема воркфлоу, правила, replay і mTLS; обмежено лише обсяги. Його ліміти замінюють типові значення власного розгортання, наведені вище:
+
+| Ліміт | План Free |
+|---|---|
+| Запити до API | 10 на секунду |
+| Події | 10 000 на місяць |
+| Проєкти | 3 |
+| Ендпоінти | 5 на проєкт |
+| Учасники | 5 на організацію |
+| Зберігання подій | 7 днів |
+| Активні тунелі | 1 |
+| Доставок на подію (розгалуження) | 100 |
+
+Власне розгортання не має лімітів плану. Діють лише типові значення з таблиць на цій сторінці.
 
 ## Ліміти розміру та розгалуження
 

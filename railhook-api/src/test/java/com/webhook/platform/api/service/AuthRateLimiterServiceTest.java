@@ -31,11 +31,70 @@ class AuthRateLimiterServiceTest {
 
     private static final int LOGIN_RATE = 5;
     private static final int REGISTER_RATE = 3;
+    private static final int REFRESH_PER_TOKEN = 8;
+    private static final int REFRESH_PER_IP = 40;
 
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        service = new AuthRateLimiterService(redissonClient, meterRegistry, LOGIN_RATE, REGISTER_RATE);
+        service = new AuthRateLimiterService(redissonClient, meterRegistry, LOGIN_RATE, REGISTER_RATE,
+                REFRESH_PER_TOKEN, REFRESH_PER_IP);
+    }
+
+    // ── Session refresh ────────────────────────────────────────────
+    //
+    // Refresh used to spend the per-IP sign-in bucket (10 a minute), so ten page loads in a
+    // minute logged a signed-in person out with a 429, and everyone behind one office NAT shared
+    // those ten. Refresh has its own budget: per refresh token, with a much higher per-IP ceiling.
+
+    @Test
+    void allowRefresh_doesNotSpendTheSignInBucket() {
+        when(redissonClient.getRateLimiter(anyString()))
+                .thenThrow(new RuntimeException("Redis connection refused"));
+
+        for (int i = 0; i < LOGIN_RATE * 3; i++) {
+            assertTrue(service.allowRefresh("10.1.0.1", "session-" + i),
+                    "refresh " + (i + 1) + " from one IP must not be capped by the sign-in limit");
+        }
+        assertTrue(service.allowLogin("10.1.0.1", "someone@example.com"),
+                "refreshes must leave the sign-in bucket for that IP untouched");
+    }
+
+    @Test
+    void allowRefresh_capsOneRefreshToken() {
+        when(redissonClient.getRateLimiter(anyString()))
+                .thenThrow(new RuntimeException("Redis connection refused"));
+
+        for (int i = 0; i < REFRESH_PER_TOKEN; i++) {
+            assertTrue(service.allowRefresh("10.1.0.2", "same-session"), "refresh " + (i + 1));
+        }
+        assertFalse(service.allowRefresh("10.1.0.2", "same-session"),
+                "one refresh token is still bounded, so a stolen cookie cannot be spun freely");
+    }
+
+    @Test
+    void allowRefresh_hasAPerIpCeiling() {
+        when(redissonClient.getRateLimiter(anyString()))
+                .thenThrow(new RuntimeException("Redis connection refused"));
+
+        for (int i = 0; i < REFRESH_PER_IP; i++) {
+            assertTrue(service.allowRefresh("10.1.0.3", "token-" + i), "refresh " + (i + 1));
+        }
+        assertFalse(service.allowRefresh("10.1.0.3", "token-final"),
+                "many different tokens from one peer are still capped");
+    }
+
+    @Test
+    void allowRefresh_usesItsOwnKeys() {
+        RRateLimiter limiter = mock(RRateLimiter.class);
+        when(redissonClient.getRateLimiter(anyString())).thenReturn(limiter);
+        when(limiter.tryAcquire(1)).thenReturn(true);
+
+        assertTrue(service.allowRefresh("127.0.0.2", "a-refresh-token"));
+
+        verify(redissonClient).getRateLimiter("rate_limiter:auth:refresh:ip:127.0.0.2");
+        verify(redissonClient).getRateLimiter(startsWith("rate_limiter:auth:refresh:token:"));
+        verify(redissonClient, never()).getRateLimiter(startsWith("rate_limiter:auth:login:"));
     }
 
     @Test

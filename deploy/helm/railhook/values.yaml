@@ -408,6 +408,12 @@ secrets:
     existingSecret: railhook-secrets
     key: jwt-secret
 
+# Platform admin panel: verified addresses (comma-separated) of the people who run this
+# deployment and may open /admin/platform with an ordinary sign-in. Each must also be an
+# active account with a sign-in under 12 hours old. Empty means nobody.
+platformAdmin:
+  emails: ""
+
 # Service Account
 serviceAccount:
   create: true

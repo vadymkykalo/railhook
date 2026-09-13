@@ -224,6 +224,7 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/admin/organizations/" + tenant.organizationId() + "/usage")
                         .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
                 .andExpect(status().isOk())
+                // The one created above; a password registration starts without one.
                 .andExpect(jsonPath("$.projects.current").value(1))
                 .andExpect(jsonPath("$.events.limit").exists())
                 .andExpect(jsonPath("$.periodStart").exists());
@@ -247,11 +248,13 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/admin/organizations/" + busy.organizationId() + "/usage")
                         .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
                 .andExpect(status().isOk())
+                // The three created above.
                 .andExpect(jsonPath("$.projects.current").value(3));
 
         mockMvc.perform(get("/api/v1/admin/organizations/" + quiet.organizationId() + "/usage")
                         .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
                 .andExpect(status().isOk())
+                // None of the busy tenant's three.
                 .andExpect(jsonPath("$.projects.current").value(0));
     }
 

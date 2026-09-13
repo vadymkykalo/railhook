@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowRight, ArrowUpRight, BarChart3, Bell, Flame, FolderKanban, Plus, Radio, Send, Webhook,
+  AlertTriangle, ArrowRight, ArrowUpRight, BarChart3, Bell, Flame, Radio, Send, Webhook,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -17,6 +17,7 @@ import StatusBadge, { kindOfDeliveryStatus } from '../components/StatusBadge';
 import AttemptRail from '../components/AttemptRail';
 import { railFromCounts } from './attemptRailData';
 import GettingStarted from '../components/GettingStarted';
+import FirstProjectCard from '../components/FirstProjectCard';
 import { cn } from '../lib/utils';
 import { Card } from '../components/ui/card';
 import { Select } from '../components/ui/select';
@@ -199,16 +200,7 @@ export default function DashboardPage() {
       {selectedProject && <GettingStarted projectId={projectId} />}
 
       {!selectedProject ? (
-        <EmptyState
-          icon={FolderKanban}
-          title={t('dashboard.noProjects')}
-          description={t('dashboard.noProjectsDesc')}
-          action={
-            <Button onClick={() => navigate('/admin/projects')}>
-              <Plus className="h-4 w-4" /> {t('dashboard.createProject')}
-            </Button>
-          }
-        />
+        <FirstProjectCard />
       ) : (
         <div className="animate-fade-in space-y-4">
           {/* The answer, then the evidence. */}

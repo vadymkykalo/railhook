@@ -194,6 +194,22 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
     }
 
     @Test
+    public void previewSanitization_isNeverServedAsHtml() throws Exception {
+        // CodeQL java/xss: the preview echoes the caller's payload. Negotiated as text/html (a
+        // browser's Accept header) a payload carrying markup would render as a page on our origin.
+        String payload = "<script>alert(1)</script>";
+
+        mockMvc.perform(post(piiRulesUrl() + "/preview")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .accept(MediaType.TEXT_HTML, MediaType.ALL)
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", startsWith("text/plain")))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+    }
+
+    @Test
     public void previewSanitization_masksPhone() throws Exception {
         mockMvc.perform(post(piiRulesUrl() + "/seed-defaults")
                         .header("Authorization", "Bearer " + jwtToken))

@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.0] - 2026-09-13
+
+### Added
+
+- **A first project for Google sign-ups, a way in for everyone else.** An account created with
+  "Continue with Google" starts with "My first project", so the dashboard opens ready to use; one
+  registered with a password names its own first project. Without a project, every sidebar section still
+  opens: it says what it is for and offers "Create project", then continues to that section. The
+  overview shows a getting-started checklist.
+- **Platform admin panel** (`/admin/platform`) for operators whose verified email is in
+  `PLATFORM_ADMIN_EMAILS`: platform overview, every organization and user, usage against quotas,
+  recent sign-ups, and suspension with a typed confirmation. Every admin request is audited, rate
+  limited, and needs a sign-in from the last 12 hours; no secrets, keys or payloads are returned.
+- **Monitoring you switch on with one command.** `./railhook monitoring up` starts Grafana,
+  Prometheus, Loki, Alertmanager, node-exporter and cAdvisor for the installed release, with
+  dashboards for alerts, errors, logs, uptime, containers and the host, and email alerts for a
+  full disk, memory, 5xx and error spikes, failing deliveries, a stale backup, an expiring
+  certificate and a site that stops answering. Grafana has no default password and is the only
+  published port, on `127.0.0.1`; `MONITORING_DOMAIN` puts it behind Caddy, and
+  `MONITORING_TLS_CERT`/`MONITORING_TLS_KEY` give Caddy a certificate for it when Let's Encrypt
+  cannot reach the name (Cloudflare with Always Use HTTPS).
+- **The production deploy proves the site works page by page** — landing, docs, auth pages,
+  legal pages, installers, runtime config, API and health — not only that `/` answers 200.
+- **Change the address you sign in with.** In Settings, or from the verification banner. An
+  unverified account changes it at once and gets a fresh link at the new address. A verified one
+  confirms with its password (or a recent Google sign-in), and nothing changes until the new
+  address confirms; the old address is told, with a "this wasn't me" link that cancels the change.
+  Confirming or cancelling signs every session out. Changes and confirmation emails are capped per
+  day, and every request, confirmation and cancellation is in the audit log.
+- **"Did you mean gmail.com?"** Registration, member invites and the billing email suggest the
+  likely address for a mistyped domain, and endings that do not exist (`.con`, `.cmo`, …) are
+  refused before any mail is sent. Signing in is not checked, so an account with a typo can still
+  get in and fix it.
+- **Every email Railhook sends is logged**, with the template, a masked recipient and whether the
+  provider accepted it — so "the email never came" has an answer.
+- The Railhook Cloud limits are documented next to the self-hosted ones.
+
+### Security
+
+- PII masking reads each key and value once and decides in code whether it is an email, phone or
+  card number, and finds a card object by reading back from its member; a crafted payload of a few
+  hundred kilobytes could otherwise pin a thread. Transformation template validation is
+  linear-time too, and the PII preview is always `text/plain`.
+- Database dumps are written readable by their owner only.
+- The deploy step receives only the secrets it sends; third-party GitHub Actions are pinned to
+  commits.
+
+### Fixed
+
+- The Trivy scan installs a pinned version and retries, instead of failing a required check when
+  one download hiccups.
+- **A busy dashboard no longer signs you out.** Refreshing a session has its own rate limit,
+  per session rather than shared with sign-in attempts from the same network, and the dashboard
+  retries a refresh that answers 429 or 5xx instead of ending the session.
+- Copy-as-curl and API key snippets send to the address the dashboard actually talks to; the tunnel
+  empty state shows the real `railhook listen` command; source pages show the provider's own
+  signature header, and a provider-signed source says to send a test from the provider instead of
+  offering an unsigned curl.
+- Signing in from an origin the server does not allow explains that, and names
+  `CORS_ALLOWED_ORIGINS`, instead of an empty 403.
+- `APP_BASE_URL` defaults to `http://localhost`, matching the UI's default port.
+- Retry schedules say that each wait varies by design; smaller wording and formatting fixes across
+  the dashboard.
+
 ## [2.19.2] - 2026-09-13
 
 ### Fixed
@@ -1859,7 +1923,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.19.2...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.20.0...HEAD
+[2.20.0]: https://github.com/vadymkykalo/railhook/compare/v2.19.2...v2.20.0
 [2.19.2]: https://github.com/vadymkykalo/railhook/compare/v2.19.1...v2.19.2
 [2.19.1]: https://github.com/vadymkykalo/railhook/compare/v2.19.0...v2.19.1
 [2.19.0]: https://github.com/vadymkykalo/railhook/compare/v2.18.1...v2.19.0

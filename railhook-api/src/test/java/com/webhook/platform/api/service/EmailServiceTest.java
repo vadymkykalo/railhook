@@ -16,6 +16,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import jakarta.mail.internet.MimeMessage;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -128,7 +130,7 @@ class EmailServiceTest {
             service.sendPasswordResetEmail("real@railhook.test", "tok-fallback");
 
             assertThat(loggedText()).doesNotContain("tok-fallback");
-            assertThat(loggedText()).contains("Failed to send password reset email");
+            assertThat(loggedText()).contains("Mail password-reset to r***l@railhook.test failed");
         }
 
         @Test
@@ -155,6 +157,100 @@ class EmailServiceTest {
             service.sendInviteEmail("real@railhook.test", "org-1", "tok-invite");
 
             assertThat(loggedText()).doesNotContain("tok-invite");
+        }
+    }
+
+    /**
+     * What a support request about a missing mail can be answered from.
+     *
+     * <p>A real person registered as {@code wheelet1228@gmail.con}; the provider showed three
+     * bounces and this log showed nothing that tied them to a template or an outcome. Every send
+     * now leaves an attempt and a result, with the recipient masked — enough to recognise the
+     * address someone reports, not enough to harvest one — and never a body or a token.
+     */
+    @Nested
+    @DisplayName("mail outcomes in the log")
+    class Outcomes {
+
+        private List<ILoggingEvent> infoAndAbove() {
+            return appender.list.stream().filter(e -> e.getLevel().isGreaterOrEqual(Level.INFO)).toList();
+        }
+
+        @Test
+        @DisplayName("a delivered mail logs its template, a masked recipient and success")
+        void successIsLogged() {
+            emailEnabled(true);
+            environment("production");
+            when(mailSender.createMimeMessage()).thenReturn(mock(MimeMessage.class));
+
+            service.sendVerificationEmail("wheelet1228@gmail.con", "tok-secret-verify");
+
+            assertThat(infoAndAbove()).extracting(ILoggingEvent::getFormattedMessage)
+                    .contains("Sending mail verification to w***8@gmail.con",
+                            "Mail verification to w***8@gmail.con sent");
+            assertThat(loggedText()).doesNotContain("wheelet1228").doesNotContain("tok-secret-verify");
+        }
+
+        @Test
+        @DisplayName("a refused mail logs the provider's error, still without the address or the token")
+        void failureIsLoggedWithTheProviderError() {
+            emailEnabled(true);
+            environment("production");
+            smtpFails();
+
+            service.sendInviteEmail("teammate@acme.io", "org-1", "tok-secret-invite");
+
+            assertThat(loggedText())
+                    .contains("Sending mail invite to t***e@acme.io")
+                    .contains("Mail invite to t***e@acme.io failed: relay refused")
+                    .doesNotContain("teammate@acme.io")
+                    .doesNotContain("tok-secret-invite");
+        }
+
+        @Test
+        @DisplayName("every template goes through the same record")
+        void everyTemplateIsNamed() {
+            emailEnabled(true);
+            environment("production");
+            when(mailSender.createMimeMessage()).thenReturn(mock(MimeMessage.class));
+
+            service.sendPasswordResetEmail("a@x.io", "t1");
+            service.sendTemporaryPasswordEmail("a@x.io", "Pw!1");
+            service.sendAlertEmail("a@x.io", "Endpoint down", "<p>body-marker</p>");
+            service.sendEmailChangeConfirmation("new@x.io", "t2");
+            service.sendEmailChangeNotice("old@x.io", "new@x.io", "t3");
+
+            assertThat(loggedText())
+                    .contains("Mail password-reset to a***@x.io sent")
+                    .contains("Mail temporary-password to a***@x.io sent")
+                    .contains("Mail alert to a***@x.io sent")
+                    .contains("Mail email-change-confirmation to n***w@x.io sent")
+                    .contains("Mail email-change-notice to o***d@x.io sent")
+                    .doesNotContain("body-marker")
+                    .doesNotContain("Pw!1");
+        }
+
+        @Test
+        @DisplayName("the development log masks the recipient too, while keeping the link it exists for")
+        void developmentMasksTheRecipient() {
+            emailEnabled(false);
+            environment("development");
+
+            service.sendVerificationEmail("wheelet1228@gmail.con", "tok-dev-link");
+
+            assertThat(loggedText()).contains("tok-dev-link").contains("w***8@gmail.con").doesNotContain("wheelet1228");
+        }
+
+        @org.junit.jupiter.params.ParameterizedTest
+        @org.junit.jupiter.params.provider.CsvSource(nullValues = "NULL", value = {
+                "wheelet1228@gmail.con, w***8@gmail.con",
+                "ab@x.io, a***b@x.io",
+                "a@x.io, a***@x.io",
+                "not-an-address, n***",
+                "NULL, (none)",
+        })
+        void masking(String address, String masked) {
+            assertThat(EmailService.maskRecipient(address)).isEqualTo(masked);
         }
     }
 

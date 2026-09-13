@@ -105,14 +105,22 @@ jobs:
       - name: Collect the production settings
         env:
           VARS_JSON: ${{ toJSON(vars) }}
-          SECRETS_JSON: ${{ toJSON(secrets) }}
+          # Sensitive settings, named one by one. Serialising the whole secrets context put the SSH
+          # deploy key and every other secret of the repository into this step's environment only
+          # for jq to drop them again; a step should hold the secrets it sends and nothing more. A new
+          # sensitive setting is a DOTENV_<NAME> secret in the environment plus a line here.
+          DOTENV_CAPTCHA_SECRET_KEY: ${{ secrets.DOTENV_CAPTCHA_SECRET_KEY }}
+          DOTENV_SMTP_PASSWORD: ${{ secrets.DOTENV_SMTP_PASSWORD }}
+          DOTENV_GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.DOTENV_GOOGLE_OAUTH_CLIENT_SECRET }}
           SETTINGS_FILE: ${{ runner.temp }}/production-settings.env
         run: |
           set -euo pipefail
-          # Every DOTENV_<NAME> variable and secret of this environment, as NAME=value. A secret
-          # wins over a variable of the same name. Anything else in either context — the SSH
-          # key, GITHUB_TOKEN — has no DOTENV_ prefix and never leaves the runner.
+          # Every DOTENV_<NAME> variable of this environment and every named DOTENV_ secret above,
+          # as NAME=value. A secret wins over a variable of the same name; an unset secret is
+          # skipped rather than sent as an empty value.
           umask 077
+          SECRETS_JSON=$(jq -n 'env | with_entries(select((.key | startswith("DOTENV_")) and .value != ""))')
+          export SECRETS_JSON
           if ! jq -rn '
             def dotenv: to_entries
               | map(select(.key | startswith("DOTENV_"))
@@ -186,15 +194,62 @@ jobs:
           served=""
           for attempt in $(seq 1 12); do
             served=$(curl -fsS --max-time 10 "https://railhook.io/version.txt?deploy=${GITHUB_RUN_ID}-${attempt}" | tr -d '[:space:]' || true)
-            if [ "$served" = "$want" ]; then
-              echo "https://railhook.io serves ${served}"
-              exit 0
-            fi
+            [ "$served" = "$want" ] && break
             echo "attempt ${attempt}: serves '${served:-nothing}', want ${want}"
             sleep 10
           done
-          echo "::error::railhook.io serves '${served:-nothing}', not ${want} — a pinned UI image or a docker-compose.override.yml on the host is holding the old site."
-          exit 1
+          if [ "$served" != "$want" ]; then
+            echo "::error::railhook.io serves '${served:-nothing}', not ${want} — a pinned UI image or a docker-compose.override.yml on the host is holding the old site."
+            exit 1
+          fi
+          echo "https://railhook.io serves ${served}"
+
+      - name: Prove the site works, page by page
+        run: |
+          set -uo pipefail
+          # The right version answering 200 on / is still not a working site: the docs, the
+          # installer, the API behind nginx and the runtime config can each break on their own.
+          # Every address a visitor, a self-hoster or the dashboard depends on is fetched from the
+          # outside, with the status it must have and a piece of content only a working one has.
+          base=https://railhook.io
+          failed=0
+          check() {
+            local path="$1" status="$2" needle="$3" body code
+            body=$(mktemp)
+            code=$(curl -sS -o "$body" -w '%{http_code}' --max-time 20 "${base}${path}" || echo 000)
+            if [ "$code" != "$status" ]; then
+              echo "::error::${path} answered ${code}, expected ${status}"
+              failed=1
+            elif [ -n "$needle" ] && ! grep -qF -- "$needle" "$body"; then
+              echo "::error::${path} answered ${code} but did not contain '${needle}'"
+              failed=1
+            else
+              echo "ok  ${code}  ${path}"
+            fi
+            rm -f "$body"
+          }
+          check /                              200 'social-card.png'
+          check /docs/                         200 'Railhook Docs'
+          check /docs/uk/                      200 'Railhook Docs'
+          check /docs/api-reference/           200 'API reference'
+          check /login                         200 '<div id="root">'
+          check /register                      200 '<div id="root">'
+          check /privacy                       200 'Privacy'
+          check /terms                         200 'Terms'
+          check /install.sh                    200 'install'
+          check /install-cli.sh                200 'railhook'
+          check /config.js                     200 '"siteUrl": "https://railhook.io"'
+          check /favicon.svg                   200 '<svg'
+          check /sitemap.xml                   200 'https://railhook.io/'
+          check /api/v1/billing/plans          200 '"free"'
+          check /api/v1/auth/providers         200 '"google"'
+          check /actuator/health               200 'UP'
+          check "/no-such-page-${GITHUB_RUN_ID}" 404 ''
+          if [ "$failed" != 0 ]; then
+            echo "::error::railhook.io is up on the new version but part of the site is broken — see the lines above."
+            exit 1
+          fi
+          echo "Every checked page of railhook.io works."
 
       - name: Say what is running now
         if: always()

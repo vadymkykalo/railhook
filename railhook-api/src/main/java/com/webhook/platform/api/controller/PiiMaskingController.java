@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -99,7 +100,10 @@ public class PiiMaskingController {
     }
 
     @Operation(summary = "Preview sanitized payload", description = "Applies current PII rules to a sample payload and returns the result")
-    @PostMapping("/preview")
+    // Always text/plain: the body echoes the caller's payload, and negotiated as text/html (a
+    // browser's Accept header) markup inside it would render on our origin (CodeQL java/xss).
+    // The dashboard client already accepts a string or a parsed object.
+    @PostMapping(value = "/preview", produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> previewSanitization(
             @PathVariable("projectId") UUID projectId,
             @RequestBody String payload,

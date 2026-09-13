@@ -15,6 +15,7 @@ import { apiKeysApi, ApiKeyResponse, ApiKeyScope } from '../api/apiKeys.api';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse, PageResponse } from '../types/api.types';
 import { cn } from '../lib/utils';
+import { sendEventCurl } from '../lib/publicSnippets';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -452,10 +453,7 @@ export default function ApiKeysPage() {
             <div className="space-y-1.5">
               <p className="mono-label">{t('apiKeys.keyDialog.howToUse')}</p>
               <pre className="overflow-x-auto rounded-lg border border-rail bg-secondary/60 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
-{`curl -X POST https://your-domain.com/api/v1/events \\
-  -H "X-API-Key: $RAILHOOK_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"type":"user.created","data":{"userId":"123"}}'`}
+{sendEventCurl({ payload: '{"type":"user.created","data":{"userId":"123"}}', apiKey: '$RAILHOOK_API_KEY' })}
               </pre>
             </div>
           </div>

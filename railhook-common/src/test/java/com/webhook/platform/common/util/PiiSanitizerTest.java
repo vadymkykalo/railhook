@@ -28,6 +28,71 @@ class PiiSanitizerTest {
     }
 
     @Nested
+    @DisplayName("hostile payloads cannot stall the sanitizer")
+    class Backtracking {
+
+        /*
+         * CodeQL java/polynomial-redos: the builtin key patterns were `"([^"]*(?:mail)[^"]*?)"`,
+         * which backtracks quadratically over one long quoted string full of the keyword. The
+         * payload is whatever a webhook sender or the preview endpoint is handed, so a single
+         * request could pin a worker thread for minutes.
+         */
+        @Test
+        void aLongUnterminatedKeyFullOfKeywordsIsLinear() {
+            String hostile = "{\"" + "mail".repeat(40_000) + " x";
+            List<PiiSanitizer.Rule> rules = List.of(
+                    builtin(PiiSanitizer.BUILTIN_EMAIL),
+                    builtin(PiiSanitizer.BUILTIN_PHONE),
+                    builtin(PiiSanitizer.BUILTIN_CARD));
+
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(2),
+                    () -> PiiSanitizer.sanitize(hostile, rules));
+        }
+
+        /*
+         * The shapes CodeQL still reported once the key segments were bounded: a bounded
+         * repetition on either side of the keyword is still ambiguous, and so is `[^"]+@[^"]+`
+         * over a value full of '@'. The key and the value are now read once each and judged in
+         * code, so none of these can backtrack.
+         */
+        @Test
+        void keysAndValuesFullOfWhatThePatternsLookForAreLinear() {
+            List<PiiSanitizer.Rule> rules = List.of(
+                    builtin(PiiSanitizer.BUILTIN_EMAIL),
+                    builtin(PiiSanitizer.BUILTIN_PHONE),
+                    builtin(PiiSanitizer.BUILTIN_CARD));
+            List<String> hostile = List.of(
+                    "{\"mail\":\"" + "!@".repeat(200_000),
+                    "{\"mail\":\"" + "!@".repeat(200_000) + "\"}",
+                    "{\"tel" + "fax".repeat(200_000),
+                    "{\"pan" + "pan".repeat(200_000),
+                    "{\"" + "\"mail\":".repeat(100_000));
+
+            for (String payload : hostile) {
+                assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
+                    PiiSanitizer.sanitize(payload, rules);
+                    PiiSanitizer.detect(payload);
+                });
+            }
+        }
+
+        @Test
+        void aKeyAfterValuesOfOtherShapesIsStillFound() {
+            String json = "{\"id\":42,\"tags\":[\"a\",\"email\"],\"ok\":true,\"contact\":{\"email\":\"john@example.com\"}}";
+            String masked = PiiSanitizer.sanitize(json, List.of(builtin(PiiSanitizer.BUILTIN_EMAIL)));
+            assertFalse(masked.contains("john@example.com"), masked);
+            assertTrue(masked.contains("\"tags\":[\"a\",\"email\"]"), masked);
+        }
+
+        @Test
+        void aRealisticKeyIsStillMasked() {
+            String masked = PiiSanitizer.sanitize("{\"customer_email_address\":\"john@example.com\"}",
+                    List.of(builtin(PiiSanitizer.BUILTIN_EMAIL)));
+            assertFalse(masked.contains("john@example.com"), masked);
+        }
+    }
+
+    @Nested
     @DisplayName("card numbers held directly by a card-ish key")
     class FlatCards {
 

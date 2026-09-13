@@ -10,6 +10,8 @@ const LandingPage = lazy(() => import('./pages/LandingPage'));
 const LoginPage = lazy(() => import('./auth/LoginPage'));
 const RegisterPage = lazy(() => import('./auth/RegisterPage'));
 const VerifyEmailPage = lazy(() => import('./auth/VerifyEmailPage'));
+const ConfirmEmailChangePage = lazy(() => import('./auth/ConfirmEmailChangePage'));
+const CancelEmailChangePage = lazy(() => import('./auth/CancelEmailChangePage'));
 const ForgotPasswordPage = lazy(() => import('./auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./auth/ResetPasswordPage'));
 const AcceptInvitePage = lazy(() => import('./auth/AcceptInvitePage'));
@@ -20,6 +22,7 @@ const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ defaul
 const TermsPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.TermsPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
+const ProjectSetupPage = lazy(() => import('./pages/ProjectSetupPage'));
 const EndpointsPage = lazy(() => import('./pages/EndpointsPage'));
 const DeliveriesPage = lazy(() => import('./pages/DeliveriesPage'));
 const EventsPage = lazy(() => import('./pages/EventsPage'));
@@ -35,6 +38,11 @@ const DlqPage = lazy(() => import('./pages/DlqPage'));
 const IncomingDlqPage = lazy(() => import('./pages/IncomingDlqPage'));
 const TestEndpointsPage = lazy(() => import('./pages/TestEndpointsPage'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
+const PlatformAdminGate = lazy(() => import('./components/PlatformAdminGate'));
+const PlatformOverviewPage = lazy(() => import('./pages/PlatformOverviewPage'));
+const PlatformOrganizationsPage = lazy(() => import('./pages/PlatformOrganizationsPage'));
+const PlatformOrganizationDetailPage = lazy(() => import('./pages/PlatformOrganizationDetailPage'));
+const PlatformUsersPage = lazy(() => import('./pages/PlatformUsersPage'));
 const IncomingSourcesPage = lazy(() => import('./pages/IncomingSourcesPage'));
 const IncomingSourceDetailPage = lazy(() => import('./pages/IncomingSourceDetailPage'));
 const IncomingEventsPage = lazy(() => import('./pages/IncomingEventsPage'));
@@ -108,6 +116,16 @@ export const router = createBrowserRouter([
     path: '/verify-email',
     element: <S><VerifyEmailPage /></S>,
   },
+  /* The two links an email change mails: confirm from the new address, "this wasn't me" from
+     the old one. Public, because either can be opened with no session. */
+  {
+    path: '/confirm-email-change',
+    element: <S><ConfirmEmailChangePage /></S>,
+  },
+  {
+    path: '/cancel-email-change',
+    element: <S><CancelEmailChangePage /></S>,
+  },
   {
     path: '/forgot-password',
     element: <S><ForgotPasswordPage /></S>,
@@ -157,6 +175,11 @@ export const router = createBrowserRouter([
       {
         path: 'projects',
         element: <S><ProjectsPage /></S>,
+      },
+      {
+        // A section opened before the organization has a project: say what it is for and make one.
+        path: 'start/:segment',
+        element: <S><ProjectSetupPage /></S>,
       },
       {
         path: 'projects/:projectId/endpoints',
@@ -293,6 +316,25 @@ export const router = createBrowserRouter([
       {
         path: 'billing',
         element: <S><BillingPage /></S>,
+      },
+      /* The platform admin panel: for the people who run the deployment, not an organization
+         role. The gate reads `platformAdmin` from /auth/me; the API checks it again, with the
+         sign-in's age, on every request. */
+      {
+        path: 'platform',
+        element: <S><PlatformAdminGate><PlatformOverviewPage /></PlatformAdminGate></S>,
+      },
+      {
+        path: 'platform/organizations',
+        element: <S><PlatformAdminGate><PlatformOrganizationsPage /></PlatformAdminGate></S>,
+      },
+      {
+        path: 'platform/organizations/:organizationId',
+        element: <S><PlatformAdminGate><PlatformOrganizationDetailPage /></PlatformAdminGate></S>,
+      },
+      {
+        path: 'platform/users',
+        element: <S><PlatformAdminGate><PlatformUsersPage /></PlatformAdminGate></S>,
       },
       {
         path: '*',

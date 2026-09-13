@@ -16,6 +16,10 @@ public class EmailService {
     @Value("${app.email.from:noreply@example.com}")
     private String fromAddress;
 
+    /** Where the "this wasn't me" notice sends a worried person. Blank on a self-hosted install. */
+    @Value("${app.email.support-address:}")
+    private String supportAddress;
+
     @Value("${app.base-url:http://localhost:5173}")
     private String baseUrl;
 
@@ -41,6 +45,30 @@ public class EmailService {
     }
 
     /**
+     * An address as the log may show it: the first and last character of the mailbox and the whole
+     * domain — {@code w***8@gmail.con}.
+     *
+     * <p>Enough to match a bounce the provider reports, or the address in a support request, to a
+     * line here; not enough to harvest the address from a log that is shipped, retained and read by
+     * more people than the users table is. The domain stays whole because it is where a typo lives.
+     */
+    static String maskRecipient(String address) {
+        if (address == null || address.isBlank()) {
+            return "(none)";
+        }
+        int at = address.lastIndexOf('@');
+        if (at < 0) {
+            return address.charAt(0) + "***";
+        }
+        String mailbox = address.substring(0, at);
+        String domain = address.substring(at);
+        if (mailbox.length() <= 1) {
+            return mailbox + "***" + domain;
+        }
+        return mailbox.charAt(0) + "***" + mailbox.charAt(mailbox.length() - 1) + domain;
+    }
+
+    /**
      * Whether a short-lived, single-use link may stand in for the mail that could not be sent.
      *
      * <p>On a workstation it must: with {@code app.email.enabled=false} — the shipped default —
@@ -58,7 +86,46 @@ public class EmailService {
 
     private void explainWithheldLink(String what, String to) {
         log.warn("{} for {} was not sent and will not be logged: APP_ENV=production with "
-                + "EMAIL_ENABLED=false. Configure SMTP, or the link cannot reach anyone.", what, to);
+                + "EMAIL_ENABLED=false. Configure SMTP, or the link cannot reach anyone.", what, maskRecipient(to));
+    }
+
+    /** The development stand-in for a mail that carries a link: where it would have gone, and the link. */
+    private void logLinkInstead(String banner, String to, String label, String url) {
+        log.info("========== {} ==========", banner);
+        log.info("To: {}", maskRecipient(to));
+        log.info("{}: {}", label, url);
+        log.info("=========================================");
+    }
+
+    @FunctionalInterface
+    private interface Send {
+        void run() throws Exception;
+    }
+
+    /**
+     * One send, and its record: the attempt, then what the provider said.
+     *
+     * <p>No body, subject or link reaches the log from here — the links are bearer credentials, and
+     * the template name says which message it was. The provider's error is kept, since it is the
+     * only thing that explains a bounce; an SMTP refusal quotes the recipient back, so that is masked
+     * too. Never throws: a mail that did not go is not a reason to fail the request that sent it.
+     *
+     * <p>No fallback to logging the link on failure. This only runs with {@code app.email.enabled=true}
+     * — a deployment that configured SMTP and had it blink. It did not ask for links in its log.
+     */
+    private void deliver(String template, String to, Send send) {
+        String masked = maskRecipient(to);
+        log.info("Sending mail {} to {}", template, masked);
+        try {
+            send.run();
+            log.info("Mail {} to {} sent", template, masked);
+        } catch (Exception e) {
+            String providerError = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            if (to != null && !to.isBlank()) {
+                providerError = providerError.replace(to, masked);
+            }
+            log.error("Mail {} to {} failed: {}", template, masked, providerError);
+        }
     }
 
     public void sendVerificationEmail(String to, String token) {
@@ -69,31 +136,20 @@ public class EmailService {
                 explainWithheldLink("An email verification link", to);
                 return;
             }
-            log.info("========== EMAIL VERIFICATION ==========");
-            log.info("To: {}", to);
-            log.info("Verify URL: {}", verifyUrl);
-            log.info("=========================================");
+            logLinkInstead("EMAIL VERIFICATION", to, "Verify URL", verifyUrl);
             return;
         }
 
-        try {
-            sendBoth(to, "Verify your email — Railhook",
-                    """
-                    Thanks for signing up for Railhook.
+        deliver("verification", to, () -> sendBoth(to, "Verify your email — Railhook",
+                """
+                Thanks for signing up for Railhook.
 
-                    Verify your email address by opening this link:
-                    %s
+                Verify your email address by opening this link:
+                %s
 
-                    The link expires in 24 hours. If you didn't create an account, ignore this.
-                    """.formatted(verifyUrl),
-                    buildVerificationHtml(verifyUrl));
-            log.info("Verification email sent to {}", to);
-        } catch (Exception e) {
-            // No fallback to the log. This branch only runs with app.email.enabled=true — a
-            // deployment that configured SMTP and had it blink. It did not ask for links in its
-            // log, and one refused relay is not a reason to put one there.
-            log.error("Failed to send verification email to {}: {}", to, e.getMessage());
-        }
+                The link expires in 24 hours. If you didn't create an account, ignore this.
+                """.formatted(verifyUrl),
+                buildVerificationHtml(verifyUrl)));
     }
 
     public void sendPasswordResetEmail(String to, String token) {
@@ -104,29 +160,88 @@ public class EmailService {
                 explainWithheldLink("A password reset link", to);
                 return;
             }
-            log.info("========== PASSWORD RESET ==========");
-            log.info("To: {}", to);
-            log.info("Reset URL: {}", resetUrl);
-            log.info("====================================");
+            logLinkInstead("PASSWORD RESET", to, "Reset URL", resetUrl);
             return;
         }
 
-        try {
-            sendBoth(to, "Reset your password — Railhook",
-                    """
-                    We received a request to reset the password for your Railhook account.
+        deliver("password-reset", to, () -> sendBoth(to, "Reset your password — Railhook",
+                """
+                We received a request to reset the password for your Railhook account.
 
-                    Set a new password here:
-                    %s
+                Set a new password here:
+                %s
 
-                    The link expires in 1 hour. If you didn't ask for this, ignore this email —
-                    your password has not changed.
-                    """.formatted(resetUrl),
-                    buildPasswordResetHtml(resetUrl));
-            log.info("Password reset email sent to {}", to);
-        } catch (Exception e) {
-            log.error("Failed to send password reset email to {}: {}", to, e.getMessage());
+                The link expires in 1 hour. If you didn't ask for this, ignore this email —
+                your password has not changed.
+                """.formatted(resetUrl),
+                buildPasswordResetHtml(resetUrl)));
+    }
+
+    /**
+     * The link that makes a new account address real. Sent to the <em>new</em> address, because
+     * opening it is the proof that the person asking can read mail there.
+     */
+    public void sendEmailChangeConfirmation(String to, String token) {
+        String confirmUrl = baseUrl + "/confirm-email-change?token=" + token;
+
+        if (!emailEnabled) {
+            if (!mayLogLinkInstead()) {
+                explainWithheldLink("An email change confirmation link", to);
+                return;
+            }
+            logLinkInstead("EMAIL CHANGE CONFIRMATION", to, "Confirm URL", confirmUrl);
+            return;
         }
+
+        deliver("email-change-confirmation", to, () -> sendBoth(to, "Confirm your new email — Railhook",
+                """
+                Someone asked to use this address for a Railhook account.
+
+                If that was you, confirm it here:
+                %s
+
+                The link expires in 24 hours. Until then the account keeps its current address.
+                If it wasn't you, ignore this email and nothing changes.
+                """.formatted(confirmUrl),
+                buildEmailChangeConfirmationHtml(confirmUrl)));
+    }
+
+    /**
+     * Tells the address an account is moving away from, with a way to stop it.
+     *
+     * <p>This is the mail that matters when the request was not the owner's: whoever holds a session
+     * can ask, and without this the owner's first sign of it would be a sign-in that no longer works.
+     * The cancel link needs no session — the owner may no longer have one.
+     */
+    public void sendEmailChangeNotice(String to, String newAddress, String cancelToken) {
+        String cancelUrl = baseUrl + "/cancel-email-change?token=" + cancelToken;
+        String maskedNew = maskRecipient(newAddress);
+        String help = supportAddress == null || supportAddress.isBlank()
+                ? "contact the administrator of this Railhook installation"
+                : "write to " + supportAddress;
+
+        if (!emailEnabled) {
+            if (!mayLogLinkInstead()) {
+                explainWithheldLink("An email change notice", to);
+                return;
+            }
+            logLinkInstead("EMAIL CHANGE NOTICE", to, "Cancel URL", cancelUrl);
+            return;
+        }
+
+        deliver("email-change-notice", to, () -> sendBoth(to, "Your Railhook email is being changed",
+                """
+                Someone asked to change the email address of your Railhook account to %s.
+
+                If that was you, there is nothing to do: the change completes when the new address
+                is confirmed.
+
+                If it wasn't you, cancel it here — this also signs out every session:
+                %s
+
+                Then reset your password. If you need help, %s.
+                """.formatted(maskedNew, cancelUrl, help),
+                buildEmailChangeNoticeHtml(maskedNew, cancelUrl, help)));
     }
 
     /**
@@ -147,28 +262,20 @@ public class EmailService {
                 explainWithheldLink("An invite link", to);
                 return;
             }
-            log.info("========== MEMBER INVITE ==========");
-            log.info("To: {}", to);
-            log.info("Invite URL: {}", inviteUrl);
-            log.info("====================================");
+            logLinkInstead("MEMBER INVITE", to, "Invite URL", inviteUrl);
             return;
         }
 
-        try {
-            sendBoth(to, "You've been invited to join an organization — Railhook",
-                    """
-                    You've been invited to join an organization on Railhook.
+        // inviteUrl() hands the same link back to the inviting owner, so a copy in the log would buy
+        // nothing and leave it in the least controlled place there is.
+        deliver("invite", to, () -> sendBoth(to, "You've been invited to join an organization — Railhook",
+                """
+                You've been invited to join an organization on Railhook.
 
-                    Accept the invitation here:
-                    %s
-                    """.formatted(inviteUrl),
-                    buildInviteHtml(inviteUrl));
-            log.info("Invite email sent to {}", to);
-        } catch (Exception e) {
-            // inviteUrl() hands the same link back to the inviting owner, so a copy here buys
-            // nothing and leaves it in the least controlled place there is.
-            log.error("Failed to send invite email to {}: {}", to, e.getMessage());
-        }
+                Accept the invitation here:
+                %s
+                """.formatted(inviteUrl),
+                buildInviteHtml(inviteUrl)));
     }
 
     /**
@@ -183,13 +290,13 @@ public class EmailService {
     public void sendTemporaryPasswordEmail(String to, String tempPassword) {
         if (!emailEnabled) {
             log.info("========== TEMP PASSWORD EMAIL SKIPPED (app.email.enabled=false) ==========");
-            log.info("To: {} — temporary password was generated but NOT logged or emailed.", to);
+            log.info("To: {} — temporary password was generated but NOT logged or emailed.", maskRecipient(to));
             log.info("Use POST /api/v1/auth/forgot-password to issue a usable (loggable) reset token instead.");
             log.info("=============================================================================");
             return;
         }
 
-        try {
+        deliver("temporary-password", to, () -> {
             var message = mailSender.createMimeMessage();
             var helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress);
@@ -197,23 +304,19 @@ public class EmailService {
             helper.setSubject("Your temporary password — Railhook");
             helper.setText(buildTemporaryPasswordHtml(tempPassword), true);
             mailSender.send(message);
-            log.info("Temporary password email sent to {}", to);
-        } catch (Exception e) {
-            // Do not fall back to logging the password on send failure either.
-            log.error("Failed to send temporary password email to {}: {}", to, e.getMessage());
-        }
+        });
     }
 
     public void sendAlertEmail(String to, String subject, String htmlBody) {
         if (!emailEnabled) {
             log.info("========== ALERT EMAIL ==========");
-            log.info("To: {}", to);
+            log.info("To: {}", maskRecipient(to));
             log.info("Subject: {}", subject);
             log.info("=================================");
             return;
         }
 
-        try {
+        deliver("alert", to, () -> {
             var message = mailSender.createMimeMessage();
             var helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress);
@@ -221,10 +324,7 @@ public class EmailService {
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
             mailSender.send(message);
-            log.info("Alert email sent to {}", to);
-        } catch (Exception e) {
-            log.error("Failed to send alert email to {}: {}", to, e.getMessage());
-        }
+        });
     }
 
     private String buildInviteHtml(String inviteUrl) {
@@ -352,5 +452,50 @@ public class EmailService {
                 </p>
             </div>
             """.formatted(verifyUrl, linkFallback(verifyUrl));
+    }
+
+    private String buildEmailChangeConfirmationHtml(String confirmUrl) {
+        return """
+            <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+                <h2 style="color: #111;">Confirm your new email</h2>
+                <p style="color: #555; line-height: 1.5;">
+                    Someone asked to use this address for a Railhook account. If that was you,
+                    confirm it with the button below.
+                </p>
+                <a href="%s"
+                   style="display: inline-block; padding: 12px 24px; background: #111; color: #fff;
+                          text-decoration: none; border-radius: 6px; margin: 16px 0;">
+                    Confirm new email
+                </a>
+%s                <p style="color: #999; font-size: 12px; margin-top: 24px;">
+                    The link expires in 24 hours. Until then the account keeps its current address.
+                    If it wasn't you, ignore this email and nothing changes.
+                </p>
+            </div>
+            """.formatted(confirmUrl, linkFallback(confirmUrl));
+    }
+
+    private String buildEmailChangeNoticeHtml(String maskedNew, String cancelUrl, String help) {
+        return """
+            <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+                <h2 style="color: #111;">Your email is being changed</h2>
+                <p style="color: #555; line-height: 1.5;">
+                    Someone asked to change the email address of your Railhook account to
+                    <strong>%s</strong>. If that was you, there is nothing to do: the change completes
+                    when the new address is confirmed.
+                </p>
+                <p style="color: #555; line-height: 1.5;">
+                    If it wasn't you, cancel it. This also signs out every session.
+                </p>
+                <a href="%s"
+                   style="display: inline-block; padding: 12px 24px; background: #b42318; color: #fff;
+                          text-decoration: none; border-radius: 6px; margin: 16px 0;">
+                    This wasn't me
+                </a>
+%s                <p style="color: #999; font-size: 12px; margin-top: 24px;">
+                    Then reset your password. If you need help, %s.
+                </p>
+            </div>
+            """.formatted(maskedNew, cancelUrl, linkFallback(cancelUrl), help);
     }
 }

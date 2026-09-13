@@ -14,6 +14,17 @@ public enum AuditAction {
     PASSWORD_RESET_REQUESTED,
     PASSWORD_RESET,
     PASSWORD_CHANGED,
+
+    /*
+     * The address an account signs in with. Recorded against every organization the person
+     * belongs to, so an owner sees a member's address change — pending, done or called off —
+     * and sees an account hammering the caps, which is what an abuse of the feature looks like.
+     */
+    EMAIL_CHANGE_REQUESTED,
+    EMAIL_CHANGED,
+    EMAIL_CHANGE_CANCELLED,
+    EMAIL_RATE_LIMITED,
+
     MEMBER_INVITED,
     MEMBER_ROLE_CHANGED,
     MEMBER_REMOVED,
@@ -37,6 +48,9 @@ public enum AuditAction {
     // the audit log is where a customer's "why did this stop working" gets answered.
     ORGANIZATION_SUSPENDED,
     ORGANIZATION_REINSTATED,
+    // Any request to the platform admin API — reads included, because reading another
+    // organization's members is the sensitive act there. Recorded under the system tenant.
+    PLATFORM_ADMIN_ACCESS,
 
     /*
      * The data-protection rights, which have to be answerable to someone who was not there:

@@ -4,6 +4,12 @@ import com.webhook.platform.api.security.ApiKeyAuthenticationFilter;
 import com.webhook.platform.api.security.JwtAuthenticationFilter;
 import com.webhook.platform.api.security.PlatformAdminAuthenticationFilter;
 import com.webhook.platform.api.security.PlatformAdminAuthenticationToken;
+import com.webhook.platform.api.audit.AuditLogAspect;
+import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.security.PlatformAdminAccessFilter;
+import com.webhook.platform.api.security.TrustedProxyResolver;
+import com.webhook.platform.api.service.AuthRateLimiterService;
+import com.webhook.platform.api.service.PlatformAdminAccessService;
 import com.webhook.platform.api.tenancy.TenantContextFilter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +32,7 @@ public class SecurityConfig {
         private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
         private final JwtAuthenticationFilter jwtAuthenticationFilter;
         private final PlatformAdminAuthenticationFilter platformAdminAuthenticationFilter;
+        private final PlatformAdminAccessFilter platformAdminAccessFilter;
         private final TenantContextFilter tenantContextFilter = new TenantContextFilter();
         private final CorsConfigurationSource corsConfigurationSource;
         private final boolean swaggerEnabled;
@@ -35,12 +42,19 @@ public class SecurityConfig {
                         ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
                         JwtAuthenticationFilter jwtAuthenticationFilter,
                         PlatformAdminAuthenticationFilter platformAdminAuthenticationFilter,
+                        PlatformAdminAccessService platformAdminAccessService,
+                        JwtUtil jwtUtil,
+                        AuthRateLimiterService authRateLimiterService,
+                        AuditLogAspect auditLogAspect,
+                        TrustedProxyResolver trustedProxyResolver,
                         @Qualifier("corsConfigurationSource") CorsConfigurationSource corsConfigurationSource,
                         @Value("${swagger.enabled:false}") boolean swaggerEnabled,
                         Environment environment) {
                 this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
                 this.jwtAuthenticationFilter = jwtAuthenticationFilter;
                 this.platformAdminAuthenticationFilter = platformAdminAuthenticationFilter;
+                this.platformAdminAccessFilter = new PlatformAdminAccessFilter(platformAdminAccessService, jwtUtil,
+                                authRateLimiterService, auditLogAspect, trustedProxyResolver);
                 this.corsConfigurationSource = corsConfigurationSource;
                 this.swaggerEnabled = swaggerEnabled;
                 this.environment = environment;
@@ -102,16 +116,26 @@ public class SecurityConfig {
                                                         .requestMatchers("/api/v1/public/**").permitAll()
                                                         .requestMatchers("/api/v1/billing/plans").permitAll()
                                                         .requestMatchers("/api/v1/billing/webhook/**").permitAll()
+                                                        // Re-encrypting every tenant's secrets: the operator
+                                                        // token only, never a signed-in platform admin.
+                                                        .requestMatchers("/api/v1/admin/encryption/**")
+                                                                        .hasAuthority(PlatformAdminAuthenticationToken.OPERATOR_TOKEN_AUTHORITY)
                                                         // Cluster-operator routes — gated on the
-                                                        // PLATFORM_ADMIN authority granted only by
-                                                        // PlatformAdminAuthenticationFilter, never by tenant
-                                                        // JWT/API-key role (org OWNER is not platform admin).
+                                                        // PLATFORM_ADMIN authority, granted by
+                                                        // PlatformAdminAuthenticationFilter (operator token) or
+                                                        // PlatformAdminAccessFilter (a verified, active, recently
+                                                        // signed-in address in PLATFORM_ADMIN_EMAILS) — never by
+                                                        // tenant JWT/API-key role (org OWNER is not platform admin).
                                                         .requestMatchers("/api/v1/admin/**")
                                                                         .hasAuthority(PlatformAdminAuthenticationToken.AUTHORITY)
                                                         .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login",
                                                                         "/api/v1/auth/refresh",
                                                                         "/api/v1/auth/verify-email",
                                                                         "/api/v1/auth/resend-verification",
+                                                                        // Opened from mail: the link is the proof,
+                                                                        // and the old address may have no session.
+                                                                        "/api/v1/auth/email-change/confirm",
+                                                                        "/api/v1/auth/email-change/cancel",
                                                                         "/api/v1/auth/forgot-password",
                                                                         "/api/v1/auth/reset-password",
                                                                         "/api/v1/auth/device/code",
@@ -153,10 +177,14 @@ public class SecurityConfig {
                                                 UsernamePasswordAuthenticationFilter.class)
                                 .addFilterBefore(platformAdminAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class)
-                                // Last of the four on purpose: it reads the identity the other
-                                // three establish and turns it into the tenant scope every query
-                                // in the request then runs under.
-                                .addFilterAfter(tenantContextFilter, PlatformAdminAuthenticationFilter.class);
+                                // After both identities are known: it may turn a JWT into the
+                                // platform-admin authority, and it must see the operator token too
+                                // to rate-limit and audit it.
+                                .addFilterAfter(platformAdminAccessFilter, PlatformAdminAuthenticationFilter.class)
+                                // Last on purpose: it reads the identity the others establish and
+                                // turns it into the tenant scope every query in the request then
+                                // runs under.
+                                .addFilterAfter(tenantContextFilter, PlatformAdminAccessFilter.class);
 
                 return http.build();
         }

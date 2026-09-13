@@ -14,6 +14,7 @@ const USER = {
   role: 'OWNER',
   emailDeliveryEnabled: true,
   hasPassword: false,
+  platformAdmin: false,
 } as unknown as CurrentUserResponse;
 
 /**

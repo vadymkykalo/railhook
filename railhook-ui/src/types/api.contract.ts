@@ -61,6 +61,8 @@ type Assert<T extends true> = T;
 
 export type AuthResponseConforms = Assert<Conforms<'AuthResponse', Mirror.AuthResponse>>;
 export type RegisterRequestConforms = Assert<Conforms<'RegisterRequest', Mirror.RegisterRequest>>;
+export type ChangeEmailRequestConforms = Assert<Conforms<'ChangeEmailRequest', Mirror.ChangeEmailRequest>>;
+export type EmailChangeResponseConforms = Assert<Conforms<'EmailChangeResponse', Mirror.EmailChangeResponse>>;
 export type LoginRequestConforms = Assert<Conforms<'LoginRequest', Mirror.LoginRequest>>;
 export type UserResponseConforms = Assert<Conforms<'UserResponse', Mirror.UserResponse>>;
 export type CurrentUserResponseConforms = Assert<Conforms<'CurrentUserResponse', Mirror.CurrentUserResponse>>;

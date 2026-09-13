@@ -1944,6 +1944,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/email-change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the email change state
+         * @description The account's address, and the change waiting for confirmation if there is one
+         */
+        get: operations["getEmailChange"];
+        put?: never;
+        /**
+         * Change email
+         * @description An unverified account moves to the new address at once and must verify it; it answers the registration CAPTCHA when one is configured. A verified account re-enters its password (or, with no password, has signed in within 10 minutes) and keeps its address until the link sent to the new one is opened.
+         */
+        post: operations["requestEmailChange"];
+        /** Cancel the pending email change */
+        delete: operations["cancelEmailChange"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/email-change/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resend the email change confirmation */
+        post: operations["resendEmailChange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/email-change/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm an email change
+         * @description Opened from the link sent to the new address. Signs every session out.
+         */
+        post: operations["confirmEmailChange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/email-change/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an email change from the old address
+         * @description Opened from the "this wasn't me" link sent to the old address. Signs every session out.
+         */
+        post: operations["cancelEmailChangeByToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/device/token": {
         parameters: {
             query?: never;
@@ -2055,7 +2137,7 @@ export interface paths {
         put?: never;
         /**
          * Suspend an organization
-         * @description Stops the organization changing anything — ingest included — until it is reinstated. Reads keep working, so the tenant can sign in and be shown why. Independent of billing status, so a payment does not lift it.
+         * @description Stops the organization changing anything — ingest included — until it is reinstated. Reads keep working, so the tenant can sign in and be shown why. Independent of billing status, so a payment does not lift it. A signed-in platform admin's own address is recorded as suspendedBy.
          */
         post: operations["adminSuspendOrganization"];
         delete?: never;
@@ -2075,7 +2157,7 @@ export interface paths {
         put?: never;
         /**
          * Reinstate an organization
-         * @description Lifts a suspension. Reinstating one that is not suspended is a no-op.
+         * @description Lifts a suspension. Reinstating one that is not suspended is a no-op. The optional reason is kept in the organization's audit log.
          */
         post: operations["adminReinstateOrganization"];
         delete?: never;
@@ -3132,6 +3214,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List accounts
+         * @description Every account on this deployment, newest first, optionally narrowed by address or name: verification, status, sign-in methods, organizations and last activity. Never carries a password hash or any token.
+         */
+        get: operations["adminListUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deployment overview
+         * @description Organizations, accounts and sign-ups, event and delivery volume, active tunnels, organizations at 80% or more of their monthly event limit, and the most recent sign-ups. Counts only.
+         */
+        get: operations["adminGetOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/organizations": {
         parameters: {
             query?: never;
@@ -3141,7 +3263,7 @@ export interface paths {
         };
         /**
          * List organizations
-         * @description Every organization on this deployment, newest first. Optionally narrowed by name, or to those currently suspended. Requires X-Platform-Admin-Token.
+         * @description Every organization on this deployment, newest first. Optionally narrowed by name or a member's address, or to those currently suspended.
          */
         get: operations["adminListOrganizations"];
         put?: never;
@@ -3161,7 +3283,7 @@ export interface paths {
         };
         /**
          * Get one organization
-         * @description Plan, billing status, project and member counts, and any suspension.
+         * @description Plan, billing status, owner, project and member counts, events this month, and any suspension.
          */
         get: operations["adminGetOrganization"];
         put?: never;
@@ -3184,6 +3306,66 @@ export interface paths {
          * @description Events this billing period, endpoints, projects and members, each against the limit their plan allows — the same numbers the tenant sees on their own billing page, so a support conversation is about one set of figures. Carries no customer data: counts and limits only.
          */
         get: operations["adminGetOrganizationUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/organizations/{organizationId}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Projects of one organization
+         * @description The organization's live projects: name and creation time, nothing they contain.
+         */
+        get: operations["adminListOrganizationProjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/organizations/{organizationId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Members of one organization
+         * @description Each member's address, role, membership and account status, sign-in methods, and when they joined and were last active.
+         */
+        get: operations["adminListOrganizationMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/organizations/{organizationId}/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit log of one organization
+         * @description Who did what in the organization, newest first: action, resource, actor, outcome, address. Without request bodies.
+         */
+        get: operations["adminListOrganizationAuditLog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4503,6 +4685,19 @@ export interface components {
             /** Format: email */
             email: string;
         };
+        ChangeEmailRequest: {
+            /** Format: email */
+            newEmail: string;
+            currentPassword?: string;
+            captchaToken?: string;
+        };
+        EmailChangeResponse: {
+            email?: string;
+            pendingEmail?: string;
+            /** Format: date-time */
+            pendingExpiresAt?: string;
+            applied?: boolean;
+        };
         DeviceTokenRequest: {
             deviceCode: string;
         };
@@ -4540,14 +4735,22 @@ export interface components {
             billingStatus?: "ACTIVE" | "PAST_DUE" | "GRACE_PERIOD" | "SUSPENDED" | "CANCELLED";
             /** Format: date-time */
             createdAt?: string;
+            ownerEmail?: string;
             /** Format: int64 */
             projectCount?: number;
             /** Format: int64 */
             memberCount?: number;
+            /** Format: int64 */
+            eventsThisMonth?: number;
+            /** Format: int64 */
+            eventsLimit?: number;
             /** Format: date-time */
             suspendedAt?: string;
             suspensionReason?: string;
             suspendedBy?: string;
+        };
+        ReinstateOrganizationRequest: {
+            reason?: string;
         };
         EncryptionRotationResponse: {
             status?: string;
@@ -4611,12 +4814,12 @@ export interface components {
             /** Format: int64 */
             offset?: number;
             sort?: components["schemas"]["SortObject"];
-            unpaged?: boolean;
             paged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
+            unpaged?: boolean;
         };
         SortObject: {
             empty?: boolean;
@@ -5541,6 +5744,7 @@ export interface components {
             role?: "OWNER" | "DEVELOPER" | "VIEWER" | "API_KEY";
             emailDeliveryEnabled?: boolean;
             hasPassword?: boolean;
+            platformAdmin?: boolean;
         };
         AuditLogResponse: {
             /** Format: uuid */
@@ -5588,6 +5792,90 @@ export interface components {
             size?: number;
             sort?: string[];
         };
+        AdminUserResponse: {
+            /** Format: uuid */
+            id?: string;
+            email?: string;
+            fullName?: string;
+            emailVerified?: boolean;
+            /** @enum {string} */
+            status?: "ACTIVE" | "PENDING_VERIFICATION" | "DISABLED";
+            signInMethods?: string[];
+            organizations?: components["schemas"]["OrganizationMembership"][];
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            lastSeenAt?: string;
+        };
+        OrganizationMembership: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            /** @enum {string} */
+            role?: "OWNER" | "DEVELOPER" | "VIEWER" | "API_KEY";
+        };
+        PageAdminUserResponse: {
+            /** Format: int32 */
+            totalPages?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["AdminUserResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"];
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            numberOfElements?: number;
+            first?: boolean;
+            last?: boolean;
+            empty?: boolean;
+        };
+        AdminSignupResponse: {
+            /** Format: uuid */
+            userId?: string;
+            email?: string;
+            fullName?: string;
+            emailVerified?: boolean;
+            /** @enum {string} */
+            status?: "ACTIVE" | "PENDING_VERIFICATION" | "DISABLED";
+            signInMethods?: string[];
+            /** Format: uuid */
+            organizationId?: string;
+            organizationName?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        PlatformOverviewResponse: {
+            /** Format: int64 */
+            organizations?: number;
+            /** Format: int64 */
+            suspendedOrganizations?: number;
+            /** Format: int64 */
+            users?: number;
+            /** Format: int64 */
+            signupsToday?: number;
+            /** Format: int64 */
+            signups7d?: number;
+            /** Format: int64 */
+            signups30d?: number;
+            /** Format: int64 */
+            eventsToday?: number;
+            /** Format: int64 */
+            events30d?: number;
+            /** Format: int64 */
+            deliveriesSucceeded24h?: number;
+            /** Format: int64 */
+            deliveriesFailed24h?: number;
+            /** Format: int64 */
+            activeTunnels?: number;
+            /** Format: int64 */
+            organizationsNearQuota?: number;
+            recentSignups?: components["schemas"]["AdminSignupResponse"][];
+            /** Format: date-time */
+            generatedAt?: string;
+        };
         PageAdminOrganizationResponse: {
             /** Format: int32 */
             totalPages?: number;
@@ -5596,6 +5884,98 @@ export interface components {
             /** Format: int32 */
             size?: number;
             content?: components["schemas"]["AdminOrganizationResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"];
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            numberOfElements?: number;
+            first?: boolean;
+            last?: boolean;
+            empty?: boolean;
+        };
+        AdminProjectResponse: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        PageAdminProjectResponse: {
+            /** Format: int32 */
+            totalPages?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["AdminProjectResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"];
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            numberOfElements?: number;
+            first?: boolean;
+            last?: boolean;
+            empty?: boolean;
+        };
+        AdminMemberResponse: {
+            /** Format: uuid */
+            userId?: string;
+            email?: string;
+            fullName?: string;
+            /** @enum {string} */
+            role?: "OWNER" | "DEVELOPER" | "VIEWER" | "API_KEY";
+            /** @enum {string} */
+            membershipStatus?: "INVITED" | "ACTIVE" | "DISABLED";
+            emailVerified?: boolean;
+            /** @enum {string} */
+            userStatus?: "ACTIVE" | "PENDING_VERIFICATION" | "DISABLED";
+            signInMethods?: string[];
+            /** Format: date-time */
+            joinedAt?: string;
+            /** Format: date-time */
+            lastSeenAt?: string;
+        };
+        PageAdminMemberResponse: {
+            /** Format: int32 */
+            totalPages?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["AdminMemberResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"];
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            numberOfElements?: number;
+            first?: boolean;
+            last?: boolean;
+            empty?: boolean;
+        };
+        AdminAuditEntryResponse: {
+            /** Format: uuid */
+            id?: string;
+            action?: string;
+            resourceType?: string;
+            /** Format: uuid */
+            resourceId?: string;
+            actorEmail?: string;
+            status?: string;
+            clientIp?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        PageAdminAuditEntryResponse: {
+            /** Format: int32 */
+            totalPages?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["AdminAuditEntryResponse"][];
             /** Format: int32 */
             number?: number;
             sort?: components["schemas"]["SortObject"];
@@ -7753,7 +8133,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": string;
+                    "text/plain": string;
                 };
             };
         };
@@ -9280,6 +9660,180 @@ export interface operations {
             };
         };
     };
+    getEmailChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+        };
+    };
+    requestEmailChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Changed, or waiting for confirmation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+            /** @description Wrong password, failed CAPTCHA or invalid address */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+            /** @description A passwordless account has not signed in recently */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+            /** @description Email already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+            /** @description Too many requests or daily cap reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+        };
+    };
+    cancelEmailChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    resendEmailChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+        };
+    };
+    confirmEmailChange: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Email changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid, used or expired link */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Email already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    cancelEmailChangeByToken: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     pollDeviceToken: {
         parameters: {
             query?: never;
@@ -9485,7 +10039,7 @@ export interface operations {
                     "*/*": components["schemas"]["AdminOrganizationResponse"];
                 };
             };
-            /** @description Forbidden — requires the platform-admin operator credential */
+            /** @description Forbidden — requires the platform admin */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9514,7 +10068,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReinstateOrganizationRequest"];
+            };
+        };
         responses: {
             /** @description Reinstated */
             200: {
@@ -9525,7 +10083,7 @@ export interface operations {
                     "*/*": components["schemas"]["AdminOrganizationResponse"];
                 };
             };
-            /** @description Forbidden — requires the platform-admin operator credential */
+            /** @description Forbidden — requires the platform admin */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11011,6 +11569,85 @@ export interface operations {
             };
         };
     };
+    adminListUsers: {
+        parameters: {
+            query: {
+                search?: string;
+                pageable: components["schemas"]["Pageable"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of accounts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminUserResponse"];
+                };
+            };
+            /** @description Forbidden — requires the platform admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminUserResponse"];
+                };
+            };
+            /** @description Too many platform admin requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminUserResponse"];
+                };
+            };
+        };
+    };
+    adminGetOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The overview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlatformOverviewResponse"];
+                };
+            };
+            /** @description Forbidden — requires the platform admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlatformOverviewResponse"];
+                };
+            };
+            /** @description Too many platform admin requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlatformOverviewResponse"];
+                };
+            };
+        };
+    };
     adminListOrganizations: {
         parameters: {
             query: {
@@ -11033,7 +11670,7 @@ export interface operations {
                     "*/*": components["schemas"]["PageAdminOrganizationResponse"];
                 };
             };
-            /** @description Forbidden — requires the platform-admin operator credential */
+            /** @description Forbidden — requires the platform admin */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11064,7 +11701,7 @@ export interface operations {
                     "*/*": components["schemas"]["AdminOrganizationResponse"];
                 };
             };
-            /** @description Forbidden — requires the platform-admin operator credential */
+            /** @description Forbidden — requires the platform admin */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11104,7 +11741,7 @@ export interface operations {
                     "*/*": components["schemas"]["UsageResponse"];
                 };
             };
-            /** @description Forbidden — requires the platform-admin operator credential */
+            /** @description Forbidden — requires the platform admin */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -11120,6 +11757,132 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["UsageResponse"];
+                };
+            };
+        };
+    };
+    adminListOrganizationProjects: {
+        parameters: {
+            query: {
+                pageable: components["schemas"]["Pageable"];
+            };
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of projects */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminProjectResponse"];
+                };
+            };
+            /** @description Forbidden — requires the platform admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminProjectResponse"];
+                };
+            };
+            /** @description No such organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminProjectResponse"];
+                };
+            };
+        };
+    };
+    adminListOrganizationMembers: {
+        parameters: {
+            query: {
+                pageable: components["schemas"]["Pageable"];
+            };
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of members */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminMemberResponse"];
+                };
+            };
+            /** @description Forbidden — requires the platform admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminMemberResponse"];
+                };
+            };
+            /** @description No such organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminMemberResponse"];
+                };
+            };
+        };
+    };
+    adminListOrganizationAuditLog: {
+        parameters: {
+            query: {
+                pageable: components["schemas"]["Pageable"];
+            };
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of audit entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminAuditEntryResponse"];
+                };
+            };
+            /** @description Forbidden — requires the platform admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminAuditEntryResponse"];
+                };
+            };
+            /** @description No such organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminAuditEntryResponse"];
                 };
             };
         };

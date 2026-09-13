@@ -197,6 +197,8 @@ auth:
   rate-limit:
     login-per-minute: ${AUTH_RATE_LIMIT_LOGIN_PER_MINUTE:10}
     register-per-minute: ${AUTH_RATE_LIMIT_REGISTER_PER_MINUTE:5}
+    refresh-per-token-per-minute: ${AUTH_RATE_LIMIT_REFRESH_PER_TOKEN_PER_MINUTE:30}
+    refresh-per-ip-per-minute: ${AUTH_RATE_LIMIT_REFRESH_PER_IP_PER_MINUTE:600}
   bcrypt:
     # BCrypt work factor. Raising it is not a migration: the cost is written into every hash,
     # so existing passwords keep verifying at the cost they were stored with.
@@ -234,6 +236,10 @@ platform:
     # Independent of org membership/JWT — see PlatformAdminAuthenticationFilter. Leave unset to
     # keep these endpoints unreachable (fail closed) until an operator explicitly needs them.
     token: ${PLATFORM_ADMIN_TOKEN:}
+    # Verified addresses of the people who may open the platform admin panel with an ordinary
+    # sign-in (comma-separated). Empty means nobody — see PlatformAdminAccessService for the
+    # checks a listed address still has to pass.
+    emails: ${PLATFORM_ADMIN_EMAILS:}
 
 webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY}
@@ -326,6 +332,7 @@ app:
   email:
     enabled: ${EMAIL_ENABLED:false}
     from: ${EMAIL_FROM:noreply@example.com}
+    support-address: ${EMAIL_SUPPORT_ADDRESS:}
 
 spring.mail:
   host: ${SMTP_HOST:localhost}

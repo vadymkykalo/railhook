@@ -7,7 +7,9 @@ import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.domain.enums.MembershipStatus;
 import com.webhook.platform.api.domain.enums.UserStatus;
+import com.webhook.platform.api.domain.repository.EmailChangeRequestRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
+import com.webhook.platform.api.domain.repository.VerificationEmailSendRepository;
 import com.webhook.platform.api.domain.repository.UserIdentityRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.exception.NotFoundException;
@@ -71,19 +73,25 @@ public class AccountErasureService {
     private final UserSessionService userSessionService;
     private final TokenBlacklistService tokenBlacklistService;
     private final UserIdentityRepository userIdentityRepository;
+    private final EmailChangeRequestRepository emailChangeRequestRepository;
+    private final VerificationEmailSendRepository verificationEmailSendRepository;
 
     public AccountErasureService(UserRepository userRepository,
                                  MembershipRepository membershipRepository,
                                  OrganizationService organizationService,
                                  UserSessionService userSessionService,
                                  TokenBlacklistService tokenBlacklistService,
-                                 UserIdentityRepository userIdentityRepository) {
+                                 UserIdentityRepository userIdentityRepository,
+                                 EmailChangeRequestRepository emailChangeRequestRepository,
+                                 VerificationEmailSendRepository verificationEmailSendRepository) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.organizationService = organizationService;
         this.userSessionService = userSessionService;
         this.tokenBlacklistService = tokenBlacklistService;
         this.userIdentityRepository = userIdentityRepository;
+        this.emailChangeRequestRepository = emailChangeRequestRepository;
+        this.verificationEmailSendRepository = verificationEmailSendRepository;
     }
 
     /**
@@ -120,6 +128,11 @@ public class AccountErasureService {
         // did not change. Left in place, "Continue with Google" would sign them straight back into
         // the account they just erased.
         userIdentityRepository.deleteByUserId(userId);
+        // Every address the account ever moved between is in these rows, including one still
+        // waiting to be confirmed. Anonymising the user row and leaving them would keep exactly
+        // what the erasure was asked to remove.
+        emailChangeRequestRepository.deleteByUserId(userId);
+        verificationEmailSendRepository.deleteByUserId(userId);
 
         // The session rows go, and the access tokens already issued are blacklisted: those are
         // stateless and would otherwise keep working until they expired on their own.

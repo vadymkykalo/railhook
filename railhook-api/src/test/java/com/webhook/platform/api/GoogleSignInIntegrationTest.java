@@ -139,6 +139,13 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.hasPassword").value(false));
 
         assertThat(userIdentityRepository.findByProviderAndSubject("google", "g-grace")).isPresent();
+
+        // The same start a password registration gets: one project, so the dashboard has
+        // something to open.
+        mockMvc.perform(get("/api/v1/projects").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].name").value("My first project"));
     }
 
     @Test

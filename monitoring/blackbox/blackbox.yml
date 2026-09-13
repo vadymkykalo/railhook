@@ -1,0 +1,18 @@
+modules:
+  # 2xx after redirects. A Cloudflare 5xx (521/522/526 — origin down, unreachable, bad
+  # origin certificate) fails it, which is the point of probing through the edge.
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: true
+      follow_redirects: true
+      headers:
+        User-Agent: railhook-uptime-probe
+
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: ip4

@@ -85,6 +85,28 @@ public class RegistrationWithoutEmailIntegrationTest extends AbstractIntegration
     }
 
     @Test
+    public void aPasswordRegistrationNamesItsOwnFirstProject() throws Exception {
+        RegisterRequest request = RegisterRequest.builder()
+                .email("firstproject@example.com")
+                .password("Test1234!")
+                .organizationName("First Project Co")
+                .build();
+
+        String body = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = objectMapper.readTree(body).get("accessToken").asText();
+
+        // Someone who filled in the form names their first project themselves; the dashboard's
+        // setup state leads them to it. Only a Google sign-up, which asked them nothing, gets one.
+        mockMvc.perform(get("/api/v1/projects").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
     public void theDashboardIsUsableImmediatelyAfterRegistering() throws Exception {
         RegisterRequest request = RegisterRequest.builder()
                 .email("usable@example.com")

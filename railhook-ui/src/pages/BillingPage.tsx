@@ -18,6 +18,8 @@ import { formatDate } from '../lib/date';
 import { cn } from '../lib/utils';
 import { showSuccess, showApiError } from '../lib/toast';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
+import EmailSuggestion from '../components/EmailSuggestion';
+import { hasImpossibleTld } from '../lib/emailTypos';
 
 /** -1 is how the plan catalog spells "no ceiling". It must never reach a reader as "-1". */
 const UNLIMITED = (n: number) => n < 0;
@@ -430,7 +432,7 @@ export default function BillingPage() {
                   label={t('common.save')}
                   savingLabel={t('common.saving')}
                   saving={updateEmailMutation.isPending}
-                  disabled={!emailDirty}
+                  disabled={!emailDirty || hasImpossibleTld(billingEmail)}
                   saved={emailSaved && !emailDirty}
                   onClick={() => updateEmailMutation.mutate()}
                 />
@@ -445,6 +447,10 @@ export default function BillingPage() {
                   onChange={(e) => { setBillingEmail(e.target.value); setEmailDirty(true); setEmailSaved(false); }}
                   placeholder={t('billing.billingEmailPlaceholder')}
                   className="max-w-sm"
+                />
+                <EmailSuggestion
+                  email={billingEmail}
+                  onAccept={(s) => { setBillingEmail(s); setEmailDirty(true); setEmailSaved(false); }}
                 />
                 <p className="text-xs text-muted-foreground">{t('billing.billingEmailHint')}</p>
               </div>

@@ -37,7 +37,10 @@ public class TransformationService {
     private final IncomingDestinationRepository incomingDestinationRepository;
     private final ObjectMapper objectMapper;
 
-    private static final Pattern EXPRESSION_PATTERN = Pattern.compile("\\$\\{([^}]*)\\}");
+    // `[^{}]` rather than `[^}]`: with no closing brace, the old class rescanned to the end of the
+    // template from every `${`, which is quadratic on a template of repeated "${{" (CodeQL
+    // java/polynomial-redos). A JSONPath expression never contains a brace.
+    private static final Pattern EXPRESSION_PATTERN = Pattern.compile("\\$\\{([^{}]*)\\}");
 
     /**
      * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this

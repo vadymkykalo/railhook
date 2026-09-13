@@ -55,7 +55,8 @@ export default function ShareBar({
             </span>
             <span className="flex-shrink-0 font-mono text-[13px] tabular-nums">
               {formatCompact(segment.value)}
-              <span className="ml-1.5 text-muted-foreground">{formatRate(share(segment.value, total))}%</span>
+              {/* A real separator, not only a margin: read as text, "1" and "50%" became "150%". */}
+              <span className="text-muted-foreground"> · {formatRate(share(segment.value, total))}%</span>
             </span>
           </li>
         ))}

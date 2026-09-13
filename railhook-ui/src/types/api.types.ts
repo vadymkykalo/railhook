@@ -28,6 +28,25 @@ export interface AuthResponse {
   emailVerified?: boolean;
 }
 
+/**
+ * A new address for the signed-in account. An unverified account sends `captchaToken` (when the
+ * deployment has a CAPTCHA); a verified one sends `currentPassword`, or nothing when it has no
+ * password and signed in within the last ten minutes.
+ */
+export interface ChangeEmailRequest {
+  newEmail: string;
+  currentPassword?: string;
+  captchaToken?: string;
+}
+
+/** `applied` true: the address changed already and needs verifying. False: it waits at `pendingEmail`. */
+export interface EmailChangeResponse {
+  email: string;
+  pendingEmail?: string;
+  pendingExpiresAt?: string;
+  applied: boolean;
+}
+
 export type UserStatus = 'ACTIVE' | 'PENDING_VERIFICATION' | 'DISABLED';
 
 export interface UserResponse {
@@ -52,6 +71,12 @@ export interface CurrentUserResponse {
    * Changing a password needs the current one, so settings points to "Forgot password" instead.
    */
   hasPassword: boolean;
+  /**
+   * Whether to offer the platform admin panel: a verified, active account listed in
+   * `PLATFORM_ADMIN_EMAILS`. The server checks it again, with the sign-in's age, on every
+   * admin request.
+   */
+  platformAdmin: boolean;
 }
 
 export interface OrganizationResponse {
