@@ -111,6 +111,10 @@ deploy/helm/**/Chart.lock
 # docs/screenshots/ and are referenced from the README or the docs site.
 .playwright-mcp/
 
+# Output of `npm run test:e2e` in railhook-ui (Playwright traces and the HTML report).
+railhook-ui/test-results/
+railhook-ui/playwright-report/
+
 # === Stray captures at the repo root ===
 # A screenshot dropped next to the pom is a scratch file, not an asset. The
 # repo root is the first thing a visitor reads; keep it to files that earn
