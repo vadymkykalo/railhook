@@ -877,7 +877,7 @@ export interface paths {
          * Cancel replay session
          * @description Requests cancellation of a running replay session
          */
-        post: operations["cancelPost"];
+        post: operations["cancel"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1955,15 +1955,15 @@ export interface paths {
          * Get the email change state
          * @description The account's address, and the change waiting for confirmation if there is one
          */
-        get: operations["current"];
+        get: operations["getEmailChange"];
         put?: never;
         /**
          * Change email
          * @description An unverified account moves to the new address at once and must verify it; it answers the registration CAPTCHA when one is configured. A verified account re-enters its password (or, with no password, has signed in within 10 minutes) and keeps its address until the link sent to the new one is opened.
          */
-        post: operations["request"];
+        post: operations["requestEmailChange"];
         /** Cancel the pending email change */
-        delete: operations["cancelDelete"];
+        delete: operations["cancelEmailChange"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1979,7 +1979,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Resend the email change confirmation */
-        post: operations["resend"];
+        post: operations["resendEmailChange"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1999,7 +1999,7 @@ export interface paths {
          * Confirm an email change
          * @description Opened from the link sent to the new address. Signs every session out.
          */
-        post: operations["confirm"];
+        post: operations["confirmEmailChange"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2019,7 +2019,7 @@ export interface paths {
          * Cancel an email change from the old address
          * @description Opened from the "this wasn't me" link sent to the old address. Signs every session out.
          */
-        post: operations["cancelByToken"];
+        post: operations["cancelEmailChangeByToken"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4706,12 +4706,12 @@ export interface components {
             /** Format: int64 */
             offset?: number;
             sort?: components["schemas"]["SortObject"];
+            unpaged?: boolean;
             paged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
-            unpaged?: boolean;
         };
         SortObject: {
             empty?: boolean;
@@ -7708,7 +7708,7 @@ export interface operations {
             };
         };
     };
-    cancelPost: {
+    cancel: {
         parameters: {
             query?: never;
             header?: never;
@@ -9375,7 +9375,7 @@ export interface operations {
             };
         };
     };
-    current: {
+    getEmailChange: {
         parameters: {
             query?: never;
             header?: never;
@@ -9395,7 +9395,7 @@ export interface operations {
             };
         };
     };
-    request: {
+    requestEmailChange: {
         parameters: {
             query?: never;
             header?: never;
@@ -9457,7 +9457,7 @@ export interface operations {
             };
         };
     };
-    cancelDelete: {
+    cancelEmailChange: {
         parameters: {
             query?: never;
             header?: never;
@@ -9475,7 +9475,7 @@ export interface operations {
             };
         };
     };
-    resend: {
+    resendEmailChange: {
         parameters: {
             query?: never;
             header?: never;
@@ -9495,7 +9495,7 @@ export interface operations {
             };
         };
     };
-    confirm: {
+    confirmEmailChange: {
         parameters: {
             query: {
                 token: string;
@@ -9529,7 +9529,7 @@ export interface operations {
             };
         };
     };
-    cancelByToken: {
+    cancelEmailChangeByToken: {
         parameters: {
             query: {
                 token: string;

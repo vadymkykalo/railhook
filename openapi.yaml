@@ -2336,7 +2336,7 @@ paths:
       - Event Time Machine
       summary: Cancel replay session
       description: Requests cancellation of a running replay session
-      operationId: cancelPost
+      operationId: cancel
       parameters:
       - name: projectId
         in: path
@@ -4214,7 +4214,7 @@ paths:
       summary: Get the email change state
       description: "The account's address, and the change waiting for confirmation\
         \ if there is one"
-      operationId: current
+      operationId: getEmailChange
       responses:
         "200":
           description: OK
@@ -4233,7 +4233,7 @@ paths:
         \ verified account re-enters its password (or, with no password, has signed\
         \ in within 10 minutes) and keeps its address until the link sent to the new\
         \ one is opened."
-      operationId: request
+      operationId: requestEmailChange
       parameters:
       - name: refresh_token
         in: cookie
@@ -4283,7 +4283,7 @@ paths:
       tags:
       - Authentication
       summary: Cancel the pending email change
-      operationId: cancelDelete
+      operationId: cancelEmailChange
       responses:
         "200":
           description: OK
@@ -4294,7 +4294,7 @@ paths:
       tags:
       - Authentication
       summary: Resend the email change confirmation
-      operationId: resend
+      operationId: resendEmailChange
       responses:
         "200":
           description: OK
@@ -4311,7 +4311,7 @@ paths:
       summary: Confirm an email change
       description: Opened from the link sent to the new address. Signs every session
         out.
-      operationId: confirm
+      operationId: confirmEmailChange
       parameters:
       - name: token
         in: query
@@ -4332,7 +4332,7 @@ paths:
       summary: Cancel an email change from the old address
       description: Opened from the "this wasn't me" link sent to the old address.
         Signs every session out.
-      operationId: cancelByToken
+      operationId: cancelEmailChangeByToken
       parameters:
       - name: token
         in: query
@@ -9077,6 +9077,8 @@ components:
           format: int64
         sort:
           $ref: "#/components/schemas/SortObject"
+        unpaged:
+          type: boolean
         paged:
           type: boolean
         pageNumber:
@@ -9085,8 +9087,6 @@ components:
         pageSize:
           type: integer
           format: int32
-        unpaged:
-          type: boolean
     SortObject:
       type: object
       properties:

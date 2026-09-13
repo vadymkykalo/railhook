@@ -43,7 +43,7 @@ public class EmailChangeController {
         this.trustedProxyResolver = trustedProxyResolver;
     }
 
-    @Operation(summary = "Get the email change state",
+    @Operation(operationId = "getEmailChange", summary = "Get the email change state",
             description = "The account's address, and the change waiting for confirmation if there is one")
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping
@@ -51,7 +51,7 @@ public class EmailChangeController {
         return ResponseEntity.ok(emailChangeService.current(auth.requireUserId()));
     }
 
-    @Operation(summary = "Change email",
+    @Operation(operationId = "requestEmailChange", summary = "Change email",
             description = "An unverified account moves to the new address at once and must verify it; it "
                     + "answers the registration CAPTCHA when one is configured. A verified account re-enters "
                     + "its password (or, with no password, has signed in within 10 minutes) and keeps its "
@@ -79,14 +79,14 @@ public class EmailChangeController {
                 auth.requireUserId(), request, cookieRefreshToken, clientIp));
     }
 
-    @Operation(summary = "Resend the email change confirmation")
+    @Operation(operationId = "resendEmailChange", summary = "Resend the email change confirmation")
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/resend")
     public ResponseEntity<EmailChangeResponse> resend(AuthContext auth) {
         return ResponseEntity.ok(emailChangeService.resend(auth.requireUserId()));
     }
 
-    @Operation(summary = "Cancel the pending email change")
+    @Operation(operationId = "cancelEmailChange", summary = "Cancel the pending email change")
     @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping
     public ResponseEntity<Void> cancel(AuthContext auth) {
@@ -94,7 +94,7 @@ public class EmailChangeController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Confirm an email change",
+    @Operation(operationId = "confirmEmailChange", summary = "Confirm an email change",
             description = "Opened from the link sent to the new address. Signs every session out.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Email changed"),
@@ -108,7 +108,7 @@ public class EmailChangeController {
         return ResponseEntity.ok().build();
     }
 
-    @Operation(summary = "Cancel an email change from the old address",
+    @Operation(operationId = "cancelEmailChangeByToken", summary = "Cancel an email change from the old address",
             description = "Opened from the \"this wasn't me\" link sent to the old address. Signs every session out.")
     @PostMapping("/cancel")
     public ResponseEntity<Void> cancelByToken(@RequestParam("token") String token, HttpServletRequest httpRequest) {
