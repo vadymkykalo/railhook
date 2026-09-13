@@ -72,7 +72,7 @@ export PROJECT_ID=...
 | `429` | The source's per-second rate limit is used up |
 
 <Aside type="tip">
-Self-hosting? Ingress URLs are built from `TUNNEL_INGRESS_BASE_URL`, which defaults to `http://localhost:8080`. Set it to your public URL, or providers will be handed an address they cannot reach. See [Configuration](/docs/self-hosting/configuration/).
+Self-hosting? Ingress URLs start with your public address, `APP_BASE_URL`, which the installer sets from `--domain`. Set `TUNNEL_INGRESS_BASE_URL` only when webhooks reach Railhook on a different host than the dashboard. See [Configuration](/docs/self-hosting/configuration/).
 </Aside>
 
 ## Next steps

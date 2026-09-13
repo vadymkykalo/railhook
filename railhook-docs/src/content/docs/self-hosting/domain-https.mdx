@@ -20,18 +20,6 @@ Before your instance faces the internet, give it a domain and HTTPS. The install
        curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --email ops@example.com
        ```
 
-    3. **Set the public ingress base URL**
-
-       Ingress URLs for sources and public CLI tunnel URLs are built from `TUNNEL_INGRESS_BASE_URL`, which the installer does not set. Add it to `~/railhook/.env` and apply:
-
-       ```bash title="~/railhook/.env"
-       TUNNEL_INGRESS_BASE_URL=https://hooks.example.com
-       ```
-
-       ```bash
-       cd ~/railhook && ./railhook up -d
-       ```
-
     </Steps>
 
     ### What `--domain` changes
@@ -42,6 +30,7 @@ Before your instance faces the internet, give it a domain and HTTPS. The install
     | Dashboard nginx | Moves to `127.0.0.1:8080`, behind Caddy |
     | `APP_ENV` | `production`, so the platform refuses to start on unsafe configuration |
     | `APP_BASE_URL`, `CORS_ALLOWED_ORIGINS` | `https://<your domain>` |
+    | Source ingress and CLI tunnel URLs | Follow `APP_BASE_URL`, so providers get `https://<your domain>/ingress/…` |
     | `DB_SSL_MODE` | `require` |
     | `LOG_LEVEL` | `WARN` |
     | `WEBHOOK_TRUSTED_PROXIES` | `172.16.0.0/12`, so real client IPs reach the audit log |
@@ -66,7 +55,6 @@ Before your instance faces the internet, give it a domain and HTTPS. The install
        APP_ENV=production
        APP_BASE_URL=https://hooks.example.com
        CORS_ALLOWED_ORIGINS=https://hooks.example.com
-       TUNNEL_INGRESS_BASE_URL=https://hooks.example.com
        WEBHOOK_TRUSTED_PROXIES=172.16.0.0/12   # the address your proxy connects from
        ```
 

@@ -20,7 +20,7 @@ Almost every variable is a timeout or a batch size whose default is fine. These 
 | `REDIS_PASSWORD` | Protects the cache |
 | `APP_BASE_URL` | The URL people type. Verification, invite and reset links are built from it |
 | `CORS_ALLOWED_ORIGINS` | Must include the origin the dashboard is served from, or sign-in fails with "Invalid CORS request" |
-| `TUNNEL_INGRESS_BASE_URL` | The public base of source ingress URLs and CLI tunnel URLs |
+| `TUNNEL_INGRESS_BASE_URL` | The public base of source ingress URLs and CLI tunnel URLs. Unset, it follows `APP_BASE_URL` |
 | `EMAIL_ENABLED`, `EMAIL_FROM`, `SMTP_*` | With email off, accounts are created already verified and invites cannot be sent |
 | `RAILHOOK_PORT`, `RAILHOOK_BIND` | Where the one published port listens |
 | `WEBHOOK_TRUSTED_PROXIES` | The proxies whose `X-Forwarded-For` is believed. Empty trusts nothing |

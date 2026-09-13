@@ -35,7 +35,7 @@ The `railhook` CLI opens a tunnel from a public URL to a port on your machine, s
 </Steps>
 
 <Aside type="tip">
-On a self-hosted instance, the public tunnel URL is built from `TUNNEL_INGRESS_BASE_URL`. Set it to the instance's public address, or the URL will point at `localhost`.
+On a self-hosted instance, the public tunnel URL starts with the instance's public address (`APP_BASE_URL`, or `TUNNEL_INGRESS_BASE_URL` when tunnels use a different host).
 </Aside>
 
 ## Commands

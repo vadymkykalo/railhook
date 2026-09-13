@@ -20,18 +20,6 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
        curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --email ops@example.com
        ```
 
-    3. **Задайте публічну базову адресу ingress**
-
-       Ingress-адреси джерел і публічні адреси тунелів CLI будуються з `TUNNEL_INGRESS_BASE_URL`, яку інсталятор не задає. Додайте її до `~/railhook/.env` і застосуйте:
-
-       ```bash title="~/railhook/.env"
-       TUNNEL_INGRESS_BASE_URL=https://hooks.example.com
-       ```
-
-       ```bash
-       cd ~/railhook && ./railhook up -d
-       ```
-
     </Steps>
 
     ### Що змінює `--domain`
@@ -42,6 +30,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
     | nginx панелі | Переходить на `127.0.0.1:8080`, за Caddy |
     | `APP_ENV` | `production`, тож платформа не запускається з небезпечною конфігурацією |
     | `APP_BASE_URL`, `CORS_ALLOWED_ORIGINS` | `https://<your domain>` |
+    | Ingress-адреси джерел і адреси тунелів CLI | Беруться з `APP_BASE_URL`, тож провайдери отримують `https://<your domain>/ingress/…` |
     | `DB_SSL_MODE` | `require` |
     | `LOG_LEVEL` | `WARN` |
     | `WEBHOOK_TRUSTED_PROXIES` | `172.16.0.0/12`, щоб до журналу аудиту потрапляли справжні IP клієнтів |
@@ -66,7 +55,6 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
        APP_ENV=production
        APP_BASE_URL=https://hooks.example.com
        CORS_ALLOWED_ORIGINS=https://hooks.example.com
-       TUNNEL_INGRESS_BASE_URL=https://hooks.example.com
        WEBHOOK_TRUSTED_PROXIES=172.16.0.0/12   # the address your proxy connects from
        ```
 
