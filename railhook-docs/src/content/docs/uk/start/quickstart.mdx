@@ -46,7 +46,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
    <Tabs syncKey="lang">
      <TabItem label="cURL">
        ```bash
-       export RAILHOOK_URL=https://railhook.io   # or http://localhost
+       export RAILHOOK_URL=https://railhook.io   # or your own instance, e.g. http://localhost or https://hooks.example.com
        export RAILHOOK_API_KEY=...
 
        curl -X POST "$RAILHOOK_URL/api/v1/events" \

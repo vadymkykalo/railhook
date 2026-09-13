@@ -8,9 +8,11 @@ Railhook віддає перевірки здоров'я на публічном
 
 ## Перевірки здоров'я
 
+`RAILHOOK_URL` — адреса вашого інстансу: `http://localhost` після типового встановлення, `http://localhost:<port>`, якщо ви передали `--port`, `https://<ваш домен>` з `--domain`.
+
 ```bash
-curl -f http://localhost/actuator/health/liveness
-curl -f http://localhost/actuator/health/readiness
+curl -f "$RAILHOOK_URL/actuator/health/liveness"
+curl -f "$RAILHOOK_URL/actuator/health/readiness"
 ```
 
 nginx проксує лише шляхи health. Решта шляхів `/actuator/` на публічному порту відповідає `404`.

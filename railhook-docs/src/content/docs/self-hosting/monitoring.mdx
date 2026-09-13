@@ -8,9 +8,11 @@ Railhook exposes health checks on its public port and Prometheus metrics on inte
 
 ## Health checks
 
+`RAILHOOK_URL` is your instance's address: `http://localhost` after a default install, `http://localhost:<port>` if you passed `--port`, `https://<your domain>` with `--domain`.
+
 ```bash
-curl -f http://localhost/actuator/health/liveness
-curl -f http://localhost/actuator/health/readiness
+curl -f "$RAILHOOK_URL/actuator/health/liveness"
+curl -f "$RAILHOOK_URL/actuator/health/readiness"
 ```
 
 nginx proxies only the health paths. Every other `/actuator/` path answers `404` on the public port.
