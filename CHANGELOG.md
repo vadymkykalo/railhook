@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.1] - 2026-09-13
+
+### Fixed
+
+- **The favicon renders.** `/favicon.svg` had `--` inside an XML comment, which makes the file
+  malformed; browsers refused it and kept showing whatever icon they had cached. A test now parses
+  every SVG the app and the docs ship.
+- **Registration says what the password is missing.** An unmet rule was a faint grey cross next to a
+  disabled button; unmet rules are red now and a line under the field names what is still needed.
+- **Forms no longer zoom on iPhone.** Fields were 14px, and iOS Safari zooms into any focused field
+  under 16px and stays zoomed, which left the registration form cut off at the right edge. Fields
+  are 16px on phones and 14px from the `sm` breakpoint up.
+
 ## [2.18.0] - 2026-09-13
 
 ### Added
@@ -1792,7 +1805,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.18.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.18.1...HEAD
+[2.18.1]: https://github.com/vadymkykalo/railhook/compare/v2.18.0...v2.18.1
 [2.18.0]: https://github.com/vadymkykalo/railhook/compare/v2.17.2...v2.18.0
 [2.17.2]: https://github.com/vadymkykalo/railhook/compare/v2.17.1...v2.17.2
 [2.17.1]: https://github.com/vadymkykalo/railhook/compare/v2.17.0...v2.17.1
