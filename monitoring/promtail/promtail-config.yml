@@ -48,6 +48,15 @@ scrape_configs:
       # Unwraps the Docker JSON log-driver envelope ({"log":"...","stream":"stdout",
       # "time":"..."}) to get at the actual line the service wrote.
       - docker: {}
+      # Spring Boot's start-up banner is ASCII art printed before logging starts, as bare lines
+      # with no level. The services no longer print it; this keeps an older image from filling
+      # the Logs panel with it after every restart. A line with no letter or digit has nothing
+      # to read in it.
+      - match:
+          selector: '{service=~"api|worker"}'
+          stages:
+            - drop:
+                expression: '^[^A-Za-z0-9]*$|^\s*:: Spring Boot ::'
       # Production logs are single-line JSON (LogstashEncoder — see logback-spring.xml
       # in both modules; Caddy logs JSON too). Extract only `level` as a Loki *label*
       # (low cardinality, useful for filtering/alerting on log volume by severity);
@@ -59,7 +68,7 @@ scrape_configs:
             level: level
       # The two plain-text services get a level too, so one filter covers every service.
       # Postgres: "... [123] ERROR:  message". nginx's error log: "... [error] 12#12: ...";
-      # its access log lines carry no level and stay without one.
+      # its access log has no level, and a request it served is info.
       - match:
           selector: '{service="postgres"}'
           stages:
@@ -70,6 +79,14 @@ scrape_configs:
           stages:
             - regex:
                 expression: '\[(?P<level>debug|info|notice|warn|error|crit|alert|emerg)\]'
+            - template:
+                source: level
+                template: '{{ if .Value }}{{ .Value }}{{ else }}info{{ end }}'
+      # One vocabulary for every service — error, warn, info, debug — so a dashboard legend never
+      # shows `api INFO` beside `api info`, and one filter value means the same thing everywhere.
+      - template:
+          source: level
+          template: '{{ with .Value }}{{ $l := ToLower . }}{{ if eq $l "warning" }}warn{{ else if or (eq $l "fatal") (eq $l "panic") (eq $l "crit") (eq $l "alert") (eq $l "emerg") }}error{{ else if or (eq $l "log") (eq $l "notice") }}info{{ else if eq (TrimRight $l "0123456789") "debug" }}debug{{ else }}{{ $l }}{{ end }}{{ end }}'
       - labels:
           level:
       # Dev-mode (non-production profile) logs are plain text, not JSON — the `json`

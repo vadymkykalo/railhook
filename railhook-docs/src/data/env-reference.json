@@ -1721,6 +1721,12 @@
           "description": "The platform's Docker network the stack joins. Empty finds it by its Compose\nlabel; set it only if that finds the wrong one."
         },
         {
+          "name": "MONITORING_NODENAME",
+          "default": "",
+          "example": null,
+          "description": "The server's name as the Host dashboard lists it (node_uname_info nodename).\nEmpty uses this machine's hostname."
+        },
+        {
           "name": "MONITORING_BACKUP_DIR",
           "default": "../backups",
           "example": null,
@@ -1825,7 +1831,7 @@
           "name": "ALERTMANAGER_EXTERNAL_URL",
           "default": "http://localhost:9093",
           "example": null,
-          "description": "The URL alert messages link back to. Alertmanager is not published, so the\ndefault only works through an SSH tunnel."
+          "description": "Alertmanager's own address, sent in Slack and webhook payloads. Alert mail does not\nuse it: it links to Grafana on MONITORING_DOMAIN, or says how to open Grafana\nthrough an SSH tunnel when there is no domain."
         }
       ]
     },

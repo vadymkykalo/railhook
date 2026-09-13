@@ -248,7 +248,7 @@ groups:
     rules:
       - alert: ErrorLogSpike
         expr: |
-          sum by (service) (railhook:log_lines:rate5m{level=~"error|fatal|panic|crit|alert|emerg"}) * 60 > 10
+          sum by (service) (railhook:log_lines:rate5m{level="error"}) * 60 > 10
         for: 10m
         labels:
           severity: warning

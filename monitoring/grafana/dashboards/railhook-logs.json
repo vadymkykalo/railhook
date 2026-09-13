@@ -67,7 +67,7 @@
         "name": "level",
         "label": "Level",
         "type": "custom",
-        "query": "error : error|fatal|panic|crit|alert|emerg,warn : warn|warning,info : info|log|notice,debug : debug.*",
+        "query": "error,warn,info,debug",
         "multi": true,
         "includeAll": true,
         "allValue": ".*",
@@ -82,29 +82,24 @@
         },
         "options": [
           {
-            "selected": true,
-            "text": "All",
-            "value": "$__all"
-          },
-          {
             "selected": false,
             "text": "error",
-            "value": "error|fatal|panic|crit|alert|emerg"
+            "value": "error"
           },
           {
             "selected": false,
             "text": "warn",
-            "value": "warn|warning"
+            "value": "warn"
           },
           {
             "selected": false,
             "text": "info",
-            "value": "info|log|notice"
+            "value": "info"
           },
           {
             "selected": false,
             "text": "debug",
-            "value": "debug.*"
+            "value": "debug"
           }
         ]
       },
@@ -178,7 +173,7 @@
             "type": "loki",
             "uid": "railhook-loki"
           },
-          "expr": "sum by (service, level) (count_over_time({service=~\"$service\"} |= \"$correlation_id\" |= \"$organization_id\" |~ \"(?i)$search\" | level=~\"(?i)(${level:pipe})\" [$__interval]))",
+          "expr": "sum by (service, level) (count_over_time({service=~\"$service\"} |= \"$correlation_id\" |= \"$organization_id\" |~ \"(?i)$search\" | level=~\"(${level:pipe})\" [$__interval]))",
           "refId": "A",
           "legendFormat": "{{service}} {{level}}"
         }
@@ -237,10 +232,10 @@
             "type": "loki",
             "uid": "railhook-loki"
           },
-          "expr": "sum by (service) (count_over_time({service=~\"$service\"} | level=~\"(?i)(error|fatal|panic|crit|alert|emerg)\" [$__range]))",
+          "expr": "sum by (service) (count_over_time({service=~\"$service\"} | level=\"error\" [$__interval]))",
           "refId": "A",
           "legendFormat": "{{service}}",
-          "queryType": "instant"
+          "queryType": "range"
         }
       ],
       "fieldConfig": {
@@ -266,8 +261,7 @@
           },
           "color": {
             "mode": "thresholds"
-          },
-          "displayName": "${__field.labels.service}"
+          }
         },
         "overrides": []
       },
@@ -320,14 +314,14 @@
             "type": "loki",
             "uid": "railhook-loki"
           },
-          "expr": "{service=~\"$service\"} |= \"$correlation_id\" |= \"$organization_id\" |~ \"(?i)$search\" | level=~\"(?i)(${level:pipe})\"",
+          "expr": "{service=~\"$service\"} |= \"$correlation_id\" |= \"$organization_id\" |~ \"(?i)$search\" | level=~\"(${level:pipe})\" | json msg=\"message\", logger=\"logger_name\", stack_trace=\"stack_trace\", correlation_id=\"correlationId\", organization_id=\"organizationId\", caddy_msg=\"msg\", caddy_logger=\"logger\" | drop __error__, __error_details__ | line_format \"{{ if .msg }}{{ alignLeft 5 (ToUpper .level) }}  {{ .logger }}  {{ .msg }}{{ else if .caddy_msg }}{{ alignLeft 5 (ToUpper .level) }}  {{ .caddy_logger }}  {{ .caddy_msg }}{{ else }}{{ __line__ }}{{ end }}\"",
           "refId": "A",
           "legendFormat": ""
         }
       ],
       "options": {
         "showTime": true,
-        "showLabels": true,
+        "showLabels": false,
         "showCommonLabels": false,
         "wrapLogMessage": true,
         "prettifyLogMessage": false,

@@ -6,8 +6,8 @@ groups:
   - name: railhook.logs
     interval: 1m
     rules:
-      # Lines per second by service and level. Level is lower-cased: the JVMs write ERROR,
-      # Caddy error, Postgres ERROR, nginx error.
+      # Lines per second by service and level. Promtail already files every service under
+      # error, warn, info or debug; lower-casing here still covers lines it stored before that.
       - record: railhook:log_lines:rate5m
         expr: |
           sum by (service, level) (

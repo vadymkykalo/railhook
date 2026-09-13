@@ -15,6 +15,9 @@
 set -eu
 
 OUT="${ALERTMANAGER_CONFIG_OUT:-/etc/alertmanager/alertmanager.yml}"
+# email.tmpl is mounted here; the links it needs are written beside the config.
+TEMPLATE_DIR="${ALERTMANAGER_TEMPLATE_DIR:-/etc/alertmanager/templates}"
+LINKS="$(dirname "$OUT")/railhook-links.tmpl"
 
 # A value inside single quotes in YAML: a quote is written twice.
 q() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g")"; }
@@ -37,12 +40,50 @@ if [ -n "$telegram_chat" ] && ! printf '%s' "$telegram_chat" | grep -Eq '^-?[0-9
   telegram_chat=""
 fi
 
+# Host names only: they are written into a template verbatim.
+hostname_or_empty() {
+  if printf '%s' "$1" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'; then printf '%s' "$1"; fi
+}
+grafana_domain="$(hostname_or_empty "${MONITORING_DOMAIN:-}")"
+site_domain="$(hostname_or_empty "${RAILHOOK_DOMAIN:-}")"
+
+# Where an alert mail sends its reader. Prometheus and Alertmanager are not published, so their
+# own links in a mail lead nowhere; Grafana on MONITORING_DOMAIN is the one address that works.
+{
+  if [ -n "$site_domain" ]; then
+    printf '{{ define "railhook.domain.suffix" }} — %s{{ end }}\n' "$site_domain"
+  else
+    printf '{{ define "railhook.domain.suffix" }}{{ end }}\n'
+  fi
+  if [ -n "$grafana_domain" ]; then
+    cat <<LINKS_ON
+{{ define "railhook.links.html" }}<p style="margin:8px 0 0;font-size:14px"><a href="https://${grafana_domain}/d/railhook-alerts/alerts" style="display:inline-block;padding:8px 14px;background:#1d4bff;color:#ffffff;border-radius:6px;text-decoration:none">Open the Alerts dashboard</a> &nbsp; <a href="https://${grafana_domain}/alerting/list?search={{ .CommonLabels.alertname }}" style="color:#1d4bff">See the rule in Grafana</a></p>{{ end }}
+{{ define "railhook.links.text" }}Alerts dashboard: https://${grafana_domain}/d/railhook-alerts/alerts
+The rule in Grafana: https://${grafana_domain}/alerting/list?search={{ .CommonLabels.alertname }}{{ end }}
+LINKS_ON
+  else
+    cat <<'LINKS_OFF'
+{{ define "railhook.links.html" }}<p style="margin:8px 0 0;font-size:13px;color:#5b6475">Grafana is not on a domain. Open it through a tunnel: <code>ssh -L 3001:127.0.0.1:3001 &lt;your server&gt;</code>, then http://localhost:3001/d/railhook-alerts/alerts</p>{{ end }}
+{{ define "railhook.links.text" }}Grafana is not on a domain. Open it through a tunnel: ssh -L 3001:127.0.0.1:3001 <your server>, then http://localhost:3001/d/railhook-alerts/alerts{{ end }}
+LINKS_OFF
+  fi
+} > "$LINKS"
+
 sinks=""
 
 {
   cat <<'STATIC'
 global:
   resolve_timeout: 5m
+
+STATIC
+  cat <<TEMPLATES
+templates:
+  - $(q "${TEMPLATE_DIR}/*.tmpl")
+  - $(q "$LINKS")
+
+TEMPLATES
+  cat <<'STATIC'
 
 route:
   receiver: railhook-default
@@ -154,6 +195,10 @@ WEBHOOK
         smarthost: $(q "${smtp_host}:${smtp_port}")
         require_tls: ${require_tls}
         send_resolved: true
+        headers:
+          Subject: '{{ template "railhook.email.subject" . }}'
+        html: '{{ template "railhook.email.html" . }}'
+        text: '{{ template "railhook.email.text" . }}'
 EMAIL
       if [ -n "${ALERTMANAGER_SMTP_USERNAME:-}" ]; then
         cat <<AUTH
@@ -189,4 +234,4 @@ HEARTBEAT
 [ -n "${ALERTMANAGER_EMAIL_TO:-}" ] && sinks="$sinks email(${smtp_host}:${smtp_port}, tls=${require_tls})"
 [ -n "${ALERTMANAGER_TELEGRAM_BOT_TOKEN:-}" ] && [ -n "$telegram_chat" ] && sinks="$sinks telegram"
 [ -n "${ALERTMANAGER_HEARTBEAT_URL:-}" ] && sinks="$sinks heartbeat"
-echo "[alertmanager-render] wrote ${OUT}; receivers:${sinks:- none — alerts stay in Alertmanager and Grafana}"
+echo "[alertmanager-render] wrote ${OUT}; receivers:${sinks:- none — alerts stay in Alertmanager and Grafana}; mail links: ${grafana_domain:-SSH tunnel hint}"

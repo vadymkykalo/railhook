@@ -1,0 +1,62 @@
+{{/*
+  Alert mail a person can act on: what happened first, then where to look.
+
+  Alertmanager's own template opens with a "View In Alertmanager" button and a "Source" link to
+  Prometheus. Neither is published, so both led nowhere. The links here go to Grafana on
+  MONITORING_DOMAIN — behind the same access proxy as the rest of it — or, without a domain, the
+  mail says how to open Grafana through an SSH tunnel. render-config.sh writes those two blocks
+  ("railhook.links.html", "railhook.links.text") and "railhook.domain" next to this file.
+*/}}
+
+{{ define "railhook.email.subject" -}}
+[{{ if eq .Status "resolved" }}RESOLVED{{ else if .CommonLabels.severity }}{{ .CommonLabels.severity | toUpper }}{{ else }}ALERT{{ end }}]
+{{- with index .Alerts 0 }} {{ or .Annotations.summary .Labels.alertname "Railhook alert" }}{{ end }}
+{{- if gt (len .Alerts) 1 }} ({{ len .Alerts }} alerts){{ end }}
+{{- template "railhook.domain.suffix" . }}
+{{- end }}
+
+{{ define "railhook.email.text" -}}
+{{ if eq .Status "resolved" }}RESOLVED — this is over.{{ else }}FIRING{{ end }}
+{{ range .Alerts.Firing }}
+{{ .Annotations.summary }}
+{{ .Annotations.description }}
+Since {{ .StartsAt.Format "2006-01-02 15:04 MST" }}
+{{ range .Labels.SortedPairs }}  {{ .Name }}: {{ .Value }}
+{{ end }}{{ end }}{{ range .Alerts.Resolved }}
+Resolved: {{ .Annotations.summary }}
+{{ .StartsAt.Format "2006-01-02 15:04 MST" }} to {{ .EndsAt.Format "2006-01-02 15:04 MST" }}
+{{ range .Labels.SortedPairs }}  {{ .Name }}: {{ .Value }}
+{{ end }}{{ end }}
+{{ template "railhook.links.text" . }}
+{{ end }}
+
+{{ define "railhook.email.html" -}}
+<!doctype html>
+<html>
+<body style="margin:0;padding:24px;background:#f5f7fa;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0a1020">
+<div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e3e7ee;border-radius:8px;padding:24px">
+{{ if eq .Status "resolved" -}}
+<p style="margin:0 0 16px;font-size:13px;font-weight:700;letter-spacing:.04em;color:#1a7f37">RESOLVED — this is over</p>
+{{- else -}}
+<p style="margin:0 0 16px;font-size:13px;font-weight:700;letter-spacing:.04em;color:{{ if eq .CommonLabels.severity "critical" }}#cf222e{{ else }}#9a6700{{ end }}">FIRING{{ with .CommonLabels.severity }} · {{ . | toUpper }}{{ end }}</p>
+{{- end }}
+{{ range .Alerts.Firing }}
+<h2 style="margin:0 0 8px;font-size:18px">{{ .Annotations.summary }}</h2>
+<p style="margin:0 0 8px;line-height:1.5;white-space:pre-line">{{ .Annotations.description }}</p>
+<p style="margin:0 0 12px;font-size:13px;color:#5b6475">Since {{ .StartsAt.Format "2006-01-02 15:04 MST" }}</p>
+<table style="border-collapse:collapse;font-size:13px;margin:0 0 20px">
+{{ range .Labels.SortedPairs }}<tr><td style="padding:2px 12px 2px 0;color:#5b6475">{{ .Name }}</td><td style="padding:2px 0;font-family:monospace">{{ .Value }}</td></tr>
+{{ end }}</table>
+{{ end }}
+{{ range .Alerts.Resolved }}
+<h2 style="margin:0 0 8px;font-size:18px">{{ .Annotations.summary }}</h2>
+<p style="margin:0 0 12px;font-size:13px;color:#5b6475">{{ .StartsAt.Format "2006-01-02 15:04 MST" }} to {{ .EndsAt.Format "2006-01-02 15:04 MST" }}</p>
+<table style="border-collapse:collapse;font-size:13px;margin:0 0 20px">
+{{ range .Labels.SortedPairs }}<tr><td style="padding:2px 12px 2px 0;color:#5b6475">{{ .Name }}</td><td style="padding:2px 0;font-family:monospace">{{ .Value }}</td></tr>
+{{ end }}</table>
+{{ end }}
+{{ template "railhook.links.html" . }}
+</div>
+</body>
+</html>
+{{- end }}

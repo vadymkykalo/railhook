@@ -105,6 +105,23 @@ describe('monitoring/docker-compose.yml', () => {
     expect(compose).toMatch(/name: \$\{RAILHOOK_NETWORK:-railhook_webhook-network\}/);
   });
 
+  it("names node-exporter after the host, not its container id, without sharing more of the host", () => {
+    // node_uname_info.nodename is what the Host dashboard's selector lists; in a container it is the id.
+    expect(services.get('node-exporter')).toMatch(/^ {4}hostname: \$\{MONITORING_NODENAME:-railhook-host\}$/m);
+    expect(services.get('node-exporter')).not.toMatch(/uts: host|privileged|cap_add/);
+    expect(read('Makefile')).toMatch(/MONITORING_NODENAME=\$\(or \$\(MONITORING_NODENAME\),\$\(shell hostname\)\)/);
+  });
+
+  it('runs a cAdvisor that reads Docker 29 containers, with one extra capability and nothing wider', () => {
+    const cadvisor = services.get('cadvisor')!;
+    const version = /image: ghcr\.io\/google\/cadvisor:v0\.(\d+)\.\d+$/m.exec(cadvisor);
+    expect(version, 'cadvisor image').not.toBeNull();
+    expect(Number(version![1]), 'v0.54 or newer reads containerd-snapshotter containers').toBeGreaterThanOrEqual(54);
+    expect(cadvisor).toContain('- /var/lib/containerd:/var/lib/containerd:ro');
+    expect(cadvisor).toMatch(/^ {4}cap_add:\n {6}- SYSLOG\n(?! {6}- )/m);
+    expect(cadvisor).not.toMatch(/privileged|uts: host|network_mode: host/);
+  });
+
   it('mounts the host read-only into the exporters', () => {
     expect(services.get('node-exporter')).toContain('- /:/host:ro,rslave');
     expect(services.get('node-exporter')).toContain('--path.rootfs=/host');
@@ -112,6 +129,35 @@ describe('monitoring/docker-compose.yml', () => {
     expect(volumes).not.toBe('');
     for (const line of volumes.trim().split('\n')) {
       expect(line, 'cadvisor mount is read-only').toMatch(/:ro$/);
+    }
+  });
+});
+
+describe('the query check allow-list', () => {
+  it('names only panels and rules that exist, each with a reason', () => {
+    const titles = new Set<string>();
+    for (const file of readdirSync(join(repoRoot, 'monitoring/grafana/dashboards'))) {
+      const walk = (items: Array<{ title?: string; panels?: unknown[] }>) =>
+        items.forEach((panel) => {
+          titles.add(`${file}|${panel.title ?? ''}`);
+          walk((panel.panels ?? []) as Array<{ title?: string; panels?: unknown[] }>);
+        });
+      walk(JSON.parse(read(`monitoring/grafana/dashboards/${file}`)).panels ?? []);
+    }
+    for (const file of ['prometheus/alerts.yml', 'prometheus/host-alerts.yml', 'loki/rules/railhook.yml']) {
+      for (const match of read(`monitoring/${file}`).matchAll(/-\s*(?:alert|record):\s*(\S+)/g)) {
+        titles.add(`${file.split('/').pop()}|${match[1]}`);
+      }
+    }
+    const entries = read('scripts/check-monitoring-queries.allow')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'));
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) {
+      const [file, title, reason] = entry.split('|').map((part) => part.trim());
+      expect(titles, entry).toContain(`${file}|${title}`);
+      expect(reason, `${entry} needs a reason`).toBeTruthy();
     }
   });
 });
@@ -182,6 +228,35 @@ describe('alertmanager/render-config.sh', () => {
     expect(log).not.toContain('re_s3cr');
     expect(log).not.toContain('tok-en');
     expect(log).toMatch(/email.*telegram/);
+  });
+
+  it('mails through the Railhook template, never linking to the unpublished Alertmanager or Prometheus', () => {
+    const { config } = render(resend);
+    expect(config).toMatch(/^templates:\n {2}- '\/etc\/alertmanager\/templates\/\*\.tmpl'\n {2}- '.*railhook-links\.tmpl'$/m);
+    expect(config).toContain(`Subject: '{{ template "railhook.email.subject" . }}'`);
+    expect(config).toContain(`html: '{{ template "railhook.email.html" . }}'`);
+    expect(config).toContain(`text: '{{ template "railhook.email.text" . }}'`);
+    const template = read('monitoring/alertmanager/email.tmpl');
+    expect(template).not.toMatch(/GeneratorURL|ExternalURL/);
+  });
+
+  it('links alert mail to Grafana on MONITORING_DOMAIN, or explains the tunnel without one', () => {
+    const links = (env: Record<string, string>) => {
+      const { config } = render({ ...resend, ...env });
+      const path = /- '([^']*railhook-links\.tmpl)'/.exec(config)?.[1];
+      expect(path, 'the config names the links template').toBeTruthy();
+      return readFileSync(path!, 'utf8');
+    };
+    const withDomain = links({ MONITORING_DOMAIN: 'grafana.example.com', RAILHOOK_DOMAIN: 'railhook.example.com' });
+    expect(withDomain).toContain('https://grafana.example.com/d/railhook-alerts/alerts');
+    expect(withDomain).toContain(' — railhook.example.com');
+    expect(withDomain).not.toMatch(/localhost:909[03]/);
+
+    const without = links({});
+    expect(without).toContain('ssh -L 3001:127.0.0.1:3001');
+    expect(without).not.toMatch(/https?:\/\/[^ ]*grafana/);
+
+    expect(links({ MONITORING_DOMAIN: 'evil.example"}}{{' }), 'not a hostname: no link written').not.toContain('evil');
   });
 
   it('skips TLS only for a local capture server', () => {
@@ -304,6 +379,10 @@ describe('railhook monitoring', () => {
     const end = installer.indexOf('\nHELPER\n', start);
     return installer.slice(start + `<<'HELPER'\n`.length, end + 1);
   }
+
+  it("hands the stack this server's name unless .env names another", () => {
+    expect(helperSource()).toMatch(/MONITORING_NODENAME="\$\(env_value MONITORING_NODENAME \| grep \. \|\| hostname\)"/);
+  });
 
   it('fetches exactly the files monitoring/ holds', () => {
     const listed = /^MONITORING_FILES="\n([\s\S]*?)"$/m.exec(helperSource())?.[1].trim().split('\n').sort();

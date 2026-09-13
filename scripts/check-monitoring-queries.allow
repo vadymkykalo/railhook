@@ -1,0 +1,9 @@
+# Queries check-monitoring-queries.py accepts as empty, and why.
+#
+# Each entry is `<file> | <panel title or rule name> | <why it is legitimately empty>`. Only a
+# query that has no series until something happens belongs here — a metric nobody exports is a
+# bug to fix, not a line to add. The check reports entries that no longer match anything empty.
+
+railhook-errors.json | nginx 5xx by path | lists paths only once nginx has answered a 5xx
+railhook.yml | railhook:nginx_responses:rate5m | records only once nginx has answered a 4xx or 5xx
+host-alerts.yml | EdgeServerErrorSpike | reads railhook:nginx_responses:rate5m, empty until nginx answers a 4xx or 5xx

@@ -120,7 +120,7 @@
       "id": 20,
       "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
-        { "expr": "sum by (topic) (rate(kafka_producer_topic_record_send_total{job=\"railhook-api\"}[5m]))", "legendFormat": "{{topic}}" }
+        { "expr": "sum by (client_id) (rate(kafka_producer_record_send_total{job=\"railhook-api\"}[5m]))", "legendFormat": "{{client_id}}" }
       ],
       "title": "Producer Record Send Rate",
       "type": "timeseries"

@@ -797,6 +797,7 @@ apply_settings() {
 # dashboards of several hundred kilobytes among them. The list is held equal to the directory
 # by a test, so a file added there cannot be forgotten here.
 MONITORING_FILES="
+alertmanager/email.tmpl
 alertmanager/render-config.sh
 backup-age/backup-age.sh
 blackbox/blackbox.yml
@@ -854,6 +855,7 @@ monitoring_network() {
 # under that name would stop the platform.
 monitoring_compose() {
     RAILHOOK_NETWORK="$(monitoring_network)" \
+    MONITORING_NODENAME="$(env_value MONITORING_NODENAME | grep . || hostname)" \
         $COMPOSE_CMD -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml "$@"
 }
 

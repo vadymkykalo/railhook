@@ -185,7 +185,7 @@
       "gridPos": { "h": 8, "w": 6, "x": 12, "y": 23 },
       "id": 21,
       "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [{ "expr": "delivery_attempts_total", "legendFormat": "Total Attempts" }],
+      "targets": [{ "expr": "delivery_attempts_stored", "legendFormat": "Total Attempts" }],
       "title": "Total Delivery Attempts",
       "type": "stat"
     },

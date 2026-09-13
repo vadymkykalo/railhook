@@ -285,7 +285,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "sum(changes(container_start_time_seconds{name!=\"\"}[1h])) or vector(0)",
+          "expr": "sum(changes(container_start_time_seconds{name!=\"\"}[1h]))",
           "refId": "A",
           "legendFormat": ""
         }
@@ -354,7 +354,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "sum(increase(container_oom_events_total{name!=\"\"}[24h])) or vector(0)",
+          "expr": "sum(increase(node_vmstat_oom_kill[24h]))",
           "refId": "A",
           "legendFormat": ""
         }

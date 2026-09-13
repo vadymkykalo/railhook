@@ -703,7 +703,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count{job=\"railhook-api\",status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=\"railhook-api\"}[5m]))",
+          "expr": "(sum(rate(http_server_requests_seconds_count{job=\"railhook-api\",status=~\"5..\"}[5m])) or vector(0)) / (sum(rate(http_server_requests_seconds_count{job=\"railhook-api\"}[5m])) > 0) or sum(rate(http_server_requests_seconds_count{job=\"railhook-api\"}[5m])) * 0",
           "legendFormat": "5xx rate"
         }
       ],
@@ -1110,7 +1110,7 @@
       },
       "targets": [
         {
-          "expr": "delivery_attempts_total",
+          "expr": "delivery_attempts_stored",
           "legendFormat": "Total Attempts"
         }
       ],
@@ -1432,8 +1432,8 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(events_ingested_total[5m]))",
-          "legendFormat": "Ingested/s"
+          "expr": "sum by (direction) (rate(events_ingested_total[5m]))",
+          "legendFormat": "ingested ({{direction}})"
         },
         {
           "expr": "sum(rate(events_duplicate_total[5m]))",
@@ -1484,7 +1484,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(deliveries_created_total[5m]))",
+          "expr": "sum(rate(deliveries_total[5m]))",
           "legendFormat": "Deliveries Created/s"
         },
         {

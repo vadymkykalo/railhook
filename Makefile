@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui init rebuild-external-db verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs ratchets types-check docs-dev docs-build docs-check seo-check prerender version-check version-set
+.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui init rebuild-external-db verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs monitoring-check-queries ratchets types-check docs-dev docs-build docs-check seo-check prerender version-check version-set
 
 # Default target
 .DEFAULT_GOAL := help
@@ -450,7 +450,7 @@ doctor: ## Run pre-flight checks
 # .env sets COMPOSE_PROJECT_NAME for the platform. The network is found by its Compose label,
 # so the checkout's directory name does not matter.
 MONITORING_NETWORK = $(or $(RAILHOOK_NETWORK),$(shell docker network ls --filter label=com.docker.compose.network=webhook-network --format '{{.Name}}' 2>/dev/null | head -1),railhook_webhook-network)
-MONITORING_COMPOSE = RAILHOOK_NETWORK=$(MONITORING_NETWORK) $(DOCKER_COMPOSE) -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml
+MONITORING_COMPOSE = RAILHOOK_NETWORK=$(MONITORING_NETWORK) MONITORING_NODENAME=$(or $(MONITORING_NODENAME),$(shell hostname)) $(DOCKER_COMPOSE) -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml
 
 monitoring-up: ## Start the monitoring stack (set GRAFANA_ADMIN_PASSWORD in .env first)
 	@pw="$$GRAFANA_ADMIN_PASSWORD"; \
@@ -473,6 +473,10 @@ monitoring-down: ## Stop monitoring stack
 
 monitoring-logs: ## Follow monitoring stack logs
 	@$(MONITORING_COMPOSE) logs -f
+
+monitoring-check-queries: ## Run every dashboard and alert query against the running monitoring stack; fails on queries with no data
+	@docker run --rm --network $${MONITORING_CHECK_NETWORK:-railhook-monitoring_monitoring} -v "$(CURDIR)":/repo:ro python:3.12-alpine \
+		python /repo/scripts/check-monitoring-queries.py $(MONITORING_CHECK_ARGS)
 
 ##@ Danger Zone
 nuke: ## DESTROY EVERYTHING including volumes (requires CONFIRM=YES)
