@@ -16,6 +16,8 @@ const AcceptInvitePage = lazy(() => import('./auth/AcceptInvitePage'));
 const DeviceApprovePage = lazy(() => import('./auth/DeviceApprovePage'));
 const AuthCallbackPage = lazy(() => import('./auth/AuthCallbackPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
+const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.PrivacyPage })));
+const TermsPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.TermsPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const EndpointsPage = lazy(() => import('./pages/EndpointsPage'));
@@ -83,6 +85,14 @@ export const router = createBrowserRouter([
       {
         path: '/contact',
         element: <S><ContactPage /></S>,
+      },
+      {
+        path: '/privacy',
+        element: <S><PrivacyPage /></S>,
+      },
+      {
+        path: '/terms',
+        element: <S><TermsPage /></S>,
       },
     ],
   },
