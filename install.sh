@@ -563,6 +563,37 @@ cat > "${INSTALL_DIR}/Caddyfile" <<'CADDY'
 	}
 }
 CADDY
+
+    # Grafana from the optional monitoring stack (`./railhook monitoring up`), when .env names
+    # a host for it. Read from .env on every write, so a refresh keeps the block and an
+    # installation that never set MONITORING_DOMAIN never gets one.
+    local monitoring_domain=""
+    if [ -f "${INSTALL_DIR}/.env" ]; then
+        monitoring_domain=$(grep '^MONITORING_DOMAIN=' "${INSTALL_DIR}/.env" | tail -1 | cut -d= -f2- | tr -d "\"'" || true)
+    fi
+    [ -n "$monitoring_domain" ] || return 0
+    # It is written into the config verbatim, so anything but a hostname is refused.
+    if [[ ! "$monitoring_domain" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then
+        warn "MONITORING_DOMAIN is not a hostname — Grafana is not added to the Caddyfile"
+        return 0
+    fi
+    cat >> "${INSTALL_DIR}/Caddyfile" <<CADDY
+
+# Grafana, from the monitoring stack. Its own login is the second lock: put an identity-aware
+# proxy in front of this host name (Cloudflare Access, for one) as the first.
+${monitoring_domain} {
+	encode gzip zstd
+	# Resolved per request, so Caddy starts and serves the platform with the stack stopped;
+	# this host name alone answers 502 until it is up.
+	reverse_proxy railhook-grafana:3000 {
+		lb_try_duration 5s
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}
+CADDY
 }
 
 # A rewritten Caddyfile is not a Caddyfile Caddy is using.
@@ -744,6 +775,166 @@ apply_settings() {
     mv -f "$tmp" .env
 }
 
+# ── The optional monitoring stack ─────────────────────────────────────────────────────────
+#
+# Prometheus, Alertmanager, Grafana, Loki and the host exporters, from monitoring/ in the
+# repository, as a second Compose project beside this one. Off until `monitoring up`; nothing
+# about the platform depends on it.
+#
+# Its files are fetched for the release this host runs, not written by install.sh: there are
+# dashboards of several hundred kilobytes among them. The list is held equal to the directory
+# by a test, so a file added there cannot be forgotten here.
+MONITORING_FILES="
+alertmanager/render-config.sh
+backup-age/backup-age.sh
+blackbox/blackbox.yml
+docker-compose.yml
+grafana/NOTICE
+grafana/dashboards/jvm-micrometer.json
+grafana/dashboards/kafka-consumer.json
+grafana/dashboards/node-exporter-full.json
+grafana/dashboards/railhook-alerts.json
+grafana/dashboards/railhook-containers.json
+grafana/dashboards/railhook-errors.json
+grafana/dashboards/railhook-logs.json
+grafana/dashboards/railhook-overview.json
+grafana/dashboards/railhook-uptime.json
+grafana/dashboards/railhook-worker.json
+grafana/entrypoint.sh
+grafana/provisioning/dashboards/dashboards.yml
+grafana/provisioning/datasources/datasource.yml
+loki/loki-config.yml
+loki/rules/railhook.yml
+prometheus/alerts.yml
+prometheus/host-alerts.yml
+prometheus/prometheus.yml
+prometheus/render-targets.sh
+promtail/promtail-config.yml
+"
+
+# One value from .env, unquoted; empty when it is not there.
+env_value() {
+    [ -f .env ] || return 0
+    { grep "^$1=" .env || true; } | tail -1 | cut -d= -f2- | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"
+}
+
+monitoring_ref() {
+    local tag
+    tag=$(env_value API_IMAGE_TAG)
+    echo "${RAILHOOK_MONITORING_REF:-v${tag#v}}"
+}
+
+# The network this installation's Compose project created, which the stack joins as external.
+# Asked of Docker by label, because its name follows the directory the project runs from.
+monitoring_network() {
+    local net project
+    net=$(env_value RAILHOOK_NETWORK)
+    if [ -z "$net" ]; then
+        project=$(compose config 2>/dev/null | sed -n 's/^name: //p' | head -1 || true)
+        net=$(docker network ls --filter "label=com.docker.compose.network=webhook-network" \
+                ${project:+--filter "label=com.docker.compose.project=${project}"} \
+                --format '{{.Name}}' 2>/dev/null | head -1 || true)
+    fi
+    echo "${net:-railhook_webhook-network}"
+}
+
+# -p because .env may set COMPOSE_PROJECT_NAME to this installation's own name, and a `down`
+# under that name would stop the platform.
+monitoring_compose() {
+    RAILHOOK_NETWORK="$(monitoring_network)" \
+        $COMPOSE_CMD -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml "$@"
+}
+
+# All files or none: a half-fetched directory is a stack that fails in a way nobody can read.
+monitoring_fetch() {
+    local ref="$1" tmp f
+    tmp=$(mktemp -d ./.monitoring.XXXXXX)
+    for f in $MONITORING_FILES; do
+        mkdir -p "${tmp}/$(dirname "$f")"
+        if ! curl -fsSL "${RAW}/${ref}/monitoring/${f}" -o "${tmp}/${f}"; then
+            rm -rf "$tmp"
+            echo "Could not fetch monitoring/${f} for ${ref}; monitoring/ is unchanged." >&2
+            return 1
+        fi
+    done
+    chmod 755 "$tmp"
+    rm -rf monitoring.previous
+    [ ! -d monitoring ] || mv monitoring monitoring.previous
+    mv "$tmp" monitoring
+    echo "monitoring/ fetched for ${ref}"
+}
+
+monitoring_up() {
+    local pw domain ref
+    pw=$(env_value GRAFANA_ADMIN_PASSWORD)
+    case "$pw" in
+        ''|admin|railhook_monitor_2024)
+            echo "Set GRAFANA_ADMIN_PASSWORD in .env first — there is no default:" >&2
+            echo "  echo \"GRAFANA_ADMIN_PASSWORD=\$(openssl rand -base64 24)\" >> .env" >&2
+            return 1 ;;
+    esac
+    if [ "${#pw}" -lt 16 ]; then
+        echo "GRAFANA_ADMIN_PASSWORD is shorter than 16 characters." >&2
+        return 1
+    fi
+
+    ref=$(monitoring_ref)
+    [ -f monitoring/docker-compose.yml ] || monitoring_fetch "$ref" || return 1
+
+    # Grafana on its own host name goes through the built-in Caddy. install.sh is what writes
+    # the Caddyfile, so it is asked to rewrite it — and then this helper, which that rewrite
+    # replaces, starts again from the top, the way `upgrade` does.
+    domain=$(env_value MONITORING_DOMAIN)
+    if [ -n "$domain" ] && [ -f Caddyfile ] && ! grep -qxF "${domain} {" Caddyfile \
+       && [ -z "${RAILHOOK_HELPER_REFRESHED:-}" ]; then
+        echo "Adding ${domain} to the Caddyfile..."
+        curl -fsSL "${RAW}/${ref}/install.sh" | bash -s -- --refresh --dir "$(pwd)" \
+            || echo "Could not refresh the Caddyfile; Grafana stays on loopback." >&2
+        RAILHOOK_HELPER_REFRESHED=1 export RAILHOOK_HELPER_REFRESHED
+        exec "$0" monitoring up
+    fi
+
+    monitoring_compose up -d --remove-orphans || return 1
+    echo
+    if [ -n "$domain" ] && [ -f Caddyfile ]; then
+        echo "Grafana: https://${domain}/"
+    elif [ -n "$domain" ]; then
+        echo "Grafana: point your proxy for ${domain} at http://127.0.0.1:$(env_value GRAFANA_PORT | grep . || echo 3001)"
+    else
+        echo "Grafana: http://127.0.0.1:$(env_value GRAFANA_PORT | grep . || echo 3001) — from elsewhere, ssh -L 3001:127.0.0.1:3001"
+    fi
+    echo "  login $(env_value GRAFANA_ADMIN_USER | grep . || echo admin), password GRAFANA_ADMIN_PASSWORD in .env"
+}
+
+monitoring_status() {
+    monitoring_compose ps
+    echo
+    echo "Prometheus targets (count, job, health):"
+    monitoring_compose exec -T prometheus wget -qO- 'http://localhost:9090/api/v1/targets?state=active' 2>/dev/null \
+        | grep -oE '"(scrapePool|health)":"[^"]*"' | paste - - \
+        | sed -E 's/"scrapePool":"([^"]*)"[[:space:]]+"health":"([^"]*)"/\1 \2/' | sort | uniq -c \
+        || echo "  Prometheus is not answering."
+}
+
+monitoring() {
+    case "${1:-}" in
+        up)     monitoring_up ;;
+        down)   [ ! -f monitoring/docker-compose.yml ] || monitoring_compose down ;;
+        status) monitoring_status ;;
+        logs)   shift; monitoring_compose logs -f "$@" ;;
+        # What `upgrade` calls: new files for the release, and a restart onto them if running.
+        update)
+            [ -d monitoring ] || return 0
+            monitoring_fetch "${2:-$(monitoring_ref)}" || return 1
+            [ -z "$(monitoring_compose ps -q 2>/dev/null)" ] || monitoring_compose up -d --remove-orphans ;;
+        *)
+            echo "railhook monitoring up|down|status|logs [service]|update [version]" >&2
+            echo "  up needs GRAFANA_ADMIN_PASSWORD in .env; MONITORING_DOMAIN serves Grafana through Caddy" >&2
+            echo "  down keeps the metrics and logs; data lives in the railhook-monitoring_* volumes" >&2
+            return 1 ;;
+    esac
+}
+
 case "${1:-help}" in
     start)   compose up -d ;;
     stop)    compose stop ;;
@@ -866,6 +1057,12 @@ case "${1:-help}" in
         # The API is the one a customer notices, because it is what accepts webhooks.
         roll_api
 
+        # Only where someone turned monitoring on. Its failure is not the upgrade's.
+        if [ -f monitoring/docker-compose.yml ] && [ -n "${git_ref:-}" ]; then
+            monitoring update "$git_ref" \
+                || echo "The monitoring stack was not updated; the platform upgrade is complete." >&2
+        fi
+
         echo
         echo "Upgraded. Watch it come up:  ./railhook status"
         echo "If it does not, the images roll back with:"
@@ -889,10 +1086,12 @@ case "${1:-help}" in
             -Fc --no-owner --no-privileges > "$f"
         echo "wrote $f — keep .env with it, or the encrypted columns are unreadable" ;;
     settings) apply_settings ;;
+    monitoring) shift; monitoring "$@" ;;
     doctor)  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh \
                  | bash -s -- --check --dir "$(pwd)" ;;
     help|-h|--help)
-        echo "railhook start|stop|restart|status|logs [service]|upgrade [version]|settings < file|backup|doctor"
+        echo "railhook start|stop|restart|status|logs [service]|upgrade [version]|settings < file|backup|doctor|monitoring"
+        echo "  monitoring up|down|status runs the optional Prometheus + Grafana stack beside it"
         echo "  upgrade takes a backup first; it does not roll the schema back afterwards"
         echo "  settings applies NAME=value lines to .env; upgrade reads them from stdin too" ;;
     *)       compose "$@" ;;

@@ -40,8 +40,8 @@ schema_config:
 
 limits_config:
   # Retention window — independent of the Postgres DATA_RETENTION_* days;
-  # logs and delivery data are different retention conversations. Default 14d.
-  retention_period: ${LOKI_RETENTION_PERIOD:-336h}
+  # logs and delivery data are different retention conversations. Default 7d.
+  retention_period: ${LOKI_RETENTION_PERIOD:-168h}
   reject_old_samples: true
   reject_old_samples_max_age: 168h
   max_query_series: 5000
@@ -54,6 +54,28 @@ limits_config:
   # in the JSON log line, queried with `| json`, not indexed as labels). This limit
   # is the safety net if a future change accidentally does label one of them.
   max_streams_per_user: 10000
+
+# Recording rules over the logs (rules/railhook.yml), remote-written into Prometheus. The
+# alerts on them — ErrorLogSpike, EdgeServerErrorSpike — are Prometheus rules, so every alert
+# reaches Alertmanager by one path and shows in one list.
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /etc/loki/rules
+  rule_path: /loki/rules-temp
+  ring:
+    kvstore:
+      store: inmemory
+  enable_api: true
+  evaluation_interval: 1m
+  wal:
+    dir: /loki/ruler-wal
+  remote_write:
+    enabled: true
+    clients:
+      prometheus:
+        url: http://prometheus:9090/api/v1/write
 
 compactor:
   working_directory: /loki/compactor

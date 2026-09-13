@@ -1,0 +1,25 @@
+# Loki recording rules, remote-written to Prometheus (see ruler: in loki-config.yml).
+#
+# Mounted as the rules of Loki's single tenant ("fake", with auth_enabled: false). The alerts
+# on these series live in prometheus/host-alerts.yml, group railhook.logs.
+groups:
+  - name: railhook.logs
+    interval: 1m
+    rules:
+      # Lines per second by service and level. Level is lower-cased: the JVMs write ERROR,
+      # Caddy error, Postgres ERROR, nginx error.
+      - record: railhook:log_lines:rate5m
+        expr: |
+          sum by (service, level) (
+            rate({service=~".+"} | label_format level="{{ lower .level }}" [5m])
+          )
+
+      # 4xx and 5xx answered by the UI's nginx — including the 502s the API never sees,
+      # because it was not there to answer.
+      - record: railhook:nginx_responses:rate5m
+        expr: |
+          sum by (status) (
+            rate({service="ui"}
+              | pattern `<_> - <_> [<_>] "<_> <_> <_>" <status> <_>`
+              | status=~"[45].." [5m])
+          )
