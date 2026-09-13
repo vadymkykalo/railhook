@@ -57,13 +57,21 @@ beforeAll(() => {
   }
 });
 
+/** The section a heading titles. */
+function sectionTitled(name: string): HTMLElement {
+  const section = screen.getByRole('heading', { name }).closest('section') as HTMLElement;
+  expect(section, `no section titled ${name}`).not.toBeNull();
+  return section;
+}
+
 describe('LandingPage', () => {
-  it('has a heading for each of its six sections', () => {
+  it('has a heading for each of its seven sections', () => {
     renderLanding();
     const headings = [
       'Never lose a webhook',
       en.landing.directions.title,
       en.landing.reliability.title,
+      en.landing.architecture.title,
       en.landing.product.title,
       en.landing.run.title,
       en.landing.developer.title,
@@ -71,6 +79,28 @@ describe('LandingPage', () => {
     for (const name of headings) {
       expect(screen.getByRole('heading', { name }), `missing section: ${name}`).toBeInTheDocument();
     }
+  });
+
+  it('explains what keeps events safe right after the reliability section, before the product', () => {
+    renderLanding();
+    const reliability = sectionTitled(en.landing.reliability.title);
+    const architecture = sectionTitled(en.landing.architecture.title);
+    const product = sectionTitled(en.landing.product.title);
+    expect(reliability.nextElementSibling).toBe(architecture);
+    expect(architecture.nextElementSibling).toBe(product);
+  });
+
+  it('draws the architecture as one picture with a text alternative naming what it runs on', () => {
+    renderLanding();
+    const architecture = sectionTitled(en.landing.architecture.title);
+    const figure = within(architecture).getByRole('figure');
+    const picture = within(figure).getByRole('img');
+    const name = picture.getAttribute('aria-label') ?? '';
+    expect(name).toBe(en.landing.architecture.diagramAria);
+    for (const part of ['PostgreSQL', 'Kafka', 'Redis']) {
+      expect(name, `the text alternative should name ${part}`).toContain(part);
+    }
+    expect(within(figure).getByRole('img', { name: /Stripe/ })).toBe(picture);
   });
 
   it('shows the install command, exactly, with a copy button beside it', () => {

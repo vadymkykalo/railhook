@@ -339,6 +339,132 @@
   .dev-band-arc, .dev-glow::before, .dev-caret { animation: none; }
 }
 
+/* ── The architecture diagram ────────────────────────────────────────────
+   One grid, two layouts, the same area names transposed. On a phone the flow
+   runs down the first column and the shared services sit beside the API and
+   the worker; from md the flow runs across and they sit below. The main line
+   is one dotted rail behind the tiles, so it stays continuous however wide a
+   column is; the tiles cover it where they sit. */
+.arch-grid {
+  --arch-line: hsl(var(--muted-foreground) / 0.6);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.25rem 6rem;
+  grid-template-rows: auto 2.25rem auto 2.25rem auto 2.25rem auto 2.25rem auto;
+  grid-template-areas:
+    "src . ."
+    "c1 . ."
+    "api l1 pg"
+    "c2 . ."
+    "kfk . lbl"
+    "c3 . ."
+    "wrk l2 rds"
+    "c4 . ."
+    "dst . .";
+}
+.arch-rail {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  justify-self: center;
+  width: 0;
+  border-left: 2px dotted var(--arch-line);
+}
+.arch-svc {
+  grid-column: 3;
+  grid-row: 3 / 8;
+  margin: -0.5rem;
+  background: hsl(var(--background) / 0.7);
+}
+.arch-link--cross::before,
+.arch-node-link::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  border-top: 2px dotted var(--arch-line);
+  translate: 0 -1px;
+}
+.arch-node-link::after { left: 50%; }
+.arch-dot {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: hsl(var(--primary));
+  translate: -50% -50%;
+  animation: arch-flow-y 3.6s linear infinite;
+}
+.arch-link--cross .arch-dot {
+  top: 50%;
+  left: 0;
+  animation-name: arch-flow-x;
+  animation-duration: 4.4s;
+}
+@keyframes arch-flow-y {
+  0% { top: 0; opacity: 0; }
+  25%, 75% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+@keyframes arch-flow-x {
+  0% { left: 0; opacity: 0; }
+  25%, 75% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+@media (min-width: 768px) {
+  .arch-grid {
+    grid-template-columns:
+      minmax(0, 1.2fr) minmax(1.1rem, 0.4fr) minmax(0, 1fr) minmax(1.1rem, 0.4fr) minmax(0, 1fr)
+      minmax(1.1rem, 0.4fr) minmax(0, 1fr) minmax(1.1rem, 0.4fr) minmax(0, 1.2fr);
+    grid-template-rows: auto 2.25rem auto;
+    grid-template-areas:
+      "src c1 api c2 kfk c3 wrk c4 dst"
+      ". . l1 . . . l2 . ."
+      ". . pg . lbl . rds . .";
+  }
+  .arch-rail {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: stretch;
+    align-self: center;
+    width: auto;
+    height: 0;
+    border-left: 0;
+    border-top: 2px dotted var(--arch-line);
+  }
+  .arch-svc {
+    grid-column: 3 / 8;
+    grid-row: 3;
+  }
+  .arch-link--cross::before,
+  .arch-node-link::after {
+    top: 0;
+    right: auto;
+    bottom: 0;
+    left: 50%;
+    border-top: 0;
+    border-left: 2px dotted var(--arch-line);
+    translate: -1px 0;
+  }
+  .arch-node-link::after { top: 50%; }
+  .arch-dot {
+    top: 50%;
+    left: 0;
+    animation-name: arch-flow-x;
+  }
+  .arch-link--cross .arch-dot {
+    top: 0;
+    left: 50%;
+    animation-name: arch-flow-y;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .arch-dot { display: none; }
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

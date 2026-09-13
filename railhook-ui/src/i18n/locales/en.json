@@ -1953,6 +1953,22 @@
     "successDesc": "You are now a member of the organization. Welcome aboard!"
   },
   "landing": {
+    "architecture": {
+      "title": "Built so events survive failures",
+      "stored": "Railhook saves every event before it replies to the sender.",
+      "survives": "If a server restarts or a service goes down, deliveries wait and then carry on.",
+      "runsOn": "It runs on PostgreSQL, Kafka and Redis, which you can run yourself.",
+      "factStored": "stored before 201",
+      "factRetries": "retries 1m → 24h",
+      "factDeploy": "Docker or Kubernetes",
+      "factsLabel": "In short",
+      "yourApp": "Your app",
+      "customers": "Customers",
+      "yourServices": "Your services",
+      "worker": "Worker",
+      "shared": "Shared services",
+      "diagramAria": "Your app, Stripe and GitHub send webhooks to the Railhook API, which checks the providers' signatures and stores each event in PostgreSQL before replying, then passes it through Kafka to the worker. The worker delivers to your customers and your services and retries what fails; both use PostgreSQL, and Redis for rate limits and ordering."
+    },
     "developer": {
       "title": "Built for developers",
       "lead": "One API call sends an event. The rest is in the docs.",

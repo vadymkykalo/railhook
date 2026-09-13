@@ -3,15 +3,17 @@ import { useLocation } from 'react-router-dom';
 import HeroSection from './landing/HeroSection';
 import DirectionsSection from './landing/DirectionsSection';
 import ReliabilitySection from './landing/ReliabilitySection';
+import ArchitectureSection from './landing/ArchitectureSection';
 import ProductSection from './landing/ProductSection';
 import RunSection from './landing/RunSection';
 import DeveloperSection from './landing/DeveloperSection';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 /**
- * Six sections, read by people who decide on outcomes as much as by the engineers who install:
+ * Seven sections, read by people who decide on outcomes as much as by the engineers who install:
  * the promise and both ways in (hero), what it does in either direction (directions), what
- * happens when the other side is down (reliability), what the team will look at (product), how
+ * happens when the other side is down (reliability), what it is built on and why that keeps
+ * events safe (architecture), what the team will look at (product), how
  * to run it — free in the cloud or on your own servers (run), and where an engineer starts, with
  * the ask again (developer).
  *
@@ -41,6 +43,7 @@ export default function LandingPage() {
       <HeroSection />
       <DirectionsSection />
       <ReliabilitySection />
+      <ArchitectureSection />
       <ProductSection />
       <RunSection />
       <DeveloperSection />
