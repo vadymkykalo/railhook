@@ -445,17 +445,25 @@ doctor: ## Run pre-flight checks
 	fi
 	@echo "$(GREEN)All checks passed$(NC)"
 
-##@ Monitoring (Prometheus + Grafana)
-MONITORING_COMPOSE := $(DOCKER_COMPOSE) -f monitoring/docker-compose.yml
+##@ Monitoring (Prometheus, Grafana, Loki, host exporters)
+# Its own Compose project reading the platform's .env. The project name is fixed because that
+# .env sets COMPOSE_PROJECT_NAME for the platform. The network is found by its Compose label,
+# so the checkout's directory name does not matter.
+MONITORING_NETWORK = $(or $(RAILHOOK_NETWORK),$(shell docker network ls --filter label=com.docker.compose.network=webhook-network --format '{{.Name}}' 2>/dev/null | head -1),railhook_webhook-network)
+MONITORING_COMPOSE = RAILHOOK_NETWORK=$(MONITORING_NETWORK) $(DOCKER_COMPOSE) -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml
 
-monitoring-up: ## Start monitoring stack (Prometheus + Grafana)
-	@echo "$(GREEN)Starting monitoring stack...$(NC)"
+monitoring-up: ## Start the monitoring stack (set GRAFANA_ADMIN_PASSWORD in .env first)
+	@pw="$$GRAFANA_ADMIN_PASSWORD"; \
+	if [ -z "$$pw" ] || [ "$${#pw}" -lt 16 ]; then \
+		echo "$(RED)Set GRAFANA_ADMIN_PASSWORD in .env (16+ characters): openssl rand -base64 24$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)Starting monitoring stack on $(MONITORING_NETWORK)...$(NC)"
 	@$(MONITORING_COMPOSE) up -d
 	@echo ""
 	@echo "$(GREEN)Monitoring started:$(NC)"
-	@echo "  Prometheus: http://localhost:9090"
-	@echo "  Grafana:    http://localhost:$${GRAFANA_PORT:-3001}"
-	@echo "  Login:      railhook / railhook_monitor_2024"
+	@echo "  Grafana: http://localhost:$${GRAFANA_PORT:-3001}  (user $${GRAFANA_ADMIN_USER:-admin}, password GRAFANA_ADMIN_PASSWORD)"
+	@echo "  Prometheus, Alertmanager and Loki are not published; use Grafana's Explore and Alerting."
 	@echo ""
 
 monitoring-down: ## Stop monitoring stack

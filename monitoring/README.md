@@ -1,231 +1,175 @@
 # Railhook Monitoring Stack
 
-**Prometheus + Alertmanager + Grafana + Loki/Promtail** — fully pre-configured, decoupled from the main platform.
+Prometheus, Alertmanager, Grafana, Loki/Promtail, node-exporter, cAdvisor and blackbox-exporter,
+preconfigured for Railhook and run as a second Compose project beside the platform. Optional:
+nothing starts until you start it.
 
-## Quick Start
+## Quick start
 
-```bash
-# From project root:
-make monitoring-up
-
-# Open Grafana:
-#   http://localhost:3001
-#   Login: railhook / railhook_monitor_2024
-```
-
-## What's Included
-
-### Prometheus
-- **Scrapes:** API (`:8082/actuator/prometheus`), Worker (`:8081/actuator/prometheus`) — see
-  "Metrics-scrape auth" below for why these are *not* 8080/the app's main port
-- **Alert rules:** 15 rules in `prometheus/alerts.yml` — retry backlog (4), DLQ (3),
-  retry governor (2), circuit breaker (2), API error rate (1), oldest-pending-age (2),
-  outbox SENDING stuck (1, P1-24c)
-- **Retention:** 30 days
-- **Port:** 9090 (localhost only)
-
-### Alertmanager
-
-Routes the 15 `alerts.yml` rules to a real receiver — Prometheus firing an alert
-with nowhere to send it is a red square on a dashboard nobody is watching during
-the incident, which was the state of this repo before Alertmanager was wired up.
-
-- **Port:** 9093 (localhost only) — UI at http://localhost:9093
-- **Config:** rendered at container start by `alertmanager/render-config.sh` from
-  the `ALERTMANAGER_*` env vars (see `.env.dist` "ALERTING" section) — Slack,
-  a generic webhook (PagerDuty/Opsgenie/custom), and/or email. Leave all unset
-  and Alertmanager still starts; alerts just have nowhere to go but its own
-  UI/API, which is the "you haven't configured a receiver yet" state, not a
-  crash. (The image is busybox-based with no `envsubst`/`apk`/bash, which is why
-  this is a POSIX-sh script instead of a static YAML file with a templating
-  sidecar — see the script's header.)
-- **Routing:** grouped by `alertname` + `component`; `severity: critical` gets
-  its own faster-paging route (`group_wait: 10s`, `repeat_interval: 1h`),
-  `warning` and `info` route separately with longer repeat intervals.
-- **Inhibition:** a firing `*Critical` alert suppresses the corresponding
-  `*High`/`*Growing`/`*Stale` warning for the same `component` — 15 rules firing
-  ungrouped at 3am is its own failure mode. See `alertmanager/render-config.sh`
-  for the exact rules.
-- **Verified live**: a synthetic `DeliveryPendingBacklogCritical` alert
-  was POSTed to Alertmanager's `/api/v2/alerts`, routed to the `railhook-critical`
-  receiver, and delivered as a webhook POST to a throwaway HTTP listener —
-  payload received, 200 OK. A paired `DeliveryPendingBacklogHigh` (warning, same
-  component) was correctly suppressed (`"state":"suppressed","inhibitedBy":[...]`
-  in `/api/v2/alerts`).
-
-### Metrics-scrape auth
-
-`SecurityConfig.java` requires a JWT or API-key on `/actuator/**` (beyond
-`health`/`health/**`/`info`), but Prometheus can't authenticate that way — it
-would get a 401 scraping `/actuator/prometheus` on the app's main port.
-
-**Fix (Compose, this stack):** the API and worker both split actuator onto a
-separate `management.server.port` (API: 8082, worker: 8081) via
-`MANAGEMENT_PORT`/`MANAGEMENT_ADDRESS`. When `management.server.port` differs
-from `server.port`, Spring Boot serves actuator from a second embedded web
-server that never passes through the app's `SecurityFilterChain` — so no auth
-is required there at all. Neither port is published to the host in
-`docker-compose.yml`; both are only reachable from other containers on
-`webhook-network`, the same trust boundary Postgres/Kafka/Redis already rely
-on. If you widen that network's membership, `/actuator/prometheus` (endpoint
-listing, cardinality, in worker's case zero auth on `/actuator/env` too if ever
-exposed) becomes reachable to whatever else is on it — that's the residual risk
-to weigh, not "wide open to the internet" (the port still isn't published).
-
-**Kubernetes/Helm:** `deploy/helm/railhook/templates/servicemonitor.yaml`
-scrapes the `management` port by name, which the chart sets to 8082 (API) and
-8081 (worker) — the same split Compose uses. It previously scraped the main
-authenticated port and every scrape 401'd, unnoticed because CI linted the
-chart but never applied it.
-
-**Bonus fix, not just Compose:** `MANAGEMENT_ADDRESS` defaulted to
-`127.0.0.1` — loopback *inside* the worker's own container — which silently
-made `worker:8081` unreachable from any other container, including this
-Prometheus (scrape always failed) and, in the Helm/K8s deployment, **kubelet's
-own liveness/readiness `httpGet` probes**, which also connect from outside the
-container's network namespace. That's not a monitoring nice-to-have, that's a
-worker pod that can never become `Ready` in a real cluster. Default is now
-`0.0.0.0`; the port still isn't published to the host anywhere.
-
-### Logs (P3-36b)
-
-No log aggregation existed before this: `docker-compose.prod.yml` sets `LOG_LEVEL`
-and logs go straight to stdout, with no collector and no rotation — a restarted or
-rescheduled container's history was simply gone. Meanwhile api/worker already had
-all the structured-logging groundwork in place and it was being thrown away:
-`JwtAuthenticationFilter`/`ApiKeyAuthenticationFilter` populate MDC with
-`organizationId`/`userId`/`projectId`, `CorrelationIdFilter` (api) and
-`DeliveryConsumer`/`IncomingForwardConsumer` (worker) populate `correlationId`,
-and both modules' `logback-spring.xml` already emit single-line JSON in production
-via `LogstashEncoder` — but each `logback-spring.xml` also had an
-`<includeMdcKeyName>` allow-list that silently dropped everything except
-`correlationId` (api) / a list that didn't even match what the worker code puts
-into MDC (worker) from the shipped JSON. Both were fixed as part of this change
-(see the two `logback-spring.xml` files) — the encoder now emits the whole MDC map.
-
-- **Loki**: single-node, filesystem-backed (`monitoring/loki/loki-config.yml`).
-  Retention via the compactor, `LOKI_RETENTION_PERIOD` (default `336h` / 14 days,
-  independent of the Postgres `DATA_RETENTION_*` days — see `.env.dist`).
-  Port 3100 (localhost only).
-- **Promtail**: discovers containers via the Docker daemon
-  (`docker_sd_configs`) and relabels on the `com.docker.compose.service` Docker
-  label rather than assuming fixed container names — this repo doesn't set
-  `container_name` for api/worker, and is routinely checked out into
-  differently-named directories (parallel-agent worktrees, forks, ...), which
-  changes Compose's default project name and therefore the generated container
-  names. Only ships `api`/`worker` logs (see the `keep` relabel rule in
-  `monitoring/promtail/promtail-config.yml` if you want to widen this).
-  Extracts `level` as a Loki label from the production JSON logs; per-request/
-  per-tenant identifiers (`correlationId`, `organizationId`, `deliveryId`, ...)
-  deliberately stay unindexed in the log line body — promoting them to Loki
-  labels would blow up index cardinality — and are queried with `| json` /
-  a substring filter instead.
-- **Grafana**: a `Loki` datasource is auto-provisioned alongside `Prometheus`
-  (`monitoring/grafana/provisioning/datasources/datasource.yml`), and the new
-  **Railhook — Logs** dashboard below gives a starting point for pivoting on
-  `correlationId`/`organizationId`.
-
-### Grafana Dashboards
-
-| Dashboard | Description |
-|---|---|
-| **Railhook — Overview** | Events ingested, delivery pipeline, queue depth, DLQ, table sizes, billing reconciliation, error rates |
-| **Railhook — Worker & Circuit Breaker** | Circuit breaker trips/rejects/slow-trips, retry governor, async pool threads, queue depths |
-| **Railhook — JVM & Micrometer** | Heap memory, GC pauses, threads, HTTP request rates & latency percentiles, HikariCP pool, CPU |
-| **Railhook — Kafka** | Consumer lag by topic/partition, records consumed rate, fetch latency, producer queue time |
-| **Railhook — Logs** | Logs panel + volume-by-level, with `correlation_id`/`organization_id` template variables for pivoting (P3-36b) |
-
-### Auto-provisioned
-- Prometheus + Loki datasources (no manual setup needed)
-- All 5 dashboards loaded on first boot
-- Home dashboard: Railhook Overview
-
-## Configuration
-
-All config is via environment variables (defaults in `docker-compose.yml`):
-
-| Variable | Default | Description |
-|---|---|---|
-| `GF_ADMIN_USER` | `railhook` | Grafana admin username |
-| `GF_ADMIN_PASSWORD` | `railhook_monitor_2024` | Grafana admin password |
-| `GRAFANA_PORT` | `3001` | Grafana external port |
-| `ALERTMANAGER_SLACK_WEBHOOK_URL` | _(unset)_ | Slack incoming-webhook URL |
-| `ALERTMANAGER_SLACK_CHANNEL` | `#railhook-alerts` | Slack channel |
-| `ALERTMANAGER_WEBHOOK_URL` | _(unset)_ | generic webhook receiver (PagerDuty/Opsgenie/custom) |
-| `ALERTMANAGER_EMAIL_TO` / `_FROM` / `_SMTP_HOST` / `_SMTP_PORT` | _(unset)_ / `alerts@example.com` / `localhost` / `1025` | email receiver |
-| `LOKI_RETENTION_PERIOD` | `336h` (14d) | how long Loki keeps ingested logs |
-
-To override, create a `.env` file in `monitoring/` or pass env vars:
+On an `install.sh` deployment (`/opt/railhook`):
 
 ```bash
-GF_ADMIN_PASSWORD=my_secret_password make monitoring-up
+cd /opt/railhook
+echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
+echo "ALERTMANAGER_EMAIL_TO=you@example.com" >> .env     # optional
+./railhook monitoring up
+ssh -L 3001:127.0.0.1:3001 you@your-host                 # then http://localhost:3001, user admin
 ```
+
+`monitoring up` fetches this directory for the release the host runs (the file list lives in the
+helper and a test holds it equal to this directory), then starts the stack. `./railhook upgrade`
+refreshes it and restarts it if it was running.
+
+From a clone:
+
+```bash
+make up
+echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
+make monitoring-up                                        # http://localhost:3001
+```
+
+There is no default Grafana password. Grafana refuses to start with an empty one, a known default,
+or anything under 16 characters, and re-applies the one in `.env` on every start — change it
+there and run `monitoring up` again.
+
+## Grafana on a domain
+
+Set `MONITORING_DOMAIN=grafana.example.com` in `.env`, point DNS at the host and run
+`./railhook monitoring up`. The helper asks `install.sh --refresh` to rewrite the Caddyfile, which
+adds a site block proxying to `railhook-grafana:3000`, and reloads Caddy. Caddy obtains the
+certificate as it does for the platform. With `--behind-proxy`, point your own proxy at
+`127.0.0.1:3001` instead.
+
+Put an identity-aware proxy (Cloudflare Access, for one) in front of that host name. If it covers
+every path, give `/.well-known/acme-challenge/` a bypass, or Caddy cannot renew the certificate.
 
 ## Commands
 
 ```bash
-make monitoring-up      # Start Prometheus + Alertmanager + Grafana
-make monitoring-down    # Stop monitoring stack
-make monitoring-logs    # Follow monitoring logs (all three services)
+./railhook monitoring up              # start, or apply .env changes
+./railhook monitoring status          # containers, and every Prometheus target's health
+./railhook monitoring logs [service]
+./railhook monitoring down            # stop; metrics and logs stay in the volumes
 ```
 
-To smoke-test the alerting path without waiting for a real threshold breach,
-POST a synthetic alert straight to Alertmanager (it doesn't care whether the
-alert came from Prometheus's rule evaluation or the API — the payload it hands
-to receivers is identical either way):
+`make monitoring-up`, `make monitoring-down` and `make monitoring-logs` do the same in a clone.
+
+Both pin the project name to `railhook-monitoring` and read the platform's `.env`
+(`--env-file`). The pin matters: that `.env` may set `COMPOSE_PROJECT_NAME` to the platform's
+own name, and a `down` under it would stop the platform.
+
+## What runs
+
+| Service | Image | Memory limit | Reachable from |
+|---|---|---|---|
+| grafana | `grafana/grafana:12.1.1` | 320m | `127.0.0.1:3001`; Caddy over the platform network |
+| prometheus | `prom/prometheus:v2.51.2` | 384m | `monitoring` network; platform network (to scrape) |
+| alertmanager | `prom/alertmanager:v0.27.0` | 64m | `monitoring` network |
+| loki | `grafana/loki:3.0.0` | 320m | `monitoring` network |
+| promtail | `grafana/promtail:3.0.0` | 96m | `monitoring` network; Docker socket read-only |
+| node-exporter | `prom/node-exporter:v1.9.1` | 64m | `monitoring` network; host `/` read-only |
+| cadvisor | `gcr.io/cadvisor/cadvisor:v0.52.1` | 192m | `monitoring` network; `/sys`, Docker socket and `/var/lib/docker` read-only |
+| blackbox | `prom/blackbox-exporter:v0.27.0` | 32m | `monitoring` network; platform network (to probe) |
+| backup-age | `busybox:1.36.1` | 8m | no network; backup directory read-only |
+
+The limits total 1480 MB. Only Grafana publishes a port. Prometheus, Alertmanager and Loki are
+reached through Grafana (Explore, Alerting — Alertmanager is a provisioned datasource) or
+`docker exec`.
+
+### Prometheus
+
+- **Scrapes:** API (`api:8082/actuator/prometheus`), worker (`worker:8081/actuator/prometheus`),
+  node-exporter, cAdvisor (named containers only), the blackbox probes, and the stack itself.
+- **Retention:** `PROMETHEUS_RETENTION` (default `15d`), capped at `PROMETHEUS_RETENTION_SIZE`
+  (default `4GB`).
+- **Rules:** `prometheus/alerts.yml` is the platform's set and is held equal to the Helm chart's
+  `PrometheusRule` by `AlertRuleParityTest`. `prometheus/host-alerts.yml` is this host's:
+
+  | Group | Alerts |
+  |---|---|
+  | host | `HostExporterDown`, `HostDiskAlmostFull` (>85%), `HostDiskCritical` (>95%), `HostMemoryHigh` (>90%), `HostOomKill`, `HostLoadHigh` (15m load > 1.5× cores) |
+  | containers | `ContainerRestarting` (≥2 restarts in 15m), `ContainerOomKilled`, `ContainerMemoryNearLimit` (>90%) |
+  | uptime | `PublicEndpointDown`, `PublicEndpointSlow` (>3s), `UiDown`, `CaddyDown`, `TlsCertificateExpiringSoon` (<14d), `TlsCertificateExpiryImminent` (<3d) |
+  | backups | `BackupStale` (newest dump >26h old), `BackupMissing` |
+  | monitoring | `MonitoringComponentDown`, `AlertmanagerNotificationsFailing` |
+
+- **Probe targets** are rendered at start by `prometheus/render-targets.sh`, because Prometheus
+  does not expand env in its config: `MONITORING_PROBE_URLS` (comma-separated), or, when empty,
+  `https://$RAILHOOK_DOMAIN/`, `/docs/` and `/actuator/health`. Inside the network it always
+  probes `http://ui:5173/`, and `caddy:443` when there is a domain. Behind Cloudflare the TLS
+  expiry is the edge certificate's; an expired origin certificate fails the probe itself (526).
+
+### Alertmanager
+
+- **Config:** rendered at container start by `alertmanager/render-config.sh` from `ALERTMANAGER_*`
+  (the image is busybox: no `envsubst`, no bash). It never prints the rendered file, which holds
+  the SMTP password and the Telegram token — only which receivers are on.
+- **Receivers:** Slack, a generic webhook, email, Telegram — each on when its variables are set.
+  Email defaults to the platform's own relay: `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`,
+  `SMTP_USERNAME`, `SMTP_PASSWORD`, unless the `ALERTMANAGER_SMTP_*` equivalents are set. TLS is
+  required except for `localhost`, `mailpit` and `mailhog`.
+- **Routing:** grouped by `alertname` + `component`; `critical` pages faster (`group_wait: 10s`,
+  `repeat_interval: 1h`).
+- **Inhibition:** a critical tier suppresses its warning tier (backlog, oldest pending, disk, TLS),
+  and `UiDown` suppresses the public probe alerts it explains.
+
+To test the path without waiting for a threshold, post a synthetic alert from inside the network:
 
 ```bash
-curl -s -XPOST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/json' -d '[{
-  "labels": {"alertname": "DeliveryPendingBacklogCritical", "severity": "critical", "component": "worker"},
-  "annotations": {"summary": "test", "description": "synthetic alert"},
-  "startsAt": "'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'"
-}]'
-curl -s http://localhost:9093/api/v2/alerts | jq .
+docker exec railhook-alertmanager amtool alert add DeliveryPendingBacklogCritical \
+  severity=critical component=worker --annotation=summary=test \
+  --alertmanager.url=http://localhost:9093
 ```
 
-## Architecture
+### Logs
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│                       Docker Network                            │
-│                railhook_webhook-network                 │
-│                                                                  │
-│  ┌─────────┐   ┌──────────┐   ┌───────────────┐  ┌────────────┐│
-│  │   API    │   │  Worker   │   │  Prometheus   │  │Alertmanager││
-│  │ :8080    │   │ :8081    │◄──│    :9090      │─►│   :9093    ││
-│  │ mgmt:8082│◄──┤(mgmt port)│  └───────┬───────┘  └─────┬──────┘│
-│  └────┬────┘   └────┬─────┘           │                │       │
-│       │(stdout)      │(stdout)  ┌───────▼───────┐   Slack/webhook│
-│       ▼              ▼          │   Grafana     │   /email       │
-│  ┌──────────────────────┐       │   :3001       │   (ALERTMANAGER_*)
-│  │       Promtail        │──┐   └───────▲───────┘                │
-│  │ docker_sd_configs,    │  │           │                        │
-│  │ api+worker logs only  │  │  reads Loki + Prometheus            │
-│  └───────────────────────┘  │           │                        │
-│                              ▼           │                        │
-│                        ┌──────────┐      │                        │
-│                        │   Loki    │──────┘                        │
-│                        │  :3100    │                               │
-│                        └──────────┘                               │
-└──────────────────────────────────────────────────────────────────┘
-```
+- **Promtail** discovers containers through the Docker socket and keeps `api`, `worker`, `ui`,
+  `caddy` and `db-backup` by their `com.docker.compose.service` label, so the platform's project
+  name does not matter. It extracts `level` as a label; per-request identifiers (`correlationId`,
+  `organizationId`, …) stay in the line and are filtered at query time, because as labels they
+  would explode Loki's index.
+- **Loki** is single-node on the filesystem; the compactor deletes lines older than
+  `LOKI_RETENTION_PERIOD` (default `168h`, 7 days).
 
-Monitoring connects to the platform's existing Docker network as an
-**external** network — no changes needed there. The main `docker-compose.yml`
-*was* changed: the API gained a dedicated `MANAGEMENT_PORT` (8082) so
-Prometheus can scrape it without authenticating, and the worker's
-`MANAGEMENT_ADDRESS` default changed from `127.0.0.1` to `0.0.0.0` so it's
-reachable at all. See "Metrics-scrape auth" above.
+### Backups
 
-## Production (Kubernetes)
+`backup-age` reads the `webhook_platform_*.dump` files the `db-backup` sidecar writes (from
+`MONITORING_BACKUP_DIR`, default `../backups`, i.e. the platform's `backups/`) every five minutes
+and writes their count and the newest one's age and size as node-exporter textfile metrics. It
+measures what a restore would need — a file — not whether a script ran.
 
-For Kubernetes deployments, use the Helm chart values or deploy kube-prometheus-stack:
+### Dashboards
 
-```bash
-helm install monitoring prometheus-community/kube-prometheus-stack \
-  --set prometheus.prometheusSpec.additionalScrapeConfigs[0].job_name=railhook-api \
-  --set prometheus.prometheusSpec.additionalScrapeConfigs[0].metrics_path=/actuator/prometheus \
-  --set prometheus.prometheusSpec.additionalScrapeConfigs[0].static_configs[0].targets[0]=railhook-api:8080
-```
+| Dashboard | What it answers |
+|---|---|
+| **Railhook — Overview** (home) | Public site up, firing alerts, disk/memory/CPU, backup age; then events, deliveries, queues, DLQ, errors |
+| **Host (Node Exporter Full)** | Everything node-exporter knows about the host. Vendored, Apache-2.0 — see `grafana/NOTICE` |
+| **Containers** | CPU, memory against the Compose limit, network and restarts per container |
+| **Uptime** | Probe status and uptime over the range, response time by phase, HTTP status, TLS days left, backups |
+| **Logs** | Filter by service, level (case-insensitive: the JVMs write `ERROR`, Caddy `error`), text, correlation or organization ID |
+| **Railhook — Worker & Circuit Breaker** | Circuit breaker, retry governor, async pools, queue depths |
+| **Railhook — JVM & Micrometer** | Heap, GC, threads, HTTP latency, HikariCP |
+| **Railhook — Kafka** | Consumer lag, consume rate, fetch latency |
 
-The Grafana dashboard JSONs in `monitoring/grafana/dashboards/` can be imported directly into any Grafana instance.
+All are provisioned from `grafana/dashboards/` and read-only in the UI; change the JSON.
+
+## Configuration
+
+Every variable is documented in `.env.dist` under "MONITORING STACK", "ALERTING" and "LOG
+AGGREGATION".
+
+## Metrics-scrape auth
+
+`SecurityConfig.java` requires a JWT or API key on `/actuator/**` (beyond `health`/`info`), which
+Prometheus cannot present. The API and worker therefore serve actuator on a separate
+`management.server.port` (API 8082, worker 8081, `MANAGEMENT_PORT`/`MANAGEMENT_ADDRESS`). A
+different management port runs a second embedded server outside the app's `SecurityFilterChain`,
+so it needs no credentials. Neither port is published by `docker-compose.yml`; both are reachable
+only from containers on the platform network — which this stack joins, and which is the trust
+boundary Postgres, Kafka and Redis already rely on.
+
+`MANAGEMENT_ADDRESS` defaults to `0.0.0.0`. Loopback inside the container made the worker's port
+unreachable from Prometheus and from kubelet's probes alike.
+
+In Kubernetes, `deploy/helm/railhook/templates/servicemonitor.yaml` scrapes the named
+`management` port; turn on the chart's `monitoring.*` values instead of running this stack.

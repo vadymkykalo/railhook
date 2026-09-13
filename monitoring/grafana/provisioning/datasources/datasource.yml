@@ -21,3 +21,15 @@ datasources:
     editable: false
     jsonData:
       maxLines: 1000
+
+  # Firing alerts and silences in Grafana's Alerting pages, so Alertmanager itself never
+  # needs a published port.
+  - name: Alertmanager
+    type: alertmanager
+    uid: railhook-alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    editable: false
+    jsonData:
+      implementation: prometheus
+      handleGrafanaManagedAlerts: false

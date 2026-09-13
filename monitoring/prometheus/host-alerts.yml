@@ -1,0 +1,311 @@
+# Railhook — alert rules for the host a Compose deployment runs on.
+#
+# Separate from alerts.yml on purpose: that file is the platform's rules and is held equal to
+# the Helm chart's PrometheusRule. These are about one Linux host and the containers on it —
+# node-exporter, cAdvisor, blackbox-exporter and the backup directory — which a Kubernetes
+# cluster answers with its own tooling.
+#
+# Metrics sources:
+#   - node_* (node-exporter), container_* (cAdvisor), probe_* (blackbox-exporter)
+#   - railhook_backup_* (backup-age sidecar, through node-exporter's textfile collector)
+
+groups:
+  - name: railhook.host
+    rules:
+      - alert: HostExporterDown
+        expr: |
+          up{job="node-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: host
+        annotations:
+          summary: "Host metrics are not being collected"
+          description: |
+            Prometheus cannot scrape node-exporter, so disk and memory alerts are blind. If the
+            whole host were down, this alert could not be sent at all — the uptime probes and
+            Cloudflare are what notice that.
+
+      # By device: one disk bind-mounted at several paths is one alert, not one per path.
+      - alert: HostDiskAlmostFull
+        expr: |
+          max by (instance, device) (
+            (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nsfs|fuse.*"}
+                  / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nsfs|fuse.*"}) * 100
+          ) > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: host
+        annotations:
+          summary: "Disk {{ $labels.device }} is {{ $value | printf \"%.0f\" }}% full"
+          description: |
+            Postgres, Kafka and the backups share this disk. Postgres stops accepting writes
+            when it is full, which stops every event from being accepted. Check backups/ and
+            `docker system df` first.
+
+      - alert: HostDiskCritical
+        expr: |
+          max by (instance, device) (
+            (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nsfs|fuse.*"}
+                  / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nsfs|fuse.*"}) * 100
+          ) > 95
+        for: 5m
+        labels:
+          severity: critical
+          component: host
+        annotations:
+          summary: "Disk {{ $labels.device }} is {{ $value | printf \"%.0f\" }}% full"
+          description: |
+            Minutes to hours before Postgres refuses writes. Free space now: prune old dumps in
+            backups/, `docker image prune`, or grow the volume.
+
+      - alert: HostMemoryHigh
+        expr: |
+          (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+          component: host
+        annotations:
+          summary: "Host memory is {{ $value | printf \"%.0f\" }}% used"
+          description: |
+            The kernel's OOM killer picks the largest process next, which is usually a JVM.
+            The Containers dashboard shows which container grew.
+
+      - alert: HostOomKill
+        expr: |
+          increase(node_vmstat_oom_kill[15m]) > 0
+        labels:
+          severity: warning
+          component: host
+        annotations:
+          summary: "The kernel killed a process for memory"
+          description: |
+            Something on the host ran out of memory in the last 15 minutes. Look for a
+            container that restarted in the same window.
+
+      - alert: HostLoadHigh
+        expr: |
+          sum by (instance) (node_load15)
+            / count by (instance) (node_cpu_seconds_total{mode="idle"}) > 1.5
+        for: 15m
+        labels:
+          severity: warning
+          component: host
+        annotations:
+          summary: "15-minute load is {{ $value | printf \"%.1f\" }}× the CPU count"
+          description: |
+            Sustained load above the core count means work is queueing for CPU — delivery
+            latency rises before anything fails.
+
+  - name: railhook.containers
+    rules:
+      # A restart policy restarts the same container, so its start time changes on the same
+      # series. A deploy replaces the container instead, which is a new series and does not
+      # count here.
+      - alert: ContainerRestarting
+        expr: |
+          changes(container_start_time_seconds{name!=""}[15m]) >= 2
+        labels:
+          severity: warning
+          component: containers
+        annotations:
+          summary: "{{ $labels.name }} restarted {{ $value }} times in 15 minutes"
+          description: |
+            A crash loop. `./railhook logs <service>` shows why; the Logs dashboard keeps the
+            output of the containers that already exited.
+
+      - alert: ContainerOomKilled
+        expr: |
+          increase(container_oom_events_total{name!=""}[15m]) > 0
+        labels:
+          severity: warning
+          component: containers
+        annotations:
+          summary: "{{ $labels.name }} hit its memory limit"
+          description: |
+            The container was killed at its Compose memory limit. Raise the limit in .env
+            (e.g. API_MEMORY_LIMIT) or find what grew.
+
+      - alert: ContainerMemoryNearLimit
+        expr: |
+          (container_memory_working_set_bytes{name!=""}
+            / (container_spec_memory_limit_bytes{name!=""} > 0)) * 100 > 90
+        for: 15m
+        labels:
+          severity: warning
+          component: containers
+        annotations:
+          summary: "{{ $labels.name }} is at {{ $value | printf \"%.0f\" }}% of its memory limit"
+          description: |
+            The next allocation spike is an OOM kill.
+
+  - name: railhook.uptime
+    rules:
+      - alert: PublicEndpointDown
+        expr: |
+          probe_success{job="blackbox-public"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          component: uptime
+        annotations:
+          summary: "{{ $labels.instance }} is failing from outside"
+          description: |
+            The probe goes through DNS, Cloudflare and Caddy like a customer does. If UiDown is
+            not firing too, the platform is up and the edge is the problem.
+
+      - alert: PublicEndpointSlow
+        expr: |
+          probe_duration_seconds{job="blackbox-public"} > 3
+        for: 10m
+        labels:
+          severity: warning
+          component: uptime
+        annotations:
+          summary: "{{ $labels.instance }} takes {{ $value | printf \"%.1f\" }}s to answer"
+
+      - alert: UiDown
+        expr: |
+          probe_success{job="blackbox-internal"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: ui
+        annotations:
+          summary: "The UI's nginx is not answering inside the network"
+          description: |
+            nginx is the single entry point for the dashboard and every API path, so this is an
+            outage for everything, /ingress included.
+
+      - alert: CaddyDown
+        expr: |
+          probe_success{job="blackbox-internal-tcp"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: caddy
+        annotations:
+          summary: "Caddy is not accepting connections on 443"
+          description: |
+            TLS terminates here, so nothing public reaches the platform. `./railhook logs caddy`.
+
+      - alert: TlsCertificateExpiringSoon
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 14
+        for: 1h
+        labels:
+          severity: warning
+          component: uptime
+        annotations:
+          summary: "The certificate for {{ $labels.instance }} expires in {{ $value | printf \"%.0f\" }} days"
+          description: |
+            Certificates renew on their own weeks before this. One that has not is a renewal
+            that is failing — check Caddy's log for ACME errors.
+
+      - alert: TlsCertificateExpiryImminent
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 3
+        for: 10m
+        labels:
+          severity: critical
+          component: uptime
+        annotations:
+          summary: "The certificate for {{ $labels.instance }} expires in {{ $value | printf \"%.1f\" }} days"
+
+  - name: railhook.backups
+    rules:
+      - alert: BackupStale
+        expr: |
+          time() - railhook_backup_newest_timestamp_seconds > 26 * 3600
+        for: 10m
+        labels:
+          severity: warning
+          component: backups
+        annotations:
+          summary: "The newest database backup is {{ $value | humanizeDuration }} old"
+          description: |
+            The db-backup sidecar dumps daily; nothing newer than 26 hours means a run failed or
+            the sidecar stopped. `./railhook logs db-backup`.
+
+      - alert: BackupMissing
+        expr: |
+          railhook_backup_files == 0
+        for: 26h
+        labels:
+          severity: warning
+          component: backups
+        annotations:
+          summary: "There are no scheduled database backups"
+          description: |
+            No webhook_platform_*.dump in the backup directory for over a day. Either scheduled
+            backups are off (COMPOSE_PROFILES without `backup`) or MONITORING_BACKUP_DIR points
+            at the wrong place.
+
+  # On series Loki's ruler records from the logs (loki/rules/railhook.yml).
+  - name: railhook.logs
+    rules:
+      - alert: ErrorLogSpike
+        expr: |
+          sum by (service) (railhook:log_lines:rate5m{level=~"error|fatal|panic|crit|alert|emerg"}) * 60 > 10
+        for: 10m
+        labels:
+          severity: warning
+          component: logs
+        annotations:
+          summary: "{{ $labels.service }} is logging {{ $value | printf \"%.0f\" }} errors a minute"
+          description: |
+            Sustained for ten minutes. The Errors dashboard lists the most frequent messages.
+
+      - alert: EdgeServerErrorSpike
+        expr: |
+          sum(railhook:nginx_responses:rate5m{status=~"5.."}) * 60 > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: ui
+        annotations:
+          summary: "nginx is answering {{ $value | printf \"%.0f\" }} 5xx a minute"
+          description: |
+            Counted at the entry point, so it includes the 502s and 504s of an API that was not
+            there to answer — which ApiErrorRateHigh, measured inside the API, cannot see.
+
+  - name: railhook.monitoring
+    rules:
+      # Always firing. Alertmanager sends it to ALERTMANAGER_HEARTBEAT_URL every minute; the
+      # service behind that URL mails you when the heartbeats stop. It is the only alert that
+      # can report this host — or this stack — being down, because every other one is sent
+      # from here.
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+          component: monitoring
+        annotations:
+          summary: "The alerting pipeline is working"
+
+      - alert: MonitoringComponentDown
+        expr: |
+          up{job=~"monitoring|cadvisor|blackbox-.*"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: monitoring
+        annotations:
+          summary: "{{ $labels.instance }} ({{ $labels.job }}) is down"
+          description: |
+            Part of the monitoring stack is not answering; the alerts that depend on it are
+            silent until it is back.
+
+      - alert: AlertmanagerNotificationsFailing
+        expr: |
+          increase(alertmanager_notifications_failed_total[15m]) > 0
+        labels:
+          severity: warning
+          component: monitoring
+        annotations:
+          summary: "Alertmanager could not deliver to {{ $labels.integration }}"
+          description: |
+            Alerts are firing and not arriving. `./railhook monitoring logs alertmanager` shows the
+            SMTP or API error.

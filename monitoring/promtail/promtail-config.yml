@@ -2,11 +2,22 @@
 #
 # Discovers containers via the Docker daemon (docker_sd_configs) rather than assuming
 # fixed container names — the main docker-compose.yml doesn't set container_name for
-# api/worker/ui, and this repo is routinely checked out into differently-named
+# api/worker, and this repo is routinely checked out into differently-named
 # directories (parallel-agent worktrees, forks, ...), which changes Compose's default
 # project name and therefore the generated container names. `com.docker.compose.service`
 # is a label Docker Compose sets on every container regardless of project name, so
-# relabeling on that is robust across all of those.
+# filtering on that is robust across all of those.
+#
+# One job per service, each filtered by the Docker API itself. A single job with a `keep`
+# relabel rule looked equivalent and was not: Promtail 3.0 went on tailing the containers
+# that rule dropped and pushed their lines with no labels at all, which Loki refused
+# ("at least one label pair is required per stream") about once a second — while reading
+# every log on the host, Kafka's included.
+#
+# Which services: api and worker for correlation-ID tracing; ui (nginx) and caddy because
+# a 502 is answered there, not in the API; postgres for the errors the API only reports as a
+# failed transaction; db-backup because a failed dump says why only in its log. Kafka and
+# Redis stay out: noisy, and rarely the question.
 
 server:
   http_listen_port: 9080
@@ -20,36 +31,45 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: railhook-containers
+  - job_name: api
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 15s
-    relabel_configs:
-      # Only ship logs for the two services correlation-ID tracing cares
-      # about — api and worker. (Postgres/Kafka/Redis/etc. logs aren't structured with
-      # the correlationId/organizationId MDC fields and would just add noise+cardinality
-      # for no query value; add more values to the regex here if that changes.)
-      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
-        regex: "api|worker"
-        action: keep
+        filters:
+          - name: label
+            values: ["com.docker.compose.service=api"]
+    relabel_configs: &relabel
       - source_labels: [__meta_docker_container_label_com_docker_compose_service]
         target_label: service
       - source_labels: [__meta_docker_container_name]
         regex: "/(.*)"
         target_label: container
-    pipeline_stages:
+    pipeline_stages: &pipeline
       # Unwraps the Docker JSON log-driver envelope ({"log":"...","stream":"stdout",
-      # "time":"..."}) to get at the actual line api/worker wrote.
+      # "time":"..."}) to get at the actual line the service wrote.
       - docker: {}
       # Production logs are single-line JSON (LogstashEncoder — see logback-spring.xml
-      # in both modules). Extract only `level` as a Loki *label* (low cardinality, useful
-      # for filtering/alerting on log volume by severity); correlationId/organizationId/
-      # userId/projectId/deliveryId/etc. deliberately stay unindexed in the line body —
-      # promoting per-request/per-tenant IDs to labels would blow up Loki's index
-      # cardinality. Query them with `| json` at query time instead — see
+      # in both modules; Caddy logs JSON too). Extract only `level` as a Loki *label*
+      # (low cardinality, useful for filtering/alerting on log volume by severity);
+      # correlationId/organizationId/userId/projectId/deliveryId/etc. deliberately stay
+      # unindexed in the line body — promoting per-request/per-tenant IDs to labels would
+      # blow up Loki's index cardinality. Query them with `| json` at query time instead.
       - json:
           expressions:
             level: level
+      # The two plain-text services get a level too, so one filter covers every service.
+      # Postgres: "... [123] ERROR:  message". nginx's error log: "... [error] 12#12: ...";
+      # its access log lines carry no level and stay without one.
+      - match:
+          selector: '{service="postgres"}'
+          stages:
+            - regex:
+                expression: '\b(?P<level>DEBUG\d?|LOG|INFO|NOTICE|WARNING|ERROR|FATAL|PANIC):\s'
+      - match:
+          selector: '{service="ui"}'
+          stages:
+            - regex:
+                expression: '\[(?P<level>debug|info|notice|warn|error|crit|alert|emerg)\]'
       - labels:
           level:
       # Dev-mode (non-production profile) logs are plain text, not JSON — the `json`
@@ -60,3 +80,53 @@ scrape_configs:
       # when it was never set) so it never gets indexed.
       - labeldrop:
           - __error__
+
+  - job_name: worker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+        filters:
+          - name: label
+            values: ["com.docker.compose.service=worker"]
+    relabel_configs: *relabel
+    pipeline_stages: *pipeline
+
+  - job_name: ui
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+        filters:
+          - name: label
+            values: ["com.docker.compose.service=ui"]
+    relabel_configs: *relabel
+    pipeline_stages: *pipeline
+
+  - job_name: caddy
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+        filters:
+          - name: label
+            values: ["com.docker.compose.service=caddy"]
+    relabel_configs: *relabel
+    pipeline_stages: *pipeline
+
+  - job_name: postgres
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+        filters:
+          - name: label
+            values: ["com.docker.compose.service=postgres"]
+    relabel_configs: *relabel
+    pipeline_stages: *pipeline
+
+  - job_name: db-backup
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+        filters:
+          - name: label
+            values: ["com.docker.compose.service=db-backup"]
+    relabel_configs: *relabel
+    pipeline_stages: *pipeline

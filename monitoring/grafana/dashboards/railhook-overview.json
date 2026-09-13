@@ -1,328 +1,1517 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [
+        "railhook"
+      ],
+      "targetBlank": false,
+      "title": "Railhook",
+      "type": "dashboards"
+    }
+  ],
   "panels": [
     {
+      "id": 106,
+      "type": "row",
+      "title": "Host & uptime",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 107,
+      "type": "stat",
+      "title": "Public site",
+      "description": "Every public URL probe succeeding. Uptime dashboard for the breakdown.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "railhook-prometheus"
+          },
+          "expr": "min(probe_success{job=\"blackbox-public\"})",
+          "refId": "A",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 108,
+      "type": "stat",
+      "title": "Firing alerts",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "railhook-prometheus"
+          },
+          "expr": "count(ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\"}) or vector(0)",
+          "refId": "A",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "links": [
+        {
+          "title": "Alerts",
+          "url": "/d/railhook-alerts"
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "type": "stat",
+      "title": "Disk used (fullest)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "railhook-prometheus"
+          },
+          "expr": "max((1 - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|nsfs|fuse.*\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|nsfs|fuse.*\"}) * 100)",
+          "refId": "A",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 110,
+      "type": "stat",
+      "title": "Memory used",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "railhook-prometheus"
+          },
+          "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100",
+          "refId": "A",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 80
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 111,
+      "type": "stat",
+      "title": "CPU used",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "railhook-prometheus"
+          },
+          "expr": "(1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[$__rate_interval]))) * 100",
+          "refId": "A",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 112,
+      "type": "stat",
+      "title": "Newest backup age",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "railhook-prometheus"
+          },
+          "expr": "time() - railhook_backup_newest_timestamp_seconds",
+          "refId": "A",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 93600
+              },
+              {
+                "color": "red",
+                "value": 172800
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
       "id": 100,
       "title": "Platform Health",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.5 }] },
-          "mappings": [{ "options": { "0": { "text": "UP" }, "1": { "text": "DOWN" } }, "type": "value" }]
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "thresholds"
+          }
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 6
+      },
       "id": 1,
-      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [{ "expr": "up{job=\"railhook-api\"}", "legendFormat": "API" }],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"railhook-api\"}",
+          "legendFormat": "API"
+        }
+      ],
       "title": "API Status",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.5 }] },
-          "mappings": [{ "options": { "0": { "text": "UP" }, "1": { "text": "DOWN" } }, "type": "value" }]
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "thresholds"
+          }
         }
       },
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 6
+      },
       "id": 2,
-      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [{ "expr": "up{job=\"railhook-worker\"}", "legendFormat": "Worker" }],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"railhook-worker\"}",
+          "legendFormat": "Worker"
+        }
+      ],
       "title": "Worker Status",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "unit": "reqps", "thresholds": { "steps": [{ "color": "blue", "value": null }] } }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 6
+      },
       "id": 3,
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [{ "expr": "sum(rate(http_server_requests_seconds_count{job=\"railhook-api\"}[5m]))", "legendFormat": "req/s" }],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"railhook-api\"}[5m]))",
+          "legendFormat": "req/s"
+        }
+      ],
       "title": "API Request Rate",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "unit": "percentunit", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.001 }, { "color": "red", "value": 0.01 }] } }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.001
+              },
+              {
+                "color": "red",
+                "value": 0.01
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 6
+      },
       "id": 4,
-      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [{ "expr": "sum(rate(http_server_requests_seconds_count{job=\"railhook-api\",status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=\"railhook-api\"}[5m]))", "legendFormat": "5xx rate" }],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"railhook-api\",status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=\"railhook-api\"}[5m]))",
+          "legendFormat": "5xx rate"
+        }
+      ],
       "title": "API 5xx Error Rate",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "unit": "s", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.5 }, { "color": "red", "value": 2 }] } }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 6
+      },
       "id": 5,
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=\"railhook-api\"}[5m])) by (le))", "legendFormat": "p95" }],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=\"railhook-api\"}[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
       "title": "API Latency p95",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }] } } },
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 6
+      },
       "id": 6,
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [{ "expr": "sum(rate(events_ingested_total{job=\"railhook-api\"}[5m])) * 60", "legendFormat": "events/min" }],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(events_ingested_total{job=\"railhook-api\"}[5m])) * 60",
+          "legendFormat": "events/min"
+        }
+      ],
       "title": "Events Ingested / min",
       "type": "stat"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
       "id": 101,
       "title": "Delivery Pipeline",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "pointSize": 5 }, "unit": "short" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "pointSize": 5
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 11
+      },
       "id": 10,
-      "options": { "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "expr": "delivery_queue_depth{status=\"pending\"}", "legendFormat": "Pending" },
-        { "expr": "delivery_queue_depth{status=\"processing\"}", "legendFormat": "Processing" },
-        { "expr": "delivery_queue_depth{status=\"dlq\"}", "legendFormat": "DLQ" }
+        {
+          "expr": "delivery_queue_depth{status=\"pending\"}",
+          "legendFormat": "Pending"
+        },
+        {
+          "expr": "delivery_queue_depth{status=\"processing\"}",
+          "legendFormat": "Processing"
+        },
+        {
+          "expr": "delivery_queue_depth{status=\"dlq\"}",
+          "legendFormat": "DLQ"
+        }
       ],
       "title": "Delivery Queue Depth",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "ops" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2
+          },
+          "unit": "ops"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 11
+      },
       "id": 11,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "expr": "sum(rate(webhook_delivery_attempts_total{result=\"success\"}[5m]))", "legendFormat": "Success" },
-        { "expr": "sum(rate(webhook_delivery_attempts_total{result=\"failure\"}[5m]))", "legendFormat": "Failure" },
-        { "expr": "sum(rate(webhook_delivery_attempts_total{result=\"error\"}[5m]))", "legendFormat": "Error" }
+        {
+          "expr": "sum(rate(webhook_delivery_attempts_total{result=\"success\"}[5m]))",
+          "legendFormat": "Success"
+        },
+        {
+          "expr": "sum(rate(webhook_delivery_attempts_total{result=\"failure\"}[5m]))",
+          "legendFormat": "Failure"
+        },
+        {
+          "expr": "sum(rate(webhook_delivery_attempts_total{result=\"error\"}[5m]))",
+          "legendFormat": "Error"
+        }
       ],
       "title": "Delivery Attempt Rate",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "s" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
       "id": 12,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "expr": "delivery_oldest_pending_age_seconds", "legendFormat": "Oldest Pending Age" }
+        {
+          "expr": "delivery_oldest_pending_age_seconds",
+          "legendFormat": "Oldest Pending Age"
+        }
       ],
       "title": "Oldest Pending Delivery Age",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 1 }, "unit": "short" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
       "id": 13,
-      "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "expr": "sum(increase(delivery_attempts_cleanup_total[1h])) by (type)", "legendFormat": "{{type}}" }
+        {
+          "expr": "sum(increase(delivery_attempts_cleanup_total[1h])) by (type)",
+          "legendFormat": "{{type}}"
+        }
       ],
       "title": "Cleanup Deleted (per hour)",
       "type": "timeseries"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
       "id": 102,
       "title": "Data Retention & Table Growth",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "short" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
       "id": 20,
-      "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "expr": "delivery_attempts_table_rows", "legendFormat": "delivery_attempts" },
-        { "expr": "incoming_events_table_rows", "legendFormat": "incoming_events" }
+        {
+          "expr": "delivery_attempts_table_rows",
+          "legendFormat": "delivery_attempts"
+        },
+        {
+          "expr": "incoming_events_table_rows",
+          "legendFormat": "incoming_events"
+        }
       ],
       "title": "Table Estimated Row Counts",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1000000 }, { "color": "red", "value": 10000000 }] } }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 23 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000000
+              },
+              {
+                "color": "red",
+                "value": 10000000
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 28
+      },
       "id": 21,
-      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [{ "expr": "delivery_attempts_total", "legendFormat": "Total Attempts" }],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "delivery_attempts_total",
+          "legendFormat": "Total Attempts"
+        }
+      ],
       "title": "Total Delivery Attempts",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }] } } },
-      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 23 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 28
+      },
       "id": 22,
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
-        { "expr": "outbox_queue_depth{status=\"pending\"}", "legendFormat": "Pending" },
-        { "expr": "outbox_queue_depth{status=\"failed\"}", "legendFormat": "Failed" },
-        { "expr": "outbox_queue_depth{status=\"dead\"}", "legendFormat": "Dead" }
+        {
+          "expr": "outbox_queue_depth{status=\"pending\"}",
+          "legendFormat": "Pending"
+        },
+        {
+          "expr": "outbox_queue_depth{status=\"failed\"}",
+          "legendFormat": "Failed"
+        },
+        {
+          "expr": "outbox_queue_depth{status=\"dead\"}",
+          "legendFormat": "Dead"
+        }
       ],
       "title": "Outbox Queue Depth",
       "type": "stat"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
       "id": 103,
       "title": "Billing Reconciliation",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 1 }, "unit": "short" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 32 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 37
+      },
       "id": 30,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "expr": "increase(billing_reconciliation_fixes_total[6h])", "legendFormat": "Fixes" },
-        { "expr": "increase(billing_reconciliation_errors_total[6h])", "legendFormat": "Errors" }
+        {
+          "expr": "increase(billing_reconciliation_fixes_total[6h])",
+          "legendFormat": "Fixes"
+        },
+        {
+          "expr": "increase(billing_reconciliation_errors_total[6h])",
+          "legendFormat": "Errors"
+        }
       ],
       "title": "Billing Reconciliation (per 6h)",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 1 }, "unit": "short" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 32 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 37
+      },
       "id": 31,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "expr": "increase(circuit_breaker_state_transitions_total[1h])", "legendFormat": "CB Trips" },
-        { "expr": "increase(circuit_breaker_slow_trips_total[1h])", "legendFormat": "Slow Trips" },
-        { "expr": "increase(circuit_breaker_rejected_total[1h])", "legendFormat": "Rejected" }
+        {
+          "expr": "increase(circuit_breaker_state_transitions_total[1h])",
+          "legendFormat": "CB Trips"
+        },
+        {
+          "expr": "increase(circuit_breaker_slow_trips_total[1h])",
+          "legendFormat": "Slow Trips"
+        },
+        {
+          "expr": "increase(circuit_breaker_rejected_total[1h])",
+          "legendFormat": "Rejected"
+        }
       ],
       "title": "Circuit Breaker Activity (per hour)",
       "type": "timeseries"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
       "id": 104,
       "title": "Outbox Publisher",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2 }, "unit": "short" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 39 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 2
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 44
+      },
       "id": 40,
-      "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "expr": "outbox_queue_depth{status=\"pending\"}", "legendFormat": "Pending" },
-        { "expr": "outbox_queue_depth{status=\"failed\"}", "legendFormat": "Failed" },
-        { "expr": "outbox_queue_depth{status=\"dead\"}", "legendFormat": "Dead" }
+        {
+          "expr": "outbox_queue_depth{status=\"pending\"}",
+          "legendFormat": "Pending"
+        },
+        {
+          "expr": "outbox_queue_depth{status=\"failed\"}",
+          "legendFormat": "Failed"
+        },
+        {
+          "expr": "outbox_queue_depth{status=\"dead\"}",
+          "legendFormat": "Dead"
+        }
       ],
       "title": "Outbox Queue Depth",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "s" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 39 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 44
+      },
       "id": 41,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "expr": "outbox_oldest_pending_age_seconds", "legendFormat": "Oldest Pending Age" },
-        { "expr": "rate(outbox_publish_latency_seconds_sum[5m]) / rate(outbox_publish_latency_seconds_count[5m])", "legendFormat": "Avg Publish Latency" }
+        {
+          "expr": "outbox_oldest_pending_age_seconds",
+          "legendFormat": "Oldest Pending Age"
+        },
+        {
+          "expr": "rate(outbox_publish_latency_seconds_sum[5m]) / rate(outbox_publish_latency_seconds_count[5m])",
+          "legendFormat": "Avg Publish Latency"
+        }
       ],
       "title": "Outbox Publish Latency & Staleness",
       "type": "timeseries"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 47 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
       "id": 105,
       "title": "Event Ingestion",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "ops" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2
+          },
+          "unit": "ops"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 53
+      },
       "id": 50,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "expr": "sum(rate(events_ingested_total[5m]))", "legendFormat": "Ingested/s" },
-        { "expr": "sum(rate(events_duplicate_total[5m]))", "legendFormat": "Duplicates/s" },
-        { "expr": "sum(rate(events_fanout_limited_total[5m]))", "legendFormat": "Fanout Limited/s" }
+        {
+          "expr": "sum(rate(events_ingested_total[5m]))",
+          "legendFormat": "Ingested/s"
+        },
+        {
+          "expr": "sum(rate(events_duplicate_total[5m]))",
+          "legendFormat": "Duplicates/s"
+        },
+        {
+          "expr": "sum(rate(events_fanout_limited_total[5m]))",
+          "legendFormat": "Fanout Limited/s"
+        }
       ],
       "title": "Event Ingestion Rate",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "railhook-prometheus" },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "ops" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "railhook-prometheus"
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2
+          },
+          "unit": "ops"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 53
+      },
       "id": 51,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
       "targets": [
-        { "expr": "sum(rate(deliveries_created_total[5m]))", "legendFormat": "Deliveries Created/s" },
-        { "expr": "sum(rate(rules_matched_total[5m]))", "legendFormat": "Rules Matched/s" },
-        { "expr": "sum(rate(rules_drop_total[5m]))", "legendFormat": "Rules Dropped/s" }
+        {
+          "expr": "sum(rate(deliveries_created_total[5m]))",
+          "legendFormat": "Deliveries Created/s"
+        },
+        {
+          "expr": "sum(rate(rules_matched_total[5m]))",
+          "legendFormat": "Rules Matched/s"
+        },
+        {
+          "expr": "sum(rate(rules_drop_total[5m]))",
+          "legendFormat": "Rules Dropped/s"
+        }
       ],
       "title": "Deliveries & Rules",
       "type": "timeseries"
     }
   ],
   "schemaVersion": 39,
-  "tags": ["railhook", "overview"],
-  "templating": { "list": [] },
-  "time": { "from": "now-6h", "to": "now" },
+  "tags": [
+    "railhook",
+    "overview"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "title": "Railhook — Overview",

@@ -1646,19 +1646,78 @@
       ]
     },
     {
+      "title": "Monitoring stack (monitoring/ — see monitoring/README.md) — optional",
+      "variables": [
+        {
+          "name": "GRAFANA_ADMIN_PASSWORD",
+          "default": "",
+          "example": null,
+          "description": "Prometheus, Alertmanager, Grafana, Loki, node-exporter, cAdvisor and\nblackbox-exporter, as a second Compose project: `./railhook monitoring up` on an\ninstall.sh deployment, `make monitoring-up` in a clone. Nothing below does\nanything until it is started. Only Grafana is published, on loopback.\n\nGrafana's admin password. Required: the stack refuses to start without it, or\nwith anything shorter than 16 characters. Generate one with\n`openssl rand -base64 24`. It is re-applied on every start, so changing it\nhere and running `./railhook monitoring up` changes it in Grafana too."
+        },
+        {
+          "name": "GRAFANA_ADMIN_USER",
+          "default": "admin",
+          "example": null,
+          "description": "Grafana's admin login."
+        },
+        {
+          "name": "GRAFANA_PORT",
+          "default": "3001",
+          "example": null,
+          "description": "The loopback port Grafana is published on, for an SSH tunnel."
+        },
+        {
+          "name": "MONITORING_DOMAIN",
+          "default": "",
+          "example": null,
+          "description": "A host name to serve Grafana on through the built-in Caddy, e.g.\ngrafana.example.com. Empty keeps it loopback-only. Point DNS at this host and\nput an identity-aware proxy (Cloudflare Access, for one) in front: Grafana's\nlogin alone should not be what stands between the internet and your logs."
+        },
+        {
+          "name": "MONITORING_PROBE_URLS",
+          "default": "",
+          "example": null,
+          "description": "URLs the uptime probes request from outside, comma-separated. Empty probes\nhttps://RAILHOOK_DOMAIN/, /docs/ and /actuator/health when a domain is set."
+        },
+        {
+          "name": "RAILHOOK_NETWORK",
+          "default": "",
+          "example": null,
+          "description": "The platform's Docker network the stack joins. Empty finds it by its Compose\nlabel; set it only if that finds the wrong one."
+        },
+        {
+          "name": "MONITORING_BACKUP_DIR",
+          "default": "../backups",
+          "example": null,
+          "description": "The directory the scheduled backups are written to, as seen from monitoring/.\nThe BackupStale alert reads the newest dump's age from here."
+        },
+        {
+          "name": "PROMETHEUS_RETENTION",
+          "default": "15d",
+          "example": null,
+          "description": "How long Prometheus keeps metrics, and the disk it may use for them."
+        },
+        {
+          "name": "PROMETHEUS_RETENTION_SIZE",
+          "default": "4GB",
+          "example": null,
+          "description": "How long Prometheus keeps metrics, and the disk it may use for them."
+        }
+      ]
+    },
+    {
       "title": "Alerting (monitoring/alertmanager — see monitoring/README.md) — optional",
       "variables": [
         {
           "name": "ALERTMANAGER_SLACK_WEBHOOK_URL",
           "default": "",
           "example": null,
-          "description": "Consumed by monitoring/alertmanager/alertmanager.yml via envsubst at\ncontainer start (see monitoring/docker-compose.yml). Leave unset and\nAlertmanager still runs — alerts just land only in its own UI\n(http://localhost:9093) and the null \"blackhole\" receiver, which is exactly\nas useless as having no Alertmanager, so set at least one of these for a real\ndeployment.\n\nSlack: an \"Incoming Webhook\" URL from https://api.slack.com/messaging/webhooks"
+          "description": "Rendered into Alertmanager's config at container start\n(monitoring/alertmanager/render-config.sh). Leave every receiver unset and\nAlertmanager still runs, but alerts reach only Grafana's Alerting page — set at\nleast one for a real deployment.\n\nSlack: an \"Incoming Webhook\" URL from https://api.slack.com/messaging/webhooks"
         },
         {
           "name": "ALERTMANAGER_SLACK_CHANNEL",
           "default": "#railhook-alerts",
           "example": null,
-          "description": "Consumed by monitoring/alertmanager/alertmanager.yml via envsubst at\ncontainer start (see monitoring/docker-compose.yml). Leave unset and\nAlertmanager still runs — alerts just land only in its own UI\n(http://localhost:9093) and the null \"blackhole\" receiver, which is exactly\nas useless as having no Alertmanager, so set at least one of these for a real\ndeployment.\n\nSlack: an \"Incoming Webhook\" URL from https://api.slack.com/messaging/webhooks"
+          "description": "Rendered into Alertmanager's config at container start\n(monitoring/alertmanager/render-config.sh). Leave every receiver unset and\nAlertmanager still runs, but alerts reach only Grafana's Alerting page — set at\nleast one for a real deployment.\n\nSlack: an \"Incoming Webhook\" URL from https://api.slack.com/messaging/webhooks"
         },
         {
           "name": "ALERTMANAGER_WEBHOOK_URL",
@@ -1670,25 +1729,67 @@
           "name": "ALERTMANAGER_EMAIL_TO",
           "default": "",
           "example": null,
-          "description": "Email receiver — set these to the same values as SMTP_* above if you want\nalert emails to go through the same relay as transactional email"
+          "description": "Email receiver: where alert mail goes. The sender and relay default to the\nEMAIL_FROM and SMTP_* settings above, so alerts go through the relay the\nplatform already sends with; set the ALERTMANAGER_ ones only to use another."
         },
         {
           "name": "ALERTMANAGER_EMAIL_FROM",
-          "default": "alerts@example.com",
+          "default": "",
           "example": null,
-          "description": "Email receiver — set these to the same values as SMTP_* above if you want\nalert emails to go through the same relay as transactional email"
+          "description": "Email receiver: where alert mail goes. The sender and relay default to the\nEMAIL_FROM and SMTP_* settings above, so alerts go through the relay the\nplatform already sends with; set the ALERTMANAGER_ ones only to use another."
         },
         {
           "name": "ALERTMANAGER_SMTP_HOST",
-          "default": "localhost",
+          "default": "",
           "example": null,
-          "description": "Email receiver — set these to the same values as SMTP_* above if you want\nalert emails to go through the same relay as transactional email"
+          "description": "Email receiver: where alert mail goes. The sender and relay default to the\nEMAIL_FROM and SMTP_* settings above, so alerts go through the relay the\nplatform already sends with; set the ALERTMANAGER_ ones only to use another."
         },
         {
           "name": "ALERTMANAGER_SMTP_PORT",
-          "default": "1025",
+          "default": "",
           "example": null,
-          "description": "Email receiver — set these to the same values as SMTP_* above if you want\nalert emails to go through the same relay as transactional email"
+          "description": "Email receiver: where alert mail goes. The sender and relay default to the\nEMAIL_FROM and SMTP_* settings above, so alerts go through the relay the\nplatform already sends with; set the ALERTMANAGER_ ones only to use another."
+        },
+        {
+          "name": "ALERTMANAGER_SMTP_USERNAME",
+          "default": "",
+          "example": null,
+          "description": "Email receiver: where alert mail goes. The sender and relay default to the\nEMAIL_FROM and SMTP_* settings above, so alerts go through the relay the\nplatform already sends with; set the ALERTMANAGER_ ones only to use another."
+        },
+        {
+          "name": "ALERTMANAGER_SMTP_PASSWORD",
+          "default": "",
+          "example": null,
+          "description": "Email receiver: where alert mail goes. The sender and relay default to the\nEMAIL_FROM and SMTP_* settings above, so alerts go through the relay the\nplatform already sends with; set the ALERTMANAGER_ ones only to use another."
+        },
+        {
+          "name": "ALERTMANAGER_SMTP_REQUIRE_TLS",
+          "default": "",
+          "example": null,
+          "description": "true or false. Empty means TLS for any relay except localhost, mailpit and\nmailhog. Port 465 is implicit TLS either way."
+        },
+        {
+          "name": "ALERTMANAGER_TELEGRAM_BOT_TOKEN",
+          "default": "",
+          "example": null,
+          "description": "Telegram: a bot token from @BotFather and the numeric chat id to post to\n(negative for a group or channel). Both, or Telegram stays off."
+        },
+        {
+          "name": "ALERTMANAGER_TELEGRAM_CHAT_ID",
+          "default": "",
+          "example": null,
+          "description": "Telegram: a bot token from @BotFather and the numeric chat id to post to\n(negative for a group or channel). Both, or Telegram stays off."
+        },
+        {
+          "name": "ALERTMANAGER_HEARTBEAT_URL",
+          "default": "",
+          "example": null,
+          "description": "A heartbeat ping URL (healthchecks.io, Better Stack, Cronitor, …). The always-firing\nWatchdog alert is POSTed here every minute, and that service alerts you when the\npings stop — the one way to hear about this host being down, since every other\nalert is sent from it."
+        },
+        {
+          "name": "ALERTMANAGER_EXTERNAL_URL",
+          "default": "http://localhost:9093",
+          "example": null,
+          "description": "The URL alert messages link back to. Alertmanager is not published, so the\ndefault only works through an SSH tunnel."
         }
       ]
     },
@@ -1697,9 +1798,9 @@
       "variables": [
         {
           "name": "LOKI_RETENTION_PERIOD",
-          "default": "336h",
+          "default": "168h",
           "example": null,
-          "description": "How long Loki keeps ingested log lines before compacting them away (Go duration,\ne.g. 336h = 14d). Independent of the DATA_RETENTION_* days above — those govern\nPostgres tables, this governs the separate log store, so a self-hoster's disk\ndoesn't fill silently."
+          "description": "How long Loki keeps ingested log lines before compacting them away (Go duration,\ne.g. 168h = 7d). Independent of the DATA_RETENTION_* days above — those govern\nPostgres tables, this governs the separate log store, so a self-hoster's disk\ndoesn't fill silently."
         }
       ]
     },

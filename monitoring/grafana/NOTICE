@@ -1,0 +1,16 @@
+Third-party material in monitoring/grafana
+==========================================
+
+dashboards/node-exporter-full.json
+  "Node Exporter Full" by Ricardo F. (rfmoz)
+  https://github.com/rfmoz/grafana-dashboards
+  Vendored from commit 99a25cc154c21c4fcbae1aa24352bf1b6764d847,
+  prometheus/node-exporter-full.json.
+  Licensed under the Apache License, Version 2.0:
+  https://www.apache.org/licenses/LICENSE-2.0
+
+  Changes: uid set to railhook-host, title, tags and links set for this stack,
+  the datasource variable pinned to the provisioned Prometheus and hidden, and
+  the __requires import block removed. The panels and queries are unchanged.
+
+Everything else in this directory is part of Railhook and under its licence.
