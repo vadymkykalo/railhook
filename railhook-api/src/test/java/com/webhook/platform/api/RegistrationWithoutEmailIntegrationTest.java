@@ -85,7 +85,7 @@ public class RegistrationWithoutEmailIntegrationTest extends AbstractIntegration
     }
 
     @Test
-    public void aNewOrganizationStartsWithItsFirstProject() throws Exception {
+    public void aPasswordRegistrationNamesItsOwnFirstProject() throws Exception {
         RegisterRequest request = RegisterRequest.builder()
                 .email("firstproject@example.com")
                 .password("Test1234!")
@@ -99,13 +99,11 @@ public class RegistrationWithoutEmailIntegrationTest extends AbstractIntegration
                 .andReturn().getResponse().getContentAsString();
         String accessToken = objectMapper.readTree(body).get("accessToken").asText();
 
-        // Every section of the dashboard is scoped to a project. An account that starts with none
-        // lands on a sidebar where nothing leads anywhere until it has worked out that a project
-        // is the thing to make first.
+        // Someone who filled in the form names their first project themselves; the dashboard's
+        // setup state leads them to it. Only a Google sign-up, which asked them nothing, gets one.
         mockMvc.perform(get("/api/v1/projects").header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].name").value("My first project"));
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test

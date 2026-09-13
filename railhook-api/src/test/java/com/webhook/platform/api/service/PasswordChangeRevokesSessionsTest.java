@@ -61,8 +61,7 @@ class PasswordChangeRevokesSessionsTest {
     void setUp() {
         authService = new AuthService(userRepository, organizationRepository, membershipRepository,
                 planRepository, jwtUtil, new BCryptPasswordEncoder(4), tokenBlacklistService,
-                userSessionService, accountLockoutService, emailService,
-                org.mockito.Mockito.mock(ProjectService.class), false);
+                userSessionService, accountLockoutService, emailService, false);
 
         user = new User();
         user.setId(UUID.randomUUID());

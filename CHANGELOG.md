@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **A new account starts with a project.** Registration and Google sign-up create "My first
-  project", so the dashboard opens ready to use. Without a project, every sidebar section still
+- **A first project for Google sign-ups, a way in for everyone else.** An account created with
+  "Continue with Google" starts with "My first project", so the dashboard opens ready to use; one
+  registered with a password names its own first project. Without a project, every sidebar section still
   opens: it says what it is for and offers "Create project", then continues to that section. The
   overview shows a getting-started checklist.
 - **Platform admin panel** (`/admin/platform`) for operators whose verified email is in

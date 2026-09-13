@@ -47,17 +47,20 @@ public class ExternalSignInService {
     private final SignInHandoffRepository signInHandoffRepository;
     private final UserSessionService userSessionService;
     private final AuthService authService;
+    private final ProjectService projectService;
 
     public ExternalSignInService(UserRepository userRepository,
                                  UserIdentityRepository userIdentityRepository,
                                  SignInHandoffRepository signInHandoffRepository,
                                  UserSessionService userSessionService,
-                                 AuthService authService) {
+                                 AuthService authService,
+                                 ProjectService projectService) {
         this.userRepository = userRepository;
         this.userIdentityRepository = userIdentityRepository;
         this.signInHandoffRepository = signInHandoffRepository;
         this.userSessionService = userSessionService;
         this.authService = authService;
+        this.projectService = projectService;
     }
 
     /**
@@ -129,7 +132,9 @@ public class ExternalSignInService {
                 .status(UserStatus.ACTIVE)
                 .emailVerified(true)
                 .build());
-        authService.createOrganizationOwnedBy(user, organizationName);
+        // Nothing was asked of this person but a click, so the dashboard opens with a project to
+        // work in. A password registration names its own; the setup state leads it there.
+        projectService.createFirstProject(authService.createOrganizationOwnedBy(user, organizationName));
         link(user.getId(), identity);
         log.info("Created account {} through {}", user.getId(), identity.provider());
         return user.getId();

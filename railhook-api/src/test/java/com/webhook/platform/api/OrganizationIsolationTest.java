@@ -86,19 +86,14 @@ public class OrganizationIsolationTest extends AbstractIntegrationTest {
         // confirm the id exists.
                 .andExpect(status().isNotFound());
 
-        // Every registration starts with a project of its own, so each list holds that one plus
-        // whatever the organization created — and never the other organization's.
         mockMvc.perform(get("/api/v1/projects")
                         .header("Authorization", "Bearer " + user1Auth.getAccessToken()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[*].id", org.hamcrest.Matchers.hasItem(project.getId().toString())));
+                .andExpect(jsonPath("$.length()").value(1));
 
         mockMvc.perform(get("/api/v1/projects")
                         .header("Authorization", "Bearer " + user2Auth.getAccessToken()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[*].id", org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.hasItem(project.getId().toString()))));
+                .andExpect(jsonPath("$.length()").value(0));
     }
 }
