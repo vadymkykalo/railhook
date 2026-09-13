@@ -233,7 +233,7 @@ sequenceDiagram
 
     App->>API: POST /api/v1/events
     API->>DB: INSERT Event + one Delivery per matching Subscription<br/>+ Outbox row — one transaction
-    API-->>App: 202 Accepted
+    API-->>App: 201 Created
 
     Note over API,DB: The Outbox row is written in the same breath as the work,<br/>so the two cannot disagree about whether it happened.
 
@@ -562,7 +562,7 @@ is the Delivery id and does not change between Attempts, and why receivers are t
 it.
 
 **The Outbox makes acceptance and announcement agree.** The Event, its Deliveries and the Outbox
-row are one transaction. Either the customer got a 202 and the work will be announced, or they
+row are one transaction. Either the customer got a 201 and the work will be announced, or they
 got an error and none of it exists. A separate announcer polls the Outbox — so Kafka being down
 delays delivery and never loses an accepted Event.
 

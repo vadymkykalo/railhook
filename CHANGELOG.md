@@ -21,9 +21,10 @@ A new site, docs you can navigate, and one install command on the project's own 
   settings on your domain, the dashboard on loopback, no TLS terminator — nothing left to edit
   in `.env` by hand.
 - **New look across the product**: white ground, cobalt accent, Manrope and Onest. The landing
-  page puts Railhook Cloud (free right now) and the self-hosted install side by side, and ends
-  with a developer section: sending an event in Node.js, Python, PHP and cURL, and links to the
-  docs, the API reference and Standard Webhooks.
+  page puts Railhook Cloud (free right now) and the self-hosted install side by side, shows what
+  Railhook is built on (sources → API → Kafka → worker → endpoints, over PostgreSQL and Redis),
+  and ends with a developer section: sending an event in Node.js, Python, PHP and cURL, and
+  links to the docs, the API reference and Standard Webhooks.
 - **`curl -fsSL https://railhook.io/install-cli.sh | bash`** installs the CLI; every UI image
   serves it next to `/install.sh`.
 - **`scripts/seed-demo.sh`** seeds a believable demo project — endpoints, subscriptions, sources,
