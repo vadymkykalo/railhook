@@ -283,10 +283,14 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
                 .isEqualTo(ADMIN_EMAIL);
 
         // The write is recorded against the organization acted on — where its owners will look —
-        // and not against the admin's own organization, which had nothing to do with it.
+        // and not against the admin's own organization, which had nothing to do with it. Only the
+        // suspension's own rows: registering gave the admin a first project, audited in their
+        // organization as it should be.
+        java.util.Set<String> suspensionActions = java.util.Set.of("ORGANIZATION_SUSPENDED", "PLATFORM_ADMIN_ACCESS");
         List<AuditLog> written = awaitAudit(() -> TenantContext.callAsSystem(() -> auditLogRepository.findAll()
                 .stream()
                 .filter(a -> admin.userId().equals(a.getUserId()))
+                .filter(a -> suspensionActions.contains(a.getAction()))
                 .toList()), 2);
 
         assertThat(written).anySatisfy(row -> {
