@@ -165,7 +165,9 @@ def parse_rules(text):
                 block = []
                 i += 1
                 while i < len(lines) and (not lines[i].strip() or len(lines[i]) - len(lines[i].lstrip()) > indent):
-                    block.append(lines[i].strip())
+                    # PromQL allows `#` comments; joined onto one line they would swallow the query.
+                    if not lines[i].strip().startswith("#"):
+                        block.append(lines[i].strip())
                     i += 1
                 yield name, " ".join(part for part in block if part)
                 continue

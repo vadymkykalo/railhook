@@ -133,6 +133,27 @@ describe('monitoring/docker-compose.yml', () => {
   });
 });
 
+describe('the Containers dashboard', () => {
+  type Panel = { title: string; targets?: Array<{ expr: string; refId: string }>; fieldConfig?: { defaults?: { unit?: string } } };
+  const panels = (JSON.parse(read('monitoring/grafana/dashboards/railhook-containers.json')).panels as Panel[]);
+  const panel = (title: string) => panels.find((p) => p.title === title)!;
+
+  it('shows CPU as a share of the host, not a count of cores rounded to 0.00', () => {
+    for (const title of ['CPU, all containers', 'CPU by container']) {
+      expect(panel(title).targets![0].expr, title).toMatch(/\/ scalar\(count\(node_cpu_seconds_total\{mode="idle"\}\)\) \* 100$/);
+      expect(panel(title).fieldConfig?.defaults?.unit, title).toBe('percent');
+    }
+  });
+
+  it('lists a recreated container once, and alerts on its restarts once', () => {
+    expect(panel('Restarts (15m window)').targets![0].expr).toMatch(/^sum by \(name\) \(changes\(container_start_time_seconds/);
+    expect(panel('Memory vs Compose limit').targets![0].expr).toMatch(/^max by \(name\) \(/);
+    expect(read('monitoring/prometheus/host-alerts.yml')).toMatch(
+      /alert: ContainerRestarting\n\s+expr: \|\n(?:\s+#.*\n)*\s+sum by \(name\) \(changes\(container_start_time_seconds\{name!=""\}\[15m\]\)\) >= 2/,
+    );
+  });
+});
+
 describe('the query check allow-list', () => {
   it('names only panels and rules that exist, each with a reason', () => {
     const titles = new Set<string>();
