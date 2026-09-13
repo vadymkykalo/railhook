@@ -14,7 +14,7 @@
 # Get both, with real generated secrets rather than the public ones in
 # .env.dist, by running the installer:
 #
-#   curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh | bash
+#   curl -fsSL https://railhook.io/install.sh | bash
 #
 # ONE PUBLISHED PORT. The ui service's nginx is the only thing bound to the
 # host; it serves the dashboard and proxies every API path to `api`. Nothing

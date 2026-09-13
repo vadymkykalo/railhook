@@ -823,9 +823,9 @@
     "docsCta": "Go to the docs",
     "docsTitle": "Read first",
     "responseNote": "We answer on working days, usually within one.",
-    "salesBody": "Plans above Pro, annual billing and volume commitments.",
-    "salesTitle": "Sales",
-    "subtitle": "Enterprise plans, volume pricing, self-hosted support, or a question the docs did not answer.",
+    "salesBody": "Paid plans with support are coming to Railhook Cloud. Tell us what you would need.",
+    "salesTitle": "Plans and support",
+    "subtitle": "Railhook Cloud, self-hosting, future paid support, or a question the docs did not answer.",
     "supportBody": "Something is wrong with a delivery, an account or a bill.",
     "supportTitle": "Support",
     "title": "Talk to us"
@@ -2821,7 +2821,7 @@
         "title": "Railhook Cloud"
       },
       "selfHosted": {
-        "body": "One command installs everything. Every feature, no usage limits, MIT licence, no licence key.",
+        "body": "One command installs everything. Every feature, no plan limits, MIT licence, no licence key.",
         "check1": "Installs with one command",
         "check2": "HTTPS sets itself up on your domain",
         "check3": "Upgrades and backups are one command too",
@@ -2940,7 +2940,7 @@
   },
   "meta": {
     "contact": {
-      "description": "Talk to us about Enterprise plans, volume pricing or self-hosted support.",
+      "description": "Talk to us about Railhook Cloud, self-hosting or paid support.",
       "title": "Contact — Railhook"
     },
     "docs": {

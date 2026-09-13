@@ -44,14 +44,10 @@ function RailLink({
         'relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors',
         collapsed && 'justify-center px-2',
         active
-          ? 'bg-secondary font-medium text-foreground'
-          : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+          ? 'bg-card font-medium text-foreground shadow-[inset_0_0_0_1px_hsl(var(--rail))]'
+          : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
       )}
     >
-      {/* The active marker is a rail, matching the tick rails used throughout. */}
-      {active && (
-        <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-primary" aria-hidden />
-      )}
       <Icon className={cn('h-4 w-4 flex-shrink-0', active && 'text-primary')} />
       {!collapsed && <span className="truncate">{name}</span>}
     </Link>
@@ -67,7 +63,7 @@ export default function Sidebar({
   const narrow = collapsed && !isMobile;
 
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="flex h-full flex-col bg-muted">
       <div className={cn('flex h-14 items-center border-b border-rail px-3', narrow && 'justify-center px-2')}>
         <Link to="/" className="flex items-center gap-2 transition-opacity hover:opacity-70">
           <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-primary">

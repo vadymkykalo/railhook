@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <!-- Flat brand teal. The old mark was a violet gradient from the previous
-       palette, and the palette has no gradients in it any more. -->
-  <rect width="32" height="32" rx="7" fill="#0D6E78"/>
-  <path d="M8 7v12c0 3.9 3.1 7 7 7s7-3.1 7-7v-6" stroke="#FAFAF8" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M19 16l3-3 3 3" stroke="#FAFAF8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <circle cx="8" cy="7" r="2" fill="#FAFAF8"/>
+  <!-- Flat brand cobalt, the same #1D4BFF as --primary. No gradients. -->
+  <rect width="32" height="32" rx="7" fill="#1D4BFF"/>
+  <path d="M8 7v12c0 3.9 3.1 7 7 7s7-3.1 7-7v-6" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M19 16l3-3 3 3" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="8" cy="7" r="2" fill="#FFFFFF"/>
 </svg>
