@@ -180,7 +180,9 @@ h1#_top {
 
 /* ---------- header ---------- */
 
-.header {
+/* The page header only. Starlight's inner Header component is a div.header too, and a border on
+   it drew a second line right under the search box. */
+header.header {
   border-bottom: 1px solid var(--sl-color-hairline);
 }
 

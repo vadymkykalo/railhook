@@ -2,6 +2,11 @@ import { useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Band, SectionHeading } from './primitives';
 import { cn } from '../../lib/utils';
+// Imported rather than served from public/: the build gives each a content hash, so a release
+// with new screenshots gets new URLs and no browser keeps last release's image.
+import dashboardShot from '../../assets/shots/dashboard.png';
+import deliveriesShot from '../../assets/shots/deliveries.png';
+import connectionsShot from '../../assets/shots/connections.png';
 
 /**
  * Screenshots of the real admin, one at a time behind tabs — at a third of the page width the
@@ -15,9 +20,9 @@ export default function ProductSection() {
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const shots = [
-    { id: 'deliveries', src: '/shots/deliveries.png', tab: t('landing.product.deliveriesTab'), body: t('landing.product.deliveriesBody'), alt: t('landing.product.deliveriesAlt') },
-    { id: 'dashboard', src: '/shots/dashboard.png', tab: t('landing.product.dashboardTab'), body: t('landing.product.dashboardBody'), alt: t('landing.product.dashboardAlt') },
-    { id: 'connections', src: '/shots/connections.png', tab: t('landing.product.connectionsTab'), body: t('landing.product.connectionsBody'), alt: t('landing.product.connectionsAlt') },
+    { id: 'deliveries', src: deliveriesShot, tab: t('landing.product.deliveriesTab'), body: t('landing.product.deliveriesBody'), alt: t('landing.product.deliveriesAlt') },
+    { id: 'dashboard', src: dashboardShot, tab: t('landing.product.dashboardTab'), body: t('landing.product.dashboardBody'), alt: t('landing.product.dashboardAlt') },
+    { id: 'connections', src: connectionsShot, tab: t('landing.product.connectionsTab'), body: t('landing.product.connectionsBody'), alt: t('landing.product.connectionsAlt') },
   ];
   const shot = shots[active];
 
