@@ -240,6 +240,20 @@ describe('alertmanager/render-config.sh', () => {
     expect(template).not.toMatch(/GeneratorURL|ExternalURL/);
   });
 
+  it('puts the summary in the subject as plain text and escapes it only in the HTML body', () => {
+    // Alertmanager renders headers with its HTML engine: without safeHtml a ">" in a summary
+    // reached the subject line as "&gt;".
+    const template = read('monitoring/alertmanager/email.tmpl');
+    const block = (name: string) => {
+      const start = template.indexOf(`{{ define "${name}" -}}`);
+      expect(start, name).toBeGreaterThan(-1);
+      return template.slice(start, template.indexOf('{{- end }}', start));
+    };
+    expect(block('railhook.email.subject')).toMatch(/\.Annotations\.summary[^}]*\| safeHtml/);
+    expect(block('railhook.email.html'), 'the HTML body keeps escaping').not.toContain('safeHtml');
+    expect(block('railhook.email.text')).not.toContain('safeHtml');
+  });
+
   it('links alert mail to Grafana on MONITORING_DOMAIN, or explains the tunnel without one', () => {
     const links = (env: Record<string, string>) => {
       const { config } = render({ ...resend, ...env });

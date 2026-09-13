@@ -8,9 +8,14 @@
   ("railhook.links.html", "railhook.links.text") and "railhook.domain" next to this file.
 */}}
 
+{{/*
+  Alertmanager renders mail headers with its HTML template engine, so a summary reading "above
+  10% for >10 min" arrived as "for &gt;10 min" in the subject line. A header is plain text: the
+  summary is marked safe here, and only here — the HTML body below keeps escaping it.
+*/}}
 {{ define "railhook.email.subject" -}}
 [{{ if eq .Status "resolved" }}RESOLVED{{ else if .CommonLabels.severity }}{{ .CommonLabels.severity | toUpper }}{{ else }}ALERT{{ end }}]
-{{- with index .Alerts 0 }} {{ or .Annotations.summary .Labels.alertname "Railhook alert" }}{{ end }}
+{{- with index .Alerts 0 }} {{ or .Annotations.summary .Labels.alertname "Railhook alert" | safeHtml }}{{ end }}
 {{- if gt (len .Alerts) 1 }} ({{ len .Alerts }} alerts){{ end }}
 {{- template "railhook.domain.suffix" . }}
 {{- end }}
