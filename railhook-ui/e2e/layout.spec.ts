@@ -141,6 +141,71 @@ test.describe('dashboard pages fit the screen', () => {
     });
   }
 
+  test.describe('record lists on a phone', () => {
+    // Seen on the local stack with real data: every list was a 650–1060px desktop table swiped
+    // sideways, with row checkboxes, copy icons and pagination under 36px tall.
+    const LISTS = [
+      `/admin/projects/${PROJECT_ID}/deliveries`,
+      `/admin/projects/${PROJECT_ID}/events`,
+      `/admin/projects/${PROJECT_ID}/endpoints`,
+    ];
+    for (const path of LISTS) {
+      test(`${path} reads as cards, not a table swiped sideways`, async ({ page, isMobile }) => {
+        test.skip(!isMobile, 'phone-only checks');
+        await mockApi(page, { signedIn: true });
+        await page.goto(path);
+        await page.waitForLoadState('networkidle');
+        await page.waitForTimeout(400);
+
+        const layout = await page.evaluate(() => {
+          const table = document.querySelector('main table');
+          if (!table) return null;
+          const head = table.querySelector('thead')!.getBoundingClientRect();
+          const firstRow = table.querySelector('tbody tr');
+          return {
+            vw: document.documentElement.clientWidth,
+            tableWidth: table.getBoundingClientRect().width,
+            headHeight: head.height,
+            labelled: firstRow ? firstRow.querySelectorAll('td[data-label]').length : 0,
+            rows: table.querySelectorAll('tbody tr').length,
+          };
+        });
+        expect(layout, `${path}: a list table is rendered`).not.toBeNull();
+        expect(layout!.rows, `${path}: the fixture rows are listed`).toBeGreaterThan(3);
+        expect(layout!.tableWidth, `${path}: the table is no wider than the phone`).toBeLessThanOrEqual(layout!.vw);
+        expect(layout!.headHeight, `${path}: the column header row is not drawn`).toBeLessThanOrEqual(1);
+        expect(layout!.labelled, `${path}: each card line names its column`).toBeGreaterThan(1);
+      });
+
+      test(`${path} has 40px tap targets`, async ({ page, isMobile }) => {
+        test.skip(!isMobile, 'phone-only checks');
+        await mockApi(page, { signedIn: true });
+        await page.goto(path);
+        await page.waitForLoadState('networkidle');
+        await page.waitForTimeout(400);
+
+        const small = await page.evaluate(() =>
+          Array.from(document.querySelectorAll<HTMLElement>('main a[href], main button, main [role=tab], main select, nav a[href]'))
+            .filter((el) => {
+              const r = el.getBoundingClientRect();
+              const s = getComputedStyle(el);
+              return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'inline'
+                && !el.closest('[aria-hidden="true"], thead') && r.height < 40;
+            })
+            .map((el) => `${Math.round(el.getBoundingClientRect().height)}px ${el.tagName.toLowerCase()} "${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30)}"`),
+        );
+        expect(small).toEqual([]);
+
+        const checkboxCells = await page.evaluate(() =>
+          Array.from(document.querySelectorAll<HTMLElement>('main td[data-cell="select"]'))
+            .map((td) => Math.min(td.getBoundingClientRect().width, td.getBoundingClientRect().height))
+            .filter((size) => size < 40),
+        );
+        expect(checkboxCells, 'selection cells are a 40px target').toEqual([]);
+      });
+    }
+  });
+
   test('the navigation opens as a drawer on a phone and fits it', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'the sidebar is always open on desktop');
     await mockApi(page, { signedIn: true });
