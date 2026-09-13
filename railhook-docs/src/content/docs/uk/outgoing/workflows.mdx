@@ -1,0 +1,90 @@
+---
+title: Воркфлоу
+description: Запускайте граф кроків, коли надходить подія, щоб відфільтрувати її, змінити, викликати сервіс, доставити або надіслати нову подію.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Воркфлоу — це граф кроків, який запускається, коли надіслано подію, або коли ви запускаєте його самі. Кожен крок отримує вихід попереднього. У панелі є візуальний конструктор; той самий воркфлоу можна створити через API.
+
+## Як виконується воркфлоу
+
+- **Тригер** запускає виконання, передаючи на вхід `data` події.
+- Вузли виконуються в топологічному порядку: вузол починає лише після того, як завершилися всі вузли, від яких він залежить.
+- Вихід кожного вузла стає входом вузлів, з якими він з'єднаний. Вузол із кількома вихідними ребрами розгалужується.
+- Вузол `filter`, умови якого не збіглися, пропускає все, що нижче за ним. Вузол `branch` спрямовує виконання ребром `true` або `false`.
+- Кожен крок записує свій статус, вхід, вихід і тривалість, тож виконання можна переглянути крок за кроком. Список виконань: `GET /api/v1/projects/{projectId}/workflows/{id}/executions`.
+
+## Тригери
+
+| `triggerType` | Коли запускається |
+|---|---|
+| `WEBHOOK_EVENT` (типово) | Для кожної події, тип якої збігається з `triggerConfig.eventTypePattern`. Без шаблону — для кожної події в проєкті. Воркфлоу виконується щонайбільше один раз на подію. |
+| `MANUAL` | Коли ви викликаєте `POST /api/v1/projects/{projectId}/workflows/{id}/trigger`. JSON-тіло стає входом. |
+
+Вмикайте й вимикайте воркфлоу через `PATCH /api/v1/projects/{projectId}/workflows/{id}/toggle`.
+
+## Типи вузлів
+
+| `type` | Що робить | Налаштування в `data` |
+|---|---|---|
+| `webhookTrigger` | Точка входу. Передає вхід тригера далі. | немає |
+| `filter` | Продовжує, лише якщо умови збіглися; інакше вузли нижче пропускаються. | `conditions`, те саме дерево умов, що й у [правилах](/docs/uk/outgoing/rules/#умови) |
+| `branch` | Перевіряє умови й іде ребром `true` або `false`. Без умов — `true`. | `conditions` |
+| `transform` | Змінює дані. Якщо задано обидва, діє збережена трансформація; якщо її не знайдено, крок зазнає невдачі. | `transformationId` або `template` із плейсхолдерами `{{field.path}}` |
+| `http` | Викликає URL і передає відповідь далі. | `url` (обов'язкове), `method` (типово `POST`), `headers`, `body` (типово — вхід), `timeout` у секундах, від 1 до 60, типово 30 |
+| `slack` | Надсилає повідомлення у вхідний вебхук Slack. | `webhookUrl`, `message`, `channel` |
+| `delivery` | Доставляє дані на наявний ендпоінт звичайним конвеєром доставки, з його повторами. | `endpointId` (обов'язкове) |
+| `createEvent` | Надсилає в Railhook нову подію, яка далі проходить правила й підписки, як будь-яка інша. | `projectId`, `eventType` (обидва обов'язкові), `payloadTemplate` (типово — вхід) |
+| `delay` | Призупиняє виконання, не займаючи потік воркера. | `delaySeconds`, від 1 до 300, типово 5 |
+
+## Створення воркфлоу
+
+Визначення — це список `nodes`, кожен з `id`, `type` і своїми `data`, та список `edges` від `source` до `target`. Ребро, що виходить із вузла `branch`, задає `sourceHandle` зі значенням `"true"` або `"false"`.
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/workflows" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Big orders to the fraud service",
+    "enabled": true,
+    "triggerType": "WEBHOOK_EVENT",
+    "triggerConfig": { "eventTypePattern": "order.*" },
+    "definition": {
+      "nodes": [
+        { "id": "start", "type": "webhookTrigger", "data": {} },
+        { "id": "big", "type": "filter", "data": { "conditions": { "type": "predicate", "field": "amount", "operator": "GTE", "value": 1000, "valueType": "NUMBER" } } },
+        { "id": "check", "type": "http", "data": { "url": "https://fraud.example.com/check", "method": "POST" } }
+      ],
+      "edges": [
+        { "source": "start", "target": "big" },
+        { "source": "big", "target": "check" }
+      ]
+    }
+  }'
+```
+
+## Обмеження часу
+
+| Обмеження | Типово |
+|---|---|
+| Одне виконання від початку до кінця | 600 секунд |
+| Один вузол | 30 секунд |
+| Вузол `http` або `slack` | 60 секунд |
+| Вузол `createEvent` | 30 секунд |
+
+## На що зважати
+
+<Aside type="caution">
+- URL вузла `http` проходить ту саму перевірку приватних адрес, що й ендпоінт, керовану `WEBHOOK_ALLOW_PRIVATE_IPS` і `WEBHOOK_ALLOWED_HOSTS`. Див. [Безпека ендпоінта](/docs/uk/outgoing/endpoint-security/#куди-можуть-іти-доставки).
+- Вузол `slack` приймає лише URL, що починається з `https://hooks.slack.com/`.
+- Кожен крок зберігає свій вхід і вихід як є. Усе таємне в даних буде видно в історії виконань, тож спершу замаскуйте його. Див. [Маскування PII](/docs/uk/platform/pii-masking/).
+</Aside>
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Правила" href="/docs/uk/outgoing/rules/" description="Однокрокові рішення маршрутизації, що виконуються до появи доставок." />
+  <LinkCard title="Трансформації" href="/docs/uk/outgoing/transformations/" description="Збережені шаблони, які може використати вузол transform." />
+  <LinkCard title="Довідник API" href="/docs/api-reference/" description="Усі запити й відповіді воркфлоу." />
+</CardGrid>

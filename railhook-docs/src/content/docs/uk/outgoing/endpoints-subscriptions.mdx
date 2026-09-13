@@ -1,0 +1,205 @@
+---
+title: Ендпоінти та підписки
+description: Зареєструйте URL, що отримує події, оберіть, які типи подій він отримує, і надішліть йому першу подію.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+**Ендпоінт** — це URL, готовий приймати ваші події. **Підписка** визначає, які типи подій цей ендпоінт хоче отримувати. Коли ваша система надсилає подію, Railhook створює по одній **доставці** на кожен ендпоінт, чия підписка збігається, і працює з кожною доставкою, доки вона не вдасться або її не полишать.
+
+У панелі ендпоінт разом із його підписками показано як один **зв'язок** на екрані «Зв'язки». Це подання, а не окремий запис: змінити зв'язок означає змінити ендпоінт або його підписки.
+
+У прикладах нижче `$RAILHOOK_URL` — адреса вашого API Railhook, `$PROJECT_ID` — ваш проєкт, а `$API_KEY` — API-ключ проєкту.
+
+## Створіть ендпоінт і підпишіть його
+
+<Steps>
+
+1. Створіть ендпоінт.
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/endpoints" \
+     -H "X-API-Key: $API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.customer.com/webhooks","description":"Orders"}'
+   ```
+
+   Відповідь містить `secret` і `standardWebhooksSecret`. Збережіть їх одразу: API повертає секрет у відкритому вигляді лише під час створення ендпоінта та під час ротації його секрету.
+
+2. Підпишіть ендпоінт на тип події.
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/subscriptions" \
+     -H "X-API-Key: $API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"endpointId":"'"$ENDPOINT_ID"'","eventType":"order.completed"}'
+   ```
+
+3. Надішліть подію (див. [Надіслати подію](#надіслати-подію) нижче). Кожен ендпоінт, підписаний на `order.completed`, отримає власну доставку.
+
+</Steps>
+
+### Поля ендпоінта
+
+| Поле | Що робить |
+|---|---|
+| `url` | Обов'язкове. Куди надсилаються доставки. Перевіряється на приватні діапазони адрес, див. [Безпека ендпоінта](/docs/uk/outgoing/endpoint-security/). |
+| `description` | Довільний текст, до 500 символів. |
+| `enabled` | Чи отримує ендпоінт доставки. |
+| `signatureScheme` | `BOTH` (типово), `LEGACY` або `STANDARD`: які заголовки підпису надсилаються. Див. [Перевірка підписів](/docs/uk/outgoing/signatures/). |
+| `rateLimitPerSecond` | Обмеження швидкості доставок для ендпоінта, від 0 до 10000. `0` знімає обмеження. |
+| `secret` | Необов'язкове. Власний секрет для підпису замість згенерованого. |
+| `allowedSourceIps` | Поле-нотатка. Нічого не обмежує, див. [Безпека ендпоінта](/docs/uk/outgoing/endpoint-security/#дозволені-ip-адреси-джерела). |
+
+<Aside type="caution" title="Нові ендпоінти й перевірка">
+Типово новий ендпоінт має статус `SKIPPED` і одразу отримує доставки. Якщо оператор задав `WEBHOOK_ENDPOINT_VERIFICATION_REQUIRED=true`, новий ендпоінт має статус `PENDING`, і кожна доставка на нього зазнає невдачі, доки він не пройде перевірку належності. Див. [Безпека ендпоінта](/docs/uk/outgoing/endpoint-security/#доведіть-що-ендпоінт-ваш).
+</Aside>
+
+### Поля підписки
+
+| Поле | Що робить |
+|---|---|
+| `endpointId` | Обов'язкове. Ендпоінт, що отримує відповідні події. |
+| `eventType` | Обов'язкове. Точний тип події або шаблон, див. нижче. |
+| `enabled` | Чи створює підписка доставки. |
+| `orderingEnabled` | Доставляти події цього ендпоінта по порядку. Типово вимкнено, див. [Порядок доставки](/docs/uk/outgoing/ordering/). |
+| `maxAttempts` | Від 1 до 20. Скільки спроб до того, як доставку полишать. |
+| `retryDelays` | Очікування між спробами в секундах через кому, наприклад `60,300,900`. |
+| `timeoutSeconds` | Від 1 до 60, типово 30. Скільки одна спроба чекає на відповідь. |
+| `transformationId` | Збережена трансформація, яку слід застосувати, див. [Трансформації](/docs/uk/outgoing/transformations/). |
+| `payloadTemplate` | Вбудований шаблон, використовується, коли `transformationId` не задано. |
+| `customHeaders` | Додаткові HTTP-заголовки як JSON-об'єкт у рядку. |
+
+Не вказуйте `maxAttempts` і `retryDelays`, щоб отримати типову драбину повторів вихідного напрямку, див. [Повторні спроби та невдалі повідомлення](/docs/uk/outgoing/retries/).
+
+### Шаблони типів подій
+
+Тип події записується малими літерами, починається з літери й розділяє сегменти крапками: `order.completed`. Підписка може вказувати не на один тип, а на шаблон:
+
+| Шаблон | Збігається з |
+|---|---|
+| `order.completed` | Лише цим типом події. |
+| `order.*` | Одним сегментом після `order.`: `order.completed`, `order.updated`. Не з `order.line.added`. |
+| `order.**` | Будь-якою кількістю сегментів після `order.`: `order.completed`, `order.line.added`. |
+| `*` | Будь-яким типом події з одного сегмента. |
+| `**` | Кожним типом події в проєкті. |
+
+## Надіслати подію
+
+`POST /api/v1/events` із `type` та об'єктом `data`. Відповідь — `201`. Надсилайте заголовок `Idempotency-Key`, щоб отримувач міг розпізнати повтор.
+
+<Tabs syncKey="lang">
+<TabItem label="Node.js">
+
+```ts
+import { Railhook } from '@railhook/node';
+
+const client = new Railhook({
+  apiKey: process.env.RAILHOOK_API_KEY,
+  baseUrl: process.env.RAILHOOK_URL,
+});
+
+const event = await client.events.send(
+  { type: 'order.completed', data: { orderId: 'ord_12345', amount: 99.99 } },
+  'order-12345-completed',
+);
+```
+
+</TabItem>
+<TabItem label="Python">
+
+```python
+import os
+
+from railhook import Railhook, Event
+
+client = Railhook(
+    api_key=os.environ["RAILHOOK_API_KEY"],
+    base_url=os.environ["RAILHOOK_URL"],
+)
+
+event = client.events.send(
+    Event(type="order.completed", data={"order_id": "ord_12345", "amount": 99.99}),
+    idempotency_key="order-12345-completed",
+)
+```
+
+</TabItem>
+<TabItem label="PHP">
+
+```php
+<?php
+use Railhook\Railhook;
+
+$client = new Railhook(
+    apiKey: getenv('RAILHOOK_API_KEY'),
+    baseUrl: getenv('RAILHOOK_URL'),
+);
+
+$event = $client->events->send(
+    type: 'order.completed',
+    data: ['orderId' => 'ord_12345', 'amount' => 99.99],
+    idempotencyKey: 'order-12345-completed',
+);
+```
+
+</TabItem>
+<TabItem label="cURL">
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/events" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: order-12345-completed" \
+  -d '{"type":"order.completed","data":{"orderId":"ord_12345","amount":99.99}}'
+```
+
+</TabItem>
+</Tabs>
+
+### Політика ідемпотентності
+
+Що станеться з подією, надісланою без `Idempotency-Key`, вирішує налаштування проєкту `idempotencyPolicy`:
+
+| Політика | Подія без ключа |
+|---|---|
+| `NONE` | Приймається, ключ не генерується. |
+| `AUTO` | Приймається й отримує випадковий ключ. |
+| `REQUIRED` | Відхиляється. |
+
+За будь-якої політики ключ, який проєкт уже використовував, повертає первісну подію замість створення другої.
+
+## Що надходить на ендпоінт
+
+Ендпоінт отримує як тіло об'єкт `data` події, а не обгортку. Ідентифікатори передаються в заголовках:
+
+```http title="Доставка"
+POST /webhooks HTTP/1.1
+Content-Type: application/json
+X-Signature: t=1738000000000,v1=<hex hmac-sha256>
+X-Timestamp: 1738000000000
+X-Event-Id: 6f0e…
+X-Delivery-Id: 91ab…
+X-Sequence-Number: 0
+Idempotency-Key: order-12345-completed-<endpoint-id>
+webhook-id: 91ab…
+webhook-timestamp: 1738000000
+webhook-signature: v1,<base64>
+
+{"orderId":"ord_12345","amount":99.99}
+```
+
+Типу події в тілі немає. Маршрутизуйте за payload або за ендпоінтом, або дайте підписці шаблон, який додає `type` у тіло.
+
+`Idempotency-Key` — це ключ події, за яким ідуть `-` та ідентифікатор ендпоінта. Якщо в події немає ключа, це ідентифікатор події, `-` та ідентифікатор ендпоінта. Він однаковий у всіх спробах доставки.
+
+<Aside type="tip">
+Щоб перевірити, чи ендпоінт відповідає, ще до реального трафіку, скористайтеся `POST /api/v1/projects/{projectId}/endpoints/{id}/test`. Він повідомляє, чи вдався запит, HTTP-статус і затримку. Повні формати запитів і відповідей — у [довіднику API](/docs/api-reference/).
+</Aside>
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Перевірка підписів" href="/docs/uk/outgoing/signatures/" description="Переконайтеся, що доставка справді надійшла від Railhook." />
+  <LinkCard title="Повторні спроби та невдалі повідомлення" href="/docs/uk/outgoing/retries/" description="Що відбувається, коли ендпоінт не відповідає 2xx." />
+  <LinkCard title="Правила" href="/docs/uk/outgoing/rules/" description="Маршрутизуйте, змінюйте чи відкидайте події за вмістом." />
+</CardGrid>

@@ -1,0 +1,205 @@
+---
+title: Endpoints and subscriptions
+description: Register a URL that receives events, choose which event types it gets, and send the first event to it.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+An **endpoint** is a URL that is willing to receive your events. A **subscription** says which event types that endpoint wants. When your system sends an event, Railhook creates one **delivery** per endpoint whose subscription matches, and works on each delivery until it succeeds or is abandoned.
+
+In the dashboard, an endpoint together with its subscriptions is shown as one **Connection**, on the Connections screen. It is a view, not a separate record: changing a connection changes the endpoint or its subscriptions.
+
+The examples below use `$RAILHOOK_URL` for the address of your Railhook API, `$PROJECT_ID` for your project and `$API_KEY` for a project API key.
+
+## Create an endpoint and subscribe it
+
+<Steps>
+
+1. Create the endpoint.
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/endpoints" \
+     -H "X-API-Key: $API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.customer.com/webhooks","description":"Orders"}'
+   ```
+
+   The response carries `secret` and `standardWebhooksSecret`. Store them now: the API returns the plaintext secret only when an endpoint is created and when its secret is rotated.
+
+2. Subscribe the endpoint to an event type.
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/subscriptions" \
+     -H "X-API-Key: $API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"endpointId":"'"$ENDPOINT_ID"'","eventType":"order.completed"}'
+   ```
+
+3. Send an event (see [Send an event](#send-an-event) below). Every endpoint subscribed to `order.completed` gets its own delivery.
+
+</Steps>
+
+### Endpoint fields
+
+| Field | What it does |
+|---|---|
+| `url` | Required. Where deliveries are sent. Checked against private address ranges, see [Endpoint security](/docs/outgoing/endpoint-security/). |
+| `description` | Free text, up to 500 characters. |
+| `enabled` | Whether the endpoint receives deliveries. |
+| `signatureScheme` | `BOTH` (default), `LEGACY` or `STANDARD`: which signature headers are sent. See [Verify signatures](/docs/outgoing/signatures/). |
+| `rateLimitPerSecond` | Per-endpoint delivery throttle, 0 to 10000. `0` removes the limit. |
+| `secret` | Optional. Supply your own signing secret instead of a generated one. |
+| `allowedSourceIps` | A note field. It restricts nothing, see [Endpoint security](/docs/outgoing/endpoint-security/#allowed-source-ips). |
+
+<Aside type="caution" title="New endpoints and verification">
+By default a new endpoint starts as `SKIPPED` and receives deliveries straight away. When the operator sets `WEBHOOK_ENDPOINT_VERIFICATION_REQUIRED=true`, a new endpoint starts as `PENDING` and every delivery to it fails until it passes the ownership check. See [Endpoint security](/docs/outgoing/endpoint-security/#prove-you-own-the-endpoint).
+</Aside>
+
+### Subscription fields
+
+| Field | What it does |
+|---|---|
+| `endpointId` | Required. The endpoint that receives the matching events. |
+| `eventType` | Required. An exact event type or a pattern, see below. |
+| `enabled` | Whether the subscription creates deliveries. |
+| `orderingEnabled` | Deliver this endpoint's events in order. Off by default, see [Ordering](/docs/outgoing/ordering/). |
+| `maxAttempts` | 1 to 20. How many attempts before the delivery is abandoned. |
+| `retryDelays` | Comma-separated waits in seconds between attempts, for example `60,300,900`. |
+| `timeoutSeconds` | 1 to 60, default 30. How long one attempt waits for a response. |
+| `transformationId` | A saved transformation to apply, see [Transformations](/docs/outgoing/transformations/). |
+| `payloadTemplate` | An inline template, used when no `transformationId` is set. |
+| `customHeaders` | Extra HTTP headers, as a JSON object in a string. |
+
+Leave `maxAttempts` and `retryDelays` out to get the default Outgoing retry ladder, see [Retries and failed messages](/docs/outgoing/retries/).
+
+### Event type patterns
+
+An event type is lower case, starts with a letter, and uses dots between segments: `order.completed`. A subscription can point at a pattern instead of one type:
+
+| Pattern | Matches |
+|---|---|
+| `order.completed` | That event type only. |
+| `order.*` | One segment after `order.`: `order.completed`, `order.updated`. Not `order.line.added`. |
+| `order.**` | Any number of segments after `order.`: `order.completed`, `order.line.added`. |
+| `*` | Any event type with a single segment. |
+| `**` | Every event type in the project. |
+
+## Send an event
+
+`POST /api/v1/events` with a `type` and a `data` object. It answers `201`. Send an `Idempotency-Key` header so that the receiver can recognise a repeat.
+
+<Tabs syncKey="lang">
+<TabItem label="Node.js">
+
+```ts
+import { Railhook } from '@railhook/node';
+
+const client = new Railhook({
+  apiKey: process.env.RAILHOOK_API_KEY,
+  baseUrl: process.env.RAILHOOK_URL,
+});
+
+const event = await client.events.send(
+  { type: 'order.completed', data: { orderId: 'ord_12345', amount: 99.99 } },
+  'order-12345-completed',
+);
+```
+
+</TabItem>
+<TabItem label="Python">
+
+```python
+import os
+
+from railhook import Railhook, Event
+
+client = Railhook(
+    api_key=os.environ["RAILHOOK_API_KEY"],
+    base_url=os.environ["RAILHOOK_URL"],
+)
+
+event = client.events.send(
+    Event(type="order.completed", data={"order_id": "ord_12345", "amount": 99.99}),
+    idempotency_key="order-12345-completed",
+)
+```
+
+</TabItem>
+<TabItem label="PHP">
+
+```php
+<?php
+use Railhook\Railhook;
+
+$client = new Railhook(
+    apiKey: getenv('RAILHOOK_API_KEY'),
+    baseUrl: getenv('RAILHOOK_URL'),
+);
+
+$event = $client->events->send(
+    type: 'order.completed',
+    data: ['orderId' => 'ord_12345', 'amount' => 99.99],
+    idempotencyKey: 'order-12345-completed',
+);
+```
+
+</TabItem>
+<TabItem label="cURL">
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/events" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: order-12345-completed" \
+  -d '{"type":"order.completed","data":{"orderId":"ord_12345","amount":99.99}}'
+```
+
+</TabItem>
+</Tabs>
+
+### Idempotency policy
+
+A project decides what happens to an event sent without an `Idempotency-Key`, through its `idempotencyPolicy` setting:
+
+| Policy | An event sent without a key |
+|---|---|
+| `NONE` | Is accepted, and no key is generated. |
+| `AUTO` | Is accepted and gets a random key. |
+| `REQUIRED` | Is rejected. |
+
+Whatever the policy, sending a key the project has already used returns the original event instead of creating a second one.
+
+## What arrives at the endpoint
+
+The endpoint receives the event's `data` object as the body, not an envelope. The identifiers travel in headers:
+
+```http title="A delivery"
+POST /webhooks HTTP/1.1
+Content-Type: application/json
+X-Signature: t=1738000000000,v1=<hex hmac-sha256>
+X-Timestamp: 1738000000000
+X-Event-Id: 6f0e…
+X-Delivery-Id: 91ab…
+X-Sequence-Number: 0
+Idempotency-Key: order-12345-completed-<endpoint-id>
+webhook-id: 91ab…
+webhook-timestamp: 1738000000
+webhook-signature: v1,<base64>
+
+{"orderId":"ord_12345","amount":99.99}
+```
+
+The event type is not in the body. Route on the payload or on the endpoint, or give the subscription a template that puts `type` into the body.
+
+`Idempotency-Key` is the event's key followed by `-` and the endpoint id. When the event has no key, it is the event id followed by `-` and the endpoint id. It stays the same across every attempt of the delivery.
+
+<Aside type="tip">
+To check that an endpoint answers before real traffic reaches it, use `POST /api/v1/projects/{projectId}/endpoints/{id}/test`. It reports whether the request succeeded, the HTTP status and the latency. The full request and response shapes are in the [API reference](/docs/api-reference/).
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Verify signatures" href="/docs/outgoing/signatures/" description="Check that a delivery really came from Railhook." />
+  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="What happens when the endpoint does not answer 2xx." />
+  <LinkCard title="Rules" href="/docs/outgoing/rules/" description="Route, reshape or drop events by their content." />
+</CardGrid>

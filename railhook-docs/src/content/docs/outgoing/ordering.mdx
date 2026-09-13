@@ -1,0 +1,66 @@
+---
+title: Ordering
+description: Deliver one endpoint's events in the order they happened, what that costs, and the one case where the order is deliberately broken.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Turn ordering on for a subscription when a receiver must see an endpoint's events in the order they were created. It is off by default, it works per endpoint, and it applies to outgoing deliveries only.
+
+## Turn it on
+
+Set `orderingEnabled` on the subscription:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/subscriptions" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"endpointId":"'"$ENDPOINT_ID"'","eventType":"order.*","orderingEnabled":true}'
+```
+
+With ordering off, deliveries to the same endpoint can overtake each other, and that freedom is most of the throughput.
+
+## How it works
+
+| Term | Meaning |
+|---|---|
+| Sequence number | A position stamped on each delivery to an endpoint. It says which of two deliveries to the same endpoint came first, whenever a worker picks them up. It is sent as `X-Sequence-Number`, and is `0` when ordering is off. |
+| Ordering buffer | Where a delivery waits while the deliveries ahead of it have not finished. Waiting is a deferral: it does not use up an attempt. |
+| Gap | The range between the last position the endpoint received and a waiting delivery, containing at least one delivery that has not resolved. The whole range is checked, not only the position just before. |
+
+A delivery goes out only when everything ahead of it for that endpoint has succeeded or been given up on. A delivery that is abandoned to Failed Messages stops blocking the ones behind it.
+
+## When a gap never closes
+
+A delivery that never resolves would otherwise hold up every later delivery to that endpoint for good. So after the gap timeout the waiting delivery is let through, out of order, and the event is counted.
+
+| Setting | Default |
+|---|---|
+| `ORDERING_GAP_TIMEOUT_SECONDS` | `60` |
+| Metric | `webhook_ordering_gap_timeout_total` |
+
+<Aside type="caution" title="The guarantee yields rather than blocks">
+An endpoint that receives nothing at all is the worse failure, so the order is broken on purpose. An occasional increase of `webhook_ordering_gap_timeout_total` is expected. A steady rate means something ahead in the sequence is not resolving, and the endpoint is not getting ordered delivery.
+</Aside>
+
+## What it costs
+
+| Cost | Why |
+|---|---|
+| Throughput | An ordered endpoint is effectively serial. Its own response time becomes your ceiling. |
+| Head-of-line blocking | One slow or failing delivery holds up everything behind it until it resolves or the gap times out. |
+| Replays go to the back | A replay creates new deliveries with new sequence numbers, so a replayed event arrives after what is already waiting, not in its original place. |
+
+## What is and is not promised
+
+- Order is per endpoint, never global. Two endpoints subscribed to the same event receive it independently.
+- Delivery is still at-least-once. A receiver can see the same delivery twice and should deduplicate on `X-Delivery-Id` or `Idempotency-Key`.
+- The order is best-effort under the gap timeout. If you need an order that never yields, put your own sequence field in the payload and check it in the receiver.
+- The incoming direction has no ordering. Railhook did not create a provider's webhooks and cannot know the order the provider intended. Use the provider's own sequence field if it has one.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="How a failing delivery ends, and stops blocking." />
+  <LinkCard title="Replay and Time Machine" href="/docs/outgoing/replay/" description="Why a replayed delivery gets a new position." />
+  <LinkCard title="Observability" href="/docs/platform/observability/" description="Where to watch the gap timeout counter." />
+</CardGrid>

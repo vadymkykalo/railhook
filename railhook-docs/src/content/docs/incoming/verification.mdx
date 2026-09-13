@@ -1,0 +1,97 @@
+---
+title: Verification
+description: Prove that an incoming webhook came from the provider, with the provider's own signature scheme or a generic HMAC.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Anyone who learns a source's ingress URL can send requests to it. Verification checks each request against the secret the provider signs with, and refuses what does not match before anything is stored.
+
+## Verification modes
+
+| `verificationMode` | What is checked |
+|---|---|
+| `NONE` | Nothing. Whatever reaches the URL is stored and forwarded. Use it only while you are wiring a provider up. |
+| `PROVIDER` | The provider's own scheme, chosen by `providerType`. Every provider type except `GENERIC` has one. |
+| `HMAC_GENERIC` | An HMAC-SHA256 signature in a header you name. This is how a `GENERIC` provider is verified. |
+
+A request that fails verification is answered `401` and is not stored.
+
+## Providers
+
+| `providerType` | Header checked | How |
+|---|---|---|
+| `GITHUB` | `X-Hub-Signature-256` | `sha256=` followed by the hex HMAC-SHA256 of the raw body. |
+| `GITLAB` | `X-Gitlab-Token` | The header must equal the secret. GitLab sends a token, not a signature. |
+| `STRIPE` | `Stripe-Signature` | `t=…,v1=…`: hex HMAC-SHA256 of `<t>.<raw body>`. `t` must be within 300 seconds of now. |
+| `SHOPIFY` | `X-Shopify-Hmac-SHA256` | Base64 HMAC-SHA256 of the raw body. |
+| `SLACK` | `X-Slack-Signature`, `X-Slack-Request-Timestamp` | `v0=` followed by the hex HMAC-SHA256 of `v0:<timestamp>:<raw body>`. The timestamp must be within 300 seconds of now. |
+| `TWILIO` | `X-Twilio-Signature` | Base64 HMAC-SHA1 with the auth token. For form-encoded requests it covers the URL followed by every parameter sorted by name; for other requests it covers the URL, and the `bodySHA256` query parameter must match the body. |
+
+For every provider the secret goes in the source's `hmacSecret`: the webhook signing secret, the GitLab secret token, or the Twilio auth token.
+
+<Aside type="caution" title="Twilio signs the URL">
+Twilio's signature covers the URL it was configured with. Railhook rebuilds that URL from `WEBHOOK_INGRESS_BASE_URL`, not from the incoming request, so it survives a reverse proxy. Set `WEBHOOK_INGRESS_BASE_URL` to the public address, and paste exactly the ingress URL the source shows into the Twilio console.
+</Aside>
+
+## Set up a provider
+
+<Steps>
+
+1. Create the source with `verificationMode` set to `PROVIDER`, the `providerType`, and the provider's secret:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"GitHub","providerType":"GITHUB","verificationMode":"PROVIDER","hmacSecret":"'"$GITHUB_WEBHOOK_SECRET"'"}'
+   ```
+
+2. Paste the source's `ingressUrl` into the provider's webhook settings, with the same secret.
+
+3. Send a test webhook from the provider. It appears under **Received**; a signature mismatch is answered `401` and does not.
+
+</Steps>
+
+## Generic HMAC
+
+For a provider without a preset, use `HMAC_GENERIC`:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `hmacHeaderName` | `X-Signature` | The header that carries the signature. |
+| `hmacSignaturePrefix` | none | A prefix to strip before comparing, such as `sha256=`. |
+| `hmacSecret` | | The shared secret. |
+
+Two header shapes are accepted:
+
+| Shape | Signed content | Replay protection |
+|---|---|---|
+| `t=<unix-ms>,v1=<hex>`, Railhook's own format | `<t>.<raw body>` | `t` must be within 300 seconds of now. |
+| A bare hex digest | The raw body only | None from the signature: the same request verifies again for as long as the secret lives. |
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Acme","providerType":"GENERIC","verificationMode":"HMAC_GENERIC","hmacHeaderName":"X-Acme-Signature","hmacSignaturePrefix":"sha256=","hmacSecret":"'"$ACME_SECRET"'"}'
+```
+
+## Replayed signatures
+
+A verified signature is remembered for a window, and a second request with the same signature inside that window is refused with `401`. For providers whose signature carries a timestamp this suppresses duplicates. For a bare hex digest it is the only protection against a captured request being sent again.
+
+| Variable | Default |
+|---|---|
+| `WEBHOOK_INGRESS_REPLAY_WINDOW_MINUTES` | `5` |
+
+<Aside type="tip">
+Prefer a provider preset where one exists, and the `t=…,v1=…` shape where the provider can send it. If you must accept a bare digest, size the replay window against how long a captured request would still be worth replaying.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Sources" href="/docs/incoming/sources/" description="Create a source and read what the ingress answers." />
+  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Forward verified webhooks to your services." />
+  <LinkCard title="Verify signatures" href="/docs/outgoing/signatures/" description="The other direction: how receivers verify Railhook." />
+</CardGrid>

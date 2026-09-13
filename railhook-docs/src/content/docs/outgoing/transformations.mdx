@@ -1,0 +1,89 @@
+---
+title: Transformations
+description: Reshape a payload before it is signed and sent, without changing the event your application sent.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+A transformation turns the event payload into the body a particular receiver expects. The stored event is not changed; only the body of the delivery is.
+
+## The template
+
+A transformation is a JSON document whose string values can contain JSONPath expressions in `${…}` placeholders. Placeholders are resolved against the event payload; everything else is copied as written.
+
+```json title="Template"
+{
+  "id": "${$.orderId}",
+  "customer": {
+    "email": "${$.customer.email}",
+    "plan": "${$.subscription.plan_name}"
+  },
+  "amount_cents": "${$.amount}",
+  "note": "Order ${$.orderId} from Railhook"
+}
+```
+
+| Written as | Result |
+|---|---|
+| A string that is exactly one expression, `"${$.amount}"` | The referenced value with its type: a number stays a number, an object stays an object. |
+| An expression inside other text, `"Order ${$.orderId} from Railhook"` | A string, with the value substituted in. |
+| A path that matches nothing | `null` for a whole-value expression, an empty string inside text. Not an error. |
+
+<Aside type="caution" title="A typo in a path is silent">
+A path that matches nothing does not fail the template, so an optional field stays optional. The same rule means a misspelled path produces `null` without complaint. Preview a template against a real payload before you attach it.
+</Aside>
+
+A template is not a script. It can read the payload and rearrange it; it cannot loop, call out or compute.
+
+## Where a transformation attaches
+
+| Attached to | Effect |
+|---|---|
+| Subscription, `transformationId` | A saved transformation applied to every delivery the subscription creates. |
+| Subscription, `payloadTemplate` | An inline template, used when no `transformationId` is set. |
+| Rule, `TRANSFORM` action | Overrides the subscription's transformation for the events the rule matches. When several matching rules transform, the last one wins. See [Rules](/docs/outgoing/rules/). |
+| Destination, `transformationId` | A saved transformation applied to forwarded incoming webhooks. |
+| Destination, `payloadTransform` | A single JSONPath expression, such as `$.data`, used when no `transformationId` is set. |
+| Workflow, `transform` node | Reshapes data inside a workflow. See [Workflows](/docs/outgoing/workflows/). |
+
+## When it runs
+
+The transformation is applied inside each attempt, before the signature is computed. The signature covers the transformed bytes, so a receiver that verifies the signature verifies what it actually received.
+
+A saved transformation is looked up when the attempt runs. Fixing a broken template therefore helps the attempts still to come.
+
+<Aside type="danger" title="A broken template never leaks the raw payload">
+If a configured transformation cannot be applied, or a `transformationId` points at a transformation that is missing or disabled, the attempt fails and is retried. The original payload is never sent in its place, because transformations are often how personal data is stripped before it leaves. Each failure increments the `transform_failed_total` counter.
+</Aside>
+
+## Create and test a transformation
+
+<Steps>
+
+1. Create it. `name` and `template` are required; the template can be up to 65536 characters.
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/transformations" \
+     -H "X-API-Key: $API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Orders to CRM","template":"{\"id\":\"${$.orderId}\",\"amount_cents\":\"${$.amount}\"}"}'
+   ```
+
+2. Preview it against a payload you paste in, with `POST /api/v1/projects/{projectId}/transform-preview`. Send `inputPayload` and either `transformationId` or an inline `template`. Nothing is delivered.
+
+3. Dry-run a delivery with `POST /api/v1/projects/{projectId}/transform-preview/delivery-dry-run`. Send the `payload`, the transformation or `payloadTemplate`, and an `endpointId`. The response shows the transformed body, the headers and the signature that would be sent, and the transformation name and version. Nothing is sent.
+
+4. Attach it by setting `transformationId` on a subscription.
+
+</Steps>
+
+In the dashboard, **Transform Studio** shows the payload and the result side by side and updates as you type.
+
+Changing a transformation's template increments its version.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Rules" href="/docs/outgoing/rules/" description="Apply a transformation only to events that match a condition." />
+  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Transform incoming webhooks before they are forwarded." />
+  <LinkCard title="PII masking" href="/docs/platform/pii-masking/" description="Hide personal data where people read payloads." />
+</CardGrid>

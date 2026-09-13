@@ -1,0 +1,82 @@
+---
+title: Replay and Time Machine
+description: Resend one delivery, or rebuild deliveries from stored events for a time range, and know which of the two you need.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Two operations are easy to confuse. Resending a delivery puts the same delivery back on its retry ladder. A **replay** builds new deliveries from events Railhook already stored. The dashboard calls replay the **Time Machine**.
+
+## Which one you want
+
+| | Resend a delivery | Replay (Time Machine) |
+|---|---|---|
+| Works on | One existing delivery | Stored events in a time range |
+| Delivery id | Kept | New |
+| Sequence number | Kept | New, so it queues behind live traffic |
+| `Idempotency-Key` | Kept | `<event id>-<endpoint id>` |
+| The original delivery | Moved again | Left untouched |
+| Use it when | One delivery failed and the receiver is fixed | A receiver lost data, or a new endpoint needs history |
+
+## Resend one delivery
+
+`POST /api/v1/deliveries/{id}/replay` puts the delivery back to `PENDING` with its attempt count at zero and queues it. It answers `202`. A delivery that already succeeded is refused rather than sent twice.
+
+Two query parameters change what it does:
+
+| Parameter | Effect |
+|---|---|
+| `dryRun=true` | Sends nothing. Returns the target URL, the event type, the payload, the `Idempotency-Key` that would go out, the previous attempts, and a plan: `WILL_SEND`, `SKIP` when the delivery already succeeded, or `BLOCKED` when the endpoint is disabled. |
+| `fromAttempt=N` | Sets the attempt count to N-1, so the next request is attempt N and later waits continue from that point of the ladder. N must be between 1 and the number of attempts already made. |
+
+Use `fromAttempt` when restarting at the one-minute wait is wrong, for example after a receiver was down for hours, or when you want the remaining attempts rather than a fresh set.
+
+To resend many deliveries at once, use `POST /api/v1/deliveries/bulk-replay` with up to 1000 `deliveryIds`, or with a `projectId` plus `status` and `endpointId` filters and a `limit` of up to 5000. The response says how many were replayed, how many were skipped, and whether more matched.
+
+To resend deliveries that were abandoned, you can also retry them from Failed Messages, see [Retries and failed messages](/docs/outgoing/retries/#failed-messages).
+
+## Replay a time range
+
+<Steps>
+
+1. Estimate first. `POST /api/v1/projects/{projectId}/replay/estimate` takes the same body as the replay and creates nothing. It returns how many events match, how many active subscriptions match, how many deliveries would be created, and a warning when the range is too large.
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/replay/estimate" \
+     -H "X-API-Key: $API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"fromDate":"2026-09-01T00:00:00Z","toDate":"2026-09-02T00:00:00Z","eventType":"order.completed"}'
+   ```
+
+2. Start the replay with `POST /api/v1/projects/{projectId}/replay` and the same body. `fromDate` and `toDate` are required; `eventType`, `endpointId` and `sourceStatus` narrow it down. It answers `201` with a session.
+
+3. Follow the session with `GET /api/v1/projects/{projectId}/replay/{sessionId}`, or stop it with `POST /api/v1/projects/{projectId}/replay/{sessionId}/cancel`.
+
+</Steps>
+
+A replay creates one delivery for each stored event and each active subscription that matches. Ordered endpoints get fresh sequence numbers, so replayed deliveries wait behind live ones instead of colliding with them.
+
+| Limit | Value |
+|---|---|
+| Replay sessions running at once, per project | 2 |
+| Events in one session | `REPLAY_MAX_EVENTS_PER_SESSION`, default `500000` |
+
+<Aside type="caution" title="The Idempotency-Key changes on a replay">
+A replayed delivery carries no key of its own, so its `Idempotency-Key` is `<event id>-<endpoint id>`. If the original event was sent with a key, the replayed request's header does not match the original one. A receiver that must recognise replays should deduplicate on its own business id or on `X-Event-Id`.
+</Aside>
+
+## Replay incoming webhooks
+
+Incoming events can be replayed too, to every destination of their source:
+
+- One event: `POST /api/v1/projects/{projectId}/incoming-events/{id}/replay`.
+- Many events: `POST /api/v1/projects/{projectId}/incoming-events/bulk-replay` with a required `sourceId`, and either a list of `eventIds` or a `from` and `to` range, optionally filtered by `verified` and capped by `maxEvents`.
+
+Each replay creates new forwards that start again from attempt 1.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="The ladder a resent delivery walks again." />
+  <LinkCard title="Ordering" href="/docs/outgoing/ordering/" description="Why a replay goes to the back of the sequence." />
+  <LinkCard title="API reference" href="/docs/api-reference/" description="Full request and response shapes for replay." />
+</CardGrid>
