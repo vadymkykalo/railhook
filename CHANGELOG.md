@@ -21,7 +21,13 @@ A new site, docs you can navigate, and one install command on the project's own 
   settings on your domain, the dashboard on loopback, no TLS terminator — nothing left to edit
   in `.env` by hand.
 - **New look across the product**: white ground, cobalt accent, Manrope and Onest. The landing
-  page puts Railhook Cloud (free right now) and the self-hosted install side by side.
+  page puts Railhook Cloud (free right now) and the self-hosted install side by side, and ends
+  with a developer section: sending an event in Node.js, Python, PHP and cURL, and links to the
+  docs, the API reference and Standard Webhooks.
+- **`curl -fsSL https://railhook.io/install-cli.sh | bash`** installs the CLI; every UI image
+  serves it next to `/install.sh`.
+- **`scripts/seed-demo.sh`** seeds a believable demo project — endpoints, subscriptions, sources,
+  delivered, retrying and failed traffic — through the public API only.
 
 ### Fixed
 
@@ -40,6 +46,9 @@ A new site, docs you can navigate, and one install command on the project's own 
   exception instead of `RailhookError`; the PHP SDK rejected the array-valued headers Laravel and
   Symfony pass. The READMEs' Stripe example could never verify and said deliveries are `PUT`
   (they are `POST`).
+- **The API reference's "Try it" client was painted over** by the docs sidebar and header.
+- **Every UI image build reinstalled Chromium** for the prerender step whenever any source file
+  changed; it is now installed before the sources are copied, so that layer is cached.
 
 ### Removed
 
