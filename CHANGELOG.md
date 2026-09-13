@@ -50,6 +50,11 @@ A new site, docs you can navigate, and one install command on the project's own 
 - **The API reference's "Try it" client was painted over** by the docs sidebar and header.
 - **Every UI image build reinstalled Chromium** for the prerender step whenever any source file
   changed; it is now installed before the sources are copied, so that layer is cached.
+- **Browsers kept showing old images after an upgrade.** nginx cached every `.png`, `.svg` and
+  `.ico` as immutable for a year by extension, including files whose names never change (the
+  favicon, logos, landing screenshots). Only content-hashed paths (`/assets/`, `/docs/_astro/`)
+  are immutable now; everything else revalidates. The landing screenshots are hashed as well.
+- **The docs header drew a second line** under the search box.
 
 ### Removed
 
