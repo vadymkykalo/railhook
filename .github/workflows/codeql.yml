@@ -67,7 +67,7 @@ jobs:
             build-mode: none
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Java only. The UI is analysed from source with build-mode: none, so it
       # needs no toolchain at all.
