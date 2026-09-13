@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.1] - 2026-09-13
+
+### Added
+
+- **Change the address you sign in with.** In Settings, or from the verification banner. An
+  unverified account changes it at once and gets a fresh link at the new address. A verified one
+  confirms with its password (or a recent Google sign-in), and nothing changes until the new
+  address confirms; the old address is told, with a "this wasn't me" link that cancels the change.
+  Confirming or cancelling signs every session out. Changes and confirmation emails are capped per
+  day, and every request, confirmation and cancellation is in the audit log.
+- **"Did you mean gmail.com?"** Registration, member invites and the billing email suggest the
+  likely address for a mistyped domain, and endings that do not exist (`.con`, `.cmo`, …) are
+  refused before any mail is sent. Signing in is not checked, so an account with a typo can still
+  get in and fix it.
+- **Every email Railhook sends is logged**, with the template, a masked recipient and whether the
+  provider accepted it — so "the email never came" has an answer.
+- The Railhook Cloud limits are documented next to the self-hosted ones.
+
+### Fixed
+
+- **A busy dashboard no longer signs you out.** Refreshing a session has its own rate limit,
+  per session rather than shared with sign-in attempts from the same network, and the dashboard
+  retries a refresh that answers 429 or 5xx instead of ending the session.
+- Copy-as-curl and API key snippets send to the address the dashboard actually talks to; the tunnel
+  empty state shows the real `railhook listen` command; source pages show the provider's own
+  signature header, and a provider-signed source says to send a test from the provider instead of
+  offering an unsigned curl.
+- Signing in from an origin the server does not allow explains that, and names
+  `CORS_ALLOWED_ORIGINS`, instead of an empty 403.
+- `APP_BASE_URL` defaults to `http://localhost`, matching the UI's default port.
+- Retry schedules say that each wait varies by design; smaller wording and formatting fixes across
+  the dashboard.
+
 ## [2.20.0] - 2026-09-13
 
 ### Added
@@ -1898,7 +1931,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.20.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.20.1...HEAD
+[2.20.1]: https://github.com/vadymkykalo/railhook/compare/v2.20.0...v2.20.1
 [2.20.0]: https://github.com/vadymkykalo/railhook/compare/v2.19.2...v2.20.0
 [2.19.2]: https://github.com/vadymkykalo/railhook/compare/v2.19.1...v2.19.2
 [2.19.1]: https://github.com/vadymkykalo/railhook/compare/v2.19.0...v2.19.1
