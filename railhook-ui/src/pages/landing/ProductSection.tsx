@@ -40,7 +40,7 @@ export default function ProductSection() {
       <SectionHeading id="product-title" title={t('landing.product.title')} lead={t('landing.product.lead')} />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div role="tablist" aria-label={t('landing.product.tabsLabel')} className="inline-flex self-start rounded-[10px] border border-input bg-background p-[3px]">
+        <div role="tablist" aria-label={t('landing.product.tabsLabel')} className="inline-flex self-start rounded-[10px] border border-input bg-background p-[3px] max-sm:grid max-sm:w-full max-sm:grid-cols-3">
           {shots.map((s, i) => (
             <button
               key={s.id}
@@ -56,7 +56,7 @@ export default function ProductSection() {
               onClick={() => setActive(i)}
               onKeyDown={onKey}
               className={cn(
-                'rounded-[7px] px-3 py-1.5 text-[13.5px] font-medium transition-colors',
+                'rounded-[7px] px-3 py-1.5 text-[13.5px] font-medium transition-colors max-sm:h-10 max-sm:px-1',
                 i === active ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -78,18 +78,24 @@ export default function ProductSection() {
             <span className="font-mono text-xs text-muted-foreground">{t('landing.product.unavailable')}</span>
           </div>
         ) : (
-          <img
-            key={shot.id}
-            src={shot.src}
-            alt={shot.alt}
-            width={1440}
-            height={900}
-            loading="lazy"
-            onError={() => setFailed((f) => ({ ...f, [shot.id]: true }))}
-            className="block aspect-[16/10] h-auto w-full object-cover object-top"
-          />
+          /* A 1440px dashboard squeezed to a phone's width is a picture of nothing. Below sm the
+             frame shows the working area at roughly twice the size — past the sidebar, from the
+             top — and a tap opens the whole screenshot; from sm it is the full image, as before. */
+          <a href={shot.src} target="_blank" rel="noopener noreferrer" className="block max-sm:aspect-[5/4] max-sm:overflow-hidden">
+            <img
+              key={shot.id}
+              src={shot.src}
+              alt={shot.alt}
+              width={1440}
+              height={900}
+              loading="lazy"
+              onError={() => setFailed((f) => ({ ...f, [shot.id]: true }))}
+              className="block aspect-[16/10] h-auto w-full object-cover object-top max-sm:-ml-[30%] max-sm:w-[210%] max-sm:max-w-none"
+            />
+          </a>
         )}
       </div>
+      {!failed[shot.id] && <p className="mt-2.5 text-center text-[13px] text-muted-foreground sm:hidden">{t('landing.product.openFull')}</p>}
     </Band>
   );
 }

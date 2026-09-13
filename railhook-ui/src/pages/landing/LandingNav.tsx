@@ -56,7 +56,7 @@ export default function LandingNav() {
     <header className="sticky top-0 z-50 border-b border-rail bg-background/90 backdrop-blur-md">
       <div className={`${WRAP} flex h-16 items-center gap-2`}>
         <nav aria-label={t('landing.nav.label')} className="flex min-w-0 flex-1 items-center gap-7">
-          <Link to="/" className="flex flex-none items-center gap-2.5 text-[17px] font-bold tracking-[-0.01em] text-foreground">
+          <Link to="/" className="flex flex-none items-center gap-2.5 text-[17px] font-bold tracking-[-0.01em] text-foreground max-sm:min-h-10">
             <span aria-hidden="true" className="grid h-[30px] w-[30px] place-items-center rounded-lg bg-primary">
               <RailhookIcon className="h-[18px] w-[18px] text-primary-foreground" />
             </span>
@@ -93,7 +93,7 @@ export default function LandingNav() {
                 {t('landing.nav.signIn')}
               </Link>
             )}
-            <Button asChild size="sm">
+            <Button asChild size="sm" className="max-sm:h-10 max-sm:px-3.5">
               {isAuthenticated ? (
                 <Link to="/admin/dashboard">{t('landing.nav.goToDashboard')}</Link>
               ) : (
@@ -109,7 +109,7 @@ export default function LandingNav() {
           aria-expanded={open}
           aria-controls="landing-mobile-nav"
           aria-label={open ? t('landing.nav.closeMenu') : t('landing.nav.openMenu')}
-          className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+          className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:h-10 max-sm:w-10 lg:hidden"
         >
           {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
         </button>

@@ -2079,6 +2079,7 @@
       "deliveriesBody": "Each delivery, every attempt, and what the other server answered.",
       "deliveriesTab": "Deliveries",
       "lead": "The screen your team opens when a customer asks what happened.",
+      "openFull": "Tap to open the full-size screenshot",
       "tabsLabel": "Screens",
       "title": "See where every webhook went",
       "unavailable": "Screenshot not captured yet"
