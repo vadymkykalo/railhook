@@ -18,6 +18,15 @@ describe('EmptyState', () => {
     expect(screen.getByText('Create your first endpoint')).toBeInTheDocument();
   });
 
+  it('keeps its centred layout when a caller only changes the spacing', () => {
+    // Inside a card, "py-10" used to replace the whole layout: the icon and title fell against
+    // the card's left edge.
+    withRouter(<EmptyState icon={Webhook} title="No projects." className="py-10" />);
+    const container = screen.getByText('No projects.').parentElement!;
+    expect(container).toHaveClass('flex', 'flex-col', 'items-center', 'justify-center', 'py-10');
+    expect(container).not.toHaveClass('py-16');
+  });
+
   it('renders the provided action', () => {
     withRouter(
       <EmptyState icon={Webhook} title="No endpoints yet" action={<button>Create endpoint</button>} />

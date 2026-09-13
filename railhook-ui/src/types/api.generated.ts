@@ -5806,6 +5806,7 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             lastSeenAt?: string;
+            platformAdmin?: boolean;
         };
         OrganizationMembership: {
             /** Format: uuid */
@@ -5936,6 +5937,7 @@ export interface components {
             joinedAt?: string;
             /** Format: date-time */
             lastSeenAt?: string;
+            platformAdmin?: boolean;
         };
         PageAdminMemberResponse: {
             /** Format: int32 */

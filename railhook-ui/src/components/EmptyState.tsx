@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { docsUrl } from '../lib/docsUrl';
 import { resolveErrorMessage } from '../lib/toast';
 import { Button } from './ui/button';
+import { cn } from '../lib/utils';
 
 interface EmptyStateProps {
   icon: LucideIcon;
@@ -13,13 +14,14 @@ interface EmptyStateProps {
   action?: ReactNode;
   /** A docs page slug, e.g. `outgoing/retries`. Opened in the reader's language. */
   docsLink?: string;
+  /** Merged with the centred layout, so a caller can change the spacing without losing it. */
   className?: string;
 }
 
 export default function EmptyState({ icon: Icon, title, description, action, docsLink, className }: EmptyStateProps) {
   const { t, i18n } = useTranslation();
   return (
-    <div className={className ?? 'flex flex-col items-center justify-center rounded-lg border border-dashed border-rail py-16'}>
+    <div className={cn('flex flex-col items-center justify-center rounded-lg border border-dashed border-rail py-16', className)}>
       <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-rail bg-card">
         <Icon className="h-5 w-5 text-muted-foreground" />
       </div>

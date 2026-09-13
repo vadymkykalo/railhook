@@ -1003,6 +1003,8 @@ jobs:
           # database and the backup sidecar are behind profiles, so a run that
           # ignored it would come up with no database at all.
           grep -q '^COMPOSE_PROFILES=.*embedded-db' .env || { echo "::error::installer did not enable embedded-db"; exit 1; }
+          # Without --admin-email nobody is a platform admin: no first-account-wins.
+          grep -qx 'PLATFORM_ADMIN_EMAILS=' .env || { echo "::error::a plain install named a platform admin"; exit 1; }
           # Pre-rename variable names are gone for good; nothing reads them.
           ! grep -q '^HOOKFLOW_' .env || { echo "::error::installer still writes HOOKFLOW_* variables"; exit 1; }
           docker compose up -d
@@ -1081,8 +1083,10 @@ jobs:
           # terminator is in the service list, the dashboard has moved to
           # loopback behind it, and production mode is on.
           ./install.sh --dir "$HOME/railhook-tls" --version v0.0.0-ci \
-            --domain hooks.example.com --email ops@example.com --no-start --yes
+            --domain hooks.example.com --email ops@example.com --admin-email ops@example.com --no-start --yes
           cd "$HOME/railhook-tls"
+          # The platform admin panel opens only for the address the installer was given.
+          grep -qx 'PLATFORM_ADMIN_EMAILS=ops@example.com' .env || { echo "::error::--admin-email was not written"; exit 1; }
           docker compose config --services | grep -qx caddy || { echo "::error::no TLS terminator"; exit 1; }
           docker compose config | grep -q "host_ip: 127.0.0.1" || { echo "::error::dashboard still bound publicly"; exit 1; }
           grep -qx 'APP_ENV=production' .env || { echo "::error::APP_ENV not production"; exit 1; }

@@ -30,4 +30,9 @@ public class AdminMemberResponse {
     private List<String> signInMethods;
     private Instant joinedAt;
     private Instant lastSeenAt;
+    /**
+     * Listed in PLATFORM_ADMIN_EMAILS, verified and active: the account half of the rule the admin
+     * API itself applies, so the panel marks exactly the people it would let in.
+     */
+    private boolean platformAdmin;
 }

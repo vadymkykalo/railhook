@@ -21,7 +21,7 @@ import type { AdminResourceUsage } from '../api/platformAdmin.api';
 import { formatDate, formatDateTimeCompact, formatNumber, formatRelativeTime } from '../lib/date';
 import { cn } from '../lib/utils';
 import {
-  OrganizationStatusBadge, PanelTitle, PlatformErrorState, SignInMethods, SuspensionDialog, VerifiedBadge,
+  EmailText, OrganizationStatusBadge, PLATFORM_TABLE, PLATFORM_TABLE_HEADER, PanelTitle, PlatformAdminBadge, PlatformErrorState, SignInMethods, SuspensionDialog, VerifiedBadge,
 } from './platformAdminParts';
 
 function BackLink() {
@@ -36,26 +36,29 @@ function BackLink() {
   );
 }
 
+/** One resource against the plan. No limit (billing off, self_hosted) reads as Unlimited, with no bar. */
 function UsageRow({ label, usage }: { label: string; usage: AdminResourceUsage }) {
   const { t } = useTranslation();
-  const percent = usage.limit > 0 ? Math.min(100, usage.percentUsed) : 0;
+  const unlimited = usage.limit <= 0;
+  const percent = unlimited ? 0 : Math.min(100, usage.percentUsed);
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 text-sm">
         <span>{label}</span>
         <span className="font-mono text-[13px] text-muted-foreground">
-          {t('platformAdmin.detail.usageOf', {
-            current: formatNumber(usage.current),
-            limit: usage.limit > 0 ? formatNumber(usage.limit) : '∞',
-          })}
+          {unlimited
+            ? t('platformAdmin.detail.usageUnlimited', { current: formatNumber(usage.current) })
+            : t('platformAdmin.detail.usageOf', { current: formatNumber(usage.current), limit: formatNumber(usage.limit) })}
         </span>
       </div>
-      <div className="mt-1.5 h-1.5 rounded-full bg-secondary" aria-hidden>
-        <div
-          className={cn('h-1.5 rounded-full', percent >= 100 ? 'bg-halt' : percent >= 80 ? 'bg-retry' : 'bg-primary')}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
+      {!unlimited && (
+        <div className="mt-1.5 h-1.5 rounded-full bg-secondary" aria-hidden>
+          <div
+            className={cn('h-1.5 rounded-full', percent >= 100 ? 'bg-halt' : percent >= 80 ? 'bg-retry' : 'bg-primary')}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -106,13 +109,16 @@ export default function PlatformOrganizationDetailPage() {
         eyebrow={t('platformAdmin.detail.eyebrow', { plan: org.planName ?? '—', created: formatDate(org.createdAt) })}
         title={org.name}
         description={(
-          <span className="flex flex-wrap items-center gap-2">
+          <span className="flex min-w-0 flex-wrap items-center gap-2">
             <OrganizationStatusBadge organization={org} />
-            <span className="break-all font-mono text-[13px]">
-              {org.ownerEmail
-                ? t('platformAdmin.detail.owner', { email: org.ownerEmail })
-                : t('platformAdmin.detail.noOwner')}
-            </span>
+            {org.ownerEmail ? (
+              <span className="flex min-w-0 max-w-full items-baseline gap-1.5">
+                <span className="flex-shrink-0 text-[13px]">{t('platformAdmin.columns.owner')}</span>
+                <EmailText email={org.ownerEmail} className="max-w-[28rem]" />
+              </span>
+            ) : (
+              <span className="font-mono text-[13px]">{t('platformAdmin.detail.noOwner')}</span>
+            )}
           </span>
         )}
         actions={suspended ? (
@@ -138,7 +144,7 @@ export default function PlatformOrganizationDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-3">
+      <div className="grid gap-5 2xl:grid-cols-3">
         <Card className="overflow-hidden">
           <PanelTitle
             title={t('platformAdmin.detail.usage')}
@@ -160,15 +166,15 @@ export default function PlatformOrganizationDetailPage() {
           </div>
         </Card>
 
-        <Card className="overflow-hidden xl:col-span-2">
+        <Card className="overflow-hidden 2xl:col-span-2">
           <PanelTitle title={t('platformAdmin.detail.members')} meta={members.data?.totalElements} />
           {members.isError ? (
             <PlatformErrorState error={members.error} onRetry={() => members.refetch()} />
           ) : !members.data ? (
             <SkeletonTable rows={4} />
           ) : (
-            <Table>
-              <TableHeader>
+            <Table className={PLATFORM_TABLE}>
+              <TableHeader className={PLATFORM_TABLE_HEADER}>
                 <TableRow>
                   <TableHead>{t('platformAdmin.columns.account')}</TableHead>
                   <TableHead>{t('platformAdmin.columns.role')}</TableHead>
@@ -181,9 +187,10 @@ export default function PlatformOrganizationDetailPage() {
               <TableBody>
                 {members.data.content.map((member) => (
                   <TableRow key={member.userId}>
-                    <TableCell className="max-w-[16rem]">
-                      <p className="truncate font-mono text-[13px]" title={member.email ?? undefined}>{member.email ?? '—'}</p>
-                      {member.fullName && <p className="truncate text-xs text-muted-foreground">{member.fullName}</p>}
+                    <TableCell>
+                      <EmailText email={member.email} />
+                      {member.fullName && <p className="max-w-[13rem] truncate text-xs text-muted-foreground max-sm:max-w-full" title={member.fullName}>{member.fullName}</p>}
+                      {member.platformAdmin && <div className="mt-1"><PlatformAdminBadge /></div>}
                     </TableCell>
                     <TableCell className="text-[13px]">{t(`members.roles.${member.role}`, { defaultValue: member.role })}</TableCell>
                     <TableCell>
@@ -217,7 +224,7 @@ export default function PlatformOrganizationDetailPage() {
         </Card>
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-3">
+      <div className="mt-5 grid gap-5 2xl:grid-cols-3">
         <Card className="overflow-hidden">
           <PanelTitle title={t('platformAdmin.detail.projects')} meta={projects.data?.totalElements} />
           {projects.isError ? (
@@ -225,7 +232,7 @@ export default function PlatformOrganizationDetailPage() {
           ) : !projects.data ? (
             <SkeletonTable rows={3} />
           ) : projects.data.content.length === 0 ? (
-            <EmptyState icon={FolderOpen} title={t('platformAdmin.detail.noProjects')} className="py-10" />
+            <EmptyState icon={FolderOpen} title={t('platformAdmin.detail.noProjects')} className="rounded-none border-0 py-10" />
           ) : (
             <ul className="divide-y divide-rail">
               {projects.data.content.map((project) => (
@@ -238,17 +245,17 @@ export default function PlatformOrganizationDetailPage() {
           )}
         </Card>
 
-        <Card className="overflow-hidden xl:col-span-2">
+        <Card className="overflow-hidden 2xl:col-span-2">
           <PanelTitle title={t('platformAdmin.detail.auditLog')} meta={audit.data?.totalElements} />
           {audit.isError ? (
             <PlatformErrorState error={audit.error} onRetry={() => audit.refetch()} />
           ) : !audit.data ? (
             <SkeletonTable rows={4} />
           ) : audit.data.content.length === 0 ? (
-            <EmptyState icon={FileText} title={t('platformAdmin.detail.noAudit')} className="py-10" />
+            <EmptyState icon={FileText} title={t('platformAdmin.detail.noAudit')} className="rounded-none border-0 py-10" />
           ) : (
-            <Table>
-              <TableHeader>
+            <Table className={PLATFORM_TABLE}>
+              <TableHeader className={PLATFORM_TABLE_HEADER}>
                 <TableRow>
                   <TableHead>{t('platformAdmin.columns.time')}</TableHead>
                   <TableHead>{t('platformAdmin.columns.action')}</TableHead>
@@ -266,8 +273,8 @@ export default function PlatformOrganizationDetailPage() {
                     <TableCell className="font-mono text-[13px]">
                       {t(`auditLog.actions.${entry.action}`, { defaultValue: entry.action })}
                     </TableCell>
-                    <TableCell className="max-w-[14rem] truncate font-mono text-[13px] text-muted-foreground" title={entry.actorEmail ?? undefined}>
-                      {entry.actorEmail ?? '—'}
+                    <TableCell className="text-muted-foreground">
+                      <EmailText email={entry.actorEmail} />
                     </TableCell>
                     <TableCell>
                       <StatusBadge

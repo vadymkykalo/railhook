@@ -24,6 +24,7 @@ VERSION=""
 PORT=""
 DOMAIN=""
 ACME_EMAIL=""
+ADMIN_EMAILS=""
 BEHIND_PROXY=0
 # The oldest release this installer can install. Earlier ones are unsupported
 # (SECURITY.md) and were published as Hookflow, under image and variable names
@@ -63,6 +64,10 @@ ${B}Options${N}
                      Same production settings, no built-in TLS terminator;
                      the dashboard listens on 127.0.0.1:<port> for your proxy.
   --email <address>  Where Let's Encrypt should send expiry warnings
+  --admin-email <address>
+                     Who may open the platform admin panel with their own
+                     sign-in (comma-separate several). Without it, nobody can.
+                     Also works with --refresh on an existing installation.
   --no-start         Write the files, do not start anything
   --yes              Do not ask before reusing a non-empty directory
   --check            Run the system and configuration checks only, change nothing
@@ -82,6 +87,7 @@ while [ $# -gt 0 ]; do
         --port)      PORT="${2:?--port needs a port}"; shift 2 ;;
         --domain)    DOMAIN="${2:?--domain needs a hostname}"; shift 2 ;;
         --email)     ACME_EMAIL="${2:?--email needs an address}"; shift 2 ;;
+        --admin-email) ADMIN_EMAILS="${2:?--admin-email needs an address}"; shift 2 ;;
         --behind-proxy) BEHIND_PROXY=1; shift ;;
         --no-start)  START=0; shift ;;
         --yes|-y)    ASSUME_YES=1; shift ;;
@@ -98,6 +104,19 @@ while [ $# -gt 0 ]; do
     esac
 done
 INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_DIR}"
+
+# Written into .env as a single line, so every address is checked before anything is touched.
+# There is deliberately no "first account to register becomes the admin": on a public instance
+# that is whoever finds the sign-up page first.
+if [ -n "$ADMIN_EMAILS" ]; then
+    [ "${ADMIN_EMAILS: -1}" != "," ] \
+        || die "--admin-email ${ADMIN_EMAILS} ends with a comma. Separate addresses with commas, e.g. ops@example.com,oncall@example.com."
+    IFS=',' read -r -a admin_addresses <<< "$ADMIN_EMAILS"
+    for address in "${admin_addresses[@]}"; do
+        [[ "$address" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]] \
+            || die "--admin-email: '${address}' is not an email address. Pass one like ops@example.com, or several separated by commas."
+    done
+fi
 
 # Refused here, before anything is checked, written or fetched.
 require_supported_version() {
@@ -379,6 +398,22 @@ resolve_version() {
 }
 
 secret() { openssl rand -base64 "$1" | tr -d '\n'; }
+
+# PLATFORM_ADMIN_EMAILS in an .env that already exists: that one line replaced, or added when
+# missing, every other line kept as it is.
+set_admin_emails() {
+    local env_file="${INSTALL_DIR}/.env" tmp
+    [ -f "$env_file" ] || return 0
+    tmp=$(mktemp "${env_file}.XXXXXX")
+    awk -v line="PLATFORM_ADMIN_EMAILS=${ADMIN_EMAILS}" '
+        /^PLATFORM_ADMIN_EMAILS=/ { if (!done) { print line; done = 1 } next }
+        { print }
+        END { if (!done) print line }
+    ' "$env_file" > "$tmp"
+    chmod 600 "$tmp"
+    mv "$tmp" "$env_file"
+    ok "Platform admins: ${ADMIN_EMAILS}"
+}
 password() { openssl rand -base64 24 | tr -d '\n/+='; }
 
 write_files() {
@@ -427,6 +462,7 @@ write_files() {
 
     if [ -f "${INSTALL_DIR}/.env" ]; then
         warn ".env already exists — keeping it, and the secrets already in it"
+        [ -z "$ADMIN_EMAILS" ] || set_admin_emails
         return
     fi
 
@@ -514,6 +550,11 @@ APP_ENV=${APP_ENV}
 # to deliver a verification link. Turn it on and set the SMTP_* variables to
 # send verification, invite and alert mail.
 EMAIL_ENABLED=false
+
+# Who may open the platform admin panel (/admin/platform) with their own sign-in: comma-separated
+# addresses, each one verified. Empty means nobody. --admin-email sets it; to change it later,
+# pipe PLATFORM_ADMIN_EMAILS=<addresses> into ./railhook settings.
+PLATFORM_ADMIN_EMAILS=${ADMIN_EMAILS}
 ${PROD_SETTINGS}
 ENVFILE
     ok ".env with newly generated secrets"
@@ -1217,6 +1258,7 @@ main() {
             exit 0 ;;
         refresh)
             [ -d "$INSTALL_DIR" ] || die "${INSTALL_DIR} does not exist — nothing to update."
+            [ -z "$ADMIN_EMAILS" ] || set_admin_emails
             write_helper
             # Only if one is already there. An installation with no domain never had a
             # Caddyfile and must not acquire one from an upgrade.
