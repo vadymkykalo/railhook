@@ -1,0 +1,124 @@
+---
+title: Install with Docker
+description: Install Railhook with the one-line installer, or run the same Compose file yourself.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Both methods run the same `docker-compose.yml`. The installer also generates real secrets and verifies the configuration before it starts anything, so use it unless you have a reason not to.
+
+<Tabs syncKey="install">
+  <TabItem label="Installer">
+    <Steps>
+
+    1. **Run the installer**
+
+       ```bash
+       curl -fsSL https://railhook.io/install.sh | bash
+       ```
+
+       It checks Docker, Compose, memory, disk and the port. It then writes `~/railhook`, which contains a `docker-compose.yml` pinned to the latest release, a `.env` with generated secrets, and a `railhook` helper script. Finally it starts the stack and waits until the API answers. The first start runs the database migrations and creates the Kafka topics, so it can take a few minutes.
+
+    2. **Open the dashboard**
+
+       Go to `http://localhost` (or `http://<server-ip>`) and register. With no mail server configured, the account is active immediately.
+
+    3. **Back up `.env`**
+
+       `WEBHOOK_ENCRYPTION_KEY` and `WEBHOOK_ENCRYPTION_SALT` in it encrypt every endpoint secret in the database. A database backup restored without this file gives you rows nothing can read.
+
+    </Steps>
+
+    ### Installer options
+
+    Pass options through the pipe with `bash -s --`:
+
+    ```bash
+    curl -fsSL https://railhook.io/install.sh | bash -s -- --dir /opt/railhook --port 8080
+    ```
+
+    | Option | Effect |
+    |---|---|
+    | `--dir <path>` | Where to install. Default `~/railhook` |
+    | `--version <tag>` | Release to pin. Default: the latest release |
+    | `--port <port>` | The one published port. Default `80` |
+    | `--domain <host>` | Serve on this domain over HTTPS. See [Domain and HTTPS](/docs/self-hosting/domain-https/) |
+    | `--email <address>` | Where Let's Encrypt sends expiry warnings |
+    | `--no-start` | Write the files, start nothing |
+    | `--yes` | Do not ask before reusing a non-empty directory |
+    | `--check` | Run the system and configuration checks only |
+    | `--uninstall` | Stop the stack and remove the containers. Data volumes are kept |
+    | `--purge` | Uninstall and delete the data volumes too |
+
+    ### Day-to-day commands
+
+    Run these from the install directory:
+
+    | Command | Does |
+    |---|---|
+    | `./railhook status` | Lists the containers and their health |
+    | `./railhook logs [service]` | Follows logs, for example `./railhook logs api` |
+    | `./railhook start` / `stop` / `restart` | Starts, stops or restarts the stack |
+    | `./railhook upgrade [version]` | Backs up, then upgrades. See [Upgrade and backup](/docs/self-hosting/upgrade-backup/) |
+    | `./railhook backup` | Writes a database dump into the directory |
+    | `./railhook doctor` | Re-runs every check against the files on disk |
+
+    Any other argument is passed straight to Docker Compose, so `./railhook ps` or `./railhook up -d` work as you would expect.
+  </TabItem>
+  <TabItem label="Docker Compose by hand">
+    <Steps>
+
+    1. **Download the Compose file and the settings catalogue**
+
+       ```bash
+       mkdir railhook && cd railhook
+       curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/railhook/main/docker-compose.yml
+       curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/.env.dist -o .env
+       ```
+
+    2. **Replace the public secrets**
+
+       The values in `.env.dist` are public. Generate your own for each of these:
+
+       ```bash title=".env"
+       WEBHOOK_ENCRYPTION_KEY=   # openssl rand -base64 32
+       WEBHOOK_ENCRYPTION_SALT=  # openssl rand -base64 16
+       JWT_SECRET=               # openssl rand -base64 48
+       POSTGRES_PASSWORD=        # must equal DB_PASSWORD
+       DB_PASSWORD=
+       REDIS_PASSWORD=
+       ```
+
+       Set `APP_BASE_URL` and `CORS_ALLOWED_ORIGINS` to the URL people will open. `RAILHOOK_PORT` in this file is `8080`.
+
+    3. **Start it with the embedded database**
+
+       ```bash
+       COMPOSE_PROFILES=embedded-db docker compose up -d
+       ```
+
+    4. **Check it**
+
+       ```bash
+       curl -f http://localhost:8080/actuator/health/liveness
+       curl -o /dev/null -w '%{http_code}\n' http://localhost:8080/api/v1/projects   # expect 401
+       ```
+
+    </Steps>
+
+    <Aside type="tip">
+    Leave `embedded-db` out of `COMPOSE_PROFILES` and set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` and `DB_PASSWORD` to use a managed PostgreSQL instead.
+    </Aside>
+  </TabItem>
+</Tabs>
+
+<Aside type="caution">
+The installer pins image tags in `.env` (`API_IMAGE_TAG`, `WORKER_IMAGE_TAG`, `UI_IMAGE_TAG`). A hand-made `.env` from `.env.dist` says `latest`, which moves under you. Pin them to a release.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Domain and HTTPS" description="Put the instance on a domain with a certificate." href="/docs/self-hosting/domain-https/" />
+  <LinkCard title="Configuration" description="The settings to decide before going live." href="/docs/self-hosting/configuration/" />
+  <LinkCard title="Quickstart" description="Send your first event." href="/docs/start/quickstart/" />
+</CardGrid>

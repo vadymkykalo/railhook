@@ -1,0 +1,138 @@
+---
+title: Kubernetes
+description: Install Railhook on Kubernetes with the Helm chart, pointed at your own PostgreSQL, Kafka and Redis.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The Helm chart runs the API, the worker and the dashboard. It does not bundle a database, a broker or a cache, so you supply those.
+
+## Prerequisites
+
+- Kubernetes 1.24+ and Helm 3.8+
+- PostgreSQL 16+, Kafka 3.7+ and Redis 7+, managed or self-run. `postgres:16-alpine`, `apache/kafka:3.7.0` and `redis:7-alpine` are the images the project tests against.
+
+## Install
+
+<Steps>
+
+1. **Create the namespace and secrets**
+
+   ```bash
+   kubectl create namespace railhook
+
+   kubectl -n railhook create secret generic railhook-secrets \
+     --from-literal=encryption-key="$(openssl rand -base64 32)" \
+     --from-literal=encryption-salt="$(openssl rand -base64 24)" \
+     --from-literal=jwt-secret="$(openssl rand -base64 64)"
+
+   kubectl -n railhook create secret generic railhook-postgresql-secret \
+     --from-literal=password="$DB_PASSWORD"
+
+   kubectl -n railhook create secret generic railhook-redis-secret \
+     --from-literal=password="$REDIS_PASSWORD"
+   ```
+
+   All three keys in `railhook-secrets` are required. Without them the API and worker pods crash-loop.
+
+2. **Write a values file**
+
+   ```yaml title="values-mycompany.yaml"
+   postgresql:
+     external:
+       host: postgres.example.com
+       port: 5432
+       database: railhook
+       username: webhook_user
+       existingSecret: railhook-postgresql-secret
+
+   kafka:
+     external:
+       bootstrapServers: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
+
+   redis:
+     external:
+       host: redis.example.com
+       port: 6379
+       existingSecret: railhook-redis-secret
+
+   ui:
+     ingress:
+       hosts:
+         - host: hooks.example.com
+           paths:
+             - path: /
+               pathType: Prefix
+   ```
+
+   Leave `app.baseUrl` empty and the chart derives the public URL from the first ingress host. Set it if people reach Railhook by another name.
+
+3. **Install the chart**
+
+   The chart is published to GHCR on every release. Its version is the release number without the `v`:
+
+   ```bash
+   helm install railhook oci://ghcr.io/vadymkykalo/charts/railhook \
+     --version <version> -n railhook -f values-mycompany.yaml
+   ```
+
+4. **Check it**
+
+   ```bash
+   kubectl -n railhook get pods
+   kubectl -n railhook logs -l app.kubernetes.io/component=api --tail=20
+   ```
+
+</Steps>
+
+<Aside type="danger">
+Back up `encryption-key` and `encryption-salt`, and never change the salt in place. It is an input to key derivation, so a changed salt makes every stored endpoint secret decrypt to garbage.
+</Aside>
+
+## Email
+
+`api.env.APP_ENV` defaults to `production`. With email off, accounts are created already verified and nobody can be invited. To turn it on:
+
+```yaml title="values-mycompany.yaml"
+email:
+  enabled: true
+  from: noreply@hooks.example.com
+  smtp:
+    host: smtp.example.com
+    port: 587
+    username: railhook@example.com
+    auth: true
+    starttls: true
+    existingSecret: railhook-smtp-secret   # key: smtp-password
+```
+
+For production defaults (more replicas, autoscaling, disruption budgets, network policies, email on), clone the repository and add `-f deploy/helm/railhook/values-production.yaml`.
+
+## How it behaves
+
+| Topic | Behaviour |
+|---|---|
+| Migrations | Run inside the API pod at startup. Replicas starting together wait on a PostgreSQL advisory lock, so each migration is applied once |
+| Kafka topics | Created by a post-install and post-upgrade hook job. Set `kafka.topicPartitions` and `kafka.topicReplicationFactor` |
+| Backups | `backup.enabled: true` adds a CronJob that writes `pg_dump` files to a PVC and prunes old ones |
+| Metrics | On the named `management` port (8082 for the API, 8081 for the worker), never published outside the cluster |
+
+## Upgrade
+
+```bash
+helm upgrade railhook oci://ghcr.io/vadymkykalo/charts/railhook --version <version> -n railhook -f values-mycompany.yaml
+```
+
+Take a database backup first. `helm rollback` returns the chart and the images, not the schema.
+
+## Uninstall
+
+```bash
+helm uninstall railhook -n railhook
+```
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Configuration" description="The environment variables behind the chart's values." href="/docs/self-hosting/configuration/" />
+  <LinkCard title="Monitoring" description="ServiceMonitor, alert rules and dashboards." href="/docs/self-hosting/monitoring/" />
+</CardGrid>

@@ -1,0 +1,124 @@
+---
+title: Встановлення з Docker
+description: Встановіть Railhook інсталятором в один рядок або запустіть той самий файл Compose самостійно.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Обидва способи запускають той самий `docker-compose.yml`. Інсталятор також генерує справжні секрети й перевіряє конфігурацію, перш ніж щось запустити, тож користуйтеся ним, якщо немає причин робити інакше.
+
+<Tabs syncKey="install">
+  <TabItem label="Інсталятор">
+    <Steps>
+
+    1. **Запустіть інсталятор**
+
+       ```bash
+       curl -fsSL https://railhook.io/install.sh | bash
+       ```
+
+       Він перевіряє Docker, Compose, пам'ять, диск і порт. Потім записує `~/railhook`: `docker-compose.yml`, закріплений на останньому релізі, `.env` зі згенерованими секретами та допоміжний скрипт `railhook`. Наостанок запускає стек і чекає, доки API відповість. Перший запуск виконує міграції бази даних і створює топіки Kafka, тож може тривати кілька хвилин.
+
+    2. **Відкрийте панель керування**
+
+       Перейдіть на `http://localhost` (або `http://<server-ip>`) і зареєструйтеся. Поки поштовий сервер не налаштовано, обліковий запис активний одразу.
+
+    3. **Збережіть резервну копію `.env`**
+
+       `WEBHOOK_ENCRYPTION_KEY` і `WEBHOOK_ENCRYPTION_SALT` із цього файлу шифрують кожен секрет ендпоінта в базі даних. Резервна копія бази, відновлена без цього файлу, дасть рядки, які ніщо не зможе прочитати.
+
+    </Steps>
+
+    ### Параметри інсталятора
+
+    Передавайте параметри через конвеєр за допомогою `bash -s --`:
+
+    ```bash
+    curl -fsSL https://railhook.io/install.sh | bash -s -- --dir /opt/railhook --port 8080
+    ```
+
+    | Параметр | Дія |
+    |---|---|
+    | `--dir <path>` | Куди встановити. Типово `~/railhook` |
+    | `--version <tag>` | Реліз, на якому закріпитися. Типово — останній |
+    | `--port <port>` | Єдиний опублікований порт. Типово `80` |
+    | `--domain <host>` | Обслуговувати на цьому домені через HTTPS. Див. [Домен і HTTPS](/docs/uk/self-hosting/domain-https/) |
+    | `--email <address>` | Куди Let's Encrypt надсилатиме попередження про закінчення терміну сертифіката |
+    | `--no-start` | Записати файли й нічого не запускати |
+    | `--yes` | Не питати перед використанням непорожнього каталогу |
+    | `--check` | Лише запустити перевірки системи та конфігурації |
+    | `--uninstall` | Зупинити стек і видалити контейнери. Томи з даними лишаються |
+    | `--purge` | Видалити встановлення разом із томами даних |
+
+    ### Щоденні команди
+
+    Запускайте з каталогу встановлення:
+
+    | Команда | Що робить |
+    |---|---|
+    | `./railhook status` | Показує контейнери та їхній стан |
+    | `./railhook logs [service]` | Стежить за журналами, наприклад `./railhook logs api` |
+    | `./railhook start` / `stop` / `restart` | Запускає, зупиняє або перезапускає стек |
+    | `./railhook upgrade [version]` | Робить резервну копію, потім оновлює. Див. [Оновлення й резервні копії](/docs/uk/self-hosting/upgrade-backup/) |
+    | `./railhook backup` | Записує дамп бази даних у каталог |
+    | `./railhook doctor` | Повторно запускає всі перевірки на файлах із диска |
+
+    Будь-який інший аргумент передається просто в Docker Compose, тож `./railhook ps` чи `./railhook up -d` працюють, як очікується.
+  </TabItem>
+  <TabItem label="Docker Compose вручну">
+    <Steps>
+
+    1. **Завантажте файл Compose і каталог налаштувань**
+
+       ```bash
+       mkdir railhook && cd railhook
+       curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/railhook/main/docker-compose.yml
+       curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/.env.dist -o .env
+       ```
+
+    2. **Замініть публічні секрети**
+
+       Значення в `.env.dist` публічні. Згенеруйте власні для кожного з них:
+
+       ```bash title=".env"
+       WEBHOOK_ENCRYPTION_KEY=   # openssl rand -base64 32
+       WEBHOOK_ENCRYPTION_SALT=  # openssl rand -base64 16
+       JWT_SECRET=               # openssl rand -base64 48
+       POSTGRES_PASSWORD=        # must equal DB_PASSWORD
+       DB_PASSWORD=
+       REDIS_PASSWORD=
+       ```
+
+       Задайте в `APP_BASE_URL` і `CORS_ALLOWED_ORIGINS` адресу, яку відкриватимуть користувачі. `RAILHOOK_PORT` у цьому файлі — `8080`.
+
+    3. **Запустіть із вбудованою базою даних**
+
+       ```bash
+       COMPOSE_PROFILES=embedded-db docker compose up -d
+       ```
+
+    4. **Перевірте**
+
+       ```bash
+       curl -f http://localhost:8080/actuator/health/liveness
+       curl -o /dev/null -w '%{http_code}\n' http://localhost:8080/api/v1/projects   # expect 401
+       ```
+
+    </Steps>
+
+    <Aside type="tip">
+    Щоб використати керовану PostgreSQL, приберіть `embedded-db` із `COMPOSE_PROFILES` і задайте `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` і `DB_PASSWORD`.
+    </Aside>
+  </TabItem>
+</Tabs>
+
+<Aside type="caution">
+Інсталятор закріплює теги образів у `.env` (`API_IMAGE_TAG`, `WORKER_IMAGE_TAG`, `UI_IMAGE_TAG`). У `.env`, створеному з `.env.dist`, стоїть `latest`, і цей тег змінюється без вашого відома. Закріпіть теги на релізі.
+</Aside>
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Домен і HTTPS" description="Розмістіть інстанс на домені із сертифікатом." href="/docs/uk/self-hosting/domain-https/" />
+  <LinkCard title="Конфігурація" description="Налаштування, які треба визначити до запуску в роботу." href="/docs/uk/self-hosting/configuration/" />
+  <LinkCard title="Швидкий старт" description="Надішліть першу подію." href="/docs/uk/start/quickstart/" />
+</CardGrid>

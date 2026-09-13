@@ -1,0 +1,111 @@
+---
+title: SDKs
+description: Official Node.js, Python and PHP libraries for sending events, managing endpoints and verifying signatures.
+---
+import { Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The SDKs wrap the parts of the API you call from application code: events, endpoints, subscriptions, deliveries, incoming sources and incoming events, plus signature verification. They authenticate with an API key alone.
+
+| Language | Package | Install |
+|---|---|---|
+| Node.js / TypeScript | [`@railhook/node`](https://www.npmjs.com/package/@railhook/node) | `npm install @railhook/node` |
+| Python | [`railhook`](https://pypi.org/project/railhook/) | `pip install railhook` |
+| PHP 8.1+ | [`railhook/php`](https://packagist.org/packages/railhook/php) | `composer require railhook/php` |
+
+The Node.js SDK has no runtime dependencies. The PHP SDK needs `ext-json` and `ext-curl`.
+
+## Send an event
+
+<Tabs syncKey="lang">
+  <TabItem label="Node.js">
+    ```ts
+    import { Railhook } from '@railhook/node';
+
+    const client = new Railhook({
+      apiKey: process.env.RAILHOOK_API_KEY,
+      baseUrl: 'https://railhook.io', // or your instance
+    });
+
+    const event = await client.events.send(
+      { type: 'order.completed', data: { orderId: 'ord_12345', amount: 99.99 } },
+      'order-12345-completed', // idempotency key, optional
+    );
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    import os
+
+    from railhook import Railhook, Event
+
+    client = Railhook(
+        api_key=os.environ["RAILHOOK_API_KEY"],
+        base_url="https://railhook.io",  # or your instance
+    )
+
+    event = client.events.send(
+        Event(type="order.completed", data={"order_id": "ord_12345", "amount": 99.99}),
+        idempotency_key="order-12345-completed",
+    )
+    ```
+  </TabItem>
+  <TabItem label="PHP">
+    ```php
+    <?php
+    use Railhook\Railhook;
+
+    $client = new Railhook(
+        apiKey: getenv('RAILHOOK_API_KEY'),
+        baseUrl: 'https://railhook.io', // or your instance
+    );
+
+    $event = $client->events->send(
+        type: 'order.completed',
+        data: ['orderId' => 'ord_12345', 'amount' => 99.99],
+        idempotencyKey: 'order-12345-completed',
+    );
+    ```
+  </TabItem>
+</Tabs>
+
+## Verify a signature
+
+Pass the raw request body, the `X-Signature` header and the endpoint secret. Verification throws when the signature does not match or the timestamp is too old.
+
+<Tabs syncKey="lang">
+  <TabItem label="Node.js">
+    ```ts
+    import { verifySignature } from '@railhook/node';
+
+    verifySignature(rawBody, req.headers['x-signature'], process.env.WEBHOOK_SECRET);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from railhook import verify_signature
+
+    verify_signature(raw_body, headers.get("X-Signature", ""), os.environ["WEBHOOK_SECRET"])
+    ```
+  </TabItem>
+  <TabItem label="PHP">
+    ```php
+    use Railhook\Webhook;
+
+    Webhook::verifySignature($payload, $headers['X-Signature'] ?? '', getenv('WEBHOOK_SECRET'));
+    ```
+  </TabItem>
+</Tabs>
+
+Each SDK also provides `constructEvent` (`construct_event` in Python), which verifies and parses in one call. If your endpoint uses the Standard Webhooks headers, use `verifyStandardWebhook` (`verify_standard_webhook`) with the endpoint's `whsec_` secret.
+
+<Aside type="tip">
+The SDKs do not cover transformations, rules, workflows, schemas, the DLQ, alerts or project administration. Each SDK has a generic request helper for those, and the [API reference](/docs/api-reference/) lists every endpoint.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Send your first webhook" description="Endpoint, subscription, event and signature, end to end." href="/docs/start/send-first-webhook/" />
+  <LinkCard title="Signatures" description="Both signing schemes and secret rotation." href="/docs/outgoing/signatures/" />
+  <LinkCard title="API reference" description="Every endpoint, generated from the OpenAPI spec." href="/docs/api-reference/" />
+</CardGrid>

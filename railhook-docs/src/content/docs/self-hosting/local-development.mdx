@@ -1,0 +1,116 @@
+---
+title: Local development
+description: Build and run Railhook from a clone of the repository, and iterate on one service at a time.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page is for working on Railhook itself. It builds the API, worker and dashboard from your working tree and runs them in the same one-port layout as a real deployment.
+
+## Prerequisites
+
+- Java 17 and Maven 3.9+
+- Node 22+
+- Docker with Compose v2
+
+## Start the stack
+
+<Steps>
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/vadymkykalo/railhook.git
+   cd railhook
+   ```
+
+2. **Start everything**
+
+   ```bash
+   make up
+   ```
+
+   This creates `.env` from `.env.dist` if it does not exist, builds the three services from your tree, starts them with the embedded database and scheduled backups, waits until the API and worker are healthy, and creates the Kafka topics. Don't do any of those steps by hand.
+
+3. **Open the dashboard**
+
+   Go to `http://localhost:8080`. The dashboard, the API, the docs and the ingress URLs all go through that port.
+
+</Steps>
+
+`make help` lists every target.
+
+## The inner loop
+
+Once the stack is up, rebuild and restart only the service you changed:
+
+| Command | Does |
+|---|---|
+| `make dev-api` | Rebuilds the API with the build cache, restarts it and follows its logs |
+| `make dev-worker` | The same for the worker |
+| `make dev-ui` | The same for the dashboard image |
+| `make health` | Prints the state of Postgres, Kafka, Redis, the API, the worker and the web port |
+| `make logs` / `make logs-api` | Follows logs |
+| `make down` | Stops the stack and keeps the data |
+
+<Aside type="caution">
+`make nuke CONFIRM=YES` deletes the containers, volumes, images and networks, including the monitoring stack. The database is gone afterwards.
+</Aside>
+
+## Ports
+
+| Port | What |
+|---|---|
+| `8080` | `RAILHOOK_PORT`: nginx, serving the dashboard and proxying the API, ingress and tunnels |
+| `5173` | The Vite dev server, when you run the dashboard with `npm run dev` |
+| `8080`, `8082` | The API and its actuator, inside the Docker network only |
+| `8081` | The worker's actuator, inside the Docker network only |
+
+To reach the API or the database directly, add a `docker-compose.override.yml` and keep the ports on loopback:
+
+```yaml title="docker-compose.override.yml"
+services:
+  api:      { ports: ["127.0.0.1:8080:8080", "127.0.0.1:8082:8082"] }
+  postgres: { ports: ["127.0.0.1:5432:5432"] }
+```
+
+The API's `127.0.0.1:8080` clashes with `RAILHOOK_PORT=8080`, so move one of them.
+
+## Run the dashboard with hot reload
+
+```bash
+cd railhook-ui
+npm install
+npm run dev
+```
+
+It serves on `http://localhost:5173` and proxies `/api` to `http://localhost:8080`, so it talks to the stack started by `make up`. Set `VITE_DEV_API_TARGET` to point it somewhere else.
+
+## Run the docs site
+
+```bash
+make docs-dev
+```
+
+## Email links without a mail server
+
+With `EMAIL_ENABLED=false` (the default in `.env.dist`), new accounts are verified immediately. Password reset and invite links are written to the API log instead of being mailed:
+
+```bash
+make reset-link
+make invite-link
+```
+
+## Checks CI runs
+
+```bash
+make test-ui                              # dashboard unit tests
+cd railhook-ui && npm run lint && npm run typecheck
+mvn clean compile -B
+```
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Configuration" description="Every variable in .env." href="/docs/self-hosting/configuration/" />
+  <LinkCard title="Monitoring" description="Start Prometheus and Grafana next to the stack." href="/docs/self-hosting/monitoring/" />
+</CardGrid>

@@ -1,0 +1,84 @@
+---
+title: Прийміть перший вебхук
+description: Підключіть провайдера як джерело, дайте йому ingress-адресу й пересилайте те, що надходить, на своє призначення.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Railhook може приймати вебхуки від стороннього провайдера, перевіряти, що вони справді від нього, і пересилати їх на ваші сервіси. Знадобляться ідентифікатор проєкту та API-ключ. Усе це також можна зробити в розділі **Вхідні** панелі керування.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Створіть джерело**
+
+   Джерело — це підключений провайдер разом із тим, що потрібно Railhook для перевірки його запитів.
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Stripe","providerType":"STRIPE","verificationMode":"PROVIDER","hmacSecret":"whsec_..."}'
+   ```
+
+   Типи провайдерів: `GENERIC`, `GITHUB`, `GITLAB`, `STRIPE`, `SHOPIFY`, `SLACK`, `TWILIO`. Режими перевірки:
+
+   | Режим | Що перевіряється |
+   |---|---|
+   | `PROVIDER` | Власна схема підпису провайдера, обрана за його типом |
+   | `HMAC_GENERIC` | HMAC від сирого тіла, зчитаний із заголовка та префікса, які ви задали |
+   | `NONE` | Нічого. Лише поки ви підключаєте провайдера |
+
+2. **Передайте провайдеру ingress-адресу**
+
+   Відповідь містить `ingressUrl` у вигляді `https://your-host/ingress/<token>`. Вставте її в налаштування вебхуків провайдера.
+
+   <Aside type="caution">
+   Токен — єдине в адресі, що вказує на джерело, тож поводьтеся з адресою як з обліковими даними. Саме перевірка не дає тому, хто її дізнався, підкидати події.
+   </Aside>
+
+3. **Додайте призначення**
+
+   Призначення — це ваша адреса, що отримує прийняте джерелом, разом зі способом автентифікації до неї.
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/stripe","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+   `authType` — одне з `NONE`, `BASIC`, `BEARER`, `CUSTOM_HEADER`. Джерело пересилає кожен перевірений вебхук на кожне своє увімкнене призначення.
+
+4. **Надішліть тестовий вебхук і простежте його**
+
+   Надішліть тестовий вебхук із панелі провайдера. Він з'явиться в розділі **Вхідні → Отримані**, з одним пересиланням на кожне призначення. Пересилання, якому забракло повторів, переходить до **Невдалих пересилань**.
+
+</Steps>
+
+## Що відповідає ingress
+
+| Статус | Значення |
+|---|---|
+| `202` | Прийнято й збережено |
+| `401` | Перевірку налаштовано, а підпис не збігся. Нічого не збережено |
+| `404` | Жодне джерело не має такого токена |
+| `410` | Джерело існує, але вимкнене |
+| `413` | Тіло перевищує ліміт розміру для вхідних |
+| `429` | Вичерпано посекундний ліміт джерела |
+
+<Aside type="tip">
+Маєте свій сервер? Ingress-адреси будуються з `TUNNEL_INGRESS_BASE_URL`, типове значення якої — `http://localhost:8080`. Задайте свою публічну адресу, інакше провайдери отримають недосяжну для них адресу. Див. [Конфігурацію](/docs/uk/self-hosting/configuration/).
+</Aside>
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Джерела" description="Типи провайдерів, ліміти й дедуплікація." href="/docs/uk/incoming/sources/" />
+  <LinkCard title="Призначення" description="Автентифікація, повтори й трансформації для кожного призначення." href="/docs/uk/incoming/destinations/" />
+  <LinkCard title="Перевірка" description="Як перевіряється підпис кожного провайдера." href="/docs/uk/incoming/verification/" />
+</CardGrid>

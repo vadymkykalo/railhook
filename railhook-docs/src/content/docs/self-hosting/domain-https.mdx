@@ -1,0 +1,103 @@
+---
+title: Domain and HTTPS
+description: Serve Railhook on your own domain with a certificate that renews itself, or behind a proxy you already run.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Before your instance faces the internet, give it a domain and HTTPS. The installer can do this for you, or you can put Railhook behind a reverse proxy you already run.
+
+<Tabs syncKey="https">
+  <TabItem label="Built-in HTTPS">
+    <Steps>
+
+    1. **Point the domain at the server**
+
+       Create an A record for the domain with the server's public IP. Ports 80 and 443 must be free and open to the internet.
+
+    2. **Install with the domain**
+
+       ```bash
+       curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --email ops@example.com
+       ```
+
+    3. **Set the public ingress base URL**
+
+       Ingress URLs for sources and public CLI tunnel URLs are built from `TUNNEL_INGRESS_BASE_URL`, which the installer does not set. Add it to `~/railhook/.env` and apply:
+
+       ```bash title="~/railhook/.env"
+       TUNNEL_INGRESS_BASE_URL=https://hooks.example.com
+       ```
+
+       ```bash
+       cd ~/railhook && ./railhook up -d
+       ```
+
+    </Steps>
+
+    ### What `--domain` changes
+
+    | Setting | Value |
+    |---|---|
+    | TLS terminator | Caddy runs on 80 and 443, and obtains and renews a Let's Encrypt certificate itself |
+    | Dashboard nginx | Moves to `127.0.0.1:8080`, behind Caddy |
+    | `APP_ENV` | `production`, so the platform refuses to start on unsafe configuration |
+    | `APP_BASE_URL`, `CORS_ALLOWED_ORIGINS` | `https://<your domain>` |
+    | `DB_SSL_MODE` | `require` |
+    | `LOG_LEVEL` | `WARN` |
+    | `WEBHOOK_TRUSTED_PROXIES` | `172.16.0.0/12`, so real client IPs reach the audit log |
+
+    <Aside type="caution">
+    Certificates live in the `caddy_data` volume. If you lose it, the certificate is issued again on the next start, and Let's Encrypt rate-limits that.
+    </Aside>
+  </TabItem>
+  <TabItem label="Your own proxy">
+    <Steps>
+
+    1. **Install without a domain, bound to loopback**
+
+       ```bash
+       curl -fsSL https://railhook.io/install.sh | bash -s -- --port 8080
+       ```
+
+       Then set these in `~/railhook/.env`:
+
+       ```bash title="~/railhook/.env"
+       RAILHOOK_BIND=127.0.0.1
+       APP_ENV=production
+       APP_BASE_URL=https://hooks.example.com
+       CORS_ALLOWED_ORIGINS=https://hooks.example.com
+       TUNNEL_INGRESS_BASE_URL=https://hooks.example.com
+       WEBHOOK_TRUSTED_PROXIES=172.16.0.0/12   # the address your proxy connects from
+       ```
+
+    2. **Proxy everything to that one port**
+
+       Send every path to `http://127.0.0.1:8080`. nginx inside already routes the dashboard, `/api/`, `/ingress/`, `/hook/`, `/tunnel/` and `/ws/tunnel`. The `/ws/tunnel` path is a WebSocket held open for a whole CLI session, so pass the upgrade headers and use a long read timeout (the built-in Caddy uses one hour).
+
+    3. **Apply**
+
+       ```bash
+       cd ~/railhook && ./railhook up -d && ./railhook doctor
+       ```
+
+    </Steps>
+  </TabItem>
+</Tabs>
+
+## In production mode
+
+With `APP_ENV=production` the API refuses to start, rather than run, when:
+
+- a secret still holds a placeholder or a shipped default,
+- `WEBHOOK_ALLOW_PRIVATE_IPS=true`,
+- `SWAGGER_ENABLED=true`,
+- `CORS_ALLOWED_ORIGINS` still contains `localhost`.
+
+`./railhook doctor` checks these ahead of time. It also warns if `APP_BASE_URL` still points at localhost, or if `EMAIL_ENABLED` is off: with email off, accounts are created already verified and nobody can be invited.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Configuration" description="Email, secrets and the rest of the settings." href="/docs/self-hosting/configuration/" />
+  <LinkCard title="Upgrade and backup" description="Keep the instance current and recoverable." href="/docs/self-hosting/upgrade-backup/" />
+</CardGrid>

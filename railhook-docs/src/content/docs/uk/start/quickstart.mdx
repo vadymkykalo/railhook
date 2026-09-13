@@ -1,0 +1,125 @@
+---
+title: Швидкий старт
+description: Отримайте інстанс Railhook, створіть проєкт і API-ключ та надішліть першу подію.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Приблизно за десять хвилин у вас будуть проєкт, API-ключ і подія, доставлена на вашу адресу, а кожна спроба залишиться в журналі.
+
+<Steps>
+
+1. **Отримайте інстанс**
+
+   <Tabs syncKey="run">
+     <TabItem label="Railhook Cloud">
+       Зареєструйтеся на [railhook.io/register](https://railhook.io/register). Зараз це безплатно за планом Free: 10 000 подій на місяць, 3 проєкти, 5 ендпоінтів на проєкт і 7 днів історії. Платні плани з підтримкою та вищими лімітами з'являться згодом.
+
+       Базова адреса API — `https://railhook.io`.
+     </TabItem>
+     <TabItem label="Свій сервер">
+       На машині з Docker:
+
+       ```bash
+       curl -fsSL https://railhook.io/install.sh | bash
+       ```
+
+       Інсталятор перевіряє машину, записує до `~/railhook` файл Compose і `.env` зі згенерованими секретами та запускає стек. Відкрийте `http://localhost` і зареєструйтеся. Поштовий сервер ще не налаштовано, тому перший обліковий запис активний одразу.
+
+       Базова адреса API — `http://localhost`.
+     </TabItem>
+   </Tabs>
+
+2. **Створіть проєкт і API-ключ**
+
+   У панелі керування створіть проєкт, відкрийте **API Ключі** й створіть ключ з областю дії `READ_WRITE`. Ключ показується лише один раз, бо зберігається тільки його хеш. Скопіюйте його одразу.
+
+3. **Додайте ендпоінт і підпишіть його**
+
+   Відкрийте **Ендпоінти** й додайте адресу, яка має приймати вебхук. Потім відкрийте **Підписки** та підпишіть цей ендпоінт на тип події `order.completed`.
+
+   <Aside type="caution">
+   Railhook типово не доставляє на приватні та внутрішні адреси. Використовуйте адресу, доступну з публічного інтернету.
+   </Aside>
+
+4. **Надішліть подію**
+
+   <Tabs syncKey="lang">
+     <TabItem label="cURL">
+       ```bash
+       export RAILHOOK_URL=https://railhook.io   # or http://localhost
+       export RAILHOOK_API_KEY=...
+
+       curl -X POST "$RAILHOOK_URL/api/v1/events" \
+         -H "X-API-Key: $RAILHOOK_API_KEY" \
+         -H "Content-Type: application/json" \
+         -H "Idempotency-Key: order-12345-completed" \
+         -d '{"type":"order.completed","data":{"orderId":"ord_12345","amount":99.99}}'
+       ```
+     </TabItem>
+     <TabItem label="Node.js">
+       ```ts
+       import { Railhook } from '@railhook/node';
+
+       const client = new Railhook({
+         apiKey: process.env.RAILHOOK_API_KEY,
+         baseUrl: process.env.RAILHOOK_URL,
+       });
+
+       const event = await client.events.send({
+         type: 'order.completed',
+         data: { orderId: 'ord_12345', amount: 99.99 },
+       });
+       console.log(event.eventId, event.deliveriesCreated);
+       ```
+     </TabItem>
+     <TabItem label="Python">
+       ```python
+       import os
+
+       from railhook import Railhook, Event
+
+       client = Railhook(
+           api_key=os.environ["RAILHOOK_API_KEY"],
+           base_url=os.environ["RAILHOOK_URL"],
+       )
+
+       event = client.events.send(
+           Event(type="order.completed", data={"order_id": "ord_12345", "amount": 99.99})
+       )
+       print(event.event_id, event.deliveries_created)
+       ```
+     </TabItem>
+     <TabItem label="PHP">
+       ```php
+       <?php
+       use Railhook\Railhook;
+
+       $client = new Railhook(
+           apiKey: getenv('RAILHOOK_API_KEY'),
+           baseUrl: getenv('RAILHOOK_URL'),
+       );
+
+       $event = $client->events->send(
+           type: 'order.completed',
+           data: ['orderId' => 'ord_12345', 'amount' => 99.99],
+       );
+       echo $event['eventId'];
+       ```
+     </TabItem>
+   </Tabs>
+
+   Railhook відповідає `201` з `eventId` і `deliveriesCreated`: по одній доставці на кожну підписку, що збіглася. Саме надсилання відбувається згодом, а не під час вашого запиту.
+
+5. **Перевірте доставку**
+
+   Відкрийте **Доставки**. Для кожної доставки видно її спроби, статус-код і тіло відповіді вашого ендпоінта. Відповідь `2xx` позначає доставку як `SUCCESS`. Будь-яка інша відповідь повторюється, а доставка, якій забракло спроб, переходить до **Невдалих повідомлень**.
+
+</Steps>
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Надішліть перший вебхук" description="Той самий шлях через API, з перевіркою підпису на боці отримувача." href="/docs/uk/start/send-first-webhook/" />
+  <LinkCard title="Прийміть перший вебхук" description="Приймайте вебхуки від Stripe, GitHub та інших і пересилайте їх на свої сервіси." href="/docs/uk/start/receive-first-webhook/" />
+  <LinkCard title="Поняття" description="Подія, ендпоінт, доставка, спроба: слова, якими користується решта документації." href="/docs/uk/start/concepts/" />
+</CardGrid>

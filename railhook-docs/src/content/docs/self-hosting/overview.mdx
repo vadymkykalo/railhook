@@ -1,0 +1,43 @@
+---
+title: Self-hosting overview
+description: What a self-hosted Railhook runs, the ways to deploy it, and which one to pick.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Railhook is open source under the MIT licence. A self-hosted instance gets every feature, with no licence key and no locked modules. This section covers running it on your own infrastructure. If you would rather not run it yourself, [Railhook Cloud](https://railhook.io/register) runs the same product for you.
+
+## What you run
+
+| Service | Role |
+|---|---|
+| `ui` | nginx. Serves the dashboard and proxies the API, ingress and tunnel paths. The only service published to the host |
+| `api` | Accepts events and incoming webhooks, and serves the REST API. Runs database migrations on startup |
+| `worker` | Makes the attempts: signs, sends, retries |
+| `postgres` | The system of record |
+| `kafka` | Carries work from the API to the worker. `kafka-init` creates the topics on first start |
+| `redis` | Rate limits, concurrency permits, circuit-breaker state |
+| `caddy` | Optional. Terminates HTTPS when you install with a domain |
+| `db-backup` | Optional. Takes a scheduled database dump |
+
+Everything goes through one port: the dashboard, the API, the ingress URLs and the CLI tunnel. Postgres, Kafka, Redis and the API itself are reachable only inside the Docker network. That means one URL to hand out, one certificate and one firewall rule.
+
+## Ways to deploy
+
+| Method | When to use it |
+|---|---|
+| [Installer](/docs/self-hosting/install-docker/) | The default. One command on a Linux host with Docker. It generates secrets and leaves an ordinary Compose deployment |
+| [Docker Compose by hand](/docs/self-hosting/install-docker/) | You manage the files with your own configuration tooling |
+| [Kubernetes with Helm](/docs/self-hosting/kubernetes/) | You already run Kubernetes and bring your own PostgreSQL, Kafka and Redis |
+| [From a clone](/docs/self-hosting/local-development/) | You are developing Railhook itself |
+
+<Aside type="tip">
+Start with the installer even if you plan to move to Kubernetes later. The configuration variables are the same everywhere.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Requirements" description="Memory, disk, ports and network access." href="/docs/self-hosting/requirements/" />
+  <LinkCard title="Install with Docker" description="The one-line installer and what it leaves behind." href="/docs/self-hosting/install-docker/" />
+  <LinkCard title="Domain and HTTPS" description="Put the instance on a domain with a certificate." href="/docs/self-hosting/domain-https/" />
+</CardGrid>

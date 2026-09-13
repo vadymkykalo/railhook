@@ -1,0 +1,91 @@
+---
+title: Моніторинг
+description: Перевірки здоров'я, метрики Prometheus, вбудований стек Grafana і сигнали, на які варто ставити сповіщення.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Railhook віддає перевірки здоров'я на публічному порту, а метрики Prometheus — на внутрішніх портах. У репозиторії є готовий стек моніторингу, який можна запустити поруч.
+
+## Перевірки здоров'я
+
+```bash
+curl -f http://localhost/actuator/health/liveness
+curl -f http://localhost/actuator/health/readiness
+```
+
+nginx проксує лише шляхи health. Решта шляхів `/actuator/` на публічному порту відповідає `404`.
+
+## Метрики
+
+Метрики доступні на окремих керувальних портах, лише всередині мережі Docker, і не потребують облікових даних:
+
+| Сервіс | Адреса метрик |
+|---|---|
+| API | `http://api:8082/actuator/prometheus` |
+| Воркер | `http://worker:8081/actuator/prometheus` |
+
+На публічний порт їх навмисно не проксовано: метрики розкрили б назви ендпоінтів і обсяги трафіку будь-кому, хто спитає.
+
+## Вбудований стек
+
+Каталог `monitoring/` у репозиторії містить уже налаштовані Prometheus, Alertmanager, Grafana, Loki та Promtail.
+
+<Steps>
+
+1. **Спершу запустіть Railhook** з клону командою `make up`.
+
+2. **Запустіть стек моніторингу**
+
+   ```bash
+   make monitoring-up
+   ```
+
+3. **Відкрийте Grafana** на `http://localhost:3001` і увійдіть як `railhook` / `railhook_monitor_2024`. Пароль змінюється так: `GF_ADMIN_PASSWORD=... make monitoring-up`.
+
+</Steps>
+
+| Сервіс | Адреса (лише loopback) |
+|---|---|
+| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) |
+| Prometheus | `127.0.0.1:9090` |
+| Alertmanager | `127.0.0.1:9093` |
+| Loki | `127.0.0.1:3100` |
+
+Grafana постачається з дашбордами для огляду, воркера й запобіжника, JVM, Kafka та журналів. Alertmanager надсилає вбудовані правила сповіщень у Slack, на загальний вебхук або поштою, щойно ви задасте змінні `ALERTMANAGER_*`.
+
+<Aside type="caution">
+Стек під'єднується до мережі Docker `railhook_webhook-network`, тож проєкт Compose із Railhook має називатися `railhook`. `.env.dist` задає `COMPOSE_PROJECT_NAME=railhook`. Якщо Prometheus не бачить цілей, перевірте це першим.
+</Aside>
+
+## На що ставити сповіщення
+
+| Метрика | Чому |
+|---|---|
+| `delivery_oldest_pending_age_seconds` | Вік найстарішої незавершеної доставки. Будь-яка причина проблем проявляється тут. `forward_oldest_pending_age_seconds` — вхідний відповідник |
+| `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Доставки й пересилання, яким забракло повторів і які потребують людини |
+| `outbox_oldest_pending_age_seconds` | Прийняті події, які ще не дійшли до Kafka |
+| `circuit_breaker_degraded_total` | Redis був недоступний, і запобіжник пропускав виклики без захисту |
+
+## Kubernetes
+
+Увімкніть інтеграції чарта з kube-prometheus-stack:
+
+```yaml title="values.yaml"
+monitoring:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+  grafanaDashboards:
+    enabled: true
+```
+
+ServiceMonitor збирає метрики з порту `management` API та воркера.
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Спостережуваність" description="Кожна метрика, згрупована за питанням, на яке відповідає." href="/docs/uk/platform/observability/" />
+  <LinkCard title="Сповіщення" description="Правила сповіщень, які ви налаштовуєте в панелі." href="/docs/uk/platform/alerts/" />
+  <LinkCard title="Вирішення проблем" description="Симптоми й виправлення." href="/docs/uk/self-hosting/troubleshooting/" />
+</CardGrid>

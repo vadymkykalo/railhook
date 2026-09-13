@@ -1,0 +1,98 @@
+---
+title: CLI
+description: Install the Railhook CLI, receive webhooks on localhost through a tunnel, and read events and replays from a terminal.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The `railhook` CLI opens a tunnel from a public URL to a port on your machine, so the code handling a webhook can run locally. It also lists events and starts replays from the terminal.
+
+<Steps>
+
+1. **Install**
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/railhook-cli/install.sh | bash
+   ```
+
+   The CLI needs Java 17 or newer. Add `-s -- --with-java` to let the script install it through your package manager, which uses `sudo`. The `railhook` command is placed in `~/.local/bin`.
+
+2. **Log in**
+
+   ```bash
+   railhook login --server https://railhook.io   # or your instance, e.g. http://localhost
+   ```
+
+   This prints a URL and a code. Approve it in the browser, and no password is typed into the terminal. For scripts, use `railhook login --email you@example.com --password` instead, and the password is prompted for.
+
+3. **Open a tunnel**
+
+   ```bash
+   railhook listen 3000
+   ```
+
+   The CLI prints a public URL and forwards every request that reaches it to `http://localhost:3000`, then returns your response. Use that URL as an endpoint while you develop. Press Ctrl+C to close it.
+
+</Steps>
+
+<Aside type="tip">
+On a self-hosted instance, the public tunnel URL is built from `TUNNEL_INGRESS_BASE_URL`. Set it to the instance's public address, or the URL will point at `localhost`.
+</Aside>
+
+## Commands
+
+| Command | Does |
+|---|---|
+| `railhook login [--server <url>]` | Logs in with the device code flow |
+| `railhook status` | Shows the server, auth state, health and active tunnels |
+| `railhook listen <port> [--project <id>]` | Opens a tunnel to a local port |
+| `railhook tunnels list` | Lists active tunnel sessions |
+| `railhook tunnels status` | Shows tunnel registry stats |
+| `railhook tunnels close <sessionId>` | Closes one tunnel |
+| `railhook events <projectId>` | Shows recent events. `--count` sets how many (default 20), `--type` filters |
+| `railhook events <projectId> --follow` | Keeps polling for new events |
+| `railhook replay <projectId>` | Replays events, by default from the last 24 hours |
+| `railhook replay <projectId> --dry-run` | Estimates the replay without running it |
+| `railhook config show` | Prints the configuration |
+| `railhook config set <key> <value>` | Sets `backend-url` or `project-id` |
+| `railhook config clear` | Clears the configuration and logs you out |
+| `railhook config profile create <name> --url <url>` | Adds a profile for another server |
+| `railhook config profile use <name>` | Switches profile |
+| `railhook config profile list` / `delete <name>` | Lists or deletes profiles |
+
+`replay` also takes `--event-type`, `--endpoint`, and `--from` / `--to` as ISO-8601 times. `railhook -h` or `railhook <command> -h` shows every option.
+
+### Operator commands
+
+On a self-hosted instance with `PLATFORM_ADMIN_TOKEN` set, `railhook admin` lists organizations and suspends or reinstates them. The token comes from `RAILHOOK_ADMIN_TOKEN` or `--token` and is never saved to the config file.
+
+```bash
+export RAILHOOK_ADMIN_TOKEN=...
+railhook admin orgs --search acme
+railhook admin suspend <organizationId> --reason "Confirmed spam reports"
+railhook admin reinstate <organizationId>
+```
+
+## Configuration file
+
+The CLI stores the server URL, tokens and active project in `~/.config/railhook/config.json`, with `600` permissions.
+
+| Variable | Effect |
+|---|---|
+| `RAILHOOK_CONFIG` | Use another config file path |
+| `XDG_CONFIG_HOME` | Base config directory (default `~/.config`) |
+| `RAILHOOK_DEBUG` | Print stack traces on errors |
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Java not found | Install Java 17+, or re-run the installer with `--with-java` |
+| Connection refused while tunnelling | Nothing is listening on the local port you gave `listen` |
+| Repeated `401` | Tokens refresh on their own. If it keeps happening, run `railhook login` again |
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Replay" description="What a replay creates, and when to use one." href="/docs/outgoing/replay/" />
+  <LinkCard title="SDKs" description="Send events from your code." href="/docs/tools/sdks/" />
+</CardGrid>

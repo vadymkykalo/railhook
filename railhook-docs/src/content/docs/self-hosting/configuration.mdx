@@ -1,0 +1,38 @@
+---
+title: Configuration
+description: The settings every self-hosted instance has to decide, and the full list of environment variables.
+---
+import { Aside } from '@astrojs/starlight/components';
+import EnvReference from '../../../components/EnvReference.astro';
+
+Railhook is configured through environment variables in the `.env` file next to `docker-compose.yml`. A variable you leave out keeps the default built into the Compose file. After editing `.env`, run `./railhook up -d`. Compose recreates only the services whose settings changed.
+
+## Settings you must decide
+
+Almost every variable is a timeout or a batch size whose default is fine. These are the exceptions: their defaults are development choices that become wrong once the instance is reachable.
+
+| Variable | Why it matters |
+|---|---|
+| `APP_ENV` | `production` makes the API refuse to start on unsafe configuration instead of running with it |
+| `WEBHOOK_ENCRYPTION_KEY`, `WEBHOOK_ENCRYPTION_SALT` | Encrypt every endpoint secret in the database. Back them up. Never change the salt once data exists |
+| `JWT_SECRET` | Signs sign-in sessions |
+| `POSTGRES_PASSWORD`, `DB_PASSWORD` | The first creates the database user and the second is what the API and worker connect with. They must be equal |
+| `REDIS_PASSWORD` | Protects the cache |
+| `APP_BASE_URL` | The URL people type. Verification, invite and reset links are built from it |
+| `CORS_ALLOWED_ORIGINS` | Must include the origin the dashboard is served from, or sign-in fails with "Invalid CORS request" |
+| `TUNNEL_INGRESS_BASE_URL` | The public base of source ingress URLs and CLI tunnel URLs |
+| `EMAIL_ENABLED`, `EMAIL_FROM`, `SMTP_*` | With email off, accounts are created already verified and invites cannot be sent |
+| `RAILHOOK_PORT`, `RAILHOOK_BIND` | Where the one published port listens |
+| `WEBHOOK_TRUSTED_PROXIES` | The proxies whose `X-Forwarded-For` is believed. Empty trusts nothing |
+| `WEBHOOK_ALLOW_PRIVATE_IPS`, `WEBHOOK_ALLOWED_HOSTS` | Keep private addresses blocked. List a named internal host to allow just that one |
+| `DB_HOST` and `COMPOSE_PROFILES` | To use a managed PostgreSQL, set the `DB_*` variables and leave `embedded-db` out of the profiles |
+| `PLATFORM_ADMIN_TOKEN` | Unlocks the operator endpoints. Empty keeps them unreachable |
+| `API_REPLICAS` | `2` makes upgrades seamless, at the cost of roughly another 600 MB |
+
+<Aside type="caution">
+Variables that start with `VITE_` are baked into the dashboard when its image is built. On the published images they cannot be changed. To change one, you have to build your own `ui` image.
+</Aside>
+
+## All variables
+
+<EnvReference />

@@ -1,0 +1,98 @@
+---
+title: CLI
+description: Встановіть Railhook CLI, приймайте вебхуки на localhost через тунель і переглядайте події та повтори з термінала.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+CLI `railhook` відкриває тунель від публічної адреси до порту на вашій машині, тож код, що обробляє вебхук, може працювати локально. Також він показує події та запускає повтори з термінала.
+
+<Steps>
+
+1. **Встановіть**
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/railhook-cli/install.sh | bash
+   ```
+
+   CLI потребує Java 17 або новішої. Додайте `-s -- --with-java`, щоб скрипт встановив її через менеджер пакетів (з `sudo`). Команда `railhook` з'являється в `~/.local/bin`.
+
+2. **Увійдіть**
+
+   ```bash
+   railhook login --server https://railhook.io   # or your instance, e.g. http://localhost
+   ```
+
+   Команда показує адресу й код. Підтвердьте їх у браузері, і пароль у терміналі вводити не доведеться. Для скриптів використовуйте `railhook login --email you@example.com --password`: пароль буде запитано окремо.
+
+3. **Відкрийте тунель**
+
+   ```bash
+   railhook listen 3000
+   ```
+
+   CLI показує публічну адресу, пересилає кожен запит на неї до `http://localhost:3000` і повертає вашу відповідь. Використовуйте цю адресу як ендпоінт під час розробки. Щоб закрити тунель, натисніть Ctrl+C.
+
+</Steps>
+
+<Aside type="tip">
+На власному інстансі публічна адреса тунелю будується з `TUNNEL_INGRESS_BASE_URL`. Задайте в ній публічну адресу інстансу, інакше адреса тунелю вказуватиме на `localhost`.
+</Aside>
+
+## Команди
+
+| Команда | Що робить |
+|---|---|
+| `railhook login [--server <url>]` | Вхід через потік device code |
+| `railhook status` | Показує сервер, стан входу, доступність і активні тунелі |
+| `railhook listen <port> [--project <id>]` | Відкриває тунель до локального порту |
+| `railhook tunnels list` | Показує активні сесії тунелів |
+| `railhook tunnels status` | Показує статистику реєстру тунелів |
+| `railhook tunnels close <sessionId>` | Закриває один тунель |
+| `railhook events <projectId>` | Показує останні події. `--count` задає кількість (типово 20), `--type` фільтрує |
+| `railhook events <projectId> --follow` | Постійно опитує нові події |
+| `railhook replay <projectId>` | Повторює події, типово за останні 24 години |
+| `railhook replay <projectId> --dry-run` | Оцінює повтор, не запускаючи його |
+| `railhook config show` | Показує конфігурацію |
+| `railhook config set <key> <value>` | Задає `backend-url` або `project-id` |
+| `railhook config clear` | Очищує конфігурацію й виходить із системи |
+| `railhook config profile create <name> --url <url>` | Додає профіль для іншого сервера |
+| `railhook config profile use <name>` | Перемикає профіль |
+| `railhook config profile list` / `delete <name>` | Показує або видаляє профілі |
+
+`replay` також приймає `--event-type`, `--endpoint` і `--from` / `--to` як час у форматі ISO-8601. `railhook -h` або `railhook <command> -h` показує всі параметри.
+
+### Команди оператора
+
+На власному інстансі із заданим `PLATFORM_ADMIN_TOKEN` команда `railhook admin` показує організації та призупиняє чи відновлює їх. Токен береться з `RAILHOOK_ADMIN_TOKEN` або `--token` і ніколи не зберігається у файлі конфігурації.
+
+```bash
+export RAILHOOK_ADMIN_TOKEN=...
+railhook admin orgs --search acme
+railhook admin suspend <organizationId> --reason "Confirmed spam reports"
+railhook admin reinstate <organizationId>
+```
+
+## Файл конфігурації
+
+CLI зберігає адресу сервера, токени й активний проєкт у `~/.config/railhook/config.json` із правами `600`.
+
+| Змінна | Дія |
+|---|---|
+| `RAILHOOK_CONFIG` | Інший шлях до файлу конфігурації |
+| `XDG_CONFIG_HOME` | Базовий каталог конфігурації (типово `~/.config`) |
+| `RAILHOOK_DEBUG` | Друкувати стек викликів при помилках |
+
+## Вирішення проблем
+
+| Симптом | Виправлення |
+|---|---|
+| Java не знайдено | Встановіть Java 17+ або перезапустіть інсталятор із `--with-java` |
+| Connection refused під час тунелювання | На локальному порту, переданому `listen`, ніхто не слухає |
+| Повторювані `401` | Токени оновлюються самі. Якщо це триває, знову виконайте `railhook login` |
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Повтор" description="Що створює повтор і коли його використовувати." href="/docs/uk/outgoing/replay/" />
+  <LinkCard title="SDK" description="Надсилайте події з коду." href="/docs/uk/tools/sdks/" />
+</CardGrid>

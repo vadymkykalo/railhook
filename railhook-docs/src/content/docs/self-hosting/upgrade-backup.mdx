@@ -1,0 +1,119 @@
+---
+title: Upgrade and backup
+description: Upgrade a Docker installation safely, take and schedule backups, and restore one.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Everything here runs from the install directory (`~/railhook` by default) with the `railhook` helper the installer wrote.
+
+## Upgrade
+
+```bash
+cd ~/railhook
+./railhook upgrade v2.16.6   # pin a release; with no version it keeps the tags already in .env
+```
+
+`upgrade` does this, in order:
+
+1. Fetches the helper and the Caddyfile for the target release.
+2. Pins `API_IMAGE_TAG`, `WORKER_IMAGE_TAG` and `UI_IMAGE_TAG` in `.env`.
+3. **Takes a database backup, and stops if that fails.**
+4. Replaces `docker-compose.yml` with the release's copy and keeps yours as `docker-compose.yml.previous`.
+5. Pulls the images, restarts every service except the API, then replaces the API containers one at a time.
+
+With one API container, clients see about twenty seconds of `502` while the new one starts. Set `API_REPLICAS=2` in `.env` and the upgrade has no gap.
+
+<Aside type="caution">
+If you edited `docker-compose.yml`, compare it with `docker-compose.yml.previous` after upgrading. The upgrade replaces the file rather than merging it.
+</Aside>
+
+### Roll back
+
+Rolling back returns the images, not the database schema. Migrations only run forward.
+
+```bash
+sed -i 's|^API_IMAGE_TAG=.*|API_IMAGE_TAG=2.16.5|' .env   # and WORKER_IMAGE_TAG, UI_IMAGE_TAG
+./railhook start
+```
+
+If the code is the problem, rolling the images back is enough. If a migration is the problem, restore the backup the upgrade took.
+
+## Check an installation
+
+```bash
+./railhook doctor
+```
+
+This re-runs the installer's machine and configuration checks against the files on disk. It catches a hand-edited `.env` before it turns into an outage.
+
+## Back up
+
+```bash
+./railhook backup
+```
+
+This writes `backup-<timestamp>.dump` (PostgreSQL custom format) into the install directory.
+
+Installations made by the installer also take a dump on a schedule, through the `db-backup` service:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DB_BACKUP_INTERVAL_SECONDS` | `86400` | How often a dump is taken |
+| `BACKUP_RETENTION_DAYS` | `30` | How long dumps are kept |
+| `BACKUP_DIR` | `./backups` | Where they are written |
+
+<Aside type="danger">
+Store `.env` separately from the dumps. Without the `WEBHOOK_ENCRYPTION_KEY` and `WEBHOOK_ENCRYPTION_SALT` it holds, a restored database cannot decrypt any endpoint secret, and nothing can bring that back.
+</Aside>
+
+## Restore
+
+<Steps>
+
+1. **Stop the API and the worker**
+
+   ```bash
+   cd ~/railhook
+   set -a; . ./.env; set +a
+   docker compose stop api worker
+   ```
+
+2. **Restore the dump**
+
+   ```bash
+   docker cp backup-20260913T020000Z.dump webhook-postgres:/tmp/restore.dump
+   docker exec webhook-postgres pg_restore \
+     -U "${POSTGRES_USER:-webhook_user}" -d "${POSTGRES_DB:-webhook_platform}" \
+     --clean --if-exists --no-owner --no-privileges /tmp/restore.dump
+   docker exec webhook-postgres rm -f /tmp/restore.dump
+   ```
+
+3. **Flush Redis**
+
+   Everything in Redis is derived and rebuilds itself. A stale cache is worse than an empty one.
+
+   ```bash
+   docker exec webhook-redis redis-cli -a "$REDIS_PASSWORD" FLUSHALL
+   ```
+
+4. **Start the stack**
+
+   ```bash
+   ./railhook start
+   ```
+
+</Steps>
+
+After a restore, leave Kafka alone. Messages for rolled-back deliveries are declined and dropped, and you will see a burst of those in the worker log. Deliveries left pending by the restore are picked up again after about an hour. Events accepted after the dump was taken are lost.
+
+<Aside type="tip">
+From a clone, `make backup-db` and `make restore-db FILE=backups/<file>.dump` do the same against the embedded database. `DB_MODE=external` points them at a managed one.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Monitoring" description="Health checks, metrics and dashboards." href="/docs/self-hosting/monitoring/" />
+  <LinkCard title="Troubleshooting" description="When something does not come up." href="/docs/self-hosting/troubleshooting/" />
+  <LinkCard title="Data retention" description="What is kept, and for how long." href="/docs/resources/data-retention/" />
+</CardGrid>
