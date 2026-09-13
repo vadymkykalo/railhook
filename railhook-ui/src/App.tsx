@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from 'sonner';
+import ThemedToaster from './components/ThemedToaster';
 import { AuthContext, AuthState } from './auth/auth.store';
 import { router } from './router';
 import { http } from './api/http';
@@ -103,7 +103,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <AuthContext.Provider value={authState}>
           <RouterProvider router={router} />
-          <Toaster position="top-right" richColors />
+          <ThemedToaster />
         </AuthContext.Provider>
       </QueryClientProvider>
     </ErrorBoundary>
