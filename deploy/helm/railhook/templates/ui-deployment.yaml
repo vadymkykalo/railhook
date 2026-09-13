@@ -35,6 +35,12 @@ spec:
           env:
             - name: RAILHOOK_CONTACT_DOMAIN
               value: {{ .Values.ui.contactDomain | default "" | quote }}
+            - name: RAILHOOK_SITE_URL
+              value: {{ include "railhook.appBaseUrl" . | quote }}
+            - name: RAILHOOK_CAPTCHA_SITE_KEY
+              value: {{ .Values.ui.captcha.siteKey | default "" | quote }}
+            - name: RAILHOOK_CAPTCHA_SCRIPT_URL
+              value: {{ .Values.ui.captcha.scriptUrl | default "" | quote }}
           ports:
             # 5173, not 80: the image is nginx serving `listen 5173`
             # (railhook-ui/nginx.conf) and EXPOSE 5173. While this said

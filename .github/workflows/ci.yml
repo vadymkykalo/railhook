@@ -70,6 +70,11 @@ jobs:
           for f in rendered/*.yaml; do
             grep -q 'WEBHOOK_INGRESS_BASE_URL: "http' "$f" \
               || { echo "::error::$f sets no WEBHOOK_INGRESS_BASE_URL"; exit 1; }
+            # The UI's canonical and og tags come from the container, not the image.
+            grep -A1 'name: RAILHOOK_SITE_URL' "$f" | grep -q 'value: "http' \
+              || { echo "::error::$f passes no RAILHOOK_SITE_URL to the UI"; exit 1; }
+            grep -q 'name: RAILHOOK_CAPTCHA_SITE_KEY' "$f" \
+              || { echo "::error::$f passes no RAILHOOK_CAPTCHA_SITE_KEY to the UI"; exit 1; }
           done
 
       - name: Validate rendered manifests against the Kubernetes schema

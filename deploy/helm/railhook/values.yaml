@@ -179,6 +179,12 @@ ui:
   # published image. Empty — the default, and right for a self-hosted install —
   # offers no mail addresses at all.
   contactDomain: ""
+  # The registration challenge's public half, read by the container at startup.
+  # Set siteKey together with the API's CAPTCHA_SECRET_KEY, never alone. Empty
+  # scriptUrl means Cloudflare Turnstile.
+  captcha:
+    siteKey: ""
+    scriptUrl: ""
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
     # (multi-arch: linux/amd64, linux/arm64).
