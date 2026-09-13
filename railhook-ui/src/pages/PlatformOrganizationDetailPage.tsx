@@ -21,7 +21,7 @@ import type { AdminResourceUsage } from '../api/platformAdmin.api';
 import { formatDate, formatDateTimeCompact, formatNumber, formatRelativeTime } from '../lib/date';
 import { cn } from '../lib/utils';
 import {
-  EmailText, OrganizationStatusBadge, PLATFORM_TABLE_HEADER, PanelTitle, PlatformAdminBadge, PlatformErrorState, SignInMethods, SuspensionDialog, VerifiedBadge,
+  EmailText, OrganizationStatusBadge, PLATFORM_TABLE, PLATFORM_TABLE_HEADER, PanelTitle, PlatformAdminBadge, PlatformErrorState, SignInMethods, SuspensionDialog, VerifiedBadge,
 } from './platformAdminParts';
 
 function BackLink() {
@@ -144,7 +144,7 @@ export default function PlatformOrganizationDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-3">
+      <div className="grid gap-5 2xl:grid-cols-3">
         <Card className="overflow-hidden">
           <PanelTitle
             title={t('platformAdmin.detail.usage')}
@@ -166,14 +166,14 @@ export default function PlatformOrganizationDetailPage() {
           </div>
         </Card>
 
-        <Card className="overflow-hidden xl:col-span-2">
+        <Card className="overflow-hidden 2xl:col-span-2">
           <PanelTitle title={t('platformAdmin.detail.members')} meta={members.data?.totalElements} />
           {members.isError ? (
             <PlatformErrorState error={members.error} onRetry={() => members.refetch()} />
           ) : !members.data ? (
             <SkeletonTable rows={4} />
           ) : (
-            <Table>
+            <Table className={PLATFORM_TABLE}>
               <TableHeader className={PLATFORM_TABLE_HEADER}>
                 <TableRow>
                   <TableHead>{t('platformAdmin.columns.account')}</TableHead>
@@ -189,7 +189,7 @@ export default function PlatformOrganizationDetailPage() {
                   <TableRow key={member.userId}>
                     <TableCell>
                       <EmailText email={member.email} />
-                      {member.fullName && <p className="max-w-[15rem] truncate text-xs text-muted-foreground max-sm:max-w-full" title={member.fullName}>{member.fullName}</p>}
+                      {member.fullName && <p className="max-w-[13rem] truncate text-xs text-muted-foreground max-sm:max-w-full" title={member.fullName}>{member.fullName}</p>}
                       {member.platformAdmin && <div className="mt-1"><PlatformAdminBadge /></div>}
                     </TableCell>
                     <TableCell className="text-[13px]">{t(`members.roles.${member.role}`, { defaultValue: member.role })}</TableCell>
@@ -224,7 +224,7 @@ export default function PlatformOrganizationDetailPage() {
         </Card>
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-3">
+      <div className="mt-5 grid gap-5 2xl:grid-cols-3">
         <Card className="overflow-hidden">
           <PanelTitle title={t('platformAdmin.detail.projects')} meta={projects.data?.totalElements} />
           {projects.isError ? (
@@ -245,7 +245,7 @@ export default function PlatformOrganizationDetailPage() {
           )}
         </Card>
 
-        <Card className="overflow-hidden xl:col-span-2">
+        <Card className="overflow-hidden 2xl:col-span-2">
           <PanelTitle title={t('platformAdmin.detail.auditLog')} meta={audit.data?.totalElements} />
           {audit.isError ? (
             <PlatformErrorState error={audit.error} onRetry={() => audit.refetch()} />
@@ -254,7 +254,7 @@ export default function PlatformOrganizationDetailPage() {
           ) : audit.data.content.length === 0 ? (
             <EmptyState icon={FileText} title={t('platformAdmin.detail.noAudit')} className="rounded-none border-0 py-10" />
           ) : (
-            <Table>
+            <Table className={PLATFORM_TABLE}>
               <TableHeader className={PLATFORM_TABLE_HEADER}>
                 <TableRow>
                   <TableHead>{t('platformAdmin.columns.time')}</TableHead>

@@ -12,7 +12,7 @@ import { usePlatformUsers } from '../api/queries';
 import { formatDate, formatRelativeTime } from '../lib/date';
 import { FilterBar } from './tableParts';
 import {
-  EmailText, OrganizationLink, PLATFORM_TABLE_HEADER, PlatformAdminBadge, PlatformErrorState, PlatformScope, SignInMethods, UserStatusBadge, VerifiedBadge, useDebouncedValue,
+  EmailText, OrganizationLink, PLATFORM_TABLE, PLATFORM_TABLE_HEADER, PlatformAdminBadge, PlatformErrorState, PlatformScope, SignInMethods, UserStatusBadge, VerifiedBadge, useDebouncedValue,
 } from './platformAdminParts';
 
 /** Every account on the deployment, newest first. */
@@ -51,7 +51,7 @@ export default function PlatformUsersPage() {
         <EmptyState icon={Users} title={t('platformAdmin.users.empty')} description={t('platformAdmin.users.emptyDesc')} />
       ) : (
         <Card className="overflow-hidden">
-          <Table>
+          <Table className={PLATFORM_TABLE}>
             <TableHeader className={PLATFORM_TABLE_HEADER}>
               <TableRow>
                 <TableHead>{t('platformAdmin.columns.account')}</TableHead>
@@ -68,7 +68,7 @@ export default function PlatformUsersPage() {
                 <TableRow key={user.id}>
                   <TableCell>
                     <EmailText email={user.email} />
-                    {user.fullName && <p className="max-w-[15rem] truncate text-xs text-muted-foreground max-sm:max-w-full" title={user.fullName}>{user.fullName}</p>}
+                    {user.fullName && <p className="max-w-[13rem] truncate text-xs text-muted-foreground max-sm:max-w-full" title={user.fullName}>{user.fullName}</p>}
                     {user.platformAdmin && <div className="mt-1"><PlatformAdminBadge /></div>}
                   </TableCell>
                   <TableCell><VerifiedBadge verified={user.emailVerified} /></TableCell>

@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { usePlatformOverview } from '../api/queries';
 import { formatDateTimeCompact, formatNumber, formatRelativeTime } from '../lib/date';
 import {
-  EmailText, OrganizationLink, PLATFORM_TABLE_HEADER, PanelTitle, PlatformErrorState, PlatformScope, SignInMethods, VerifiedBadge,
+  EmailText, OrganizationLink, PLATFORM_TABLE, PLATFORM_TABLE_HEADER, PanelTitle, PlatformErrorState, PlatformScope, SignInMethods, VerifiedBadge,
 } from './platformAdminParts';
 
 function Kpi({ label, value, hint }: { label: string; value: number; hint?: string }) {
@@ -81,7 +81,7 @@ export default function PlatformOverviewPage() {
             {data.recentSignups.length === 0 ? (
               <EmptyState icon={UserPlus} title={t('platformAdmin.overview.noSignups')} className="rounded-none border-0 py-10" />
             ) : (
-              <Table>
+              <Table className={PLATFORM_TABLE}>
                 <TableHeader className={PLATFORM_TABLE_HEADER}>
                   <TableRow>
                     <TableHead>{t('platformAdmin.columns.account')}</TableHead>
@@ -96,7 +96,7 @@ export default function PlatformOverviewPage() {
                     <TableRow key={signup.userId}>
                       <TableCell>
                         <EmailText email={signup.email} />
-                        {signup.fullName && <p className="max-w-[15rem] truncate text-xs text-muted-foreground max-sm:max-w-full" title={signup.fullName}>{signup.fullName}</p>}
+                        {signup.fullName && <p className="max-w-[13rem] truncate text-xs text-muted-foreground max-sm:max-w-full" title={signup.fullName}>{signup.fullName}</p>}
                       </TableCell>
                       <TableCell>
                         {signup.organizationId && signup.organizationName

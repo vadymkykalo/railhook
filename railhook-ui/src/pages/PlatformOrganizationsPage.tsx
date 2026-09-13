@@ -13,7 +13,7 @@ import { usePlatformOrganizations } from '../api/queries';
 import { formatDate } from '../lib/date';
 import { FilterBar } from './tableParts';
 import {
-  EmailText, EventsAgainstLimit, OrganizationLink, OrganizationStatusBadge, PLATFORM_TABLE_HEADER, PlatformErrorState,
+  EmailText, EventsAgainstLimit, OrganizationLink, OrganizationStatusBadge, PLATFORM_TABLE, PLATFORM_TABLE_HEADER, PlatformErrorState,
   PlatformScope, useDebouncedValue,
 } from './platformAdminParts';
 
@@ -69,7 +69,7 @@ export default function PlatformOrganizationsPage() {
         />
       ) : (
         <Card className="overflow-hidden">
-          <Table>
+          <Table className={PLATFORM_TABLE}>
             <TableHeader className={PLATFORM_TABLE_HEADER}>
               <TableRow>
                 <TableHead>{t('platformAdmin.columns.organization')}</TableHead>

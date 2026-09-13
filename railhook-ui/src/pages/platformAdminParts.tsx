@@ -111,7 +111,7 @@ export function PlatformScope() {
 export function EmailText({ email, className }: { email: string | null | undefined; className?: string }) {
   if (!email) return <span className="text-muted-foreground">—</span>;
   return (
-    <span className={cn('block max-w-[15rem] truncate font-mono text-[13px] max-sm:max-w-full', className)} title={email}>
+    <span className={cn('block max-w-[13rem] truncate font-mono text-[13px] max-sm:max-w-full', className)} title={email}>
       {email}
     </span>
   );
@@ -127,7 +127,7 @@ export function OrganizationLink({ id, name, className }: { id: string; name: st
       to={`/admin/platform/organizations/${id}`}
       title={name}
       className={cn(
-        'block max-w-[15rem] truncate underline-offset-4 hover:underline',
+        'block max-w-[12rem] truncate underline-offset-4 hover:underline',
         'max-sm:max-w-full max-sm:whitespace-normal max-sm:break-words',
         className,
       )}
@@ -139,6 +139,12 @@ export function OrganizationLink({ id, name, className }: { id: string; name: st
 
 /** Column titles stay on one line; a table wider than its card scrolls inside it instead. */
 export const PLATFORM_TABLE_HEADER = '[&_th]:whitespace-nowrap';
+
+/**
+ * Slightly tighter cells than the dashboard default, so the widest panel table fits its card at a
+ * 1440px screen. The phone layout sets its own cell padding and is not affected.
+ */
+export const PLATFORM_TABLE = '[&_td]:px-3 [&_th]:px-3';
 
 /** An account the server counts as a platform admin, next to its row in the panel's lists. */
 export function PlatformAdminBadge() {
