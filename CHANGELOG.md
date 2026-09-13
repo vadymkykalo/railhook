@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+A new site, docs you can navigate, and one install command on the project's own domain.
+
+### Added
+
+- **Docs site at `/docs/`**, in English and Ukrainian. Guides grouped by what you are doing
+  (get started, self-hosting, sending, receiving, platform), full-text search that works
+  offline, and an API reference with "Try it" that calls the instance serving the page. The
+  configuration reference is generated from `.env.dist`, so it cannot drift from it.
+- **`curl -fsSL https://railhook.io/install.sh | bash`.** Every UI image serves the installer
+  at `/install.sh`.
+- **`install.sh --domain <host> --behind-proxy`** for a reverse proxy you already run: production
+  settings on your domain, the dashboard on loopback, no TLS terminator — nothing left to edit
+  in `.env` by hand.
+- **New look across the product**: white ground, cobalt accent, Manrope and Onest. The landing
+  page puts Railhook Cloud (free right now) and the self-hosted install side by side.
+
+### Fixed
+
+- **Incoming-source and tunnel URLs pointed at `http://localhost:8080`** on every `--domain`
+  install and every Helm release, so providers and the CLI were handed an address nothing
+  published. They now follow `APP_BASE_URL` (Compose) or `app.baseUrl` (chart);
+  `TUNNEL_INGRESS_BASE_URL` / `app.ingressBaseUrl` still override.
+- **`ENTITLEMENT_DEFAULT_RATE_LIMIT` and `ENTITLEMENT_DEFAULT_MAX_FANOUT` never reached the API**
+  under Compose; `.env.dist` documented them and nothing passed them through.
+- **The dashboard's HTML was served without `X-Frame-Options`** and the other security headers:
+  nginx drops server-level `add_header`s in any location that sets one of its own, and the
+  cache headers did exactly that.
+- **Toasts stayed light on the dark theme.**
+- **SDKs**: the Node SDK accepted a signature whose timestamp was not a number (the tolerance
+  check was skipped); the Python SDK answered malformed signature headers with an unhandled
+  exception instead of `RailhookError`; the PHP SDK rejected the array-valued headers Laravel and
+  Symfony pass. The READMEs' Stripe example could never verify and said deliveries are `PUT`
+  (they are `POST`).
+
+### Removed
+
+- The in-app guides and the Redoc page. Old `/docs/<section>` addresses no longer resolve; the
+  pages live under `/docs/<group>/<page>/`.
+- The pricing page and the cloud plan grid.
+- Installer support for releases older than 2.12.0, the `HOOKFLOW_*` variable names, and the
+  `--write-helper` alias for `--refresh`.
+
 ## [2.16.0] - 2026-09-12
 
 An upgrade no longer stops the API to replace it. Measured on a production host, same probe
