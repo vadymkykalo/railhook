@@ -1,4 +1,4 @@
-# Contributing to Webhook Platform
+# Contributing to Railhook
 
 Thank you for your interest in contributing! This document outlines the guidelines and workflow for contributing to the project.
 

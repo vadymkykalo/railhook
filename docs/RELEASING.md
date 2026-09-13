@@ -40,12 +40,12 @@ accident.
    `railhook/php`, and refuses the mismatch. Marking it abandoned is what turns
    that silent failure into a message.
 
-4. **The domain** — `railhook.dev` (`.app` and `.sh` are also free; `.com` is
-   registered and parked). Then set `VITE_SITE_URL` and `VITE_CONTACT_DOMAIN` on
-   the public build, and regenerate the sitemap:
+4. **The domain** — production is `https://railhook.io`, deployed by
+   `.github/workflows/deploy-prod.yml`. Set `VITE_SITE_URL` and
+   `VITE_CONTACT_DOMAIN` on the public build to match, and regenerate the sitemap:
 
    ```bash
-   cd railhook-ui && SITE_URL=https://railhook.dev npm run seo:sitemap
+   cd railhook-ui && SITE_URL=https://railhook.io npm run seo:sitemap
    ```
 
    and edit the `Sitemap:` line in `public/robots.txt` to match.

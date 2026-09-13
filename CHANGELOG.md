@@ -322,7 +322,7 @@ a failing test before it was touched. No new features, no API changes.
 - **The GDPR export was quietly short, and the guide described data it does not contain.** It
   caps audit entries at 10,000 and said nothing about it, so a subject-access response could be
   incomplete and look whole; it now carries `auditLogsTruncated` and `auditLogsTotal`. And
-  `docs/guides/data-retention.md` promised the export included Events, Deliveries and Attempts.
+  the data-retention guide promised the export included Events, Deliveries and Attempts.
   It never has — those are the payload tables, and they are aged out by retention instead. The
   guide says so now, along with what each of the two erasures actually does.
 

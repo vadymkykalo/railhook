@@ -294,7 +294,7 @@ kubectl delete pvc -l app.kubernetes.io/instance=railhook
 
 ## Further Reading
 
-- **[Self-Hosted Guide](../../../docs/SELF_HOSTED_GUIDE.md)** — hardware sizing, pre-flight checks, TLS, monitoring
+- **[Kubernetes install](https://railhook.io/docs/self-hosting/kubernetes/)** and **[self-hosting](https://railhook.io/docs/self-hosting/overview/)** — hardware sizing, pre-flight checks, TLS, monitoring
 - **[Operations Guide](../../../docs/OPERATIONS.md)** — quick start, scaling, common issues
 
 ## Support

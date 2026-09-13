@@ -2,7 +2,7 @@
 #
 # Railhook installer.
 #
-#   curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh | bash
+#   curl -fsSL https://railhook.io/install.sh | bash
 #
 # Creates a directory, writes a Compose file pinned to a release and a .env with
 # freshly generated secrets, then starts the stack. What it leaves behind is an
@@ -863,7 +863,7 @@ finish() {
     say "    ./railhook status | logs | stop | start | backup | doctor"
     say "    .env holds your secrets. ${B}Back it up.${N}"
     say ""
-    say "  Putting this on a server? ${DIM}docs/SELF_HOSTED_GUIDE.md${N} covers TLS,"
+    say "  Putting this on a server? ${DIM}https://railhook.io/docs/self-hosting/overview/${N} covers TLS,"
     say "  APP_ENV=production and what to change before it faces the internet."
     say ""
 }

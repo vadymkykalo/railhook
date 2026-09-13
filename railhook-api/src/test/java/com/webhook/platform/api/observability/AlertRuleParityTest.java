@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>What that cost: the Helm set was four rules short, and
  * {@code outbox_oldest_pending_age_seconds} — the third of the three signals
- * {@code docs/guides/observability.md} tells an operator to alert on if they alert on nothing
+ * the observability guide tells an operator to alert on if they alert on nothing
  * else — had no rule in any of the three. This test makes the two surviving sets one set.
  */
 @Tag("ratchet")
@@ -72,16 +72,16 @@ class AlertRuleParityTest {
         String compose = read(COMPOSE_RULES);
         String chart = read(CHART_RULES);
 
-        // docs/guides/observability.md, "If you only alert on three things".
+        // The observability guide, "If you only alert on three things".
         for (String metric : new String[]{
                 "delivery_oldest_pending_age_seconds",
                 "circuit_breaker_degraded_total",
                 "outbox_oldest_pending_age_seconds"}) {
             assertTrue(compose.contains(metric),
-                    metric + " is named in docs/guides/observability.md as one of the three signals to "
+                    metric + " is named in the observability guide as one of the three signals to "
                             + "alert on, but no Compose rule uses it.");
             assertTrue(chart.contains(metric),
-                    metric + " is named in docs/guides/observability.md as one of the three signals to "
+                    metric + " is named in the observability guide as one of the three signals to "
                             + "alert on, but no chart rule uses it.");
         }
     }

@@ -15,7 +15,7 @@ spec:
     # was accepted and which delivery_queue_depth cannot see — it is not a Delivery yet.
     - name: railhook.outbox
       rules:
-        # The third of the three signals docs/guides/observability.md tells an operator to
+        # The third of the three signals the observability guide tells an operator to
         # alert on if they alert on nothing else, and the one that had no rule anywhere.
         - alert: OutboxOldestPendingAgeHigh
           expr: outbox_oldest_pending_age_seconds > 300
