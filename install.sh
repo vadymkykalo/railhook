@@ -547,6 +547,35 @@ cat > "${INSTALL_DIR}/Caddyfile" <<'CADDY'
 CADDY
 }
 
+# A rewritten Caddyfile is not a Caddyfile Caddy is using.
+#
+# It is a bind mount, so `compose up -d` sees no change in the service and does not
+# recreate the container: Caddy goes on serving whatever it parsed at startup, and the
+# new file sits on disk until something unrelated restarts it. That is how the retry
+# added in 2.16.3 reached production and did nothing.
+#
+# Validated first — a reload that fails has already torn nothing down, but a validate
+# that fails says so before anything is attempted. Neither failing aborts the upgrade:
+# the config Caddy already has is still serving, and the images are what the operator
+# asked for.
+reload_caddy() {
+    resolve_compose || return 0
+    # No domain, no Caddy. Nothing to reload, and not an error.
+    [ -n "$(cd "$INSTALL_DIR" && compose ps -q caddy 2>/dev/null)" ] || return 0
+
+    if ! (cd "$INSTALL_DIR" && compose exec -T caddy \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile) >/dev/null 2>&1; then
+        warn "the new Caddyfile does not validate — leaving Caddy on the config it has"
+        return 0
+    fi
+    if (cd "$INSTALL_DIR" && compose exec -T caddy \
+            caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile) >/dev/null 2>&1; then
+        ok "Caddy reloaded"
+    else
+        warn "Caddy would not reload — it is still serving the config it had"
+    fi
+}
+
 write_helper() {
     cat > "${INSTALL_DIR}/railhook" <<'HELPER'
 #!/usr/bin/env bash
@@ -856,6 +885,7 @@ main() {
             if [ -f "${INSTALL_DIR}/Caddyfile" ]; then
                 write_caddyfile
                 ok "Caddyfile refreshed"
+                reload_caddy
             fi
             exit 0 ;;
     esac
