@@ -1,10 +1,10 @@
 ---
 title: Моніторинг
-description: Перевірки здоров'я, метрики Prometheus, вбудований стек Grafana і сигнали, на які варто ставити сповіщення.
+description: Перевірки здоров'я, метрики Prometheus, вбудований стек Grafana зі сповіщеннями про хост, контейнери, доступність і журнали, та сигнали, на які варто ставити сповіщення.
 ---
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Railhook віддає перевірки здоров'я на публічному порту, а метрики Prometheus — на внутрішніх портах. У репозиторії є готовий стек моніторингу, який можна запустити поруч.
+Railhook віддає перевірки здоров'я на публічному порту, а метрики Prometheus — на внутрішніх портах. У репозиторії є необов'язковий стек моніторингу — Grafana, Prometheus, Alertmanager, Loki та експортери для хоста, контейнерів і доступності, — який запускається поруч однією командою.
 
 ## Перевірки здоров'я
 
@@ -30,34 +30,112 @@ nginx проксує лише шляхи health. Решта шляхів `/actua
 
 ## Вбудований стек
 
-Каталог `monitoring/` у репозиторії містить уже налаштовані Prometheus, Alertmanager, Grafana, Loki та Promtail.
+`monitoring/` у репозиторії — другий Compose-проєкт: Grafana, Prometheus, Alertmanager, Loki і Promtail, node-exporter, cAdvisor та blackbox-exporter. Він вимкнений, доки ви його не запустите, а його ліміти пам'яті разом дають 1,5 ГБ.
+
+Порт публікує лише Grafana, на `127.0.0.1:3001`. Prometheus, Alertmanager і Loki доступні лише всередині мережі стека; сторінки Explore та Alerting у Grafana читають усі три.
+
+### На сервері, встановленому через install.sh
 
 <Steps>
 
-1. **Спершу запустіть Railhook** з клону командою `make up`.
+1. **Задайте пароль Grafana.** Типового пароля немає: Grafana не стартує без нього або з паролем, коротшим за 16 символів.
 
-2. **Запустіть стек моніторингу**
+   ```bash
+   cd /opt/railhook
+   echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
+   ```
+
+2. **Вкажіть, куди йдуть сповіщення.** Пошта йде через той самий релей, яким уже користується платформа (`EMAIL_FROM`, `SMTP_*`), якщо ви не задали змінні `ALERTMANAGER_SMTP_*`.
+
+   ```bash
+   echo "ALERTMANAGER_EMAIL_TO=you@example.com" >> .env
+   ```
+
+   Slack (`ALERTMANAGER_SLACK_WEBHOOK_URL`), загальний вебхук (`ALERTMANAGER_WEBHOOK_URL`) і Telegram (`ALERTMANAGER_TELEGRAM_BOT_TOKEN`, `ALERTMANAGER_TELEGRAM_CHAT_ID`) налаштовуються так само.
+
+3. **Запустіть.**
+
+   ```bash
+   ./railhook monitoring up
+   ```
+
+   Перший запуск завантажує `monitoring/` для релізу, на якому працює сервер. `./railhook upgrade` оновлює його та перезапускає стек, якщо той працював.
+
+4. **Відкрийте Grafana** через SSH-тунель і увійдіть як `admin` з паролем із `.env`:
+
+   ```bash
+   ssh -L 3001:127.0.0.1:3001 root@your-server
+   ```
+
+   Потім відкрийте `http://localhost:3001`.
+
+</Steps>
+
+`./railhook monitoring status` показує контейнери та стан кожної цілі Prometheus. `./railhook monitoring logs [service]` стежить за журналами. `./railhook monitoring down` зупиняє стек і зберігає його метрики та журнали.
+
+### Grafana на власному домені
+
+Задайте `MONITORING_DOMAIN=grafana.example.com` у `.env`, спрямуйте це ім'я на сервер і знову виконайте `./railhook monitoring up`. Команда додасть ім'я до Caddyfile і перезавантажить Caddy, який отримає сертифікат так само, як для платформи. З `--behind-proxy` спрямуйте власний проксі на `127.0.0.1:3001`.
+
+<Aside type="caution">
+Поставте перед цим ім'ям проксі з перевіркою особи, наприклад Cloudflare Access. Логін Grafana не має бути єдиним, що стоїть між інтернетом і вашими журналами. Якщо проксі охоплює всі шляхи, виключіть `/.well-known/acme-challenge/`, інакше Caddy не зможе поновити сертифікат.
+</Aside>
+
+### З клону
+
+<Steps>
+
+1. Запустіть Railhook командою `make up`, потім додайте `GRAFANA_ADMIN_PASSWORD` до `.env`.
+
+2. Запустіть стек:
 
    ```bash
    make monitoring-up
    ```
 
-3. **Відкрийте Grafana** на `http://localhost:3001` і увійдіть як `railhook` / `railhook_monitor_2024`. Пароль змінюється так: `GF_ADMIN_PASSWORD=... make monitoring-up`.
+3. Відкрийте Grafana на `http://localhost:3001`.
 
 </Steps>
 
-| Сервіс | Адреса (лише loopback) |
+`make monitoring-down` зупиняє його; `make monitoring-logs` показує його журнали.
+
+### Дашборди
+
+| Дашборд | Що показує |
 |---|---|
-| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) |
-| Prometheus | `127.0.0.1:9090` |
-| Alertmanager | `127.0.0.1:9093` |
-| Loki | `127.0.0.1:3100` |
+| Railhook — Overview | Чи доступний публічний сайт, активні сповіщення, диск, пам'ять, CPU і вік резервної копії, далі — події, доставки, черги та DLQ |
+| Alerts | Кожне активне й очікуване сповіщення, чи працює сам ланцюжок сповіщень, історію та посилання, щоб приглушити сповіщення |
+| Errors | Рядки журналів з помилками й попередженнями за сервісами, найчастіші повідомлення про помилки, 4xx і 5xx в API та nginx, 401/403/429, невдалі доставки та ріст DLQ |
+| Logs | Рядки API, воркера, nginx інтерфейсу, Caddy, Postgres і резервного копіювання з фільтрами за сервісом, рівнем, текстом, correlation ID або organization ID |
+| Host | Node Exporter Full: CPU, пам'ять, диски, мережа, файлові системи |
+| Containers | CPU, пам'ять відносно ліміту Compose, мережа й перезапуски для кожного контейнера |
+| Uptime | Стан перевірок, доступність за період, час відповіді, скільки днів лишилося сертифікату TLS, резервні копії |
+| Worker & Circuit Breaker, JVM & Micrometer, Kafka | Внутрішня робота платформи |
 
-Grafana постачається з дашбордами для огляду, воркера й запобіжника, JVM, Kafka та журналів. Alertmanager надсилає вбудовані правила сповіщень у Slack, на загальний вебхук або поштою, щойно ви задасте змінні `ALERTMANAGER_*`.
+### Які сповіщення надсилає
 
-<Aside type="caution">
-Стек під'єднується до мережі Docker `railhook_webhook-network`, тож проєкт Compose із Railhook має називатися `railhook`. `.env.dist` задає `COMPOSE_PROJECT_NAME=railhook`. Якщо Prometheus не бачить цілей, перевірте це першим.
+Правила платформи — той самий набір, що постачає Helm-чарт. Понад них, для сервера:
+
+| Сповіщення | Спрацьовує, коли |
+|---|---|
+| `HostDiskAlmostFull`, `HostDiskCritical` | Файлова система заповнена більш ніж на 85% або більш ніж на 95% |
+| `HostMemoryHigh`, `HostOomKill` | Пам'ять зайнята більш ніж на 90% протягом 10 хвилин або ядро вбило процес |
+| `HostLoadHigh` | 15-хвилинне навантаження перевищує кількість CPU в 1,5 раза |
+| `ContainerRestarting`, `ContainerOomKilled`, `ContainerMemoryNearLimit` | Контейнер двічі перезапустився за 15 хвилин, досяг ліміту пам'яті або перевищує 90% від нього |
+| `PublicEndpointDown`, `PublicEndpointSlow` | Публічна адреса не відповідає або відповідає довше за 3 секунди ззовні |
+| `UiDown`, `CaddyDown` | nginx інтерфейсу або Caddy перестав відповідати всередині мережі |
+| `TlsCertificateExpiringSoon`, `TlsCertificateExpiryImminent` | Сертифікат спливає менш ніж за 14 днів або менш ніж за 3 |
+| `ErrorLogSpike`, `EdgeServerErrorSpike` | Сервіс пише понад 10 помилок на хвилину або nginx віддає понад 5 відповідей 5xx на хвилину |
+| `BackupStale`, `BackupMissing` | Найновіша планова резервна копія старша за 26 годин або її немає |
+| `Watchdog` | Завжди. Надсилається лише на `ALERTMANAGER_HEARTBEAT_URL` |
+
+Перевірки запитують `https://RAILHOOK_DOMAIN/`, `/docs/` і `/actuator/health`; щоб перевіряти інші адреси, задайте `MONITORING_PROBE_URLS`.
+
+<Aside type="tip">
+Кожне інше сповіщення надсилає той самий сервер, який воно описує, тож жодне з них не повідомить, що сервер лежить. Спрямуйте `ALERTMANAGER_HEARTBEAT_URL` на сервіс heartbeat, наприклад healthchecks.io: він щохвилини отримує `Watchdog` і сповіщає вас, коли той перестає надходити.
 </Aside>
+
+Стек знаходить мережу Docker платформи за її міткою Compose. Якщо він обрав не ту, задайте `RAILHOOK_NETWORK`. Усі змінні — у [довіднику конфігурації](/docs/uk/self-hosting/configuration/).
 
 ## На що ставити сповіщення
 

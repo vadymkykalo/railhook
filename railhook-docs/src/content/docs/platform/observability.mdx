@@ -23,33 +23,27 @@ On Kubernetes the Helm chart wires this up: its `ServiceMonitor` scrapes the por
 
 ## Run the monitoring stack with Docker Compose
 
-`monitoring/` in the repository contains Prometheus, Alertmanager, Grafana, Loki and Promtail, preconfigured for Railhook.
+`monitoring/` in the repository contains Grafana, Prometheus, Alertmanager, Loki and Promtail, node-exporter, cAdvisor and blackbox-exporter, preconfigured for Railhook.
 
 <Steps>
-1. With Railhook running, start the stack from the repository root:
+1. Add a Grafana password to `.env`. There is no default, and Grafana refuses to start without one:
 
    ```bash
-   make monitoring-up
+   echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
    ```
 
-2. Open Grafana at `http://localhost:3001` and sign in as `railhook` / `railhook_monitor_2024`. Set your own `GF_ADMIN_USER` and `GF_ADMIN_PASSWORD` before anyone else can reach the host.
-3. Set a receiver for alerts: `ALERTMANAGER_SLACK_WEBHOOK_URL`, `ALERTMANAGER_WEBHOOK_URL`, or the `ALERTMANAGER_EMAIL_*` and `ALERTMANAGER_SMTP_*` variables. With none set, Alertmanager still starts, but alerts go nowhere.
-
-   The stack is its own Compose project, so put these variables, and the Grafana ones, in `monitoring/.env` or export them in the shell before `make monitoring-up`:
-
-   ```bash
-   GF_ADMIN_PASSWORD=change-me ALERTMANAGER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/… make monitoring-up
-   ```
+2. Set a receiver for alerts: `ALERTMANAGER_EMAIL_TO` (sent through your `SMTP_*` relay), `ALERTMANAGER_SLACK_WEBHOOK_URL`, `ALERTMANAGER_WEBHOOK_URL`, or `ALERTMANAGER_TELEGRAM_BOT_TOKEN` and `ALERTMANAGER_TELEGRAM_CHAT_ID`. With none set, alerts show only in Grafana.
+3. Start the stack: `./railhook monitoring up` on a server installed with install.sh, `make monitoring-up` in a clone.
 </Steps>
 
 | Component | Address | Notes |
 |---|---|---|
-| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) | Five dashboards: Overview, Worker & Circuit Breaker, JVM & Micrometer, Kafka, Logs |
-| Prometheus | `127.0.0.1:9090` | Keeps 30 days |
-| Alertmanager | `127.0.0.1:9093` | `CRITICAL` alerts route faster than warnings; a firing critical alert suppresses the matching warning |
-| Loki | `127.0.0.1:3100` | Keeps logs for `LOKI_RETENTION_PERIOD`, default `336h` (14 days) |
+| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) | Overview, Alerts, Errors, Logs, Host, Containers, Uptime, Worker & Circuit Breaker, JVM & Micrometer, Kafka |
+| Prometheus | Inside the stack only | Keeps `PROMETHEUS_RETENTION`, default `15d` |
+| Alertmanager | Inside the stack only | `CRITICAL` alerts route faster than warnings; a firing critical alert suppresses the matching warning |
+| Loki | Inside the stack only | Keeps logs for `LOKI_RETENTION_PERIOD`, default `168h` (7 days) |
 
-`make monitoring-down` stops the stack; `make monitoring-logs` follows its logs.
+[Monitoring](/docs/self-hosting/monitoring/) covers serving Grafana on its own domain and the host, container, uptime and log alerts.
 
 ## The numbers that matter
 

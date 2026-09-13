@@ -270,9 +270,12 @@ port, so Prometheus can scrape without a JWT/API-key — the app's main-port
 auth" for the full rationale. The Helm chart splits the port the same way, and
 its `ServiceMonitor` scrapes the management port by name.
 
-Alerting: `make monitoring-up` also starts Alertmanager (`:9093`), which routes
-the rules in `monitoring/prometheus/alerts.yml` to Slack/webhook/email via the
-`ALERTMANAGER_*` env vars (`.env.dist`). See `monitoring/README.md` "Alerting".
+Alerting: the monitoring stack (`./railhook monitoring up` on an install.sh host,
+`make monitoring-up` in a clone; needs `GRAFANA_ADMIN_PASSWORD` in `.env`) runs
+Alertmanager, which routes `monitoring/prometheus/alerts.yml` (the platform) and
+`host-alerts.yml` (disk, memory, containers, uptime, TLS, backups, error logs) to
+email/Slack/webhook/Telegram via the `ALERTMANAGER_*` env vars (`.env.dist`). Only
+Grafana is published, on loopback. See `monitoring/README.md`.
 
 **Kubernetes (closed):** the chart sets `MANAGEMENT_PORT` on both deployments
 (8082 for the API, 8081 for the worker), exposes it as a named `management`

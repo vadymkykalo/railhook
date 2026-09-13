@@ -23,33 +23,27 @@ Prometheus збирає `/actuator/prometheus` з **порту керуванн�
 
 ## Запустіть стек моніторингу через Docker Compose
 
-Каталог `monitoring/` у репозиторії містить Prometheus, Alertmanager, Grafana, Loki і Promtail, уже налаштовані для Railhook.
+Каталог `monitoring/` у репозиторії містить Grafana, Prometheus, Alertmanager, Loki і Promtail, node-exporter, cAdvisor та blackbox-exporter, уже налаштовані для Railhook.
 
 <Steps>
-1. Коли Railhook запущено, стартуйте стек із кореня репозиторію:
+1. Додайте пароль Grafana до `.env`. Типового пароля немає, і без нього Grafana не стартує:
 
    ```bash
-   make monitoring-up
+   echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
    ```
 
-2. Відкрийте Grafana на `http://localhost:3001` і увійдіть як `railhook` / `railhook_monitor_2024`. Задайте власні `GF_ADMIN_USER` і `GF_ADMIN_PASSWORD`, перш ніж хтось інший зможе дістатися до хоста.
-3. Задайте отримувача алертів: `ALERTMANAGER_SLACK_WEBHOOK_URL`, `ALERTMANAGER_WEBHOOK_URL` або змінні `ALERTMANAGER_EMAIL_*` і `ALERTMANAGER_SMTP_*`. Якщо жодної не задано, Alertmanager усе одно стартує, але алерти нікуди не йдуть.
-
-   Стек — окремий Compose-проєкт, тож покладіть ці змінні, а також змінні Grafana, у `monitoring/.env` або експортуйте їх у shell перед `make monitoring-up`:
-
-   ```bash
-   GF_ADMIN_PASSWORD=change-me ALERTMANAGER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/… make monitoring-up
-   ```
+2. Задайте отримувача алертів: `ALERTMANAGER_EMAIL_TO` (надсилається через ваш релей `SMTP_*`), `ALERTMANAGER_SLACK_WEBHOOK_URL`, `ALERTMANAGER_WEBHOOK_URL` або `ALERTMANAGER_TELEGRAM_BOT_TOKEN` і `ALERTMANAGER_TELEGRAM_CHAT_ID`. Якщо жодного не задано, алерти видно лише в Grafana.
+3. Запустіть стек: `./railhook monitoring up` на сервері, встановленому через install.sh, `make monitoring-up` у клоні.
 </Steps>
 
 | Компонент | Адреса | Примітки |
 |---|---|---|
-| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) | П'ять дашбордів: Overview, Worker & Circuit Breaker, JVM & Micrometer, Kafka, Logs |
-| Prometheus | `127.0.0.1:9090` | Зберігає 30 днів |
-| Alertmanager | `127.0.0.1:9093` | Алерти `CRITICAL` маршрутизуються швидше за попередження; критичний алерт, що спрацював, приглушує відповідне попередження |
-| Loki | `127.0.0.1:3100` | Зберігає логи протягом `LOKI_RETENTION_PERIOD`, за замовчуванням `336h` (14 днів) |
+| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) | Overview, Alerts, Errors, Logs, Host, Containers, Uptime, Worker & Circuit Breaker, JVM & Micrometer, Kafka |
+| Prometheus | Лише всередині стека | Зберігає `PROMETHEUS_RETENTION`, за замовчуванням `15d` |
+| Alertmanager | Лише всередині стека | Алерти `CRITICAL` маршрутизуються швидше за попередження; критичний алерт, що спрацював, приглушує відповідне попередження |
+| Loki | Лише всередині стека | Зберігає логи протягом `LOKI_RETENTION_PERIOD`, за замовчуванням `168h` (7 днів) |
 
-`make monitoring-down` зупиняє стек; `make monitoring-logs` показує його логи.
+[Моніторинг](/docs/uk/self-hosting/monitoring/) описує, як віддати Grafana на власному домені, та сповіщення про хост, контейнери, доступність і журнали.
 
 ## Числа, які мають значення
 
