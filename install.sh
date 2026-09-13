@@ -545,8 +545,9 @@ cat > "${INSTALL_DIR}/Caddyfile" <<'CADDY'
 		# image changes — a few seconds during which a dial is refused and every
 		# path, /hook and /ingress included, answered 502. Retrying turns that
 		# into a slow request instead. Safe for any method: a refused dial means
-		# nothing was written, so there is nothing to send twice.
-		lb_try_duration 20s
+		# nothing was written, so there is nothing to send twice. 30s rather than
+		# 20s: a slow image swap outlasting the window is exactly a 502.
+		lb_try_duration 30s
 		lb_try_interval 250ms
 		# The CLI tunnel holds a WebSocket open for the length of a developer's
 		# session, so it must not be cut off at the default idle timeout.
@@ -681,6 +682,68 @@ roll_api() {
         echo "  drained and removed ${old:0:12}"
     done
 }
+
+# Applies KEY=VALUE lines from stdin to .env: how a deploy hands this host its settings, so
+# nobody edits .env over a root shell. All or nothing — one refused line and nothing is written.
+#
+# Values are never printed and never pass through sed, so a password with | & / or $ in it
+# is written exactly as sent.
+#
+# Never from a deploy: the encryption key and salt, because a new one leaves every encrypted
+# column unreadable; the JWT and database passwords, which this host generated and Postgres
+# and Redis already hold; and the image tags, which belong to the version being upgraded to.
+apply_settings() {
+    local line key lineno=0 current status tmp
+    local -A wanted=()
+    local -a order=()
+    while IFS= read -r line || [ -n "$line" ]; do
+        lineno=$((lineno + 1))
+        line="${line%$'\r'}"
+        case "$line" in ''|'#'*) continue ;; esac
+        key="${line%%=*}"
+        if [ "$key" = "$line" ] || [[ ! "$key" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
+            echo "settings: line ${lineno} is not NAME=value — nothing applied" >&2
+            return 1
+        fi
+        case "$key" in
+            WEBHOOK_ENCRYPTION_KEY|WEBHOOK_ENCRYPTION_SALT|JWT_SECRET|POSTGRES_PASSWORD|DB_PASSWORD|REDIS_PASSWORD|API_IMAGE_TAG|WORKER_IMAGE_TAG|UI_IMAGE_TAG)
+                echo "settings: ${key} cannot be set by a deploy — nothing applied" >&2
+                return 1 ;;
+        esac
+        [ -n "${wanted[$key]+set}" ] || order+=("$key")
+        wanted[$key]="${line#*=}"
+    done
+    [ "${#order[@]}" -gt 0 ] || { echo "settings: none sent"; return 0; }
+
+    tmp=$(mktemp ./.env.settings.XXXXXX)
+    local -A seen=()
+    if [ -f .env ]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            key="${line%%=*}"
+            if [ "$key" != "$line" ] && [ -n "${wanted[$key]+set}" ] && [ -z "${seen[$key]+set}" ]; then
+                seen[$key]="${line#*=}"
+                printf '%s=%s\n' "$key" "${wanted[$key]}"
+            else
+                printf '%s\n' "$line"
+            fi
+        done < .env > "$tmp"
+        chmod --reference=.env "$tmp"
+    else
+        chmod 600 "$tmp"
+    fi
+    for key in "${order[@]}"; do
+        if [ -z "${seen[$key]+set}" ]; then
+            printf '%s=%s\n' "$key" "${wanted[$key]}" >> "$tmp"
+            status="added"
+        else
+            current="${seen[$key]}"
+            if [ "$current" = "${wanted[$key]}" ]; then status="unchanged"; else status="changed"; fi
+        fi
+        echo "settings: ${key} ${status}"
+    done
+    mv -f "$tmp" .env
+}
+
 case "${1:-help}" in
     start)   compose up -d ;;
     stop)    compose stop ;;
@@ -723,6 +786,15 @@ case "${1:-help}" in
             RAILHOOK_HELPER_REFRESHED=1 export RAILHOOK_HELPER_REFRESHED
             exec "$0" upgrade "$want"
         fi
+
+        # Settings sent with the deploy (deploy-prod.yml pipes them into the SSH session),
+        # applied by the refreshed helper before anything else changes. The refresh above
+        # reads nothing from this stdin: bash -s takes its script, and its children their
+        # input, from the curl pipe. An operator at a terminal sends none.
+        if [ ! -t 0 ]; then
+            apply_settings || { echo "Settings refused — not upgrading, nothing has changed." >&2; exit 1; }
+        fi
+
         if [ -n "$want" ]; then
             # Releases are tagged v2.16.0 in git and the images are published as 2.16.0 —
             # docker/metadata-action writes the version, not the ref. Writing the git tag
@@ -774,10 +846,22 @@ case "${1:-help}" in
 
         compose pull
 
-        # Everything except the API first. The worker is invisible to a customer
-        # while it restarts — a Delivery is durable in Postgres and Kafka and comes
-        # back to the ladder — and nginx, Caddy and the data services are seconds.
-        compose up -d --no-deps postgres kafka redis ui caddy worker 2>/dev/null || compose up -d
+        # Everything except the API first, one service per call. All of them in a single
+        # `up` left the UI stopped while Compose worked through the rest — about 45 seconds
+        # of 502 on the 2.17.0 deploy, longer than Caddy's retry window. On its own, with the
+        # image already pulled, the UI swap is a couple of seconds and Caddy's retry covers
+        # it. The worker goes last: invisible to a customer while it restarts, since a
+        # Delivery is durable in Postgres and Kafka and comes back to the ladder.
+        #
+        # Only services the active profiles enable. Naming one on the command line switches
+        # its profile on, so an install without a domain would start Caddy, and one on an
+        # external database would start an empty Postgres.
+        active=$(compose config --services)
+        up_one() {
+            printf '%s\n' "$active" | grep -qx "$1" || return 0
+            compose up -d --no-deps "$1" || { echo "Could not start $1 — see ./railhook logs $1" >&2; exit 1; }
+        }
+        for svc in postgres kafka redis ui caddy worker; do up_one "$svc"; done
 
         # The API is the one a customer notices, because it is what accepts webhooks.
         roll_api
@@ -802,11 +886,13 @@ case "${1:-help}" in
             -d "${POSTGRES_DB:-webhook_platform}" \
             -Fc --no-owner --no-privileges > "$f"
         echo "wrote $f — keep .env with it, or the encrypted columns are unreadable" ;;
+    settings) apply_settings ;;
     doctor)  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh \
                  | bash -s -- --check --dir "$(pwd)" ;;
     help|-h|--help)
-        echo "railhook start|stop|restart|status|logs [service]|upgrade [version]|backup|doctor"
-        echo "  upgrade takes a backup first; it does not roll the schema back afterwards" ;;
+        echo "railhook start|stop|restart|status|logs [service]|upgrade [version]|settings < file|backup|doctor"
+        echo "  upgrade takes a backup first; it does not roll the schema back afterwards"
+        echo "  settings applies NAME=value lines to .env; upgrade reads them from stdin too" ;;
     *)       compose "$@" ;;
 esac
 HELPER

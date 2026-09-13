@@ -10,32 +10,25 @@
       canonical through `useDocumentMeta`, so this block describes the landing
       page and nothing else relies on it.
 
-      `%SITE_URL%` is filled in at build time from VITE_SITE_URL. Any line
-      still carrying the placeholder is deleted instead - see the siteUrl
-      plugin in vite.config.ts. A build that has not been told which origin it
-      will be served from publishes no absolute URL about itself rather than
-      guessing one, because the guess used to be a domain this project does
-      not own, and a canonical is an instruction to credit whoever it names.
-
-      The canonical is in that set rather than written as a relative "/": Vite
-      treats `href` on a `<link>` as an asset reference and tries to read it,
-      so a root-relative canonical fails the build outright with EISDIR on the
-      public directory. `useDocumentMeta` creates the tag on mount anyway, for
-      every route and with the right path, so nothing is lost by its absence
-      here.
+      https://site-url.railhook.invalid is a placeholder, not an address: the
+      image is built once for every deployment, so the build cannot know the
+      origin. nginx replaces it when serving with the container's
+      RAILHOOK_SITE_URL, or with nothing - a relative URL - when none is set.
+      `.invalid` is reserved, so a placeholder that ever escaped points nowhere
+      real rather than at somebody else's site.
     -->
     <meta name="description" content="Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start." />
-    <link rel="canonical" href="%SITE_URL%/" />
+    <link rel="canonical" href="https://site-url.railhook.invalid/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Railhook" />
     <meta property="og:title" content="Railhook — Open-source webhook gateway" />
     <meta property="og:description" content="Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start." />
-    <meta property="og:url" content="%SITE_URL%/" />
-    <meta property="og:image" content="%SITE_URL%/og-image.png" />
+    <meta property="og:url" content="https://site-url.railhook.invalid/" />
+    <meta property="og:image" content="https://site-url.railhook.invalid/og-image.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Railhook — Open-source webhook gateway" />
     <meta name="twitter:description" content="Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start." />
-    <meta name="twitter:image" content="%SITE_URL%/og-image.png" />
+    <meta name="twitter:image" content="https://site-url.railhook.invalid/og-image.png" />
     <title>Railhook — Open-source webhook gateway</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -53,11 +46,11 @@
         "name": "Railhook",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Any",
-        "url": "%SITE_URL%/",
+        "url": "https://site-url.railhook.invalid/",
         "description": "Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start.",
         "license": "https://opensource.org/licenses/MIT",
         "offers": [
-          { "@type": "Offer", "name": "Railhook Cloud Free", "price": "0", "priceCurrency": "USD", "url": "%SITE_URL%/register" }
+          { "@type": "Offer", "name": "Railhook Cloud Free", "price": "0", "priceCurrency": "USD", "url": "https://site-url.railhook.invalid/register" }
         ]
       }
     </script>

@@ -66,13 +66,17 @@ public class BillingOverviewService {
      * <p>Root scope is safe here in the way it usually is not: plans are a catalog, not tenant
      * data, and nothing on this path writes.
      *
-     * <p>The self-hosted plan is an internal row, not something to offer anyone.
+     * <p>The self-hosted plan is an internal row, not something to offer anyone. With no payment
+     * provider configured nothing priced is offered either — the deployment runs the free plan
+     * only, and a price nobody can pay is not an offer.
      */
     @SystemTenant("the plan catalog is identical for every organization, and this endpoint is "
             + "reachable without credentials, so there is no tenant to run as")
     public List<PlanResponse> catalog() {
+        boolean takesPayments = !BillingService.NO_PAYMENT_PROVIDER.equals(billingService.getDefaultProviderCode());
         return billingService.listActivePlans().stream()
                 .filter(plan -> !"self_hosted".equals(plan.getName()))
+                .filter(plan -> takesPayments || plan.getPriceMonthlyCents() == 0)
                 .map(PlanResponse::of)
                 .toList();
     }

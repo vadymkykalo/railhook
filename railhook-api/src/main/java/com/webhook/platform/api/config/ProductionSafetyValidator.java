@@ -91,9 +91,6 @@ public class ProductionSafetyValidator {
     @Value("${app.email.enabled:false}")
     private boolean emailEnabled;
 
-    @Value("${billing.default-provider:noop}")
-    private String billingProvider;
-
     @Value("${captcha.secret-key:}")
     private String captchaSecretKey;
 
@@ -157,11 +154,12 @@ public class ProductionSafetyValidator {
      *   <li>Mail. Registration marks an account verified when no mail can be sent, because a
      *       token nobody receives proves nothing — correct for self-hosting, and on open
      *       registration it means every account is verified by assertion.</li>
-     *   <li>A payment provider. {@code noop} accepts every plan change and charges for none, so
-     *       billing is "enabled" and free.</li>
      *   <li>A CAPTCHA. The registration rate limit is per address, which is the one thing a
      *       signup farm has plenty of.</li>
      * </ul>
+     *
+     * <p>A payment provider is not required. With {@code noop} the deployment runs the free plan
+     * only: quotas are enforced, assignPlan admits nothing but {@code free}, and checkout refuses.
      *
      * <p>Nothing here fires for a self-hosted deployment: with billing off, which is the shipped
      * default, this method has nothing to say.
@@ -174,11 +172,6 @@ public class ProductionSafetyValidator {
             violations.add("BILLING_ENABLED=true with EMAIL_ENABLED=false — registration would mark "
                     + "every account verified without sending anything, so a paid tier sits behind "
                     + "an address nobody proved they own");
-        }
-        if (billingProvider == null || billingProvider.isBlank() || "noop".equalsIgnoreCase(billingProvider)) {
-            violations.add("BILLING_ENABLED=true with BILLING_DEFAULT_PROVIDER=" + billingProvider
-                    + " — the no-op provider accepts every plan change and charges for none, so plans "
-                    + "would be enforced and free");
         }
         if (captchaSecretKey == null || captchaSecretKey.isBlank()) {
             violations.add("BILLING_ENABLED=true with no CAPTCHA_SECRET_KEY — registration is then "

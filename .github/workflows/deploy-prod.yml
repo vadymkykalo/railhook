@@ -13,6 +13,12 @@
 #     can run `deploy <vX.Y.Z>` and `status` and nothing else. It cannot read .env, it
 #     cannot open a shell, and a version that is not a plain tag is refused before the
 #     host acts on it.
+#
+# Production settings live in Settings → Environments → production, not in a shell on the
+# host: a variable (or, for anything sensitive, a secret) named DOTENV_<NAME> becomes
+# NAME=value in /opt/railhook/.env on every deploy. To change one, edit it there and run this
+# workflow again — the version already deployed is fine. The encryption key and salt, JWT and
+# database passwords stay on the host; the helper refuses them.
 name: Deploy to production
 
 on:
@@ -96,21 +102,59 @@ jobs:
           # notice a host key that changed.
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 600 ~/.ssh/known_hosts
 
+      - name: Collect the production settings
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
+          SECRETS_JSON: ${{ toJSON(secrets) }}
+          SETTINGS_FILE: ${{ runner.temp }}/production-settings.env
+        run: |
+          set -euo pipefail
+          # Every DOTENV_<NAME> variable and secret of this environment, as NAME=value. A secret
+          # wins over a variable of the same name. Anything else in either context — the SSH
+          # key, GITHUB_TOKEN — has no DOTENV_ prefix and never leaves the runner.
+          umask 077
+          if ! jq -rn '
+            def dotenv: to_entries
+              | map(select(.key | startswith("DOTENV_"))
+                    | {key: (.key | ltrimstr("DOTENV_")), value: (.value | tostring)})
+              | from_entries;
+            ((env.VARS_JSON | fromjson | dotenv) + (env.SECRETS_JSON | fromjson | dotenv))
+            | to_entries[]
+            | if (.key | test("^[A-Z][A-Z0-9_]*$") | not) then error("DOTENV_\(.key) is not a valid variable name")
+              elif (.value | test("[\r\n]")) then error("DOTENV_\(.key) contains a line break, which .env cannot hold")
+              else "\(.key)=\(.value)" end
+          ' > "$SETTINGS_FILE" 2> "$RUNNER_TEMP/settings.err"; then
+            echo "::error::$(sed 's/^jq: error[^:]*: //' "$RUNNER_TEMP/settings.err")"
+            exit 1
+          fi
+          # Names only. Values stay out of the log, secrets and variables alike.
+          if [ -s "$SETTINGS_FILE" ]; then
+            echo "Settings sent with this deploy:"
+            cut -d= -f1 "$SETTINGS_FILE" | sed 's/^/  /'
+          else
+            echo "No DOTENV_ settings in the production environment; .env is left as it is."
+          fi
+
       - name: Deploy
         env:
           HOST: ${{ secrets.PROD_HOST }}
           VERSION: ${{ inputs.version }}
+          SETTINGS_FILE: ${{ runner.temp }}/production-settings.env
         run: |
           set -euo pipefail
+          trap 'rm -f "$SETTINGS_FILE"' EXIT
           # The command is ignored by the host — it is forced — so this string is only
-          # ever read as an argument by railhook-deploy. It takes a backup before it
-          # migrates, and refuses to continue if that backup fails.
+          # ever read as an argument by railhook-deploy. Its stdin is not: railhook-deploy
+          # runs `./railhook upgrade`, which applies these settings to .env before anything
+          # else, and refuses the whole upgrade if one of them is not allowed. It takes a
+          # backup before it migrates, and refuses to continue if that backup fails.
           ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes \
-              "root@${HOST}" "deploy ${VERSION}"
+              "root@${HOST}" "deploy ${VERSION}" < "$SETTINGS_FILE"
 
       - name: Prove it came back up
         env:
           HOST: ${{ secrets.PROD_HOST }}
+          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           echo "--- containers ---"
@@ -119,16 +163,37 @@ jobs:
           # From the outside, over the real certificate, because that is what a customer
           # gets. A deploy that leaves the stack healthy behind a broken proxy is not a
           # deploy that worked.
+          up=""
           for attempt in $(seq 1 30); do
             code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 https://railhook.io/ || echo 000)
             if [ "$code" = "200" ]; then
               echo "https://railhook.io answered 200 after ${attempt} attempt(s)"
-              exit 0
+              up=1
+              break
             fi
             echo "attempt ${attempt}: ${code}"
             sleep 10
           done
-          echo "::error::railhook.io never answered 200. The host may be mid-rollback — check ./railhook status."
+          if [ -z "$up" ]; then
+            echo "::error::railhook.io never answered 200. The host may be mid-rollback — check ./railhook status."
+            exit 1
+          fi
+
+          # A 200 is not the release. 2.17.0 answered 200 while the host still served the
+          # previous UI, pinned by an override, and this step called it deployed. The UI image
+          # serves its own version; the query string keeps any cache out of the answer.
+          want="${VERSION#v}"
+          served=""
+          for attempt in $(seq 1 12); do
+            served=$(curl -fsS --max-time 10 "https://railhook.io/version.txt?deploy=${GITHUB_RUN_ID}-${attempt}" | tr -d '[:space:]' || true)
+            if [ "$served" = "$want" ]; then
+              echo "https://railhook.io serves ${served}"
+              exit 0
+            fi
+            echo "attempt ${attempt}: serves '${served:-nothing}', want ${want}"
+            sleep 10
+          done
+          echo "::error::railhook.io serves '${served:-nothing}', not ${want} — a pinned UI image or a docker-compose.override.yml on the host is holding the old site."
           exit 1
 
       - name: Say what is running now

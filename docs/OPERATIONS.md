@@ -101,8 +101,10 @@ and be told to check their mail.
 `CAPTCHA_SECRET_KEY` adds the challenge. The auth rate limit is per address, and an address is
 the one thing a signup farm has plenty of. Cloudflare Turnstile by default; hCaptcha speaks the
 same siteverify shape, so `CAPTCHA_VERIFY_URL` is all that changes. The dashboard needs
-`VITE_CAPTCHA_SITE_KEY` at build time — without it the registration page renders no challenge
-and sends no token, which is exactly what the unconfigured server side expects.
+`CAPTCHA_SITE_KEY` (and `CAPTCHA_SCRIPT_URL` for hCaptcha), read by the UI container when it
+starts — `docker compose up -d ui` after setting it, no rebuild. Without it the registration page
+renders no challenge and sends no token, which is exactly what the unconfigured server side
+expects.
 
 Verification **fails closed**: a provider that is unreachable or answering nonsense means
 registration is refused, not waved through. A deployment that would rather stay open when the
@@ -111,6 +113,19 @@ making it for them.
 
 With `APP_ENV=production` and `BILLING_ENABLED=true`, the API refuses to start without both.
 Neither is required, or wanted, for self-hosting.
+
+## Changing settings on a Compose install
+
+`./railhook settings < file` applies `NAME=value` lines to `.env` in one step: existing names are
+replaced in place, new ones appended, and the names are printed with `changed`, `unchanged` or
+`added` — never the values. `./railhook upgrade` reads the same lines from stdin, so an
+automated deploy can send settings and a release together: that is how `railhook.io` is
+configured (GitHub environment `production`, `DOTENV_<NAME>` variables and secrets — see
+`docs/RELEASING.md`).
+
+Refused, with nothing written: the encryption key and salt, `JWT_SECRET`, the Postgres and Redis
+passwords, and the image tags. The first four were generated on the host and are already in use
+by the database and Redis; the tags belong to the version argument of `upgrade`.
 
 ## The operator back-office
 

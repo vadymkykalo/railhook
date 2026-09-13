@@ -73,10 +73,31 @@ const MIME = {
   '.txt': 'text/plain',
 };
 
+/**
+ * The origin nginx substitutes with the container's RAILHOOK_SITE_URL when serving.
+ *
+ * The prerender hands it to the app as the configured site URL, so the canonical and og:url that
+ * `useDocumentMeta` writes carry the placeholder rather than this throwaway server's address.
+ */
+const SITE_URL_PLACEHOLDER = 'https://site-url.railhook.invalid';
+
+/** What the image's entrypoint would write, with the placeholder as the origin. */
+const PRERENDER_CONFIG_JS = `window.__RAILHOOK__ = ${JSON.stringify({
+  contactDomain: '',
+  siteUrl: SITE_URL_PLACEHOLDER,
+  captchaSiteKey: '',
+  captchaScriptUrl: '',
+})};\n`;
+
 /** The same SPA fallback nginx serves, so the browser sees production routing. */
 function serveDist() {
   return createServer(async (req, res) => {
     const url = new URL(req.url, `http://localhost:${PORT}`);
+    if (url.pathname === '/config.js') {
+      res.writeHead(200, { 'Content-Type': 'text/javascript' });
+      res.end(PRERENDER_CONFIG_JS);
+      return;
+    }
     let filePath = join(DIST, decodeURIComponent(url.pathname));
     if (!existsSync(filePath) || !extname(filePath)) {
       filePath = join(DIST, 'index.html');
@@ -157,6 +178,13 @@ async function main() {
       if (failures.length) {
         throw new Error(`${route} threw while rendering: ${failures.join(' | ')}`);
       }
+
+      // The policy src/lib/csp.ts wrote here knows only the prerender's config, which has no
+      // registration challenge. Baked in, a browser would enforce it alongside the one the page
+      // writes from the real container's config — the intersection — and block the widget.
+      await page.evaluate(() => {
+        document.querySelectorAll('meta[http-equiv="Content-Security-Policy"]').forEach((m) => m.remove());
+      });
 
       const html = await page.content();
       // A route that rendered a shell and nothing else is worse than no prerender: it would

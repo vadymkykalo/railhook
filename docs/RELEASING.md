@@ -41,16 +41,12 @@ accident.
    that silent failure into a message.
 
 4. **The domain** — production is `https://railhook.io`, deployed by
-   `.github/workflows/deploy-prod.yml`. Set `VITE_SITE_URL` on the public build to
-   match, set `RAILHOOK_CONTACT_DOMAIN=railhook.io` in the production host's `.env`
-   (read by the UI container at startup, so the published image stays neutral),
-   and regenerate the sitemap:
-
-   ```bash
-   cd railhook-ui && SITE_URL=https://railhook.io npm run seo:sitemap
-   ```
-
-   and edit the `Sitemap:` line in `public/robots.txt` to match.
+   `.github/workflows/deploy-prod.yml`, running the published images with nothing
+   built on the host. The production `.env` carries what differs from any other
+   install, all read by the UI container at startup: `APP_BASE_URL=https://railhook.io`
+   (canonical, og tags, sitemap), `RAILHOOK_CONTACT_DOMAIN=railhook.io` and
+   `CAPTCHA_SITE_KEY`. The deploy fails unless `https://railhook.io/version.txt`
+   answers the version it deployed.
 
 5. **GHCR** — nothing to claim. The first release publishes `railhook-api`,
    `-worker` and `-ui` as new packages; the old `hookflow-*` ones stay pullable,
@@ -76,4 +72,21 @@ accident.
 
 CI's `version-check` job (`.github/workflows/ci.yml`) fails the build if the
 pom, Chart, UI and SDK versions ever disagree again.
+
+## Production settings
+
+What production runs with is set in GitHub, not in a shell on the host. In **Settings →
+Environments → production**, a variable named `DOTENV_<NAME>` becomes `NAME=value` in
+`/opt/railhook/.env` on every deploy; use a secret with the same naming for anything
+sensitive (`DOTENV_SMTP_PASSWORD`, `DOTENV_CAPTCHA_SECRET_KEY`). A secret wins over a variable
+of the same name.
+
+To change a setting, edit it there and run **Deploy to production** again — redeploying the
+version that is already live is fine and applies the change. The deploy log lists the names it
+sent, never the values.
+
+The host keeps what it generated at install and a deploy must never replace: the encryption key
+and salt (a new one leaves encrypted columns unreadable), `JWT_SECRET`, and the Postgres and
+Redis passwords. The image tags come from the version being deployed. The helper refuses any of
+these, and the whole upgrade stops before anything changes.
 

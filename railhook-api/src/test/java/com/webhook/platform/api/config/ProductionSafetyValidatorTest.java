@@ -37,7 +37,6 @@ class ProductionSafetyValidatorTest {
         ReflectionTestUtils.setField(v, "swaggerEnabled", false);
         ReflectionTestUtils.setField(v, "billingEnabled", false);
         ReflectionTestUtils.setField(v, "emailEnabled", false);
-        ReflectionTestUtils.setField(v, "billingProvider", "noop");
         ReflectionTestUtils.setField(v, "captchaSecretKey", "");
     }
 
@@ -245,7 +244,6 @@ class ProductionSafetyValidatorTest {
         ProductionSafetyValidator v = newValidator();
         setValid(v);
         ReflectionTestUtils.setField(v, "billingEnabled", true);
-        ReflectionTestUtils.setField(v, "billingProvider", "stripe");
         ReflectionTestUtils.setField(v, "captchaSecretKey", "0x4AAAAAAA-turnstile-secret");
         ReflectionTestUtils.setField(v, "emailEnabled", false);
 
@@ -254,16 +252,16 @@ class ProductionSafetyValidatorTest {
     }
 
     @Test
-    void billingWithTheNoOpProviderIsRejected() {
+    void billingWithTheNoOpProviderRunsTheFreePlanOnly() {
+        // A hosted deployment that sells nothing yet. Quotas are enforced, and no paid plan is
+        // reachable: assignPlan admits only `free`, and checkout refuses without a provider.
         ProductionSafetyValidator v = newValidator();
         setValid(v);
         ReflectionTestUtils.setField(v, "billingEnabled", true);
         ReflectionTestUtils.setField(v, "emailEnabled", true);
         ReflectionTestUtils.setField(v, "captchaSecretKey", "0x4AAAAAAA-turnstile-secret");
-        ReflectionTestUtils.setField(v, "billingProvider", "noop");
 
-        IllegalStateException e = assertThrows(IllegalStateException.class, v::validateProductionConfig);
-        assertTrue(e.getMessage().contains("BILLING_DEFAULT_PROVIDER"));
+        assertDoesNotThrow(v::validateProductionConfig);
     }
 
     @Test
@@ -272,7 +270,6 @@ class ProductionSafetyValidatorTest {
         setValid(v);
         ReflectionTestUtils.setField(v, "billingEnabled", true);
         ReflectionTestUtils.setField(v, "emailEnabled", true);
-        ReflectionTestUtils.setField(v, "billingProvider", "stripe");
         ReflectionTestUtils.setField(v, "captchaSecretKey", "0x4AAAAAAA-turnstile-secret");
 
         assertDoesNotThrow(v::validateProductionConfig);
@@ -285,7 +282,6 @@ class ProductionSafetyValidatorTest {
         setValid(v);
         ReflectionTestUtils.setField(v, "billingEnabled", true);
         ReflectionTestUtils.setField(v, "emailEnabled", true);
-        ReflectionTestUtils.setField(v, "billingProvider", "stripe");
         ReflectionTestUtils.setField(v, "captchaSecretKey", "");
 
         IllegalStateException e = assertThrows(IllegalStateException.class, v::validateProductionConfig);
