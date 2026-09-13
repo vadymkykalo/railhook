@@ -25,16 +25,14 @@ afterEach(() => {
  * command (`railhook listen --port 3000`) the CLI does not accept.
  */
 describe('sendEventCurl', () => {
-  it('targets the deployment it is shown on, from the runtime site URL', () => {
-    (window as { __RAILHOOK__?: unknown }).__RAILHOOK__ = { siteUrl: 'https://railhook.io' };
+  it('targets the API this dashboard itself calls, not the canonical site URL', () => {
+    // The site URL is what pages name about themselves (APP_BASE_URL). On a local stack still
+    // carrying the old localhost:5173 default it pointed the copied curl at a port nothing served,
+    // while the dashboard talked to its own origin. The API a curl should reach is that one.
+    (window as { __RAILHOOK__?: unknown }).__RAILHOOK__ = { siteUrl: 'http://localhost:5173' };
     const curl = sendEventCurl({ payload: '{"a":1}' });
-    expect(curl).toContain('https://railhook.io/api/v1/events');
-    expect(curl).not.toMatch(/your-api\.com|your-domain\.com|example\.com/);
-  });
-
-  it('falls back to the page origin on a deployment that declares none', () => {
-    const curl = sendEventCurl({ payload: '{}' });
-    expect(curl).toContain(`${window.location.origin}/api/v1/events`);
+    expect(curl).toContain(`curl -X POST ${window.location.origin}/api/v1/events`);
+    expect(curl).not.toMatch(/localhost:5173|your-api\.com|your-domain\.com|example\.com/);
   });
 
   it('keeps the key a placeholder and the payload verbatim', () => {
