@@ -268,6 +268,28 @@ describe('the Caddyfile install.sh writes', () => {
     expect(writeCaddyfile(null).caddyfile).not.toContain('railhook-grafana');
   });
 
+  it('serves Grafana with a certificate you provide, when both files are named', () => {
+    const env = 'RAILHOOK_DOMAIN=example.com\nMONITORING_DOMAIN=grafana.example.com\n';
+    const withCert = writeCaddyfile(
+      `${env}MONITORING_TLS_CERT=/data/certs/grafana.example.com.pem\nMONITORING_TLS_KEY=/data/certs/grafana.example.com.key\n`,
+    ).caddyfile;
+    const grafanaBlock = withCert.slice(withCert.indexOf('grafana.example.com {'));
+    expect(grafanaBlock).toMatch(/^\ttls \/data\/certs\/grafana\.example\.com\.pem \/data\/certs\/grafana\.example\.com\.key$/m);
+    expect(withCert.slice(0, withCert.indexOf('grafana.example.com {')), 'the platform keeps its own certificate').not.toMatch(/^\ttls /m);
+
+    expect(writeCaddyfile(env).caddyfile, 'no files: Caddy obtains one').not.toMatch(/^\ttls /m);
+    expect(writeCaddyfile(`${env}MONITORING_TLS_CERT=/data/certs/a.pem\n`).caddyfile, 'a certificate without its key').not.toMatch(/^\ttls /m);
+  });
+
+  it('refuses a certificate path that is not a plain absolute path', () => {
+    const { caddyfile, log } = writeCaddyfile(
+      'MONITORING_DOMAIN=grafana.example.com\nMONITORING_TLS_CERT=/data/a.pem }\nMONITORING_TLS_KEY=/data/a.key\n',
+    );
+    expect(caddyfile).toContain('railhook-grafana:3000');
+    expect(caddyfile).not.toMatch(/^\ttls /m);
+    expect(log).toMatch(/MONITORING_TLS_CERT/);
+  });
+
   it('refuses a value that is not a hostname rather than writing it into the config', () => {
     const { caddyfile, log } = writeCaddyfile('MONITORING_DOMAIN=evil.example {\n');
     expect(caddyfile).not.toContain('railhook-grafana');

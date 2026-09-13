@@ -79,6 +79,16 @@ Set `MONITORING_DOMAIN=grafana.example.com` in `.env`, point that name at the se
 
 <Aside type="caution">
 Put an identity-aware proxy such as Cloudflare Access in front of that name. Grafana's login should not be the only thing between the internet and your logs. If the proxy covers every path, exempt `/.well-known/acme-challenge/`, or Caddy cannot renew the certificate.
+
+Some proxies stop Let's Encrypt from reaching the name at all: Cloudflare with Always Use HTTPS sends the challenge to HTTPS, where there is no certificate yet. Give Caddy one instead, such as a Cloudflare origin certificate for that name. Copy the certificate and key into the Caddy data volume, name them in `.env`, and run `./railhook monitoring up` again:
+
+```bash
+docker exec webhook-caddy mkdir -p /data/certs
+docker cp grafana.pem webhook-caddy:/data/certs/grafana.example.com.pem
+docker cp grafana.key webhook-caddy:/data/certs/grafana.example.com.key
+printf '%s\n' MONITORING_TLS_CERT=/data/certs/grafana.example.com.pem \
+  MONITORING_TLS_KEY=/data/certs/grafana.example.com.key | ./railhook settings
+```
 </Aside>
 
 ### From a clone

@@ -24,14 +24,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dashboards for alerts, errors, logs, uptime, containers and the host, and email alerts for a
   full disk, memory, 5xx and error spikes, failing deliveries, a stale backup, an expiring
   certificate and a site that stops answering. Grafana has no default password and is the only
-  published port, on `127.0.0.1`; `MONITORING_DOMAIN` puts it behind Caddy.
+  published port, on `127.0.0.1`; `MONITORING_DOMAIN` puts it behind Caddy, and
+  `MONITORING_TLS_CERT`/`MONITORING_TLS_KEY` give Caddy a certificate for it when Let's Encrypt
+  cannot reach the name (Cloudflare with Always Use HTTPS).
 - **The production deploy proves the site works page by page** — landing, docs, auth pages,
   legal pages, installers, runtime config, API and health — not only that `/` answers 200.
 
 ### Security
 
-- Linear-time regular expressions in PII masking and transformation template validation (a crafted
-  payload could pin a thread); the PII preview is always `text/plain`.
+- PII masking reads each key and value once and decides in code whether it is an email, phone or
+  card number, and finds a card object by reading back from its member; a crafted payload of a few
+  hundred kilobytes could otherwise pin a thread. Transformation template validation is
+  linear-time too, and the PII preview is always `text/plain`.
 - Database dumps are written readable by their owner only.
 - The deploy step receives only the secrets it sends; third-party GitHub Actions are pinned to
   commits.

@@ -1679,6 +1679,18 @@
           "description": "A host name to serve Grafana on through the built-in Caddy, e.g.\ngrafana.example.com. Empty keeps it loopback-only. Point DNS at this host and\nput an identity-aware proxy (Cloudflare Access, for one) in front: Grafana's\nlogin alone should not be what stands between the internet and your logs."
         },
         {
+          "name": "MONITORING_TLS_CERT",
+          "default": "",
+          "example": null,
+          "description": "A certificate for MONITORING_DOMAIN that Caddy serves instead of obtaining one,\nfor a host name Let's Encrypt cannot reach through the proxy in front of it\n(Cloudflare with Always Use HTTPS; a Cloudflare origin certificate fits). Paths\nas the Caddy container sees them: copy both files into its data volume, e.g.\n/data/certs/grafana.example.com.pem. Both or neither."
+        },
+        {
+          "name": "MONITORING_TLS_KEY",
+          "default": "",
+          "example": null,
+          "description": "A certificate for MONITORING_DOMAIN that Caddy serves instead of obtaining one,\nfor a host name Let's Encrypt cannot reach through the proxy in front of it\n(Cloudflare with Always Use HTTPS; a Cloudflare origin certificate fits). Paths\nas the Caddy container sees them: copy both files into its data volume, e.g.\n/data/certs/grafana.example.com.pem. Both or neither."
+        },
+        {
           "name": "MONITORING_PROBE_URLS",
           "default": "",
           "example": null,

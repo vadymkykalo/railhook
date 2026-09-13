@@ -577,12 +577,24 @@ CADDY
         warn "MONITORING_DOMAIN is not a hostname — Grafana is not added to the Caddyfile"
         return 0
     fi
+    # A certificate the operator provides, for a host name Let's Encrypt cannot reach through
+    # the proxy in front of it. Both files or neither; paths are inside the Caddy container.
+    local tls_cert tls_key tls_line=""
+    tls_cert=$(grep '^MONITORING_TLS_CERT=' "${INSTALL_DIR}/.env" | tail -1 | cut -d= -f2- | tr -d "\"'" || true)
+    tls_key=$(grep '^MONITORING_TLS_KEY=' "${INSTALL_DIR}/.env" | tail -1 | cut -d= -f2- | tr -d "\"'" || true)
+    if [ -n "$tls_cert" ] && [ -n "$tls_key" ]; then
+        if [[ "$tls_cert" =~ ^/[A-Za-z0-9._/-]+$ && "$tls_key" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+            tls_line=$'\ttls '"${tls_cert} ${tls_key}"$'\n'
+        else
+            warn "MONITORING_TLS_CERT or MONITORING_TLS_KEY is not a plain absolute path — Caddy obtains Grafana's certificate itself"
+        fi
+    fi
     cat >> "${INSTALL_DIR}/Caddyfile" <<CADDY
 
 # Grafana, from the monitoring stack. Its own login is the second lock: put an identity-aware
 # proxy in front of this host name (Cloudflare Access, for one) as the first.
 ${monitoring_domain} {
-	encode gzip zstd
+${tls_line}	encode gzip zstd
 	# Resolved per request, so Caddy starts and serves the platform with the stack stopped;
 	# this host name alone answers 502 until it is up.
 	reverse_proxy railhook-grafana:3000 {
@@ -884,8 +896,11 @@ monitoring_up() {
     # Grafana on its own host name goes through the built-in Caddy. install.sh is what writes
     # the Caddyfile, so it is asked to rewrite it — and then this helper, which that rewrite
     # replaces, starts again from the top, the way `upgrade` does.
+    # A certificate named after the block was written needs the same rewrite.
     domain=$(env_value MONITORING_DOMAIN)
-    if [ -n "$domain" ] && [ -f Caddyfile ] && ! grep -qxF "${domain} {" Caddyfile \
+    tls_cert=$(env_value MONITORING_TLS_CERT)
+    if [ -n "$domain" ] && [ -f Caddyfile ] \
+       && { ! grep -qxF "${domain} {" Caddyfile || { [ -n "$tls_cert" ] && ! grep -qF "tls ${tls_cert} " Caddyfile; }; } \
        && [ -z "${RAILHOOK_HELPER_REFRESHED:-}" ]; then
         echo "Adding ${domain} to the Caddyfile..."
         curl -fsSL "${RAW}/${ref}/install.sh" | bash -s -- --refresh --dir "$(pwd)" \
