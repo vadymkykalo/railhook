@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "No data" on a production host:
   - **Containers:** cAdvisor 0.60 reads containers on Docker 29, which stores images through
     containerd and left the old cAdvisor exporting nothing. OOM kills are counted from the
-    kernel, so "OOM kills (24h)" is real rather than a 0 with no source.
+    kernel, so "OOM kills (24h)" is real rather than a 0 with no source. CPU reads as a share of
+    the host's cores, and a recreated container is one line, not one per container id — so one
+    restart or OOM is one alert.
   - **Kafka:** the api and worker publish their Kafka client metrics — consumer lag, records and
     bytes consumed, fetch latency, send rate, queue time.
   - **Latency:** HTTP requests carry latency buckets, so the p50–p99 panels have something to read.
@@ -41,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Grafana on `MONITORING_DOMAIN`; before, they pointed at Alertmanager and Prometheus, which are
   not published, so they led nowhere. Without a domain the mail says how to open Grafana through
   an SSH tunnel.
+- **The platform admin panel lays out properly.** Empty states sit centred inside their cards,
+  every table fits its card at 1440px, long email addresses and organization names end in "…"
+  with the full value on hover instead of breaking mid-word, and column titles stay on one line.
 
 ### Changed
 
@@ -51,6 +56,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Naming the platform admins on a self-hosted install:** `install.sh --admin-email you@company.com`
+  (several addresses separated by commas) writes `PLATFORM_ADMIN_EMAILS`, on a new install or with
+  `--refresh`. Without it nobody is a platform admin; no account becomes one by registering first.
+- **The platform admin panel says what it is.** Every view opens with who can see it and that the
+  only change it makes is suspending or reinstating an organization, linked to the docs. Platform
+  admins carry a "Platform admin" badge in the users and members lists, and a plan without limits
+  reads "Unlimited".
 - `make monitoring-check-queries` runs every dashboard and alert query against the running
   monitoring stack and fails on any that return no data, apart from a short allow-list of panels
   that stay empty until something happens.
