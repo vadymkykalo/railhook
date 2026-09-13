@@ -62,8 +62,12 @@ describe('SettingsPage — changing the email address', () => {
     renderSettings();
 
     await user.click(await screen.findByRole('button', { name: /^change email$/i }));
-    await user.type(screen.getByLabelText(/new email address/i), 'owner-new@example.com');
-    await user.type(screen.getByLabelText(/current password/i, { selector: '#email-change-password' }), 'Test1234!');
+    // Pasted, not typed: one keystroke at a time re-renders the whole Settings page per key and
+    // outran the test timeout under a full run. What matters is what the form sends.
+    await user.click(screen.getByLabelText(/new email address/i));
+    await user.paste('owner-new@example.com');
+    await user.click(screen.getByLabelText(/current password/i, { selector: '#email-change-password' }));
+    await user.paste('Test1234!');
     await user.click(screen.getByRole('button', { name: /send confirmation link/i }));
 
     await waitFor(() => expect(authApi.requestEmailChange).toHaveBeenCalledWith({
@@ -72,7 +76,7 @@ describe('SettingsPage — changing the email address', () => {
     expect(await screen.findByText(/waiting for confirmation at/i)).toHaveTextContent('owner-new@example.com');
 
     await user.click(screen.getByRole('button', { name: /resend link/i }));
-    expect(authApi.resendEmailChange).toHaveBeenCalled();
+    await waitFor(() => expect(authApi.resendEmailChange).toHaveBeenCalled());
 
     await user.click(screen.getByRole('button', { name: /cancel change/i }));
     await waitFor(() => expect(authApi.cancelEmailChange).toHaveBeenCalled());

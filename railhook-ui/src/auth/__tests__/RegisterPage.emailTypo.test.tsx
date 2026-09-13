@@ -31,10 +31,17 @@ describe('RegisterPage — a mistyped address', () => {
     const user = userEvent.setup();
     renderRegister();
 
-    await user.type(screen.getByLabelText(/name/i, { selector: '#fullName' }), 'Wheelet');
-    await user.type(screen.getByLabelText(/organization|company|workspace/i), 'Wheelet Org');
-    await user.type(screen.getByLabelText(/^password/i), 'A str0ng! passphrase');
-    await user.type(screen.getByLabelText(/email/i), 'wheelet1228@gmail.con');
+    // Pasted, not typed: typing ~75 characters one keystroke at a time re-rendered the page (and
+    // its password strength meter) on every key, which outran the test timeout under a full run.
+    // What is under test is the address the form ends up holding, not how it got there.
+    const fill = async (field: HTMLElement, value: string) => {
+      await user.click(field);
+      await user.paste(value);
+    };
+    await fill(screen.getByLabelText(/name/i, { selector: '#fullName' }), 'Wheelet');
+    await fill(screen.getByLabelText(/organization|company|workspace/i), 'Wheelet Org');
+    await fill(screen.getByLabelText(/^password/i), 'A str0ng! passphrase');
+    await fill(screen.getByLabelText(/email/i), 'wheelet1228@gmail.con');
 
     const submit = screen.getByRole('button', { name: /create|register|sign up/i });
     expect(submit).toBeDisabled();
