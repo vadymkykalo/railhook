@@ -35,9 +35,9 @@
         },
         {
           "name": "APP_BASE_URL",
-          "default": "http://localhost:5173",
+          "default": "http://localhost",
           "example": null,
-          "description": "Public frontend URL (used for emails, shared debug links, etc.). The UI container also\nreads it at startup as the origin its pages name about themselves: the canonical link,\nog:url / og:image and the sitemap."
+          "description": "Public frontend URL (used for emails, shared debug links, etc.). The UI container also\nreads it at startup as the origin its pages name about themselves: the canonical link,\nog:url / og:image and the sitemap.\n\nThe default is where this stack publishes the dashboard (RAILHOOK_PORT, 80). Add the port\nwhen you move it, e.g. http://localhost:8080. install.sh writes your real address here."
         }
       ]
     },

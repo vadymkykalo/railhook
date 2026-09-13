@@ -374,7 +374,7 @@ services:
       EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@example.com}
       EMAIL_SUPPORT_ADDRESS: ${EMAIL_SUPPORT_ADDRESS:-}
-      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost}
       SMTP_HOST: ${SMTP_HOST:-localhost}
       SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_USERNAME: ${SMTP_USERNAME:-}

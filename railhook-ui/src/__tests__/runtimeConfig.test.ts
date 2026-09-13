@@ -274,6 +274,17 @@ describe('the settings reach the container', () => {
     expect(envDist).toMatch(/^#\s*CAPTCHA_SCRIPT_URL=/m);
   });
 
+  it('APP_BASE_URL defaults to where Compose publishes the dashboard, not the Vite dev server', () => {
+    // It defaulted to localhost:5173, which is `npm run dev`. `make up` publishes the ui container
+    // on RAILHOOK_PORT (80), so every verification, reset and invite link a local stack mailed
+    // pointed at a port nothing listened on. install.sh writes the real address either way.
+    const api = compose.slice(compose.indexOf('\n  api:'), compose.indexOf('\n  worker:'));
+    expect(read('.env.dist')).toMatch(/^APP_BASE_URL=http:\/\/localhost$/m);
+    expect(api).toMatch(/^\s+APP_BASE_URL: \$\{APP_BASE_URL:-http:\/\/localhost\}$/m);
+    expect(ui).toMatch(/\$\{RAILHOOK_PORT:-80\}:5173/);
+    expect(read('install.sh')).toMatch(/^APP_BASE_URL=\$\{BASE_URL\}$/m);
+  });
+
   it('Compose passes all four to the ui service', () => {
     expect(ui).toMatch(/^\s+RAILHOOK_CONTACT_DOMAIN: \$\{RAILHOOK_CONTACT_DOMAIN:-\}$/m);
     expect(ui).toMatch(/^\s+RAILHOOK_SITE_URL: \$\{APP_BASE_URL:-\}$/m);
