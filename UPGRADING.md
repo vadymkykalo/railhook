@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v2.17.2
+
+### `./railhook settings` — change `.env` without editing it
+
+Nothing to do on upgrade. The helper gains `./railhook settings < file`, which applies
+`NAME=value` lines to `.env` and prints which names changed, never their values. `./railhook
+upgrade` reads the same lines from stdin when it is not run from a terminal, which is how an
+automated deploy sends settings with a release. It refuses the encryption key and salt,
+`JWT_SECRET`, the Postgres and Redis passwords and the image tags, and then changes nothing.
+
 ## v2.17.1
 
 ### The published UI image serves your domain and your CAPTCHA — no UI build of your own
