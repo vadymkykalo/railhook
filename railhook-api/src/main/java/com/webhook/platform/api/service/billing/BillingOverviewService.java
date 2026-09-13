@@ -19,8 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.YearMonth;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,17 +31,6 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class BillingOverviewService {
-
-    /** The month usage is measured over: whole UTC months, half-open. */
-    private record BillingPeriod(Instant start, Instant end) {
-
-        static BillingPeriod current(Clock clock) {
-            YearMonth month = YearMonth.now(clock.withZone(ZoneOffset.UTC));
-            return new BillingPeriod(
-                    month.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC),
-                    month.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC));
-        }
-    }
 
     private final BillingService billingService;
     private final EntitlementService entitlementService;

@@ -224,7 +224,9 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/admin/organizations/" + tenant.organizationId() + "/usage")
                         .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.projects.current").value(1))
+                // Two: every new organization starts with a project of its own, plus the one
+                // created above.
+                .andExpect(jsonPath("$.projects.current").value(2))
                 .andExpect(jsonPath("$.events.limit").exists())
                 .andExpect(jsonPath("$.periodStart").exists());
     }
@@ -247,12 +249,14 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/admin/organizations/" + busy.organizationId() + "/usage")
                         .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.projects.current").value(3));
+                // The organization's first project plus the three created above.
+                .andExpect(jsonPath("$.projects.current").value(4));
 
         mockMvc.perform(get("/api/v1/admin/organizations/" + quiet.organizationId() + "/usage")
                         .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.projects.current").value(0));
+                // Only its own first project: none of the busy tenant's three.
+                .andExpect(jsonPath("$.projects.current").value(1));
     }
 
     @Test

@@ -15,10 +15,17 @@ import java.util.List;
  */
 public class PlatformAdminAuthenticationToken extends AbstractAuthenticationToken {
 
+    /** The platform admin panel — held by this token and by a verified, listed, recent sign-in. */
     public static final String AUTHORITY = "PLATFORM_ADMIN";
 
+    /**
+     * What only the deployment's operator token may do: re-encrypting every tenant's secrets is
+     * run from the deployment, and no browser session — however verified — carries it.
+     */
+    public static final String OPERATOR_TOKEN_AUTHORITY = "PLATFORM_ADMIN_TOKEN";
+
     public PlatformAdminAuthenticationToken() {
-        super(List.of(new SimpleGrantedAuthority(AUTHORITY)));
+        super(List.of(new SimpleGrantedAuthority(AUTHORITY), new SimpleGrantedAuthority(OPERATOR_TOKEN_AUTHORITY)));
         setAuthenticated(true);
     }
 

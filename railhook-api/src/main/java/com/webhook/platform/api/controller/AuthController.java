@@ -25,6 +25,7 @@ import com.webhook.platform.api.service.AuthService;
 import com.webhook.platform.api.service.SessionOrigin;
 import com.webhook.platform.api.service.AccountErasureService;
 import com.webhook.platform.api.service.ExternalSignInService;
+import com.webhook.platform.api.service.PlatformAdminAccessService;
 import com.webhook.platform.api.service.UserSessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -58,6 +59,7 @@ public class AuthController {
     private final TrustedProxyResolver trustedProxyResolver;
     private final CaptchaVerifier captchaVerifier;
     private final ExternalSignInService externalSignInService;
+    private final PlatformAdminAccessService platformAdminAccessService;
     private final boolean isProduction;
     private final int refreshCookieMaxAgeSeconds;
 
@@ -69,6 +71,7 @@ public class AuthController {
             TrustedProxyResolver trustedProxyResolver,
             CaptchaVerifier captchaVerifier,
             ExternalSignInService externalSignInService,
+            PlatformAdminAccessService platformAdminAccessService,
             @Value("${app.env:development}") String appEnv,
             @Value("${jwt.refresh-token-expiration:86400000}") long refreshTokenExpirationMs) {
         this.authService = authService;
@@ -78,6 +81,7 @@ public class AuthController {
         this.trustedProxyResolver = trustedProxyResolver;
         this.captchaVerifier = captchaVerifier;
         this.externalSignInService = externalSignInService;
+        this.platformAdminAccessService = platformAdminAccessService;
         this.isProduction = "production".equalsIgnoreCase(appEnv);
         // Derived from the token's own lifetime rather than hardcoded. The cookie used to be
         // pinned at seven days while the token it carries expires in one, so for six of those
@@ -287,6 +291,7 @@ public class AuthController {
         CurrentUserResponse response = authService.getCurrentUser(
                 auth.requireUserId(),
                 auth.role());
+        response.setPlatformAdmin(platformAdminAccessService.offersPanelTo(auth.requireUserId()));
         return ResponseEntity.ok(response);
     }
 

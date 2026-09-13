@@ -37,6 +37,9 @@ public enum AuditAction {
     // the audit log is where a customer's "why did this stop working" gets answered.
     ORGANIZATION_SUSPENDED,
     ORGANIZATION_REINSTATED,
+    // Any request to the platform admin API — reads included, because reading another
+    // organization's members is the sensitive act there. Recorded under the system tenant.
+    PLATFORM_ADMIN_ACCESS,
 
     /*
      * The data-protection rights, which have to be answerable to someone who was not there:

@@ -115,6 +115,10 @@ spec:
                   name: {{ .Values.googleSignIn.existingSecret }}
                   key: {{ .Values.googleSignIn.existingSecretKey | default "client-secret" }}
             {{- end }}
+            {{- with .Values.platformAdmin.emails }}
+            - name: PLATFORM_ADMIN_EMAILS
+              value: {{ . | quote }}
+            {{- end }}
             # After the api.env range above, deliberately: these two are not
             # knobs. The probes, the UI's health proxy and the ServiceMonitor
             # all address actuator on this port and expect it bound on every

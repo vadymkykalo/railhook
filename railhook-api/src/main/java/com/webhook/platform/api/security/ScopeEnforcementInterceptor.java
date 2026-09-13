@@ -159,7 +159,11 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
         }
 
         UUID organizationId;
-        if (authentication instanceof JwtAuthenticationToken jwt) {
+        if (authentication instanceof PlatformAdminUserAuthenticationToken) {
+            // The platform admin acting from the panel: their own organization being suspended
+            // must not stop them lifting someone else's suspension.
+            return;
+        } else if (authentication instanceof JwtAuthenticationToken jwt) {
             organizationId = jwt.getOrganizationId();
         } else if (authentication instanceof ApiKeyAuthenticationToken apiKey) {
             organizationId = apiKey.getOrganizationId();

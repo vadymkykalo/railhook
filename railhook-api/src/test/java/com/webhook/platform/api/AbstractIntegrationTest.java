@@ -96,6 +96,7 @@ public abstract class AbstractIntegrationTest {
         // spurious 429 (pre-existing gap here since allowTokenAction was added; not
         // related to password-reset hashing, just needed so PasswordResetIntegrationTest can run at all).
         when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
+        when(authRateLimiterService.allowPlatformAdmin(anyString())).thenReturn(true);
         when(tokenBlacklistService.isBlacklisted(any())).thenReturn(false);
         when(tokenBlacklistService.isTokenRevokedByEpoch(any(), any())).thenReturn(false);
     }

@@ -109,6 +109,13 @@ class ServiceTenantParameterTest {
             // read one set of figures rather than two implementations of the same question.
             "PlatformAdminService.getUsage",
 
+            // The rest of the organization detail view, built exactly like getUsage: each enters
+            // the subject organization's scope with callAs and lets @TenantId confine the query to
+            // it, rather than filtering members, projects or audit rows by the id by hand.
+            "PlatformAdminService.listMembers",
+            "PlatformAdminService.listProjects",
+            "PlatformAdminService.listAuditLog",
+
             // Suspension lookup and its cache, exactly parallel to PlanLookup above: asked about
             // an organization by whoever holds its id - the request filter chain, before any
             // handler, and the operator evicting after a change.

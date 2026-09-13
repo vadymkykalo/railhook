@@ -3,11 +3,14 @@ package com.webhook.platform.api.domain.repository;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.domain.enums.MembershipStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,16 +19,6 @@ import java.util.UUID;
 public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     List<Membership> findByUserId(UUID userId);
 
-    /**
-     * A user's memberships, oldest first.
-     *
-     * <p>Login and refresh pick the first of these as the organization to mint the token for.
-     * With the unordered {@link #findByUserId} that choice came down to whatever order the
-     * database happened to return, so a user belonging to two organizations could land in a
-     * different one on each login — and since {@code TenantContextFilter} derives the
-     * Hibernate tenant from that claim, in a different set of data. Oldest-first at least
-     * makes it the same organization every time, until there is a way to choose.</p>
-     */
     List<Membership> findByUserIdOrderByCreatedAtAsc(UUID userId);
 
     List<Membership> findByOrganizationId(UUID organizationId);
@@ -36,14 +29,6 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     Optional<Membership> findByInviteTokenHash(String inviteTokenHash);
 
-    /**
-     * Members holding a role whose status is not the given one.
-     *
-     * <p>Used for the last-owner guard, with {@code DISABLED} excluded. Counting owner rows
-     * flatly would let a suspended owner stand in for an administrator who can actually sign
-     * in: suspend one of two owners, then remove or demote the other, and the organization is
-     * left with nobody able to administer it — including nobody able to lift the suspension.</p>
-     */
     long countByOrganizationIdAndRoleAndStatusNot(UUID organizationId, MembershipRole role,
             MembershipStatus status);
 
@@ -51,4 +36,25 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     @Query("SELECT m, u FROM Membership m JOIN User u ON m.userId = u.id WHERE m.organizationId = :orgId")
     List<Object[]> findMembersWithUsers(@Param("orgId") UUID organizationId);
+
+    /**
+     * {@code [organizationId, email]} of the members holding {@code role} in each organization,
+     * oldest membership first — for the platform admin's list, which names each organization's
+     * owner. Only meaningful in the system scope, where it can see more than one organization.
+     */
+    @Query("SELECT m.organizationId, u.email FROM Membership m JOIN User u ON m.userId = u.id "
+            + "WHERE m.organizationId IN :organizationIds AND m.role = :role AND m.status = :status "
+            + "ORDER BY m.createdAt ASC")
+    List<Object[]> findEmailsByRole(@Param("organizationIds") Collection<UUID> organizationIds,
+            @Param("role") MembershipRole role, @Param("status") MembershipStatus status);
+
+    /** {@code [userId, organizationId, organizationName, role]} for each of the given accounts. */
+    @Query("SELECT m.userId, o.id, o.name, m.role FROM Membership m JOIN m.organization o "
+            + "WHERE m.userId IN :userIds ORDER BY m.createdAt ASC")
+    List<Object[]> findOrganizationsOfUsers(@Param("userIds") Collection<UUID> userIds);
+
+    /** The scope's members with their accounts, for a page that shows both. */
+    @Query(value = "SELECT m FROM Membership m JOIN FETCH m.user",
+            countQuery = "SELECT COUNT(m) FROM Membership m")
+    Page<Membership> findAllWithUser(Pageable pageable);
 }

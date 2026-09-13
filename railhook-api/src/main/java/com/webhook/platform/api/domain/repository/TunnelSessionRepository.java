@@ -19,6 +19,8 @@ public interface TunnelSessionRepository extends JpaRepository<TunnelSession, UU
 
     Optional<TunnelSession> findByPublicSlug(String publicSlug);
 
+    long countByStatus(TunnelStatus status);
+
     List<TunnelSession> findByOrganizationIdAndStatus(UUID organizationId, TunnelStatus status);
 
     List<TunnelSession> findByUserIdAndStatus(UUID userId, TunnelStatus status);
