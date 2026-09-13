@@ -1962,12 +1962,11 @@
       "factRetries": "retries 1m → 24h",
       "factDeploy": "Docker or Kubernetes",
       "factsLabel": "In short",
-      "yourApp": "Your app",
-      "customers": "Customers",
-      "yourServices": "Your services",
+      "sources": "Event sources",
+      "endpoints": "Your customers' endpoints",
       "worker": "Worker",
       "shared": "Shared services",
-      "diagramAria": "Your app, Stripe and GitHub send webhooks to the Railhook API, which checks the providers' signatures and stores each event in PostgreSQL before replying, then passes it through Kafka to the worker. The worker delivers to your customers and your services and retries what fails; both use PostgreSQL, and Redis for rate limits and ordering."
+      "diagramAria": "Your app, Stripe, GitHub and Shopify send webhooks to the Railhook API, which checks the providers' signatures and stores each event in PostgreSQL before replying, then passes it through Kafka to the worker. The worker delivers to your customers and your services and retries what fails; both use PostgreSQL, and Redis for rate limits and ordering."
     },
     "developer": {
       "title": "Built for developers",

@@ -342,41 +342,84 @@
 /* ── The architecture diagram ────────────────────────────────────────────
    One grid, two layouts, the same area names transposed. On a phone the flow
    runs down the first column and the shared services sit beside the API and
-   the worker; from md the flow runs across and they sit below. The main line
-   is one dotted rail behind the tiles, so it stays continuous however wide a
-   column is; the tiles cover it where they sit. */
+   the worker; from md the flow runs across and they sit below, joined to both
+   by an elbow. The main line is one dotted rail behind the cells; pictures and
+   captions (which carry the card's background) cover it where they sit. */
 .arch-grid {
-  --arch-line: hsl(var(--muted-foreground) / 0.6);
+  --arch-line: hsl(var(--muted-foreground) / 0.55);
+  /* The centre of a shared-services tile below its group's top edge:
+     border, padding, half a tile. */
+  --arch-svc-y: calc(1px + 0.375rem + 21px);
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 2.25rem 6rem;
-  grid-template-rows: auto 2.25rem auto 2.25rem auto 2.25rem auto 2.25rem auto;
+  grid-template-columns: minmax(0, 1fr) 2.5rem auto;
+  grid-template-rows: auto 2rem auto 2rem auto 2rem auto 2rem auto;
   grid-template-areas:
     "src . ."
-    "c1 . ."
-    "api l1 pg"
-    "c2 . ."
-    "kfk . lbl"
-    "c3 . ."
-    "wrk l2 rds"
-    "c4 . ."
+    "c1  . ."
+    "api l1 ."
+    "c2  . ."
+    "kfk . ."
+    "c3  . ."
+    "wrk l2 ."
+    "c4  . ."
     "dst . .";
+}
+.arch-cap {
+  max-width: 7.5rem;
+  text-wrap: balance;
+}
+.arch-cap-ghost::before {
+  content: attr(data-caption);
+  visibility: hidden;
 }
 .arch-rail {
   grid-column: 1;
-  grid-row: 1 / -1;
+  grid-row: 2 / 9;
   justify-self: center;
   width: 0;
   border-left: 2px dotted var(--arch-line);
+  translate: -1px 0;
 }
 .arch-svc {
   grid-column: 3;
-  grid-row: 3 / 8;
-  margin: -0.5rem;
-  background: hsl(var(--background) / 0.7);
+  grid-row: 5;
+  align-self: center;
+}
+.arch-svc .arch-cap { max-width: 5.5rem; }
+.arch-svc-rail {
+  grid-column: 3;
+  grid-row: 4 / 7;
+  justify-self: center;
+  width: 0;
+  border-left: 2px dotted var(--arch-line);
+  translate: -1px 0;
+}
+.arch-elbow { position: relative; }
+.arch-elbow::before {
+  content: '';
+  position: absolute;
+  border: 0 dotted var(--arch-line);
+}
+.arch-elbow--api { grid-column: 3; grid-row: 3; }
+.arch-elbow--api::before {
+  top: calc(50% - 1px);
+  right: calc(50% - 1px);
+  bottom: 0;
+  left: 0;
+  border-width: 2px 2px 0 0;
+}
+.arch-elbow--wrk { grid-column: 3; grid-row: 7; }
+.arch-elbow--wrk::before {
+  top: 0;
+  right: calc(50% - 1px);
+  bottom: calc(50% - 1px);
+  left: 0;
+  border-width: 0 2px 2px 0;
 }
 .arch-link--cross::before,
-.arch-node-link::after {
+.arch-node-link::after,
+.arch-end::after {
   content: '';
   position: absolute;
   top: 50%;
@@ -386,6 +429,16 @@
   translate: 0 -1px;
 }
 .arch-node-link::after { left: 50%; }
+.arch-end::after {
+  top: 0;
+  right: auto;
+  left: 50%;
+  border-top: 0;
+  border-left: 2px dotted var(--arch-line);
+  translate: -1px 0;
+}
+.arch-end--start::after { top: 50%; bottom: 0; }
+.arch-end--end::after { bottom: 50%; }
 .arch-dot {
   position: absolute;
   z-index: 1;
@@ -417,16 +470,16 @@
 @media (min-width: 768px) {
   .arch-grid {
     grid-template-columns:
-      minmax(0, 1.2fr) minmax(1.1rem, 0.4fr) minmax(0, 1fr) minmax(1.1rem, 0.4fr) minmax(0, 1fr)
-      minmax(1.1rem, 0.4fr) minmax(0, 1fr) minmax(1.1rem, 0.4fr) minmax(0, 1.2fr);
-    grid-template-rows: auto 2.25rem auto;
+      auto minmax(1.25rem, 1fr) auto minmax(1.25rem, 1fr) auto
+      minmax(1.25rem, 1fr) auto minmax(1.25rem, 1fr) auto;
+    grid-template-rows: auto 1.25rem auto;
     grid-template-areas:
       "src c1 api c2 kfk c3 wrk c4 dst"
-      ". . l1 . . . l2 . ."
-      ". . pg . lbl . rds . .";
+      ".   .  l1  .  .   .  l2  .  ."
+      ".   .  .   .  .   .  .   .  .";
   }
   .arch-rail {
-    grid-column: 1 / -1;
+    grid-column: 2 / 9;
     grid-row: 1;
     justify-self: stretch;
     align-self: center;
@@ -434,11 +487,46 @@
     height: 0;
     border-left: 0;
     border-top: 2px dotted var(--arch-line);
+    translate: 0 -1px;
   }
   .arch-svc {
     grid-column: 3 / 8;
     grid-row: 3;
+    align-self: start;
+    justify-self: center;
   }
+  .arch-svc .arch-cap { max-width: 7.5rem; }
+  .arch-svc-rail {
+    grid-column: 4 / 7;
+    grid-row: 3;
+    justify-self: stretch;
+    align-self: start;
+    width: auto;
+    height: calc(var(--arch-svc-y) + 1px);
+    border-left: 0;
+    border-bottom: 2px dotted var(--arch-line);
+    translate: 0;
+  }
+  .arch-elbow--api { grid-column: 3; grid-row: 3; }
+  .arch-elbow--api::before {
+    top: 0;
+    right: 0;
+    bottom: auto;
+    left: calc(50% - 1px);
+    height: calc(var(--arch-svc-y) + 1px);
+    border-width: 0 0 2px 2px;
+  }
+  .arch-elbow--wrk { grid-column: 7; grid-row: 3; }
+  .arch-elbow--wrk::before {
+    top: 0;
+    right: calc(50% - 1px);
+    bottom: auto;
+    left: 0;
+    height: calc(var(--arch-svc-y) + 1px);
+    border-width: 0 2px 2px 0;
+  }
+  /* The API's and the worker's lines down to the shared services leave the
+     tile's centre and run behind the caption. */
   .arch-link--cross::before,
   .arch-node-link::after {
     top: 0;
@@ -450,6 +538,17 @@
     translate: -1px 0;
   }
   .arch-node-link::after { top: 50%; }
+  .arch-end::after {
+    top: 50%;
+    right: 0;
+    bottom: auto;
+    left: 0;
+    border-left: 0;
+    border-top: 2px dotted var(--arch-line);
+    translate: 0 -1px;
+  }
+  .arch-end--start::after { left: 50%; }
+  .arch-end--end::after { right: 50%; }
   .arch-dot {
     top: 50%;
     left: 0;

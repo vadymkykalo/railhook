@@ -103,6 +103,19 @@ describe('LandingPage', () => {
     expect(within(figure).getByRole('img', { name: /Stripe/ })).toBe(picture);
   });
 
+  it('draws what it runs on with the vendors’ own logos, bundled with the page and silent to a screen reader', () => {
+    renderLanding();
+    const figure = within(sectionTitled(en.landing.architecture.title)).getByRole('figure');
+    const logos = Array.from(figure.querySelectorAll('img'));
+    const sources = logos.map((logo) => logo.getAttribute('src'));
+    for (const name of ['postgresql', 'redis', 'apachekafka']) {
+      expect(sources, `the diagram should draw the ${name} logo`).toContain(`/logos/brand/${name}.svg`);
+    }
+    for (const logo of logos) {
+      expect(logo, 'a logo inside the described figure is decorative').toHaveAttribute('alt', '');
+    }
+  });
+
   it('shows the install command, exactly, with a copy button beside it', () => {
     renderLanding();
     const install = document.getElementById('install') as HTMLElement;

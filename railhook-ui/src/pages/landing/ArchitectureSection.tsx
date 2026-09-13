@@ -1,8 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { ChevronDown, Code2, Cog, Globe, RotateCw, Server } from 'lucide-react';
+import { ChevronDown, Cloud, Code2, Cog, Globe, RotateCw, Server } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { RailhookIcon } from '../../components/icons/RailhookIcon';
-import { Band, LogoMark, SectionHeading } from './primitives';
+import { Band, SectionHeading } from './primitives';
 import { cn } from '../../lib/utils';
 
 /**
@@ -15,69 +15,90 @@ import { cn } from '../../lib/utils';
  * worker attempts, and retries on the ladder. Redis holds rate limits, ordering and the circuit
  * breaker, not events. Nothing here promises availability numbers, because nothing measures them.
  *
+ * Third-party marks are the vendors' own full-colour logos, bundled under `/logos/brand` (see
+ * SOURCES.md there) because every self-hosted image serves this page and must not reach out for
+ * them. Tiles hold only a picture, never text, so no translation can wrap inside one; names sit
+ * under each group as captions.
+ *
  * The drawing is HTML on a CSS grid rather than an SVG, so that on a phone it reflows instead of
- * shrinking: the flow runs down, and the shared services move beside the boxes they serve. The
+ * shrinking: the flow runs down, and the shared services move beside the API and the worker. The
  * grid areas are the same names in both layouts, transposed (see `.arch-grid` in index.css). To a
- * screen reader the whole figure is one image with a sentence-long description.
+ * screen reader the whole figure is one image with a sentence-long description, so every logo
+ * inside it is decorative.
  */
 
-const LOGO = { stripe: '#635BFF', postgresql: '#4169E1', redis: '#FF4438' } as const;
+const CAPTION = 'arch-cap px-1 py-1 text-center text-[13px] leading-snug';
 
-function Tile({
-  area,
-  icon,
-  label,
-  accent = false,
-  link = false,
-}: {
-  area: string;
-  icon: ReactNode;
-  label: string;
-  accent?: boolean;
-  /** Draws the start of the line to the shared service beside or below this tile. */
-  link?: boolean;
-}) {
+function Tile({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div style={{ gridArea: area }} className={cn('relative flex items-center justify-center', link && 'arch-node-link')}>
-      <div
-        className={cn(
-          'relative z-[1] flex w-full max-w-[6rem] flex-col items-center gap-1.5 rounded-[11px] border px-1 py-2.5 text-center shadow-card',
-          accent ? 'border-primary bg-primary text-primary-foreground' : 'border-rail bg-card text-foreground',
-        )}
-      >
-        {icon}
-        <span className={cn('font-mono text-[11px] leading-tight', accent ? 'text-primary-foreground' : 'text-muted-foreground')}>
-          {label}
-        </span>
-      </div>
-    </div>
+    <span className={cn('grid h-[42px] w-[42px] place-items-center rounded-[10px] border border-rail bg-card shadow-card', className)}>
+      {children}
+    </span>
   );
 }
 
-function Group({ area, items }: { area: string; items: { icon: ReactNode; label: string }[] }) {
+/** A bundled brand logo. `mono` marks are near-black, so they turn light with the theme. */
+function Logo({ name, mono = false }: { name: string; mono?: boolean }) {
   return (
-    <div style={{ gridArea: area }} className="relative z-[1] flex items-center">
-      <div className="grid w-full gap-1 rounded-xl border border-dashed border-input bg-card p-1.5">
-        {items.map((item) => (
-          <div key={item.label} className="flex items-center gap-1.5 rounded-lg border border-rail bg-card px-1.5 py-1.5 shadow-card">
-            {item.icon}
-            <span className="font-mono text-[11px] leading-tight text-muted-foreground">{item.label}</span>
-          </div>
-        ))}
-      </div>
+    <img
+      src={`/logos/brand/${name}.svg`}
+      alt=""
+      width={24}
+      height={24}
+      draggable={false}
+      className={cn('h-6 w-6', mono && 'dark:invert')}
+    />
+  );
+}
+
+function Group({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn('grid gap-1.5 rounded-xl border border-rail bg-muted p-1.5', className)}>{children}</div>;
+}
+
+/**
+ * A group or a node with its caption underneath. The line through the row has to meet the picture
+ * at its centre, not the centre of picture and caption together, so the caption is mirrored above
+ * as an invisible copy (drawn from an attribute, so it adds no text to the page): whatever the
+ * caption's length or line count in either language, the picture stays in the middle. On a phone
+ * the flow runs down and only the two cells a side line leaves from need that balance.
+ *
+ * The caption carries the card's own background, so a line running behind it stops at the words
+ * instead of striking through them.
+ */
+function Cell({
+  area,
+  caption,
+  children,
+  className,
+  strong = false,
+  balancedOnPhone = false,
+}: {
+  area: string;
+  caption: string;
+  children: ReactNode;
+  className?: string;
+  strong?: boolean;
+  balancedOnPhone?: boolean;
+}) {
+  const weight = strong ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground';
+  return (
+    <div style={{ gridArea: area }} className={cn('relative flex flex-col items-center justify-center', className)}>
+      <span aria-hidden="true" data-caption={caption} className={cn(CAPTION, weight, 'arch-cap-ghost', balancedOnPhone ? 'block' : 'hidden md:block')} />
+      <div className="relative z-[1]">{children}</div>
+      <span className={cn(CAPTION, weight, 'relative z-[1] bg-card')}>{caption}</span>
     </div>
   );
 }
 
 /**
- * A connector: a chevron in a circle, and a dot travelling through. `cross` is the link to a
- * shared service, which runs across the main flow in both layouts.
+ * A connector: a chevron in a circle, and a dot travelling through. `cross` is the link to the
+ * shared services, which runs across the main flow in both layouts.
  */
 function Connector({ area, delay, cross = false, retry = false }: { area: string; delay: string; cross?: boolean; retry?: boolean }) {
   return (
     <div style={{ gridArea: area }} className={cn('arch-link relative', cross && 'arch-link--cross')}>
       <span className="arch-dot" style={{ animationDelay: delay } as CSSProperties} />
-      <span className="absolute left-1/2 top-1/2 z-[2] grid h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-rail bg-card text-primary shadow-card">
+      <span className="absolute left-1/2 top-1/2 z-[2] grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-rail bg-card text-primary shadow-card">
         {retry ? (
           <RotateCw className="h-2.5 w-2.5" strokeWidth={2.5} />
         ) : (
@@ -90,48 +111,82 @@ function Connector({ area, delay, cross = false, retry = false }: { area: string
 
 function ArchitectureDiagram() {
   const { t } = useTranslation();
-  const icon = 'h-[18px] w-[18px]';
-  const small = 'h-3.5 w-3.5';
+  const glyph = 'h-5 w-5 text-muted-foreground';
 
   return (
-    <figure className="m-0 rounded-2xl border border-rail bg-gradient-to-b from-accent to-background p-5 shadow-card sm:p-6">
+    <figure className="m-0 rounded-2xl border border-rail bg-card p-5 shadow-card sm:p-6">
       <div role="img" aria-label={t('landing.architecture.diagramAria')} className="arch-grid">
         <div aria-hidden="true" className="arch-rail" />
-        <div aria-hidden="true" className="arch-svc rounded-xl border border-dashed border-input" />
+        <div aria-hidden="true" className="arch-svc-rail" />
+        <div aria-hidden="true" className="arch-elbow arch-elbow--api" />
+        <div aria-hidden="true" className="arch-elbow arch-elbow--wrk" />
 
-        <Group
-          area="src"
-          items={[
-            { icon: <Code2 className={cn(small, 'shrink-0 text-foreground')} />, label: t('landing.architecture.yourApp') },
-            { icon: <LogoMark name="stripe" color={LOGO.stripe} className={small} />, label: 'Stripe' },
-            { icon: <LogoMark name="github" className={cn(small, 'text-foreground')} />, label: 'GitHub' },
-          ]}
-        />
+        <Cell area="src" caption={t('landing.architecture.sources')} className="arch-end arch-end--start">
+          <Group className="grid-cols-2">
+            <Tile>
+              <Code2 className={glyph} strokeWidth={2} />
+            </Tile>
+            <Tile>
+              <Logo name="stripe" />
+            </Tile>
+            <Tile>
+              <Logo name="github" mono />
+            </Tile>
+            <Tile>
+              <Logo name="shopify" />
+            </Tile>
+          </Group>
+        </Cell>
+
         <Connector area="c1" delay="0s" />
-        <Tile area="api" accent link icon={<RailhookIcon className={icon} />} label="Railhook API" />
+        <Cell area="api" caption="Railhook API" strong balancedOnPhone className="arch-node-link">
+          <span className="grid h-14 w-14 place-items-center rounded-[14px] bg-primary text-primary-foreground shadow-card ring-4 ring-accent">
+            <RailhookIcon className="h-7 w-7" />
+          </span>
+        </Cell>
+
         <Connector area="c2" delay="-0.9s" />
-        <Tile area="kfk" icon={<LogoMark name="apachekafka" className={icon} />} label="Kafka" />
+        <Cell area="kfk" caption="Kafka">
+          <Tile>
+            <Logo name="apachekafka" mono />
+          </Tile>
+        </Cell>
+
         <Connector area="c3" delay="-1.8s" retry />
-        <Tile area="wrk" link icon={<Cog className={icon} />} label={t('landing.architecture.worker')} />
+        <Cell area="wrk" caption={t('landing.architecture.worker')} balancedOnPhone className="arch-node-link">
+          <Tile>
+            <Cog className={glyph} strokeWidth={2} />
+          </Tile>
+        </Cell>
+
         <Connector area="c4" delay="-2.7s" />
-        <Group
-          area="dst"
-          items={[
-            { icon: <Globe className={cn(small, 'shrink-0 text-foreground')} />, label: t('landing.architecture.customers') },
-            { icon: <Server className={cn(small, 'shrink-0 text-foreground')} />, label: t('landing.architecture.yourServices') },
-          ]}
-        />
+        <Cell area="dst" caption={t('landing.architecture.endpoints')} className="arch-end arch-end--end">
+          <Group className="grid-cols-3 md:grid-cols-2">
+            <Tile>
+              <Globe className={glyph} strokeWidth={2} />
+            </Tile>
+            <Tile>
+              <Server className={glyph} strokeWidth={2} />
+            </Tile>
+            <Tile className="md:col-span-2 md:justify-self-center">
+              <Cloud className={glyph} strokeWidth={2} />
+            </Tile>
+          </Group>
+        </Cell>
 
         <Connector area="l1" delay="-0.4s" cross />
         <Connector area="l2" delay="-2.1s" cross />
-        <Tile area="pg" icon={<LogoMark name="postgresql" color={LOGO.postgresql} className={icon} />} label="PostgreSQL" />
-        <div
-          style={{ gridArea: 'lbl' }}
-          className="relative z-[1] flex items-center justify-center text-center font-mono text-[10.5px] uppercase leading-tight tracking-[0.08em] text-muted-foreground"
-        >
-          {t('landing.architecture.shared')}
+        <div className="arch-svc relative z-[1] flex flex-col items-center bg-card">
+          <Group className="grid-cols-1 md:grid-cols-2">
+            <Tile>
+              <Logo name="postgresql" />
+            </Tile>
+            <Tile>
+              <Logo name="redis" />
+            </Tile>
+          </Group>
+          <span className={cn(CAPTION, 'font-medium text-muted-foreground')}>{t('landing.architecture.shared')}</span>
         </div>
-        <Tile area="rds" icon={<LogoMark name="redis" color={LOGO.redis} className={icon} />} label="Redis" />
       </div>
     </figure>
   );

@@ -106,31 +106,6 @@ export function Band({
   );
 }
 
-/**
- * A third-party logo from `/logos`, drawn as a mask so it can take a colour: the brand's own where
- * a picture is better for it, or the text colour, so a black mark stays legible in dark mode.
- */
-export function LogoMark({ name, color, className }: { name: string; color?: string; className?: string }) {
-  const url = `url(/logos/${name}.svg)`;
-  return (
-    <span
-      aria-hidden="true"
-      className={cn('inline-block h-5 w-5 shrink-0', className)}
-      style={{
-        backgroundColor: color ?? 'currentColor',
-        maskImage: url,
-        WebkitMaskImage: url,
-        maskRepeat: 'no-repeat',
-        WebkitMaskRepeat: 'no-repeat',
-        maskPosition: 'center',
-        WebkitMaskPosition: 'center',
-        maskSize: 'contain',
-        WebkitMaskSize: 'contain',
-      }}
-    />
-  );
-}
-
 export function SectionHeading({
   id,
   title,
