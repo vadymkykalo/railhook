@@ -545,8 +545,9 @@ cat > "${INSTALL_DIR}/Caddyfile" <<'CADDY'
 		# image changes — a few seconds during which a dial is refused and every
 		# path, /hook and /ingress included, answered 502. Retrying turns that
 		# into a slow request instead. Safe for any method: a refused dial means
-		# nothing was written, so there is nothing to send twice.
-		lb_try_duration 20s
+		# nothing was written, so there is nothing to send twice. 30s rather than
+		# 20s: a slow image swap outlasting the window is exactly a 502.
+		lb_try_duration 30s
 		lb_try_interval 250ms
 		# The CLI tunnel holds a WebSocket open for the length of a developer's
 		# session, so it must not be cut off at the default idle timeout.
@@ -774,10 +775,22 @@ case "${1:-help}" in
 
         compose pull
 
-        # Everything except the API first. The worker is invisible to a customer
-        # while it restarts — a Delivery is durable in Postgres and Kafka and comes
-        # back to the ladder — and nginx, Caddy and the data services are seconds.
-        compose up -d --no-deps postgres kafka redis ui caddy worker 2>/dev/null || compose up -d
+        # Everything except the API first, one service per call. All of them in a single
+        # `up` left the UI stopped while Compose worked through the rest — about 45 seconds
+        # of 502 on the 2.17.0 deploy, longer than Caddy's retry window. On its own, with the
+        # image already pulled, the UI swap is a couple of seconds and Caddy's retry covers
+        # it. The worker goes last: invisible to a customer while it restarts, since a
+        # Delivery is durable in Postgres and Kafka and comes back to the ladder.
+        #
+        # Only services the active profiles enable. Naming one on the command line switches
+        # its profile on, so an install without a domain would start Caddy, and one on an
+        # external database would start an empty Postgres.
+        active=$(compose config --services)
+        up_one() {
+            printf '%s\n' "$active" | grep -qx "$1" || return 0
+            compose up -d --no-deps "$1" || { echo "Could not start $1 — see ./railhook logs $1" >&2; exit 1; }
+        }
+        for svc in postgres kafka redis ui caddy worker; do up_one "$svc"; done
 
         # The API is the one a customer notices, because it is what accepts webhooks.
         roll_api

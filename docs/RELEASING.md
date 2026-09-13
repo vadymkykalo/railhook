@@ -41,16 +41,12 @@ accident.
    that silent failure into a message.
 
 4. **The domain** — production is `https://railhook.io`, deployed by
-   `.github/workflows/deploy-prod.yml`. Set `VITE_SITE_URL` on the public build to
-   match, set `RAILHOOK_CONTACT_DOMAIN=railhook.io` in the production host's `.env`
-   (read by the UI container at startup, so the published image stays neutral),
-   and regenerate the sitemap:
-
-   ```bash
-   cd railhook-ui && SITE_URL=https://railhook.io npm run seo:sitemap
-   ```
-
-   and edit the `Sitemap:` line in `public/robots.txt` to match.
+   `.github/workflows/deploy-prod.yml`, running the published images with nothing
+   built on the host. The production `.env` carries what differs from any other
+   install, all read by the UI container at startup: `APP_BASE_URL=https://railhook.io`
+   (canonical, og tags, sitemap), `RAILHOOK_CONTACT_DOMAIN=railhook.io` and
+   `CAPTCHA_SITE_KEY`. The deploy fails unless `https://railhook.io/version.txt`
+   answers the version it deployed.
 
 5. **GHCR** — nothing to claim. The first release publishes `railhook-api`,
    `-worker` and `-ui` as new packages; the old `hookflow-*` ones stay pullable,

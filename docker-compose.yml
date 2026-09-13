@@ -591,16 +591,23 @@ services:
       # operator's own proxy with --behind-proxy. Nothing else changes, because
       # either one proxies straight to this same nginx.
       - "${RAILHOOK_BIND:-0.0.0.0}:${RAILHOOK_PORT:-80}:5173"
-    # The UI is a static bundle behind nginx. Vite inlines every VITE_* value at
-    # build time, so none of those belong here — on a pre-built image there is
-    # no build to feed. nginx proxies /api/, /ws/tunnel, /hook/ and /ingress/ to
-    # the api service, so the bundle talks to its own origin and needs no API URL.
+    # The UI is a static bundle behind nginx. nginx proxies /api/, /ws/tunnel,
+    # /hook/ and /ingress/ to the api service, so the bundle talks to its own
+    # origin and needs no API URL.
     #
-    # What is here is read by the container when it starts and handed to the page
-    # as /config.js, because it has to differ between deployments of one image.
+    # What is here is read by the container when it starts, because it has to
+    # differ between deployments of one published image. Changing a value takes
+    # `docker compose up -d ui`, never a rebuild.
     environment:
       # Domain behind the sales@ / support@ addresses. Empty: none are offered.
       RAILHOOK_CONTACT_DOMAIN: ${RAILHOOK_CONTACT_DOMAIN:-}
+      # The public origin the pages name about themselves: canonical, og tags,
+      # sitemap. Empty: they stay relative to whatever origin serves them.
+      RAILHOOK_SITE_URL: ${APP_BASE_URL:-}
+      # The registration challenge's public half. Turn it on together with
+      # CAPTCHA_SECRET_KEY on the API, never one without the other.
+      RAILHOOK_CAPTCHA_SITE_KEY: ${CAPTCHA_SITE_KEY:-}
+      RAILHOOK_CAPTCHA_SCRIPT_URL: ${CAPTCHA_SCRIPT_URL:-}
     depends_on:
       - api
     logging:

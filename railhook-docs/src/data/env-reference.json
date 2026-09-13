@@ -37,7 +37,7 @@
           "name": "APP_BASE_URL",
           "default": "http://localhost:5173",
           "example": null,
-          "description": "Public frontend URL (used for emails, shared debug links, etc.)"
+          "description": "Public frontend URL (used for emails, shared debug links, etc.). The UI container also\nreads it at startup as the origin its pages name about themselves: the canonical link,\nog:url / og:image and the sitemap."
         }
       ]
     },
@@ -370,19 +370,13 @@
           "name": "VITE_API_URL",
           "default": "",
           "example": null,
-          "description": "BUILD-TIME ONLY. Vite inlines VITE_* into the bundle, so these are passed as\nbuild args (docker-compose.yml -> ui.build.args) and take effect only when the\nUI image is rebuilt. On the pre-built images they\ncannot be changed at all.\n\nLeave VITE_API_URL empty: the UI's nginx proxies /api/, /ws/tunnel, /hook/ and\n/ingress/ to the api service, so the browser talks to its own origin and needs\nno CORS. Set it only when the API is genuinely served from another origin —\nthen add that origin to CORS_ALLOWED_ORIGINS too."
+          "description": "BUILD-TIME ONLY. Vite inlines VITE_* into the bundle, so these are passed as\nbuild args (docker-compose.build.yml -> ui.build.args) and take effect only when\nthe UI image is rebuilt. On the pre-built images they cannot be changed at all.\n\nLeave VITE_API_URL empty: the UI's nginx proxies /api/, /ws/tunnel, /hook/ and\n/ingress/ to the api service, so the browser talks to its own origin and needs\nno CORS. Set it only when the API is genuinely served from another origin —\nthen add that origin to CORS_ALLOWED_ORIGINS too."
         },
         {
           "name": "VITE_CSP_EXTRA_CONNECT",
           "default": "",
           "example": null,
           "description": "Extra origins for CSP connect-src (space-separated). Auto-includes VITE_API_URL + localhost in dev.\nExample for prod: VITE_CSP_EXTRA_CONNECT=https://api.example.com wss://api.example.com"
-        },
-        {
-          "name": "VITE_SITE_URL",
-          "default": "",
-          "example": null,
-          "description": "Public origin this deployment is served from, e.g. https://hooks.example.com.\n\nOnly affects what the app publishes *about itself*: the canonical link, og:url\nand og:image, and the schema.org block in index.html. Leave it empty and the\napp derives the canonical from the browser's own origin and omits the absolute\ntags entirely — correct for a private dashboard, which nobody is unfurling into\na chat or asking Google to index.\n\nSet it for a public marketing site. It is also what `npm run prerender` bakes\ninto the static HTML; without it the prerender would freeze the throwaway local\nserver's address into the canonical of every public page."
         },
         {
           "name": "RAILHOOK_CONTACT_DOMAIN",
@@ -1417,16 +1411,16 @@
           "description": "Empty is the default and means no challenge at all: a self-hosted registration page has\nnobody to challenge, and sending its visitors to a third party to prove otherwise would be\na worse default than accepting them.\n\nSet it wherever registration is open to strangers. The auth rate limit is per address, and\nan address is the one thing a signup farm has plenty of. With APP_ENV=production and\nBILLING_ENABLED=true the API refuses to start without this.\n\nCloudflare Turnstile by default; hCaptcha speaks the same siteverify shape, so pointing\nCAPTCHA_VERIFY_URL at https://api.hcaptcha.com/siteverify is all that differs.\nVerification fails closed: if the provider is unreachable, registration is refused rather\nthan waved through."
         },
         {
-          "name": "VITE_CAPTCHA_SITE_KEY",
+          "name": "CAPTCHA_SITE_KEY",
           "default": null,
           "example": null,
-          "description": "The dashboard's half. Without a site key the registration page renders no challenge and\nsends no token, which is what makes the server-side default consistent rather than a\nsubmit button that never works.\n\nBuild-time, like every VITE_ variable: Vite inlines it when the bundle is compiled, so it is\na property of the image and not of the container. Setting it here is only half the job —\nthe image has to be built afterwards:\n\nmake rebuild-ui\n\nThat matters most if you installed with install.sh or the Helm chart, because both run the\npublished images, which are built with this empty. Until you build your own UI image the\nsite key cannot take effect, and the two halves must be turned on together: CAPTCHA_SECRET_KEY\nset on the API with no site key in the bundle means the page sends no token, the API verifies\na null one, and every registration is refused."
+          "description": "The dashboard's half. Without a site key the registration page renders no challenge and\nsends no token, which is what makes the server-side default consistent rather than a\nsubmit button that never works.\n\nRead by the UI container when it starts, so it works on the published image: set it and\nrun `docker compose up -d ui`, no rebuild. Turn both halves on together — CAPTCHA_SECRET_KEY\non the API with no site key on the page means no token is sent and every registration is\nrefused."
         },
         {
-          "name": "VITE_CAPTCHA_SCRIPT_URL",
+          "name": "CAPTCHA_SCRIPT_URL",
           "default": null,
           "example": "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit",
-          "description": "The dashboard's half. Without a site key the registration page renders no challenge and\nsends no token, which is what makes the server-side default consistent rather than a\nsubmit button that never works.\n\nBuild-time, like every VITE_ variable: Vite inlines it when the bundle is compiled, so it is\na property of the image and not of the container. Setting it here is only half the job —\nthe image has to be built afterwards:\n\nmake rebuild-ui\n\nThat matters most if you installed with install.sh or the Helm chart, because both run the\npublished images, which are built with this empty. Until you build your own UI image the\nsite key cannot take effect, and the two halves must be turned on together: CAPTCHA_SECRET_KEY\nset on the API with no site key in the bundle means the page sends no token, the API verifies\na null one, and every registration is refused."
+          "description": "The dashboard's half. Without a site key the registration page renders no challenge and\nsends no token, which is what makes the server-side default consistent rather than a\nsubmit button that never works.\n\nRead by the UI container when it starts, so it works on the published image: set it and\nrun `docker compose up -d ui`, no rebuild. Turn both halves on together — CAPTCHA_SECRET_KEY\non the API with no site key on the page means no token is sent and every registration is\nrefused."
         }
       ]
     },
