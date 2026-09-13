@@ -5,7 +5,9 @@ import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.domain.enums.MembershipStatus;
 import com.webhook.platform.api.domain.enums.UserStatus;
+import com.webhook.platform.api.domain.repository.EmailChangeRequestRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
+import com.webhook.platform.api.domain.repository.VerificationEmailSendRepository;
 import com.webhook.platform.api.domain.repository.UserIdentityRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +54,8 @@ class AccountErasureServiceTest {
     @Mock private UserSessionService userSessionService;
     @Mock private TokenBlacklistService tokenBlacklistService;
     @Mock private UserIdentityRepository userIdentityRepository;
+    @Mock private EmailChangeRequestRepository emailChangeRequestRepository;
+    @Mock private VerificationEmailSendRepository verificationEmailSendRepository;
 
     private AccountErasureService service;
 
@@ -61,7 +65,8 @@ class AccountErasureServiceTest {
     @BeforeEach
     void setUp() {
         service = new AccountErasureService(userRepository, membershipRepository,
-                organizationService, userSessionService, tokenBlacklistService, userIdentityRepository);
+                organizationService, userSessionService, tokenBlacklistService, userIdentityRepository,
+                emailChangeRequestRepository, verificationEmailSendRepository);
         userId = UUID.randomUUID();
         user = User.builder()
                 .id(userId)
@@ -85,6 +90,9 @@ class AccountErasureServiceTest {
         service.eraseAccount(userId);
 
         verify(userIdentityRepository).deleteByUserId(userId);
+        // Every address the account moved between — including one still waiting for confirmation.
+        verify(emailChangeRequestRepository).deleteByUserId(userId);
+        verify(verificationEmailSendRepository).deleteByUserId(userId);
     }
 
     private Membership membership(UUID orgId, MembershipRole role) {

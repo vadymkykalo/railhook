@@ -2336,7 +2336,7 @@ paths:
       - Event Time Machine
       summary: Cancel replay session
       description: Requests cancellation of a running replay session
-      operationId: cancel
+      operationId: cancelPost
       parameters:
       - name: projectId
         in: path
@@ -4207,6 +4207,141 @@ paths:
           description: "If the email exists, a reset link has been sent"
         "429":
           description: Too many requests
+  /api/v1/auth/email-change:
+    get:
+      tags:
+      - Authentication
+      summary: Get the email change state
+      description: "The account's address, and the change waiting for confirmation\
+        \ if there is one"
+      operationId: current
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EmailChangeResponse"
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - Authentication
+      summary: Change email
+      description: "An unverified account moves to the new address at once and must\
+        \ verify it; it answers the registration CAPTCHA when one is configured. A\
+        \ verified account re-enters its password (or, with no password, has signed\
+        \ in within 10 minutes) and keeps its address until the link sent to the new\
+        \ one is opened."
+      operationId: request
+      parameters:
+      - name: refresh_token
+        in: cookie
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeEmailRequest"
+        required: true
+      responses:
+        "200":
+          description: "Changed, or waiting for confirmation"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EmailChangeResponse"
+        "400":
+          description: "Wrong password, failed CAPTCHA or invalid address"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EmailChangeResponse"
+        "403":
+          description: A passwordless account has not signed in recently
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EmailChangeResponse"
+        "409":
+          description: Email already exists
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EmailChangeResponse"
+        "429":
+          description: Too many requests or daily cap reached
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EmailChangeResponse"
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - Authentication
+      summary: Cancel the pending email change
+      operationId: cancelDelete
+      responses:
+        "200":
+          description: OK
+      security:
+      - bearerAuth: []
+  /api/v1/auth/email-change/resend:
+    post:
+      tags:
+      - Authentication
+      summary: Resend the email change confirmation
+      operationId: resend
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EmailChangeResponse"
+      security:
+      - bearerAuth: []
+  /api/v1/auth/email-change/confirm:
+    post:
+      tags:
+      - Authentication
+      summary: Confirm an email change
+      description: Opened from the link sent to the new address. Signs every session
+        out.
+      operationId: confirm
+      parameters:
+      - name: token
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Email changed
+        "400":
+          description: "Invalid, used or expired link"
+        "409":
+          description: Email already exists
+  /api/v1/auth/email-change/cancel:
+    post:
+      tags:
+      - Authentication
+      summary: Cancel an email change from the old address
+      description: Opened from the "this wasn't me" link sent to the old address.
+        Signs every session out.
+      operationId: cancelByToken
+      parameters:
+      - name: token
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
   /api/v1/auth/device/token:
     post:
       tags:
@@ -8697,6 +8832,36 @@ components:
           minLength: 1
       required:
       - email
+    ChangeEmailRequest:
+      type: object
+      properties:
+        newEmail:
+          type: string
+          format: email
+          maxLength: 255
+          minLength: 0
+        currentPassword:
+          type: string
+          maxLength: 128
+          minLength: 0
+        captchaToken:
+          type: string
+          maxLength: 4096
+          minLength: 0
+      required:
+      - newEmail
+    EmailChangeResponse:
+      type: object
+      properties:
+        email:
+          type: string
+        pendingEmail:
+          type: string
+        pendingExpiresAt:
+          type: string
+          format: date-time
+        applied:
+          type: boolean
     DeviceTokenRequest:
       type: object
       properties:
@@ -8912,8 +9077,6 @@ components:
           format: int64
         sort:
           $ref: "#/components/schemas/SortObject"
-        unpaged:
-          type: boolean
         paged:
           type: boolean
         pageNumber:
@@ -8922,6 +9085,8 @@ components:
         pageSize:
           type: integer
           format: int32
+        unpaged:
+          type: boolean
     SortObject:
       type: object
       properties:

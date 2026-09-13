@@ -7,6 +7,7 @@ import com.webhook.platform.api.domain.entity.Organization;
 import com.webhook.platform.api.domain.entity.Plan;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.entity.UserSession;
+import com.webhook.platform.api.domain.entity.VerificationEmailSend;
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.domain.enums.MembershipStatus;
 import com.webhook.platform.api.domain.enums.UserStatus;
@@ -52,6 +53,7 @@ public class AuthService {
     private final AccountLockoutService accountLockoutService;
     private final EmailService emailService;
     private final ProjectService projectService;
+    private final VerificationMailBudget verificationMailBudget;
     private final boolean billingEnabled;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -69,6 +71,7 @@ public class AuthService {
             AccountLockoutService accountLockoutService,
             EmailService emailService,
             ProjectService projectService,
+            VerificationMailBudget verificationMailBudget,
             @Value("${billing.enabled:false}") boolean billingEnabled) {
         this.userRepository = userRepository;
         this.organizationRepository = organizationRepository;
@@ -84,6 +87,7 @@ public class AuthService {
         this.accountLockoutService = accountLockoutService;
         this.emailService = emailService;
         this.projectService = projectService;
+        this.verificationMailBudget = verificationMailBudget;
         this.billingEnabled = billingEnabled;
     }
 
@@ -122,6 +126,7 @@ public class AuthService {
         Organization organization = createOrganizationOwnedBy(user, request.getOrganizationName());
 
         if (verificationIsDeliverable) {
+            verificationMailBudget.recordSend(user.getId(), VerificationEmailSend.REGISTER);
             emailService.sendVerificationEmail(user.getEmail(), verificationToken);
         }
 
@@ -504,12 +509,16 @@ public class AuthService {
         if (Boolean.TRUE.equals(user.getEmailVerified())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already verified");
         }
+        // The per-minute limiter in front of this bounds a burst; this bounds a day of them,
+        // shared with email change so neither is a way around the other.
+        verificationMailBudget.requireSendAllowance(user);
 
         String newToken = generateVerificationToken();
         user.setVerificationToken(CryptoUtils.hashApiKey(newToken));
         user.setVerificationTokenExpiresAt(Instant.now().plus(TOKEN_EXPIRY_HOURS, ChronoUnit.HOURS));
         userRepository.save(user);
 
+        verificationMailBudget.recordSend(user.getId(), VerificationEmailSend.RESEND);
         emailService.sendVerificationEmail(user.getEmail(), newToken);
         log.info("Resent verification email to {}", user.getEmail());
     }

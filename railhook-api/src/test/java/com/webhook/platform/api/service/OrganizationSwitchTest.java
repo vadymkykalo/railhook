@@ -81,7 +81,8 @@ class OrganizationSwitchTest {
         authService = new AuthService(userRepository, organizationRepository, membershipRepository,
                 planRepository, jwtUtil, new BCryptPasswordEncoder(4), tokenBlacklistService,
                 userSessionService, accountLockoutService, emailService,
-                org.mockito.Mockito.mock(ProjectService.class), false);
+                org.mockito.Mockito.mock(ProjectService.class),
+                org.mockito.Mockito.mock(VerificationMailBudget.class), false);
 
         refreshToken = jwtUtil.generateRefreshToken(userId, sessionId);
         session = UserSession.builder()
