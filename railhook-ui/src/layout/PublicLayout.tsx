@@ -47,13 +47,15 @@ export default function PublicLayout({ nav = true }: { nav?: boolean }) {
   );
 }
 
-const LINK = 'text-sm text-muted-foreground transition-colors hover:text-foreground';
+/* Below sm a link is a 40px row, so a thumb hits the one it meant; from sm the column is as dense
+   as it always was. */
+const LINK = 'text-sm text-muted-foreground transition-colors hover:text-foreground max-sm:flex max-sm:min-h-10 max-sm:items-center';
 
 function Column({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h2 className="mono-label mb-3">{title}</h2>
-      <ul className="space-y-2">{children}</ul>
+      <h2 className="mono-label mb-3 max-sm:mb-1">{title}</h2>
+      <ul className="space-y-2 max-sm:space-y-0">{children}</ul>
     </div>
   );
 }
@@ -106,7 +108,7 @@ function ConnectWithUs() {
               href={href}
               aria-label={label}
               title={label}
-              className="grid h-9 w-9 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+              className="grid h-9 w-9 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground max-sm:h-10 max-sm:w-10"
               {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             >
               <Icon className="h-5 w-5" aria-hidden="true" />
@@ -127,9 +129,10 @@ export function Footer() {
   return (
     <footer className="border-t border-rail bg-background">
       <div className={`${WRAP} py-12`}>
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(4,minmax(0,1fr))]">
-          <div>
-            <Link to="/" className="mb-4 flex items-center gap-2.5">
+        {/* Two columns of links on a phone, with the brand across the top, instead of one long list. */}
+        <div className="grid gap-10 max-sm:grid-cols-2 max-sm:gap-x-6 max-sm:gap-y-8 sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(4,minmax(0,1fr))]">
+          <div className="max-sm:col-span-2">
+            <Link to="/" className="mb-4 flex items-center gap-2.5 max-sm:min-h-10">
               <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-md bg-primary">
                 <RailhookIcon className="h-4 w-4 text-primary-foreground" />
               </span>
@@ -168,7 +171,7 @@ export function Footer() {
           </div>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
-            <ThemeToggle className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" />
+            <ThemeToggle className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:grid max-sm:h-10 max-sm:w-10 max-sm:place-items-center" />
           </div>
         </div>
       </div>

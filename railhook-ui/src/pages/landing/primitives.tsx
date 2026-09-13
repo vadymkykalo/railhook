@@ -118,10 +118,10 @@ export function SectionHeading({
   className?: string;
 }) {
   return (
-    <div className={cn('mb-10 grid max-w-2xl gap-2.5', className)}>
+    <div className={cn('mb-10 grid max-w-2xl gap-2.5 max-sm:mb-8', className)}>
       <h2
         id={id}
-        className="font-display text-[clamp(1.55rem,3vw,2.3rem)] font-bold leading-[1.12] tracking-[-0.025em] text-foreground [text-wrap:balance]"
+        className="font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.03em] text-foreground [text-wrap:balance] sm:text-[clamp(1.55rem,3vw,2.3rem)] sm:leading-[1.12] sm:tracking-[-0.025em]"
       >
         {title}
       </h2>

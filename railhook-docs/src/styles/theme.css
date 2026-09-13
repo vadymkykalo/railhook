@@ -257,12 +257,17 @@ starlight-toc a[aria-current='true'] {
 
 starlight-tabs [role='tablist'] {
   border-bottom-color: var(--sl-color-hairline);
+  /* A row of language tabs is wider than a phone: it scrolls sideways instead of running past the
+     edge of the page. On a wide screen it fits and nothing changes. */
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 starlight-tabs [role='tab'] {
   color: var(--rh-slate);
   font-weight: 500;
   font-size: var(--sl-text-sm);
+  white-space: nowrap;
 }
 
 starlight-tabs [role='tab'][aria-selected='true'] {
