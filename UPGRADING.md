@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v2.17.0
+
 ### `HOOKFLOW_BIND`, `HOOKFLOW_PORT` and `HOOKFLOW_DOMAIN` are no longer read
 
 Installations from before 2.12.0 carried these names in `.env`, and `docker-compose.yml` fell
