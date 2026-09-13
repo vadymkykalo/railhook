@@ -1,0 +1,134 @@
+---
+title: Observability
+description: Scrape Railhook's metrics, read the numbers that show whether it is healthy, and route the shipped Prometheus alerts.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Railhook exports Prometheus metrics, ships alert rules and Grafana dashboards, and writes structured logs. This page shows where to scrape, which few numbers to watch, and what each shipped alert means.
+
+## Where the metrics are
+
+Prometheus scrapes `/actuator/prometheus` on a **management port**, separate from the application port:
+
+| Service | Application port | Management port |
+|---|---|---|
+| API | `8080` | `8082` |
+| Worker | none | `8081` |
+
+<Aside type="caution" title="Scrape the management port, not 8080">
+On the application port, `/actuator/**` requires a JWT or an API key, and Prometheus has neither. Scraping `8080` returns `401`, and every alert rule then fires on missing data. The management port is not published to the host; only containers on the same network reach it.
+</Aside>
+
+On Kubernetes the Helm chart wires this up: its `ServiceMonitor` scrapes the port named `management`, and a `PrometheusRule` carries the alert rules. See [Kubernetes](/docs/self-hosting/kubernetes/).
+
+## Run the monitoring stack with Docker Compose
+
+`monitoring/` in the repository contains Prometheus, Alertmanager, Grafana, Loki and Promtail, preconfigured for Railhook.
+
+<Steps>
+1. With Railhook running, start the stack from the repository root:
+
+   ```bash
+   make monitoring-up
+   ```
+
+2. Open Grafana at `http://localhost:3001` and sign in as `railhook` / `railhook_monitor_2024`. Set your own `GF_ADMIN_USER` and `GF_ADMIN_PASSWORD` before anyone else can reach the host.
+3. Set a receiver for alerts: `ALERTMANAGER_SLACK_WEBHOOK_URL`, `ALERTMANAGER_WEBHOOK_URL`, or the `ALERTMANAGER_EMAIL_*` and `ALERTMANAGER_SMTP_*` variables. With none set, Alertmanager still starts, but alerts go nowhere.
+
+   The stack is its own Compose project, so put these variables, and the Grafana ones, in `monitoring/.env` or export them in the shell before `make monitoring-up`:
+
+   ```bash
+   GF_ADMIN_PASSWORD=change-me ALERTMANAGER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/… make monitoring-up
+   ```
+</Steps>
+
+| Component | Address | Notes |
+|---|---|---|
+| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) | Five dashboards: Overview, Worker & Circuit Breaker, JVM & Micrometer, Kafka, Logs |
+| Prometheus | `127.0.0.1:9090` | Keeps 30 days |
+| Alertmanager | `127.0.0.1:9093` | `CRITICAL` alerts route faster than warnings; a firing critical alert suppresses the matching warning |
+| Loki | `127.0.0.1:3100` | Keeps logs for `LOKI_RETENTION_PERIOD`, default `336h` (14 days) |
+
+`make monitoring-down` stops the stack; `make monitoring-logs` follows its logs.
+
+## The numbers that matter
+
+Railhook exports far more series than anyone should watch. These answer the questions that matter.
+
+### Is work getting through?
+
+| Metric | Reading it |
+|---|---|
+| `events_ingested_total` | Events accepted |
+| `deliveries_created_total` | Deliveries created by fan-out. Divided by events, the average subscriptions per event. |
+| `webhook_delivery_attempts_total` | Attempts. Far more attempts than deliveries means retries are doing a lot of work. |
+| `webhook_delivery_latency_ms` | Time the endpoint took to answer. A rising p95 is the endpoint's problem. |
+| `incoming_events_received_total`, `incoming_forward_attempts_total` | The same pair for incoming webhooks |
+
+### Is anything piling up?
+
+| Metric | Reading it |
+|---|---|
+| **`delivery_oldest_pending_age_seconds`** | **The best single health signal**: the age of the oldest unresolved delivery. A dead endpoint, a broker outage and a stuck worker all show up here. `forward_oldest_pending_age_seconds` is the incoming twin. |
+| `delivery_queue_depth`, `incoming_forward_queue_depth` | Work waiting. Steady is fine; always rising is not. |
+| `outbox_queue_depth`, `outbox_oldest_pending_age_seconds` | Events accepted but not yet handed to Kafka. A rising age means Kafka is unreachable: the events are safe, but not moving. |
+| `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Failed messages waiting for a person |
+| `delivery_escalated_to_dlq_total` | Deliveries moved to failed messages by the 96-hour hard cap rather than by running out of retries. Non-zero means something was degraded for days. |
+
+### Is a protection interfering?
+
+When a limiter or circuit breaker holds a delivery back, nothing is sent and no retry is used up. A high rate here is the platform protecting an endpoint, not an error.
+
+| Metric | Reading it |
+|---|---|
+| `circuit_breaker_rejected_total` | Attempts the breaker held back |
+| `circuit_breaker_state_transitions_total`, `circuit_breaker_slow_trips_total` | How often it tripped, and whether on failures or slowness |
+| **`circuit_breaker_degraded_total`** | Redis was unreachable and the breaker let calls through unprotected. Non-zero means a safety net is down. |
+| `webhook_concurrency_rejected_total`, `webhook_rate_limit_exceeded_total`, `webhook_project_rate_limit_exceeded_total` | Which limit is holding deliveries back |
+
+### Are retries and ordering coping?
+
+| Metric | Reading it |
+|---|---|
+| `retry_governor_effective_batch` | The retry scheduler's batch size. Falling toward its floor means it is backing off from a struggling downstream. |
+| `webhook_ordering_buffered_total` | Deliveries waiting for earlier ones to the same endpoint |
+| **`webhook_ordering_gap_timeout_total`** | An earlier delivery never resolved, so a later one was released to keep the endpoint moving. Order was knowingly broken. Rare is expected; frequent is not. |
+| `transform_failed_total` | A transformation failed |
+| `events_duplicate_total`, `events_fanout_limited_total` | Idempotency keys catching repeats; events refused for fanning out too far |
+
+## If you alert on only three things
+
+1. `delivery_oldest_pending_age_seconds` above a few hours. Catches almost everything.
+2. `circuit_breaker_degraded_total` increasing. Catches protections that stopped protecting.
+3. `outbox_oldest_pending_age_seconds` above a few minutes. Catches accepted events that never started moving, which no delivery metric shows.
+
+## Shipped alerts
+
+The same rules ship in `monitoring/prometheus/alerts.yml` for Compose and in the Helm chart's `PrometheusRule` for Kubernetes. A test in the build keeps the two identical.
+
+| What it means | Alerts |
+|---|---|
+| Events accepted but not moving | `OutboxOldestPendingAgeHigh`, `OutboxSendingStuck` |
+| The backlog is growing | `DeliveryPendingBacklogGrowing`, `DeliveryPendingBacklogHigh`, `DeliveryPendingBacklogCritical`, `IncomingForwardPendingBacklogHigh`, `OldestPendingDeliveryStale`, `OldestPendingDeliveryCritical`, `OldestPendingForwardStale` |
+| Deliveries are being abandoned | `DlqDepthGrowing`, `DlqRateHigh`, `IncomingForwardFailureRateHigh`, `DlqActionableBacklog`, `IncomingForwardDlqActionableBacklog` |
+| A protection is engaging, or has failed | `CircuitBreakerTripsHigh`, `CircuitBreakerRejectionsHigh`, `CircuitBreakerDegraded` |
+| The platform is struggling | `RetryGovernorCooldown`, `RetryGovernorConsecutiveFailures`, `ApiErrorRateHigh` |
+| A process is down | `ApiDown`, `WorkerDown` |
+
+`DlqActionableBacklog` and `IncomingForwardDlqActionableBacklog` are the ones that need a person: they clear when someone retries or purges the failed messages. `CircuitBreakerDegraded` is the odd one out among the breaker alerts: it means the breaker is **not** working.
+
+## Logs
+
+In production the API and worker log single-line JSON that includes the correlation id and, for authenticated requests, the organization id. The worker's delivery log lines name the delivery id, which is how you get from a Grafana panel to a delivery in the dashboard. The Compose monitoring stack ships only the `api` and `worker` logs to Loki, with `level` as the only label. Filter by the other ids with `| json` in Grafana; the Logs dashboard has variables for correlation id and organization id.
+
+## Tracing
+
+There is none. Railhook has no OpenTelemetry export, so a slow delivery cannot be followed from ingestion through Kafka to the attempt as one trace.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Monitoring a deployment" href="/docs/self-hosting/monitoring/" description="Health checks and what to watch after install." />
+  <LinkCard title="Alerts and incidents" href="/docs/platform/alerts/" description="Alert rules for endpoint owners." />
+  <LinkCard title="Troubleshooting" href="/docs/self-hosting/troubleshooting/" description="What to do when a number goes wrong." />
+</CardGrid>

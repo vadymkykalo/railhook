@@ -1,0 +1,86 @@
+---
+title: Organizations and roles
+description: How organizations isolate your data, what each role and API key scope may do, and what access control does not cover yet.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Use this page to decide who gets which role and which scope an API key needs. Two mechanisms are involved: **tenancy** decides which data exists for a caller at all, and **roles** decide what the caller may do with it.
+
+## Organizations and projects
+
+| Term | What it is |
+|---|---|
+| **Organization** | The tenant. Everything a customer owns belongs to exactly one organization. |
+| **Project** | A division of an organization's work. Endpoints, sources and API keys belong to a project. |
+
+The organization is the security boundary. A project is not: it organizes work, it does not confine who can see it.
+
+### Rows from another organization do not exist
+
+Every query the API runs is scoped to the caller's organization by the data layer itself, lookups by id included. Nobody has to remember to add the filter. Two things follow:
+
+- Asking for another organization's resource by its id answers `404`, not `403`. A wrong tenant and a wrong id look the same, so an id reveals nothing.
+- A new API feature inherits the scoping automatically.
+
+A person can belong to several organizations. `POST /api/v1/auth/switch-organization` issues an access token for another organization they belong to, with the role from that membership.
+
+## Roles for people
+
+| Role | May |
+|---|---|
+| `OWNER` | Everything, including organization settings, members, the data export and deleting the organization |
+| `DEVELOPER` | Read and change the configuration: endpoints, subscriptions, sources, rules and the rest of a project |
+| `VIEWER` | Read only |
+
+A fourth value, `API_KEY`, exists in the role list, but it is not a role anyone is given. It marks a request made with an API key.
+
+### What only an owner can do
+
+- Change organization settings.
+- Export the organization's data and delete the organization. See [Data retention and export](/docs/resources/data-retention/).
+- Add members, change a member's role, remove, suspend and reinstate members.
+
+A few guards stop an organization from locking itself out. Each answers `409 Conflict`:
+
+- The last owner who can still sign in cannot be demoted, removed or suspended.
+- You cannot suspend yourself.
+- The `OWNER` role cannot be granted through the change-role request.
+
+## Scopes for API keys
+
+| Scope | Allows |
+|---|---|
+| `READ_WRITE` | Reads and writes, including sending events |
+| `READ_ONLY` | Reads only |
+
+An API key never holds `OWNER`, whatever its scope. Owner-only actions always need a person signed in as an owner.
+
+## How a request is checked
+
+Roles and scopes are different kinds of permission, so each API action states what it needs from the caller rather than naming a minimum role:
+
+| Action needs | Passes | Refused |
+|---|---|---|
+| Read | Any authenticated caller | — |
+| Write | Owners, developers, `READ_WRITE` keys | Viewers, `READ_ONLY` keys |
+| Owner | Owners | Everyone else, including every API key |
+
+A refused request answers `403` with the standard error envelope. See [Errors and limits](/docs/platform/errors-limits/).
+
+## Not available yet
+
+<Aside type="caution">
+Check these before you plan around them.
+</Aside>
+
+- **No custom roles and no per-resource permissions.** Three fixed roles and two key scopes. You cannot give someone write access to one project and read access to another in the same organization.
+- **No SSO (SAML or OIDC) and no SCIM.**
+- **Projects are not a permission boundary.** Every member sees every project in the organization, with the same role.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Authentication" href="/docs/platform/authentication/" description="Sessions, API keys and rotation." />
+  <LinkCard title="PII masking" href="/docs/platform/pii-masking/" description="Hide personal data from people who view payloads." />
+  <LinkCard title="Data retention and export" href="/docs/resources/data-retention/" description="Export an organization, or erase it." />
+</CardGrid>

@@ -1,0 +1,78 @@
+---
+title: How Railhook compares
+description: Railhook next to Svix, Hookdeck and Convoy as of 2026-09, including what Railhook does not have.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Use this page to shortlist a webhook platform. It compares Railhook with Svix, Hookdeck and Convoy on points each vendor states in its own public documentation, and it lists Railhook's gaps as plainly as its strengths.
+
+<Aside title="As of 2026-09">
+Competitor details come from the linked public pages as they read in September 2026. Products change: read their documentation before you decide, and send a correction as a pull request if something here is out of date.
+</Aside>
+
+## At a glance
+
+| | Railhook | Svix | Hookdeck | Convoy |
+|---|---|---|---|---|
+| Open-source licence | MIT | MIT (the Svix server) | Apache-2.0 (Outpost) | Elastic License 2.0 |
+| Sends webhooks to your customers | Yes | Yes | Yes (Outpost) | Yes |
+| Receives webhooks from providers | Yes | Yes (Svix Ingest) | Yes (Event Gateway) | Yes |
+| Delivers to queues and cloud services, not only HTTP | No | — | Yes (Outpost) | — |
+| Customer-facing portal | No | App Portal, in the hosted version only | User portal (Outpost) | Portal Links |
+| OpenTelemetry | No | Yes (server) | Yes (Outpost) | — |
+| Every feature self-hosted without a licence key | Yes | — | — | No |
+
+A dash means the vendor's pages we checked did not settle the point either way. It is not a claim that the feature is missing.
+
+## Railhook
+
+- **Both directions in one place.** Outgoing events to your customers' endpoints and incoming webhooks from providers share one attempt lifecycle, one dashboard and one set of failed messages.
+- **Nothing held back from self-hosting.** Every feature is in the MIT repository, with no licence key. `BILLING_ENABLED` defaults to `false`.
+- **Railhook Cloud** runs at railhook.io on a free plan. Paid plans with higher limits are coming.
+- **Standard Webhooks signatures**, alongside Railhook's own `X-Signature` header, with a grace window when a secret is rotated.
+- **Per-endpoint ordering**, opt-in, with a timeout so one stuck delivery cannot block an endpoint forever.
+- **Replay creates new deliveries** from stored events (Time Machine in the dashboard) instead of re-sending the original.
+- **A built-in request bin and a localhost tunnel** in the CLI.
+- **A workflow builder** that goes beyond single-step transformations.
+
+### What Railhook does not have
+
+- **No customer-facing portal.** You manage your customers' endpoints on their behalf. A shareable debug link covers one event; there is nothing embeddable. This is the largest gap, and it is first on the roadmap.
+- **HTTP delivery only.** No SQS, S3, EventBridge, Pub/Sub, RabbitMQ or Kafka destinations.
+- **No SSO (SAML or OIDC) and no SCIM.**
+- **No OpenTelemetry.** Prometheus metrics are thorough; there are no traces.
+- **Three fixed roles and two API key scopes.** No custom roles, no per-resource permissions.
+- **Filtering is project-level.** A subscription cannot carry its own filter, and incoming webhooks cannot be filtered.
+- **No automatic disabling** of an endpoint that keeps failing.
+- **No batching, no built-in static egress IPs** (see [Static egress IP](/docs/resources/static-egress-ip/)), no PagerDuty or Opsgenie alert channel.
+- **SDKs for Node.js, Python and PHP only.** No Go SDK and no Terraform provider.
+
+## Svix
+
+- The Svix server is open source under the MIT licence and can export traces to an OpenTelemetry collector. ([svix/svix-webhooks](https://github.com/svix/svix-webhooks))
+- Its App Portal lets your customers add endpoints, debug deliveries, and inspect and replay past webhooks. ([App Portal](https://docs.svix.com/app-portal)) Svix states the portal is included only in the hosted version, not the open-source one. ([Consumer App Portal (OSS)](https://docs.svix.com/app-portal/oss))
+- Svix Ingest receives webhooks from providers, verifies them and forwards them to destinations. ([Receiving with Ingest](https://docs.svix.com/ingest/receiving-with-ingest))
+
+**Choose Svix** if a polished portal your customers use themselves is the priority and a hosted service suits you.
+
+## Hookdeck
+
+- **Outpost** is Hookdeck's open-source, Apache-2.0 product for sending events. It delivers to webhooks, Hookdeck Event Gateway, Amazon EventBridge, AWS SQS, AWS S3, GCP Pub/Sub, RabbitMQ and Kafka, and includes a user portal and OpenTelemetry traces, metrics and logs. ([hookdeck/outpost](https://github.com/hookdeck/outpost))
+- **Event Gateway** receives webhooks at a source URL and routes them through connections to destinations, with filters, transformations, deduplication and retries. ([Hookdeck docs](https://hookdeck.com/docs/sources))
+
+**Choose Hookdeck** if your customers' receivers are queues or cloud event buses rather than HTTP services. Railhook cannot deliver there.
+
+## Convoy
+
+- Convoy sends webhooks to your users and receives webhooks from providers. It is licensed under the Elastic License 2.0. ([frain-dev/convoy](https://github.com/frain-dev/convoy))
+- Some features of the self-hosted edition are enabled by a licence key, and the free Community edition is limited to one user, one organisation and two projects. ([frain-dev/convoy](https://github.com/frain-dev/convoy))
+- Portal Links generate a customer-facing dashboard of an endpoint's deliveries, as a one-time link or one you embed. ([Portal Links](https://getconvoy.io/docs/product-manual/portal-links))
+
+**Choose Convoy** if you want both directions and an embeddable delivery view, and its licence terms fit.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Migrate to Railhook" href="/docs/resources/migrating/" description="Move from another platform without a maintenance window." />
+  <LinkCard title="Quickstart" href="/docs/start/quickstart/" description="Install Railhook and send a first event." />
+</CardGrid>

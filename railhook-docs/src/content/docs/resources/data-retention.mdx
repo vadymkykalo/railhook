@@ -1,0 +1,86 @@
+---
+title: Data retention and export
+description: How long Railhook keeps events and attempts, how to change it, and how to export or erase an organization or an account.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Railhook keeps every event, attempt and incoming event, and retention is the only thing that stops those tables growing. This page shows what is kept and for how long, and how to answer an export or erasure request.
+
+## What is kept, and for how long
+
+Set these in `.env`. The defaults keep a self-hosted deployment from growing without bound.
+
+| Data | Variable | Default |
+|---|---|---|
+| Failed attempts | `DATA_RETENTION_ATTEMPTS_DAYS` | 90 days |
+| Successful (2xx) attempts | `DATA_RETENTION_SUCCESSFUL_ATTEMPTS_DAYS` | **14 days** |
+| Events | `DATA_RETENTION_EVENTS_DAYS` | 90 days |
+| Incoming events | `DATA_RETENTION_INCOMING_EVENTS_DAYS` | 30 days |
+| Attempts kept per delivery | `DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY` | 10 |
+| Abandoned outbox rows | `OUTBOX_DEAD_RETENTION_DAYS` | 90 days |
+| Tunnel request log | — | 7 days |
+
+Why the defaults look like this:
+
+- **Successful attempts go first.** A 2xx attempt tells you little once you know it worked; a failed one is the debugging record. Removing successes at 14 days removes most of the volume and keeps the evidence.
+- **Events and failed attempts share 90 days.** Keeping attempts longer than their event leaves records that point at nothing.
+- **A cap per delivery** catches what age cannot: an endpoint that fails for a week keeps adding attempts to the same delivery.
+
+<Aside type="caution" title="Plans do not trim anything on a self-hosted deployment">
+Retention per billing plan only runs when `BILLING_ENABLED=true`. With the self-hosted default, `false`, the `DATA_RETENTION_*` variables are the only limit.
+</Aside>
+
+## When cleanup runs
+
+| Job | Default schedule | Variable |
+|---|---|---|
+| Main cleanup | 02:00 daily | `DATA_RETENTION_CRON` |
+| Attempts-per-delivery cap | Every 30 minutes | `DATA_RETENTION_LIMIT_CRON` |
+| Burst cleanup | Every 4 hours | `DATA_RETENTION_BURST_CLEANUP_CRON` |
+| Table size metrics | Every 15 minutes | `DATA_RETENTION_TABLE_METRICS_INTERVAL_MS` |
+
+Rows are deleted in batches of `DATA_RETENTION_BATCH_SIZE` (default 1000), so a long-overdue first run does not lock the platform.
+
+Delivery attempts and the tunnel request log are partitioned by time in Postgres. For those tables an expired period is removed by dropping its whole partition, which is instant, instead of deleting rows one by one. `PARTITION_MAINTENANCE_ENABLED` (default `true`) creates partitions ahead of time and drops expired ones.
+
+## Check that cleanup is working
+
+| Metric | Meaning |
+|---|---|
+| `delivery_attempts_table_rows`, `events_table_rows`, `incoming_events_table_rows` | Estimated rows in each large table |
+| `delivery_attempts_cleanup_total`, `events_cleanup_total`, `incoming_events_cleanup_total` | Rows removed |
+| `partition_dropped_total` | Partitions dropped |
+| `partition_default_rows` | Rows that landed in the default partition. Should be zero; anything else means a partition was missing. |
+
+If a table keeps growing while its cleanup counter stays flat, the job is not running. Check the cron values and the API logs around 02:00.
+
+## Export an organization
+
+An owner can export an organization with `GET /api/v1/orgs/{orgId}/export`. The export is one JSON document with the organization's configuration and audit history: the organization, members, projects, endpoints, subscriptions, sources, destinations, API keys and audit entries.
+
+- **Payloads are not included.** Events, deliveries and attempts are too large to assemble into one document. Say so to anyone answering a subject-access request with this file.
+- **Audit entries are capped at 10,000.** When the cap applies, `auditLogsTruncated` is `true` and `auditLogsTotal` gives the real count.
+
+## Erase data
+
+**A whole organization.** An owner deletes it with `DELETE /api/v1/orgs/{orgId}`, which removes everything that belongs to it. The audit log is kept on purpose, so the erasure can be shown to have happened.
+
+**One person's account.** The person deletes it with `DELETE /api/v1/auth/me`:
+
+- Identifying data is replaced and the account can never sign in again. Every session is closed and every membership removed.
+- An organization where they were the only member is deleted with them.
+- The request answers `409` if they are the last owner of an organization other people still belong to. Ownership has to be handed over first.
+
+Both erasures and the export are recorded in the audit log.
+
+<Aside type="danger" title="PII masking does not erase anything">
+[PII masking](/docs/platform/pii-masking/) changes what the dashboard shows. It does not change what is stored or delivered. There is no tool to erase one field inside stored payloads: retention removes them on the schedule above. If a field must never be stored, remove it before sending the event, or in a [transformation](/docs/outgoing/transformations/).
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Upgrade and back up" href="/docs/self-hosting/upgrade-backup/" description="Back up before you change retention." />
+  <LinkCard title="Configuration" href="/docs/self-hosting/configuration/" description="Every environment variable." />
+  <LinkCard title="PII masking" href="/docs/platform/pii-masking/" description="Hide personal data from people viewing payloads." />
+</CardGrid>

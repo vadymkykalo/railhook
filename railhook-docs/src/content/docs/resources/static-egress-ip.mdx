@@ -1,0 +1,62 @@
+---
+title: Static egress IP
+description: Give your customers a fixed IP address to allowlist by pinning the worker's outbound traffic at the network layer.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Customers whose receivers sit behind a firewall ask which IP address your webhooks come from. This page shows how to give them a fixed one.
+
+Railhook has no setting for this. The worker's HTTP client has no forward-proxy option, and it does not read `HTTP_PROXY` or `HTTPS_PROXY`. Solve it one layer down instead: the **worker** is the only component that sends deliveries, so fixing the worker's outbound address fixes it for every webhook you send.
+
+```text
+worker  →  your network's outbound address  →  your customer's endpoint
+                        ↑
+            this is the address they allowlist
+```
+
+By default that address is whatever your infrastructure happens to use: a node's public IP, a shared NAT pool, an address that changes when a node is replaced. None of those can be allowlisted.
+
+## Option 1: a NAT gateway with a static IP
+
+Put the worker's subnet behind a managed NAT gateway with a static address. Every outbound connection then uses that address. Start here: it needs no Railhook configuration and survives node replacement.
+
+| Environment | Service | Attach |
+|---|---|---|
+| AWS | NAT Gateway | An Elastic IP, on the route table of the worker nodes' private subnet |
+| Google Cloud | Cloud NAT | A reserved static external IP |
+| Azure | NAT Gateway | A static public IP |
+| Other providers, bare metal | A gateway host | A floating IP, with the worker's default route through it |
+
+<Aside type="tip" title="Publish two addresses">
+One NAT gateway is a single point of failure. Customers find it far easier to allowlist a second address up front than during an outage.
+</Aside>
+
+## Option 2: a dedicated node pool
+
+If only webhook traffic should use the fixed address, run the worker on nodes that sit behind the NAT, and keep other workloads elsewhere. That keeps dashboard traffic, backups and image pulls off an address that may be expensive or rate-limited.
+
+<Aside type="caution">
+In the Helm chart, `nodeSelector` and `tolerations` are single top-level values applied to both the API and the worker. To place only the worker, patch its deployment or use a separate values override for it.
+</Aside>
+
+## Option 3: an egress gateway
+
+If you already run a service mesh or an egress gateway, such as an Istio or Cilium egress gateway, route the worker's traffic through it. The redirect happens below the application, which is why it works without a Railhook setting.
+
+An egress gateway is also a good place to log or restrict where deliveries go. It adds to Railhook's own SSRF protection, which checks every delivery URL before a request is built and refuses private addresses unless `WEBHOOK_ALLOW_PRIVATE_IPS` or `WEBHOOK_ALLOWED_HOSTS` allows them. It does not replace it.
+
+## What to tell your customers
+
+Publish the addresses where customers can read them without asking, and state:
+
+1. **Every address** that may be used.
+2. **That the list can change, and with how much notice.** An allowlist changed without warning is an outage on someone else's infrastructure.
+
+This only concerns webhooks you send. Providers sending webhooks **to** Railhook need your ingress URL, not an allowlist.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Endpoint security" href="/docs/outgoing/endpoint-security/" description="SSRF protection and other controls on delivery URLs." />
+  <LinkCard title="Kubernetes" href="/docs/self-hosting/kubernetes/" description="Deploy the worker with the Helm chart." />
+</CardGrid>

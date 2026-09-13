@@ -1,0 +1,59 @@
+---
+title: PII masking
+description: Hide personal data in the dashboard and in shared debug links without changing what is stored or delivered.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+PII masking rules redact values in a payload when that payload is shown to a person. Set them up per project so support staff, and anyone you send a debug link to, can work with a payload without seeing the personal data in it.
+
+<Aside type="caution" title="Masking changes what a screen shows, nothing else">
+The stored payload is unchanged, and your endpoint receives the unmasked payload. Masking limits who sees a value. It does not stop the value being kept, and it is not a way to answer a data-erasure request. If a field must never be stored, remove it before you send the event, or remove it in a [transformation](/docs/outgoing/transformations/).
+</Aside>
+
+## Where masking applies
+
+| Surface | What is masked |
+|---|---|
+| Deliveries | The request body shown on a delivery and on each attempt |
+| Incoming events | The body as it arrived from the provider |
+| Event diff | Both sides of a comparison between two events |
+| Shared debug links | The payload behind the link |
+
+Shared debug links matter most. Anyone with the URL can open one without signing in, so masking is what makes it safe to send one outside your organization.
+
+## Two kinds of rule
+
+Each rule belongs to one project and can be turned off without being deleted.
+
+| Type | Matches |
+|---|---|
+| `BUILTIN` | A named pattern Railhook recognises anywhere in a payload, at any depth: `email`, `phone` or `card`. You choose the style, not the pattern. |
+| `CUSTOM` | A JSONPath you write, such as `$.customer.taxId`. Use it for anything specific to your domain. |
+
+## Redaction styles
+
+| Style | Result | Example |
+|---|---|---|
+| `PARTIAL` | Keeps the first two and last two characters. For an email address, keeps the first two characters and the domain. The default. | `jo***@example.com` |
+| `FULL` | Replaces the whole value. Use it when even the shape is sensitive. | — |
+| `HASH` | Replaces the value with `sha256:` and the first 12 hex characters of its hash. The same value always masks the same way, so you can tell two events concern the same person without learning who. | `sha256:3f1a…` |
+
+## What a new project starts with
+
+Three `BUILTIN` rules are created with every project, all `PARTIAL` and enabled: `email`, `phone` and `card`. Change their style or turn them off as you need.
+
+To check a rule before you rely on it, preview it against a sample payload on the project's PII rules page, or with the preview request in the [API reference](/docs/api-reference/).
+
+## What masking is not
+
+- **Not encryption.** Secrets and certificates are encrypted at rest separately. Masking does not touch storage.
+- **Not a delivery filter.** The receiver is trusted with the payload; the person looking at the dashboard may not be.
+- **Not an audit control.** It changes what is shown. It does not record who looked.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Data retention and export" href="/docs/resources/data-retention/" description="What actually removes stored payloads, and when." />
+  <LinkCard title="Transformations" href="/docs/outgoing/transformations/" description="Remove a field before it is delivered." />
+  <LinkCard title="Organizations and roles" href="/docs/platform/organizations-rbac/" description="Who can see a project at all." />
+</CardGrid>
