@@ -1,0 +1,79 @@
+---
+title: Alerts and incidents
+description: Create alert rules that watch your project and notify someone when failures, latency or failed messages cross a threshold.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Alert rules watch the traffic of one project and notify someone when it crosses a threshold you set. Use them to hear about a failing endpoint before its owner does.
+
+<Aside title="Two different things are called alerts">
+This page covers **alert rules** created in the dashboard. They watch your deliveries and go to whoever owns the endpoints. Separately, a self-hosted deployment ships **Prometheus alerts** that watch the platform itself: backlogs, circuit breakers, processes that stopped. Those go to whoever runs Railhook. If you self-host, set up both. See [Observability](/docs/platform/observability/).
+</Aside>
+
+## Create a rule
+
+<Steps>
+1. Open the project's **Alerts** page and create a rule.
+2. Pick a **condition** and a **threshold**.
+3. Pick a **window**. For `CONSECUTIVE_FAILURES`, also pick the **endpoint** to watch.
+4. Pick a **severity** and a **channel**.
+5. Save. Rules are evaluated every minute by default (`ALERTS_EVALUATION_CRON`).
+</Steps>
+
+## Conditions
+
+| Condition | Fires when |
+|---|---|
+| `FAILURE_RATE` | The share of the project's deliveries created in the window that failed, as a percentage, is at or above the threshold. Right when traffic is degrading rather than dead. |
+| `CONSECUTIVE_FAILURES` | The endpoint's most recent deliveries, as many as the threshold, all failed. Needs an endpoint: a rule without one never fires. Catches an endpoint that has gone away sooner than a rate can, because it does not need volume. |
+| `DLQ_THRESHOLD` | The number of the project's deliveries that became failed messages in the window is at or above the threshold. This is the condition that says deliveries are being abandoned, not just retried. |
+| `LATENCY_THRESHOLD` | The project's p95 response time over the window, in milliseconds, is at or above the threshold. A slow endpoint uses up concurrency and eventually trips the circuit breaker. |
+
+A rule fires when its condition **starts** to hold, not on every evaluation while it keeps holding. One outage produces one notification, not one a minute.
+
+## Settings that decide whether anyone acts
+
+| Setting | Default | Guidance |
+|---|---|---|
+| Window | 5 minutes | How far back the condition looks. Short windows are jumpy on low traffic; long ones are slow on high traffic. Match it to how many deliveries the project gets in that time. |
+| Endpoint | None | Required for `CONSECUTIVE_FAILURES`. The other conditions measure the whole project. |
+| Severity | `WARNING` | `INFO`, `WARNING` or `CRITICAL`. A `CRITICAL` rule also opens an incident when it fires. |
+| Mute and snooze | Off | Mute a rule indefinitely, or snooze it until a set time. Snooze during planned work instead of deleting the rule. Turning a rule off stops it being evaluated at all. |
+
+## Channels
+
+One channel per rule. To notify two places, create two rules.
+
+| Channel | Sends to | Needs |
+|---|---|---|
+| `IN_APP` | A notification in the dashboard. The default. | Nothing |
+| `EMAIL` | One or more recipients | Email configured on the deployment: `EMAIL_ENABLED=true` and SMTP settings |
+| `SLACK` | A Slack incoming webhook URL | The URL |
+| `WEBHOOK` | Any URL of yours, as a JSON `POST`. Use it to reach a pager, a ticket system or your own routing. | The URL |
+
+<Aside type="caution" title="Alert URLs are checked like delivery URLs">
+Slack and webhook URLs go through the same SSRF protection as endpoint URLs. Private and loopback addresses are refused unless the deployment allows them with `WEBHOOK_ALLOW_PRIVATE_IPS` or `WEBHOOK_ALLOWED_HOSTS`.
+</Aside>
+
+## Incidents
+
+An incident groups what happened into a record with a timeline. A `CRITICAL` rule opens one automatically when it fires; you can also open one yourself on the project's **Incidents** page and add notes to its timeline.
+
+| Status | Means |
+|---|---|
+| `OPEN` | Not yet picked up |
+| `INVESTIGATING` | Someone is working on it |
+| `RESOLVED` | Closed. The timeline is kept, so the next occurrence can be compared with this one. |
+
+## Not available yet
+
+- **No PagerDuty or Opsgenie channel.** Both accept an HTTP request, so the `WEBHOOK` channel reaches them with a small adapter on your side.
+- **No alert on silence.** A rule fires on what happened, not on a project that stopped sending traffic when it should not have.
+- **No automatic disabling** of an endpoint that keeps failing. An alert tells you; a person turns the endpoint off.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="What happens to a delivery before it counts as failed." />
+  <LinkCard title="Observability" href="/docs/platform/observability/" description="Metrics and platform alerts for operators." />
+</CardGrid>

@@ -370,18 +370,20 @@ class WebhookEvent:
 
 class ProviderType(str, Enum):
     GENERIC = "GENERIC"
-    STRIPE = "STRIPE"
     GITHUB = "GITHUB"
-    TWILIO = "TWILIO"
+    GITLAB = "GITLAB"
+    STRIPE = "STRIPE"
     SHOPIFY = "SHOPIFY"
-    HUBSPOT = "HUBSPOT"
     SLACK = "SLACK"
-    CUSTOM = "CUSTOM"
+    TWILIO = "TWILIO"
 
 
 class VerificationMode(str, Enum):
     NONE = "NONE"
+    #: Your own header and prefix, HMAC-SHA256 over the body (or ``t=…,v1=…``).
     HMAC_GENERIC = "HMAC_GENERIC"
+    #: The provider's own scheme, chosen by ``provider_type`` — e.g. Stripe's timestamped one.
+    PROVIDER = "PROVIDER"
 
 
 class IncomingSourceStatus(str, Enum):

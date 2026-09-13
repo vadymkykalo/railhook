@@ -297,7 +297,7 @@ export default function DeliveriesPage() {
                 {t('deliveries.goToEvents')}
               </Button>
             }
-            docsLink="/docs#deliveries-api"
+            docsLink="api-reference"
           />
         )
       ) : (

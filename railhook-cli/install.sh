@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Railhook CLI installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/railhook-cli/install.sh | bash
+# Usage: curl -fsSL https://railhook.io/install-cli.sh | bash
 #
 # Pass flags after `--` when piping into bash:
 #   curl -fsSL .../install.sh | bash -s -- --with-java
@@ -55,7 +55,7 @@ print_help() {
 Railhook CLI installer
 
 Usage:
-  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/railhook-cli/install.sh | bash
+  curl -fsSL https://railhook.io/install-cli.sh | bash
   curl -fsSL .../install.sh | bash -s -- [--with-java] [--uninstall] [-h|--help]
 
 Flags:
@@ -343,7 +343,7 @@ JAR_FILE="$JAR_DIR/railhook-cli.jar"
 
 if [ ! -f "$JAR_FILE" ]; then
     echo "railhook: $JAR_FILE not found. Re-run the installer:" >&2
-    echo "  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/railhook-cli/install.sh | bash" >&2
+    echo "  curl -fsSL https://railhook.io/install-cli.sh | bash" >&2
     exit 1
 fi
 
@@ -442,7 +442,7 @@ main() {
         echo "    railhook --version"
     fi
     echo ""
-    echo "  Uninstall: curl -fsSL https://raw.githubusercontent.com/$REPO/main/railhook-cli/install.sh | bash -s -- --uninstall"
+    echo "  Uninstall: curl -fsSL https://railhook.io/install-cli.sh | bash -s -- --uninstall"
     echo ""
 }
 

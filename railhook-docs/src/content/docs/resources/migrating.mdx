@@ -1,0 +1,91 @@
+---
+title: Migrate to Railhook
+description: Move from Svix, Hookdeck, Convoy or a home-grown sender to Railhook, usually without changing your receivers or scheduling a cutover.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Two things decide how hard a move is: whether your receivers have to change, and whether your concepts carry over. This page covers both, then gives a migration you can run with both platforms live.
+
+## Your receivers usually keep working
+
+Railhook signs outgoing deliveries with the [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks) headers:
+
+```http
+webhook-id: <the delivery id, unchanged across retries>
+webhook-timestamp: <unix seconds>
+webhook-signature: v1,<base64>
+```
+
+The signature is HMAC-SHA256 over `{id}.{timestamp}.{body}`, base64-encoded. A receiver that already verifies with a Svix or Standard Webhooks library keeps working once it has the new secret.
+
+<Aside type="caution" title="Give libraries the whsec_ secret">
+Standard Webhooks libraries expect the secret as `whsec_` followed by standard base64. The API returns that form as `standardWebhooksSecret`, next to `secret`. Do not hand a library the plain `secret`: it uses URL-safe base64 without padding, and the library would fail to decode it or decode it to different bytes.
+</Aside>
+
+New endpoints also receive Railhook's own header by default:
+
+```http
+X-Signature: t=<unix milliseconds>,v1=<hex HMAC-SHA256 of "{t}.{body}">
+```
+
+A receiver verifies the header it knows and ignores the other, so you can move receivers one at a time, or never.
+
+| Your receiver verifies with | What to change |
+|---|---|
+| A Svix or Standard Webhooks library | The secret and the URL. Nothing else. |
+| Another platform's own signature header | Switch to a Standard Webhooks library, or verify `X-Signature`. Both are sent. |
+| A hand-written `t=…,v1=…` parser | Check the units: `t` in `X-Signature` is in milliseconds, not seconds. |
+
+Receivers should deduplicate on `webhook-id`. Delivery is at-least-once, and the id stays the same across retries.
+
+See [Signatures](/docs/outgoing/signatures/) for verification code in each SDK language.
+
+## How the concepts map
+
+| Railhook | Svix | Hookdeck | Convoy |
+|---|---|---|---|
+| Organization | — | — | Organisation |
+| Project | Application | — | Project |
+| **Endpoint** | Endpoint | Destination (Outpost) | Endpoint |
+| **Subscription** (an endpoint and an event type) | Event types on an endpoint | — | Subscription |
+| **Event** | Message | Event | Event |
+| **Delivery** (one event to one endpoint) | — | — | Event delivery |
+| **Attempt** (one HTTP request) | Attempt | Attempt | — |
+| **Source** (a provider you receive from) | Source (Ingest) | Source (Event Gateway) | Source |
+| **Destination** (where a received webhook goes) | Destination (Ingest) | Destination (Event Gateway) | — |
+| **Time Machine** (replay) | Replay | — | — |
+
+A dash means we found no direct equivalent in that vendor's documentation, not that the vendor lacks the capability.
+
+Two differences matter when you move:
+
+- **Delivery and attempt are separate.** A delivery is the obligation to get one event to one endpoint; an attempt is one HTTP request towards it. "How many times was this retried" has an exact answer.
+- **Replay is not a retry.** A retry is the next attempt on the same delivery. A replay builds a new delivery from a stored event and leaves the original as it was. See [Replay](/docs/outgoing/replay/).
+
+## Migrate without a maintenance window
+
+Because receivers can verify both signature schemes, the old platform and Railhook can run side by side.
+
+<Steps>
+1. **Recreate the shape.** Create projects, endpoints and subscriptions through the API. See [Endpoints and subscriptions](/docs/outgoing/endpoints-subscriptions/).
+2. **Give each receiver its new secret** in `whsec_` form. It now accepts signatures from both platforms.
+3. **Send every event to both platforms** for as long as you need confidence. A receiver that deduplicates on `webhook-id` handles each Railhook delivery once.
+4. **Compare.** Watch `delivery_oldest_pending_age_seconds` and failed messages in Railhook against the old platform's numbers. See [Observability](/docs/platform/observability/).
+5. **Stop sending to the old platform.** There is no cutover moment.
+</Steps>
+
+<Aside type="caution" title="History does not move">
+Railhook can only replay events it stored itself. If you need the old platform's history, export it before you close that account.
+</Aside>
+
+## Before you commit
+
+Check [How Railhook compares](/docs/resources/comparison/) for what Railhook does not have yet, such as a customer-facing portal, SSO and non-HTTP destinations.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Quickstart" href="/docs/start/quickstart/" description="Install Railhook and send a first event." />
+  <LinkCard title="Signatures" href="/docs/outgoing/signatures/" description="Verify deliveries in your receiver." />
+  <LinkCard title="Receive your first webhook" href="/docs/start/receive-first-webhook/" description="Move incoming webhooks too." />
+</CardGrid>

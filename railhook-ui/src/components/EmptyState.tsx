@@ -1,7 +1,7 @@
 import { type LucideIcon, BookOpen, AlertTriangle, RefreshCw } from 'lucide-react';
 import { type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { docsUrl } from '../lib/docsUrl';
 import { resolveErrorMessage } from '../lib/toast';
 import { Button } from './ui/button';
 
@@ -11,12 +11,13 @@ interface EmptyStateProps {
   /** ReactNode, not string: some descriptions name the record in <strong>. */
   description?: ReactNode;
   action?: ReactNode;
+  /** A docs page slug, e.g. `outgoing/retries`. Opened in the reader's language. */
   docsLink?: string;
   className?: string;
 }
 
 export default function EmptyState({ icon: Icon, title, description, action, docsLink, className }: EmptyStateProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   return (
     <div className={className ?? 'flex flex-col items-center justify-center rounded-lg border border-dashed border-rail py-16'}>
       <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-rail bg-card">
@@ -28,10 +29,10 @@ export default function EmptyState({ icon: Icon, title, description, action, doc
       )}
       {action && <div className="mb-3">{action}</div>}
       {docsLink && (
-        <Link to={docsLink} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+        <a href={docsUrl(i18n.language, docsLink)} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
           <BookOpen className="h-3.5 w-3.5" />
           {t('common.learnMore')}
-        </Link>
+        </a>
       )}
     </div>
   );

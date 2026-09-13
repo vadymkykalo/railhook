@@ -176,4 +176,4 @@ File permissions are set to `600` (owner-only) to protect tokens.
 
 ## Architecture
 
-See [docs/CLI_ARCHITECTURE.md](../docs/CLI_ARCHITECTURE.md) for detailed architecture documentation.
+See the [CLI documentation](https://railhook.io/docs/tools/cli/) for usage.

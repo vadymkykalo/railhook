@@ -64,6 +64,13 @@ export default defineConfig({
         target: process.env.VITE_DEV_API_TARGET || 'http://localhost:8080',
         changeOrigin: true,
       },
+      // The docs are a site of their own (railhook-docs/, `make docs-dev` serves it on 4321
+      // under the same /docs base). In production nginx serves both from one origin; this
+      // keeps the dashboard's /docs/ links working under `npm run dev`.
+      '/docs': {
+        target: 'http://localhost:4321',
+        changeOrigin: true,
+      },
     },
   },
   test: {
@@ -107,11 +114,23 @@ export default defineConfig({
       // methodology, not lost coverage. Lowered lines/statements to stay a
       // couple points under the new number; left functions/branches alone
       // since they still clear the old thresholds comfortably.
+      //
+      // Re-baseline (recorded 2026-09-12): @vitest/coverage-v8 3.2.4 -> 4.1.11
+      // (the vitest 4 line, taken for the @vitest/mocker path-traversal
+      // advisory). v4 makes AST-aware remapping the default and drops the
+      // toggle, so every metric is now measured against syntax rather than
+      // against v8's line ranges - the same 59 files and 472 tests that
+      // measured 54.28/74.11/43.95 under 3.2.4 measure 42.49/36.64/34.82
+      // under 4.1.11. Branches moves most because v8 used to score a whole
+      // uncovered ternary or ?? chain as one taken branch. Numbers below are
+      // set a few points under each new measurement; they are NOT comparable
+      // with the ones in the paragraph above, and the direction of travel is
+      // still up as UI tests land.
       thresholds: {
-        lines: 12,
-        statements: 12,
-        functions: 16,
-        branches: 55,
+        lines: 38,
+        statements: 36,
+        functions: 30,
+        branches: 32,
       },
     },
   }

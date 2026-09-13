@@ -166,20 +166,32 @@ Receive, validate, and forward webhooks from third-party providers (Stripe, GitH
 ```python
 from railhook import IncomingSourceCreateParams, IncomingSourceUpdateParams
 
-# Create an incoming source with HMAC verification
+# Create an incoming source that verifies Stripe's own signature scheme
 source = client.incoming_sources.create(
     project_id,
     IncomingSourceCreateParams(
         name="Stripe Webhooks",
         slug="stripe",
         provider_type="STRIPE",
-        verification_mode="HMAC_GENERIC",
-        hmac_secret="whsec_...",
-        hmac_header_name="Stripe-Signature",
+        verification_mode="PROVIDER",  # Stripe-Signature: t=<unix-s>,v1=<hex>, 300 s tolerance
+        hmac_secret="whsec_...",  # the signing secret from Stripe's webhook settings
     ),
 )
 
 print(f"Ingress URL: {source.ingress_url}")
+
+# A provider with no preset (provider_type GENERIC) uses HMAC_GENERIC instead:
+# HMAC-SHA256 over the body, read from the header and prefix you name.
+client.incoming_sources.create(
+    project_id,
+    IncomingSourceCreateParams(
+        name="Acme Webhooks",
+        verification_mode="HMAC_GENERIC",
+        hmac_secret="acme-shared-secret",
+        hmac_header_name="X-Acme-Signature",
+        hmac_signature_prefix="sha256=",
+    ),
+)
 
 # List sources
 sources = client.incoming_sources.list(project_id)
@@ -246,6 +258,8 @@ print(f"Replayed to {result.destinations_count} destinations")
 Verify incoming webhooks in your endpoint:
 
 ```python
+import os
+
 from railhook import verify_signature, construct_event, RailhookError
 
 # Flask example
@@ -282,7 +296,7 @@ def handle_webhook():
 
 ### What lands on your endpoint
 
-Railhook PUTs the event's **payload** on the wire, not an envelope. This:
+Railhook POSTs the event's **payload** on the wire, not an envelope. This:
 
 ```python
 client.events.send(Event(type="order.completed", data={"order_id": "ord_1"}))
@@ -299,6 +313,9 @@ X-Event-Id: 6f0e…
 X-Delivery-Id: 91ab…
 X-Sequence-Number: 0
 Idempotency-Key: 6f0e…-<endpoint-id>
+webhook-id: 91ab…
+webhook-timestamp: 1738000000
+webhook-signature: v1,<base64 hmac-sha256>
 
 {"order_id":"ord_1"}
 ```
@@ -314,9 +331,50 @@ the endpoint secret, and the server rejects timestamps more than **300
 seconds** old — verify against the *raw* body bytes, before any JSON parse and
 re-serialize.
 
+### Standard Webhooks headers
+
+An endpoint receives both header sets by default (`signatureScheme: BOTH`; `LEGACY` sends
+only `X-Signature`, `STANDARD` only the `webhook-*` headers). The
+[Standard Webhooks](https://www.standardwebhooks.com) signature is over
+`f"{webhook_id}.{webhook_timestamp}.{raw_body}"` — timestamp in seconds, digest in base64 —
+with the endpoint's `standardWebhooksSecret` (`whsec_…`), so any Standard Webhooks library
+verifies it too:
+
+```python
+import os
+
+from flask import Flask, request
+from railhook import verify_standard_webhook, RailhookError
+
+app = Flask(__name__)
+
+@app.route("/webhooks", methods=["POST"])
+def handle_standard_webhook():
+    try:
+        verify_standard_webhook(
+            request.get_data(as_text=True),
+            dict(request.headers),
+            os.environ["STANDARD_WEBHOOKS_SECRET"],
+        )
+    except RailhookError:
+        return "Invalid signature", 400
+    return "OK", 200
+```
+
+### Secret rotation
+
+After `endpoints.rotate_secret`, every delivery is signed with the new secret **and** the
+retired one until the endpoint's grace window closes (24 hours by default), so the new secret
+can be deployed at any point inside it. `X-Signature` then carries two `v1=` values and
+`webhook-signature` two space-separated `v1,` entries. `verify_signature`, `construct_event`
+and `verify_standard_webhook` accept the request when **any** `v1` matches, ignore other
+versions, and still reject a timestamp outside the tolerance.
+
 ### FastAPI Example
 
 ```python
+import os
+
 from fastapi import FastAPI, Request, HTTPException
 from railhook import construct_event, RailhookError
 
@@ -344,7 +402,10 @@ async def handle_webhook(request: Request):
 ## Error Handling
 
 ```python
+import time
+
 from railhook import (
+    Event,
     RailhookError,
     RateLimitError,
     AuthenticationError,
@@ -427,6 +488,10 @@ All generic methods use the same authentication, error handling, and rate-limit 
 ## Configuration
 
 ```python
+import os
+
+from railhook import Railhook
+
 client = Railhook(
     api_key=os.environ["RAILHOOK_API_KEY"],  # Required: Your project API key
     base_url="https://api.example.com",  # Optional (default: http://localhost:8080)

@@ -1,0 +1,95 @@
+---
+title: Errors and limits
+description: The error envelope every API error uses, what each status means, and the rate, size and fan-out limits behind them.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Every error from the Railhook API has the same shape, so one handler in your client covers all of them. Use this page to tell an error you should fix from one you should retry.
+
+## The error envelope
+
+```json title="400 Bad Request"
+{
+  "error": "validation_error",
+  "message": "Invalid request parameters",
+  "status": 400,
+  "fieldErrors": {
+    "type": "Event type is required",
+    "data": "Event data cannot be empty"
+  }
+}
+```
+
+| Field | Always present | Meaning |
+|---|---|---|
+| `error` | Yes | A stable, machine-readable code. Branch on this. |
+| `message` | Yes | A human-readable explanation. Do not parse it. |
+| `status` | Yes | The HTTP status, repeated |
+| `fieldErrors` | No | On validation errors: field name → what is wrong with it |
+
+## Error codes
+
+| Status | `error` | What to do |
+|---|---|---|
+| `400` | `validation_error` | Fix the fields named in `fieldErrors`. |
+| `400` | `malformed_request` | The body is missing or is not valid JSON. |
+| `400` | `missing_parameter`, `invalid_parameter` | A query or path parameter is missing or in the wrong format. |
+| `400` | `invalid_url` | A URL was refused, for example by SSRF protection. |
+| `400` | `invalid_request` | The request was understood but rejected, for example an event that would fan out past the limit. Read `message`. |
+| `401` | `unauthorized` | Credentials missing, expired or wrong. Refresh the access token, or check the `X-API-Key` header. |
+| `403` | `forbidden` | Authenticated, but the role or key scope does not allow it. A `READ_ONLY` key cannot write. |
+| `404` | `not_found` | Nothing with that id exists in your organization. |
+| `405` | `method_not_allowed` | Wrong HTTP method. The `Allow` header lists the right ones. |
+| `409` | `conflict` | It already exists, or it changed while you were editing. Re-read it and try again. |
+| `413` | `payload_too_large` | The body is over the size limit. |
+| `415` | `unsupported_media_type` | Send `Content-Type: application/json`. |
+| `422` | `unprocessable_entity` | The request is valid but cannot be applied in the resource's current state. |
+| `429` | `rate_limit_exceeded`, `organization_rate_limit`, `platform_rate_limit` | Wait for `Retry-After` seconds, then retry. |
+| `500` | `internal_error` | Railhook failed. Retry with backoff. |
+
+Some errors carry only a generic code, `client_error` for a `4xx` or `server_error` for a `5xx`, in the same envelope: a sign-in rate limit or a blocked change to the last owner, for example. Branch on `status` first and use `error` to refine.
+
+<Aside type="tip" title="Which errors to retry">
+Retry `429` and `5xx` with backoff. Never retry other `4xx` errors unchanged: the request will fail the same way. Sending events is safe to retry when you send an `Idempotency-Key` header, because a repeated key does not create a second event.
+</Aside>
+
+## Rate limits
+
+| Limit | Applies to | Default | On a 429 |
+|---|---|---|---|
+| Event ingestion | `POST /api/v1/events`, per project | 100 per second | `rate_limit_exceeded` with budget headers |
+| Organization | All API traffic of one organization | Off (`ORG_RATE_LIMIT_ENABLED=false`); 200 per second when on | `organization_rate_limit`, `Retry-After: 1` |
+| Platform | All traffic, per API instance | 5000 per second (`GLOBAL_RATE_LIMIT_PER_SECOND`) | `platform_rate_limit` |
+| Ingress URL | Webhooks received at `/ingress/…`, per source | 100 per second (`WEBHOOK_INCOMING_RATE_LIMIT_PER_SECOND`), unless the source sets its own | `Retry-After: 1` |
+| Sign-in | Per IP and per email | 10 per minute (`AUTH_RATE_LIMIT_LOGIN_PER_MINUTE`) | `429` |
+
+Every response from `POST /api/v1/events` carries the project's current budget:
+
+| Header | Meaning |
+|---|---|
+| `X-RateLimit-Limit` | Requests the current window allows |
+| `X-RateLimit-Remaining` | Requests left in it |
+| `X-RateLimit-Reset` | Unix timestamp when the window resets |
+| `Retry-After` | On a `429` only: seconds to wait |
+
+## Size and fan-out limits
+
+| Limit | Default | Variable |
+|---|---|---|
+| Request body, API | 256 KB (262144 bytes) | `WEBHOOK_MAX_PAYLOAD_SIZE_BYTES` |
+| Request body, ingress URL | 512 KB (524288 bytes) | `WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES` |
+| Deliveries per event (fan-out) | 50 on a self-hosted deployment | — |
+
+The ingress limit is higher because what a provider sends is not yours to shrink. An event that matches more subscriptions than the fan-out limit is rejected with `400` as a whole. It is never delivered to some matching endpoints and not others.
+
+## Responses at an ingress URL
+
+An ingress URL answers the provider that sent the webhook, not you, so its responses are shorter: a successful receive is `202` with `status` and `requestId`, and an error carries `error` and `message` without `status`. When a deployment with plans runs out of quota, the ingress URL answers `429` with no detail, so a provider never learns anything about your plan.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="API reference" href="/docs/api-reference/" description="Status codes for every request." />
+  <LinkCard title="Authentication" href="/docs/platform/authentication/" description="Fix a 401 or a 403." />
+  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="How Railhook retries your endpoints." />
+</CardGrid>

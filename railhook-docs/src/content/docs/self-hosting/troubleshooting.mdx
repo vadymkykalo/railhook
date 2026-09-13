@@ -1,0 +1,59 @@
+---
+title: Troubleshooting
+description: The problems self-hosted installations actually hit, what causes each one, and how to fix it.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Start here, from the install directory:
+
+```bash
+./railhook doctor        # machine and configuration checks
+./railhook status        # containers and their health
+./railhook logs api      # or worker, ui, postgres, kafka, redis
+```
+
+## Installing
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Port 80 is already in use` | Another service holds the port | Stop it, or install with `--port 8080`. With `--domain`, both 80 and 443 must be free. If your own reverse proxy holds them, add `--behind-proxy` |
+| `Docker is installed but the daemon is not reachable` | The daemon is stopped, or your user is not in the `docker` group | Start Docker, or `sudo usermod -aG docker $USER && newgrp docker` |
+| The installer stops on RAM | Less than 2 GiB of memory | Use a bigger host. About 4 GiB is comfortable |
+| `Could not reach the GitHub API` | No access to `api.github.com` | Pass a release explicitly: `--version v2.16.6` |
+| `exists and is not empty` | The target directory has other files | Use `--dir`, or `--yes` to go ahead |
+| `It did not come up within 10 minutes` | A service failed on first start | `./railhook logs` shows which one |
+
+## Starting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| The API cannot authenticate to the database | `POSTGRES_PASSWORD` and `DB_PASSWORD` differ | Make them equal. `doctor` reports this |
+| The stack starts but cannot reach a database | Neither `COMPOSE_PROFILES=embedded-db` nor `DB_HOST` is set | Turn the profile on, or point `DB_HOST` at your database |
+| The API exits right away in production | Unsafe configuration: a placeholder secret, `WEBHOOK_ALLOW_PRIVATE_IPS=true`, `SWAGGER_ENABLED=true`, or `localhost` in `CORS_ALLOWED_ORIGINS` | Fix what the log names. `doctor` checks all four |
+
+## Using it
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Sign-in fails with "Invalid CORS request" | The URL in the browser is not in `CORS_ALLOWED_ORIGINS` | Add it, then `./railhook up -d` |
+| Emailed links point at `localhost` | `APP_BASE_URL` was not changed | Set it to the public URL |
+| Source ingress URLs or tunnel URLs show `localhost` | `APP_BASE_URL` (or `TUNNEL_INGRESS_BASE_URL`) still names localhost | Set it to the public URL in `.env`, then `./railhook start` |
+| Deliveries to an internal service fail | Private and internal addresses are blocked by default | Add the host name to `WEBHOOK_ALLOWED_HOSTS` |
+| "Too many failed sign-in attempts" | The account locked after repeated failures | Wait (60 seconds, doubling up to 15 minutes), or reset the password, which clears the lock at once |
+| `502` for about 20 seconds during an upgrade | One API container is being replaced | Set `API_REPLICAS=2` |
+| `docker logs webhook-api` finds nothing | The API has no fixed container name since 2.16.0 | Use `docker compose logs api` |
+
+<Aside type="tip">
+In a restored or recovering installation, a burst of `delivery already claimed or not PENDING` messages in the worker log is expected. Stale Kafka messages are being declined, which is the intended behaviour.
+</Aside>
+
+## Still stuck
+
+Open an issue at [github.com/vadymkykalo/railhook/issues](https://github.com/vadymkykalo/railhook/issues) with the output of `./railhook doctor` and the relevant log lines. Remove any secrets first.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Configuration" description="What each setting decides." href="/docs/self-hosting/configuration/" />
+  <LinkCard title="Monitoring" description="Catch problems before users report them." href="/docs/self-hosting/monitoring/" />
+</CardGrid>

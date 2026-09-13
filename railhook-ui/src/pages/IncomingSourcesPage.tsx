@@ -199,7 +199,7 @@ export default function IncomingSourcesPage() {
           title={t('incomingSources.noSources')}
           description={t('incomingSources.noSourcesDesc')}
           action={newSourceButton}
-          docsLink="/docs#incoming-webhooks"
+          docsLink="incoming/sources"
         />
       ) : (
         <>

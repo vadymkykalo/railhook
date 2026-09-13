@@ -2,18 +2,18 @@ openapi: 3.1.0
 info:
   title: Railhook API
   description: |
-    Enterprise-grade distributed webhook delivery system with at-least-once guarantees.
+    Send webhooks to the endpoints your customers register, and receive webhooks from any provider, with every attempt on record.
 
-    ## Features
-    - **Event Ingestion**: Send events via REST API with automatic fan-out to subscribed endpoints
-    - **Reliable Delivery**: Automatic retries with exponential backoff (1m → 24h, 7 attempts)
-    - **HMAC Signatures**: Secure webhook verification with SHA-256 signatures
-    - **Multi-tenant**: Organization-based isolation with JWT authentication
-    - **Rate Limiting**: Distributed rate limiting via Redis
+    ## What you can do
+    - **Outgoing**: post an event once; Railhook delivers it, signed, to every subscribed endpoint and retries on its own (1m → 24h, 7 attempts). What never arrives lands in Failed Messages.
+    - **Incoming**: give each provider its own ingress URL; Railhook verifies the signature and forwards the event to your destinations.
+    - **Replay**: send past events again with Time Machine.
 
     ## Authentication
-    - **JWT Bearer Token**: For all operations (UI / user context)
-    - **API Key**: For all project-scoped operations (`X-API-Key` header, SDK usage)
+    - **API key** (`X-API-Key` header): project-scoped calls, including sending events. What the SDKs use.
+    - **Bearer token**: account and organization calls made on behalf of a signed-in user.
+
+    Guides: [/docs/](/docs/)
   contact:
     name: Railhook
     url: https://github.com/vadymkykalo/railhook

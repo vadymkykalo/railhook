@@ -1,0 +1,158 @@
+---
+title: Джерела
+description: Дайте сторонньому провайдеру одну адресу для його вебхуків і дізнайтеся, що ця адреса відповідає.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+**Джерело** — це один сторонній провайдер, якого ви підключаєте, наприклад Stripe чи GitHub, разом із тим, що потрібно Railhook, аби довести, що вебхук справді надійшов від нього. Створення джерела дає вам ingress-адресу, яку треба вставити в налаштування провайдера.
+
+## Як це працює
+
+<Steps>
+
+1. Провайдер надсилає вебхук на ingress-адресу джерела.
+
+2. Railhook перевіряє його так, як налаштовано джерело. Вебхук, що не пройшов перевірку, відхиляється й не зберігається.
+
+3. Вебхук зберігається в тому вигляді, в якому надійшов, як **вхідна подія**. У панелі вони показані в розділі **«Отримані»**.
+
+4. Railhook створює по одному **пересиланню** на кожне призначення джерела й працює з кожним, доки воно не вдасться або його не полишать. Див. [Призначення](/docs/uk/incoming/destinations/).
+
+</Steps>
+
+## Створення джерела
+
+<Tabs syncKey="lang">
+<TabItem label="Node.js">
+
+```ts
+import { Railhook } from '@railhook/node';
+
+const client = new Railhook({ apiKey: process.env.RAILHOOK_API_KEY, baseUrl: process.env.RAILHOOK_URL });
+
+const source = await client.incomingSources.create(projectId, {
+  name: 'Stripe',
+  providerType: 'STRIPE',
+  verificationMode: 'PROVIDER',
+  hmacSecret: process.env.STRIPE_WEBHOOK_SECRET,
+});
+
+console.log(source.ingressUrl);
+```
+
+</TabItem>
+<TabItem label="Python">
+
+```python
+import os
+
+from railhook import IncomingSourceCreateParams, Railhook
+
+client = Railhook(api_key=os.environ["RAILHOOK_API_KEY"], base_url=os.environ["RAILHOOK_URL"])
+
+source = client.incoming_sources.create(
+    project_id,
+    IncomingSourceCreateParams(
+        name="Stripe",
+        provider_type="STRIPE",
+        verification_mode="PROVIDER",
+        hmac_secret=os.environ["STRIPE_WEBHOOK_SECRET"],
+    ),
+)
+
+print(source.ingress_url)
+```
+
+</TabItem>
+<TabItem label="PHP">
+
+```php
+<?php
+use Railhook\Railhook;
+
+$client = new Railhook(apiKey: getenv('RAILHOOK_API_KEY'), baseUrl: getenv('RAILHOOK_URL'));
+
+$source = $client->incomingSources->create($projectId, [
+    'name' => 'Stripe',
+    'providerType' => 'STRIPE',
+    'verificationMode' => 'PROVIDER',
+    'hmacSecret' => getenv('STRIPE_WEBHOOK_SECRET'),
+]);
+
+echo $source['ingressUrl'];
+```
+
+</TabItem>
+<TabItem label="cURL">
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Stripe","providerType":"STRIPE","verificationMode":"PROVIDER","hmacSecret":"'"$STRIPE_WEBHOOK_SECRET"'"}'
+```
+
+</TabItem>
+</Tabs>
+
+Вставте `ingressUrl` у налаштування вебхуків провайдера, а потім додайте щонайменше одне призначення.
+
+| Поле | Що робить |
+|---|---|
+| `name` | Обов'язкове. Назва для відображення, до 255 символів. |
+| `slug` | Назва для URL: малі літери, цифри й дефіси, до 64 символів. Генерується, якщо не вказати. |
+| `providerType` | `GENERIC`, `GITHUB`, `GITLAB`, `STRIPE`, `SHOPIFY`, `SLACK` або `TWILIO`. |
+| `verificationMode` | `NONE`, `HMAC_GENERIC` або `PROVIDER`. Див. [Перевірка вхідних вебхуків](/docs/uk/incoming/verification/). |
+| `hmacSecret` | Секрет, яким підписує провайдер. Лише для запису: API ніколи його не повертає. |
+| `hmacHeaderName`, `hmacSignaturePrefix` | Де знаходиться підпис, для `HMAC_GENERIC`. |
+| `rateLimitPerSecond` | Скільки запитів за секунду приймає це джерело. |
+| `status` | `ACTIVE` або `DISABLED`. |
+
+## Ingress-адреса
+
+Ingress-адреса — це `WEBHOOK_INGRESS_BASE_URL`, за яким ідуть `/ingress/` і непрозорий токен. Токен — єдине, що називає джерело, тож поводьтеся з цією адресою як з обліковими даними. Саме перевірка не дає тому, хто дізнався адресу, надсилати вам події.
+
+<Aside type="caution">
+Задайте `WEBHOOK_INGRESS_BASE_URL` публічною адресою, до якої звертаються провайдери. З неї будується адреса на сторінці джерела, і саме цю точну адресу підписує Twilio.
+</Aside>
+
+## Що відповідає ingress
+
+Ingress відповідає провайдерові, а не людині. Кожен код — це те, що побачить логіка повторів самого провайдера.
+
+| Статус | Значення |
+|---|---|
+| `202` | Прийнято й збережено. У тілі — `requestId`. |
+| `401` | Перевірку налаштовано, а підпис не збігся, або такий самий підпис уже траплявся. Нічого не збережено. |
+| `404` | Жодне джерело не має такого токена. |
+| `410` | Джерело існує, але вимкнене. |
+| `413` | Тіло більше за обмеження, типово 512 КБ. |
+| `429` | Вичерпано ліміт швидкості джерела, з `Retry-After: 1`. Також повертається, без `Retry-After`, коли організація зараз не може приймати більше вебхуків. |
+
+| Змінна | Типово | Дія |
+|---|---|---|
+| `WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES` | `524288` | Найбільше тіло, яке приймає ingress. |
+| `WEBHOOK_INCOMING_RATE_LIMIT_PER_SECOND` | `100` | Ліміт швидкості для джерела, яке не задало власного. `0` вимикає це типове значення. |
+
+## Повторні надсилання провайдера
+
+Провайдери надсилають той самий вебхук повторно. Якщо запит несе ідентифікатор, який Railhook розпізнає, повторне надходження з тим самим ідентифікатором повертає збережену подію замість того, щоб переслати її ще раз:
+
+| Провайдер | Ідентифікатор |
+|---|---|
+| Загальний | заголовок `X-Webhook-Id` |
+| Stripe | заголовок `Stripe-Webhook-Id` |
+| GitHub | заголовок `X-GitHub-Delivery` |
+| Shopify | заголовок `X-Shopify-Webhook-Id` |
+| Twilio | заголовок `X-Twilio-Webhook-Id` |
+| Slack | `event_id` у JSON-тілі |
+
+Провайдер, який не надсилає жодного з них, не дедуплікується.
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Призначення" href="/docs/uk/incoming/destinations/" description="Куди й як пересилаються отримані вебхуки." />
+  <LinkCard title="Перевірка вхідних вебхуків" href="/docs/uk/incoming/verification/" description="Як перевіряється підпис кожного провайдера." />
+  <LinkCard title="Повтор і Машина часу" href="/docs/uk/outgoing/replay/#повтор-вхідних-вебхуків" description="Перешліть збережені вхідні події ще раз." />
+</CardGrid>

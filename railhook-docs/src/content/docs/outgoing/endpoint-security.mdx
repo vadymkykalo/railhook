@@ -1,0 +1,108 @@
+---
+title: Endpoint security
+description: Rotate an endpoint's secret, prove you own it, present a client certificate, and control which addresses deliveries may reach.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Everything on an endpoint that is about trust: its signing secret, the proof that whoever registered it owns it, the certificate Railhook presents to it, and the network rules every delivery passes.
+
+## Rotate the signing secret
+
+<Steps>
+
+1. Call `POST /api/v1/projects/{projectId}/endpoints/{id}/rotate-secret`, or rotate it in the dashboard. The response carries the new `secret` and `standardWebhooksSecret`.
+
+2. For the endpoint's grace period, 24 hours by default, every delivery carries two signatures: one made with the new secret and one with the retired secret. A receiver verifying with either succeeds.
+
+3. Deploy the new secret to the receiver inside that window. When it closes, the retired secret stops signing, and a receiver still using it fails verification.
+
+</Steps>
+
+The official SDKs accept either signature during the window. See [Verify signatures](/docs/outgoing/signatures/#rotate-a-secret-without-breaking-the-receiver) for what the headers look like.
+
+## Prove you own the endpoint
+
+A URL anyone can type is a URL anyone can point at somebody else's server. Verification proves that whoever registered the endpoint can read responses from it.
+
+| `WEBHOOK_ENDPOINT_VERIFICATION_REQUIRED` | A new endpoint starts as |
+|---|---|
+| `false` (default) | `SKIPPED`, and receives deliveries straight away. |
+| `true` | `PENDING`, and receives nothing until it is verified or skipped. |
+
+Deliveries go only to an endpoint that is `VERIFIED` or `SKIPPED`. A delivery to any other endpoint fails without being retried. Changing an endpoint's URL resets its status the same way, so a verified endpoint cannot be pointed somewhere else and keep delivering.
+
+<Steps>
+
+1. Call `POST /api/v1/projects/{projectId}/endpoints/{id}/verify`. Railhook sends this to the endpoint's URL and waits up to 10 seconds:
+
+   ```http title="What Railhook sends"
+   POST /webhooks HTTP/1.1
+   Content-Type: application/json
+
+   {"type":"webhook.verification","challenge":"<token>","timestamp":"2026-09-13T10:30:00Z"}
+   ```
+
+2. Answer with the challenge, either as JSON or as the bare token:
+
+   ```http title="What to answer"
+   HTTP/1.1 200 OK
+   Content-Type: application/json
+
+   {"challenge":"<token>"}
+   ```
+
+3. A matching answer sets the endpoint to `VERIFIED`. Anything else sets it to `FAILED`, and you can run the check again.
+
+</Steps>
+
+To deliver without the check, call `POST /api/v1/projects/{projectId}/endpoints/{id}/skip-verification` with a `reason`. The reason is kept on the endpoint, so an unverified endpoint is a recorded decision rather than a step that silently did not happen.
+
+## Present a client certificate (mTLS)
+
+For an endpoint that requires Railhook to prove who it is at the TLS layer, configure a client certificate with `POST /api/v1/projects/{projectId}/endpoints/{id}/mtls`:
+
+| Field | |
+|---|---|
+| `clientCert` | Required. PEM. Presented on every delivery to this endpoint. |
+| `clientKey` | Required. PEM, matching the certificate. |
+| `caCert` | Optional. PEM. Supply it when the endpoint's certificate is signed by an authority outside the platform's trust store, such as an internal CA. |
+
+The endpoint then reports `mtlsEnabled: true`; the certificate and key are not returned. Remove them with `DELETE` on the same path.
+
+## Where deliveries may go
+
+Every endpoint URL is checked when it is saved and again before an attempt is made. Loopback, link-local and private address ranges are refused unless the operator allows them. This is a deployment setting, not a per-endpoint one, because it is the operator's decision rather than a tenant's.
+
+| Variable | Default | Effect |
+|---|---|---|
+| `WEBHOOK_ALLOW_PRIVATE_IPS` | `false` | `true` allows every private address. Refused at startup when `APP_ENV=production`. |
+| `WEBHOOK_ALLOWED_HOSTS` | empty | Comma-separated host names exempt from the check, matched as written in the URL. The supported way to reach one internal service. |
+
+The same check applies to incoming destinations and to HTTP steps in workflows.
+
+## Limit load on an endpoint
+
+| Setting | Effect |
+|---|---|
+| `rateLimitPerSecond` on the endpoint | Deliveries per second to this endpoint, 0 to 10000. `0` removes the limit. |
+| `WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT` | Attempts in flight at once to one endpoint, default `5`. |
+
+Work turned away by either limit is deferred, not failed: it does not use up an attempt.
+
+## Allowed source IPs
+
+<Aside type="caution" title="A note field, not a control">
+Despite its name, `allowedSourceIps` restricts nothing. It records which addresses the endpoint expects webhooks from, next to the endpoint, and nothing reads it to make a decision. If your customers need to allowlist the address Railhook sends from, solve it at the network layer: see [Static egress IP](/docs/resources/static-egress-ip/).
+</Aside>
+
+## Secrets at rest
+
+Endpoint signing secrets, client certificates and client keys are stored encrypted with the deployment's encryption key. A `caCert` is public and is stored as given. The operator sets it with `WEBHOOK_ENCRYPTION_KEY`, or with versioned keys in `WEBHOOK_ENCRYPTION_KEYS` and `WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION`. See [Configuration](/docs/self-hosting/configuration/).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Verify signatures" href="/docs/outgoing/signatures/" description="Check the signature on every delivery." />
+  <LinkCard title="Static egress IP" href="/docs/resources/static-egress-ip/" description="Give receivers one address to allowlist." />
+  <LinkCard title="Configuration" href="/docs/self-hosting/configuration/" description="Every deployment setting, including the ones above." />
+</CardGrid>

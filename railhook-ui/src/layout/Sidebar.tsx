@@ -4,6 +4,7 @@ import { BookOpen, ChevronsLeft, LogOut, Settings, X } from 'lucide-react';
 import { RailhookIcon } from '../components/icons/RailhookIcon';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
+import { docsUrl } from '../lib/docsUrl';
 import { hasMinRole, type Role } from '../auth/ProtectedRoute';
 import ProjectSwitcher from '../components/ProjectSwitcher';
 import OrganizationSwitcher from '../components/OrganizationSwitcher';
@@ -44,14 +45,10 @@ function RailLink({
         'relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors',
         collapsed && 'justify-center px-2',
         active
-          ? 'bg-secondary font-medium text-foreground'
-          : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+          ? 'bg-card font-medium text-foreground shadow-[inset_0_0_0_1px_hsl(var(--rail))]'
+          : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
       )}
     >
-      {/* The active marker is a rail, matching the tick rails used throughout. */}
-      {active && (
-        <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-primary" aria-hidden />
-      )}
       <Icon className={cn('h-4 w-4 flex-shrink-0', active && 'text-primary')} />
       {!collapsed && <span className="truncate">{name}</span>}
     </Link>
@@ -61,13 +58,13 @@ function RailLink({
 export default function Sidebar({
   projectId, role, user, collapsed, onToggleCollapsed, isMobile = false, onNavigate, onLogout,
 }: SidebarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const segment = segmentOf(location.pathname);
   const narrow = collapsed && !isMobile;
 
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="flex h-full flex-col bg-muted">
       <div className={cn('flex h-14 items-center border-b border-rail px-3', narrow && 'justify-center px-2')}>
         <Link to="/" className="flex items-center gap-2 transition-opacity hover:opacity-70">
           <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-primary">
@@ -114,8 +111,9 @@ export default function Sidebar({
           expanded sidebar, so a wide screen showed two identical "Search ⌘K"
           controls at once and a collapsed one showed none. */}
       <div className="space-y-0.5 border-t border-rail p-2">
-        <Link
-          to="/docs"
+        {/* A page load, not a route: the docs are their own site at /docs/. */}
+        <a
+          href={docsUrl(i18n.language)}
           onClick={isMobile ? onNavigate : undefined}
           title={narrow ? t('nav.documentation') : undefined}
           className={cn(
@@ -125,7 +123,7 @@ export default function Sidebar({
         >
           <BookOpen className="h-4 w-4 flex-shrink-0" />
           {!narrow && <span>{t('nav.documentation')}</span>}
-        </Link>
+        </a>
         {/* Shown to everyone, and it lands on the personal profile — the page
             where a member changes their own password. What the section's
             org-level tabs need is stated in nav.config and filtered there. */}

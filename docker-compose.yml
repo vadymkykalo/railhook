@@ -14,7 +14,7 @@
 # Get both, with real generated secrets rather than the public ones in
 # .env.dist, by running the installer:
 #
-#   curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh | bash
+#   curl -fsSL https://railhook.io/install.sh | bash
 #
 # ONE PUBLISHED PORT. The ui service's nginx is the only thing bound to the
 # host; it serves the dashboard and proxies every API path to `api`. Nothing
@@ -291,6 +291,8 @@ services:
       DATA_RETENTION_BURST_CLEANUP_CRON: ${DATA_RETENTION_BURST_CLEANUP_CRON:-0 0 */4 * * *}
       DATA_RETENTION_TABLE_METRICS_INTERVAL_MS: ${DATA_RETENTION_TABLE_METRICS_INTERVAL_MS:-900000}
       EVENT_INGESTION_RATE_LIMIT_PER_SECOND: ${EVENT_INGESTION_RATE_LIMIT_PER_SECOND:-100}
+      ENTITLEMENT_DEFAULT_RATE_LIMIT: ${ENTITLEMENT_DEFAULT_RATE_LIMIT:-100}
+      ENTITLEMENT_DEFAULT_MAX_FANOUT: ${ENTITLEMENT_DEFAULT_MAX_FANOUT:-50}
       GLOBAL_RATE_LIMIT_PER_SECOND: ${GLOBAL_RATE_LIMIT_PER_SECOND:-5000}
       ORG_RATE_LIMIT_ENABLED: ${ORG_RATE_LIMIT_ENABLED:-false}
       ORG_RATE_LIMIT_PER_SECOND: ${ORG_RATE_LIMIT_PER_SECOND:-200}
@@ -306,7 +308,10 @@ services:
       AUTH_SESSION_CLEANUP_INTERVAL_MS: ${AUTH_SESSION_CLEANUP_INTERVAL_MS:-3600000}
       WEBHOOK_ALLOW_PRIVATE_IPS: ${WEBHOOK_ALLOW_PRIVATE_IPS:-false}
       WEBHOOK_ALLOWED_HOSTS: ${WEBHOOK_ALLOWED_HOSTS:-}
-      WEBHOOK_INGRESS_BASE_URL: ${TUNNEL_INGRESS_BASE_URL:-http://localhost:8080}
+      # Incoming-source and tunnel URLs are built from this and handed to providers and the CLI, so it
+      # has to be the public address. Unset, it follows APP_BASE_URL - the old localhost:8080 default
+      # named a port nothing publishes, and a --domain install showed localhost URLs.
+      WEBHOOK_INGRESS_BASE_URL: ${TUNNEL_INGRESS_BASE_URL:-${APP_BASE_URL:-http://localhost}}
       TUNNEL_HEARTBEAT_TIMEOUT_SECONDS: ${TUNNEL_HEARTBEAT_TIMEOUT_SECONDS:-120}
       TUNNEL_CLEANUP_INTERVAL_MS: ${TUNNEL_CLEANUP_INTERVAL_MS:-60000}
       TUNNEL_REQUEST_LOG_RETENTION_DAYS: ${TUNNEL_REQUEST_LOG_RETENTION_DAYS:-7}
@@ -581,21 +586,21 @@ services:
     container_name: webhook-ui
     ports:
       # The one published port. 80 by default because that is what a browser
-      # assumes. With the `tls` profile on, install.sh moves this to
-      # 127.0.0.1:8080 and Caddy below takes 80/443 instead — nothing else
-      # changes, because Caddy proxies straight to this same nginx.
-      # Both spellings, and this is not tidy-uppable. install.sh keeps an
-      # existing .env rather than rewriting it, so a deployment installed before
-      # 2.12.0 still has HOOKFLOW_BIND/HOOKFLOW_PORT in its .env after it
-      # upgrades. Reading only the new names would silently move a dashboard
-      # published on 8080 back to 80 - a regression that starts cleanly, logs
-      # nothing, and is found by a customer.
-      - "${RAILHOOK_BIND:-${HOOKFLOW_BIND:-0.0.0.0}}:${RAILHOOK_PORT:-${HOOKFLOW_PORT:-80}}:5173"
-    # No environment block: the UI is a static bundle behind nginx. Vite inlines
-    # every VITE_* value at build time, so nothing here could change it — and on
-    # a pre-built image there is no build to feed. nginx proxies /api/,
-    # /ws/tunnel, /hook/ and /ingress/ to the api service, so the bundle talks
-    # to its own origin and needs no API URL at all.
+      # assumes. With a domain, install.sh moves this to 127.0.0.1:8080 and
+      # something else takes 80/443: Caddy below under the `tls` profile, or the
+      # operator's own proxy with --behind-proxy. Nothing else changes, because
+      # either one proxies straight to this same nginx.
+      - "${RAILHOOK_BIND:-0.0.0.0}:${RAILHOOK_PORT:-80}:5173"
+    # The UI is a static bundle behind nginx. Vite inlines every VITE_* value at
+    # build time, so none of those belong here — on a pre-built image there is
+    # no build to feed. nginx proxies /api/, /ws/tunnel, /hook/ and /ingress/ to
+    # the api service, so the bundle talks to its own origin and needs no API URL.
+    #
+    # What is here is read by the container when it starts and handed to the page
+    # as /config.js, because it has to differ between deployments of one image.
+    environment:
+      # Domain behind the sales@ / support@ addresses. Empty: none are offered.
+      RAILHOOK_CONTACT_DOMAIN: ${RAILHOOK_CONTACT_DOMAIN:-}
     depends_on:
       - api
     logging:
@@ -642,7 +647,7 @@ services:
       # every install that is not using TLS. An empty value reaches the
       # Caddyfile, where Caddy refuses to start with a clear message — and only
       # when this profile is actually on.
-      RAILHOOK_DOMAIN: ${RAILHOOK_DOMAIN:-${HOOKFLOW_DOMAIN:-}}
+      RAILHOOK_DOMAIN: ${RAILHOOK_DOMAIN:-}
       ACME_EMAIL: ${ACME_EMAIL:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

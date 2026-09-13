@@ -1,0 +1,144 @@
+---
+title: Authentication
+description: Sign in for a session token, send events with a project API key, and rotate either without downtime.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Railhook accepts four credentials. This page shows which one to use, how to get it, and how to replace it without breaking the callers that hold it.
+
+| Credential | Used by | Sent as | Carries |
+|---|---|---|---|
+| Access token (JWT) | The dashboard and anything acting as a person | `Authorization: Bearer …` | A user, their organization, their role |
+| API key | Your servers and the SDKs | `X-API-Key: …` | One project and a scope |
+| Device code | `railhook login` in the CLI | Exchanged for a session | Same as an access token |
+| Platform admin token | Whoever operates the deployment | `X-Platform-Admin-Token: …` | Access to `/api/v1/admin/**`, across organizations |
+
+## Access tokens
+
+Sign in with `POST /api/v1/auth/login`. The response body carries the `accessToken`. The refresh token does not appear in the body: it is set as an `HttpOnly` cookie named `refresh_token`, scoped to `/api/v1/auth`.
+
+<Tabs syncKey="lang">
+  <TabItem label="cURL">
+    ```bash
+    curl -X POST https://railhook.example.com/api/v1/auth/login \
+      -H "Content-Type: application/json" \
+      -c cookies.txt \
+      -d '{"email":"you@company.com","password":"••••••••"}'
+    ```
+  </TabItem>
+  <TabItem label="Node.js">
+    ```js
+    const res = await fetch('https://railhook.example.com/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'you@company.com', password: process.env.PASSWORD }),
+    });
+    const { accessToken } = await res.json();
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    import os
+
+    import requests
+
+    res = requests.post(
+        "https://railhook.example.com/api/v1/auth/login",
+        json={"email": "you@company.com", "password": os.environ["PASSWORD"]},
+    )
+    access_token = res.json()["accessToken"]
+    ```
+  </TabItem>
+</Tabs>
+
+Send the access token on every request that acts as that user:
+
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+### Lifetimes and refresh
+
+| Token | Default lifetime |
+|---|---|
+| Access token | 15 minutes |
+| Refresh token | 24 hours |
+
+`POST /api/v1/auth/refresh` reads the `refresh_token` cookie, or a `refreshToken` field in the JSON body if there is no cookie. It returns a new access token and sets a new refresh cookie. The refresh token you spent is blacklisted.
+
+<Aside type="caution" title="A reused refresh token ends every session">
+Presenting a refresh token that was already spent revokes every token that user holds. A replayed refresh token is what a stolen one looks like, so Railhook treats it that way.
+</Aside>
+
+Each sign-in is a session. A user can list their sessions, close one, or close all of them. `POST /api/v1/auth/logout` revokes the current access and refresh tokens.
+
+### Failed sign-ins
+
+Sign-in is rate limited and repeated failures lock the account for a while. Both are configured through the environment:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `AUTH_RATE_LIMIT_LOGIN_PER_MINUTE` | `10` | Sign-in attempts per IP and per email, per minute. Past it the API answers `429`. |
+| `AUTH_LOCKOUT_ENABLED` | `true` | Turns lockout on or off |
+| `AUTH_LOCKOUT_THRESHOLD` | `5` | Consecutive failures before the first lockout |
+| `AUTH_LOCKOUT_INITIAL_SECONDS` | `60` | First lockout. Doubles with each further failure. |
+| `AUTH_LOCKOUT_MAX_SECONDS` | `900` | The longest a lockout gets |
+| `AUTH_LOCKOUT_FAILURE_WINDOW_MINUTES` | `60` | How far back failures are counted |
+
+A lockout expires on its own, and a password reset clears it straight away.
+
+## API keys
+
+An API key belongs to one project. It is what sends events, and what the SDKs are built on.
+
+<Steps>
+1. Create the key for a project, in the dashboard or with `POST /api/v1/projects/{projectId}/api-keys`.
+2. Copy the `key` from the response. It is shown once: Railhook stores only a hash, so a lost key cannot be recovered, only replaced.
+3. Put it in an environment variable on a server you control and send it in the `X-API-Key` header:
+
+   ```http
+   X-API-Key: Kz1uAIM8VeJUQN7yGSYCst64WxNLabBHfOYbrPlJ1yk
+   ```
+</Steps>
+
+### Scopes and expiry
+
+| Scope | Allows |
+|---|---|
+| `READ_WRITE` | Reads and writes. Sending an event is a write. The default. |
+| `READ_ONLY` | Reads only. A write answers `403`. |
+
+A key can carry an `expiresAt` date. After it, or once the key is revoked, the key authenticates nothing. Revoking takes effect immediately, with no grace period.
+
+<Aside type="danger">
+A key in client-side code or in a repository can be used by anyone who reads it. Keep keys on servers only.
+</Aside>
+
+### Rotate a key without downtime
+
+`POST /api/v1/projects/{projectId}/api-keys/{apiKeyId}/rotate` creates a replacement with the same name and scope. The old key keeps working for a grace window, so you can deploy the new one everywhere before the old one stops.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `gracePeriodHours` | `24` | How long the old key keeps working. `0` cuts it off now, which is the rotation to run after a leak. |
+| `expiresAt` | none | Optional expiry for the new key |
+
+Rotation never extends the old key: if it was already due to expire sooner, that date stands. A key can be rotated once. To rotate again, rotate its replacement.
+
+## CLI sign-in
+
+`railhook login` uses a device code. The CLI prints a URL and a code, you approve the code in the dashboard, and the CLI receives a session of its own. See [CLI](/docs/tools/cli/).
+
+## Platform admin token
+
+`PLATFORM_ADMIN_TOKEN` is the credential for the operator endpoints under `/api/v1/admin/**`. It is independent of organizations: an organization `OWNER` does not get it. Leave it empty and the admin endpoints stay unreachable. Set it only when an operator needs them, and send it in the `X-Platform-Admin-Token` header.
+
+The request and response shapes for every auth endpoint are in the [API reference](/docs/api-reference/).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Organizations and roles" href="/docs/platform/organizations-rbac/" description="What each role and key scope may do." />
+  <LinkCard title="Errors and limits" href="/docs/platform/errors-limits/" description="What a 401, 403 or 429 means and what to do next." />
+  <LinkCard title="Send your first webhook" href="/docs/start/send-first-webhook/" description="Use your API key to send an event." />
+</CardGrid>

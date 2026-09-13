@@ -14,7 +14,8 @@ topics — don't do either by hand. There is one `docker-compose.yml` (published
 put a service change in the former, never in both.
 
 `make dev-api` / `dev-worker` / `dev-ui` rebuild one service and restart it:
-the fast inner loop once the stack is up.
+the fast inner loop once the stack is up. `make docs-dev` runs the docs site
+(`railhook-docs/`, Starlight) on http://localhost:4321/docs/.
 
 ```bash
 mvn clean compile -B                # what CI compiles with
@@ -41,12 +42,16 @@ rather than a list here. Each failure names its remedy. Three whose remedy nobod
   A backend DTO change then also lands in the UI: `npm run types:generate` regenerates
   `src/types/api.generated.ts` (`make types-check` mirrors CI), and `src/types/api.contract.ts`
   fails the typecheck until the hand-written mirror in `api.types.ts` agrees with it again.
-- **The in-app API reference is generated, not written.** `src/pages/docs/api-index.generated.json`
-  is derived from `openapi.yaml` and committed; `make docs-check` (and CI) fails when it is
-  stale. Regenerate with `cd railhook-ui && npm run docs:api-index`. The guides under
-  `src/pages/docs/` stay hand-written — they explain *why*, which a spec cannot. Never
-  hand-write an endpoint table: that is what the 4,000-line page this replaced was, and nothing
-  kept it in sync.
+- **The docs are a separate site, and their references are generated, not written.**
+  `railhook-docs/` (Starlight, EN + UK) is built into the UI image and served at `/docs/`.
+  The API reference is Scalar over the root `openapi.yaml`, copied in at build. The
+  configuration reference is `src/data/env-reference.json`, derived from `.env.dist` and
+  committed: after touching `.env.dist`, run `cd railhook-docs && npm run env:reference`, or
+  `make docs-check` (and CI) fails. That check also runs the EN/UK parity test and the build's
+  internal links validator. Guides stay hand-written — they explain
+  *why*, which a spec cannot — but never hand-write an endpoint table: that is what the
+  4,000-line page this replaced was, and nothing kept it in sync. `railhook-docs/CLAUDE.md`
+  has the page rules.
 - **The version lives in seven places** — reactor pom, `deploy/helm/railhook/Chart.yaml` (version
   *and* appVersion), `railhook-ui/package.json`, all three SDK manifests under `sdks/`.
   Never bump one by hand: `make version-set VERSION=2.4.0`; `make version-check` mirrors CI.

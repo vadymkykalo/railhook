@@ -1,0 +1,130 @@
+---
+title: Призначення
+description: Оберіть, куди пересилаються вебхуки джерела, як Railhook автентифікується в цьому сервісі і що відбувається, коли той не відповідає.
+---
+import { Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+**Призначення** — це ваша URL-адреса, що отримує вебхуки джерела, разом із тим, як до неї автентифікуватися. Кожна вхідна подія створює по одному **пересиланню** на кожне увімкнене призначення її джерела. Кожне призначення має власні повтори, таймаут і облікові дані, тож повільний сервіс не затримує решту.
+
+## Додавання призначення
+
+<Tabs syncKey="lang">
+<TabItem label="Node.js">
+
+```ts
+const destination = await client.incomingSources.createDestination(projectId, sourceId, {
+  url: 'https://billing.internal.example.com/webhooks/stripe',
+  enabled: true,
+  maxAttempts: 5,
+  timeoutSeconds: 30,
+});
+```
+
+</TabItem>
+<TabItem label="Python">
+
+```python
+from railhook import IncomingDestinationCreateParams
+
+destination = client.incoming_sources.create_destination(
+    project_id,
+    source_id,
+    IncomingDestinationCreateParams(
+        url="https://billing.internal.example.com/webhooks/stripe",
+        enabled=True,
+        max_attempts=5,
+        timeout_seconds=30,
+    ),
+)
+```
+
+</TabItem>
+<TabItem label="PHP">
+
+```php
+<?php
+$destination = $client->incomingSources->createDestination($projectId, $sourceId, [
+    'url' => 'https://billing.internal.example.com/webhooks/stripe',
+    'enabled' => true,
+    'maxAttempts' => 5,
+    'timeoutSeconds' => 30,
+]);
+```
+
+</TabItem>
+<TabItem label="cURL">
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://billing.internal.example.com/webhooks/stripe",
+    "authType": "BEARER",
+    "authConfig": "{\"token\":\"'"$BILLING_TOKEN"'\"}",
+    "timeoutSeconds": 30
+  }'
+```
+
+</TabItem>
+</Tabs>
+
+| Поле | Що робить |
+|---|---|
+| `url` | Обов'язкове. Куди надсилаються пересилання. Перевіряється на приватні діапазони адрес так само, як URL ендпоінта, див. [Безпека ендпоінта](/docs/uk/outgoing/endpoint-security/#куди-можуть-іти-доставки). |
+| `enabled` | Чи отримує призначення пересилання. |
+| `authType`, `authConfig` | Як Railhook автентифікується, див. нижче. `authConfig` — JSON-рядок до 4096 символів, зберігається зашифрованим. |
+| `customHeadersJson` | Додаткові HTTP-заголовки як JSON-об'єкт у рядку. |
+| `maxAttempts` | Скільки спроб до того, як пересилання полишать. Типово `5`. |
+| `retryDelays` | Очікування в секундах через кому. Типово `60,300,900,3600,21600`. |
+| `timeoutSeconds` | Скільки одна спроба чекає на відповідь. Типово `30`. |
+| `transformationId` | Збережена трансформація, яку застосовують перед пересиланням. |
+| `payloadTransform` | Вираз JSONPath, наприклад `$.data`, використовується, коли `transformationId` не задано. |
+
+## Автентифікація
+
+Пересилання не підписуються. Railhook доводить вашому сервісу, хто він, обліковими даними призначення:
+
+| `authType` | `authConfig` | Як надсилається |
+|---|---|---|
+| `NONE` | немає | Нічого. |
+| `BEARER` | `{"token": "…"}` | `Authorization: Bearer <token>` |
+| `BASIC` | `{"username": "…", "password": "…"}` | `Authorization: Basic <base64>` |
+| `CUSTOM_HEADER` | `{"headerName": "…", "headerValue": "…"}` | Заголовок із заданою назвою |
+
+У заголовках запиту, які показує панель, облікові дані замасковано.
+
+## Що отримує призначення
+
+Тіло — це вебхук саме в тому вигляді, в якому його надіслав провайдер, з його первісним `Content-Type`, якщо не налаштовано трансформацію. Railhook додає такі заголовки:
+
+| Заголовок | Значення |
+|---|---|
+| `X-Incoming-Event-Id` | Вхідна подія. |
+| `X-Incoming-Request-Id` | Ідентифікатор запиту, який ingress повернув провайдерові. |
+| `X-Forward-Attempt` | Номер спроби, починаючи з 1. |
+| `Idempotency-Key` | `<incoming event id>-<destination id>`, не змінюється між спробами. |
+
+Первісні заголовки провайдера, зокрема його підпис, не пересилаються. Перевірка відбулася на ingress; ваш сервіс має покладатися на облікові дані призначення.
+
+## Трансформація перед пересиланням
+
+Railhook бере перше, що задано: збережену трансформацію `transformationId`, потім вираз JSONPath `payloadTransform`, потім тіло без змін. Якщо налаштовану трансформацію не вдається застосувати, спроба вважається невдалою й повторюється; нетрансформоване тіло замість неї ніколи не пересилається. Див. [Трансформації](/docs/uk/outgoing/transformations/).
+
+## Коли призначення не відповідає
+
+Пересилання йдуть за драбиною повторів вхідного напрямку: 5 спроб з очікуваннями 1 хв, 5 хв, 15 хв і 1 год, з розкидом від 50% до 150%. `408`, `429`, будь-який `5xx`, помилка з'єднання й таймаут повторюються; будь-який інший `4xx` одразу завершує пересилання невдачею. Пересилання, що лишається невиконаним через 24 години після надходження вебхука, полишають незалежно від кількості спроб.
+
+Полишені пересилання з'являються в розділі **«Невдалі пересилання»**. Повтор створює нове пересилання на те саме призначення, яке знову починається зі спроби 1. Див. [Повторні спроби та невдалі повідомлення](/docs/uk/outgoing/retries/).
+
+<Aside type="tip">
+Щоб знову надіслати збережені вебхуки на призначення, наприклад після виправлення помилки у вашому сервісі, повторіть вхідні події. Див. [Повтор і Машина часу](/docs/uk/outgoing/replay/#повтор-вхідних-вебхуків).
+</Aside>
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Перевірка вхідних вебхуків" href="/docs/uk/incoming/verification/" description="Як ingress перевіряє підпис кожного провайдера." />
+  <LinkCard title="Повторні спроби та невдалі повідомлення" href="/docs/uk/outgoing/retries/" description="Обидві драбини повторів і чому вони різні." />
+  <LinkCard title="Трансформації" href="/docs/uk/outgoing/transformations/" description="Синтаксис шаблонів для зміни пересланого тіла." />
+</CardGrid>

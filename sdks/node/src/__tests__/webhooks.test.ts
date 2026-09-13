@@ -1,3 +1,5 @@
+import * as crypto from 'crypto';
+import type { IncomingHttpHeaders } from 'http';
 import { verifySignature, constructEvent, generateSignature } from '../webhooks';
 import { RailhookError } from '../errors';
 
@@ -70,6 +72,66 @@ describe('Webhook Signature Verification', () => {
     it('still rejects a tampered body', () => {
       expect(() => verifySignature(`${payload} `, dualHeader(payload), newSecret))
         .toThrow(RailhookError);
+    });
+
+    it('verifies when the matching v1 is not the first entry and an unknown version sits beside it', () => {
+      const at = Date.now();
+      const v1For = (s: string) => generateSignature(payload, s, at).split('v1=')[1];
+      const header = `t=${at},v0=deadbeef,v1=${v1For(retiredSecret)},v2=${v1For(newSecret)},v1=${v1For(newSecret)}`;
+
+      expect(verifySignature(payload, header, newSecret)).toBe(true);
+    });
+
+    it('still enforces the timestamp tolerance when both signatures are valid', () => {
+      const stale = Date.now() - 600000;
+      expect(() => verifySignature(payload, dualHeader(payload, stale), retiredSecret))
+        .toThrow('outside tolerance window');
+    });
+  });
+
+  describe('a timestamp that is not a number', () => {
+    it('is rejected instead of skipping the tolerance check', () => {
+      // parseInt('abc') is NaN, and NaN > tolerance is false: the window check passed and a
+      // signature over this header would verify forever.
+      const signature = generateSignature(payload, secret).replace(/^t=\d+/, 't=abc');
+      const v1 = crypto.createHmac('sha256', secret).update(`abc.${payload}`).digest('hex');
+      const header = signature.replace(/v1=[a-f0-9]+/, `v1=${v1}`);
+
+      expect(() => verifySignature(payload, header, secret)).toThrow(RailhookError);
+    });
+
+    it('is rejected when digits are followed by garbage', () => {
+      const at = Date.now();
+      const v1 = crypto.createHmac('sha256', secret).update(`${at}x.${payload}`).digest('hex');
+
+      expect(() => verifySignature(payload, `t=${at}x,v1=${v1}`, secret)).toThrow(RailhookError);
+    });
+  });
+
+  describe('headers as a Node HTTP server hands them over', () => {
+    it('accepts IncomingHttpHeaders, whose values may be string arrays', () => {
+      const timestamp = Date.now();
+      // What Express's req.headers is typed as: set-cookie is always a string[].
+      const headers: IncomingHttpHeaders = {
+        'x-signature': generateSignature(payload, secret, timestamp),
+        'x-timestamp': timestamp.toString(),
+        'x-event-id': 'evt_123',
+        'x-delivery-id': 'dlv_456',
+        'set-cookie': ['a=b'],
+      };
+
+      const event = constructEvent(payload, headers, secret);
+      expect(event.eventId).toBe('evt_123');
+    });
+
+    it('uses the first value of a header that arrived as an array', () => {
+      const timestamp = Date.now();
+      const headers: IncomingHttpHeaders = {
+        'x-signature': [generateSignature(payload, secret, timestamp)] as unknown as string,
+        'x-event-id': 'evt_123',
+      };
+
+      expect(constructEvent(payload, headers, secret).eventId).toBe('evt_123');
     });
   });
 

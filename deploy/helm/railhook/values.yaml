@@ -25,6 +25,11 @@ app:
   # names localhost. Comma-separated for more than one origin.
   corsAllowedOrigins: ""
 
+  # Public base of incoming-source and tunnel URLs (…/ingress/<token>, …/tunnel/<slug>),
+  # which are handed to providers and the CLI. Defaults to app.baseUrl above; set it
+  # only when webhooks reach Railhook on a different host than the dashboard.
+  ingressBaseUrl: ""
+
 # API service configuration
 api:
   # 30s for spring.lifecycle.timeout-per-shutdown-phase to drain the web server,
@@ -169,6 +174,11 @@ ui:
   # nginx serves static files; there is nothing in flight worth waiting for.
   terminationGracePeriodSeconds: 30
   replicaCount: 2
+  # Domain behind the sales@ / support@ addresses on /contact and in the footer,
+  # e.g. example.com. Read by the container at startup, so it works on the
+  # published image. Empty — the default, and right for a self-hosted install —
+  # offers no mail addresses at all.
+  contactDomain: ""
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
     # (multi-arch: linux/amd64, linux/arm64).

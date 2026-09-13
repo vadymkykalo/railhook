@@ -1,0 +1,138 @@
+---
+title: Kubernetes
+description: Встановіть Railhook у Kubernetes за допомогою Helm-чарта, спрямувавши його на власні PostgreSQL, Kafka та Redis.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Helm-чарт запускає API, воркер і панель керування. Базу даних, брокер і кеш він не містить, тож їх треба надати самостійно.
+
+## Що потрібно
+
+- Kubernetes 1.24+ і Helm 3.8+
+- PostgreSQL 16+, Kafka 3.7+ і Redis 7+, керовані або власні. Проєкт тестується з образами `postgres:16-alpine`, `apache/kafka:3.7.0` і `redis:7-alpine`.
+
+## Встановлення
+
+<Steps>
+
+1. **Створіть простір імен і секрети**
+
+   ```bash
+   kubectl create namespace railhook
+
+   kubectl -n railhook create secret generic railhook-secrets \
+     --from-literal=encryption-key="$(openssl rand -base64 32)" \
+     --from-literal=encryption-salt="$(openssl rand -base64 24)" \
+     --from-literal=jwt-secret="$(openssl rand -base64 64)"
+
+   kubectl -n railhook create secret generic railhook-postgresql-secret \
+     --from-literal=password="$DB_PASSWORD"
+
+   kubectl -n railhook create secret generic railhook-redis-secret \
+     --from-literal=password="$REDIS_PASSWORD"
+   ```
+
+   Усі три ключі в `railhook-secrets` обов'язкові. Без них поди API й воркера перезапускаються по колу.
+
+2. **Напишіть файл values**
+
+   ```yaml title="values-mycompany.yaml"
+   postgresql:
+     external:
+       host: postgres.example.com
+       port: 5432
+       database: railhook
+       username: webhook_user
+       existingSecret: railhook-postgresql-secret
+
+   kafka:
+     external:
+       bootstrapServers: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
+
+   redis:
+     external:
+       host: redis.example.com
+       port: 6379
+       existingSecret: railhook-redis-secret
+
+   ui:
+     ingress:
+       hosts:
+         - host: hooks.example.com
+           paths:
+             - path: /
+               pathType: Prefix
+   ```
+
+   Якщо лишити `app.baseUrl` порожнім, чарт виведе публічну адресу з першого хоста ingress. Задайте його, якщо Railhook відкривають за іншою назвою.
+
+3. **Встановіть чарт**
+
+   Чарт публікується в GHCR з кожним релізом. Його версія — номер релізу без `v`:
+
+   ```bash
+   helm install railhook oci://ghcr.io/vadymkykalo/charts/railhook \
+     --version <version> -n railhook -f values-mycompany.yaml
+   ```
+
+4. **Перевірте**
+
+   ```bash
+   kubectl -n railhook get pods
+   kubectl -n railhook logs -l app.kubernetes.io/component=api --tail=20
+   ```
+
+</Steps>
+
+<Aside type="danger">
+Збережіть резервні копії `encryption-key` і `encryption-salt` і ніколи не змінюйте сіль на місці. Вона бере участь у виведенні ключа, тож зі зміненою сіллю кожен збережений секрет ендпоінта розшифровується в сміття.
+</Aside>
+
+## Пошта
+
+`api.env.APP_ENV` типово дорівнює `production`. Без пошти облікові записи створюються вже підтвердженими, а запросити нікого не можна. Щоб увімкнути пошту:
+
+```yaml title="values-mycompany.yaml"
+email:
+  enabled: true
+  from: noreply@hooks.example.com
+  smtp:
+    host: smtp.example.com
+    port: 587
+    username: railhook@example.com
+    auth: true
+    starttls: true
+    existingSecret: railhook-smtp-secret   # key: smtp-password
+```
+
+Для типових production-значень (більше реплік, автомасштабування, бюджети переривань, мережеві політики, увімкнена пошта) клонуйте репозиторій і додайте `-f deploy/helm/railhook/values-production.yaml`.
+
+## Як це працює
+
+| Тема | Поведінка |
+|---|---|
+| Міграції | Виконуються в поді API під час запуску. Репліки, що стартують разом, чекають на advisory lock PostgreSQL, тож кожна міграція застосовується один раз |
+| Топіки Kafka | Створюються hook-завданням після встановлення й оновлення. Налаштовуються через `kafka.topicPartitions` і `kafka.topicReplicationFactor` |
+| Резервні копії | `backup.enabled: true` додає CronJob, який записує файли `pg_dump` на PVC і видаляє старі |
+| Метрики | На названому порту `management` (8082 для API, 8081 для воркера), ніколи не публікуються за межі кластера |
+
+## Оновлення
+
+```bash
+helm upgrade railhook oci://ghcr.io/vadymkykalo/charts/railhook --version <version> -n railhook -f values-mycompany.yaml
+```
+
+Спершу зробіть резервну копію бази даних. `helm rollback` повертає чарт і образи, але не схему.
+
+## Видалення
+
+```bash
+helm uninstall railhook -n railhook
+```
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Конфігурація" description="Змінні середовища, що стоять за значеннями чарта." href="/docs/uk/self-hosting/configuration/" />
+  <LinkCard title="Моніторинг" description="ServiceMonitor, правила сповіщень і дашборди." href="/docs/uk/self-hosting/monitoring/" />
+</CardGrid>

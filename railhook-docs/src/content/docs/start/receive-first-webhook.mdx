@@ -1,0 +1,84 @@
+---
+title: Receive your first webhook
+description: Connect a provider as a source, give it the ingress URL, and forward what arrives to a destination of yours.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Railhook can receive webhooks from a third-party provider, check that they really came from it, and forward them to your own services. You need a project ID and an API key. You can also do all of this under **Incoming** in the dashboard.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Create a source**
+
+   A source is one provider you have connected, plus what Railhook needs to verify its requests.
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Stripe","providerType":"STRIPE","verificationMode":"PROVIDER","hmacSecret":"whsec_..."}'
+   ```
+
+   Provider types: `GENERIC`, `GITHUB`, `GITLAB`, `STRIPE`, `SHOPIFY`, `SLACK`, `TWILIO`. Verification modes:
+
+   | Mode | What is checked |
+   |---|---|
+   | `PROVIDER` | The provider's own signature scheme, chosen by provider type |
+   | `HMAC_GENERIC` | An HMAC over the raw body, read from the header and prefix you configure |
+   | `NONE` | Nothing. Use it only while you wire a provider up |
+
+2. **Give the provider the ingress URL**
+
+   The response contains `ingressUrl`, in the form `https://your-host/ingress/<token>`. Paste it into the provider's webhook settings.
+
+   <Aside type="caution">
+   The token is the only thing in the URL that identifies the source, so treat the URL like a credential. Verification is what stops someone who learns it from injecting events.
+   </Aside>
+
+3. **Add a destination**
+
+   A destination is a URL of yours that receives what the source takes in, together with how to authenticate to it.
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/stripe","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+   `authType` is one of `NONE`, `BASIC`, `BEARER`, `CUSTOM_HEADER`. A source forwards every verified webhook to each of its enabled destinations.
+
+4. **Send a test and watch it arrive**
+
+   Send a test webhook from the provider's dashboard. It shows up under **Incoming → Received**, with one forward per destination. A forward that runs out of retries moves to **Failed Forwards**.
+
+</Steps>
+
+## What the ingress answers
+
+| Status | Meaning |
+|---|---|
+| `202` | Accepted and stored |
+| `401` | Verification is configured and the signature did not match. Nothing is stored |
+| `404` | No source has that token |
+| `410` | The source exists but is disabled |
+| `413` | The body is larger than the incoming size limit |
+| `429` | The source's per-second rate limit is used up |
+
+<Aside type="tip">
+Self-hosting? Ingress URLs start with your public address, `APP_BASE_URL`, which the installer sets from `--domain`. Set `TUNNEL_INGRESS_BASE_URL` only when webhooks reach Railhook on a different host than the dashboard. See [Configuration](/docs/self-hosting/configuration/).
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Sources" description="Provider types, rate limits and deduplication." href="/docs/incoming/sources/" />
+  <LinkCard title="Destinations" description="Authentication, retries and transformations per destination." href="/docs/incoming/destinations/" />
+  <LinkCard title="Verification" description="How each provider's signature is checked." href="/docs/incoming/verification/" />
+</CardGrid>

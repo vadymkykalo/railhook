@@ -24,25 +24,25 @@
       every route and with the right path, so nothing is lost by its absence
       here.
     -->
-    <meta name="description" content="Send webhooks to your customers' endpoints and receive them from Stripe, GitHub or Slack. HMAC-signed, retried on a ladder from 1 minute to 24 hours, with Failed Messages and replay. Free for 10,000 events a month, or self-host under MIT." />
+    <meta name="description" content="Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start." />
     <link rel="canonical" href="%SITE_URL%/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Railhook" />
-    <meta property="og:title" content="Railhook — Webhook infrastructure, both directions" />
-    <meta property="og:description" content="Deliveries out to your customers' endpoints, webhooks in from the providers you use. Signed, retried, and every attempt on the record. Free for 10,000 events a month." />
+    <meta property="og:title" content="Railhook — Open-source webhook gateway" />
+    <meta property="og:description" content="Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start." />
     <meta property="og:url" content="%SITE_URL%/" />
     <meta property="og:image" content="%SITE_URL%/og-image.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Railhook — Webhook infrastructure, both directions" />
-    <meta name="twitter:description" content="Deliveries out to your customers' endpoints, webhooks in from the providers you use. Signed, retried, replayable. Free for 10,000 events a month, MIT if you self-host." />
+    <meta name="twitter:title" content="Railhook — Open-source webhook gateway" />
+    <meta name="twitter:description" content="Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start." />
     <meta name="twitter:image" content="%SITE_URL%/og-image.png" />
-    <title>Railhook — Webhook infrastructure, both directions</title>
+    <title>Railhook — Open-source webhook gateway</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <!--
-      Free is a real, non-expiring plan with a listed allowance, so it is a
-      priced offer rather than a trial. No aggregateRating, no review: there are
+      The cloud's free plan is a real offer, so it is listed at 0. There are no
+      paid plans, so nothing else is. No aggregateRating, no review: there are
       none, and structured data is the one place a made-up number is machine
       readable.
     -->
@@ -54,15 +54,20 @@
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Any",
         "url": "%SITE_URL%/",
-        "description": "Webhook infrastructure in both directions: deliveries out to the endpoints your customers registered, and webhooks in from providers like Stripe, GitHub and Slack. HMAC-signed, retried on a ladder from 1 minute to 24 hours, with Failed Messages and replay.",
+        "description": "Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start.",
         "license": "https://opensource.org/licenses/MIT",
         "offers": [
-          { "@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "USD", "url": "%SITE_URL%/pricing" },
-          { "@type": "Offer", "name": "Starter", "price": "29", "priceCurrency": "USD", "url": "%SITE_URL%/pricing" },
-          { "@type": "Offer", "name": "Pro", "price": "99", "priceCurrency": "USD", "url": "%SITE_URL%/pricing" }
+          { "@type": "Offer", "name": "Railhook Cloud Free", "price": "0", "priceCurrency": "USD", "url": "%SITE_URL%/register" }
         ]
       }
     </script>
+    <!--
+      Settings that belong to the running container rather than to the image
+      (window.__RAILHOOK__), written when the container starts. A classic
+      script, so it has run before the deferred app module reads it. The copy
+      in public/ is an empty placeholder for the dev server and the prerender.
+    -->
+    <script src="/config.js"></script>
   </head>
   <body>
     <div id="root"></div>

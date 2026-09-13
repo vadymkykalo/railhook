@@ -1,0 +1,309 @@
+---
+/**
+ * Every environment variable in `.env.dist`, searchable, grouped by its section there.
+ *
+ * Rendered from `src/data/env-reference.json`, which `scripts/env-reference.mjs` derives from
+ * `.env.dist` — so a variable is documented by writing its comment in `.env.dist`, never here.
+ * The descriptions are the file's own comments and stay in English on the Ukrainian page;
+ * the table chrome is translated.
+ *
+ *   import EnvReference from '../../../components/EnvReference.astro';     (EN page)
+ *   import EnvReference from '../../../../components/EnvReference.astro';  (uk/ page)
+ */
+import data from '../data/env-reference.json';
+import { envParagraphs as paragraphs, envSectionId as slug } from './env-paragraphs.mjs';
+
+const uk = Astro.locals.starlightRoute.locale === 'uk';
+const t = uk
+  ? {
+      search: 'Пошук змінних',
+      placeholder: 'Назва або слово з опису',
+      variable: 'Змінна',
+      default: 'Типово',
+      description: 'Опис',
+      unset: 'не задано',
+      empty: 'порожньо',
+      example: 'приклад',
+      none: 'Жодна змінна не відповідає пошуку.',
+      forms: ['змінна', 'змінні', 'змінних'],
+    }
+  : {
+      search: 'Search variables',
+      placeholder: 'Name or a word from the description',
+      variable: 'Variable',
+      default: 'Default',
+      description: 'Description',
+      unset: 'unset',
+      empty: 'empty',
+      example: 'example',
+      none: 'No variable matches the search.',
+      forms: ['variable', 'variables', 'variables'],
+    };
+
+const total = data.sections.reduce((n, s) => n + s.variables.length, 0);
+
+/**
+ * Hard-wrapped comment lines back into paragraphs. An indented line is an example
+ * (`  WEBHOOK_TRUSTED_PROXIES=10.0.0.5,…`), so a run of them is kept verbatim as code while
+ * the prose around it is rejoined.
+ */
+function paragraphs(/** @type {string} */ text) {
+  /** @type {Array<{ code: boolean, text: string }>} */
+  const blocks = [];
+  for (const para of text.split('\n\n').filter(Boolean)) {
+    for (const line of para.split('\n')) {
+      const code = /^\s{2,}/.test(line);
+      const last = blocks.at(-1);
+      if (last && last.code === code && !last.text.endsWith('\n\n')) {
+        last.text += code ? `\n${line}` : ` ${line.trim()}`;
+      } else {
+        blocks.push({ code, text: code ? line : line.trim() });
+      }
+    }
+    const last = blocks.at(-1);
+    if (last) last.text += '\n\n';
+  }
+  return blocks.map((b) => ({ code: b.code, text: b.code ? b.text.replace(/\n+$/, '') : b.text.trim() }));
+}
+
+const slug = (/** @type {string} */ title) =>
+  `env-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+---
+
+<div
+  class="env-ref not-content"
+  data-env-ref
+  data-lang={uk ? 'uk' : 'en'}
+  data-forms={JSON.stringify(t.forms)}
+  data-total={total}
+>
+  <div class="env-ref__bar">
+    <label class="env-ref__search">
+      <span class="sr-only">{t.search}</span>
+      <input type="search" placeholder={t.placeholder} autocomplete="off" spellcheck="false" data-env-search />
+    </label>
+    <span class="env-ref__count" aria-live="polite" data-env-count>{total}</span>
+  </div>
+
+  {
+    data.sections.map((section) => (
+      <section class="env-ref__section" data-env-section aria-labelledby={slug(section.title)}>
+        <h3 id={slug(section.title)}>{section.title}</h3>
+        <div class="env-ref__scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">{t.variable}</th>
+                <th scope="col">{t.default}</th>
+                <th scope="col">{t.description}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {section.variables.map((v) => (
+                <tr id={v.name} data-env-row data-env-text={`${v.name} ${v.description}`.toLowerCase()}>
+                  <td class="env-ref__name">
+                    <code>{v.name}</code>
+                  </td>
+                  <td class="env-ref__default">
+                    {v.default === null ? (
+                      <>
+                        <span class="env-ref__muted">{t.unset}</span>
+                        {v.example && (
+                          <span class="env-ref__example">
+                            {t.example}: <code>{v.example}</code>
+                          </span>
+                        )}
+                      </>
+                    ) : v.default === '' ? (
+                      <span class="env-ref__muted">{t.empty}</span>
+                    ) : (
+                      <code>{v.default}</code>
+                    )}
+                  </td>
+                  <td class="env-ref__desc">
+                    {v.description
+                      ? paragraphs(v.description).map((p) => (p.code ? <pre>{p.text}</pre> : <p>{p.text}</p>))
+                      : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    ))
+  }
+
+  <p class="env-ref__none" hidden data-env-none>{t.none}</p>
+</div>
+
+<script>
+  function plural(n: number, lang: string, forms: string[]) {
+    if (lang === 'uk') {
+      const mod10 = n % 10;
+      const mod100 = n % 100;
+      if (mod10 === 1 && mod100 !== 11) return forms[0];
+      if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+      return forms[2];
+    }
+    return n === 1 ? forms[0] : forms[1];
+  }
+
+  for (const root of document.querySelectorAll<HTMLElement>('[data-env-ref]')) {
+    const input = root.querySelector<HTMLInputElement>('[data-env-search]')!;
+    const count = root.querySelector<HTMLElement>('[data-env-count]')!;
+    const none = root.querySelector<HTMLElement>('[data-env-none]')!;
+    const lang = root.dataset.lang ?? 'en';
+    const forms = JSON.parse(root.dataset.forms ?? '[]') as string[];
+    const total = Number(root.dataset.total);
+
+    const render = () => {
+      const terms = input.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      let shown = 0;
+      for (const section of root.querySelectorAll<HTMLElement>('[data-env-section]')) {
+        let inSection = 0;
+        for (const row of section.querySelectorAll<HTMLElement>('[data-env-row]')) {
+          const text = row.dataset.envText ?? '';
+          const match = terms.every((term) => text.includes(term));
+          row.hidden = !match;
+          if (match) inSection += 1;
+        }
+        section.hidden = inSection === 0;
+        shown += inSection;
+      }
+      none.hidden = shown > 0;
+      count.textContent = terms.length
+        ? `${shown} / ${total} ${plural(total, lang, forms)}`
+        : `${total} ${plural(total, lang, forms)}`;
+    };
+
+    input.addEventListener('input', render);
+    render();
+  }
+</script>
+
+<style>
+  .env-ref {
+    margin-block: 1.5rem;
+    display: grid;
+    gap: 1.75rem;
+  }
+  .env-ref__bar {
+    position: sticky;
+    top: calc(var(--sl-nav-height) + 0.5rem);
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--rh-radius-card, 16px);
+    background: var(--sl-color-bg);
+  }
+  .env-ref__search {
+    flex: 1 1 16rem;
+  }
+  .env-ref__search input {
+    width: 100%;
+    font: inherit;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-white);
+    background: var(--rh-mist, var(--sl-color-bg-sidebar));
+    border: 1px solid var(--rh-rail-strong, var(--sl-color-gray-5));
+    border-radius: var(--rh-radius-control, 10px);
+    padding: 0.5rem 0.75rem;
+  }
+  .env-ref__search input:focus-visible {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 1px;
+  }
+  .env-ref__count {
+    font-family: var(--__sl-font-mono);
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+    padding-inline: 0.25rem;
+  }
+  .env-ref__section h3 {
+    font-size: var(--sl-text-lg);
+    font-weight: 600;
+    color: var(--sl-color-white);
+    margin: 0 0 0.625rem;
+  }
+  .env-ref__scroll {
+    overflow-x: auto;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--rh-radius-card, 16px);
+  }
+  table {
+    width: 100%;
+    min-width: 40rem;
+    border-collapse: collapse;
+    font-size: var(--sl-text-sm);
+  }
+  th {
+    text-align: start;
+    font-weight: 500;
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+    background: var(--rh-mist, var(--sl-color-bg-sidebar));
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+  }
+  td {
+    vertical-align: top;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+  }
+  tr:last-child td {
+    border-bottom: 0;
+  }
+  tr:target td {
+    background: var(--sl-color-accent-low);
+  }
+  code {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.86em;
+    overflow-wrap: anywhere;
+  }
+  .env-ref__name {
+    width: 16rem;
+  }
+  .env-ref__name code {
+    color: var(--sl-color-white);
+    font-weight: 500;
+  }
+  .env-ref__default {
+    width: 10rem;
+  }
+  .env-ref__muted {
+    color: var(--sl-color-gray-3);
+    font-style: italic;
+  }
+  .env-ref__example {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .env-ref__desc p {
+    margin: 0 0 0.5rem;
+    color: var(--sl-color-text);
+  }
+  .env-ref__desc p:last-child {
+    margin-bottom: 0;
+  }
+  .env-ref__desc pre {
+    margin: 0 0 0.5rem;
+    white-space: pre-wrap;
+    font-family: var(--__sl-font-mono);
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+  }
+  .env-ref__none {
+    color: var(--sl-color-gray-3);
+  }
+  [hidden] {
+    display: none !important;
+  }
+</style>

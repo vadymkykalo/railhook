@@ -1,0 +1,59 @@
+---
+title: Вирішення проблем
+description: Проблеми, з якими справді стикаються власні встановлення, що їх спричиняє і як це виправити.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Почніть звідси, з каталогу встановлення:
+
+```bash
+./railhook doctor        # machine and configuration checks
+./railhook status        # containers and their health
+./railhook logs api      # or worker, ui, postgres, kafka, redis
+```
+
+## Встановлення
+
+| Симптом | Причина | Виправлення |
+|---|---|---|
+| `Port 80 is already in use` | Порт зайнятий іншим сервісом | Зупиніть його або встановіть із `--port 8080`. З `--domain` мають бути вільні і 80, і 443. Якщо їх тримає ваш власний зворотний проксі, додайте `--behind-proxy` |
+| `Docker is installed but the daemon is not reachable` | Демон зупинено або ваш користувач не в групі `docker` | Запустіть Docker або виконайте `sudo usermod -aG docker $USER && newgrp docker` |
+| Інсталятор зупиняється через RAM | Менше ніж 2 ГіБ пам'яті | Візьміть більший хост. Комфортно — близько 4 ГіБ |
+| `Could not reach the GitHub API` | Немає доступу до `api.github.com` | Вкажіть реліз явно: `--version v2.16.6` |
+| `exists and is not empty` | У цільовому каталозі є інші файли | Використайте `--dir` або `--yes`, щоб продовжити |
+| `It did not come up within 10 minutes` | Сервіс не запустився з першого разу | `./railhook logs` покаже, який саме |
+
+## Запуск
+
+| Симптом | Причина | Виправлення |
+|---|---|---|
+| API не може автентифікуватися в базі даних | `POSTGRES_PASSWORD` і `DB_PASSWORD` різні | Зробіть їх однаковими. `doctor` про це повідомляє |
+| Стек запускається, але не бачить бази даних | Не задано ні `COMPOSE_PROFILES=embedded-db`, ні `DB_HOST` | Увімкніть профіль або спрямуйте `DB_HOST` на свою базу |
+| API одразу завершується в production | Небезпечна конфігурація: заглушка в секреті, `WEBHOOK_ALLOW_PRIVATE_IPS=true`, `SWAGGER_ENABLED=true` або `localhost` у `CORS_ALLOWED_ORIGINS` | Виправте те, що називає журнал. `doctor` перевіряє всі чотири |
+
+## Використання
+
+| Симптом | Причина | Виправлення |
+|---|---|---|
+| Вхід завершується помилкою «Invalid CORS request» | Адреси з браузера немає в `CORS_ALLOWED_ORIGINS` | Додайте її й виконайте `./railhook up -d` |
+| Посилання в листах ведуть на `localhost` | `APP_BASE_URL` не змінено | Задайте публічну адресу |
+| Ingress-адреси джерел або адреси тунелів показують `localhost` | `APP_BASE_URL` (або `TUNNEL_INGRESS_BASE_URL`) досі вказує на localhost | Задайте публічну адресу в `.env`, потім `./railhook start` |
+| Доставки на внутрішній сервіс не проходять | Приватні та внутрішні адреси типово заблоковано | Додайте назву хоста до `WEBHOOK_ALLOWED_HOSTS` |
+| «Too many failed sign-in attempts» | Обліковий запис заблоковано після кількох невдалих спроб | Зачекайте (60 секунд, щоразу вдвічі довше, до 15 хвилин) або скиньте пароль — це одразу знімає блокування |
+| `502` близько 20 секунд під час оновлення | Замінюється єдиний контейнер API | Задайте `API_REPLICAS=2` |
+| `docker logs webhook-api` нічого не знаходить | Починаючи з 2.16.0, API не має фіксованої назви контейнера | Використовуйте `docker compose logs api` |
+
+<Aside type="tip">
+В інстансі після відновлення серія повідомлень `delivery already claimed or not PENDING` у журналі воркера — очікувана річ. Так відхиляються застарілі повідомлення Kafka, і це нормальна поведінка.
+</Aside>
+
+## Досі не працює
+
+Створіть issue на [github.com/vadymkykalo/railhook/issues](https://github.com/vadymkykalo/railhook/issues) з виводом `./railhook doctor` і відповідними рядками журналу. Спершу приберіть із них секрети.
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Конфігурація" description="Що визначає кожне налаштування." href="/docs/uk/self-hosting/configuration/" />
+  <LinkCard title="Моніторинг" description="Помічайте проблеми раніше за користувачів." href="/docs/uk/self-hosting/monitoring/" />
+</CardGrid>

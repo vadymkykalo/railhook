@@ -1,0 +1,158 @@
+---
+title: Sources
+description: Give a third-party provider one URL to send its webhooks to, and learn what that URL answers.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+A **source** is one third-party provider you connect, such as Stripe or GitHub, together with what Railhook needs to prove a webhook really came from it. Creating a source gives you an ingress URL to paste into the provider.
+
+## How it works
+
+<Steps>
+
+1. The provider sends a webhook to the source's ingress URL.
+
+2. Railhook verifies it, as the source is configured to. A webhook that fails verification is refused and not stored.
+
+3. The webhook is stored as it arrived, as an **incoming event**. The dashboard lists these under **Received**.
+
+4. Railhook creates one **forward** for each destination of the source, and works on each until it succeeds or is abandoned. See [Destinations](/docs/incoming/destinations/).
+
+</Steps>
+
+## Create a source
+
+<Tabs syncKey="lang">
+<TabItem label="Node.js">
+
+```ts
+import { Railhook } from '@railhook/node';
+
+const client = new Railhook({ apiKey: process.env.RAILHOOK_API_KEY, baseUrl: process.env.RAILHOOK_URL });
+
+const source = await client.incomingSources.create(projectId, {
+  name: 'Stripe',
+  providerType: 'STRIPE',
+  verificationMode: 'PROVIDER',
+  hmacSecret: process.env.STRIPE_WEBHOOK_SECRET,
+});
+
+console.log(source.ingressUrl);
+```
+
+</TabItem>
+<TabItem label="Python">
+
+```python
+import os
+
+from railhook import IncomingSourceCreateParams, Railhook
+
+client = Railhook(api_key=os.environ["RAILHOOK_API_KEY"], base_url=os.environ["RAILHOOK_URL"])
+
+source = client.incoming_sources.create(
+    project_id,
+    IncomingSourceCreateParams(
+        name="Stripe",
+        provider_type="STRIPE",
+        verification_mode="PROVIDER",
+        hmac_secret=os.environ["STRIPE_WEBHOOK_SECRET"],
+    ),
+)
+
+print(source.ingress_url)
+```
+
+</TabItem>
+<TabItem label="PHP">
+
+```php
+<?php
+use Railhook\Railhook;
+
+$client = new Railhook(apiKey: getenv('RAILHOOK_API_KEY'), baseUrl: getenv('RAILHOOK_URL'));
+
+$source = $client->incomingSources->create($projectId, [
+    'name' => 'Stripe',
+    'providerType' => 'STRIPE',
+    'verificationMode' => 'PROVIDER',
+    'hmacSecret' => getenv('STRIPE_WEBHOOK_SECRET'),
+]);
+
+echo $source['ingressUrl'];
+```
+
+</TabItem>
+<TabItem label="cURL">
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Stripe","providerType":"STRIPE","verificationMode":"PROVIDER","hmacSecret":"'"$STRIPE_WEBHOOK_SECRET"'"}'
+```
+
+</TabItem>
+</Tabs>
+
+Paste `ingressUrl` into the provider's webhook settings, then add at least one destination.
+
+| Field | What it does |
+|---|---|
+| `name` | Required. Display name, up to 255 characters. |
+| `slug` | URL-friendly name, lower case letters, digits and dashes, up to 64 characters. Generated when left out. |
+| `providerType` | `GENERIC`, `GITHUB`, `GITLAB`, `STRIPE`, `SHOPIFY`, `SLACK` or `TWILIO`. |
+| `verificationMode` | `NONE`, `HMAC_GENERIC` or `PROVIDER`. See [Verification](/docs/incoming/verification/). |
+| `hmacSecret` | The secret the provider signs with. Write-only: the API never returns it. |
+| `hmacHeaderName`, `hmacSignaturePrefix` | Where the signature is, for `HMAC_GENERIC`. |
+| `rateLimitPerSecond` | Requests per second this source accepts. |
+| `status` | `ACTIVE` or `DISABLED`. |
+
+## The ingress URL
+
+The ingress URL is `WEBHOOK_INGRESS_BASE_URL` followed by `/ingress/` and an opaque token. The token is the only thing that names the source, so treat the URL as a credential. Verification is what stops someone who learns the URL from sending you events.
+
+<Aside type="caution">
+Set `WEBHOOK_INGRESS_BASE_URL` to the public address providers reach. It builds the URL shown on the source's page, and Twilio verification signs that exact URL.
+</Aside>
+
+## What the ingress answers
+
+The ingress answers a provider, not a person. Each code is what the provider's own retry logic sees.
+
+| Status | Meaning |
+|---|---|
+| `202` | Accepted and stored. The body carries `requestId`. |
+| `401` | Verification is configured and the signature did not check out, or the same signature was already seen. Nothing is stored. |
+| `404` | No source has that token. |
+| `410` | The source exists but is disabled. |
+| `413` | The body is larger than the limit, 512 KB by default. |
+| `429` | The source's rate limit is spent, with `Retry-After: 1`. Also returned, without `Retry-After`, when the organization cannot accept more webhooks right now. |
+
+| Variable | Default | Effect |
+|---|---|---|
+| `WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES` | `524288` | Largest body the ingress accepts. |
+| `WEBHOOK_INCOMING_RATE_LIMIT_PER_SECOND` | `100` | Rate limit for a source that sets none of its own. `0` disables this default. |
+
+## Provider resends
+
+Providers send the same webhook again. When a request carries an id Railhook recognises, a second arrival with the same id returns the stored event instead of forwarding it again:
+
+| Provider | Id |
+|---|---|
+| Generic | `X-Webhook-Id` header |
+| Stripe | `Stripe-Webhook-Id` header |
+| GitHub | `X-GitHub-Delivery` header |
+| Shopify | `X-Shopify-Webhook-Id` header |
+| Twilio | `X-Twilio-Webhook-Id` header |
+| Slack | `event_id` in the JSON body |
+
+A provider that sends none of these is not deduplicated.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Where received webhooks are forwarded, and how." />
+  <LinkCard title="Verification" href="/docs/incoming/verification/" description="How each provider's signature is checked." />
+  <LinkCard title="Replay and Time Machine" href="/docs/outgoing/replay/#replay-incoming-webhooks" description="Forward stored incoming events again." />
+</CardGrid>

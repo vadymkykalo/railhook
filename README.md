@@ -1,162 +1,79 @@
 <div align="center">
 
-# Railhook
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/railhook-logo-dark.svg">
+  <img src="docs/brand/railhook-logo.svg" alt="Railhook" height="48">
+</picture>
 
-**Self-hosted webhook infrastructure. Outgoing delivery + incoming ingress.**
+**Self-hosted, open-source webhook gateway — send webhooks to your customers and receive them
+from any provider, with every delivery on record.**
 
+[![Latest release](https://img.shields.io/github/v/release/vadymkykalo/railhook?label=release)](https://github.com/vadymkykalo/railhook/releases/latest)
 [![CI](https://github.com/vadymkykalo/railhook/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/railhook/actions/workflows/ci.yml)
-[![Latest Release](https://img.shields.io/github/v/release/vadymkykalo/railhook?label=release)](https://github.com/vadymkykalo/railhook/releases/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Java 17](https://img.shields.io/badge/Java-17-orange)](https://openjdk.org/projects/jdk/17/)
-[![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-green)](https://spring.io/projects/spring-boot)
-[![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Frailhook-blue?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=railhook)
+[![License: MIT](https://img.shields.io/badge/license-MIT-1D4BFF.svg)](./LICENSE)
+[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Frailhook-1D4BFF?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=railhook)
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh | bash
-```
+[Website](https://railhook.io) · [Docs](https://railhook.io/docs/) ·
+[API reference](https://railhook.io/docs/api-reference/) · [Railhook Cloud](https://railhook.io/register) · [Changelog](./CHANGELOG.md)
 
-Checks the machine, writes a Compose file pinned to the latest release and a
-`.env` with freshly generated secrets, and starts the stack. No clone, no
-config to write, no secrets to invent.
-
-**Open → http://localhost** &nbsp;·&nbsp; register, and you are in the dashboard.
+<img src="docs/screenshots/deliveries.png" alt="Deliveries: every attempt and the response it got" width="100%">
 
 </div>
 
-<div align="center">
-  <img src="docs/screenshots/deliveries.png" alt="Every delivery, its attempts and the response each one got" width="100%">
-  <p><em>Deliveries — every attempt on the record, with the retry ladder each one is on.</em></p>
-  <p><sub><a href="docs/screenshots/">More screenshots</a> · <a href="docs/DEMO.md">a public demo is planned, not deployed</a></sub></p>
-</div>
-
----
-
-**[Quick start](#quick-start)** ·
-**[What it does](#what-it-does)** ·
-**[Architecture](#architecture)** ·
-**[API & SDKs](#api-reference--sdks)** ·
-**[Documentation](#documentation)** ·
-**[Roadmap](./ROADMAP.md)** ·
-**[Changelog](./CHANGELOG.md)** ·
-**[Contributing](#contributing)**
-
----
-
-## Quick Start
-
-**Prerequisites:** Docker 20.10+, Compose v2, ~4 GB of RAM. The images are
-[multi-arch](https://github.com/vadymkykalo?tab=packages&repo_name=railhook),
-so nothing is compiled on your machine.
-
-The installer above refuses to start until Docker, memory, disk and the port
-all check out, and verifies the configuration it wrote before starting
-anything. Open **http://localhost**, register, create a project — nothing is
-gated behind a verification email you never receive. Pass
-`-s -- --dir /opt/railhook --port 8080` to put it elsewhere.
+## Install
 
 ```bash
-# Send your first event, with the API key the dashboard just gave you.
-# The key already says which project this is, so the path carries no id.
-curl -X POST http://localhost/api/v1/events \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"type": "user.signup", "data": {"userId": "usr_42"}}'
+curl -fsSL https://railhook.io/install.sh | bash
 ```
 
-**One published port.** nginx serves the dashboard and proxies every API path
-to the backend, so there is a single URL to hand out, a single certificate to
-obtain and a single firewall rule to write. Postgres, Kafka, Redis and the API
-itself are reachable only from inside the Docker network.
-
-### On a domain, with HTTPS
-
-Point the A record at the server, then:
+On a server with a domain pointed at it, get HTTPS in the same step:
 
 ```bash
-curl -fsSL .../install.sh | bash -s -- --domain hooks.example.com --email ops@example.com
+curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --email ops@example.com
 ```
 
-That brings up a TLS terminator which obtains and renews the certificate itself
-— no cron entry, no renewal hook — moves the dashboard behind it onto loopback,
-and switches the platform to production mode, where it refuses to start on
-unsafe configuration rather than running with it.
+Already running a reverse proxy? Add `--behind-proxy` instead of `--email`. Then point the proxy at `127.0.0.1:8080`.
 
-### Day two
+Open **http://localhost** and register — the first account is active immediately.
 
-```bash
-cd ~/railhook
-./railhook status | logs | stop | start | upgrade | backup | doctor
-```
+- Checks the machine first: Docker with Compose v2, about 4 GiB of RAM, 5 GiB of disk, a free port.
+- Writes a Compose file pinned to the latest release and a `.env` with freshly generated secrets.
+- Starts everything behind one port. Day two is `./railhook status | logs | upgrade | backup | doctor`.
 
-`upgrade` takes a backup before it changes anything and stops if that fails — migrations are
-the part of an upgrade that does not roll back, and there are no down-migrations here.
-`./railhook upgrade v2.13.0` pins the version; with no argument it pulls whatever the tags in
-`.env` already say. `doctor` re-runs the machine and configuration checks against what is on disk,
-so a hand-edited `.env` gets caught before it becomes a support question. `.env`
-holds your secrets — **back it up**: `WEBHOOK_ENCRYPTION_KEY` is what every
-endpoint secret in the database is encrypted with, and a database backup
-without it restores rows nothing can read.
-
-To remove it: `... install.sh | bash -s -- --uninstall` keeps your data,
-`--purge` deletes it.
-
-### Running it from a clone
-
-```bash
-git clone https://github.com/vadymkykalo/railhook.git && cd railhook
-make up      # builds the three services from your tree, writes .env, creates the topics
-make help    # everything else
-```
-
-Same one-port shape as an installed deployment, on **http://localhost:8080** —
-nothing you learn here stops working when you deploy.
-[`CONTRIBUTING.md`](./CONTRIBUTING.md) has the test commands CI runs and what
-each build guard means when it fails.
-
----
+Rather not run it yourself? Railhook Cloud at https://railhook.io is free right now (10,000 events
+a month, 3 projects, 7 days of history). Paid plans with support and higher limits will come later.
 
 ## What it does
 
-**Outgoing** — your system announces an event; Railhook gets it to every endpoint
-your customers registered. Written to a transactional outbox in the same
-statement as the work itself, so an event cannot be accepted and then lost.
-Signed with HMAC-SHA256, ordered per endpoint, retried on a six-rung ladder
-(1m → 24h), and parked in a DLQ for a human once the ladder runs out. Every
-attempt is on the record with the response it got.
+**Outgoing** — your app announces an event; Railhook gets it to every endpoint that subscribed.
 
-**Incoming** — a provider posts to a URL you own; Railhook verifies the
-signature and forwards it to the destinations you nominated. Stripe, GitHub,
-GitLab, Shopify, Slack and Twilio are understood out of the box, plus generic
-HMAC for anything else.
+- An accepted event is never lost: it is recorded in the same transaction as your write.
+- Customers verify every request — Standard Webhooks headers, with secret rotation.
+- Failures retry on a schedule that runs for more than a day, then land in Failed Messages for bulk retry.
+- Deliveries to one endpoint can arrive in the order the events happened.
+- Time Machine replays a past range as fresh deliveries.
+- Every attempt is on record with the response it got.
 
-Both directions run the same claim → send → classify → finalise loop, so a fix
-to attempt behaviour lands once rather than twice.
+**Incoming** — a provider posts to a URL you own; Railhook checks it and forwards it on.
 
-### Everything in the box
+- Stripe, GitHub, GitLab, Shopify, Slack and Twilio are verified out of the box; generic HMAC covers the rest.
+- Each incoming event is kept as it arrived; a provider's repeat of the same event is not forwarded twice.
+- Forwards reach your destinations with their own retries and Failed Messages.
+
+## Everything in the box
 
 | | |
 |---|---|
-| **Delivery** | Six-rung retry ladder · per-endpoint FIFO ordering · rate limits and concurrency caps · shared circuit breaker · 96h hard cap |
-| **Recovery** | Failed Messages with bulk requeue · Time Machine replay that builds *fresh* deliveries, not re-sends |
-| **Signing** | HMAC-SHA256 in two schemes at once, including [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks) · secret rotation with an overlap window |
-| **Shaping** | Rules engine · JSONPath transformations · schema registry with compatibility modes · wildcard subscriptions · workflow builder |
-| **Incoming** | Stripe, GitHub, GitLab, Shopify, Slack, Twilio and generic HMAC · deduplication · authenticated forwarding |
-| **Developing** | CLI tunnel to `localhost` · disposable receiving endpoints · transformation preview and delivery dry-run |
-| **Security** | Row-level tenant isolation · AES-256-GCM with key rotation · SSRF protection · mTLS · PII masking · audit log |
-| **Operating** | Prometheus metrics, 4 dashboards, 22 alert rules · configurable retention · GDPR export · CI-tested restore drill |
-
-Organizations → Projects → Endpoints, with Owner / Developer / Viewer roles.
-Nothing is gated — see [Is this really MIT?](#is-this-really-mit-what-is-the-billing-code-doing-here)
-Honest comparison against Svix, Hookdeck and Convoy, gaps included:
-[`docs/guides/comparison.md`](docs/guides/comparison.md).
+| **Delivery** | Retry ladder · per-endpoint ordering · rate limits · shared circuit breaker |
+| **Recovery** | Failed Messages with bulk retry · Time Machine replay |
+| **Signing** | HMAC-SHA256 in [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks) and legacy headers · secret rotation |
+| **Shaping** | Rules · JSONPath transformations · schema registry · workflows · wildcard subscriptions |
+| **Developing** | CLI tunnel to `localhost` · test endpoints · transformation preview · delivery dry-run |
+| **Security** | Tenant isolation · AES-256-GCM secrets at rest · SSRF protection · mTLS · PII masking · audit log |
+| **Access** | Organizations and projects · Owner / Developer / Viewer roles · API keys |
+| **Operating** | Prometheus metrics · Grafana dashboards · 22 alert rules · data retention · GDPR export · Helm chart |
 
 ## Architecture
-
-The write path never publishes to Kafka directly: work and its announcement go
-into a transactional outbox in the same statement, so they cannot disagree. The
-worker consumes, attempts delivery, and reschedules onto one of six delay
-topics that make up the retry ladder.
 
 ```
 Outgoing   your app ──▶ api ──▶ outbox (same txn) ──▶ Kafka ──▶ worker ──▶ endpoint
@@ -167,98 +84,48 @@ Outgoing   your app ──▶ api ──▶ outbox (same txn) ──▶ Kafka �
 Incoming   provider ──▶ /ingress/{token} ──▶ verify signature ──▶ Kafka ──▶ worker ──▶ destination
 ```
 
-**[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** goes the rest of the way:
-fourteen diagrams covering the data model, the claim and its fence token, the
-admission order, the delivery state machine, ordering and gaps, tenancy and the
-production topology — plus the consistency model, the partitioning and the
-failure modes in prose. **[`CONTEXT.md`](CONTEXT.md)** is the vocabulary all of
-it uses.
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) covers the attempt lifecycle, Claims, ordering,
+tenancy and the failure modes; [`CONTEXT.md`](CONTEXT.md) is the vocabulary it uses.
 
+## SDKs
 
-## API Reference & SDKs
+| Language | Install | Source |
+|---|---|---|
+| Node.js | `npm i @railhook/node` | [`sdks/node`](sdks/node) |
+| Python | `pip install railhook` | [`sdks/python`](sdks/python) |
+| PHP | `composer require railhook/php` | [`sdks/php`](sdks/php) |
 
-- **In-app docs** — the dashboard's [Documentation page](railhook-ui/src/pages/DocumentationPage.tsx) has prose, concepts and per-language quick-start samples for every endpoint (open `/docs` — it needs no account).
-- **OpenAPI spec** — [`openapi.yaml`](./openapi.yaml), generated by `springdoc-openapi` from the controllers and committed. `OpenApiDriftIntegrationTest` fails the build if it drifts from what the API serves. Rendered with Redoc at [`docs/api-reference.html`](docs/api-reference.html).
-- **Swagger UI** — `http://localhost:8080/swagger-ui.html` against a running instance (`SWAGGER_ENABLED=true`).
-
-### SDKs
-
-[Node](sdks/node) · [Python](sdks/python) · [PHP](sdks/php). Each covers
-send-an-event, manage-endpoints and verify-a-signature, with a generic
-authenticated-request escape hatch for the rest, and authenticates with
-`X-API-Key` alone. Coverage tables are in each SDK's README.
-
----
-
-## Documentation
-
-**[`docs/`](docs/README.md)** is the front door, split by audience: the
-repository holds what you read while evaluating or operating Railhook, the
-dashboard's `/docs` holds what you read with the product open. Nothing is
-written in both places.
-
-[Architecture](docs/ARCHITECTURE.md) ·
-[Self-hosting](docs/SELF_HOSTED_GUIDE.md) ·
-[Operations](docs/OPERATIONS.md) ·
-[Observability](docs/guides/observability.md) ·
-[Access control](docs/guides/rbac-and-tenancy.md) ·
-[Retention & export](docs/guides/data-retention.md) ·
-[Migrating here](docs/guides/migrating-from-other-providers.md) ·
-[Roadmap](ROADMAP.md) ·
-[Changelog](CHANGELOG.md) ·
-[Upgrading](UPGRADING.md)
-
-## Running it in production
-
-[`docs/SELF_HOSTED_GUIDE.md`](docs/SELF_HOSTED_GUIDE.md) is the operator's
-document — sizing, ports, TLS and mTLS, backup and restore, the upgrade path —
-and [`docs/OPERATIONS.md`](docs/OPERATIONS.md) covers the runbooks.
+Each sends events, manages endpoints and verifies signatures, authenticating with `X-API-Key`.
+See [SDKs](https://railhook.io/docs/tools/sdks/).
 
 ## CLI
 
-Receive webhooks on `localhost` while you develop — no deploy, no ngrok.
-
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/railhook-cli/install.sh | bash -s -- --with-java
-
-railhook login              # device-code flow, like `gh auth login`
-railhook listen 3000        # public URL → your machine, responses flow back
-railhook events <projectId> --follow
-railhook replay <projectId> --dry-run
+curl -fsSL https://railhook.io/install-cli.sh | bash
 ```
 
-`railhook -h` lists the rest.
+Receive webhooks on `localhost` while you develop — `railhook login`, then `railhook listen 3000`.
+`railhook events <projectId> --follow` tails events; `railhook replay <projectId> --dry-run` previews a replay.
+Install and usage: [CLI docs](https://railhook.io/docs/tools/cli/).
+
+## Documentation
+
+- [Quickstart](https://railhook.io/docs/start/quickstart/)
+- [Self-hosting overview](https://railhook.io/docs/self-hosting/overview/)
+- [Configuration](https://railhook.io/docs/self-hosting/configuration/)
+- [API reference](https://railhook.io/docs/api-reference/)
+
+For contributors and operators: [Architecture](docs/ARCHITECTURE.md) ·
+[Operations](docs/OPERATIONS.md) · [Upgrading](UPGRADING.md) · [Roadmap](ROADMAP.md) ·
+[all repository docs](docs/README.md).
 
 ## Contributing
 
-Contributions are welcome — bug reports, docs fixes and features alike.
-
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — how to set up, which branch to target
-  (`develop`, never `main`), the test commands CI actually runs, and what each
-  build guard means when it fails.
-- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) — the Contributor Covenant.
-- [`SECURITY.md`](./SECURITY.md) — report vulnerabilities privately, not as an issue.
-- [`CONTEXT.md`](./CONTEXT.md) — the domain vocabulary. Every term carries a list
-  of near-synonyms *not* to use; read it before naming a class, column or UI string.
-
-## Is this really MIT? What is the billing code doing here?
-
-Yes, really MIT — and self-hosting gets **every** feature, with no licence key,
-no locked modules and no paid tier. `BILLING_ENABLED` defaults to `false`, which
-is what makes that true: with billing off, quota and feature checks are
-short-circuited and nothing is gated.
-
-The `Plan`/`Subscription` entities, the Stripe and WayForPay providers and the
-seeded price rows exist because the plan is to offer a managed instance of this
-same code, and hosting is the only thing that would ever be sold. That instance
-is not running yet. Selling hosting rather than features is why none of this
-needs to be closed, so it lives here like everything else — inert while billing
-is off.
-
----
+Bug reports, docs fixes and features are welcome. [`CONTRIBUTING.md`](CONTRIBUTING.md) covers setup,
+the branch to target (`develop`) and the checks CI runs. Report vulnerabilities privately per
+[`SECURITY.md`](SECURITY.md).
 
 ## License
 
-[MIT](./LICENSE) © Vadym Kykalo — [`NOTICE`](./NOTICE) for third-party
-attributions, [`docs/licenses/`](docs/licenses/) for the generated dependency
-report, SBOMs and the recorded licensing decisions. No copyleft in either tree.
+[MIT](./LICENSE) © Vadym Kykalo. Self-hosted gets every feature — no licence key, no paid tier.
+Third-party attributions: [`NOTICE`](./NOTICE), [`docs/licenses/`](docs/licenses/).

@@ -3,7 +3,7 @@
 ## Quick Start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/install.sh | bash
+curl -fsSL https://railhook.io/install.sh | bash
 
 # Health, on the one published port. The actuator itself is on 8082 inside the
 # network and is not bound to the host; nginx proxies these two paths from it
@@ -495,12 +495,12 @@ Key settings:
 
 ## Detailed Documentation
 
-- **[Self-Hosted Deployment Guide](./SELF_HOSTED_GUIDE.md)** — hardware sizing, pre-flight checks, Helm install, TLS, monitoring
+- **[Self-hosting](https://railhook.io/docs/self-hosting/overview/)** — hardware sizing, pre-flight checks, Helm install, TLS, monitoring
 - **[Architecture](./ARCHITECTURE.md)** — the two pipelines, the attempt lifecycle, consistency and failure modes
-- **[Observability](./guides/observability.md)** — every metric worth alerting on, and the three to start with
-- **[Access control and tenancy](./guides/rbac-and-tenancy.md)** — roles, scopes, and what `@TenantId` does and does not cover
-- **[Data retention and export](./guides/data-retention.md)** — what is kept and for how long, and how to bound the two largest tables
-- **[Static egress IP](./guides/static-egress-ip.md)** — giving customers a fixed address to allowlist
+- **[Observability](https://railhook.io/docs/platform/observability/)** — every metric worth alerting on, and the three to start with
+- **[Organizations and roles](https://railhook.io/docs/platform/organizations-rbac/)** — roles, scopes, and what `@TenantId` does and does not cover
+- **[Data retention and export](https://railhook.io/docs/resources/data-retention/)** — what is kept and for how long, and how to bound the two largest tables
+- **[Static egress IP](https://railhook.io/docs/resources/static-egress-ip/)** — giving customers a fixed address to allowlist
 
 ## Support
 

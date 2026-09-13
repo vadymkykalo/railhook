@@ -1,0 +1,304 @@
+---
+title: Verify signatures
+description: Check that a delivery came from Railhook and was not changed on the way, with an SDK or with plain HMAC.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Every delivery is signed with the endpoint's secret. Verify the signature before you act on a request, so that nobody who learns your endpoint URL can send you events.
+
+## Two signature schemes
+
+A delivery can carry two independent signatures over the same body. The endpoint's `signatureScheme` decides which are sent:
+
+| `signatureScheme` | Headers sent |
+|---|---|
+| `BOTH` (default) | `X-Signature` and the Standard Webhooks headers. |
+| `LEGACY` | Only `X-Signature`. |
+| `STANDARD` | Only `webhook-id`, `webhook-timestamp`, `webhook-signature`. |
+
+A receiver ignores the headers it does not read, so verify either one. Narrow the endpoint to a single scheme only once nothing reads the other.
+
+## Headers on every delivery
+
+| Header | Value |
+|---|---|
+| `X-Signature` | `t=<unix-ms>,v1=<hex>`. May carry a second `v1` during a secret rotation. |
+| `X-Timestamp` | The same value as `t`: when this attempt was signed, in milliseconds. |
+| `X-Event-Id` | The event. The same id reaches every subscribed endpoint. |
+| `X-Delivery-Id` | This delivery: one event to one endpoint. Unchanged across attempts. |
+| `X-Sequence-Number` | The position of this delivery when ordering is on, `0` when it is off. |
+| `Idempotency-Key` | Stable across attempts, so you can discard what you already processed. |
+| `webhook-id` | The delivery id. Part of what the Standard Webhooks signature covers. |
+| `webhook-timestamp` | When this attempt was signed, in **seconds**. |
+| `webhook-signature` | `v1,<base64>`, space-separated when there is more than one. |
+
+## Verify `X-Signature`
+
+`v1` is HMAC-SHA256 over the exact string `<t>.<raw body>`, keyed with the endpoint secret, as lower-case hex. `t` is in milliseconds. Railhook's SDKs reject a timestamp more than 300 seconds away from now.
+
+### With an SDK
+
+<Tabs syncKey="lang">
+<TabItem label="Node.js">
+
+```ts
+import express from 'express';
+import { constructEvent } from '@railhook/node';
+
+const app = express();
+
+// express.raw, not express.json: the signature covers the bytes that arrived.
+app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
+  try {
+    const event = constructEvent(req.body.toString('utf8'), req.headers, process.env.WEBHOOK_SECRET);
+    // event.data is the parsed body; event.deliveryId is safe to deduplicate on.
+    res.sendStatus(200);
+  } catch {
+    res.sendStatus(400);
+  }
+});
+```
+
+</TabItem>
+<TabItem label="Python">
+
+```python
+import os
+
+from flask import Flask, request
+from railhook import RailhookError, construct_event
+
+app = Flask(__name__)
+
+@app.route("/webhooks", methods=["POST"])
+def handle_webhook():
+    payload = request.get_data(as_text=True)
+    try:
+        event = construct_event(payload, dict(request.headers), os.environ["WEBHOOK_SECRET"])
+    except RailhookError:
+        return "Invalid signature", 400
+    # event.data is the parsed body; event.delivery_id is safe to deduplicate on.
+    return "OK", 200
+```
+
+</TabItem>
+<TabItem label="PHP">
+
+```php
+<?php
+use Railhook\Webhook;
+use Railhook\Exception\RailhookException;
+
+$payload = file_get_contents('php://input');
+
+try {
+    $event = Webhook::constructEvent($payload, getallheaders(), getenv('WEBHOOK_SECRET'));
+    // $event['data'] is the decoded body; $event['deliveryId'] is safe to deduplicate on.
+    http_response_code(200);
+} catch (RailhookException $e) {
+    http_response_code(400);
+}
+```
+
+</TabItem>
+</Tabs>
+
+### Without an SDK
+
+The same check in plain code. Read every `v1` in the header, not only the first one.
+
+<Tabs syncKey="lang">
+<TabItem label="Node.js">
+
+```js
+import crypto from 'node:crypto';
+
+export function verify(rawBody, header, secret) {
+  let t;
+  const candidates = [];
+  for (const part of header.split(',')) {
+    const [key, value] = part.split('=', 2);
+    if (key === 't') t = value;
+    if (key === 'v1') candidates.push(value);
+  }
+  if (!t || candidates.length === 0) return false;
+  if (Math.abs(Date.now() - Number(t)) > 5 * 60 * 1000) return false;
+
+  const expected = Buffer.from(
+    crypto.createHmac('sha256', secret).update(`${t}.${rawBody}`).digest('hex'),
+  );
+  let ok = false;
+  for (const candidate of candidates) {
+    const given = Buffer.from(candidate);
+    if (given.length === expected.length && crypto.timingSafeEqual(given, expected)) ok = true;
+  }
+  return ok;
+}
+```
+
+</TabItem>
+<TabItem label="Python">
+
+```python
+import hashlib
+import hmac
+import time
+
+def verify(raw_body: bytes, header: str, secret: str) -> bool:
+    t, candidates = None, []
+    for part in header.split(","):
+        key, _, value = part.partition("=")
+        if key == "t":
+            t = value
+        elif key == "v1":
+            candidates.append(value)
+    if t is None or not candidates:
+        return False
+    if abs(time.time() * 1000 - int(t)) > 5 * 60 * 1000:
+        return False
+
+    expected = hmac.new(secret.encode(), f"{t}.".encode() + raw_body, hashlib.sha256).hexdigest()
+    ok = False
+    for candidate in candidates:
+        if hmac.compare_digest(expected, candidate):
+            ok = True
+    return ok
+```
+
+</TabItem>
+<TabItem label="PHP">
+
+```php
+<?php
+function verify(string $rawBody, string $header, string $secret): bool
+{
+    $t = null;
+    $candidates = [];
+    foreach (explode(',', $header) as $part) {
+        [$key, $value] = array_pad(explode('=', $part, 2), 2, '');
+        if ($key === 't') {
+            $t = $value;
+        } elseif ($key === 'v1') {
+            $candidates[] = $value;
+        }
+    }
+    if ($t === null || $candidates === []) {
+        return false;
+    }
+    if (abs((int) (microtime(true) * 1000) - (int) $t) > 300000) {
+        return false;
+    }
+
+    $expected = hash_hmac('sha256', $t . '.' . $rawBody, $secret);
+    $ok = false;
+    foreach ($candidates as $candidate) {
+        if (hash_equals($expected, $candidate)) {
+            $ok = true;
+        }
+    }
+    return $ok;
+}
+```
+
+</TabItem>
+</Tabs>
+
+## Verify the Standard Webhooks headers
+
+The Standard Webhooks headers follow a published convention, so an off-the-shelf library can verify them. Three things differ from `X-Signature`:
+
+- The signed string is `<webhook-id>.<webhook-timestamp>.<raw body>`: the id is part of it.
+- `webhook-timestamp` is in seconds, not milliseconds.
+- The digest is base64, not hex, and the key is the endpoint's `standardWebhooksSecret`, in the form `whsec_<base64>`.
+
+The API returns `standardWebhooksSecret` next to `secret`, at creation and at rotation. The SDKs also accept a raw secret and use it as-is, so passing the wrong form fails as an invalid signature, not as an error that names the form.
+
+<Tabs syncKey="lang">
+<TabItem label="Node.js">
+
+```ts
+import express from 'express';
+import { verifyStandardWebhook } from '@railhook/node';
+
+app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
+  try {
+    verifyStandardWebhook(req.body.toString('utf8'), req.headers, process.env.RAILHOOK_WHSEC);
+  } catch {
+    return res.sendStatus(400);
+  }
+  const data = JSON.parse(req.body.toString('utf8'));
+  return res.sendStatus(204);
+});
+```
+
+</TabItem>
+<TabItem label="Python">
+
+```python
+import os
+
+from fastapi import HTTPException, Request, Response
+from railhook import RailhookError, verify_standard_webhook
+
+@app.post("/webhooks")
+async def receive(request: Request) -> Response:
+    body = (await request.body()).decode()
+    try:
+        verify_standard_webhook(body, dict(request.headers), os.environ["RAILHOOK_WHSEC"])
+    except RailhookError:
+        raise HTTPException(status_code=400)
+    return Response(status_code=204)
+```
+
+</TabItem>
+<TabItem label="PHP">
+
+```php
+<?php
+use Railhook\Webhook;
+use Railhook\Exception\RailhookException;
+
+$payload = file_get_contents('php://input');
+
+try {
+    Webhook::verifyStandardWebhook($payload, getallheaders(), getenv('RAILHOOK_WHSEC'));
+    http_response_code(204);
+} catch (RailhookException $e) {
+    http_response_code(400);
+}
+```
+
+</TabItem>
+</Tabs>
+
+## Rotate a secret without breaking the receiver
+
+<Steps>
+
+1. Call `POST /api/v1/projects/{projectId}/endpoints/{id}/rotate-secret`. The response carries the new `secret` and `standardWebhooksSecret`.
+
+2. For the endpoint's grace period, 24 hours by default, every delivery is signed with both the new and the retired secret. `X-Signature` carries one `v1` for each, and `webhook-signature` carries one space-separated entry for each:
+
+   ```http
+   X-Signature: t=1735689600000,v1=8f2a41c7…new,v1=3b90de55…retired
+   ```
+
+3. Deploy the new secret to the receiver at any point inside that window. After the window closes, only the new secret signs.
+
+</Steps>
+
+<Aside type="caution" title="Common mistakes">
+- Verify the raw bytes. A body parsed and serialised again hashes differently.
+- Compare in constant time: `timingSafeEqual`, `hmac.compare_digest`, `hash_equals`.
+- Reject an old timestamp, so a captured request cannot be sent again later.
+- Read every `v1` or every space-separated entry. Taking only one makes a rotation look like a forged request.
+- Do not mix the units: `X-Timestamp` is milliseconds, `webhook-timestamp` is seconds.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Endpoint security" href="/docs/outgoing/endpoint-security/" description="Ownership checks, client certificates and private address rules." />
+  <LinkCard title="SDKs" href="/docs/tools/sdks/" description="Install the Node.js, Python and PHP SDKs." />
+  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="What your answer to a delivery decides." />
+</CardGrid>

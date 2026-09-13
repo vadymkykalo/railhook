@@ -1,0 +1,68 @@
+---
+/**
+ * Replaces Starlight's theme <select>: one icon button, as in the dashboard header. It flips to
+ * the opposite of the theme on screen, and stores the choice under Starlight's own key, so the
+ * inline ThemeProvider script still applies it before first paint.
+ */
+import { Icon } from '@astrojs/starlight/components';
+---
+
+<rh-theme-toggle>
+  <button type="button" class="toggle" aria-label={Astro.locals.t('themeSelect.accessibleLabel')}>
+    <Icon name="moon" class="to-dark" />
+    <Icon name="sun" class="to-light" />
+  </button>
+</rh-theme-toggle>
+
+<style>
+  .toggle {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.625rem;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+  }
+  .toggle:hover {
+    color: var(--sl-color-white);
+    border-color: var(--sl-color-gray-4);
+    background: var(--sl-color-gray-6);
+  }
+  .toggle:focus-visible {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 2px;
+  }
+  .toggle :global(svg) {
+    width: 1.05rem;
+    height: 1.05rem;
+  }
+  /* Show the theme a click switches to. */
+  :global([data-theme='light']) .to-light,
+  :global([data-theme='dark']) .to-dark {
+    display: none;
+  }
+</style>
+
+<script>
+  const storageKey = 'starlight-theme';
+
+  class RailhookThemeToggle extends HTMLElement {
+    constructor() {
+      super();
+      this.querySelector('button')?.addEventListener('click', () => {
+        const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+        try {
+          localStorage.setItem(storageKey, next);
+        } catch {
+          /* private mode: the switch still applies for this page */
+        }
+      });
+    }
+  }
+  if (!customElements.get('rh-theme-toggle')) customElements.define('rh-theme-toggle', RailhookThemeToggle);
+</script>

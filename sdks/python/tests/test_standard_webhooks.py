@@ -59,6 +59,35 @@ def test_either_secret_verifies_during_a_rotation():
     assert verify_standard_webhook(PAYLOAD, headers(ts, header), f"whsec_{retired}")
 
 
+def test_rotation_header_verifies_when_the_match_is_last_beside_an_unknown_version():
+    ts = int(time.time())
+    retired = "b2xkLXNlY3JldC1ieXRlcy1oZXJlLXBhZGRpbmc="
+    header = f"v1,{sign(ts, retired)} v2,{sign(ts)} v1,{sign(ts)}"
+
+    assert verify_standard_webhook(PAYLOAD, headers(ts, header), SHARED_SECRET)
+
+
+def test_rotation_header_still_enforces_the_tolerance():
+    old = int(time.time()) - 3600
+    retired = "b2xkLXNlY3JldC1ieXRlcy1oZXJlLXBhZGRpbmc="
+    header = f"v1,{sign(old)} v1,{sign(old, retired)}"
+
+    with pytest.raises(RailhookError) as exc:
+        verify_standard_webhook(PAYLOAD, headers(old, header), SHARED_SECRET)
+
+    assert exc.value.code == "timestamp_expired"
+
+
+def test_non_ascii_signature_entry_is_rejected_not_crashed():
+    # hmac.compare_digest raises TypeError on a non-ASCII str, and the header is whatever
+    # the sender put there: that was an unhandled exception (a 500), not a rejection.
+    ts = int(time.time())
+    with pytest.raises(RailhookError) as exc:
+        verify_standard_webhook(PAYLOAD, headers(ts, "v1,é"), SHARED_SECRET)
+
+    assert exc.value.code == "invalid_signature"
+
+
 def test_rejects_a_replay_despite_a_valid_signature():
     # A signature over a fixed body never expires on its own, so without the timestamp
     # check a captured request stays replayable for as long as the secret lives.

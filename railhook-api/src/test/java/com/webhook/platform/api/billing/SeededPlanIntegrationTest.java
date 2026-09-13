@@ -11,10 +11,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The plan ladder as the migrations leave it, asserted against the numbers the
- * public pricing page prints.
+ * public landing page prints.
  *
- * `railhook-ui/src/pages/landing/plans.ts` is a hand-written mirror of
- * these rows — the landing page cannot query the database, and quoting a limit
+ * `railhook-ui/src/pages/landing/plans.ts` hand-mirrors the free plan's limits,
+ * which the landing quotes for Railhook Cloud — it cannot query the database, and quoting a limit
  * it does not enforce is the kind of mistake nobody notices until a customer
  * does. Nothing but a test spans the two, so this is it: change a seeded limit
  * and this fails, naming the file to update.

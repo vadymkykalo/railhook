@@ -1,0 +1,93 @@
+---
+title: Monitoring
+description: Health checks, Prometheus metrics, the bundled Grafana stack, and the signals worth alerting on.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Railhook exposes health checks on its public port and Prometheus metrics on internal ports. The repository ships a ready monitoring stack you can start next to it.
+
+## Health checks
+
+`RAILHOOK_URL` is your instance's address: `http://localhost` after a default install, `http://localhost:<port>` if you passed `--port`, `https://<your domain>` with `--domain`.
+
+```bash
+curl -f "$RAILHOOK_URL/actuator/health/liveness"
+curl -f "$RAILHOOK_URL/actuator/health/readiness"
+```
+
+nginx proxies only the health paths. Every other `/actuator/` path answers `404` on the public port.
+
+## Metrics
+
+Metrics are on separate management ports, inside the Docker network only, and need no credentials:
+
+| Service | Metrics URL |
+|---|---|
+| API | `http://api:8082/actuator/prometheus` |
+| Worker | `http://worker:8081/actuator/prometheus` |
+
+They are deliberately not proxied to the public port: metrics would reveal endpoint names and traffic volume to anyone who asked.
+
+## The bundled stack
+
+The `monitoring/` directory of the repository contains Prometheus, Alertmanager, Grafana, Loki and Promtail, preconfigured.
+
+<Steps>
+
+1. **Start Railhook first**, from a clone with `make up`.
+
+2. **Start the monitoring stack**
+
+   ```bash
+   make monitoring-up
+   ```
+
+3. **Open Grafana** at `http://localhost:3001` and sign in as `railhook` / `railhook_monitor_2024`. Change the password with `GF_ADMIN_PASSWORD=... make monitoring-up`.
+
+</Steps>
+
+| Service | Address (loopback only) |
+|---|---|
+| Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) |
+| Prometheus | `127.0.0.1:9090` |
+| Alertmanager | `127.0.0.1:9093` |
+| Loki | `127.0.0.1:3100` |
+
+Grafana comes with dashboards for the overview, the worker and circuit breaker, JVM, Kafka, and logs. Alertmanager sends the bundled alert rules to Slack, a generic webhook or email once you set the `ALERTMANAGER_*` variables.
+
+<Aside type="caution">
+The stack joins the Docker network `railhook_webhook-network`, so the Railhook Compose project must be named `railhook`. `.env.dist` sets `COMPOSE_PROJECT_NAME=railhook`. If Prometheus shows no targets, check this first.
+</Aside>
+
+## What to alert on
+
+| Metric | Why |
+|---|---|
+| `delivery_oldest_pending_age_seconds` | The age of the oldest unfinished delivery. Every cause of trouble shows up here. `forward_oldest_pending_age_seconds` is the incoming twin |
+| `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Deliveries and forwards that ran out of retries and need a person |
+| `outbox_oldest_pending_age_seconds` | Accepted events that have not reached Kafka yet |
+| `circuit_breaker_degraded_total` | Redis was unreachable and the breaker let calls through unprotected |
+
+## Kubernetes
+
+Turn on the chart's integrations with kube-prometheus-stack:
+
+```yaml title="values.yaml"
+monitoring:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+  grafanaDashboards:
+    enabled: true
+```
+
+The ServiceMonitor scrapes the `management` port of the API and the worker.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Observability" description="Every metric, grouped by the question it answers." href="/docs/platform/observability/" />
+  <LinkCard title="Alerts" description="Alert rules you configure in the dashboard." href="/docs/platform/alerts/" />
+  <LinkCard title="Troubleshooting" description="Symptoms and fixes." href="/docs/self-hosting/troubleshooting/" />
+</CardGrid>

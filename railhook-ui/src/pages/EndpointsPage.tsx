@@ -292,7 +292,7 @@ export default function EndpointsPage() {
           title={t('endpoints.noEndpoints')}
           description={t('endpoints.noEndpointsDesc')}
           action={newEndpointButton}
-          docsLink="/docs#endpoints-api"
+          docsLink="outgoing/endpoints-subscriptions"
         />
       ) : (
         <>

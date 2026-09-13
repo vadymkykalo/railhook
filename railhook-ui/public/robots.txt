@@ -14,8 +14,10 @@ Disallow: /accept-invite
 Disallow: /device
 Disallow: /shared/
 
-# Regenerate this line and public/sitemap.xml together for the domain you
+# Regenerate these lines and public/sitemap.xml together for the domain you
 # serve from: SITE_URL=https://your.domain npm run seo:sitemap
 # example.com is IANA-reserved, so an unconfigured deployment points nowhere
-# real rather than at somebody else's site.
+# real rather than at somebody else's site. The second sitemap is the docs site's
+# own (railhook-docs/, served at /docs/).
 Sitemap: https://example.com/sitemap.xml
+Sitemap: https://example.com/docs/sitemap-index.xml

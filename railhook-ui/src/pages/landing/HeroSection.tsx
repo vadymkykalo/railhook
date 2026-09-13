@@ -1,85 +1,55 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '../../components/ui/button';
 import { useAuth } from '../../auth/auth.store';
-import AmbientDelivery from './AmbientDelivery';
-import DeliveryFlight from './DeliveryFlight';
-import { Reveal } from './primitives';
-import { FREE_PLAN } from './plans';
+import InstallCommand from './InstallCommand';
+import RailMap from './RailMap';
+import { WRAP } from './primitives';
 
 /**
- * The headline is the outcome, not the topology.
- *
- * It used to lead with "on your own servers" and follow with four technical
- * facts in one breath — HMAC, the ladder, the DLQ, the two directions. Where
- * the software runs is an implementation detail; not losing a webhook is the
- * reason to buy. The proof still appears, one rung down: the chips under the
- * fold carry it, and the sections below spell it out once each.
- *
- * Both buttons stay inside the funnel: the account, then the documentation.
- * The repository is a trust signal, not a step, so it lives as a mark in the
- * nav — a visitor deciding whether to buy should not be handed a git clone as
- * one of their two choices.
- *
- * The free-plan numbers are interpolated from FREE_PLAN rather than written
- * into the sentence, because the same figures are rendered again in the pricing
- * grid and a hand-typed copy of them drifts on the first plan change.
+ * The outcome as the headline, both ways to get it as the two buttons, and the install command
+ * right there for the reader who has already decided. The map underneath shows the headline
+ * happening: one delivery fails, waits, and still arrives.
  */
 export default function HeroSection() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
-  const events = new Intl.NumberFormat(i18n.language).format(FREE_PLAN.events);
 
   return (
-    <section className="relative overflow-hidden">
-      <AmbientDelivery />
-      <div className="relative mx-auto max-w-6xl px-5 pb-14 pt-14 sm:px-6 lg:pb-20 lg:pt-20">
-        <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-14">
-          <div>
-            <p className="mono-label">{t('landing.hero.eyebrow')}</p>
-            <h1 className="mt-4 max-w-[14ch] font-display text-[2.25rem] leading-[1.05] tracking-[-0.03em] text-foreground sm:text-[2.75rem] lg:max-w-[15ch] lg:text-[3.25rem]">
-              {t('landing.hero.title')}
-            </h1>
-            <p className="mt-5 max-w-xl text-body-lg text-muted-foreground">{t('landing.hero.subtitle')}</p>
+    <section aria-labelledby="hero-title" className="pt-14 sm:pt-[76px]">
+      <div className={`${WRAP} text-center`}>
+        <h1
+          id="hero-title"
+          className="mx-auto max-w-[14ch] font-display text-[clamp(2.3rem,5.6vw,4.3rem)] font-extrabold leading-[1.04] tracking-[-0.035em] text-foreground [text-wrap:balance]"
+        >
+          <Trans i18nKey="landing.hero.title" components={{ em: <em className="not-italic text-primary" /> }} />
+        </h1>
+        <p className="mx-auto mt-5 max-w-[56ch] text-[clamp(1.02rem,1.6vw,1.2rem)] text-muted-foreground [text-wrap:balance]">
+          {t('landing.hero.lead')}
+        </p>
 
-            {/* flex-wrap, not just sm:flex-row: the Ukrainian labels are half
-                again as long as the English ones and pushed the second button
-                under the panel in the next column. */}
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              {isAuthenticated ? (
-                <Link to="/admin/dashboard">
-                  <Button size="lg" className="w-full sm:w-auto">
-                    {t('landing.nav.goToDashboard')} <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                </Link>
-              ) : (
-                <>
-                  <Link to="/register">
-                    <Button size="lg" className="w-full sm:w-auto">
-                      {t('landing.hero.ctaPrimary')} <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  </Link>
-                  <Link to="/docs">
-                    <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                      {t('landing.hero.ctaSecondary')}
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </div>
-            <p className="mt-3 text-sm text-muted-foreground">{t('landing.hero.ctaNote', { events })}</p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Button asChild size="lg">
+            {isAuthenticated ? (
+              <Link to="/admin/dashboard">{t('landing.nav.goToDashboard')}</Link>
+            ) : (
+              <Link to="/register">{t('landing.hero.startFree')}</Link>
+            )}
+          </Button>
+          <Button asChild size="lg" variant="outline">
+            <a href="#install">{t('landing.hero.install')}</a>
+          </Button>
+        </div>
+        {!isAuthenticated && <p className="mt-3 text-sm text-muted-foreground">{t('landing.hero.cloudNote')}</p>}
 
-            <ul className="mt-8 flex flex-col gap-2 border-t border-rail pt-6 font-mono text-[12px] text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-6">
-              <li>{t('landing.hero.chip1')}</li>
-              <li>{t('landing.hero.chip2')}</li>
-              <li>{t('landing.hero.chip3')}</li>
-            </ul>
-          </div>
+        <InstallCommand label id="install" className="mt-10" />
+      </div>
 
-          <Reveal delay={120} className="lg:pl-4">
-            <DeliveryFlight />
-          </Reveal>
+      {/* Not on a phone: at that width the map is either a sideways scroll or unreadably small,
+          and the directions cards directly below say the same thing in words. */}
+      <div className="mt-11 hidden border-t border-rail bg-gradient-to-b from-background to-muted pb-8 pt-6 sm:block">
+        <div className={WRAP}>
+          <RailMap />
         </div>
       </div>
     </section>

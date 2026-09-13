@@ -153,17 +153,26 @@ Receive, validate, and forward webhooks from third-party providers (Stripe, GitH
 ### Incoming Sources
 
 ```php
-// Create an incoming source with HMAC verification
+// Create an incoming source that verifies Stripe's own signature scheme
 $source = $client->incomingSources->create($projectId, [
     'name' => 'Stripe Webhooks',
     'slug' => 'stripe',
     'providerType' => 'STRIPE',
-    'verificationMode' => 'HMAC_GENERIC',
-    'hmacSecret' => 'whsec_...',
-    'hmacHeaderName' => 'Stripe-Signature',
+    'verificationMode' => 'PROVIDER', // Stripe-Signature: t=<unix-s>,v1=<hex>, 300 s tolerance
+    'hmacSecret' => 'whsec_...',      // the signing secret from Stripe's webhook settings
 ]);
 
 echo "Ingress URL: {$source['ingressUrl']}\n";
+
+// A provider with no preset (providerType GENERIC) uses HMAC_GENERIC instead:
+// HMAC-SHA256 over the body, read from the header and prefix you name.
+$client->incomingSources->create($projectId, [
+    'name' => 'Acme Webhooks',
+    'verificationMode' => 'HMAC_GENERIC',
+    'hmacSecret' => 'acme-shared-secret',
+    'hmacHeaderName' => 'X-Acme-Signature',
+    'hmacSignaturePrefix' => 'sha256=',
+]);
 
 // List sources
 $sources = $client->incomingSources->list($projectId);
@@ -263,7 +272,7 @@ try {
 
 ### What lands on your endpoint
 
-Railhook PUTs the event's **payload** on the wire, not an envelope. This:
+Railhook POSTs the event's **payload** on the wire, not an envelope. This:
 
 ```php
 $client->events->send('order.completed', ['orderId' => 'ord_1']);
@@ -280,6 +289,9 @@ X-Event-Id: 6f0e…
 X-Delivery-Id: 91ab…
 X-Sequence-Number: 0
 Idempotency-Key: 6f0e…-<endpoint-id>
+webhook-id: 91ab…
+webhook-timestamp: 1738000000
+webhook-signature: v1,<base64 hmac-sha256>
 
 {"orderId":"ord_1"}
 ```
@@ -294,6 +306,42 @@ The signature is computed over `"{$timestamp}.{$rawBody}"` with HMAC-SHA256 and
 the endpoint secret, and the server rejects timestamps more than **300
 seconds** old — verify against the *raw* body from `php://input`, before any
 `json_decode` and re-encode.
+
+### Standard Webhooks headers
+
+An endpoint receives both header sets by default (`signatureScheme: BOTH`; `LEGACY` sends
+only `X-Signature`, `STANDARD` only the `webhook-*` headers). The
+[Standard Webhooks](https://www.standardwebhooks.com) signature is over
+`"{$webhookId}.{$webhookTimestamp}.{$rawBody}"` — timestamp in seconds, digest in base64 —
+with the endpoint's `standardWebhooksSecret` (`whsec_…`), so any Standard Webhooks library
+verifies it too:
+
+```php
+<?php
+
+use Railhook\Webhook;
+use Railhook\Exception\RailhookException;
+
+try {
+    Webhook::verifyStandardWebhook(
+        file_get_contents('php://input'),
+        getallheaders(), // or Laravel/Symfony's $request->headers->all()
+        getenv('STANDARD_WEBHOOKS_SECRET')
+    );
+    http_response_code(200);
+} catch (RailhookException $e) {
+    http_response_code(400);
+}
+```
+
+### Secret rotation
+
+After `endpoints->rotateSecret()`, every delivery is signed with the new secret **and** the
+retired one until the endpoint's grace window closes (24 hours by default), so the new secret
+can be deployed at any point inside it. `X-Signature` then carries two `v1=` values and
+`webhook-signature` two space-separated `v1,` entries. `verifySignature`, `constructEvent`
+and `verifyStandardWebhook` accept the request when **any** `v1` matches, ignore other
+versions, and still reject a timestamp outside the tolerance.
 
 ### Laravel Example
 
@@ -459,6 +507,8 @@ All generic methods use the same authentication, error handling, and rate-limit 
 ## Configuration
 
 ```php
+use Railhook\Railhook;
+
 $client = new Railhook(
     apiKey: getenv('RAILHOOK_API_KEY'), // Required: Your project API key
     baseUrl: 'https://api.example.com', // Optional (default: http://localhost:8080)

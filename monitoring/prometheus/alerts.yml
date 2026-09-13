@@ -38,7 +38,7 @@ groups:
   - name: railhook.outbox
     rules:
       # Accepted but unannounced. This is the third of the three signals
-      # docs/guides/observability.md tells an operator to alert on if they alert on nothing
+      # the observability guide tells an operator to alert on if they alert on nothing
       # else — and until now it was the only one of the three with no rule behind it.
       - alert: OutboxOldestPendingAgeHigh
         expr: |

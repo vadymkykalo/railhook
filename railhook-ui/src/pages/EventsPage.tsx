@@ -204,7 +204,7 @@ export default function EventsPage() {
           action={search ? (
             <Button variant="outline" onClick={() => setSearch('')}>{t('common.clearSearch')}</Button>
           ) : sendAction}
-          docsLink={search ? undefined : '/docs#events-api'}
+          docsLink={search ? undefined : 'api-reference'}
         />
       ) : (
         <div className="animate-fade-in">

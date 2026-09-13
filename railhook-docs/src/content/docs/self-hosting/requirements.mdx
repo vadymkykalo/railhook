@@ -1,0 +1,59 @@
+---
+title: Requirements
+description: The host, ports and network access a self-hosted Railhook needs.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Check these before you install. The installer checks the same things and refuses to go ahead until they pass. On an existing installation, `./railhook doctor` runs those checks again.
+
+## Host
+
+| Resource | Requirement |
+|---|---|
+| Docker | Docker Engine 20.10 or newer, with the daemon running and reachable by your user |
+| Compose | Compose v2, as `docker compose` or the standalone `docker-compose` |
+| Memory | About 4 GiB. Between 2 and 4 GiB the installer warns you to expect swapping; below 2 GiB it stops |
+| Disk | At least 5 GiB free for the images, plus room for the database and the Kafka log |
+| Tools | `curl` and `openssl`, which the installer uses to download files and generate secrets |
+
+The stack runs two JVMs, a broker, a database and a cache. These are the default memory limits per container, and each one can be changed in `.env`:
+
+| Service | Limit | Variable |
+|---|---|---|
+| `api` | 768m | `API_MEMORY_LIMIT` |
+| `worker` | 768m | `WORKER_MEMORY_LIMIT` |
+| `postgres` | 1G | `POSTGRES_MEMORY_LIMIT` |
+| `kafka` | 1G | `KAFKA_MEMORY_LIMIT` |
+| `redis` | 512m | `REDIS_MEMORY_LIMIT` |
+| `ui` | 128m | `UI_MEMORY_LIMIT` |
+
+## Ports
+
+| Port | When |
+|---|---|
+| `80` | Without a domain. Change it with `--port` if something else already holds it |
+| `80` and `443` | With `--domain`. Both must be free, because the TLS terminator takes them |
+| `8080` on `127.0.0.1` | With `--domain --behind-proxy`. Your proxy keeps 80 and 443. Change it with `--port` |
+
+Nothing else is published to the host.
+
+## Network
+
+- **Inbound:** the one port above, from wherever your users and your webhook providers are.
+- **Outbound, to install and upgrade:** `raw.githubusercontent.com` and `api.github.com` for the release files, and `ghcr.io` for the images.
+- **Outbound, to deliver:** HTTP and HTTPS to your endpoints and destinations, on whatever ports they use.
+
+<Aside type="caution">
+By default Railhook refuses to deliver to private and internal IP addresses, so an endpoint cannot be used to reach your internal network. To allow one named internal host, add it to `WEBHOOK_ALLOWED_HOSTS` instead of switching the protection off.
+</Aside>
+
+## Kubernetes
+
+The Helm chart needs Kubernetes 1.24+ and Helm 3.8+, plus PostgreSQL 16+, Kafka 3.7+ and Redis 7+ that you supply. See [Kubernetes](/docs/self-hosting/kubernetes/).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Install with Docker" description="Run the installer." href="/docs/self-hosting/install-docker/" />
+  <LinkCard title="Kubernetes" description="Install the Helm chart." href="/docs/self-hosting/kubernetes/" />
+</CardGrid>

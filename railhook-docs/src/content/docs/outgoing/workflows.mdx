@@ -1,0 +1,90 @@
+---
+title: Workflows
+description: Run a graph of steps when an event arrives, to filter it, reshape it, call a service, deliver it, or send a new event.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+A workflow is a graph of steps that runs when an event is sent, or when you start it yourself. Each step receives the output of the step before it. The dashboard has a visual builder; the same workflow can be created through the API.
+
+## How a workflow runs
+
+- A **trigger** starts the run with the event's `data` as input.
+- Nodes run in topological order: a node starts only after every node it depends on has finished.
+- Each node's output becomes the input of the nodes it connects to. A node with several outgoing edges fans out.
+- A `filter` node that does not match skips everything downstream of it. A `branch` node sends the run down its `true` or its `false` edge.
+- Every step records its status, input, output and duration, so a run can be read back step by step. List runs with `GET /api/v1/projects/{projectId}/workflows/{id}/executions`.
+
+## Triggers
+
+| `triggerType` | Starts a run |
+|---|---|
+| `WEBHOOK_EVENT` (default) | For each event whose type matches `triggerConfig.eventTypePattern`. Without a pattern, for every event in the project. A workflow runs at most once per event. |
+| `MANUAL` | When you call `POST /api/v1/projects/{projectId}/workflows/{id}/trigger`. The JSON body is the input. |
+
+Turn a workflow on or off with `PATCH /api/v1/projects/{projectId}/workflows/{id}/toggle`.
+
+## Node types
+
+| `type` | What it does | Config in `data` |
+|---|---|---|
+| `webhookTrigger` | The entry point. Passes the trigger input on. | none |
+| `filter` | Continues only when the conditions match; otherwise downstream nodes are skipped. | `conditions`, the same condition tree as [rules](/docs/outgoing/rules/#conditions) |
+| `branch` | Evaluates the conditions and follows the `true` or the `false` edge. No conditions means `true`. | `conditions` |
+| `transform` | Reshapes the data. A saved transformation wins when both are set; one that cannot be found fails the step. | `transformationId`, or `template` with `{{field.path}}` placeholders |
+| `http` | Calls a URL and passes the response on. | `url` (required), `method` (default `POST`), `headers`, `body` (default: the input), `timeout` in seconds, 1 to 60, default 30 |
+| `slack` | Posts a message to a Slack incoming webhook. | `webhookUrl`, `message`, `channel` |
+| `delivery` | Delivers the data to an existing endpoint through the normal delivery pipeline, with its retries. | `endpointId` (required) |
+| `createEvent` | Sends a new event into Railhook, which then goes through rules and subscriptions like any other. | `projectId`, `eventType` (both required), `payloadTemplate` (default: the input) |
+| `delay` | Pauses the run, without holding a worker thread. | `delaySeconds`, 1 to 300, default 5 |
+
+## Create a workflow
+
+A definition is a list of `nodes`, each with an `id`, a `type` and its `data`, and a list of `edges` from `source` to `target`. An edge leaving a `branch` node sets `sourceHandle` to `"true"` or `"false"`.
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/workflows" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Big orders to the fraud service",
+    "enabled": true,
+    "triggerType": "WEBHOOK_EVENT",
+    "triggerConfig": { "eventTypePattern": "order.*" },
+    "definition": {
+      "nodes": [
+        { "id": "start", "type": "webhookTrigger", "data": {} },
+        { "id": "big", "type": "filter", "data": { "conditions": { "type": "predicate", "field": "amount", "operator": "GTE", "value": 1000, "valueType": "NUMBER" } } },
+        { "id": "check", "type": "http", "data": { "url": "https://fraud.example.com/check", "method": "POST" } }
+      ],
+      "edges": [
+        { "source": "start", "target": "big" },
+        { "source": "big", "target": "check" }
+      ]
+    }
+  }'
+```
+
+## Time limits
+
+| Limit | Default |
+|---|---|
+| One run, end to end | 600 seconds |
+| One node | 30 seconds |
+| An `http` or `slack` node | 60 seconds |
+| A `createEvent` node | 30 seconds |
+
+## What to watch
+
+<Aside type="caution">
+- An `http` node's URL goes through the same private address check as an endpoint, controlled by `WEBHOOK_ALLOW_PRIVATE_IPS` and `WEBHOOK_ALLOWED_HOSTS`. See [Endpoint security](/docs/outgoing/endpoint-security/#where-deliveries-may-go).
+- A `slack` node only accepts a URL that starts with `https://hooks.slack.com/`.
+- Each step stores its input and output as they were. Anything secret in the data is readable in the run history, so mask it first. See [PII masking](/docs/platform/pii-masking/).
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Rules" href="/docs/outgoing/rules/" description="Single-step routing decisions, evaluated before deliveries exist." />
+  <LinkCard title="Transformations" href="/docs/outgoing/transformations/" description="Saved templates a transform node can reuse." />
+  <LinkCard title="API reference" href="/docs/api-reference/" description="Every workflow request and response." />
+</CardGrid>

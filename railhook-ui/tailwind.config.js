@@ -16,6 +16,7 @@ export default {
         foreground: "hsl(var(--foreground))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
+          hover: "hsl(var(--primary-hover))",
           foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
@@ -72,34 +73,35 @@ export default {
         },
       },
       borderRadius: {
-        xl: "calc(var(--radius) + 4px)",
+        // Controls are 10px (`lg`, --radius); cards are 16px (`xl`).
+        xl: "calc(var(--radius) + 6px)",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        // One family, two voices. Geologica is a technical grotesk with full
-        // Cyrillic — which decides it, because the product ships in English and
-        // Ukrainian and the previous display face (Bricolage Grotesque) has no
-        // Cyrillic at all, so every Ukrainian headline would have silently
-        // fallen back. `display` and `sans` are the same family; the landing's
-        // voice comes from weight and tracking, not from a second typeface.
-        display: ['Geologica', 'system-ui', 'sans-serif'],
-        sans: ['Geologica', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        // Three faces, and all three carry full Cyrillic — the product ships in
+        // English and Ukrainian, so a face without it would silently fall back
+        // on every Ukrainian string. Onest is the body and the whole admin.
+        // Manrope is display only: landing H1/H2 and docs page titles, never
+        // the admin. JetBrains Mono is the machine voice — code, event types,
+        // ids, URLs, eyebrows.
+        display: ['Manrope', 'Onest', 'system-ui', 'sans-serif'],
+        sans: ['Onest', 'system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       fontSize: {
-        'display': ['3.75rem', { lineHeight: '1.04', letterSpacing: '-0.04em', fontWeight: '600' }],
-        'headline': ['2.375rem', { lineHeight: '1.1', letterSpacing: '-0.032em', fontWeight: '600' }],
-        'title': ['1.3125rem', { lineHeight: '1.28', letterSpacing: '-0.018em', fontWeight: '600' }],
+        'display': ['3.75rem', { lineHeight: '1.04', letterSpacing: '-0.035em', fontWeight: '800' }],
+        'headline': ['2.375rem', { lineHeight: '1.12', letterSpacing: '-0.025em', fontWeight: '700' }],
+        'title': ['1.3125rem', { lineHeight: '1.28', letterSpacing: '-0.015em', fontWeight: '600' }],
         'body-lg': ['1.0625rem', { lineHeight: '1.65' }],
       },
       boxShadow: {
-        // No glows. Elevation is a shadow you would get from paper on paper.
-        'card': '0 1px 2px 0 rgb(16 20 24 / 0.04)',
-        'card-hover': '0 2px 8px -2px rgb(16 20 24 / 0.08), 0 1px 2px 0 rgb(16 20 24 / 0.04)',
-        'elevated': '0 8px 24px -6px rgb(16 20 24 / 0.12), 0 2px 6px -2px rgb(16 20 24 / 0.06)',
-        'elevated-lg': '0 16px 40px -10px rgb(16 20 24 / 0.16), 0 4px 10px -4px rgb(16 20 24 / 0.08)',
+        // Quiet. A card is drawn by its hairline; the shadow only lifts what floats.
+        'card': '0 1px 2px 0 rgb(11 14 26 / 0.05)',
+        'card-hover': '0 1px 2px rgb(11 14 26 / 0.05), 0 10px 30px rgb(11 14 26 / 0.07)',
+        'elevated': '0 1px 2px rgb(11 14 26 / 0.05), 0 10px 30px rgb(11 14 26 / 0.07)',
+        'elevated-lg': '0 2px 4px rgb(11 14 26 / 0.06), 0 16px 40px rgb(11 14 26 / 0.10)',
       },
       spacing: {
         '18': '4.5rem',

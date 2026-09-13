@@ -1,0 +1,116 @@
+---
+title: Локальна розробка
+description: Зберіть і запустіть Railhook з клону репозиторію та змінюйте по одному сервісу за раз.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Ця сторінка — для роботи над самим Railhook. Вона збирає API, воркер і панель керування з вашого робочого дерева й запускає їх з тим самим одним портом, що й справжнє розгортання.
+
+## Що потрібно
+
+- Java 17 і Maven 3.9+
+- Node 22+
+- Docker із Compose v2
+
+## Запуск стеку
+
+<Steps>
+
+1. **Клонуйте репозиторій**
+
+   ```bash
+   git clone https://github.com/vadymkykalo/railhook.git
+   cd railhook
+   ```
+
+2. **Запустіть усе**
+
+   ```bash
+   make up
+   ```
+
+   Команда створює `.env` із `.env.dist`, якщо його немає, збирає три сервіси з вашого дерева, запускає їх із вбудованою базою даних і резервними копіями за розкладом, чекає, доки API й воркер стануть здоровими, і створює топіки Kafka. Не виконуйте жоден із цих кроків вручну.
+
+3. **Відкрийте панель керування**
+
+   Перейдіть на `http://localhost:8080`. Панель, API, документація та ingress-адреси — усе йде через цей порт.
+
+</Steps>
+
+`make help` показує всі цілі.
+
+## Внутрішній цикл
+
+Коли стек запущено, перезбирайте й перезапускайте лише той сервіс, який змінили:
+
+| Команда | Що робить |
+|---|---|
+| `make dev-api` | Перезбирає API з кешем збірки, перезапускає його й показує журнали |
+| `make dev-worker` | Те саме для воркера |
+| `make dev-ui` | Те саме для образу панелі керування |
+| `make health` | Показує стан Postgres, Kafka, Redis, API, воркера та вебпорту |
+| `make logs` / `make logs-api` | Стежить за журналами |
+| `make down` | Зупиняє стек, зберігаючи дані |
+
+<Aside type="caution">
+`make nuke CONFIRM=YES` видаляє контейнери, томи, образи й мережі, разом зі стеком моніторингу. Після цього бази даних не буде.
+</Aside>
+
+## Порти
+
+| Порт | Що |
+|---|---|
+| `8080` | `RAILHOOK_PORT`: nginx, що віддає панель і проксує API, ingress і тунелі |
+| `5173` | Dev-сервер Vite, коли панель запущено через `npm run dev` |
+| `8080`, `8082` | API та його actuator, лише всередині мережі Docker |
+| `8081` | Actuator воркера, лише всередині мережі Docker |
+
+Щоб дістатися до API чи бази напряму, додайте `docker-compose.override.yml` і лишіть порти на loopback:
+
+```yaml title="docker-compose.override.yml"
+services:
+  api:      { ports: ["127.0.0.1:8080:8080", "127.0.0.1:8082:8082"] }
+  postgres: { ports: ["127.0.0.1:5432:5432"] }
+```
+
+`127.0.0.1:8080` для API конфліктує з `RAILHOOK_PORT=8080`, тож перенесіть один із них.
+
+## Панель керування з гарячим перезавантаженням
+
+```bash
+cd railhook-ui
+npm install
+npm run dev
+```
+
+Вона працює на `http://localhost:5173` і проксує `/api` на `http://localhost:8080`, тобто до стеку, запущеного через `make up`. Щоб спрямувати її деінде, задайте `VITE_DEV_API_TARGET`.
+
+## Сайт документації
+
+```bash
+make docs-dev
+```
+
+## Посилання з листів без поштового сервера
+
+З `EMAIL_ENABLED=false` (типово в `.env.dist`) нові облікові записи підтверджуються одразу. Посилання для скидання пароля та запрошення записуються в журнал API, а не надсилаються поштою:
+
+```bash
+make reset-link
+make invite-link
+```
+
+## Перевірки, які запускає CI
+
+```bash
+make test-ui                              # dashboard unit tests
+cd railhook-ui && npm run lint && npm run typecheck
+mvn clean compile -B
+```
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Конфігурація" description="Кожна змінна з .env." href="/docs/uk/self-hosting/configuration/" />
+  <LinkCard title="Моніторинг" description="Запустіть Prometheus і Grafana поруч зі стеком." href="/docs/uk/self-hosting/monitoring/" />
+</CardGrid>

@@ -20,6 +20,13 @@ COPY railhook-ui/package*.json ./
 # Install dependencies
 RUN npm ci
 
+# Chromium for the prerender step. Alpine's package rather than a Puppeteer download:
+# puppeteer-core ships no browser, and the musl builds Puppeteer fetches do not run here.
+# It lives in the build stage only — the runtime image below is nginx and carries none of it.
+# Installed before the sources are copied, so a code change does not reinstall a browser.
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
 # Copy UI source files
 COPY railhook-ui/ .
 
@@ -31,7 +38,6 @@ COPY railhook-ui/ .
 ARG VITE_API_URL=""
 ARG VITE_CSP_EXTRA_CONNECT=""
 ARG VITE_SITE_URL=""
-ARG VITE_CONTACT_DOMAIN=""
 # The registration challenge. Build-time like every other VITE_ value, and the
 # site key's presence is also what src/lib/csp.ts keys the widened script-src
 # and frame-src off — so an image built without it cannot show a challenge even
@@ -41,15 +47,9 @@ ARG VITE_CAPTCHA_SCRIPT_URL=""
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_CSP_EXTRA_CONNECT=$VITE_CSP_EXTRA_CONNECT
 ENV VITE_SITE_URL=$VITE_SITE_URL
-ENV VITE_CONTACT_DOMAIN=$VITE_CONTACT_DOMAIN
 ENV VITE_CAPTCHA_SITE_KEY=$VITE_CAPTCHA_SITE_KEY
 ENV VITE_CAPTCHA_SCRIPT_URL=$VITE_CAPTCHA_SCRIPT_URL
 
-# Chromium for the prerender step. Alpine's package rather than a Puppeteer download:
-# puppeteer-core ships no browser, and the musl builds Puppeteer fetches do not run here.
-# It lives in the build stage only — the runtime image below is nginx and carries none of it.
-RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # A sitemap has to carry absolute URLs, so unlike everything else in this build it cannot
 # be origin-neutral. The committed copy names example.com — IANA reserves it precisely so
@@ -60,9 +60,12 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 # Sitemap: line in robots.txt have to name it or they point a crawler somewhere else
 # entirely. Regenerated here, before the build copies public/ into dist, and only when
 # the domain is actually set.
+#
+# The sed swaps only the origin of each Sitemap: line, keeping its path — robots.txt names two,
+# the app's and the docs site's.
 RUN if [ -n "$VITE_SITE_URL" ]; then \
         SITE_URL="$VITE_SITE_URL" npm run seo:sitemap && \
-        sed -i "s|^Sitemap: .*|Sitemap: ${VITE_SITE_URL%/}/sitemap.xml|" public/robots.txt && \
+        sed -i "s|^Sitemap: [a-z]*://[^/]*|Sitemap: ${VITE_SITE_URL%/}|" public/robots.txt && \
         echo "sitemap and robots.txt point at $VITE_SITE_URL"; \
     else \
         echo "no VITE_SITE_URL — sitemap keeps its example.com placeholder"; \
@@ -73,6 +76,22 @@ RUN if [ -n "$VITE_SITE_URL" ]; then \
 # pages whose body is empty until React mounts.
 RUN npm run build && npm run prerender
 
+# Docs stage: the Starlight site in railhook-docs/, served at /docs/ by the same nginx.
+# Pinned to $BUILDPLATFORM for the same reason as the build stage — its output is static
+# HTML, identical on every architecture. It reads two files from the repository root:
+# openapi.yaml (the API reference) and .env.dist (the configuration reference), which is
+# why the build context is the root.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS docs
+
+WORKDIR /app
+COPY openapi.yaml .env.dist ./
+ARG VITE_SITE_URL=""
+ENV VITE_SITE_URL=$VITE_SITE_URL
+COPY railhook-docs/package*.json railhook-docs/
+RUN cd railhook-docs && npm ci
+COPY railhook-docs/ railhook-docs/
+RUN cd railhook-docs && npm run build
+
 # Runtime stage
 # Bumped from the 1.25 stable branch (past EOL) to the current 1.30
 # stable branch.
@@ -81,15 +100,26 @@ FROM nginx:1.30-alpine
 # Copy built assets from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
+# The docs site, served by nginx.conf's /docs/ location.
+COPY --from=docs /app/railhook-docs/dist /usr/share/nginx/html/docs
+
+# `curl -fsSL https://<host>/install.sh | bash` — the installer, served by the site it installs.
+COPY install.sh /usr/share/nginx/html/install.sh
+COPY railhook-cli/install.sh /usr/share/nginx/html/install-cli.sh
+
 # Copy nginx config
 COPY railhook-ui/nginx.conf /etc/nginx/conf.d/default.conf
+COPY railhook-ui/nginx-security-headers.conf /etc/nginx/snippets/security-headers.conf
 
 # Runs before nginx starts — the base image's entrypoint executes
 # /docker-entrypoint.d/*.sh in order. Fills in the resolver address from
 # /etc/resolv.conf, which is the only thing that is right under both Compose and
 # Kubernetes.
 COPY railhook-ui/docker-entrypoint.d/15-resolver.sh /docker-entrypoint.d/15-resolver.sh
-RUN chmod +x /docker-entrypoint.d/15-resolver.sh
+# Writes /tmp/railhook-config.js (served as /config.js) from the container's own
+# environment: the settings that must differ between deployments of one image.
+COPY railhook-ui/docker-entrypoint.d/20-runtime-config.sh /docker-entrypoint.d/20-runtime-config.sh
+RUN chmod +x /docker-entrypoint.d/15-resolver.sh /docker-entrypoint.d/20-runtime-config.sh
 
 EXPOSE 5173
 

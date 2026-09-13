@@ -1,0 +1,111 @@
+---
+title: SDK
+description: Офіційні бібліотеки для Node.js, Python і PHP, щоб надсилати події, керувати ендпоінтами й перевіряти підписи.
+---
+import { Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+SDK огортають ті частини API, які ви викликаєте з коду застосунку: події, ендпоінти, підписки, доставки, вхідні джерела й вхідні події, а також перевірку підпису. Для автентифікації достатньо API-ключа.
+
+| Мова | Пакет | Встановлення |
+|---|---|---|
+| Node.js / TypeScript | [`@railhook/node`](https://www.npmjs.com/package/@railhook/node) | `npm install @railhook/node` |
+| Python | [`railhook`](https://pypi.org/project/railhook/) | `pip install railhook` |
+| PHP 8.1+ | [`railhook/php`](https://packagist.org/packages/railhook/php) | `composer require railhook/php` |
+
+SDK для Node.js не має залежностей під час виконання. SDK для PHP потребує `ext-json` і `ext-curl`.
+
+## Надіслати подію
+
+<Tabs syncKey="lang">
+  <TabItem label="Node.js">
+    ```ts
+    import { Railhook } from '@railhook/node';
+
+    const client = new Railhook({
+      apiKey: process.env.RAILHOOK_API_KEY,
+      baseUrl: 'https://railhook.io', // or your instance
+    });
+
+    const event = await client.events.send(
+      { type: 'order.completed', data: { orderId: 'ord_12345', amount: 99.99 } },
+      'order-12345-completed', // idempotency key, optional
+    );
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    import os
+
+    from railhook import Railhook, Event
+
+    client = Railhook(
+        api_key=os.environ["RAILHOOK_API_KEY"],
+        base_url="https://railhook.io",  # or your instance
+    )
+
+    event = client.events.send(
+        Event(type="order.completed", data={"order_id": "ord_12345", "amount": 99.99}),
+        idempotency_key="order-12345-completed",
+    )
+    ```
+  </TabItem>
+  <TabItem label="PHP">
+    ```php
+    <?php
+    use Railhook\Railhook;
+
+    $client = new Railhook(
+        apiKey: getenv('RAILHOOK_API_KEY'),
+        baseUrl: 'https://railhook.io', // or your instance
+    );
+
+    $event = $client->events->send(
+        type: 'order.completed',
+        data: ['orderId' => 'ord_12345', 'amount' => 99.99],
+        idempotencyKey: 'order-12345-completed',
+    );
+    ```
+  </TabItem>
+</Tabs>
+
+## Перевірити підпис
+
+Передайте сире тіло запиту, заголовок `X-Signature` і секрет ендпоінта. Перевірка кидає виняток, якщо підпис не збігається або позначка часу застаріла.
+
+<Tabs syncKey="lang">
+  <TabItem label="Node.js">
+    ```ts
+    import { verifySignature } from '@railhook/node';
+
+    verifySignature(rawBody, req.headers['x-signature'], process.env.WEBHOOK_SECRET);
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from railhook import verify_signature
+
+    verify_signature(raw_body, headers.get("X-Signature", ""), os.environ["WEBHOOK_SECRET"])
+    ```
+  </TabItem>
+  <TabItem label="PHP">
+    ```php
+    use Railhook\Webhook;
+
+    Webhook::verifySignature($payload, $headers['X-Signature'] ?? '', getenv('WEBHOOK_SECRET'));
+    ```
+  </TabItem>
+</Tabs>
+
+Кожен SDK також має `constructEvent` (`construct_event` у Python), що перевіряє й розбирає подію одним викликом. Якщо ваш ендпоінт використовує заголовки Standard Webhooks, застосовуйте `verifyStandardWebhook` (`verify_standard_webhook`) із секретом ендпоінта у форматі `whsec_`.
+
+<Aside type="tip">
+SDK не охоплюють трансформації, правила, воркфлоу, схеми, DLQ, сповіщення й адміністрування проєктів. Для цього кожен SDK має загальний метод довільного запиту, а в [довіднику API](/docs/uk/api-reference/) є всі ендпоінти.
+</Aside>
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Надішліть перший вебхук" description="Ендпоінт, підписка, подія й підпис від початку до кінця." href="/docs/uk/start/send-first-webhook/" />
+  <LinkCard title="Підписи" description="Обидві схеми підпису й ротація секретів." href="/docs/uk/outgoing/signatures/" />
+  <LinkCard title="Довідник API" description="Усі ендпоінти, згенеровані зі специфікації OpenAPI." href="/docs/uk/api-reference/" />
+</CardGrid>

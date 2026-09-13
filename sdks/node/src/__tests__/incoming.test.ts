@@ -83,6 +83,22 @@ describe('IncomingSources', () => {
       expect(result.id).toBe(sourceId);
       expect(result.ingressUrl).toContain('tok_abc');
     });
+
+    it('accepts PROVIDER mode, which is how the API verifies a provider it has a preset for', async () => {
+      // Stripe signs `t=<ts>,v1=<hex>` over `<ts>.<body>`; HMAC_GENERIC cannot check that,
+      // only the STRIPE preset can. The type used to allow NONE and HMAC_GENERIC only.
+      setMockResponse(200, { ...sourceResponse, verificationMode: 'PROVIDER' });
+
+      const result = await client.incomingSources.create(projectId, {
+        name: 'Stripe Webhooks',
+        providerType: 'STRIPE',
+        verificationMode: 'PROVIDER',
+        hmacSecret: 'whsec_test',
+      });
+
+      expect(JSON.parse(lastRequest.body).verificationMode).toBe('PROVIDER');
+      expect(result.verificationMode).toBe('PROVIDER');
+    });
   });
 
   describe('get', () => {

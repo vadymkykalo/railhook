@@ -1,0 +1,91 @@
+---
+title: Rules
+description: Match an event on its content, then route it to an extra endpoint, transform it, or drop it before any delivery exists.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+A rule looks inside an event and decides, before any delivery is created, whether to add an endpoint, change the payload, or stop the event.
+
+## How a rule runs
+
+<Steps>
+
+1. Your system sends an event, and Railhook stores it.
+
+2. Enabled rules whose `eventTypePattern` matches the event type are collected, highest `priority` first.
+
+3. Each rule's condition tree is evaluated against the payload. A rule with no conditions matches every event of its type.
+
+4. The actions of every matching rule are applied, then subscriptions are matched and deliveries are created.
+
+</Steps>
+
+<Aside type="caution" title="Order matters">
+Rules run before subscriptions are matched. A `DROP` therefore stops the event before a single delivery exists: the event is still stored and the API still answers `201`, but nothing is sent. Give a rule without conditions a narrow event type pattern.
+</Aside>
+
+## Actions
+
+| Action | What it does |
+|---|---|
+| `ROUTE` | Delivers the event to `endpointId`, whether or not a subscription points at that endpoint. An endpoint already reached through a subscription does not get a second delivery. |
+| `TRANSFORM` | Applies the saved transformation `transformationId` instead of the subscription's own. When several matching rules transform, the last one wins. |
+| `DROP` | Stops the event. The first matching rule with `DROP` ends evaluation, and no delivery is created. |
+| `TAG` | Accepted with a `config` object. It does not change which deliveries are created or what they carry. |
+
+A rule can carry several actions; `sortOrder` sets their order.
+
+## Conditions
+
+Conditions form a tree of groups and predicates.
+
+| Node | Fields |
+|---|---|
+| Group, `"type": "group"` | `op`: `AND`, `OR` or `NOT`; `children`: groups or predicates. |
+| Predicate, `"type": "predicate"` | `field`: a dot-separated path in the event's `data`, such as `customer.email` or `items[0].sku`; `operator`; `value`; `valueType`; optional `caseInsensitive`. |
+
+| Operators | |
+|---|---|
+| Comparison | `EQ`, `NEQ`, `GT`, `GTE`, `LT`, `LTE`, `BETWEEN` |
+| Text | `CONTAINS`, `NOT_CONTAINS`, `STARTS_WITH`, `ENDS_WITH`, `REGEX` |
+| Sets | `IN`, `NOT_IN` |
+| Presence | `EXISTS`, `NOT_EXISTS`, `IS_NULL`, `NOT_NULL` |
+
+`valueType` is one of `STRING`, `NUMBER`, `BOOLEAN`, `ARRAY_STRING`, `ARRAY_NUMBER`, `DATE_TIME`.
+
+## Example: route high-value orders
+
+Any `order.*` event with an amount of 1000 or more, in USD or EUR, also goes to a fraud-check endpoint, on top of whatever its subscriptions already do.
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/rules" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Route high-value orders to fraud detection",
+    "enabled": true,
+    "priority": 10,
+    "eventTypePattern": "order.*",
+    "conditions": {
+      "type": "group",
+      "op": "AND",
+      "children": [
+        { "type": "predicate", "field": "amount", "operator": "GTE", "value": 1000, "valueType": "NUMBER" },
+        { "type": "predicate", "field": "currency", "operator": "IN", "value": ["USD","EUR"], "valueType": "ARRAY_STRING" }
+      ]
+    },
+    "actions": [
+      { "type": "ROUTE", "endpointId": "'"$FRAUD_ENDPOINT_ID"'", "sortOrder": 0 }
+    ]
+  }'
+```
+
+Turn a rule on or off with `PATCH /api/v1/projects/{projectId}/rules/{id}/toggle`.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Transformations" href="/docs/outgoing/transformations/" description="Write the transformation a TRANSFORM action applies." />
+  <LinkCard title="Endpoints and subscriptions" href="/docs/outgoing/endpoints-subscriptions/" description="The matching that runs after rules." />
+  <LinkCard title="Workflows" href="/docs/outgoing/workflows/" description="Multi-step logic that runs when an event arrives." />
+</CardGrid>

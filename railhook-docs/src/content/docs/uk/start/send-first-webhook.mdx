@@ -1,0 +1,147 @@
+---
+title: Надішліть перший вебхук
+description: Зареєструйте ендпоінт, підпишіть його на тип події, надішліть подію та перевірте її підпис на боці отримувача.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Ця сторінка проводить одну подію від вашої системи до ендпоінта вашого клієнта через API і показує отримувачу, як переконатися, що запит справді від вас. Знадобляться ідентифікатор проєкту та API-ключ з областю дії `READ_WRITE` (обидва описано у [Швидкому старті](/docs/uk/start/quickstart/)).
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance, e.g. http://localhost or https://hooks.example.com
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Зареєструйте ендпоінт**
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/endpoints" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.customer.com/webhooks","description":"Orders"}'
+   ```
+
+   Відповідь містить `id` ендпоінта та його `secret`. Секрет потрібен отримувачу для перевірки підписів.
+
+2. **Підпишіть його на тип події**
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/subscriptions" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"endpointId":"'"$ENDPOINT_ID"'","eventType":"order.completed"}'
+   ```
+
+   Шаблони теж працюють: `order.*` збігається з одним сегментом, `order.**` — з будь-якою їх кількістю.
+
+3. **Надішліть подію**
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/events" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -H "Idempotency-Key: order-12345-completed" \
+     -d '{"type":"order.completed","data":{"orderId":"ord_12345","amount":99.99}}'
+   ```
+
+   У відповідь приходить `201` з `eventId` і `deliveriesCreated`.
+
+4. **Перевірте підпис на боці отримувача**
+
+   Ендпоінт отримує `POST`, тіло якого — об'єкт `data` події, разом із такими заголовками:
+
+   ```http title="Що надходить на ендпоінт"
+   POST /webhooks HTTP/1.1
+   Content-Type: application/json
+   X-Signature: t=1738000000000,v1=<hex hmac-sha256>
+   X-Timestamp: 1738000000000
+   X-Event-Id: 6f0e…
+   X-Delivery-Id: 91ab…
+
+   {"orderId":"ord_12345","amount":99.99}
+   ```
+
+   Підпис — це HMAC-SHA256 від `<t>.<raw body>` з ключем-секретом ендпоінта. Перевіряйте сирі байти тіла, до розбору JSON:
+
+   <Tabs syncKey="lang">
+     <TabItem label="Node.js">
+       ```ts
+       import express from 'express';
+       import { verifySignature } from '@railhook/node';
+
+       const app = express();
+
+       app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
+         try {
+           verifySignature(req.body.toString(), req.headers['x-signature'], process.env.WEBHOOK_SECRET);
+         } catch {
+           return res.status(400).send('Invalid signature');
+         }
+         const data = JSON.parse(req.body.toString());
+         res.sendStatus(200);
+       });
+       ```
+     </TabItem>
+     <TabItem label="Python">
+       ```python
+       import os
+
+       from flask import Flask, request
+       from railhook import RailhookError, verify_signature
+
+       app = Flask(__name__)
+
+       @app.route("/webhooks", methods=["POST"])
+       def handle_webhook():
+           payload = request.get_data(as_text=True)
+           try:
+               verify_signature(payload, request.headers.get("X-Signature", ""), os.environ["WEBHOOK_SECRET"])
+           except RailhookError:
+               return "Invalid signature", 400
+           return "OK", 200
+       ```
+     </TabItem>
+     <TabItem label="PHP">
+       ```php
+       <?php
+       use Railhook\Webhook;
+       use Railhook\Exception\RailhookException;
+
+       $payload = file_get_contents('php://input');
+       $headers = getallheaders();
+
+       try {
+           Webhook::verifySignature($payload, $headers['X-Signature'] ?? '', getenv('WEBHOOK_SECRET'));
+       } catch (RailhookException $e) {
+           http_response_code(400);
+           exit('Invalid signature');
+       }
+       http_response_code(200);
+       ```
+     </TabItem>
+     <TabItem label="cURL">
+       ```bash
+       # Recompute the signature from the raw body and compare it with v1.
+       EXPECTED=$(printf '%s' "${TIMESTAMP}.${BODY}" | openssl dgst -sha256 -hmac "$SECRET" | cut -d' ' -f2)
+       [ "$EXPECTED" = "$V1" ] || exit 1
+       ```
+     </TabItem>
+   </Tabs>
+
+   Типово SDK також відхиляють позначку часу, старшу за п'ять хвилин, тож перехоплений запит не вдасться відтворити пізніше.
+
+</Steps>
+
+<Aside type="tip">
+Доставка відбувається щонайменше один раз. Спроба може вдатися на вашому ендпоінті, але не записатися, тож відповідайте `2xx` швидко й ігноруйте ідентифікатор доставки, який ви вже обробили.
+</Aside>
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Підписи" description="Обидві схеми підпису, ротація секретів і Standard Webhooks." href="/docs/uk/outgoing/signatures/" />
+  <LinkCard title="Повторні спроби та невдалі повідомлення" description="Що відбувається, поки ендпоінт недоступний." href="/docs/uk/outgoing/retries/" />
+  <LinkCard title="SDK" description="Клієнти для Node.js, Python і PHP." href="/docs/uk/tools/sdks/" />
+</CardGrid>

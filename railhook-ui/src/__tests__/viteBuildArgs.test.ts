@@ -32,8 +32,19 @@ describe('VITE_ build arguments', () => {
 
   it('finds the variables it is meant to be checking', () => {
     // If this ever empties out, every assertion below passes vacuously.
-    expect(documented.length).toBeGreaterThanOrEqual(6);
+    expect(documented.length).toBeGreaterThanOrEqual(5);
     expect(documented).toContain('VITE_CAPTCHA_SITE_KEY');
+  });
+
+  it('has no build-time contact domain: it is a runtime setting of the UI container', () => {
+    // Baked into the published image, a contact domain would put one deployment's mail
+    // addresses on every install of that image. RAILHOOK_CONTACT_DOMAIN replaced it, and
+    // nothing is kept for the old name.
+    const vite = read('railhook-ui/vite.config.ts');
+    const viteEnv = read('railhook-ui/src/vite-env.d.ts');
+    for (const [file, text] of Object.entries({ envDist, dockerfile, composeBuild, vite, viteEnv })) {
+      expect(text, file).not.toMatch(/VITE_CONTACT_DOMAIN/);
+    }
   });
 
   it.each(documented)('%s is declared as an ARG in the Dockerfile', (name) => {
@@ -63,17 +74,20 @@ describe('VITE_ build arguments', () => {
  */
 describe('content-security-policy ownership', () => {
   const nginxConf = read('railhook-ui/nginx.conf');
+  const securityHeaders = read('railhook-ui/nginx-security-headers.conf');
 
   it('nginx does not send a Content-Security-Policy of its own', () => {
     expect(nginxConf).not.toMatch(/add_header\s+Content-Security-Policy/i);
+    expect(securityHeaders).not.toMatch(/add_header\s+Content-Security-Policy/i);
   });
 
   it('nginx still sends the headers that are not policy, and cannot be set from a meta tag', () => {
     // frame-ancestors is ignored in a meta tag by specification, so X-Frame-Options is what
-    // actually stops this being framed and has to survive.
-    expect(nginxConf).toMatch(/add_header\s+X-Frame-Options/i);
-    expect(nginxConf).toMatch(/add_header\s+X-Content-Type-Options/i);
-    expect(nginxConf).toMatch(/add_header\s+Referrer-Policy/i);
+    // actually stops this being framed and has to survive. The headers live in a snippet that
+    // nginx.conf includes; nginxSecurityHeaders.test.ts holds every location to it.
+    expect(securityHeaders).toMatch(/add_header\s+X-Frame-Options/i);
+    expect(securityHeaders).toMatch(/add_header\s+X-Content-Type-Options/i);
+    expect(securityHeaders).toMatch(/add_header\s+Referrer-Policy/i);
   });
 });
 

@@ -1,0 +1,119 @@
+---
+title: Оновлення й резервні копії
+description: Безпечно оновлюйте встановлення на Docker, робіть резервні копії за потреби й за розкладом та відновлюйте їх.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Усе на цій сторінці виконується з каталогу встановлення (типово `~/railhook`) допоміжним скриптом `railhook`, який записав інсталятор.
+
+## Оновлення
+
+```bash
+cd ~/railhook
+./railhook upgrade v2.16.6   # pin a release; with no version it keeps the tags already in .env
+```
+
+`upgrade` робить таке, по черзі:
+
+1. Завантажує допоміжний скрипт і Caddyfile для цільового релізу.
+2. Закріплює `API_IMAGE_TAG`, `WORKER_IMAGE_TAG` і `UI_IMAGE_TAG` у `.env`.
+3. **Робить резервну копію бази даних і зупиняється, якщо не вдалося.**
+4. Замінює `docker-compose.yml` копією з релізу, а ваш зберігає як `docker-compose.yml.previous`.
+5. Завантажує образи, перезапускає всі сервіси, крім API, а потім замінює контейнери API по одному.
+
+З одним контейнером API клієнти бачать близько двадцяти секунд `502`, поки запускається новий. Задайте `API_REPLICAS=2` у `.env`, і оновлення пройде без перерви.
+
+<Aside type="caution">
+Якщо ви редагували `docker-compose.yml`, після оновлення порівняйте його з `docker-compose.yml.previous`. Оновлення замінює файл, а не зливає зміни.
+</Aside>
+
+### Відкат
+
+Відкат повертає образи, а не схему бази даних. Міграції виконуються лише вперед.
+
+```bash
+sed -i 's|^API_IMAGE_TAG=.*|API_IMAGE_TAG=2.16.5|' .env   # and WORKER_IMAGE_TAG, UI_IMAGE_TAG
+./railhook start
+```
+
+Якщо проблема в коді, досить відкотити образи. Якщо в міграції — відновіть резервну копію, яку зробило оновлення.
+
+## Перевірка встановлення
+
+```bash
+./railhook doctor
+```
+
+Команда повторно запускає перевірки машини й конфігурації з інсталятора на файлах із диска. Вона ловить помилку у вручну відредагованому `.env` раніше, ніж та перетвориться на збій.
+
+## Резервна копія
+
+```bash
+./railhook backup
+```
+
+Команда записує `backup-<timestamp>.dump` (власний формат PostgreSQL) у каталог встановлення.
+
+Встановлення, зроблені інсталятором, також роблять дамп за розкладом через сервіс `db-backup`:
+
+| Змінна | Типово | Значення |
+|---|---|---|
+| `DB_BACKUP_INTERVAL_SECONDS` | `86400` | Як часто робиться дамп |
+| `BACKUP_RETENTION_DAYS` | `30` | Скільки зберігаються дампи |
+| `BACKUP_DIR` | `./backups` | Куди вони записуються |
+
+<Aside type="danger">
+Зберігайте `.env` окремо від дампів. Без `WEBHOOK_ENCRYPTION_KEY` і `WEBHOOK_ENCRYPTION_SALT` із нього відновлена база не розшифрує жодного секрету ендпоінта, і повернути це вже не вдасться.
+</Aside>
+
+## Відновлення
+
+<Steps>
+
+1. **Зупиніть API й воркер**
+
+   ```bash
+   cd ~/railhook
+   set -a; . ./.env; set +a
+   docker compose stop api worker
+   ```
+
+2. **Відновіть дамп**
+
+   ```bash
+   docker cp backup-20260913T020000Z.dump webhook-postgres:/tmp/restore.dump
+   docker exec webhook-postgres pg_restore \
+     -U "${POSTGRES_USER:-webhook_user}" -d "${POSTGRES_DB:-webhook_platform}" \
+     --clean --if-exists --no-owner --no-privileges /tmp/restore.dump
+   docker exec webhook-postgres rm -f /tmp/restore.dump
+   ```
+
+3. **Очистіть Redis**
+
+   Усе в Redis — похідні дані, які відбудовуються самі. Застарілий кеш гірший за порожній.
+
+   ```bash
+   docker exec webhook-redis redis-cli -a "$REDIS_PASSWORD" FLUSHALL
+   ```
+
+4. **Запустіть стек**
+
+   ```bash
+   ./railhook start
+   ```
+
+</Steps>
+
+Після відновлення не чіпайте Kafka. Повідомлення для відкочених доставок відхиляються й відкидаються, тож у журналі воркера з'явиться їхня серія. Доставки, які після відновлення лишилися в очікуванні, підхоплюються знову приблизно за годину. Події, прийняті після створення дампу, втрачено.
+
+<Aside type="tip">
+З клону репозиторію `make backup-db` і `make restore-db FILE=backups/<file>.dump` роблять те саме для вбудованої бази. `DB_MODE=external` спрямовує їх на керовану базу.
+</Aside>
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Моніторинг" description="Перевірки здоров'я, метрики й дашборди." href="/docs/uk/self-hosting/monitoring/" />
+  <LinkCard title="Вирішення проблем" description="Коли щось не запускається." href="/docs/uk/self-hosting/troubleshooting/" />
+  <LinkCard title="Зберігання даних" description="Що зберігається й скільки." href="/docs/uk/resources/data-retention/" />
+</CardGrid>

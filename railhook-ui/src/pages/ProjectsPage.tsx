@@ -157,7 +157,7 @@ export default function ProjectsPage() {
               </VerificationGate>
             </PermissionGate>
           }
-          docsLink="/docs#getting-started"
+          docsLink="start/quickstart"
         />
       ) : (
         <div className="grid animate-fade-in gap-4 md:grid-cols-2 xl:grid-cols-3">

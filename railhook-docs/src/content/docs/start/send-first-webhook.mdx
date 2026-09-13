@@ -1,0 +1,147 @@
+---
+title: Send your first webhook
+description: Register an endpoint, subscribe it to an event type, send an event and verify its signature on the receiving side.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page takes one event from your system to your customer's endpoint through the API, and shows the receiver how to prove the request came from you. You need a project ID and an API key with the `READ_WRITE` scope ([Quickstart](/docs/start/quickstart/) covers both).
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance, e.g. http://localhost or https://hooks.example.com
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Register an endpoint**
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/endpoints" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.customer.com/webhooks","description":"Orders"}'
+   ```
+
+   The response includes the endpoint's `id` and its `secret`. The receiver needs the secret to check signatures.
+
+2. **Subscribe it to an event type**
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/subscriptions" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"endpointId":"'"$ENDPOINT_ID"'","eventType":"order.completed"}'
+   ```
+
+   Patterns work too: `order.*` matches one segment, `order.**` matches any number.
+
+3. **Send an event**
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/events" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -H "Idempotency-Key: order-12345-completed" \
+     -d '{"type":"order.completed","data":{"orderId":"ord_12345","amount":99.99}}'
+   ```
+
+   The response is `201`, with `eventId` and `deliveriesCreated`.
+
+4. **Verify the signature on the receiver**
+
+   The endpoint receives a `POST` whose body is the event's `data` object, plus these headers:
+
+   ```http title="What lands on the endpoint"
+   POST /webhooks HTTP/1.1
+   Content-Type: application/json
+   X-Signature: t=1738000000000,v1=<hex hmac-sha256>
+   X-Timestamp: 1738000000000
+   X-Event-Id: 6f0e…
+   X-Delivery-Id: 91ab…
+
+   {"orderId":"ord_12345","amount":99.99}
+   ```
+
+   The signature is HMAC-SHA256 over `<t>.<raw body>`, keyed with the endpoint secret. Verify against the raw bytes, before you parse the JSON:
+
+   <Tabs syncKey="lang">
+     <TabItem label="Node.js">
+       ```ts
+       import express from 'express';
+       import { verifySignature } from '@railhook/node';
+
+       const app = express();
+
+       app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
+         try {
+           verifySignature(req.body.toString(), req.headers['x-signature'], process.env.WEBHOOK_SECRET);
+         } catch {
+           return res.status(400).send('Invalid signature');
+         }
+         const data = JSON.parse(req.body.toString());
+         res.sendStatus(200);
+       });
+       ```
+     </TabItem>
+     <TabItem label="Python">
+       ```python
+       import os
+
+       from flask import Flask, request
+       from railhook import RailhookError, verify_signature
+
+       app = Flask(__name__)
+
+       @app.route("/webhooks", methods=["POST"])
+       def handle_webhook():
+           payload = request.get_data(as_text=True)
+           try:
+               verify_signature(payload, request.headers.get("X-Signature", ""), os.environ["WEBHOOK_SECRET"])
+           except RailhookError:
+               return "Invalid signature", 400
+           return "OK", 200
+       ```
+     </TabItem>
+     <TabItem label="PHP">
+       ```php
+       <?php
+       use Railhook\Webhook;
+       use Railhook\Exception\RailhookException;
+
+       $payload = file_get_contents('php://input');
+       $headers = getallheaders();
+
+       try {
+           Webhook::verifySignature($payload, $headers['X-Signature'] ?? '', getenv('WEBHOOK_SECRET'));
+       } catch (RailhookException $e) {
+           http_response_code(400);
+           exit('Invalid signature');
+       }
+       http_response_code(200);
+       ```
+     </TabItem>
+     <TabItem label="cURL">
+       ```bash
+       # Recompute the signature from the raw body and compare it with v1.
+       EXPECTED=$(printf '%s' "${TIMESTAMP}.${BODY}" | openssl dgst -sha256 -hmac "$SECRET" | cut -d' ' -f2)
+       [ "$EXPECTED" = "$V1" ] || exit 1
+       ```
+     </TabItem>
+   </Tabs>
+
+   By default the SDKs also reject a timestamp more than five minutes old, so a captured request cannot be replayed later.
+
+</Steps>
+
+<Aside type="tip">
+Delivery is at-least-once. An attempt can succeed at your endpoint and fail to be recorded, so answer `2xx` quickly and ignore a delivery ID you have already processed.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Signatures" description="Both signing schemes, secret rotation and Standard Webhooks." href="/docs/outgoing/signatures/" />
+  <LinkCard title="Retries and failed messages" description="What happens while the endpoint is down." href="/docs/outgoing/retries/" />
+  <LinkCard title="SDKs" description="Node.js, Python and PHP clients." href="/docs/tools/sdks/" />
+</CardGrid>

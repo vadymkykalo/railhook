@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-09-13
+
+A new site, docs you can navigate, and one install command on the project's own domain.
+
+### Added
+
+- **Docs site at `/docs/`**, in English and Ukrainian. Guides grouped by what you are doing
+  (get started, self-hosting, sending, receiving, platform), full-text search that works
+  offline, and an API reference with "Try it" that calls the instance serving the page. The
+  configuration reference is generated from `.env.dist`, so it cannot drift from it.
+- **`curl -fsSL https://railhook.io/install.sh | bash`.** Every UI image serves the installer
+  at `/install.sh`.
+- **`install.sh --domain <host> --behind-proxy`** for a reverse proxy you already run: production
+  settings on your domain, the dashboard on loopback, no TLS terminator — nothing left to edit
+  in `.env` by hand.
+- **New look across the product**: white ground, cobalt accent, Manrope and Onest. The landing
+  page puts Railhook Cloud (free right now) and the self-hosted install side by side, shows what
+  Railhook is built on (sources → API → Kafka → worker → endpoints, over PostgreSQL and Redis),
+  and ends with a developer section: sending an event in Node.js, Python, PHP and cURL, and
+  links to the docs, the API reference and Standard Webhooks.
+- **`curl -fsSL https://railhook.io/install-cli.sh | bash`** installs the CLI; every UI image
+  serves it next to `/install.sh`.
+- **`scripts/seed-demo.sh`** seeds a believable demo project — endpoints, subscriptions, sources,
+  delivered, retrying and failed traffic — through the public API only.
+- **"Connect with us" in the public footer**: the GitHub repository, and support mail when the
+  deployment has a contact domain.
+
+### Changed
+
+- **The contact page's mail domain is set at runtime.** `RAILHOOK_CONTACT_DOMAIN` on the UI
+  container (`ui.contactDomain` on Helm) decides the sales@ / support@ addresses, so the
+  published image can offer them; empty, as on a self-hosted install, offers none.
+  `VITE_CONTACT_DOMAIN` is gone — see UPGRADING.md.
+
+### Fixed
+
+- **Incoming-source and tunnel URLs pointed at `http://localhost:8080`** on every `--domain`
+  install and every Helm release, so providers and the CLI were handed an address nothing
+  published. They now follow `APP_BASE_URL` (Compose) or `app.baseUrl` (chart);
+  `TUNNEL_INGRESS_BASE_URL` / `app.ingressBaseUrl` still override.
+- **`ENTITLEMENT_DEFAULT_RATE_LIMIT` and `ENTITLEMENT_DEFAULT_MAX_FANOUT` never reached the API**
+  under Compose; `.env.dist` documented them and nothing passed them through.
+- **The dashboard's HTML was served without `X-Frame-Options`** and the other security headers:
+  nginx drops server-level `add_header`s in any location that sets one of its own, and the
+  cache headers did exactly that.
+- **Toasts stayed light on the dark theme.**
+- **SDKs**: the Node SDK accepted a signature whose timestamp was not a number (the tolerance
+  check was skipped); the Python SDK answered malformed signature headers with an unhandled
+  exception instead of `RailhookError`; the PHP SDK rejected the array-valued headers Laravel and
+  Symfony pass. The READMEs' Stripe example could never verify and said deliveries are `PUT`
+  (they are `POST`).
+- **The API reference's "Try it" client was painted over** by the docs sidebar and header.
+- **Every UI image build reinstalled Chromium** for the prerender step whenever any source file
+  changed; it is now installed before the sources are copied, so that layer is cached.
+- **Browsers kept showing old images after an upgrade.** nginx cached every `.png`, `.svg` and
+  `.ico` as immutable for a year by extension, including files whose names never change (the
+  favicon, logos, landing screenshots). Only content-hashed paths (`/assets/`, `/docs/_astro/`)
+  are immutable now; everything else revalidates. The landing screenshots are hashed as well.
+- **The docs header drew a second line** under the search box.
+
+### Removed
+
+- The in-app guides and the Redoc page. Old `/docs/<section>` addresses no longer resolve; the
+  pages live under `/docs/<group>/<page>/`.
+- The pricing page and the cloud plan grid.
+- Installer support for releases older than 2.12.0, the `HOOKFLOW_*` variable names, and the
+  `--write-helper` alias for `--refresh`.
+
 ## [2.16.0] - 2026-09-12
 
 An upgrade no longer stops the API to replace it. Measured on a production host, same probe
@@ -322,7 +390,7 @@ a failing test before it was touched. No new features, no API changes.
 - **The GDPR export was quietly short, and the guide described data it does not contain.** It
   caps audit entries at 10,000 and said nothing about it, so a subject-access response could be
   incomplete and look whole; it now carries `auditLogsTruncated` and `auditLogsTotal`. And
-  `docs/guides/data-retention.md` promised the export included Events, Deliveries and Attempts.
+  the data-retention guide promised the export included Events, Deliveries and Attempts.
   It never has — those are the payload tables, and they are aged out by retention instead. The
   guide says so now, along with what each of the two erasures actually does.
 
@@ -1672,7 +1740,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.10.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.17.0...HEAD
+[2.17.0]: https://github.com/vadymkykalo/railhook/compare/v2.16.6...v2.17.0
 [2.10.0]: https://github.com/vadymkykalo/railhook/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/vadymkykalo/railhook/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/vadymkykalo/railhook/compare/v2.8.0...v2.9.0

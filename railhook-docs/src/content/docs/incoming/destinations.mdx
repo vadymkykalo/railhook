@@ -1,0 +1,130 @@
+---
+title: Destinations
+description: Choose where a source's webhooks are forwarded, how Railhook authenticates to that service, and what happens when it does not answer.
+---
+import { Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+A **destination** is a URL of yours that receives a source's webhooks, together with how to authenticate to it. Every incoming event creates one **forward** for each enabled destination of its source. Each destination has its own retries, timeout and credentials, so a slow service does not hold up the others.
+
+## Add a destination
+
+<Tabs syncKey="lang">
+<TabItem label="Node.js">
+
+```ts
+const destination = await client.incomingSources.createDestination(projectId, sourceId, {
+  url: 'https://billing.internal.example.com/webhooks/stripe',
+  enabled: true,
+  maxAttempts: 5,
+  timeoutSeconds: 30,
+});
+```
+
+</TabItem>
+<TabItem label="Python">
+
+```python
+from railhook import IncomingDestinationCreateParams
+
+destination = client.incoming_sources.create_destination(
+    project_id,
+    source_id,
+    IncomingDestinationCreateParams(
+        url="https://billing.internal.example.com/webhooks/stripe",
+        enabled=True,
+        max_attempts=5,
+        timeout_seconds=30,
+    ),
+)
+```
+
+</TabItem>
+<TabItem label="PHP">
+
+```php
+<?php
+$destination = $client->incomingSources->createDestination($projectId, $sourceId, [
+    'url' => 'https://billing.internal.example.com/webhooks/stripe',
+    'enabled' => true,
+    'maxAttempts' => 5,
+    'timeoutSeconds' => 30,
+]);
+```
+
+</TabItem>
+<TabItem label="cURL">
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://billing.internal.example.com/webhooks/stripe",
+    "authType": "BEARER",
+    "authConfig": "{\"token\":\"'"$BILLING_TOKEN"'\"}",
+    "timeoutSeconds": 30
+  }'
+```
+
+</TabItem>
+</Tabs>
+
+| Field | What it does |
+|---|---|
+| `url` | Required. Where forwards are sent. Checked against private address ranges like an endpoint URL, see [Endpoint security](/docs/outgoing/endpoint-security/#where-deliveries-may-go). |
+| `enabled` | Whether the destination receives forwards. |
+| `authType`, `authConfig` | How Railhook authenticates, see below. `authConfig` is a JSON string, up to 4096 characters, encrypted at rest. |
+| `customHeadersJson` | Extra HTTP headers, as a JSON object in a string. |
+| `maxAttempts` | Attempts before the forward is abandoned. Default `5`. |
+| `retryDelays` | Comma-separated waits in seconds. Default `60,300,900,3600,21600`. |
+| `timeoutSeconds` | How long one attempt waits for a response. Default `30`. |
+| `transformationId` | A saved transformation applied before forwarding. |
+| `payloadTransform` | A JSONPath expression, such as `$.data`, used when no `transformationId` is set. |
+
+## Authentication
+
+Forwards are not signed. Railhook proves who it is to your service with the destination's credentials:
+
+| `authType` | `authConfig` | Sent as |
+|---|---|---|
+| `NONE` | none | Nothing. |
+| `BEARER` | `{"token": "…"}` | `Authorization: Bearer <token>` |
+| `BASIC` | `{"username": "…", "password": "…"}` | `Authorization: Basic <base64>` |
+| `CUSTOM_HEADER` | `{"headerName": "…", "headerValue": "…"}` | The named header |
+
+Credentials are masked in the request headers the dashboard shows.
+
+## What the destination receives
+
+The body is the webhook exactly as the provider sent it, with its original `Content-Type`, unless a transformation is configured. Railhook adds these headers:
+
+| Header | Value |
+|---|---|
+| `X-Incoming-Event-Id` | The incoming event. |
+| `X-Incoming-Request-Id` | The request id the ingress returned to the provider. |
+| `X-Forward-Attempt` | The attempt number, starting at 1. |
+| `Idempotency-Key` | `<incoming event id>-<destination id>`, stable across attempts. |
+
+The provider's original headers, including its signature, are not forwarded. Verification happened at the ingress; your service should rely on the destination credentials instead.
+
+## Transforming before forwarding
+
+Railhook uses the first of these that is set: the saved transformation `transformationId`, then the JSONPath expression `payloadTransform`, then the body unchanged. If a configured transformation cannot be applied, the attempt fails and is retried; the untransformed body is never forwarded in its place. See [Transformations](/docs/outgoing/transformations/).
+
+## When a destination does not answer
+
+Forwards follow the incoming retry ladder: 5 attempts with waits of 1 min, 5 min, 15 min and 1 h, jittered between 50% and 150%. `408`, `429`, any `5xx`, a connection error and a timeout are retried; any other `4xx` fails the forward at once. A forward still outstanding 24 hours after the webhook arrived is abandoned whatever its attempt count.
+
+Abandoned forwards appear under **Failed Forwards**. Retrying one creates a new forward to the same destination, starting again from attempt 1. See [Retries and failed messages](/docs/outgoing/retries/).
+
+<Aside type="tip">
+To send stored webhooks to a destination again, for example after fixing a bug in your service, replay the incoming events. See [Replay and Time Machine](/docs/outgoing/replay/#replay-incoming-webhooks).
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Verification" href="/docs/incoming/verification/" description="How the ingress checks each provider's signature." />
+  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="Both retry ladders, and why they differ." />
+  <LinkCard title="Transformations" href="/docs/outgoing/transformations/" description="Template syntax for reshaping a forwarded body." />
+</CardGrid>

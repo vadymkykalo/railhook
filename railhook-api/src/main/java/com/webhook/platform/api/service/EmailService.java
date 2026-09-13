@@ -77,13 +77,16 @@ public class EmailService {
         }
 
         try {
-            var message = mailSender.createMimeMessage();
-            var helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(fromAddress);
-            helper.setTo(to);
-            helper.setSubject("Verify your email — Railhook");
-            helper.setText(buildVerificationHtml(verifyUrl), true);
-            mailSender.send(message);
+            sendBoth(to, "Verify your email — Railhook",
+                    """
+                    Thanks for signing up for Railhook.
+
+                    Verify your email address by opening this link:
+                    %s
+
+                    The link expires in 24 hours. If you didn't create an account, ignore this.
+                    """.formatted(verifyUrl),
+                    buildVerificationHtml(verifyUrl));
             log.info("Verification email sent to {}", to);
         } catch (Exception e) {
             // No fallback to the log. This branch only runs with app.email.enabled=true — a
@@ -109,13 +112,17 @@ public class EmailService {
         }
 
         try {
-            var message = mailSender.createMimeMessage();
-            var helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(fromAddress);
-            helper.setTo(to);
-            helper.setSubject("Reset your password — Railhook");
-            helper.setText(buildPasswordResetHtml(resetUrl), true);
-            mailSender.send(message);
+            sendBoth(to, "Reset your password — Railhook",
+                    """
+                    We received a request to reset the password for your Railhook account.
+
+                    Set a new password here:
+                    %s
+
+                    The link expires in 1 hour. If you didn't ask for this, ignore this email —
+                    your password has not changed.
+                    """.formatted(resetUrl),
+                    buildPasswordResetHtml(resetUrl));
             log.info("Password reset email sent to {}", to);
         } catch (Exception e) {
             log.error("Failed to send password reset email to {}: {}", to, e.getMessage());
@@ -148,13 +155,14 @@ public class EmailService {
         }
 
         try {
-            var message = mailSender.createMimeMessage();
-            var helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(fromAddress);
-            helper.setTo(to);
-            helper.setSubject("You've been invited to join an organization — Railhook");
-            helper.setText(buildInviteHtml(inviteUrl), true);
-            mailSender.send(message);
+            sendBoth(to, "You've been invited to join an organization — Railhook",
+                    """
+                    You've been invited to join an organization on Railhook.
+
+                    Accept the invitation here:
+                    %s
+                    """.formatted(inviteUrl),
+                    buildInviteHtml(inviteUrl));
             log.info("Invite email sent to {}", to);
         } catch (Exception e) {
             // inviteUrl() hands the same link back to the inviting owner, so a copy here buys
@@ -232,11 +240,11 @@ public class EmailService {
                           text-decoration: none; border-radius: 6px; margin: 16px 0;">
                     Accept Invitation
                 </a>
-                <p style="color: #999; font-size: 12px; margin-top: 24px;">
+%s                <p style="color: #999; font-size: 12px; margin-top: 24px;">
                     This invitation expires in 48 hours. If you didn't expect this, you can safely ignore it.
                 </p>
             </div>
-            """.formatted(inviteUrl);
+            """.formatted(inviteUrl, linkFallback(inviteUrl));
     }
 
     private String buildTemporaryPasswordHtml(String tempPassword) {
@@ -266,6 +274,45 @@ public class EmailService {
             """.formatted(tempPassword, loginUrl);
     }
 
+
+    /**
+     * Sends one message as both plain text and HTML.
+     *
+     * <p>{@code setText(html, true)} sends HTML and nothing else, which costs more than
+     * appearance: a message with no {@code text/plain} alternative scores worse with every
+     * spam filter that looks for one, and a password reset is the message that must not be
+     * filtered. It is also what a client that will not render HTML shows — nothing at all.
+     *
+     * <p>Two arguments to the same call is the whole fix. The alternative parts must say the
+     * same thing, so both are built from the same link.
+     */
+    private void sendBoth(String to, String subject, String plain, String html) throws Exception {
+        var message = mailSender.createMimeMessage();
+        var helper = new MimeMessageHelper(message, true, "UTF-8");
+        helper.setFrom(fromAddress);
+        helper.setTo(to);
+        helper.setSubject(subject);
+        helper.setText(plain, html);
+        mailSender.send(message);
+    }
+
+    /**
+     * The address written out, under the button that points at it.
+     *
+     * <p>A button is an anchor with padding: a client that will not style it leaves the
+     * destination invisible, and a person who would rather copy an address than click a
+     * button in a mail — which is the advice everyone is given about exactly these
+     * messages — has nothing to copy.
+     */
+    private static String linkFallback(String url) {
+        return """
+            <p style="color: #777; font-size: 12px; line-height: 1.6; margin-top: 8px;">
+                Or copy this address into your browser:<br>
+                <span style="color: #555; word-break: break-all;">%s</span>
+            </p>
+            """.formatted(url);
+    }
+
     private String buildPasswordResetHtml(String resetUrl) {
         return """
             <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
@@ -279,12 +326,12 @@ public class EmailService {
                           text-decoration: none; border-radius: 6px; margin: 16px 0;">
                     Reset Password
                 </a>
-                <p style="color: #999; font-size: 12px; margin-top: 24px;">
+%s                <p style="color: #999; font-size: 12px; margin-top: 24px;">
                     If you didn't request a password reset, you can safely ignore this email.
                     This link expires in 1 hour.
                 </p>
             </div>
-            """.formatted(resetUrl);
+            """.formatted(resetUrl, linkFallback(resetUrl));
     }
 
     private String buildVerificationHtml(String verifyUrl) {
@@ -299,11 +346,11 @@ public class EmailService {
                           text-decoration: none; border-radius: 6px; margin: 16px 0;">
                     Verify Email
                 </a>
-                <p style="color: #999; font-size: 12px; margin-top: 24px;">
+%s                <p style="color: #999; font-size: 12px; margin-top: 24px;">
                     If you didn't create an account, you can safely ignore this email.
                     This link expires in 24 hours.
                 </p>
             </div>
-            """.formatted(verifyUrl);
+            """.formatted(verifyUrl, linkFallback(verifyUrl));
     }
 }

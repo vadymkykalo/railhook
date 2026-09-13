@@ -1,17 +1,10 @@
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Check, Copy } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
-import SyntaxHighlight, { normalizeLanguage } from '../../components/SyntaxHighlight';
 
 /**
- * The landing page's shared furniture.
- *
- * Two rules are enforced here rather than repeated in every section: section
- * headers are left-aligned (the old page centred seventeen identical ones), and
- * the divider between sections is the attempt rail — a hairline with ticks at
- * log-spaced positions — not a decorative gradient line.
+ * The public pages' shared furniture: the landing's bands and section headings, and the panel,
+ * section and reveal the contact page is built from.
  */
 
 /** Tick positions as fractions of the rail, on a log scale of 1m…24h. */
@@ -53,13 +46,8 @@ export function RailRule({ className }: { className?: string }) {
 }
 
 /**
- * The landing's card surface, in one place because eight sections were each
- * spelling it out and four of them had drifted.
- *
- * `interactive` is the hover state: the rail warms to brand teal and the panel
- * rises one step off the paper. It is opt-in rather than universal so the lift
- * still means something — a panel that merely holds a fact does not move, and a
- * panel you are meant to read as an option does.
+ * A card surface. `interactive` adds the hover state — the rail warms to the accent and the
+ * panel rises one step — and is opt-in so the lift still means "this is an option".
  */
 export function panel(interactive = false): string {
   return cn(
@@ -89,149 +77,60 @@ export function Section({
   );
 }
 
-export function SectionHeader({
-  eyebrow,
-  title,
-  body,
-  className,
-  aside,
+/** The landing's content column. */
+export const WRAP = 'mx-auto w-full max-w-[1080px] px-5 sm:px-7';
+
+/**
+ * One landing section: a full-width band, optionally on the muted surface, with the content
+ * column inside. `scroll-mt` keeps an anchored band clear of the sticky header.
+ */
+export function Band({
+  id,
+  muted = false,
+  labelledBy,
+  children,
 }: {
-  eyebrow: string;
-  title: string;
-  body?: string;
-  className?: string;
-  aside?: ReactNode;
+  id?: string;
+  muted?: boolean;
+  labelledBy?: string;
+  children: ReactNode;
 }) {
-  const heading = (
-    <div>
-      <p className="mono-label">{eyebrow}</p>
-      <h2 className="mt-3 font-display text-3xl leading-[1.1] tracking-tight text-foreground sm:text-headline">
+  return (
+    <section
+      id={id}
+      aria-labelledby={labelledBy}
+      className={cn('scroll-mt-16 py-16 sm:py-[84px]', muted && 'border-y border-rail bg-muted')}
+    >
+      <div className={WRAP}>{children}</div>
+    </section>
+  );
+}
+
+export function SectionHeading({
+  id,
+  title,
+  lead,
+  className,
+}: {
+  id?: string;
+  title: string;
+  lead?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn('mb-10 grid max-w-2xl gap-2.5', className)}>
+      <h2
+        id={id}
+        className="font-display text-[clamp(1.55rem,3vw,2.3rem)] font-bold leading-[1.12] tracking-[-0.025em] text-foreground [text-wrap:balance]"
+      >
         {title}
       </h2>
-    </div>
-  );
-
-  /* With an aside, the deck stays under the headline and the aside takes the
-     right column. Without one, the deck *is* the right column: stacking it
-     under the headline left the right half of every section header empty and
-     made the block twice as tall, which is what read as filler. */
-  if (aside) {
-    return (
-      <div className={cn('flex flex-col gap-6 md:flex-row md:items-end md:justify-between', className)}>
-        <div className="max-w-2xl">
-          {heading}
-          {body && <p className="mt-4 text-body-lg text-muted-foreground">{body}</p>}
-        </div>
-        <div className="shrink-0">{aside}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        'grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-end lg:gap-14',
-        className,
-      )}
-    >
-      <div className="max-w-2xl">{heading}</div>
-      {body && <p className="max-w-xl text-body-lg text-muted-foreground lg:pb-1">{body}</p>}
+      {lead && <p className="text-[1.05rem] text-muted-foreground">{lead}</p>}
     </div>
   );
 }
 
-/**
- * A service mark from public/logos.
- *
- * Flattened to one treatment — grey on paper, inverted on ink — because the
- * files are a mix of brand-coloured and monochrome SVGs, and a strip where half
- * the marks shout their own colour and half do not is louder than anything on
- * the page it sits under. A logo strip is evidence, not decoration.
- *
- * Tried and reverted: masking each glyph and painting it in the service's brand
- * hex. A mask keeps only the silhouette, so any mark carrying internal detail —
- * the Postgres elephant, the Kafka glyph — collapsed into a blob, and the row
- * of brand colours fought the palette instead of sitting inside it.
- */
-export function LogoMark({ src, name, className }: { src: string; name: string; className?: string }) {
-  return (
-    <img
-      src={src}
-      alt={name}
-      loading="lazy"
-      className={cn(
-        'h-6 w-6 shrink-0 opacity-70 grayscale transition-opacity duration-250 dark:opacity-80 dark:invert',
-        className,
-      )}
-    />
-  );
-}
-
-/**
- * A code sample sits on the ink surface, not on paper: a dark field is where
- * machine output lives in this design, and it is the same surface the auth
- * pages use. The caption underneath stays in the paper voice so the boundary
- * between what the machine said and what we are telling you stays visible.
- *
- * `wrap` breaks long shell lines rather than clipping a command the reader is
- * meant to copy.
- */
-export function CodeBlock({
-  code,
-  label,
-  className,
-  wrap = false,
-}: {
-  code: string;
-  label?: string;
-  className?: string;
-  wrap?: boolean;
-}) {
-  const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
-
-  const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  };
-
-  return (
-    <div className={cn('surface-ink min-w-0 max-w-full overflow-hidden rounded-lg border border-rail', className)}>
-      <div className="flex items-center justify-between gap-3 border-b border-rail px-3 py-2">
-        <span className="truncate font-mono text-[11px] tracking-tight text-muted-foreground">{label}</span>
-        <button
-          type="button"
-          onClick={onCopy}
-          aria-label={t('landing.quickstart.copyAria')}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-        >
-          {copied ? <Check className="h-3 w-3 text-ok" aria-hidden="true" /> : <Copy className="h-3 w-3" aria-hidden="true" />}
-          {copied ? t('landing.quickstart.copied') : t('landing.quickstart.copy')}
-        </button>
-      </div>
-      {/* Same highlighter the docs use, so a sample does not read one way on
-          the marketing page and another way in the documentation it links to. */}
-      <pre
-        className={cn(
-          'px-4 py-3.5 font-mono text-[12.5px] leading-relaxed text-foreground',
-          wrap ? 'whitespace-pre-wrap break-words' : 'overflow-x-auto',
-        )}
-      >
-        <code>
-          <SyntaxHighlight code={code} language={normalizeLanguage(label)} />
-        </code>
-      </pre>
-    </div>
-  );
-}
-
-
-function prefersReducedMotion(): boolean {
+export function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined'
     && typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

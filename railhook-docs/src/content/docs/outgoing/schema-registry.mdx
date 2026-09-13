@@ -1,0 +1,73 @@
+---
+title: Schema registry
+description: Keep a versioned JSON Schema per event type, see what each version changed, and choose whether events that do not match are refused.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The schema registry holds a JSON Schema for each event type in a project. Uploading a version compares it with the one before and refuses changes that break the compatibility you promised. Turn validation on, and events are checked against the active version when they arrive, before they are stored.
+
+## Add a schema
+
+<Steps>
+
+1. Create the event type with `POST /api/v1/projects/{projectId}/schemas`. `name` is the event type, such as `order.completed`.
+
+2. Upload a version. It starts as `DRAFT` and is not enforced yet.
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/schemas/$EVENT_TYPE_ID/versions" \
+     -H "X-API-Key: $API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "schemaJson": "{\"type\":\"object\",\"required\":[\"order_id\"],\"properties\":{\"order_id\":{\"type\":\"string\"}}}",
+       "compatibilityMode": "BACKWARD"
+     }'
+   ```
+
+3. Promote it with `POST /api/v1/projects/{projectId}/schemas/{eventTypeId}/versions/{versionId}/promote`. It becomes `ACTIVE`, and the version it replaces becomes `DEPRECATED`.
+
+4. Turn validation on for the project: set `schemaValidationEnabled` to `true` and choose a `schemaValidationPolicy`.
+
+</Steps>
+
+## Version lifecycle
+
+| Status | What it does |
+|---|---|
+| `DRAFT` | Uploaded, not enforced. |
+| `ACTIVE` | The version events of this type are validated against. One per event type. |
+| `DEPRECATED` | Kept for history and comparison, not enforced. Promoting a new version deprecates the one it replaces; a version can also be deprecated directly. |
+
+## Validation policies
+
+Validation is off until the project turns it on. Once it is on, an event whose type has an `ACTIVE` version is checked against it when it arrives. An event type with no active version is not checked.
+
+| `schemaValidationPolicy` | An event that does not match |
+|---|---|
+| `WARN` | Is accepted and delivered, and the validation errors are returned in the response to the sender. |
+| `BLOCK` | Is rejected with `400` and not stored, so no delivery is created. |
+
+With validation on, an event type Railhook has not seen before is added to the registry, with a `DRAFT` schema inferred from its first payload. Review it and promote it when it is right.
+
+## Compatibility modes
+
+Each version carries a compatibility mode, checked against the previous version when it is uploaded. A version that breaks it is refused instead of stored. Leave the mode out and the previous version's mode carries over; the first version defaults to `NONE`.
+
+| Mode | Refused |
+|---|---|
+| `NONE` | Nothing. No promise and no check. |
+| `BACKWARD` | A property whose type changed, a new required property, a property that became required. |
+| `FORWARD` | A property whose type changed, a removed property that was required, a property that is no longer required. |
+| `FULL` | Everything `BACKWARD` and `FORWARD` refuse. |
+
+<Aside type="tip">
+The changes between versions are recorded. List them for one event type with `GET /api/v1/projects/{projectId}/schemas/{eventTypeId}/changes`, or for the whole project with `GET /api/v1/projects/{projectId}/schemas/changes`.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Endpoints and subscriptions" href="/docs/outgoing/endpoints-subscriptions/" description="Event type patterns and what a subscription matches." />
+  <LinkCard title="Errors and limits" href="/docs/platform/errors-limits/" description="What a rejected event looks like to the sender." />
+  <LinkCard title="API reference" href="/docs/api-reference/" description="Every schema registry request and response." />
+</CardGrid>
