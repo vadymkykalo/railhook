@@ -124,6 +124,46 @@ class TestVerifySignature:
         with pytest.raises(RailhookError):
             verify_signature(payload + " ", header, "whsec_new")
 
+    def test_rotation_header_verifies_when_the_match_is_last_beside_an_unknown_version(self):
+        payload = '{"type": "order.completed"}'
+        timestamp = int(time.time() * 1000)
+
+        def v1(secret):
+            return generate_signature(payload, secret, timestamp).split("v1=")[1]
+
+        header = f"t={timestamp},v0=deadbeef,v1={v1('whsec_retired')},v2={v1('whsec_new')},v1={v1('whsec_new')}"
+
+        assert verify_signature(payload, header, "whsec_new") is True
+
+    def test_rotation_header_still_enforces_the_tolerance(self):
+        payload = '{"type": "order.completed"}'
+        stale = int(time.time() * 1000) - 600000
+        header = "{},v1={}".format(
+            generate_signature(payload, "whsec_new", stale),
+            generate_signature(payload, "whsec_retired", stale).split("v1=")[1],
+        )
+
+        with pytest.raises(RailhookError) as exc:
+            verify_signature(payload, header, "whsec_retired")
+
+        assert exc.value.code == "timestamp_expired"
+
+    def test_non_numeric_timestamp_raises_railhook_error(self):
+        """A malformed header is a bad request, not an unhandled ValueError (a 500)."""
+        with pytest.raises(RailhookError) as exc:
+            verify_signature("payload", "t=abc,v1=00", "secret")
+
+        assert exc.value.code == "invalid_signature"
+
+    def test_non_ascii_signature_is_rejected_not_crashed(self):
+        """hmac.compare_digest raises TypeError on non-ASCII str; the header is attacker-controlled."""
+        timestamp = int(time.time() * 1000)
+
+        with pytest.raises(RailhookError) as exc:
+            verify_signature("payload", f"t={timestamp},v1=é", "secret")
+
+        assert exc.value.code == "invalid_signature"
+
     def test_raises_on_missing_signature(self):
         """Should raise on missing signature."""
         with pytest.raises(RailhookError) as exc:

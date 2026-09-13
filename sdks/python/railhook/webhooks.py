@@ -70,7 +70,15 @@ def verify_signature(
             "invalid_signature",
         )
 
-    # Check timestamp
+    # Digits only: a malformed header is a rejected request, not a ValueError escaping
+    # to the caller's framework as a 500.
+    if not (timestamp.isascii() and timestamp.isdigit()):
+        raise RailhookError(
+            "Invalid signature format. Expected: t=timestamp,v1=signature",
+            400,
+            "invalid_signature",
+        )
+
     timestamp_ms = int(timestamp)
     now_ms = int(time.time() * 1000)
 
@@ -90,10 +98,12 @@ def verify_signature(
     ).hexdigest()
 
     # Every candidate is compared, with no early exit, so the time taken does not
-    # depend on which position matched.
+    # depend on which position matched. As bytes: compare_digest raises TypeError on a
+    # non-ASCII str, and the header is whatever the sender chose to put in it.
     matched = False
+    expected_bytes = expected_signature.encode("utf-8")
     for candidate in signatures:
-        if hmac.compare_digest(candidate, expected_signature):
+        if hmac.compare_digest(candidate.encode("utf-8"), expected_bytes):
             matched = True
 
     if not matched:
@@ -168,12 +178,14 @@ def verify_standard_webhook(
 
     # Space-separated, one per valid secret during a rotation window. Every candidate is
     # compared with no early exit, so the time taken does not reveal which one matched.
+    # As bytes, because compare_digest raises TypeError on a non-ASCII str.
     matched = False
+    expected_bytes = expected.encode("utf-8")
     for part in str(signature).strip().split():
         version, _, candidate = part.partition(",")
         if version != "v1" or not candidate:
             continue
-        if hmac.compare_digest(candidate, expected):
+        if hmac.compare_digest(candidate.encode("utf-8"), expected_bytes):
             matched = True
 
     if not matched:
@@ -191,7 +203,7 @@ def construct_event(
     """
     Construct a webhook event from request, verifying signature.
 
-    What Railhook actually PUTs on the wire is the event's **payload**, not an
+    What Railhook actually POSTs on the wire is the event's **payload**, not an
     envelope: a ``client.events.send(Event(type="order.completed", data={...}))``
     arrives at your endpoint as the ``data`` object alone, with the identifiers
     carried in headers (``X-Event-Id``, ``X-Delivery-Id``, ``X-Timestamp``,

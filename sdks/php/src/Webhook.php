@@ -118,9 +118,11 @@ class Webhook
         string $secret,
         int $toleranceSeconds = self::DEFAULT_STANDARD_TOLERANCE_SECONDS
     ): bool {
+        // Laravel's and Symfony's `$request->headers->all()` map each name to a list of
+        // values; constructEvent already unwrapped those, this did not.
         $normalized = [];
         foreach ($headers as $key => $value) {
-            $normalized[strtolower((string) $key)] = $value;
+            $normalized[strtolower((string) $key)] = is_array($value) ? ($value[0] ?? null) : $value;
         }
 
         $messageId = $normalized['webhook-id'] ?? null;
@@ -185,7 +187,7 @@ class Webhook
     /**
      * Construct a webhook event from request, verifying signature.
      *
-     * What Railhook actually PUTs on the wire is the event's **payload**, not
+     * What Railhook actually POSTs on the wire is the event's **payload**, not
      * an envelope: a `$client->events->send(type: 'order.completed', data:
      * [...])` arrives at your endpoint as the `data` array alone, with the
      * identifiers carried in headers (`X-Event-Id`, `X-Delivery-Id`,

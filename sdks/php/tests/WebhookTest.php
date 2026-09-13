@@ -97,6 +97,30 @@ class WebhookTest extends TestCase
         $this->assertTrue(Webhook::verifySignature(self::PAYLOAD, $header, 'whsec_retired'));
     }
 
+    public function testVerifySignatureAcceptsAMatchThatIsNotFirstBesideAnUnknownVersion(): void
+    {
+        $timestamp = (int) (microtime(true) * 1000);
+        $v1 = function (string $secret) use ($timestamp): string {
+            $signature = Webhook::generateSignature(self::PAYLOAD, $secret, $timestamp);
+            return substr($signature, strpos($signature, 'v1=') + 3);
+        };
+        $header = "t={$timestamp},v0=deadbeef,v1={$v1('whsec_retired')},v2={$v1('whsec_new')},v1={$v1('whsec_new')}";
+
+        $this->assertTrue(Webhook::verifySignature(self::PAYLOAD, $header, 'whsec_new'));
+    }
+
+    public function testVerifySignatureStillEnforcesTheToleranceWithTwoSignatures(): void
+    {
+        $stale = (int) (microtime(true) * 1000) - 600000;
+        $retired = Webhook::generateSignature(self::PAYLOAD, 'whsec_retired', $stale);
+        $header = Webhook::generateSignature(self::PAYLOAD, 'whsec_new', $stale)
+            . ',v1=' . substr($retired, strpos($retired, 'v1=') + 3);
+
+        $this->expectException(RailhookException::class);
+        $this->expectExceptionMessage('outside tolerance window');
+        Webhook::verifySignature(self::PAYLOAD, $header, 'whsec_retired');
+    }
+
     public function testVerifySignatureStillRejectsAnUnrelatedSecretWithTwoSignatures(): void
     {
         $header = $this->dualSignatureHeader(self::PAYLOAD, 'whsec_new', 'whsec_retired');

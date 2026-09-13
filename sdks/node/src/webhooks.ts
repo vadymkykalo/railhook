@@ -9,12 +9,21 @@ const DELIVERY_ID_HEADER = 'x-delivery-id';
 
 const DEFAULT_TOLERANCE = 300000; // 5 minutes in milliseconds
 
+/**
+ * Request headers. Wide enough to take Node's `IncomingHttpHeaders` (Express's `req.headers`)
+ * as-is, where a repeated header arrives as a `string[]`; the first value is used.
+ */
 export interface WebhookHeaders {
-  'x-signature'?: string;
-  'x-timestamp'?: string;
-  'x-event-id'?: string;
-  'x-delivery-id'?: string;
-  [key: string]: string | undefined;
+  'x-signature'?: string | string[];
+  'x-timestamp'?: string | string[];
+  'x-event-id'?: string | string[];
+  'x-delivery-id'?: string | string[];
+  [key: string]: string | string[] | undefined;
+}
+
+function header(headers: WebhookHeaders, lower: string, canonical: string): string | undefined {
+  const value = headers[lower] || headers[canonical];
+  return Array.isArray(value) ? value[0] : value;
 }
 
 export interface VerifyOptions {
@@ -64,6 +73,16 @@ export function verifySignature(
   }
 
   if (!timestamp || signatures.length === 0) {
+    throw new RailhookError(
+      'Invalid signature format. Expected: t=timestamp,v1=signature',
+      400,
+      'invalid_signature'
+    );
+  }
+
+  // Digits only. parseInt('abc') is NaN, and NaN compared with the tolerance is false, so a
+  // non-numeric t used to skip the replay window entirely.
+  if (!/^\d+$/.test(timestamp)) {
     throw new RailhookError(
       'Invalid signature format. Expected: t=timestamp,v1=signature',
       400,
@@ -140,9 +159,9 @@ export function verifyStandardWebhook(
 ): boolean {
   const tolerance = options.toleranceSeconds ?? DEFAULT_STANDARD_TOLERANCE_SECONDS;
 
-  const id = headers[STANDARD_ID_HEADER] || headers['Webhook-Id'];
-  const timestamp = headers[STANDARD_TIMESTAMP_HEADER] || headers['Webhook-Timestamp'];
-  const signature = headers[STANDARD_SIGNATURE_HEADER] || headers['Webhook-Signature'];
+  const id = header(headers, STANDARD_ID_HEADER, 'Webhook-Id');
+  const timestamp = header(headers, STANDARD_TIMESTAMP_HEADER, 'Webhook-Timestamp');
+  const signature = header(headers, STANDARD_SIGNATURE_HEADER, 'Webhook-Signature');
 
   if (!id || !timestamp || !signature) {
     throw new RailhookError(
@@ -152,8 +171,9 @@ export function verifyStandardWebhook(
     );
   }
 
-  const timestampSeconds = parseInt(timestamp, 10);
-  if (Number.isNaN(timestampSeconds)) {
+  // Digits only: parseInt stops at the first non-digit, so `<ts>xyz` verified as `<ts>`.
+  const timestampSeconds = parseInt(timestamp.trim(), 10);
+  if (!/^\d+$/.test(timestamp.trim())) {
     throw new RailhookError('Invalid webhook-timestamp header', 400, 'invalid_signature');
   }
 
@@ -201,7 +221,7 @@ export function verifyStandardWebhook(
 /**
  * Constructs a webhook event from the request.
  *
- * What Railhook actually PUTs on the wire is the event's **payload**, not an
+ * What Railhook actually POSTs on the wire is the event's **payload**, not an
  * envelope: a `client.events.send({ type: 'order.completed', data: {...} })`
  * arrives at your endpoint as the `data` object alone, with the identifiers
  * carried in headers (`X-Event-Id`, `X-Delivery-Id`, `X-Timestamp`,
@@ -227,10 +247,10 @@ export function constructEvent(
   secret: string,
   options: VerifyOptions = {}
 ): WebhookEvent {
-  const signature = headers[SIGNATURE_HEADER] || headers['X-Signature'];
-  const timestamp = headers[TIMESTAMP_HEADER] || headers['X-Timestamp'];
-  const eventId = headers[EVENT_ID_HEADER] || headers['X-Event-Id'];
-  const deliveryId = headers[DELIVERY_ID_HEADER] || headers['X-Delivery-Id'];
+  const signature = header(headers, SIGNATURE_HEADER, 'X-Signature');
+  const timestamp = header(headers, TIMESTAMP_HEADER, 'X-Timestamp');
+  const eventId = header(headers, EVENT_ID_HEADER, 'X-Event-Id');
+  const deliveryId = header(headers, DELIVERY_ID_HEADER, 'X-Delivery-Id');
 
   if (!signature) {
     throw new RailhookError('Missing X-Signature header', 400, 'missing_header');

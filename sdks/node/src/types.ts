@@ -185,7 +185,11 @@ export interface WebhookEvent {
 // ── Incoming Webhooks ──
 
 export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO';
-export type VerificationMode = 'NONE' | 'HMAC_GENERIC';
+/**
+ * `HMAC_GENERIC` checks your own header and prefix; `PROVIDER` uses the scheme of the source's
+ * `providerType` (Stripe's timestamped `t=…,v1=…`, GitHub's `sha256=`, …).
+ */
+export type VerificationMode = 'NONE' | 'HMAC_GENERIC' | 'PROVIDER';
 export type IncomingSourceStatus = 'ACTIVE' | 'DISABLED';
 export type IncomingAuthType = 'NONE' | 'BEARER' | 'BASIC' | 'CUSTOM_HEADER';
 

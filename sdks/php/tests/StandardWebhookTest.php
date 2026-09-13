@@ -82,6 +82,39 @@ class StandardWebhookTest extends TestCase
             self::PAYLOAD, $this->headers($ts, $header), $this->sharedSecret($retired)));
     }
 
+    public function testRotationHeaderVerifiesWhenTheMatchIsLastBesideAnUnknownVersion(): void
+    {
+        $ts = time();
+        $retired = 'b2xkLXNlY3JldC1ieXRlcy1oZXJlLXBhZGRpbmc=';
+        $header = 'v1,' . $this->sign($ts, $retired) . ' v2,' . $this->sign($ts) . ' v1,' . $this->sign($ts);
+
+        $this->assertTrue(Webhook::verifyStandardWebhook(
+            self::PAYLOAD, $this->headers($ts, $header), $this->sharedSecret()));
+    }
+
+    public function testRotationHeaderStillEnforcesTheTolerance(): void
+    {
+        $old = time() - 3600;
+        $retired = 'b2xkLXNlY3JldC1ieXRlcy1oZXJlLXBhZGRpbmc=';
+        $header = 'v1,' . $this->sign($old) . ' v1,' . $this->sign($old, $retired);
+
+        $this->expectException(RailhookException::class);
+        $this->expectExceptionMessage('outside tolerance window');
+        Webhook::verifyStandardWebhook(self::PAYLOAD, $this->headers($old, $header), $this->sharedSecret());
+    }
+
+    public function testAcceptsArrayValuedHeadersAsLaravelAndSymfonyGiveThem(): void
+    {
+        // $request->headers->all() in both frameworks maps each name to a list of values.
+        $ts = time();
+        $headers = array_map(
+            fn (string $value): array => [$value],
+            $this->headers($ts, 'v1,' . $this->sign($ts))
+        );
+
+        $this->assertTrue(Webhook::verifyStandardWebhook(self::PAYLOAD, $headers, $this->sharedSecret()));
+    }
+
     public function testRejectsAReplayDespiteAValidSignature(): void
     {
         // A signature over a fixed body never expires by itself, so without the timestamp

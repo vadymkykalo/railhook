@@ -29,7 +29,7 @@ npm install @railhook/node
 import { Railhook } from '@railhook/node';
 
 const client = new Railhook({
-  apiKey: process.env.RAILHOOK_API_KEY, // e.g. 'Kz1uAIM8VeJUQN7yGSYCst64WxNLabBHfOYbrPlJ1yk'
+  apiKey: process.env.RAILHOOK_API_KEY!, // e.g. 'Kz1uAIM8VeJUQN7yGSYCst64WxNLabBHfOYbrPlJ1yk'
   baseUrl: 'http://localhost:8080', // optional, defaults to localhost
 });
 
@@ -145,17 +145,26 @@ Receive, validate, and forward webhooks from third-party providers (Stripe, GitH
 ### Incoming Sources
 
 ```typescript
-// Create an incoming source with HMAC verification
+// Create an incoming source that verifies Stripe's own signature scheme
 const source = await client.incomingSources.create(projectId, {
   name: 'Stripe Webhooks',
   slug: 'stripe',
   providerType: 'STRIPE',
-  verificationMode: 'HMAC_GENERIC',
-  hmacSecret: 'whsec_...',
-  hmacHeaderName: 'Stripe-Signature',
+  verificationMode: 'PROVIDER', // Stripe-Signature: t=<unix-s>,v1=<hex>, 300 s tolerance
+  hmacSecret: 'whsec_...', // the signing secret from Stripe's webhook settings
 });
 
 console.log(`Ingress URL: ${source.ingressUrl}`);
+
+// A provider with no preset (providerType GENERIC) uses HMAC_GENERIC instead: HMAC-SHA256
+// over the body, read from the header and prefix you name.
+await client.incomingSources.create(projectId, {
+  name: 'Acme Webhooks',
+  verificationMode: 'HMAC_GENERIC',
+  hmacSecret: 'acme-shared-secret',
+  hmacHeaderName: 'X-Acme-Signature',
+  hmacSignaturePrefix: 'sha256=',
+});
 
 // List sources
 const sources = await client.incomingSources.list(projectId);
@@ -219,16 +228,19 @@ console.log(`Replayed to ${result.destinationsCount} destinations`);
 Verify incoming webhooks in your endpoint:
 
 ```typescript
+import express from 'express';
 import { verifySignature, constructEvent } from '@railhook/node';
 
-app.post('/webhooks', (req, res) => {
-  const payload = req.body; // raw body string
-  const signature = req.headers['x-signature'];
-  const secret = process.env.WEBHOOK_SECRET;
+const app = express();
+const secret = process.env.WEBHOOK_SECRET!;
+
+// The raw body, not express.json(): the signature is over the exact bytes sent.
+app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
+  const payload = req.body.toString();
 
   try {
     // Option 1: Just verify
-    verifySignature(payload, signature, secret);
+    verifySignature(payload, req.header('x-signature') ?? '', secret);
 
     // Option 2: Verify and parse
     const event = constructEvent(payload, req.headers, secret);
@@ -241,7 +253,7 @@ app.post('/webhooks', (req, res) => {
 
     res.status(200).send('OK');
   } catch (err) {
-    console.error('Webhook verification failed:', err.message);
+    console.error('Webhook verification failed:', (err as Error).message);
     res.status(400).send('Invalid signature');
   }
 });
@@ -249,7 +261,7 @@ app.post('/webhooks', (req, res) => {
 
 ### What lands on your endpoint
 
-Railhook PUTs the event's **payload** on the wire, not an envelope. This:
+Railhook POSTs the event's **payload** on the wire, not an envelope. This:
 
 ```typescript
 await client.events.send({ type: 'order.completed', data: { orderId: 'ord_1' } });
@@ -266,6 +278,9 @@ X-Event-Id: 6f0e…
 X-Delivery-Id: 91ab…
 X-Sequence-Number: 0
 Idempotency-Key: 6f0e…-<endpoint-id>
+webhook-id: 91ab…
+webhook-timestamp: 1738000000
+webhook-signature: v1,<base64 hmac-sha256>
 
 {"orderId":"ord_1"}
 ```
@@ -281,6 +296,40 @@ and the endpoint secret, and the server rejects timestamps more than **300
 seconds** old — verify against the *raw* body bytes, before any JSON parse and
 re-serialize.
 
+### Standard Webhooks headers
+
+An endpoint receives both header sets by default (`signatureScheme: BOTH`; `LEGACY` sends
+only `X-Signature`, `STANDARD` only the `webhook-*` headers). The
+[Standard Webhooks](https://www.standardwebhooks.com) signature is over
+`` `${webhookId}.${webhookTimestamp}.${rawBody}` `` — timestamp in seconds, digest in base64 —
+with the endpoint's `standardWebhooksSecret` (`whsec_…`), so any Standard Webhooks library
+verifies it too:
+
+```typescript
+import express from 'express';
+import { verifyStandardWebhook } from '@railhook/node';
+
+const app = express();
+
+app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
+  try {
+    verifyStandardWebhook(req.body.toString(), req.headers, process.env.STANDARD_WEBHOOKS_SECRET!);
+    res.sendStatus(200);
+  } catch {
+    res.status(400).send('Invalid signature');
+  }
+});
+```
+
+### Secret rotation
+
+After `endpoints.rotateSecret`, every delivery is signed with the new secret **and** the
+retired one until the endpoint's grace window closes (24 hours by default), so the new secret
+can be deployed at any point inside it. `X-Signature` then carries two `v1=` values and
+`webhook-signature` two space-separated `v1,` entries. `verifySignature`, `constructEvent`
+and `verifyStandardWebhook` accept the request when **any** `v1` matches, ignore other
+versions, and still reject a timestamp outside the tolerance.
+
 ### Express.js Example
 
 ```typescript
@@ -294,7 +343,7 @@ app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
   const event = constructEvent(
     req.body.toString(),
     req.headers,
-    process.env.WEBHOOK_SECRET
+    process.env.WEBHOOK_SECRET!
   );
 
   // Process event...
@@ -391,8 +440,10 @@ All generic methods use the same authentication, error handling, and rate-limit 
 ## Configuration
 
 ```typescript
+import { Railhook } from '@railhook/node';
+
 const client = new Railhook({
-  apiKey: process.env.RAILHOOK_API_KEY, // Required: Your project API key
+  apiKey: process.env.RAILHOOK_API_KEY!, // Required: Your project API key
   baseUrl: 'https://api.example.com', // Optional: API base URL (default: http://localhost:8080)
   timeout: 30000,              // Optional: Request timeout in ms (default: 30000)
 });

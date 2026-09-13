@@ -1,6 +1,7 @@
 import { verifyStandardWebhook } from '../webhooks';
 import { RailhookError } from '../errors';
 import * as crypto from 'crypto';
+import type { IncomingHttpHeaders } from 'http';
 
 /**
  * The point of this scheme is that a receiver can verify with a library they already have,
@@ -39,6 +40,38 @@ describe('verifyStandardWebhook', () => {
 
     expect(verifyStandardWebhook(payload, headers(ts, header), sharedSecret)).toBe(true);
     expect(verifyStandardWebhook(payload, headers(ts, header), `whsec_${retired}`)).toBe(true);
+  });
+
+  it('accepts a rotation header whose matching entry is last, beside an unknown version', () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const retired = 'b2xkLXNlY3JldC1ieXRlcy1oZXJlLXBhZGRpbmc=';
+    const header = `v1,${sign(ts, retired)} v2,${sign(ts)} v1,${sign(ts)}`;
+
+    expect(verifyStandardWebhook(payload, headers(ts, header), sharedSecret)).toBe(true);
+  });
+
+  it('still enforces the timestamp tolerance on a rotation header', () => {
+    const old = Math.floor(Date.now() / 1000) - 3600;
+    const retired = 'b2xkLXNlY3JldC1ieXRlcy1oZXJlLXBhZGRpbmc=';
+    const header = `v1,${sign(old)} v1,${sign(old, retired)}`;
+
+    expect(() => verifyStandardWebhook(payload, headers(old, header), sharedSecret))
+      .toThrow('outside tolerance window');
+  });
+
+  it('rejects a webhook-timestamp that is not purely digits', () => {
+    // parseInt stops at the first non-digit, so `<ts>xyz` used to verify as `<ts>`.
+    const ts = Math.floor(Date.now() / 1000);
+    expect(() =>
+      verifyStandardWebhook(payload, { ...headers(ts, `v1,${sign(ts)}`), 'webhook-timestamp': `${ts}xyz` }, sharedSecret)
+    ).toThrow('Invalid webhook-timestamp header');
+  });
+
+  it('accepts IncomingHttpHeaders straight from a Node HTTP server', () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const incoming: IncomingHttpHeaders = { ...headers(ts, `v1,${sign(ts)}`), 'set-cookie': ['a=b'] };
+
+    expect(verifyStandardWebhook(payload, incoming, sharedSecret)).toBe(true);
   });
 
   it('rejects a replayed request even though its signature is still valid', () => {
