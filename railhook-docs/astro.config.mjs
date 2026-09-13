@@ -3,8 +3,10 @@ import { existsSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
+import sitemap from '@astrojs/sitemap';
 
 import { API_REFERENCE, SIDEBAR_GROUPS } from './src/data/slugs.mjs';
+import { lastmodFor, socialImageHead } from './scripts/seo.mjs';
 
 /**
  * The docs are served from the UI image at /docs/, next to the dashboard, so every URL here
@@ -68,6 +70,7 @@ export default defineConfig({
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' } },
         { tag: 'link', attrs: { rel: 'stylesheet', href: FONTS } },
+        ...socialImageHead,
       ],
       // The code surface is dark in both site themes, as it is on the landing page and in
       // the dashboard: one theme, no light/dark switch for code.
@@ -105,6 +108,12 @@ export default defineConfig({
       // The API reference is a custom page (Scalar), which the validator cannot see into; the
       // pages themselves exist, so links to them are excluded rather than reported.
       plugins: [starlightLinksValidator({ exclude: ['/docs/api-reference/', '/docs/uk/api-reference/', '/api-reference/', '/uk/api-reference/'] })],
+    }),
+    // Starlight adds this integration itself unless one is already configured; declared here
+    // with the same i18n alternates so every entry can also say when its page last changed.
+    sitemap({
+      i18n: { defaultLocale: 'root', locales: { root: 'en', uk: 'uk' } },
+      serialize: (item) => ({ ...item, lastmod: lastmodFor(item.url).toISOString() }),
     }),
   ],
 });

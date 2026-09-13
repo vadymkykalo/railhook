@@ -5,7 +5,7 @@
  * The app is a single-page bundle, so what nginx serves for every URL is
  * `<div id="root"></div>` and nothing else. A crawler that does not run
  * JavaScript — and several that do, budget-permitting — sees an empty document
- * on the landing page, the pricing page and the contact page. (The docs are a
+ * on the landing page and the contact page. (The docs are a
  * static site of their own and need none of this.)
  * Every other SEO fix in this repo (per-route titles, canonicals, the sitemap,
  * JSON-LD) points at pages whose body is empty until React mounts.

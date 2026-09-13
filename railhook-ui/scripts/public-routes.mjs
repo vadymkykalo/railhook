@@ -10,10 +10,14 @@
  * that `public/robots.txt` points crawlers at.
  */
 
-/** The marketing pages, with the priority they deserve relative to each other. */
+/**
+ * The marketing pages, with the priority they deserve relative to each other.
+ *
+ * No /pricing: there are no paid plans to price, and nginx sends the old address to the landing
+ * page with a 301. Listed here it was a sitemap entry for a duplicate of `/`.
+ */
 const MARKETING = [
   { path: '/', priority: '1.0', changefreq: 'weekly' },
-  { path: '/pricing', priority: '0.9', changefreq: 'weekly' },
   { path: '/contact', priority: '0.5', changefreq: 'monthly' },
 ];
 

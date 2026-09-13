@@ -15,6 +15,7 @@
     "check": "npm run env:reference:check && npm test"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.4",
     "@astrojs/starlight": "^0.42.0",
     "@scalar/api-reference": "^1.68.0",
     "astro": "^7.3.2",
