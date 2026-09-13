@@ -10,6 +10,8 @@ const LandingPage = lazy(() => import('./pages/LandingPage'));
 const LoginPage = lazy(() => import('./auth/LoginPage'));
 const RegisterPage = lazy(() => import('./auth/RegisterPage'));
 const VerifyEmailPage = lazy(() => import('./auth/VerifyEmailPage'));
+const ConfirmEmailChangePage = lazy(() => import('./auth/ConfirmEmailChangePage'));
+const CancelEmailChangePage = lazy(() => import('./auth/CancelEmailChangePage'));
 const ForgotPasswordPage = lazy(() => import('./auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./auth/ResetPasswordPage'));
 const AcceptInvitePage = lazy(() => import('./auth/AcceptInvitePage'));
@@ -108,6 +110,16 @@ export const router = createBrowserRouter([
   {
     path: '/verify-email',
     element: <S><VerifyEmailPage /></S>,
+  },
+  /* The two links an email change mails: confirm from the new address, "this wasn't me" from
+     the old one. Public, because either can be opened with no session. */
+  {
+    path: '/confirm-email-change',
+    element: <S><ConfirmEmailChangePage /></S>,
+  },
+  {
+    path: '/cancel-email-change',
+    element: <S><CancelEmailChangePage /></S>,
   },
   {
     path: '/forgot-password',

@@ -28,6 +28,25 @@ export interface AuthResponse {
   emailVerified?: boolean;
 }
 
+/**
+ * A new address for the signed-in account. An unverified account sends `captchaToken` (when the
+ * deployment has a CAPTCHA); a verified one sends `currentPassword`, or nothing when it has no
+ * password and signed in within the last ten minutes.
+ */
+export interface ChangeEmailRequest {
+  newEmail: string;
+  currentPassword?: string;
+  captchaToken?: string;
+}
+
+/** `applied` true: the address changed already and needs verifying. False: it waits at `pendingEmail`. */
+export interface EmailChangeResponse {
+  email: string;
+  pendingEmail?: string;
+  pendingExpiresAt?: string;
+  applied: boolean;
+}
+
 export type UserStatus = 'ACTIVE' | 'PENDING_VERIFICATION' | 'DISABLED';
 
 export interface UserResponse {

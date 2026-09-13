@@ -877,7 +877,7 @@ export interface paths {
          * Cancel replay session
          * @description Requests cancellation of a running replay session
          */
-        post: operations["cancel"];
+        post: operations["cancelPost"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1938,6 +1938,88 @@ export interface paths {
          * @description Sends a password reset email to the user
          */
         post: operations["forgotPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/email-change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the email change state
+         * @description The account's address, and the change waiting for confirmation if there is one
+         */
+        get: operations["current"];
+        put?: never;
+        /**
+         * Change email
+         * @description An unverified account moves to the new address at once and must verify it; it answers the registration CAPTCHA when one is configured. A verified account re-enters its password (or, with no password, has signed in within 10 minutes) and keeps its address until the link sent to the new one is opened.
+         */
+        post: operations["request"];
+        /** Cancel the pending email change */
+        delete: operations["cancelDelete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/email-change/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resend the email change confirmation */
+        post: operations["resend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/email-change/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm an email change
+         * @description Opened from the link sent to the new address. Signs every session out.
+         */
+        post: operations["confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/email-change/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an email change from the old address
+         * @description Opened from the "this wasn't me" link sent to the old address. Signs every session out.
+         */
+        post: operations["cancelByToken"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4503,6 +4585,19 @@ export interface components {
             /** Format: email */
             email: string;
         };
+        ChangeEmailRequest: {
+            /** Format: email */
+            newEmail: string;
+            currentPassword?: string;
+            captchaToken?: string;
+        };
+        EmailChangeResponse: {
+            email?: string;
+            pendingEmail?: string;
+            /** Format: date-time */
+            pendingExpiresAt?: string;
+            applied?: boolean;
+        };
         DeviceTokenRequest: {
             deviceCode: string;
         };
@@ -4611,12 +4706,12 @@ export interface components {
             /** Format: int64 */
             offset?: number;
             sort?: components["schemas"]["SortObject"];
-            unpaged?: boolean;
             paged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
+            unpaged?: boolean;
         };
         SortObject: {
             empty?: boolean;
@@ -7613,7 +7708,7 @@ export interface operations {
             };
         };
     };
-    cancel: {
+    cancelPost: {
         parameters: {
             query?: never;
             header?: never;
@@ -9273,6 +9368,180 @@ export interface operations {
             };
             /** @description Too many requests */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    current: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+        };
+    };
+    request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Changed, or waiting for confirmation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+            /** @description Wrong password, failed CAPTCHA or invalid address */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+            /** @description A passwordless account has not signed in recently */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+            /** @description Email already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+            /** @description Too many requests or daily cap reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+        };
+    };
+    cancelDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    resend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EmailChangeResponse"];
+                };
+            };
+        };
+    };
+    confirm: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Email changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid, used or expired link */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Email already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    cancelByToken: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

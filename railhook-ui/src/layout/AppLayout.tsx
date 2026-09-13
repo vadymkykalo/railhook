@@ -12,6 +12,7 @@ import { showApiError, showSuccess } from '../lib/toast';
 import { CommandPalette } from '../components/CommandPalette';
 import { isDarkApplied, toggleTheme } from '../lib/theme';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import ChangeEmailForm from '../components/ChangeEmailForm';
 import ProtectedRoute from '../auth/ProtectedRoute';
 import Sidebar from './Sidebar';
 import SectionTabs from './SectionTabs';
@@ -32,6 +33,7 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === '1');
   const [isDark, setIsDark] = useState(isDarkApplied);
   const [resending, setResending] = useState(false);
+  const [changingEmail, setChangingEmail] = useState(false);
 
   const routeProjectId = params.projectId || location.pathname.match(/\/admin\/projects\/([^/]+)/)?.[1];
 
@@ -181,18 +183,46 @@ export default function AppLayout() {
           <SectionTabs projectId={projectId} role={role} />
 
           {needsVerification && (
-            <div className="flex items-center justify-between gap-4 border-b border-retry/30 bg-retry-soft px-4 py-2.5 lg:px-6">
-              <div className="flex items-center gap-2 text-sm text-retry">
-                <Mail className="h-4 w-4 flex-shrink-0" />
-                <span>
-                  <Trans i18nKey="auth.verification.banner" values={{ email: user?.user?.email }} components={{ strong: <strong /> }} />
-                </span>
+            <div className="border-b border-retry/30 bg-retry-soft px-4 py-2.5 lg:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <div className="flex items-center gap-2 text-sm text-retry">
+                  <Mail className="h-4 w-4 flex-shrink-0" />
+                  <span>
+                    <Trans i18nKey="auth.verification.banner" values={{ email: user?.user?.email }} components={{ strong: <strong /> }} />
+                  </span>
+                </div>
+                <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+                  {/* A typo in the address is the likeliest reason no link ever arrived, and
+                      resending to it again cannot fix that. */}
+                  {!changingEmail && (
+                    <Button variant="link" size="sm" onClick={() => setChangingEmail(true)} className="text-retry">
+                      {t('auth.verification.changeAddress')}
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={handleResendVerification} disabled={resending}
+                    className="border-retry/40 text-retry hover:bg-retry/10">
+                    {resending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                    {resending ? t('auth.verification.resending') : t('auth.verification.resend')}
+                  </Button>
+                </div>
               </div>
-              <Button variant="outline" size="sm" onClick={handleResendVerification} disabled={resending}
-                className="flex-shrink-0 border-retry/40 text-retry hover:bg-retry/10">
-                {resending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                {resending ? t('auth.verification.resending') : t('auth.verification.resend')}
-              </Button>
+              {changingEmail && (
+                <div className="mt-3 rounded-md border border-rail bg-card p-3">
+                  <ChangeEmailForm
+                    unverified
+                    hasPassword={user.hasPassword !== false}
+                    currentEmail={user.user.email}
+                    initialValue={user.user.email}
+                    submitLabel={t('emailChange.submitUnverified')}
+                    onDone={(response) => {
+                      updateUser({ ...user, user: { ...user.user, email: response.email } });
+                      showSuccess(t('auth.verification.changed', { email: response.email }));
+                      setChangingEmail(false);
+                    }}
+                    onCancel={() => setChangingEmail(false)}
+                  />
+                </div>
+              )}
             </div>
           )}
 
