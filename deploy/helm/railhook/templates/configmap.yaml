@@ -21,6 +21,9 @@ data:
   # application's own localhost default.
   APP_BASE_URL: {{ include "railhook.appBaseUrl" . | quote }}
   CORS_ALLOWED_ORIGINS: {{ .Values.app.corsAllowedOrigins | default (include "railhook.appBaseUrl" .) | quote }}
+  # Incoming-source and tunnel URLs handed to providers and the CLI. Without it the API
+  # falls back to http://localhost:8080 for tunnels, which nobody outside the pod can reach.
+  WEBHOOK_INGRESS_BASE_URL: {{ .Values.app.ingressBaseUrl | default (include "railhook.appBaseUrl" .) | trimSuffix "/" | quote }}
 
   # SMTP. Read only when EMAIL_ENABLED is true; the password is a Secret, so it
   # is set on the api Deployment rather than here.

@@ -25,6 +25,11 @@ app:
   # names localhost. Comma-separated for more than one origin.
   corsAllowedOrigins: ""
 
+  # Public base of incoming-source and tunnel URLs (…/ingress/<token>, …/tunnel/<slug>),
+  # which are handed to providers and the CLI. Defaults to app.baseUrl above; set it
+  # only when webhooks reach Railhook on a different host than the dashboard.
+  ingressBaseUrl: ""
+
 # API service configuration
 api:
   # 30s for spring.lifecycle.timeout-per-shutdown-phase to drain the web server,

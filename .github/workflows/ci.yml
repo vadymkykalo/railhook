@@ -65,6 +65,12 @@ jobs:
             -f deploy/helm/railhook/values-production.yaml \
             > rendered/production.yaml
           wc -l rendered/*.yaml
+          # Tunnel and incoming-source URLs must follow the public address, never the API's
+          # localhost default.
+          for f in rendered/*.yaml; do
+            grep -q 'WEBHOOK_INGRESS_BASE_URL: "http' "$f" \
+              || { echo "::error::$f sets no WEBHOOK_INGRESS_BASE_URL"; exit 1; }
+          done
 
       - name: Validate rendered manifests against the Kubernetes schema
         run: |
@@ -1023,6 +1029,10 @@ jobs:
           docker compose config | grep -q "host_ip: 127.0.0.1" || { echo "::error::dashboard still bound publicly"; exit 1; }
           grep -qx 'APP_ENV=production' .env || { echo "::error::APP_ENV not production"; exit 1; }
           grep -q '^CORS_ALLOWED_ORIGINS=https://hooks.example.com$' .env || { echo "::error::CORS not on the domain"; exit 1; }
+          # Incoming-source and tunnel URLs are handed to Stripe, GitHub and the CLI. Built from
+          # the compose default they pointed at localhost:8080, a port nothing publishes.
+          docker compose config | grep -qE 'WEBHOOK_INGRESS_BASE_URL: "?https://hooks.example.com"?$' \
+            || { echo "::error::ingress URLs are not on the domain"; docker compose config | grep WEBHOOK_INGRESS_BASE_URL; exit 1; }
           test -f Caddyfile || { echo "::error::no Caddyfile"; exit 1; }
 
       - name: Dump logs on failure
