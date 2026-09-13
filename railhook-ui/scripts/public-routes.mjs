@@ -19,6 +19,9 @@
 const MARKETING = [
   { path: '/', priority: '1.0', changefreq: 'weekly' },
   { path: '/contact', priority: '0.5', changefreq: 'monthly' },
+  // Linked from the registration form and from Google's consent screen, which requires both.
+  { path: '/privacy', priority: '0.3', changefreq: 'yearly' },
+  { path: '/terms', priority: '0.3', changefreq: 'yearly' },
 ];
 
 /** Every public route, in the order a sitemap should list them. */

@@ -116,23 +116,7 @@ public class AuthService {
                 .build();
         user = userRepository.save(user);
 
-        String defaultPlanName = billingEnabled ? "free" : "self_hosted";
-        Plan defaultPlan = planRepository.findByName(defaultPlanName)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                        "Default plan '" + defaultPlanName + "' not found. Run database migrations."));
-
-        Organization organization = Organization.builder()
-                .name(request.getOrganizationName())
-                .plan(defaultPlan)
-                .build();
-        organization = organizationRepository.save(organization);
-
-        Membership membership = Membership.builder()
-                .userId(user.getId())
-                .organizationId(organization.getId())
-                .role(MembershipRole.OWNER)
-                .build();
-        membershipRepository.save(membership);
+        Organization organization = createOrganizationOwnedBy(user, request.getOrganizationName());
 
         if (verificationIsDeliverable) {
             emailService.sendVerificationEmail(user.getEmail(), verificationToken);
@@ -159,7 +143,9 @@ public class AuthService {
                             + " minute(s), or reset your password to unlock the account now.");
         }
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+        // An account created through Google has no password until its owner sets one. It answers
+        // exactly like a wrong password, so the sign-in page does not reveal how an address signs in.
+        if (user.getPasswordHash() == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             accountLockoutService.recordFailure(user);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
@@ -174,6 +160,45 @@ public class AuthService {
 
         Membership membership = membershipToIssueTokenFor(user.getId());
 
+        return issueSession(user, membership.getOrganizationId(), membership.getRole(), origin,
+                Boolean.TRUE.equals(user.getEmailVerified()));
+    }
+
+    /**
+     * The organization a new account starts in, on the plan this deployment gives new
+     * organizations, with the account as its owner. Shared by password registration and by
+     * {@link ExternalSignInService}, so an account created through Google lands on exactly the
+     * plan a registered one does. Runs inside the caller's system scope and transaction.
+     */
+    public Organization createOrganizationOwnedBy(User owner, String organizationName) {
+        String defaultPlanName = billingEnabled ? "free" : "self_hosted";
+        Plan defaultPlan = planRepository.findByName(defaultPlanName)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Default plan '" + defaultPlanName + "' not found. Run database migrations."));
+
+        Organization organization = organizationRepository.save(Organization.builder()
+                .name(organizationName)
+                .plan(defaultPlan)
+                .build());
+
+        membershipRepository.save(Membership.builder()
+                .userId(owner.getId())
+                .organizationId(organization.getId())
+                .role(MembershipRole.OWNER)
+                .build());
+        return organization;
+    }
+
+    /**
+     * A session for a user who has already proven who they are some other way than a password —
+     * the one-time code {@link ExternalSignInService} hands the dashboard after Google. The same
+     * membership choice and suspension rule as {@link #login}, and the same token pair.
+     */
+    public AuthResponse issueSessionFor(User user, SessionOrigin origin) {
+        if (user.getStatus() == UserStatus.DISABLED) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
+        }
+        Membership membership = membershipToIssueTokenFor(user.getId());
         return issueSession(user, membership.getOrganizationId(), membership.getRole(), origin,
                 Boolean.TRUE.equals(user.getEmailVerified()));
     }
@@ -493,6 +518,10 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
+        if (user.getPasswordHash() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "This account has no password yet. Use \"Forgot password\" to set one.");
+        }
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
         }
@@ -615,6 +644,7 @@ public class AuthService {
                 .organization(orgResponse)
                 .role(role)
                 .emailDeliveryEnabled(emailService.isEnabled())
+                .hasPassword(user.getPasswordHash() != null)
                 .build();
     }
 }

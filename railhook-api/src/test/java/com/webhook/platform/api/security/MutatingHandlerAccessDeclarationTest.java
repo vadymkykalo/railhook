@@ -60,6 +60,9 @@ class MutatingHandlerAccessDeclarationTest {
             "AuthController.register",
             "AuthController.login",
             "AuthController.refreshToken",
+            // Called before any session exists: the caller holds a one-time code from the Google
+            // callback, not a membership, and the code is what authorises the call.
+            "AuthController.exchangeSignInCode",
             "AuthController.logout",
             "AuthController.verifyEmail",
             "AuthController.resendVerification",

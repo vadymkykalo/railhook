@@ -1,5 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { AlertTriangle, Check, Loader2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
 import { usePermissions } from '../auth/usePermissions';
@@ -252,6 +253,16 @@ export default function SettingsPage() {
             </div>
           </FormSection>
 
+          {user.hasPassword === false ? (
+            <FormSection
+              title={t('settings.changePassword')}
+              description={t('settings.noPassword.description')}
+            >
+              <Button asChild variant="outline" className="w-fit">
+                <Link to="/forgot-password">{t('settings.noPassword.action')}</Link>
+              </Button>
+            </FormSection>
+          ) : (
           <form onSubmit={handleChangePassword}>
             <FormSection
               title={t('settings.changePassword')}
@@ -316,6 +327,7 @@ export default function SettingsPage() {
               )}
             </FormSection>
           </form>
+          )}
 
           <FormSection
             title={t('settings.sessions.title')}

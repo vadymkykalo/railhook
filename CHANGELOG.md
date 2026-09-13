@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.0] - 2026-09-13
+
+### Added
+
+- **Sign in and sign up with Google.** A "Continue with Google" button on the login and registration
+  pages creates a verified account and its organization in one step, or signs in to — and links —
+  an existing account with the same address. Authorization code with PKCE and a nonce; the
+  id_token is verified against Google's keys; the browser gets a single-use sign-in code, never a
+  token in a URL. It is on only when `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` are
+  set: a self-hosted install without them shows no button and the endpoints answer 404.
+- **Privacy Policy and Terms of Service** pages (`/privacy`, `/terms`), linked from the footer and
+  from the consent line on the registration page.
+
+### Fixed
+
+- **A flaky integration test.** The workflow outbox reclaim test counted rows other tests had left
+  in the table; each test now starts from an empty one.
+
 ## [2.18.1] - 2026-09-13
 
 ### Fixed
@@ -1805,7 +1823,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.18.1...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.19.0...HEAD
+[2.19.0]: https://github.com/vadymkykalo/railhook/compare/v2.18.1...v2.19.0
 [2.18.1]: https://github.com/vadymkykalo/railhook/compare/v2.18.0...v2.18.1
 [2.18.0]: https://github.com/vadymkykalo/railhook/compare/v2.17.2...v2.18.0
 [2.17.2]: https://github.com/vadymkykalo/railhook/compare/v2.17.1...v2.17.2

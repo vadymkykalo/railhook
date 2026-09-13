@@ -1425,6 +1425,23 @@
       ]
     },
     {
+      "title": "Sign in with google",
+      "variables": [
+        {
+          "name": "GOOGLE_OAUTH_CLIENT_ID",
+          "default": null,
+          "example": null,
+          "description": "\"Continue with Google\" on the sign-in and registration pages. Off unless both are set, and\nthen the button is not shown and the endpoints answer 404.\n\nOne button signs in and signs up: a Google account that matches no Railhook account gets one\non the spot, verified by Google, with its own organization named after its Google Workspace\ndomain (or the person, for a personal account). An account that already signed up with a\npassword and the same address gains Google as a second way in.\n\nCreate an OAuth client of type \"Web application\" in Google Cloud Console (APIs & Services →\nCredentials) and add this authorized redirect URI, exactly, built from APP_BASE_URL:\n  <APP_BASE_URL>/api/v1/auth/oauth/google/callback\nThe consent screen needs the openid, email and profile scopes and nothing else."
+        },
+        {
+          "name": "GOOGLE_OAUTH_CLIENT_SECRET",
+          "default": null,
+          "example": null,
+          "description": "\"Continue with Google\" on the sign-in and registration pages. Off unless both are set, and\nthen the button is not shown and the endpoints answer 404.\n\nOne button signs in and signs up: a Google account that matches no Railhook account gets one\non the spot, verified by Google, with its own organization named after its Google Workspace\ndomain (or the person, for a personal account). An account that already signed up with a\npassword and the same address gains Google as a second way in.\n\nCreate an OAuth client of type \"Web application\" in Google Cloud Console (APIs & Services →\nCredentials) and add this authorized redirect URI, exactly, built from APP_BASE_URL:\n  <APP_BASE_URL>/api/v1/auth/oauth/google/callback\nThe consent screen needs the openid, email and profile scopes and nothing else."
+        }
+      ]
+    },
+    {
       "title": "Billing / plans",
       "variables": [
         {

@@ -99,4 +99,14 @@ describe('the public route list', () => {
     expect(publicRoutes().map((r: { path: string }) => r.path)).not.toContain('/pricing');
     expect(read('railhook-ui/public/sitemap.xml')).not.toMatch(/\/pricing</);
   });
+
+  it('serves the privacy policy and the terms as prerendered pages, not as 404s or noindex shells', () => {
+    // Google's consent screen links both, so they must answer 200 and stay indexable: prerendered
+    // into dist/<page>/index.html and served by `location /`, never by the app-route regex.
+    const paths = publicRoutes().map((r: { path: string }) => r.path);
+    expect(paths).toEqual(expect.arrayContaining(['/privacy', '/terms']));
+    expect(spaSegments()).not.toContain('privacy');
+    expect(spaSegments()).not.toContain('terms');
+    expect(location('/')!.body).toMatch(/try_files\s+\$uri\s+\$uri\/index\.html\s+=404;/);
+  });
 });

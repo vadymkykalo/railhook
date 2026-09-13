@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Loader2, Mail } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import AuthLayout from './AuthLayout';
+import GoogleSignInButton from './GoogleSignInButton';
 import { showApiError, showSuccess } from '../lib/toast';
 import { authApi } from '../api/auth.api';
 import { http } from '../api/http';
@@ -128,6 +129,7 @@ export default function RegisterPage() {
         </>
       }
     >
+      <GoogleSignInButton intent="register" />
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -214,7 +216,15 @@ export default function RegisterPage() {
           {loading ? t('auth.register.submitting') : t('auth.register.submit')}
         </Button>
 
-        <p className="text-xs text-muted-foreground">{t('auth.register.terms')}</p>
+        <p className="text-xs text-muted-foreground">
+          <Trans
+            i18nKey="auth.register.terms"
+            components={{
+              terms: <Link to="/terms" className="font-medium text-foreground underline-offset-2 hover:underline" />,
+              privacy: <Link to="/privacy" className="font-medium text-foreground underline-offset-2 hover:underline" />,
+            }}
+          />
+        </p>
       </form>
     </AuthLayout>
   );

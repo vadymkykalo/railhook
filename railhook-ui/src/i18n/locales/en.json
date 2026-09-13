@@ -354,6 +354,24 @@
     "title": "Audit Log"
   },
   "auth": {
+    "google": {
+      "backToSignIn": "Back to sign in",
+      "continue": "Continue with Google",
+      "errors": {
+        "generic": "Signing in with Google did not work. Please try again.",
+        "google_account_disabled": "This account has been disabled. Contact your organization's owner.",
+        "google_denied": "Google sign-in was cancelled.",
+        "google_exchange": "This sign-in link has expired or was already used. Please sign in again.",
+        "google_identity": "Google's answer could not be verified. Please try again.",
+        "google_state": "The sign-in took too long or was started in another browser. Please try again.",
+        "google_unavailable": "Google could not be reached. Please try again in a moment.",
+        "google_unverified_email": "The email address on your Google account is not verified, so it cannot be used here."
+      },
+      "failedTitle": "Could not sign you in",
+      "or": "or",
+      "renameOrganization": "We named your organization “{{name}}”. You can rename it in organization settings.",
+      "signingIn": "Signing you in…"
+    },
     "device": {
       "approve": "Approve",
       "approved": "Device authorized successfully!",
@@ -463,7 +481,7 @@
       "submitting": "Creating account...",
       "subtitle": "Get started with your webhook infrastructure",
       "success": "Account created! Please verify your email.",
-      "terms": "By creating an account, you agree to our Terms of Service and Privacy Policy.",
+      "terms": "By creating an account, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
       "title": "Create your account",
       "verificationSent": "We've sent a verification link to <strong>{{email}}</strong>. Click it to activate your account."
     },
@@ -1585,6 +1603,7 @@
     "github": "GitHub",
     "issues": "Issues",
     "overview": "How it works",
+    "privacy": "Privacy Policy",
     "product": "Product",
     "quickstart": "Quickstart",
     "security": "Security",
@@ -1592,7 +1611,8 @@
     "selfHosting": "Self-hosting guide",
     "signIn": "Sign in",
     "tagline": "Open-source webhook gateway. Send and receive webhooks, in our cloud or on your own servers.",
-    "talkToUs": "Talk to us"
+    "talkToUs": "Talk to us",
+    "terms": "Terms of Service"
   },
   "incidents": {
     "addNote": "Add Note",
@@ -2094,6 +2114,101 @@
       "title": "Run it your way"
     }
   },
+  "legal": {
+    "privacy": {
+      "intro": "This policy explains what data Railhook Cloud, the hosted service at railhook.io, processes and why. It does not cover copies of Railhook you run on your own servers: there, you are the operator and your data never reaches us.",
+      "sections": {
+        "changes": {
+          "body": "When this policy changes, we update this page and the date at the top.",
+          "title": "Changes"
+        },
+        "contact": {
+          "body": "Questions about this policy: support@railhook.io.",
+          "title": "Contact"
+        },
+        "data": {
+          "body": "- Account data: your name, email address, organization name and a hash of your password — or, if you sign in with Google, your Google account identifier instead of a password.\n- Webhook data: the payloads, headers and delivery attempts you send through the service.\n- Technical logs: IP address, user agent and request metadata.\n\nWe do not process payment data. There are no paid plans yet.",
+          "title": "What we process"
+        },
+        "google": {
+          "body": "If you choose to sign in with Google, we request only the openid, email and profile scopes. We use the name, email address and account identifier Google returns only to create your account or sign you in. We do not use Google user data for advertising, do not sell or transfer it, and do not use it for any other purpose.\n\nRailhook's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements.",
+          "title": "Sign in with Google"
+        },
+        "processors": {
+          "body": "- Hetzner — hosting, in the EU (Helsinki).\n- Cloudflare — CDN, DNS and the Turnstile check.\n- Resend — transactional email.\n- Google — only if you choose to sign in with Google.",
+          "title": "Who processes it for us"
+        },
+        "purpose": {
+          "body": "- To provide the service: receive, store and deliver your webhooks and show you their history.\n- To keep it secure and prevent abuse, including a Cloudflare Turnstile check when you register.\n- To send transactional email: address verification and password reset.",
+          "title": "Why we process it"
+        },
+        "retention": {
+          "body": "- Webhook events on the Free plan are kept for 7 days.\n- Account data is kept until you delete your account. You can delete it in the product.\n- Backups roll over, so deleted data leaves them over time.",
+          "title": "How long we keep it"
+        },
+        "rights": {
+          "body": "You can ask for a copy of your data, have it corrected, or have it deleted by writing to support@railhook.io. You can also delete your account yourself in the product.",
+          "title": "Your rights"
+        },
+        "sharing": {
+          "body": "We do not sell your data, and we do not use advertising trackers.",
+          "title": "What we do not do"
+        },
+        "who": {
+          "body": "Railhook is an open-source webhook gateway released under the MIT license. Railhook Cloud at railhook.io is operated by the project maintainer. You can reach us at support@railhook.io.",
+          "title": "Who we are"
+        }
+      },
+      "title": "Privacy Policy"
+    },
+    "terms": {
+      "intro": "These terms apply to Railhook Cloud, the hosted service at railhook.io. By creating an account you agree to them.",
+      "sections": {
+        "changes": {
+          "body": "When these terms change, we update this page and the date at the top.",
+          "title": "Changes"
+        },
+        "contact": {
+          "body": "Questions about these terms: support@railhook.io.",
+          "title": "Contact"
+        },
+        "free": {
+          "body": "Railhook Cloud is currently free, within these limits:\n\n- 10,000 events per month\n- 3 projects\n- 7-day retention of webhook events\n\nPaid plans may be offered later. We will not move you to one without your consent.",
+          "title": "The Free plan"
+        },
+        "law": {
+          "body": "These terms are governed by the laws of Ukraine.",
+          "title": "Governing law"
+        },
+        "liability": {
+          "body": "To the extent the law allows, we are not liable for indirect or consequential damages, or for lost data, revenue or profits, arising from your use of the service.",
+          "title": "Limitation of liability"
+        },
+        "selfHosted": {
+          "body": "Railhook you run on your own servers is governed by the MIT license, not by these terms.",
+          "title": "Self-hosted Railhook"
+        },
+        "service": {
+          "body": "Railhook Cloud sends and receives webhooks on your behalf. It is provided \"as is\" and \"as available\", without warranties of any kind.",
+          "title": "The service"
+        },
+        "suspension": {
+          "body": "We may suspend or close accounts that abuse the service or break these terms.",
+          "title": "Suspension"
+        },
+        "use": {
+          "body": "You agree not to use the service to:\n\n- send or store illegal content;\n- send spam or otherwise abuse the service;\n- attack, probe or overload third parties through webhooks.",
+          "title": "Acceptable use"
+        },
+        "warranty": {
+          "body": "We work to keep the service available and your webhooks delivered, but we do not guarantee that it will be uninterrupted or error-free.",
+          "title": "No warranty"
+        }
+      },
+      "title": "Terms of Service"
+    },
+    "updated": "Last updated: {{date}}"
+  },
   "members": {
     "actions": "Actions",
     "addMember": "Add Member",
@@ -2212,6 +2327,14 @@
     "landing": {
       "description": "Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start.",
       "title": "Railhook — Open-source webhook gateway"
+    },
+    "privacy": {
+      "title": "Privacy Policy — Railhook",
+      "description": "What data Railhook Cloud processes, why, for how long, and who processes it on our behalf."
+    },
+    "terms": {
+      "title": "Terms of Service — Railhook",
+      "description": "The terms for using Railhook Cloud: the Free plan limits, acceptable use and liability."
     }
   },
   "mtls": {
@@ -2881,6 +3004,10 @@
     "versions": "Versions"
   },
   "settings": {
+    "noPassword": {
+      "action": "Set a password",
+      "description": "You sign in with Google and have no password yet. To add one, request a link to set it."
+    },
     "accountStatus": "Account status",
     "changePassword": "Change Password",
     "changePasswordBtn": "Change password",

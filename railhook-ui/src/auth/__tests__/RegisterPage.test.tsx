@@ -145,6 +145,13 @@ describe('RegisterPage', () => {
     expect(http.getToken()).toBeNull();
   });
 
+  it('links the terms and the privacy policy it asks people to agree to', () => {
+    renderRegister();
+
+    expect(screen.getByRole('link', { name: /terms of service/i })).toHaveAttribute('href', '/terms');
+    expect(screen.getByRole('link', { name: /privacy policy/i })).toHaveAttribute('href', '/privacy');
+  });
+
   it('says which password rule is still missing instead of a silently disabled button', async () => {
     // Seen on production: a password with everything but a special character left the button
     // disabled, the missing rule drawn as a faint grey cross, and the person with no idea why.

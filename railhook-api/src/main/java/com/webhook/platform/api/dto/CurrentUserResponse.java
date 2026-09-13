@@ -22,4 +22,10 @@ public class CurrentUserResponse {
      * rather than on an endpoint of its own.
      */
     private boolean emailDeliveryEnabled;
+
+    /**
+     * False for an account created through Google that has never set a password. Changing a
+     * password needs the current one, so the settings page offers "Forgot password" instead.
+     */
+    private boolean hasPassword;
 }

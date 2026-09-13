@@ -63,6 +63,13 @@ class WorkflowTriggerOutboxReclaimRepositoryTest extends AbstractIntegrationTest
 
     @BeforeEach
     void seedTheEventTheRowHangsOff() {
+        // reclaimStalledRows and claimBatch act on the whole table, and the database outlives each
+        // test. A row another test left PROCESSING with an old claimed_at was reclaimed alongside
+        // this test's own, so the exact counts below passed or failed depending on test order.
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
+                entityManager.createNativeQuery("DELETE FROM workflow_trigger_outbox").executeUpdate());
+        entityManager.clear();
+
         Plan plan = planRepository.findByName("self_hosted")
                 .orElseGet(() -> planRepository.findAll().stream().findFirst().orElseThrow());
         Organization org = organizationRepository.save(
