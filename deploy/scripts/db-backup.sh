@@ -47,6 +47,8 @@ BACKUP_DIR="${BACKUP_DIR:-./backups}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 
+# Dumps hold every row of the database: readable by their owner only.
+umask 077
 mkdir -p "$BACKUP_DIR"
 
 case "$DB_MODE" in

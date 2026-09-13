@@ -28,16 +28,19 @@ public final class PiiSanitizer {
     public static final String BUILTIN_PHONE = "phone";
     public static final String BUILTIN_CARD = "card";
 
+    // Key segments around the keyword are bounded ({0,64}): unbounded [^"]* on both sides of the
+    // alternation backtracked quadratically over one long quoted string of the keyword
+    // (CodeQL java/polynomial-redos), and a real JSON key is never that long.
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
-            "\"([^\"]*(?:email|e-mail|mail)[^\"]*?)\"\\s*:\\s*\"([^\"]+@[^\"]+)\"",
+            "\"([^\"]{0,64}?(?:email|e-mail|mail)[^\"]{0,64}?)\"\\s*:\\s*\"([^\"]+@[^\"]+)\"",
             Pattern.CASE_INSENSITIVE);
 
     private static final Pattern PHONE_PATTERN = Pattern.compile(
-            "\"([^\"]*(?:phone|mobile|cell|tel|fax)[^\"]*?)\"\\s*:\\s*\"([+]?[0-9\\s\\-().]{7,20})\"",
+            "\"([^\"]{0,64}?(?:phone|mobile|cell|tel|fax)[^\"]{0,64}?)\"\\s*:\\s*\"([+]?[0-9\\s\\-().]{7,20})\"",
             Pattern.CASE_INSENSITIVE);
 
     private static final Pattern CARD_PATTERN = Pattern.compile(
-            "\"([^\"]*(?:card|pan|credit|debit|account)[^\"]*?)\"\\s*:\\s*\"(\\d[\\d\\s\\-]{11,18}\\d)\"",
+            "\"([^\"]{0,64}?(?:card|pan|credit|debit|account)[^\"]{0,64}?)\"\\s*:\\s*\"(\\d[\\d\\s\\-]{11,18}\\d)\"",
             Pattern.CASE_INSENSITIVE);
 
     /**

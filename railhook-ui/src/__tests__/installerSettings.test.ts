@@ -172,10 +172,13 @@ describe('railhook upgrade reads the settings a deploy sends', () => {
 describe('the deploy workflow sends them', () => {
   const workflow = read('.github/workflows/deploy-prod.yml');
 
-  it('builds the payload from DOTENV_-prefixed environment variables and secrets', () => {
+  it('builds the payload from DOTENV_-prefixed variables and a named list of secrets', () => {
     expect(workflow).toMatch(/toJSON\(vars\)/);
-    expect(workflow).toMatch(/toJSON\(secrets\)/);
     expect(workflow).toContain('DOTENV_');
+    // The whole secrets context put the SSH deploy key and every other secret into one step's
+    // environment just to throw most of it away. Secrets are named one by one instead.
+    expect(workflow).not.toMatch(/toJSON\(secrets\)/);
+    expect(workflow).toMatch(/DOTENV_SMTP_PASSWORD: \$\{\{ secrets\.DOTENV_SMTP_PASSWORD \}\}/);
   });
 
   it('pipes it into the forced deploy command', () => {

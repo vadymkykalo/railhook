@@ -87,6 +87,22 @@ class TransformationTemplateValidationTest {
                 .doesNotThrowAnyException();
     }
 
+    @Test
+    @DisplayName("a template full of unclosed ${ openers is rejected in linear time")
+    void unclosedExpressionOpenersDoNotBacktrack() {
+        /* CodeQL java/polynomial-redos: `\$\{([^}]*)\}` rescans to the end of the template from
+           every `${` when no `}` follows, so a valid-JSON template of repeated "${{" took
+           quadratic time on save — a request anyone with write access could send. */
+        String template = "{\"a\":\"" + "${{".repeat(60_000) + "\"}";
+        org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
+            try {
+                service.create(projectId, request(template));
+            } catch (IllegalArgumentException expected) {
+                // rejected or accepted is not the point; finishing promptly is
+            }
+        });
+    }
+
     private TransformationRequest request(String template) {
         TransformationRequest r = new TransformationRequest();
         r.setName("t");

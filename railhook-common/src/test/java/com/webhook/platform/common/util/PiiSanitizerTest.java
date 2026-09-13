@@ -28,6 +28,36 @@ class PiiSanitizerTest {
     }
 
     @Nested
+    @DisplayName("hostile payloads cannot stall the sanitizer")
+    class Backtracking {
+
+        /*
+         * CodeQL java/polynomial-redos: the builtin key patterns were `"([^"]*(?:mail)[^"]*?)"`,
+         * which backtracks quadratically over one long quoted string full of the keyword. The
+         * payload is whatever a webhook sender or the preview endpoint is handed, so a single
+         * request could pin a worker thread for minutes.
+         */
+        @Test
+        void aLongUnterminatedKeyFullOfKeywordsIsLinear() {
+            String hostile = "{\"" + "mail".repeat(40_000) + " x";
+            List<PiiSanitizer.Rule> rules = List.of(
+                    builtin(PiiSanitizer.BUILTIN_EMAIL),
+                    builtin(PiiSanitizer.BUILTIN_PHONE),
+                    builtin(PiiSanitizer.BUILTIN_CARD));
+
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(2),
+                    () -> PiiSanitizer.sanitize(hostile, rules));
+        }
+
+        @Test
+        void aRealisticKeyIsStillMasked() {
+            String masked = PiiSanitizer.sanitize("{\"customer_email_address\":\"john@example.com\"}",
+                    List.of(builtin(PiiSanitizer.BUILTIN_EMAIL)));
+            assertFalse(masked.contains("john@example.com"), masked);
+        }
+    }
+
+    @Nested
     @DisplayName("card numbers held directly by a card-ish key")
     class FlatCards {
 

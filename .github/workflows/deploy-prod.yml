@@ -105,14 +105,22 @@ jobs:
       - name: Collect the production settings
         env:
           VARS_JSON: ${{ toJSON(vars) }}
-          SECRETS_JSON: ${{ toJSON(secrets) }}
+          # Sensitive settings, named one by one. Serialising the whole secrets context put the SSH
+          # deploy key and every other secret of the repository into this step's environment only
+          # for jq to drop them again; a step should hold the secrets it sends and nothing more. A new
+          # sensitive setting is a DOTENV_<NAME> secret in the environment plus a line here.
+          DOTENV_CAPTCHA_SECRET_KEY: ${{ secrets.DOTENV_CAPTCHA_SECRET_KEY }}
+          DOTENV_SMTP_PASSWORD: ${{ secrets.DOTENV_SMTP_PASSWORD }}
+          DOTENV_GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.DOTENV_GOOGLE_OAUTH_CLIENT_SECRET }}
           SETTINGS_FILE: ${{ runner.temp }}/production-settings.env
         run: |
           set -euo pipefail
-          # Every DOTENV_<NAME> variable and secret of this environment, as NAME=value. A secret
-          # wins over a variable of the same name. Anything else in either context — the SSH
-          # key, GITHUB_TOKEN — has no DOTENV_ prefix and never leaves the runner.
+          # Every DOTENV_<NAME> variable of this environment and every named DOTENV_ secret above,
+          # as NAME=value. A secret wins over a variable of the same name; an unset secret is
+          # skipped rather than sent as an empty value.
           umask 077
+          SECRETS_JSON=$(jq -n 'env | with_entries(select((.key | startswith("DOTENV_")) and .value != ""))')
+          export SECRETS_JSON
           if ! jq -rn '
             def dotenv: to_entries
               | map(select(.key | startswith("DOTENV_"))

@@ -4620,8 +4620,8 @@ export interface components {
         };
         SortObject: {
             empty?: boolean;
-            sorted?: boolean;
             unsorted?: boolean;
+            sorted?: boolean;
         };
         TunnelRequestLog: {
             /** Format: uuid */
@@ -7753,7 +7753,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": string;
+                    "text/plain": string;
                 };
             };
         };

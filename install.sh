@@ -878,6 +878,8 @@ case "${1:-help}" in
         # and taking them from the environment meant the defaults below were what actually ran.
         # shellcheck disable=SC1091
         set -a; [ -f .env ] && . ./.env; set +a
+        # The dump holds every row of the database: owner-only, not the default 644.
+        umask 077
         f="backup-$(date -u +%Y%m%dT%H%M%SZ).dump"
         # Same flags as deploy/scripts/db-backup.sh and the chart's CronJob: -Fc to be
         # restorable with pg_restore at all, --no-owner --no-privileges to restore into a
