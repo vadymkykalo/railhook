@@ -54,7 +54,9 @@ export default function AppLayout() {
 
   useEffect(() => {
     authApi.getCurrentUser().then((freshUser) => {
-      if (freshUser.user?.status !== user?.user?.status) {
+      // platformAdmin too: an address added to PLATFORM_ADMIN_EMAILS should bring the panel's
+      // entry up on the next navigation, not only after signing out and in again.
+      if (freshUser.user?.status !== user?.user?.status || freshUser.platformAdmin !== user?.platformAdmin) {
         updateUser(freshUser);
       }
     }).catch(() => { });

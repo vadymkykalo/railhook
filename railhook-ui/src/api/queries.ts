@@ -6,6 +6,7 @@ import { eventsApi } from './events.api';
 import { subscriptionsApi, type SubscriptionRequest } from './subscriptions.api';
 import { membersApi, type MembershipRole } from './members.api';
 import { authApi } from './auth.api';
+import { platformAdminApi, type OrganizationFilters } from './platformAdmin.api';
 import { organizationsApi } from './organizations.api';
 import { dashboardApi } from './dashboard.api';
 import { dlqApi, type DlqFilters } from './dlq.api';
@@ -26,6 +27,20 @@ import type { EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest
 // ─── Query Keys ────────────────────────────────────────────────────
 
 export const queryKeys = {
+    platformAdmin: {
+        all: ['platformAdmin'] as const,
+        overview: () => ['platformAdmin', 'overview'] as const,
+        organizations: (page: number, size: number, filters: OrganizationFilters) =>
+            ['platformAdmin', 'organizations', page, size, filters] as const,
+        organization: (id: string) => ['platformAdmin', 'organization', id] as const,
+        usage: (id: string) => ['platformAdmin', 'organization', id, 'usage'] as const,
+        members: (id: string, page: number, size: number) =>
+            ['platformAdmin', 'organization', id, 'members', page, size] as const,
+        projects: (id: string) => ['platformAdmin', 'organization', id, 'projects'] as const,
+        auditLog: (id: string, page: number, size: number) =>
+            ['platformAdmin', 'organization', id, 'audit-log', page, size] as const,
+        users: (page: number, size: number, search: string) => ['platformAdmin', 'users', page, size, search] as const,
+    },
     projects: {
         all: ['projects'] as const,
         detail: (id: string) => ['projects', id] as const,
@@ -953,5 +968,105 @@ export function useToggleRule(projectId: string) {
         mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
             rulesApi.toggle(projectId, id, enabled),
         onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.rules.list(projectId) }); },
+    });
+}
+
+// ─── Platform admin ─────────────────────────────────────────────
+
+/**
+ * A 4xx from the platform admin API is an answer — not listed, sign-in too old, no such
+ * organization — and asking again changes nothing except the rate limit it counts against.
+ */
+function platformRetry(failureCount: number, error: unknown) {
+    const status = (error as { response?: { status?: number } } | null)?.response?.status;
+    return !(status !== undefined && status < 500) && failureCount < 2;
+}
+
+export function usePlatformOverview() {
+    return useQuery({
+        queryKey: queryKeys.platformAdmin.overview(),
+        queryFn: () => platformAdminApi.overview(),
+        retry: platformRetry,
+    });
+}
+
+export function usePlatformOrganizations(page: number, size: number, filters: OrganizationFilters) {
+    return useQuery({
+        queryKey: queryKeys.platformAdmin.organizations(page, size, filters),
+        queryFn: () => platformAdminApi.organizations(page, size, filters),
+        placeholderData: (previous) => previous,
+        retry: platformRetry,
+    });
+}
+
+export function usePlatformOrganization(id: string) {
+    return useQuery({
+        queryKey: queryKeys.platformAdmin.organization(id),
+        queryFn: () => platformAdminApi.organization(id),
+        enabled: !!id,
+        retry: platformRetry,
+    });
+}
+
+export function usePlatformOrganizationUsage(id: string) {
+    return useQuery({
+        queryKey: queryKeys.platformAdmin.usage(id),
+        queryFn: () => platformAdminApi.usage(id),
+        enabled: !!id,
+        retry: platformRetry,
+    });
+}
+
+export function usePlatformOrganizationMembers(id: string, page: number, size: number) {
+    return useQuery({
+        queryKey: queryKeys.platformAdmin.members(id, page, size),
+        queryFn: () => platformAdminApi.members(id, page, size),
+        enabled: !!id,
+        placeholderData: (previous) => previous,
+        retry: platformRetry,
+    });
+}
+
+export function usePlatformOrganizationProjects(id: string) {
+    return useQuery({
+        queryKey: queryKeys.platformAdmin.projects(id),
+        queryFn: () => platformAdminApi.projects(id, 0, 50),
+        enabled: !!id,
+        retry: platformRetry,
+    });
+}
+
+export function usePlatformOrganizationAuditLog(id: string, page: number, size: number) {
+    return useQuery({
+        queryKey: queryKeys.platformAdmin.auditLog(id, page, size),
+        queryFn: () => platformAdminApi.auditLog(id, page, size),
+        enabled: !!id,
+        placeholderData: (previous) => previous,
+        retry: platformRetry,
+    });
+}
+
+export function usePlatformUsers(page: number, size: number, search: string) {
+    return useQuery({
+        queryKey: queryKeys.platformAdmin.users(page, size, search),
+        queryFn: () => platformAdminApi.users(page, size, search || undefined),
+        placeholderData: (previous) => previous,
+        retry: platformRetry,
+    });
+}
+
+export function useSuspendOrganization() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, reason }: { id: string; reason: string }) => platformAdminApi.suspend(id, reason),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.platformAdmin.all }); },
+    });
+}
+
+export function useReinstateOrganization() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, reason }: { id: string; reason: string }) => platformAdminApi.reinstate(id, reason),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.platformAdmin.all }); },
     });
 }

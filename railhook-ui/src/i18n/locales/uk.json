@@ -2361,6 +2361,10 @@
     "uploadKey": "Завантажити .pem/.key"
   },
   "nav": {
+    "platformAdmin": "Адміністратор платформи",
+    "platformOrganizations": "Організації",
+    "platformOverview": "Огляд",
+    "platformUsers": "Користувачі",
     "alerts": "Алерти",
     "allDeliveries": "Усі доставки",
     "allProjects": "Усі проєкти",
@@ -2615,6 +2619,131 @@
       "updated": "Правило маскування оновлено"
     },
     "type": "Тип"
+  },
+  "platformAdmin": {
+    "columns": {
+      "account": "Обліковий запис",
+      "action": "Дія",
+      "actor": "Хто",
+      "address": "IP-адреса",
+      "created": "Створено",
+      "eventsThisMonth": "Події цього місяця",
+      "lastSeen": "Остання активність",
+      "members": "Учасники",
+      "membership": "Членство",
+      "organization": "Організація",
+      "organizations": "Організації",
+      "owner": "Власник",
+      "plan": "План",
+      "projects": "Проєкти",
+      "result": "Результат",
+      "role": "Роль",
+      "signIn": "Вхід",
+      "status": "Стан",
+      "time": "Час",
+      "verified": "Пошта"
+    },
+    "denied": {
+      "description": "Ця панель — для людей, які керують цим розгортанням. Власник організації не стає адміністратором платформи: оператор вказує їхні адреси в PLATFORM_ADMIN_EMAILS.",
+      "title": "Ви не адміністратор платформи"
+    },
+    "detail": {
+      "auditLog": "Нещодавній журнал аудиту",
+      "back": "Усі організації",
+      "eyebrow": "План {{plan}} · створено {{created}}",
+      "members": "Учасники",
+      "noAudit": "Поки нічого не записано.",
+      "noOwner": "Немає активного власника",
+      "noProjects": "Немає проєктів.",
+      "owner": "Власник {{email}}",
+      "projects": "Проєкти",
+      "reinstate": "Відновити",
+      "suspend": "Призупинити",
+      "suspendedSince": "Призупинено {{time}}, хто: {{by}}",
+      "usage": "Використання цього місяця",
+      "usageEndpoints": "Ендпоінти на проєкт",
+      "usageEvents": "Події",
+      "usageMembers": "Учасники",
+      "usageOf": "{{current}} з {{limit}}",
+      "usageProjects": "Проєкти"
+    },
+    "eyebrow": "Адміністратор платформи",
+    "loadFailed": "Не вдалося завантажити дані адміністратора платформи",
+    "organizations": {
+      "all": "Усі організації",
+      "count": "Організації · {{count}}",
+      "description": "Усі організації на цьому розгортанні. Шукайте за назвою або за поштою учасника.",
+      "empty": "Немає відповідних організацій",
+      "emptyDesc": "Спробуйте іншу назву чи пошту.",
+      "search": "Пошук за назвою або поштою учасника",
+      "statusFilter": "Стан",
+      "suspendedOnly": "Лише призупинені"
+    },
+    "overview": {
+      "description": "Усе на цьому розгортанні, в усіх організаціях.",
+      "generatedAt": "Станом на {{time}}",
+      "kpi": {
+        "activeTunnels": "Активні тунелі",
+        "deliveriesFailed": "Невдалі доставки, 24 год",
+        "deliveriesFailedHint": "Ще повторюються або покинуті",
+        "deliveriesSucceeded": "Успішні доставки, 24 год",
+        "events30d": "{{total}} за 30 днів",
+        "eventsToday": "Події сьогодні",
+        "nearQuota": "Близько до ліміту подій",
+        "nearQuotaHint": "80% або більше місячного ліміту плану",
+        "organizations": "Організації",
+        "signupsPeriods": "{{week}} за 7 днів · {{month}} за 30 днів",
+        "signupsToday": "Реєстрації сьогодні",
+        "suspended": "призупинено: {{count}}",
+        "users": "Облікові записи"
+      },
+      "noSignups": "Облікових записів ще немає",
+      "recentSignups": "Нещодавні реєстрації"
+    },
+    "reauth": {
+      "action": "Увійти ще раз",
+      "description": "Панелі адміністратора платформи потрібен вхід, виконаний протягом останніх 12 годин.",
+      "title": "Увійдіть ще раз, щоб продовжити"
+    },
+    "signIn": {
+      "google": "Google",
+      "password": "Пароль"
+    },
+    "status": {
+      "active": "Активна",
+      "pastDue": "Прострочена оплата",
+      "suspended": "Призупинена"
+    },
+    "suspendDialog": {
+      "confirmReinstate": "Відновити організацію",
+      "confirmSuspend": "Призупинити організацію",
+      "failed": "Не вдалося змінити призупинення",
+      "reason": "Причина",
+      "reinstateDescription": "Знімає призупинення: організація знову може вносити зміни й приймати події.",
+      "reinstateReasonHint": "Зберігається в журналі аудиту організації.",
+      "reinstateTitle": "Відновити {{name}}?",
+      "reinstated": "{{name}} відновлено",
+      "suspendDescription": "Учасники й далі можуть входити та читати, але нічого не змінюється — включно з прийманням подій — доки організацію не відновлять.",
+      "suspendReasonHint": "Її побачать учасники організації.",
+      "suspendTitle": "Призупинити {{name}}?",
+      "suspended": "{{name}} призупинено",
+      "typeName": "Введіть {{name}} для підтвердження"
+    },
+    "unverified": "Не підтверджено",
+    "userStatus": {
+      "active": "Активний",
+      "disabled": "Вимкнений",
+      "pending": "Очікує підтвердження"
+    },
+    "users": {
+      "count": "Облікові записи · {{count}}",
+      "description": "Усі облікові записи на цьому розгортанні, спершу найновіші.",
+      "empty": "Немає відповідних облікових записів",
+      "emptyDesc": "Спробуйте іншу пошту чи ім'я.",
+      "noOrganization": "Без організації",
+      "search": "Пошук за поштою або ім'ям"
+    },
+    "verified": "Підтверджено"
   },
   "projects": {
     "copyIdOf": "Скопіювати ID проєкту {{name}}",

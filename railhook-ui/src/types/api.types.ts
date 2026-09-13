@@ -52,6 +52,12 @@ export interface CurrentUserResponse {
    * Changing a password needs the current one, so settings points to "Forgot password" instead.
    */
   hasPassword: boolean;
+  /**
+   * Whether to offer the platform admin panel: a verified, active account listed in
+   * `PLATFORM_ADMIN_EMAILS`. The server checks it again, with the sign-in's age, on every
+   * admin request.
+   */
+  platformAdmin: boolean;
 }
 
 export interface OrganizationResponse {
