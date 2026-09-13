@@ -145,9 +145,10 @@ Two whose remedy nobody guesses:
   `mvn test -pl railhook-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`.
   Then `cd railhook-ui && npm run types:generate`, and fix whatever
   `src/types/api.contract.ts` reports.
-- **Changed the API surface?** `npm run docs:api-index` regenerates the in-app
-  reference. Never hand-write an endpoint table — that is what the 4,000-line
-  page this replaced was, and nothing kept it in sync.
+- **Changed the API surface or `.env.dist`?** The docs site (`railhook-docs/`) reads
+  `openapi.yaml` at build for its API reference; after touching `.env.dist`, run
+  `cd railhook-docs && npm run env:reference`, or `make docs-check` fails. Never
+  hand-write an endpoint table — that is what the 4,000-line page this replaced was.
 
 **A schema change touches three places**: the JPA entity in `api`, its copy in
 `worker`, and a Flyway migration. A column left unmapped on either side fails

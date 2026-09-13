@@ -1,0 +1,16 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import ApiReference from '../components/ApiReference.astro';
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'API reference',
+    description:
+      'Every endpoint of the Railhook API, generated from its OpenAPI spec. Send a request to your own instance from this page.',
+    tableOfContents: false,
+    editUrl: false,
+  }}
+>
+  <ApiReference />
+</StarlightPage>

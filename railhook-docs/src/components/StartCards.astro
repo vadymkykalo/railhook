@@ -1,0 +1,27 @@
+---
+// Link cards to pages in the slug contract, rendered only for the pages that exist.
+//
+// The docs home points at pages that are still being written. A plain link card to one of
+// those would fail the links validator until it lands; this renders a card only once its page
+// is in the content collection, so the home names its destinations now and never links to a
+// page that is not there. `href` is for custom pages (the API reference), which are not
+// content entries. The logic lives in start-cards.mjs.
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { resolveStartCards } from './start-cards.mjs';
+
+const present = await resolveStartCards(
+  Astro.props.cards,
+  Astro.locals.starlightRoute.locale,
+  import.meta.env.BASE_URL.replace(/\/$/, ''),
+);
+---
+
+{
+  present.length > 0 && (
+    <CardGrid>
+      {present.map((card) => (
+        <LinkCard title={card.title} description={card.description} href={card.href} />
+      ))}
+    </CardGrid>
+  )
+}

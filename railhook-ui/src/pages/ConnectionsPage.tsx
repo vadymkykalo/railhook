@@ -293,7 +293,7 @@ export default function ConnectionsPage() {
           title={t('connections.empty')}
           description={t('connections.emptyDescNew', 'A connection is an endpoint plus the event types it is subscribed to. Create the first one and events start flowing to it.')}
           action={newConnectionButton}
-          docsLink="/docs#endpoints-api"
+          docsLink="outgoing/endpoints-subscriptions"
         />
       ) : (
         <Card className="overflow-hidden">

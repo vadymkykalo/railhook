@@ -34,5 +34,4 @@ For contributors and for operators who want the internals.
 - **[`UPGRADING.md`](../UPGRADING.md)** — breaking changes, per release.
 - **[`CHANGELOG.md`](../CHANGELOG.md)** · **[`ROADMAP.md`](../ROADMAP.md)** ·
   **[`SECURITY.md`](../SECURITY.md)** · **[`CONTRIBUTING.md`](../CONTRIBUTING.md)**
-- **[API reference (Redoc)](./api-reference.html)** — the same spec, offline.
 - **[Third-party licences](./licenses/README.md)** — generated SBOMs and licence reports.

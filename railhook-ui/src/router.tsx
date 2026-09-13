@@ -14,7 +14,6 @@ const ForgotPasswordPage = lazy(() => import('./auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./auth/ResetPasswordPage'));
 const AcceptInvitePage = lazy(() => import('./auth/AcceptInvitePage'));
 const DeviceApprovePage = lazy(() => import('./auth/DeviceApprovePage'));
-const DocumentationPage = lazy(() => import('./pages/DocumentationPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
@@ -114,23 +113,9 @@ export const router = createBrowserRouter([
     path: '/device',
     element: <S><DeviceApprovePage /></S>,
   },
-  /* Each guide gets a URL of its own. They used to share `/docs`, addressed by
-     hash — thirteen pages of hand-written explanation behind one indexable
-     address. `/docs/cli` was the one exception, hard-coded; it is now just the
-     `:sectionId` route matching, and every old `/docs#retries` link still lands
-     right because `resolveAnchor` is still consulted when there is no param.
-     The docs bring their own chrome — a fixed full-height sidebar and a mobile
-     bar — so they are not wrapped in PublicLayout: a footer laid out beside a
-     `fixed` aside slides underneath it. DocumentationPage renders the footer
-     itself, inside the content column. */
-  {
-    path: '/docs',
-    element: <S><DocumentationPage /></S>,
-  },
-  {
-    path: '/docs/:sectionId',
-    element: <S><DocumentationPage /></S>,
-  },
+  /* No /docs route: the docs are a separate static site (railhook-docs/) that nginx
+     serves at /docs/ from this same image, so a link to them is a full page load,
+     never a router navigation. */
   /* No child route below states a role. `/admin` requires a session, and what
      each destination requires beyond that is declared once in nav.config's
      `requiredRoleFor` — which AppLayout applies around the outlet, and which the

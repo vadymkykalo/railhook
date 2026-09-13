@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.astro/
+# The root .gitignore drops every `data/` directory (runtime volumes). This one is source:
+# the slug contract and the generated, committed env reference.
+!src/data/
+# Copied from the repository root at dev/build time by scripts/copy-openapi.mjs.
+public/openapi.yaml

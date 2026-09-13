@@ -10,8 +10,6 @@
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "typecheck": "tsc --noEmit",
     "types:generate": "openapi-typescript ../openapi.yaml -o src/types/api.generated.ts",
-    "docs:api-index": "node scripts/generate-docs-api-index.mjs",
-    "docs:api-index:check": "node scripts/generate-docs-api-index.mjs --check",
     "seo:sitemap": "node scripts/generate-sitemap.mjs",
     "seo:sitemap:check": "node scripts/generate-sitemap.mjs --check",
     "prerender": "node scripts/prerender.mjs",

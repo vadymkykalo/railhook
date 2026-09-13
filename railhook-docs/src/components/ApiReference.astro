@@ -1,0 +1,148 @@
+---
+/**
+ * The API reference: Scalar over the repository's committed `openapi.yaml`.
+ *
+ * Nothing here is written by hand — the spec is copied into `public/` at build
+ * (scripts/copy-openapi.mjs), and `OpenApiDriftIntegrationTest` holds that spec to what the
+ * API actually serves. Scalar is bundled, not loaded from a CDN, and makes no requests of its
+ * own: no proxy, no telemetry, no hosted fonts. "Try it" sends straight to the origin the page
+ * is served from — the reader's own instance, or railhook.io on the cloud.
+ */
+const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
+---
+
+<div class="railhook-api-reference not-content" data-spec-url={specUrl}>
+  <div data-api-reference-mount></div>
+</div>
+
+<script>
+  import { createApiReference } from '@scalar/api-reference';
+  import '@scalar/api-reference/style.css';
+
+  const wrapper = document.querySelector<HTMLElement>('.railhook-api-reference')!;
+  const mount = wrapper.querySelector<HTMLElement>('[data-api-reference-mount]')!;
+
+  // Starlight owns the theme switch; Scalar follows it instead of offering a second one.
+  const colorMode = (): 'dark' | 'light' =>
+    document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  const applyColorMode = () => {
+    const mode = colorMode();
+    document.body.classList.toggle('dark-mode', mode === 'dark');
+    document.body.classList.toggle('light-mode', mode === 'light');
+  };
+
+  createApiReference(mount, {
+    url: wrapper.dataset.specUrl,
+    servers: [{ url: window.location.origin, description: 'This installation' }],
+    theme: 'none',
+    layout: 'modern',
+    withDefaultFonts: false,
+    hideDownloadButton: false,
+    hideDarkModeToggle: true,
+    forceDarkModeState: colorMode(),
+    showDeveloperTools: 'never',
+    telemetry: false,
+    mcp: { disabled: true },
+    // The "Ask AI" agent loads its API list from api.scalar.com on every page view.
+    agent: { disabled: true },
+    persistAuth: false,
+    defaultHttpClient: { targetKey: 'shell', clientKey: 'curl' },
+    // Four ways to send a request: shell/curl, node/fetch, python/requests, php/guzzle.
+    hiddenClients: {
+      c: true,
+      clojure: true,
+      csharp: true,
+      dart: true,
+      fsharp: true,
+      go: true,
+      http: true,
+      java: true,
+      js: true,
+      julia: true,
+      kotlin: true,
+      objc: true,
+      ocaml: true,
+      powershell: true,
+      r: true,
+      ruby: true,
+      rust: true,
+      swift: true,
+      shell: ['httpie', 'wget'],
+      node: ['axios', 'ofetch', 'undici'],
+      python: ['python3', 'aiohttp', 'httpx_sync', 'httpx_async'],
+      php: ['curl', 'laravel'],
+    },
+    authentication: {
+      preferredSecurityScheme: 'apiKey',
+      securitySchemes: {
+        apiKey: { type: 'apiKey', name: 'X-API-Key', in: 'header', value: '' },
+      },
+    },
+  });
+
+  applyColorMode();
+  new MutationObserver(applyColorMode).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
+</script>
+
+<style is:global>
+  /* The reference needs the width; the page has no table of contents of its own. */
+  .main-pane:has(.railhook-api-reference) .sl-container {
+    max-width: none;
+  }
+
+  .railhook-api-reference {
+    margin-top: 1.5rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--rh-radius-card, 16px);
+    overflow: clip;
+  }
+
+  .railhook-api-reference,
+  .railhook-api-reference .scalar-app {
+    --scalar-font: var(--__sl-font);
+    --scalar-font-code: var(--__sl-font-mono);
+    --scalar-radius: var(--rh-radius-control, 10px);
+    --scalar-radius-lg: var(--rh-radius-card, 16px);
+    --scalar-radius-xl: var(--rh-radius-card, 16px);
+    --scalar-custom-header-height: var(--sl-nav-height);
+
+    --scalar-background-1: var(--sl-color-bg);
+    --scalar-background-2: var(--rh-mist);
+    --scalar-background-3: var(--sl-color-hairline);
+    --scalar-background-accent: var(--sl-color-accent-low);
+    --scalar-color-1: var(--sl-color-white);
+    --scalar-color-2: var(--sl-color-gray-3);
+    --scalar-color-3: var(--sl-color-gray-4);
+    --scalar-color-accent: var(--sl-color-text-accent);
+    --scalar-color-disabled: var(--sl-color-gray-4);
+    --scalar-color-ghost: var(--sl-color-gray-4);
+    --scalar-border-color: var(--sl-color-hairline);
+
+    --scalar-button-1: var(--rh-accent);
+    --scalar-button-1-color: var(--rh-on-accent);
+    --scalar-button-1-hover: var(--rh-accent-hover);
+
+    --scalar-sidebar-background-1: var(--rh-mist);
+    --scalar-sidebar-color-1: var(--sl-color-white);
+    --scalar-sidebar-color-2: var(--sl-color-gray-3);
+    --scalar-sidebar-border-color: var(--sl-color-hairline);
+    --scalar-sidebar-item-hover-background: var(--sl-color-hairline);
+    --scalar-sidebar-item-hover-color: var(--sl-color-white);
+    --scalar-sidebar-item-active-background: var(--rh-accent-tint);
+    --scalar-sidebar-color-active: var(--rh-accent);
+    --scalar-sidebar-search-background: var(--sl-color-bg);
+    --scalar-sidebar-search-border-color: var(--rh-rail-strong);
+    --scalar-sidebar-search-color: var(--sl-color-gray-3);
+
+    /* Status hues stay status hues: response codes read ok / retry / halt. */
+    --scalar-color-green: var(--rh-ok);
+    --scalar-color-red: var(--rh-halt);
+    --scalar-color-yellow: var(--rh-retry);
+    --scalar-color-orange: var(--rh-retry);
+    --scalar-color-blue: var(--rh-accent);
+    --scalar-color-purple: var(--rh-accent);
+  }
+</style>

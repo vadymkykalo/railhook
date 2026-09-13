@@ -1,0 +1,361 @@
+/*
+ * Railhook tokens mapped onto Starlight.
+ *
+ * Starlight's own styles live in cascade layers, so these unlayered rules win without
+ * specificity games. Starlight names its scale for dark mode — "white" is the strongest text,
+ * "black" the page — and swaps the scale under [data-theme='light'].
+ *
+ * Status hues (ok / retry / halt) are used only where Starlight itself means a status:
+ * caution and danger asides, and success/caution/danger badges. The accent never stands in
+ * for a status, and chrome never borrows a status hue.
+ */
+
+:root {
+  --sl-font: 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --rh-font-display: 'Manrope', 'Onest', system-ui, sans-serif;
+
+  --rh-radius-control: 10px;
+  --rh-radius-card: 16px;
+
+  /* dark */
+  --rh-paper: #0b0d14;
+  --rh-mist: #10131c;
+  --rh-ink: #edeff5;
+  --rh-slate: #9aa3b5;
+  --rh-rail: #232838;
+  --rh-rail-strong: #343a4c;
+  --rh-accent: #6f8dff;
+  --rh-accent-hover: #8ba3ff;
+  --rh-accent-tint: #151e45;
+  --rh-on-accent: #0b0d14;
+  --rh-ok: #3fc486;
+  --rh-ok-soft: #0f2a1e;
+  --rh-retry: #f0a640;
+  --rh-retry-soft: #2e2210;
+  --rh-halt: #f2685c;
+  --rh-halt-soft: #33141a;
+
+  --sl-color-white: var(--rh-ink);
+  --sl-color-gray-1: var(--rh-ink);
+  --sl-color-gray-2: #cdd2de;
+  --sl-color-gray-3: var(--rh-slate);
+  --sl-color-gray-4: #6b7385;
+  --sl-color-gray-5: var(--rh-rail-strong);
+  --sl-color-gray-6: var(--rh-rail);
+  --sl-color-black: var(--rh-paper);
+
+  --sl-color-accent-low: var(--rh-accent-tint);
+  --sl-color-accent: var(--rh-accent);
+  --sl-color-accent-high: var(--rh-accent-hover);
+
+  --sl-color-blue-low: var(--rh-accent-tint);
+  --sl-color-blue: var(--rh-accent);
+  --sl-color-blue-high: var(--rh-accent);
+  --sl-color-purple-low: var(--rh-accent-tint);
+  --sl-color-purple: var(--rh-accent);
+  --sl-color-purple-high: var(--rh-accent);
+  --sl-color-green-low: var(--rh-ok-soft);
+  --sl-color-green: var(--rh-ok);
+  --sl-color-green-high: var(--rh-ok);
+  --sl-color-orange-low: var(--rh-retry-soft);
+  --sl-color-orange: var(--rh-retry);
+  --sl-color-orange-high: var(--rh-retry);
+  --sl-color-red-low: var(--rh-halt-soft);
+  --sl-color-red: var(--rh-halt);
+  --sl-color-red-high: var(--rh-halt);
+
+  --sl-color-text: var(--sl-color-gray-2);
+  --sl-color-text-accent: var(--rh-accent);
+  --sl-color-text-invert: var(--rh-on-accent);
+  --sl-color-bg: var(--rh-paper);
+  --sl-color-bg-nav: var(--rh-paper);
+  --sl-color-bg-sidebar: var(--rh-mist);
+  --sl-color-bg-inline-code: var(--rh-mist);
+  --sl-color-bg-accent: var(--rh-accent);
+  --sl-color-hairline-light: var(--rh-rail);
+  --sl-color-hairline: var(--rh-rail);
+  --sl-color-hairline-shade: #06070d;
+
+  --sl-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sl-shadow-md: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-theme='light'] {
+  --rh-paper: #ffffff;
+  --rh-mist: #f5f6fa;
+  --rh-ink: #0b0e1a;
+  --rh-slate: #5a6072;
+  --rh-rail: #e4e6ee;
+  --rh-rail-strong: #cdd1dc;
+  --rh-accent: #1d4bff;
+  --rh-accent-hover: #1239db;
+  --rh-accent-tint: #e8eeff;
+  --rh-on-accent: #ffffff;
+  --rh-ok: #12804f;
+  --rh-ok-soft: #e4f5ec;
+  --rh-retry: #b25e00;
+  --rh-retry-soft: #fdf0dd;
+  --rh-halt: #c4291f;
+  --rh-halt-soft: #fce8e6;
+
+  --sl-color-white: var(--rh-ink);
+  --sl-color-gray-1: var(--rh-ink);
+  --sl-color-gray-2: #262b3a;
+  --sl-color-gray-3: var(--rh-slate);
+  --sl-color-gray-4: #8a90a0;
+  --sl-color-gray-5: var(--rh-rail-strong);
+  --sl-color-gray-6: var(--rh-rail);
+  --sl-color-gray-7: var(--rh-mist);
+  --sl-color-black: var(--rh-paper);
+
+  --sl-color-accent-low: var(--rh-accent-tint);
+  --sl-color-accent: var(--rh-accent);
+  --sl-color-accent-high: var(--rh-accent-hover);
+
+  --sl-color-blue-low: var(--rh-accent-tint);
+  --sl-color-blue: var(--rh-accent);
+  --sl-color-blue-high: var(--rh-accent);
+  --sl-color-purple-low: var(--rh-accent-tint);
+  --sl-color-purple: var(--rh-accent);
+  --sl-color-purple-high: var(--rh-accent);
+  --sl-color-green-low: var(--rh-ok-soft);
+  --sl-color-green: var(--rh-ok);
+  --sl-color-green-high: var(--rh-ok);
+  --sl-color-orange-low: var(--rh-retry-soft);
+  --sl-color-orange: var(--rh-retry);
+  --sl-color-orange-high: var(--rh-retry);
+  --sl-color-red-low: var(--rh-halt-soft);
+  --sl-color-red: var(--rh-halt);
+  --sl-color-red-high: var(--rh-halt);
+
+  --sl-color-text: var(--sl-color-gray-2);
+  --sl-color-text-accent: var(--rh-accent);
+  --sl-color-text-invert: var(--rh-on-accent);
+  --sl-color-bg: var(--rh-paper);
+  --sl-color-bg-nav: var(--rh-paper);
+  --sl-color-bg-sidebar: var(--rh-mist);
+  --sl-color-bg-inline-code: var(--rh-mist);
+  --sl-color-bg-accent: var(--rh-accent);
+  --sl-color-hairline-light: var(--rh-rail);
+  --sl-color-hairline: var(--rh-rail);
+  --sl-color-hairline-shade: var(--rh-rail-strong);
+
+  --sl-shadow-sm: 0 1px 2px rgba(11, 14, 26, 0.05);
+  --sl-shadow-md: 0 1px 2px rgba(11, 14, 26, 0.05), 0 10px 30px rgba(11, 14, 26, 0.07);
+}
+
+/* ---------- type ---------- */
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Manrope for the page title and the site title only; everything else is Onest. */
+h1#_top {
+  font-family: var(--rh-font-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.site-title {
+  font-family: var(--rh-font-display);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--sl-color-white);
+}
+
+.sl-markdown-content :is(h2, h3, h4) {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* The lead under the title. */
+.content-panel header p,
+[data-page-title] + p {
+  color: var(--rh-slate);
+}
+
+/* ---------- header ---------- */
+
+.header {
+  border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+site-search button[data-open-modal] {
+  border-radius: var(--rh-radius-control);
+  border-color: var(--rh-rail-strong);
+  background-color: var(--rh-mist);
+}
+
+/* ---------- sidebar: active page is the accent tint ---------- */
+
+#starlight__sidebar .large {
+  font-size: var(--sl-text-xs);
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+
+#starlight__sidebar a {
+  border-radius: 7px;
+  color: var(--rh-slate);
+}
+
+#starlight__sidebar a:hover {
+  color: var(--sl-color-white);
+}
+
+#starlight__sidebar a[aria-current='page'],
+#starlight__sidebar a[aria-current='page']:hover,
+#starlight__sidebar a[aria-current='page']:focus {
+  background-color: var(--rh-accent-tint);
+  color: var(--rh-accent);
+  font-weight: 600;
+}
+
+/* ---------- table of contents ---------- */
+
+starlight-toc a[aria-current='true'] {
+  color: var(--sl-color-white);
+  box-shadow: inset 2px 0 0 var(--rh-accent);
+}
+
+/* ---------- asides ---------- */
+
+.starlight-aside {
+  border: 1px solid var(--sl-color-asides-border);
+  border-radius: 12px;
+}
+
+.starlight-aside--note,
+.starlight-aside--tip {
+  border-color: var(--rh-accent-tint);
+  background-color: var(--rh-accent-tint);
+}
+
+.starlight-aside--caution {
+  border-color: var(--rh-retry-soft);
+}
+
+.starlight-aside--danger {
+  border-color: var(--rh-halt-soft);
+}
+
+.starlight-aside__title {
+  color: var(--sl-color-white);
+}
+
+.starlight-aside__icon {
+  color: var(--sl-color-asides-text-accent);
+}
+
+/* ---------- tabs: ink label, accent underline ---------- */
+
+starlight-tabs [role='tablist'] {
+  border-bottom-color: var(--sl-color-hairline);
+}
+
+starlight-tabs [role='tab'] {
+  color: var(--rh-slate);
+  font-weight: 500;
+  font-size: var(--sl-text-sm);
+}
+
+starlight-tabs [role='tab'][aria-selected='true'] {
+  color: var(--sl-color-white);
+  border-color: var(--rh-accent);
+  font-weight: 600;
+}
+
+/* ---------- cards ---------- */
+
+/* Starlight's `1fr 1fr` lets a code block's min-content width widen one column and crush the
+   other; minmax(0, 1fr) keeps the two columns equal and lets the code scroll instead. */
+@media (min-width: 50rem) {
+  .card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.card-grid > * {
+  min-width: 0;
+}
+
+.sl-markdown-content .card,
+.sl-link-card {
+  border-radius: var(--rh-radius-card);
+  border-color: var(--sl-color-hairline);
+  background-color: var(--sl-color-bg);
+  box-shadow: none;
+}
+
+.sl-link-card:hover {
+  border-color: var(--rh-accent);
+  background-color: var(--sl-color-bg);
+  box-shadow: var(--sl-shadow-md);
+}
+
+.sl-link-card .icon {
+  color: var(--rh-accent);
+}
+
+.sl-markdown-content .card .icon {
+  color: var(--rh-accent);
+  background-color: var(--rh-accent-tint);
+  border-color: var(--rh-accent-tint);
+  border-radius: var(--rh-radius-control);
+}
+
+/* ---------- buttons ---------- */
+
+.sl-link-button {
+  border-radius: var(--rh-radius-control);
+  font-weight: 600;
+}
+
+.sl-link-button.primary {
+  background-color: var(--rh-accent);
+  border-color: var(--rh-accent);
+  color: var(--rh-on-accent);
+}
+
+.sl-link-button.primary:hover {
+  background-color: var(--rh-accent-hover);
+  border-color: var(--rh-accent-hover);
+}
+
+/* ---------- steps: numbered circles on a rail ---------- */
+
+.sl-steps > li::before {
+  background-color: var(--sl-color-bg);
+  border: 1px solid var(--rh-rail-strong);
+  color: var(--sl-color-white);
+  font-weight: 600;
+}
+
+.sl-steps > li::after {
+  background-color: var(--rh-rail-strong);
+}
+
+/* ---------- inline code ---------- */
+
+.sl-markdown-content :not(pre) > code {
+  font-size: 0.86em;
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 5px;
+  padding: 0.0625rem 0.3125rem;
+}
+
+/* ---------- tables ---------- */
+
+.sl-markdown-content table th {
+  background-color: var(--rh-mist);
+  color: var(--rh-slate);
+  font-weight: 500;
+}
+
+:focus-visible {
+  outline-color: var(--rh-accent);
+}

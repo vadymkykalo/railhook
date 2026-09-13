@@ -2,18 +2,15 @@
 /**
  * Derives public/sitemap.xml from the routes the app actually serves.
  *
- * The public surface is the landing page, pricing, contact, and one URL per
- * documentation guide — and the guide list already exists, in
- * `src/pages/docs/sections.ts`, as the thing the sidebar renders. Reading it
- * here rather than retyping the paths means a guide added to the docs is in the
- * sitemap on the next run, and a guide removed cannot leave a 404 behind in it.
+ * The public surface is the landing page, pricing and contact, listed once in
+ * `scripts/public-routes.mjs`. The docs are a separate site with a sitemap of their own
+ * (/docs/sitemap-index.xml), so they are not repeated here.
  *
  * Admin routes are excluded on purpose: they are behind auth, they render
  * nothing to a crawler, and listing them only invites requests.
  *
- * `scripts/prerender.mjs` derives its route list the same way and from the same file, so a
- * URL in the sitemap is a URL that was rendered to static HTML — the two cannot list
- * different sets without the docs sidebar changing under both of them.
+ * `scripts/prerender.mjs` reads the same module, so a URL in the sitemap is a URL that was
+ * rendered to static HTML.
  *
  *   npm run seo:sitemap             regenerate (commit the result)
  *   npm run seo:sitemap -- --check  fail if the committed copy is stale

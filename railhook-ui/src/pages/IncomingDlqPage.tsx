@@ -164,7 +164,7 @@ export default function IncomingDlqPage() {
       )}
 
       {items.length === 0 ? (
-        <EmptyState icon={CheckCircle2} title={t('incomingDlq.noItems')} description={t('incomingDlq.noItemsDesc')} docsLink="/docs#retries" />
+        <EmptyState icon={CheckCircle2} title={t('incomingDlq.noItems')} description={t('incomingDlq.noItemsDesc')} docsLink="outgoing/retries" />
       ) : (
         <div className="animate-fade-in">
           <PermissionGate allowed={canManageDlq}>

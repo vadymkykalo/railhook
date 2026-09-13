@@ -196,7 +196,7 @@ export default function DlqPage() {
       </FilterBar>
 
       {items.length === 0 ? (
-        <EmptyState icon={CheckCircle2} title={t('dlq.noItems')} description={t('dlq.noItemsDesc')} docsLink="/docs#retries" />
+        <EmptyState icon={CheckCircle2} title={t('dlq.noItems')} description={t('dlq.noItemsDesc')} docsLink="outgoing/retries" />
       ) : (
         <div className="animate-fade-in">
           <PermissionGate allowed={canManageDlq}>

@@ -10,6 +10,7 @@ import {
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { cn } from '../lib/utils';
+import { docsUrl } from '../lib/docsUrl';
 import IntentPicker from './IntentPicker';
 import ConnectionSetupDialog from './ConnectionSetupDialog';
 import SendTestEventModal from './SendTestEventModal';
@@ -90,7 +91,7 @@ function StepRow({ step, index, onLaunch }: { step: Step; index: number; onLaunc
 }
 
 export default function GettingStarted({ projectId }: { projectId: string | undefined }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
 
   const { data: status, isLoading } = useOnboardingStatus(projectId);
@@ -194,7 +195,7 @@ export default function GettingStarted({ projectId }: { projectId: string | unde
               <Check className="h-4 w-4 text-ok" aria-hidden />
             </span>
             <p className="text-sm font-medium">{t('onboarding.allDone')}</p>
-            <Button variant="outline" size="sm" onClick={() => navigate('/docs')}>
+            <Button variant="outline" size="sm" onClick={() => window.location.assign(docsUrl(i18n.language))}>
               {t('onboarding.allDoneAction')}
               <ArrowRight className="h-3.5 w-3.5" />
             </Button>

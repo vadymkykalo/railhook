@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui init rebuild-external-db verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs ratchets types-check docs-check seo-check prerender version-check version-set
+.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui init rebuild-external-db verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs ratchets types-check docs-dev docs-build docs-check seo-check prerender version-check version-set
 
 # Default target
 .DEFAULT_GOAL := help
@@ -238,10 +238,16 @@ ratchets: ## Run every @Tag("ratchet") guard test (needs Docker)
 types-check: ## Fail if the UI's generated API types are stale vs openapi.yaml (same check CI runs)
 	@scripts/check-types-drift.sh
 
-docs-check: ## Fail if the in-app API reference index is stale vs openapi.yaml (same check CI runs)
-	@cd railhook-ui && npm run docs:api-index:check
+docs-dev: ## Run the docs site (railhook-docs, Starlight) with live reload on http://localhost:4321/docs/
+	@cd railhook-docs && { [ -d node_modules ] || npm ci; } && npm run dev
 
-seo-check: ## Fail if public/sitemap.xml is stale vs the docs guide list (same check CI runs)
+docs-build: ## Build the docs site into railhook-docs/dist (runs the internal links validator)
+	@cd railhook-docs && npm ci && npm run build
+
+docs-check: ## Fail if the docs' env reference is stale, their tests fail, or their build breaks (same check CI runs)
+	@cd railhook-docs && npm ci && node scripts/env-reference.mjs --check && node --test "scripts/*.test.mjs" && npm run build
+
+seo-check: ## Fail if public/sitemap.xml is stale vs the public route list (same check CI runs)
 	@cd railhook-ui && npm run seo:sitemap:check
 
 prerender: ## Render the public pages to static HTML over an existing dist/ (needs a Chromium)

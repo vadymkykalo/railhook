@@ -340,7 +340,7 @@ export default function ReplayPage() {
           icon={History}
           title={t('replay.noSessions')}
           description={t('replay.noSessionsDesc')}
-          docsLink="/docs#deterministic-replay"
+          docsLink="outgoing/replay"
         />
       ) : (
         <div className="animate-fade-in overflow-hidden rounded-lg border border-rail bg-card">

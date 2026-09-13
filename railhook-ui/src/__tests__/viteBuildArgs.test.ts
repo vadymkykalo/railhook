@@ -63,17 +63,20 @@ describe('VITE_ build arguments', () => {
  */
 describe('content-security-policy ownership', () => {
   const nginxConf = read('railhook-ui/nginx.conf');
+  const securityHeaders = read('railhook-ui/nginx-security-headers.conf');
 
   it('nginx does not send a Content-Security-Policy of its own', () => {
     expect(nginxConf).not.toMatch(/add_header\s+Content-Security-Policy/i);
+    expect(securityHeaders).not.toMatch(/add_header\s+Content-Security-Policy/i);
   });
 
   it('nginx still sends the headers that are not policy, and cannot be set from a meta tag', () => {
     // frame-ancestors is ignored in a meta tag by specification, so X-Frame-Options is what
-    // actually stops this being framed and has to survive.
-    expect(nginxConf).toMatch(/add_header\s+X-Frame-Options/i);
-    expect(nginxConf).toMatch(/add_header\s+X-Content-Type-Options/i);
-    expect(nginxConf).toMatch(/add_header\s+Referrer-Policy/i);
+    // actually stops this being framed and has to survive. The headers live in a snippet that
+    // nginx.conf includes; nginxSecurityHeaders.test.ts holds every location to it.
+    expect(securityHeaders).toMatch(/add_header\s+X-Frame-Options/i);
+    expect(securityHeaders).toMatch(/add_header\s+X-Content-Type-Options/i);
+    expect(securityHeaders).toMatch(/add_header\s+Referrer-Policy/i);
   });
 });
 

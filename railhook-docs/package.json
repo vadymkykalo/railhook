@@ -1,0 +1,24 @@
+{
+  "name": "railhook-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/copy-openapi.mjs",
+    "dev": "astro dev",
+    "prebuild": "node scripts/copy-openapi.mjs",
+    "build": "astro build",
+    "preview": "astro preview",
+    "env:reference": "node scripts/env-reference.mjs",
+    "env:reference:check": "node scripts/env-reference.mjs --check",
+    "check:parity": "node scripts/check-parity.mjs",
+    "test": "node --test \"scripts/*.test.mjs\"",
+    "check": "npm run env:reference:check && npm test"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.42.0",
+    "@scalar/api-reference": "^1.68.0",
+    "astro": "^7.3.2",
+    "sharp": "^0.35.4",
+    "starlight-links-validator": "^0.26.0"
+  }
+}

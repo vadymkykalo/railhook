@@ -214,7 +214,7 @@ export default function SubscriptionsPage() {
             title={t('subscriptions.noSubscriptions')}
             description={t('subscriptions.noSubscriptionsDesc')}
             action={newSubscriptionButton}
-            docsLink="/docs#subscriptions-api"
+            docsLink="outgoing/endpoints-subscriptions"
           />
           {catalogTypes.length === 0 && endpoints.length > 0 && (
             <p className="text-center text-xs text-muted-foreground">{t('subscriptions.noEventTypesHint')}</p>

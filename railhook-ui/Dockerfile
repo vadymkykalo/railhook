@@ -60,9 +60,12 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 # Sitemap: line in robots.txt have to name it or they point a crawler somewhere else
 # entirely. Regenerated here, before the build copies public/ into dist, and only when
 # the domain is actually set.
+#
+# The sed swaps only the origin of each Sitemap: line, keeping its path — robots.txt names two,
+# the app's and the docs site's.
 RUN if [ -n "$VITE_SITE_URL" ]; then \
         SITE_URL="$VITE_SITE_URL" npm run seo:sitemap && \
-        sed -i "s|^Sitemap: .*|Sitemap: ${VITE_SITE_URL%/}/sitemap.xml|" public/robots.txt && \
+        sed -i "s|^Sitemap: [a-z]*://[^/]*|Sitemap: ${VITE_SITE_URL%/}|" public/robots.txt && \
         echo "sitemap and robots.txt point at $VITE_SITE_URL"; \
     else \
         echo "no VITE_SITE_URL — sitemap keeps its example.com placeholder"; \
@@ -73,6 +76,22 @@ RUN if [ -n "$VITE_SITE_URL" ]; then \
 # pages whose body is empty until React mounts.
 RUN npm run build && npm run prerender
 
+# Docs stage: the Starlight site in railhook-docs/, served at /docs/ by the same nginx.
+# Pinned to $BUILDPLATFORM for the same reason as the build stage — its output is static
+# HTML, identical on every architecture. It reads two files from the repository root:
+# openapi.yaml (the API reference) and .env.dist (the configuration reference), which is
+# why the build context is the root.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS docs
+
+WORKDIR /app
+COPY openapi.yaml .env.dist ./
+ARG VITE_SITE_URL=""
+ENV VITE_SITE_URL=$VITE_SITE_URL
+COPY railhook-docs/package*.json railhook-docs/
+RUN cd railhook-docs && npm ci
+COPY railhook-docs/ railhook-docs/
+RUN cd railhook-docs && npm run build
+
 # Runtime stage
 # Bumped from the 1.25 stable branch (past EOL) to the current 1.30
 # stable branch.
@@ -81,8 +100,15 @@ FROM nginx:1.30-alpine
 # Copy built assets from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
+# The docs site, served by nginx.conf's /docs/ location.
+COPY --from=docs /app/railhook-docs/dist /usr/share/nginx/html/docs
+
+# `curl -fsSL https://<host>/install.sh | bash` — the installer, served by the site it installs.
+COPY install.sh /usr/share/nginx/html/install.sh
+
 # Copy nginx config
 COPY railhook-ui/nginx.conf /etc/nginx/conf.d/default.conf
+COPY railhook-ui/nginx-security-headers.conf /etc/nginx/snippets/security-headers.conf
 
 # Runs before nginx starts — the base image's entrypoint executes
 # /docker-entrypoint.d/*.sh in order. Fills in the resolver address from

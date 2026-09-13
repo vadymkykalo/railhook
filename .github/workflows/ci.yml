@@ -635,12 +635,14 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: railhook-ui/package-lock.json
-      
+          cache-dependency-path: |
+            railhook-ui/package-lock.json
+            railhook-docs/package-lock.json
+
       - name: Install dependencies
         working-directory: railhook-ui
         run: npm ci
-      
+
       # openapi.yaml is drift-checked against springdoc by OpenApiDriftIntegrationTest,
       # so it describes the real backend. This carries that guarantee across to the
       # frontend: api.generated.ts is committed, and a DTO change that never reached
@@ -654,17 +656,22 @@ jobs:
       - name: Check generated API types match openapi.yaml
         run: scripts/check-types-drift.sh
 
-      # The in-app API reference is rendered from a derived index generated from
-      # the same openapi.yaml, and that index is committed. Before this, the
-      # reference was 2,100 lines of hand-written endpoint tables that nothing
-      # kept in sync — this is what stops the replacement rotting the same way.
-      - name: Check generated docs API index matches openapi.yaml
-        working-directory: railhook-ui
-        run: npm run docs:api-index:check
+      # The docs are a Starlight site of their own (railhook-docs/), served at /docs/ from
+      # the UI image. The API reference renders openapi.yaml directly; the configuration
+      # reference is derived from .env.dist and committed, so the check fails when it lags.
+      # The node tests hold every page to an EN/UK pair, and the build runs the internal links
+      # validator.
+      - name: Check docs site (env reference, tests, build with link validation)
+        working-directory: railhook-docs
+        run: |
+          npm ci
+          node scripts/env-reference.mjs --check
+          node --test "scripts/*.test.mjs"
+          npm run build
 
-      # sitemap.xml is derived from the same guide list the docs sidebar renders
-      # and committed, so a guide added without regenerating it would be a page
-      # that exists and is never crawled.
+      # sitemap.xml is derived from the public route list in scripts/public-routes.mjs
+      # and committed, so a page added without regenerating it would exist and never be
+      # crawled.
       - name: Check sitemap.xml matches the public route list
         working-directory: railhook-ui
         run: npm run seo:sitemap:check
@@ -972,7 +979,8 @@ jobs:
             [ "$code" = "$2" ] || { echo "::error::$1 returned $code, expected $2"; exit 1; }
           }
           check /                          200   # dashboard
-          check /docs                      200   # public docs, no account
+          check /docs/                     200   # public docs site, no account
+          check /install.sh                200   # the installer, served by the site it installs
           check /actuator/health/liveness  200   # probes
           check /api/v1/projects           401   # reachable, and refusing anonymous access
           # Neither of these may be public: metrics leak tenant cardinality and

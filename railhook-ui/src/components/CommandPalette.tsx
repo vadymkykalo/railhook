@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, FolderKanban, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { docsUrl } from '../lib/docsUrl';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 import { projectsApi } from '../api/projects.api';
 import { usePermissions } from '../auth/usePermissions';
@@ -34,10 +35,12 @@ interface PaletteItem {
   hint?: string;
   icon: React.ElementType;
   path: string;
+  /** Outside the app (the docs site): opened with a page load rather than the router. */
+  external?: boolean;
 }
 
 export function CommandPalette() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { role } = usePermissions();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -49,8 +52,9 @@ export function CommandPalette() {
 
   const projectId = location.pathname.match(/\/admin\/projects\/([^/]+)/)?.[1];
 
-  const go = useCallback((path: string) => {
-    navigate(path);
+  const go = useCallback((item: Pick<PaletteItem, 'path' | 'external'>) => {
+    if (item.external) window.location.assign(item.path);
+    else navigate(item.path);
     setOpen(false);
   }, [navigate]);
 
@@ -117,11 +121,12 @@ export function CommandPalette() {
       section: t('commandPalette.groupResources'),
       hint: 'docs',
       icon: BookOpen,
-      path: '/docs',
+      path: docsUrl(i18n.language),
+      external: true,
     }];
 
     return [...destinations, ...settings, ...projectItems, ...resources];
-  }, [projects, projectId, role, t]);
+  }, [projects, projectId, role, t, i18n.language]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -171,7 +176,7 @@ export function CommandPalette() {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const target = filtered[selectedIndex];
-      if (target) go(target.path);
+      if (target) go(target);
     }
   };
 
@@ -233,7 +238,7 @@ export function CommandPalette() {
                         role="option"
                         aria-selected={active}
                         type="button"
-                        onClick={() => go(item.path)}
+                        onClick={() => go(item)}
                         onMouseMove={() => setSelectedIndex(index)}
                         className={cn(
                           'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',

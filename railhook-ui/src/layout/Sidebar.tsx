@@ -4,6 +4,7 @@ import { BookOpen, ChevronsLeft, LogOut, Settings, X } from 'lucide-react';
 import { RailhookIcon } from '../components/icons/RailhookIcon';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
+import { docsUrl } from '../lib/docsUrl';
 import { hasMinRole, type Role } from '../auth/ProtectedRoute';
 import ProjectSwitcher from '../components/ProjectSwitcher';
 import OrganizationSwitcher from '../components/OrganizationSwitcher';
@@ -57,7 +58,7 @@ function RailLink({
 export default function Sidebar({
   projectId, role, user, collapsed, onToggleCollapsed, isMobile = false, onNavigate, onLogout,
 }: SidebarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const segment = segmentOf(location.pathname);
   const narrow = collapsed && !isMobile;
@@ -110,8 +111,9 @@ export default function Sidebar({
           expanded sidebar, so a wide screen showed two identical "Search ⌘K"
           controls at once and a collapsed one showed none. */}
       <div className="space-y-0.5 border-t border-rail p-2">
-        <Link
-          to="/docs"
+        {/* A page load, not a route: the docs are their own site at /docs/. */}
+        <a
+          href={docsUrl(i18n.language)}
           onClick={isMobile ? onNavigate : undefined}
           title={narrow ? t('nav.documentation') : undefined}
           className={cn(
@@ -121,7 +123,7 @@ export default function Sidebar({
         >
           <BookOpen className="h-4 w-4 flex-shrink-0" />
           {!narrow && <span>{t('nav.documentation')}</span>}
-        </Link>
+        </a>
         {/* Shown to everyone, and it lands on the personal profile — the page
             where a member changes their own password. What the section's
             org-level tabs need is stated in nav.config and filtered there. */}

@@ -64,6 +64,13 @@ export default defineConfig({
         target: process.env.VITE_DEV_API_TARGET || 'http://localhost:8080',
         changeOrigin: true,
       },
+      // The docs are a site of their own (railhook-docs/, `make docs-dev` serves it on 4321
+      // under the same /docs base). In production nginx serves both from one origin; this
+      // keeps the dashboard's /docs/ links working under `npm run dev`.
+      '/docs': {
+        target: 'http://localhost:4321',
+        changeOrigin: true,
+      },
     },
   },
   test: {

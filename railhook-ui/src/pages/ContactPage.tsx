@@ -1,10 +1,10 @@
-import { Link } from 'react-router-dom';
 import { BookOpen, Github, LifeBuoy, Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { panel, Reveal, Section } from './landing/primitives';
 import { cn } from '../lib/utils';
 import { REPO_URL } from './landing/plans';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
+import { docsUrl } from '../lib/docsUrl';
 
 /**
  * The route that replaces a mailto to a personal Gmail address.
@@ -59,7 +59,7 @@ function Card({
 const LINK = 'text-sm font-medium text-primary hover:underline';
 
 export default function ContactPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   useDocumentMeta({ titleKey: 'meta.contact.title', descriptionKey: 'meta.contact.description', path: '/contact' });
 
   return (
@@ -120,9 +120,9 @@ export default function ContactPage() {
             title={t('contact.docsTitle')}
             body={t('contact.docsBody')}
             action={
-              <Link to="/docs" className={LINK}>
+              <a href={docsUrl(i18n.language)} className={LINK}>
                 {t('contact.docsCta')}
-              </Link>
+              </a>
             }
           />
         </Reveal>
