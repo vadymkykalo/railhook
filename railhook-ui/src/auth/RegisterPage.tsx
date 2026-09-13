@@ -15,6 +15,8 @@ import { Label } from '../components/ui/label';
 import IntentPicker from '../components/IntentPicker';
 import { writeIntent } from '../lib/onboarding';
 import PasswordStrengthIndicator, { missingPasswordRules, passwordMeetsPolicy } from '../components/PasswordStrengthIndicator';
+import EmailSuggestion from '../components/EmailSuggestion';
+import { hasImpossibleTld } from '../lib/emailTypos';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -172,6 +174,7 @@ export default function RegisterPage() {
             disabled={loading}
             autoComplete="email"
           />
+          <EmailSuggestion email={email} onAccept={setEmail} />
         </div>
 
         <div className="space-y-1.5">
@@ -209,7 +212,7 @@ export default function RegisterPage() {
         <Button
           type="submit"
           className="h-10 w-full"
-          disabled={loading || !passwordMeetsPolicy(password)
+          disabled={loading || !passwordMeetsPolicy(password) || hasImpossibleTld(email)
             || (isCaptchaConfigured() && !captchaToken)}
         >
           {loading && <Loader2 className="h-4 w-4 animate-spin" />}

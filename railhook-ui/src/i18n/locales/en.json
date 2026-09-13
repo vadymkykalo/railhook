@@ -662,6 +662,10 @@
     "disable": "Disable",
     "disabled": "Disabled",
     "edit": "Edit",
+    "emailSuggestion": {
+      "didYouMean": "Did you mean <suggestion>{{email}}</suggestion>?",
+      "impossible": "This address cannot receive mail."
+    },
     "enable": "Enable",
     "enabled": "Enabled",
     "error": "An unexpected error occurred",

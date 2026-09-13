@@ -5,6 +5,8 @@ import { showApiError, showSuccess } from '../lib/toast';
 import { membersApi, MemberResponse, MembershipRole } from '../api/members.api';
 import { useAuth } from '../auth/auth.store';
 import InviteLink from './InviteLink';
+import EmailSuggestion from './EmailSuggestion';
+import { hasImpossibleTld } from '../lib/emailTypos';
 import { GRANTABLE_ROLES, RoleCard } from './PermissionGate';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -62,6 +64,8 @@ export default function AddMemberModal({ orgId, open, onClose, onSuccess }: AddM
       setEmailError(t('members.addModal.emailInvalid'));
       return false;
     }
+    // EmailSuggestion under the field already says why and offers the fix.
+    if (hasImpossibleTld(email)) return false;
     setEmailError('');
     return true;
   };
@@ -124,8 +128,10 @@ export default function AddMemberModal({ orgId, open, onClose, onSuccess }: AddM
                   required
                   autoFocus
                 />
-                {emailError && (
+                {emailError ? (
                   <p id="member-email-error" className="text-sm text-halt">{emailError}</p>
+                ) : (
+                  <EmailSuggestion email={email} onAccept={setEmail} />
                 )}
               </div>
 

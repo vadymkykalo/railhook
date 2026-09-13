@@ -662,6 +662,10 @@
     "disable": "Вимкнути",
     "disabled": "Вимкнено",
     "edit": "Редагувати",
+    "emailSuggestion": {
+      "didYouMean": "Ви мали на увазі <suggestion>{{email}}</suggestion>?",
+      "impossible": "Ця адреса не може отримувати пошту."
+    },
     "enable": "Увімкнути",
     "enabled": "Увімкнено",
     "error": "Сталася непередбачена помилка",
