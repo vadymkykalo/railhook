@@ -2016,6 +2016,7 @@
       "legendFlight": "on its way",
       "legendOk": "delivered",
       "legendRetry": "waiting to retry",
+      "retryLabel": "503 · retry",
       "receive": "RECEIVE",
       "send": "SEND",
       "yourService": "Your service"

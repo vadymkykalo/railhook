@@ -2016,6 +2016,7 @@
       "legendFlight": "в дорозі",
       "legendOk": "доставлено",
       "legendRetry": "чекає повтору",
+      "retryLabel": "503 · повтор",
       "receive": "ПРИЙМАЄ",
       "send": "НАДСИЛАЄ",
       "yourService": "Ваш сервіс"

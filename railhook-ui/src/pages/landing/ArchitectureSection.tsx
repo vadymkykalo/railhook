@@ -46,7 +46,7 @@ function Tile({
         )}
       >
         {icon}
-        <span className={cn('font-mono text-[10px] leading-tight', accent ? 'text-primary-foreground' : 'text-muted-foreground')}>
+        <span className={cn('font-mono text-[11px] leading-tight', accent ? 'text-primary-foreground' : 'text-muted-foreground')}>
           {label}
         </span>
       </div>
@@ -61,7 +61,7 @@ function Group({ area, items }: { area: string; items: { icon: ReactNode; label:
         {items.map((item) => (
           <div key={item.label} className="flex items-center gap-1.5 rounded-lg border border-rail bg-card px-1.5 py-1.5 shadow-card">
             {item.icon}
-            <span className="font-mono text-[10px] leading-tight text-muted-foreground">{item.label}</span>
+            <span className="font-mono text-[11px] leading-tight text-muted-foreground">{item.label}</span>
           </div>
         ))}
       </div>
@@ -127,7 +127,7 @@ function ArchitectureDiagram() {
         <Tile area="pg" icon={<LogoMark name="postgresql" color={LOGO.postgresql} className={icon} />} label="PostgreSQL" />
         <div
           style={{ gridArea: 'lbl' }}
-          className="relative z-[1] flex items-center justify-center text-center font-mono text-[9.5px] uppercase leading-tight tracking-[0.08em] text-muted-foreground"
+          className="relative z-[1] flex items-center justify-center text-center font-mono text-[10.5px] uppercase leading-tight tracking-[0.08em] text-muted-foreground"
         >
           {t('landing.architecture.shared')}
         </div>

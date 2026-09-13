@@ -103,7 +103,7 @@ export default function RailMap() {
           ))}
           <circle cx="760" cy="300" r="30" fill="none" stroke={C.retry} strokeWidth="1.5" strokeDasharray="2 4" opacity="0.8" />
           <text x="760" y="352" textAnchor="middle" fill={C.retry} fontSize="11" fontWeight="600" className="font-mono">
-            503 · retry
+            {t('landing.map.retryLabel')}
           </text>
 
           <Chip x={40} y={46} name="Stripe" sub="invoice.paid" />
