@@ -16,7 +16,7 @@ const FILTER_THRESHOLD = 7;
 /**
  * The switcher sits under the logo and never leaves the screen, so its whole
  * job is to answer "which project am I in?" before anyone has to ask. The
- * current project gets the name slot and a teal marker; everything else about
+ * current project gets the name slot and an accent marker; everything else about
  * the control stays quiet.
  */
 export default function ProjectSwitcher({ currentProjectId, collapsed }: ProjectSwitcherProps) {

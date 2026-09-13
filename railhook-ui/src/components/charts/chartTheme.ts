@@ -8,7 +8,7 @@ import i18n from '../../i18n';
  * series may only wear them when the series *means* delivered / still-owed /
  * abandoned / untried. Every other series — event types, endpoints, latency —
  * is nominal or ordinal and therefore takes the one non-status series hue the
- * product has: the brand teal. That is deliberate, not a shortage. A nominal
+ * product has: the brand cobalt. That is deliberate, not a shortage. A nominal
  * bar chart is one series (the title names it), so it needs exactly one hue;
  * an ordered scale (p50 → p99) takes that same hue stepped in lightness so the
  * reader sees the order in the colour.
@@ -46,8 +46,8 @@ export const MONO_STACK = 'JetBrains Mono, ui-monospace, SFMono-Regular, monospa
  * Opacity rather than a second set of hex values, so the ramp re-anchors
  * itself when the surface flips to dark. These five steps were searched, not
  * guessed: they are the lightest opening that clears OKLCH ΔL >= 0.06 between
- * every neighbour *and* the 2:1 light-end floor in both modes — 2.20:1 on
- * paper, 2.78:1 on ink.
+ * every neighbour *and* the 2:1 light-end floor in both modes. Rechecked for
+ * the cobalt accent: the light end is 2.30:1 on paper, 2.37:1 on ink.
  */
 export const ORDINAL_STEPS = [0.49, 0.61, 0.74, 0.87, 1] as const;
 

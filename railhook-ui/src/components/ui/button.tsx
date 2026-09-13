@@ -12,7 +12,7 @@ const buttonVariants = cva(
       // dark mode --halt / --ok lighten, and their paired *-foreground tokens
       // darken with them. Hardcoded white went unreadable there.
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "bg-primary text-primary-foreground hover:bg-primary-hover",
         destructive: "bg-halt text-destructive-foreground hover:bg-halt/90",
         outline: "border border-rail bg-card hover:bg-secondary",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/70",

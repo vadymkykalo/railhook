@@ -22,7 +22,7 @@ import { closeBrackets } from '@codemirror/autocomplete';
  *
  * The syntax palette is deliberately two-tone. The four status hues are
  * reserved for statuses, so a JSON string is not allowed to be "ok green";
- * keys carry the brand teal, values carry ink, and the rest is separated by
+ * keys carry the brand accent, values carry ink, and the rest is separated by
  * weight and italics rather than by inventing colours.
  */
 

@@ -6,107 +6,111 @@
    Railhook design tokens
 
    One rule governs this palette: the four status hues — ok, retry, halt,
-   idle — belong to statuses and to nothing else. Chrome never borrows them.
-   That is why the brand accent is teal and not blue or green: a "retrying"
-   badge and a primary button must never read as the same thing in a table
-   full of both.
+   idle — belong to statuses and to nothing else. Chrome never borrows them,
+   and the accent is never used for a status. The accent is one saturated
+   cobalt, clear of green, amber, red and grey alike, so a "retrying" badge
+   and a primary button never read as the same thing in a table full of both.
+
+   The ground is white. Surfaces separate by hairline (--rail) and by the
+   mist tint (--muted, --secondary), not by a tinted page under white cards.
    ───────────────────────────────────────────────────────────────────────── */
 
 @layer base {
   :root {
-    /* Surfaces.
-       The page is a distinctly warm grey and cards are white, because the
-       first pass put them 2% of lightness apart and the result was white on
-       white — a card had to be found rather than seen. The gap below is what
-       lets a surface read as a surface without a shadow doing the work. */
-    --background: 55 14% 95%;      /* #F4F3EE  paper */
-    --foreground: 218 22% 7%;      /* #0E1116  ink   */
+    /* Surfaces */
+    --background: 0 0% 100%;             /* #FFFFFF  paper */
+    --foreground: 228 40.5% 7.3%;        /* #0B0E1A  ink   */
     --card: 0 0% 100%;
-    --card-foreground: 218 22% 7%;
+    --card-foreground: 228 40.5% 7.3%;
     --popover: 0 0% 100%;
-    --popover-foreground: 218 22% 7%;
+    --popover-foreground: 228 40.5% 7.3%;
 
-    /* Brand — deep teal. Disjoint from every status hue. */
-    --primary: 186 80% 26%;        /* #0D6E78 */
-    --primary-foreground: 55 14% 95%;
-    --accent: 186 44% 94%;
-    --accent-foreground: 186 80% 22%;
+    /* Brand — cobalt. Disjoint from every status hue. */
+    --primary: 227.8 100% 55.7%;         /* #1D4BFF */
+    --primary-hover: 228.4 84.8% 46.5%;  /* #1239DB */
+    --primary-foreground: 0 0% 100%;
+    --accent: 224.3 100% 95.5%;          /* #E8EEFF  accent tint */
+    --accent-foreground: 227.8 100% 55.7%;
 
-    /* Neutrals, warmed to match the paper */
-    --secondary: 55 13% 90%;
-    --secondary-foreground: 218 22% 7%;
-    --muted: 55 13% 91%;
-    --muted-foreground: 70 7% 38%;
+    /* Neutrals */
+    --secondary: 228 33.3% 97.1%;        /* #F5F6FA  mist */
+    --secondary-foreground: 228 40.5% 7.3%;
+    --muted: 228 33.3% 97.1%;            /* #F5F6FA  mist */
+    --muted-foreground: 225 11.8% 40%;   /* #5A6072  slate */
 
     /* Rails — the hairlines and tick marks the whole system is drawn with.
-       Darkened from the first pass: at 86% they vanished against the page and
-       every boundary in the product is drawn with one of these. */
-    --rail: 60 8% 82%;             /* #D5D5CD */
-    --border: 60 8% 82%;
-    --input: 60 8% 82%;
-    --ring: 186 80% 26%;
+       Inputs take the stronger rail so a field reads as a field on white. */
+    --rail: 228 22.7% 91.4%;             /* #E4E6EE */
+    --border: 228 22.7% 91.4%;
+    --input: 224 17.6% 83.3%;            /* #CDD1DC  rail-strong */
+    --ring: 227.8 100% 55.7%;
 
     /* Status — reserved. Never chrome. */
-    --ok: 152 69% 28%;             /* #167A4B  delivered      */
-    --ok-soft: 152 44% 93%;
-    --retry: 36 100% 35%;          /* #B26A00  attempt pending */
-    --retry-soft: 36 78% 92%;
-    --halt: 3 71% 41%;             /* #B3261E  abandoned, DLQ  */
-    --halt-soft: 3 70% 95%;
-    --idle: 220 9% 46%;            /* #6B7280  nothing yet     */
-    --idle-soft: 220 14% 94%;
+    --ok: 153.3 75.3% 28.6%;             /* #12804F  delivered       */
+    --ok-soft: 148.2 45.9% 92.7%;        /* #E4F5EC */
+    --retry: 31.7 100% 34.9%;            /* #B25E00  attempt pending */
+    --retry-soft: 35.6 88.9% 92.9%;      /* #FDF0DD */
+    --halt: 3.6 72.7% 44.5%;             /* #C4291F  abandoned, DLQ  */
+    --halt-soft: 5.5 78.6% 94.5%;        /* #FCE8E6 */
+    --idle: 221.5 10.8% 47.1%;           /* #6B7385  nothing yet     */
+    --idle-soft: 220 21.4% 94.5%;        /* #EEF0F4 */
 
     /* Legacy aliases — shadcn primitives still reference these names */
-    --destructive: 3 71% 41%;
+    --destructive: 3.6 72.7% 44.5%;
     --destructive-foreground: 0 0% 100%;
-    --success: 152 69% 28%;
+    --success: 153.3 75.3% 28.6%;
     --success-foreground: 0 0% 100%;
-    --warning: 36 100% 35%;
+    --warning: 31.7 100% 34.9%;
     --warning-foreground: 0 0% 100%;
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;                  /* 10px controls; cards are rounded-xl = 16px */
     --sidebar-width: 15rem;
     --header-height: 3.5rem;
   }
 
   .dark {
-    --background: 220 20% 7%;
-    --foreground: 60 12% 96%;
-    --card: 220 16% 13%;
-    --card-foreground: 60 12% 96%;
-    --popover: 220 18% 11%;
-    --popover-foreground: 60 12% 96%;
+    --background: 226.7 29% 6.1%;        /* #0B0D14 */
+    --foreground: 225 28.6% 94.5%;       /* #EDEFF5 */
+    --card: 226.7 29% 6.1%;
+    --card-foreground: 225 28.6% 94.5%;
+    /* A popover has no shadow to lift it on ink, so it sits one step up, on mist. */
+    --popover: 225 27.3% 8.6%;           /* #10131C */
+    --popover-foreground: 225 28.6% 94.5%;
 
-    --primary: 185 79% 45%;        /* brand-bright — teal needs lifting on ink */
-    --primary-foreground: 220 20% 8%;
-    --accent: 186 50% 16%;
-    --accent-foreground: 185 79% 62%;
+    --primary: 227.5 100% 71.8%;         /* #6F8DFF */
+    --primary-hover: 227.6 100% 77.3%;   /* #8BA3FF */
+    --primary-foreground: 226.7 29% 6.1%;
+    --accent: 228.8 53.3% 17.6%;         /* #151E45 */
+    --accent-foreground: 227.5 100% 71.8%;
 
-    --secondary: 220 14% 18%;
-    --secondary-foreground: 60 12% 96%;
-    --muted: 220 14% 18%;
-    --muted-foreground: 70 5% 62%;
+    /* Secondary sits a step above mist: hover and selected rows are painted
+       with it, and mist itself is too close to the ground to see there. */
+    --secondary: 224 25.4% 11.6%;        /* #161A25 */
+    --secondary-foreground: 225 28.6% 94.5%;
+    --muted: 225 27.3% 8.6%;             /* #10131C  mist */
+    --muted-foreground: 220 15.4% 65.7%; /* #9AA3B5 */
 
-    --rail: 220 12% 24%;
-    --border: 220 12% 24%;
-    --input: 220 12% 24%;
-    --ring: 185 79% 45%;
+    --rail: 225.7 23.1% 17.8%;           /* #232838 */
+    --border: 225.7 23.1% 17.8%;
+    --input: 225 18.8% 25.1%;            /* #343A4C */
+    --ring: 227.5 100% 71.8%;
 
-    --ok: 152 55% 46%;
-    --ok-soft: 152 40% 14%;
-    --retry: 36 82% 52%;
-    --retry-soft: 36 50% 14%;
-    --halt: 3 72% 58%;
-    --halt-soft: 3 45% 15%;
-    --idle: 220 9% 60%;
-    --idle-soft: 220 12% 18%;
+    --ok: 152 53% 50.8%;                 /* #3FC486 */
+    --ok-soft: 153.3 47.4% 11.2%;        /* #0F2A1E */
+    --retry: 34.8 85.4% 59.6%;           /* #F0A640 */
+    --retry-soft: 36 48.4% 12.2%;        /* #2E2210 */
+    --halt: 4.8 85.2% 65.5%;             /* #F2685C */
+    --halt-soft: 348.4 43.7% 13.9%;      /* #33141A */
+    --idle: 222.2 13.2% 59.8%;           /* #8B93A6 */
+    --idle-soft: 224 22.4% 13.1%;        /* #1A1E29 */
 
-    --destructive: 3 72% 58%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 152 55% 46%;
-    --success-foreground: 220 20% 8%;
-    --warning: 36 82% 52%;
-    --warning-foreground: 220 20% 8%;
+    /* The dark status hues are light, so what sits on them is ink, not white. */
+    --destructive: 4.8 85.2% 65.5%;
+    --destructive-foreground: 226.7 29% 6.1%;
+    --success: 152 53% 50.8%;
+    --success-foreground: 226.7 29% 6.1%;
+    --warning: 34.8 85.4% 59.6%;
+    --warning-foreground: 226.7 29% 6.1%;
   }
 }
 
@@ -150,53 +154,62 @@
      without knowing it is on ink. Status hues take their dark-theme
      values, because the light-theme ones are too dark to read here. */
   .surface-ink {
-    /* Not black. The ink is the brand teal taken down to near-darkness, so a
-       dark panel still belongs to the palette instead of reading as a neutral
-       slab dropped onto it. */
-    background-color: hsl(192 42% 6.5%);
-    color: hsl(180 12% 95%);
+    /* The code surface: the same near-black, blue-leaning ink as a code
+       block, so a dark panel belongs to the palette instead of reading as a
+       neutral slab dropped onto it. */
+    background-color: hsl(233.3 39.1% 9%);       /* #0E1020 */
+    color: hsl(230 31.6% 92.5%);                 /* #E6E8F2 */
 
-    --background: 192 42% 6.5%;
-    --foreground: 180 12% 95%;
-    --card: 192 32% 12%;
-    --rail: 192 20% 22%;
-    --border: 192 20% 22%;
-    --muted-foreground: 186 10% 64%;
-    --secondary: 192 28% 15%;
-    --secondary-foreground: 180 12% 95%;
-    --primary: 184 72% 52%;
-    --primary-foreground: 192 42% 6.5%;
-    --accent: 192 32% 16%;
-    --accent-foreground: 184 72% 62%;
-    --ok: 152 55% 50%;
-    --retry: 36 82% 56%;
-    --halt: 3 74% 62%;
-    --idle: 192 8% 60%;
+    --background: 233.3 39.1% 9%;
+    --foreground: 230 31.6% 92.5%;
+    --card: 230.5 30.2% 12.4%;                   /* #161929 */
+    --rail: 232.2 24.7% 18.2%;                   /* #23263A  code line */
+    --border: 232.2 24.7% 18.2%;
+    --muted-foreground: 227.1 13.6% 59.6%;       /* #8A90A6  code dim  */
+    --secondary: 231.8 29.7% 14.5%;              /* #1A1D30 */
+    --secondary-foreground: 230 31.6% 92.5%;
+    --primary: 227.5 100% 71.8%;                 /* #6F8DFF */
+    --primary-hover: 227.6 100% 77.3%;           /* #8BA3FF */
+    --primary-foreground: 233.3 39.1% 9%;
+    --accent: 228.8 53.3% 17.6%;                 /* #151E45 */
+    --accent-foreground: 227.6 100% 77.3%;
+    --ok: 152 53% 50.8%;
+    --retry: 34.8 85.4% 59.6%;
+    --halt: 4.8 85.2% 65.5%;
+    --idle: 222.2 13.2% 59.8%;
 
     /* The soft tints have to come with their hues. A Badge reads
        `bg-ok-soft text-ok`; leaving the tint at its paper value paints a
        near-white pill on near-black the moment a badge lands on this panel. */
-    --ok-soft: 152 40% 14%;
-    --retry-soft: 36 45% 15%;
-    --halt-soft: 3 40% 16%;
-    --idle-soft: 192 14% 16%;
+    --ok-soft: 153.3 47.4% 11.2%;
+    --retry-soft: 36 48.4% 12.2%;
+    --halt-soft: 348.4 43.7% 13.9%;
+    --idle-soft: 224 22.4% 13.1%;
 
     /* Read by components that render in place rather than through a portal:
        the tooltip, the global form-control rule, skeletons, ErrorBoundary. */
-    --card-foreground: 180 12% 95%;
-    --popover: 192 32% 12%;
-    --popover-foreground: 180 12% 95%;
-    --muted: 192 24% 16%;
-    --input: 192 20% 22%;
-    --ring: 184 72% 52%;
+    --card-foreground: 230 31.6% 92.5%;
+    --popover: 230.5 30.2% 12.4%;
+    --popover-foreground: 230 31.6% 92.5%;
+    --muted: 230.5 30.2% 12.4%;
+    --input: 230.8 22% 23.1%;                    /* #2E3248 */
+    --ring: 227.5 100% 71.8%;
 
     /* shadcn aliases, kept in step with the hues above. */
-    --destructive: 3 74% 62%;
-    --destructive-foreground: 192 42% 6.5%;
-    --success: 152 55% 50%;
-    --success-foreground: 192 42% 6.5%;
-    --warning: 36 82% 56%;
-    --warning-foreground: 192 42% 6.5%;
+    --destructive: 4.8 85.2% 65.5%;
+    --destructive-foreground: 233.3 39.1% 9%;
+    --success: 152 53% 50.8%;
+    --success-foreground: 233.3 39.1% 9%;
+    --warning: 34.8 85.4% 59.6%;
+    --warning-foreground: 233.3 39.1% 9%;
+  }
+
+  /* On a dark page the code surface drops below the ground rather than
+     sitting above it, so the panel still reads as the deepest thing there. */
+  .dark .surface-ink {
+    background-color: hsl(231.4 36.8% 3.7%);     /* #06070D */
+    --background: 231.4 36.8% 3.7%;
+    --primary-foreground: 231.4 36.8% 3.7%;
   }
 
   .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }

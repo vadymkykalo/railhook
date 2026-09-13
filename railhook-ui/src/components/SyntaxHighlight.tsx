@@ -29,7 +29,7 @@ import { useMemo, type ReactNode } from 'react';
  *
  * The palette is the one `JsonEditor` already uses, for the same reason: the
  * four status hues belong to statuses, so a string is not allowed to be "ok
- * green". Three tiers do the work — teal for the thing being named (a command, a
+ * green". Three tiers do the work — the accent for the thing being named (a command, a
  * keyword, a JSON key), full-strength ink for the data, muted for scaffolding
  * and comments — and every colour is a token, so `.surface-ink` carries them
  * into either theme without being told.
