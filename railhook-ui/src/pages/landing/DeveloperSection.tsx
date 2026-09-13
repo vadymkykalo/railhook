@@ -304,7 +304,7 @@ function CodeWindow() {
             onClick={() => setActive(i)}
             onKeyDown={onKeyDown}
             className={cn(
-              'flex-none rounded-lg border px-3.5 py-1.5 font-mono text-[12.5px] transition-colors',
+              'flex-none rounded-lg border px-3.5 py-1.5 font-mono text-[12.5px] transition-colors max-sm:h-10 max-sm:px-4',
               i === active
                 ? 'border-primary/60 bg-accent text-accent-foreground'
                 : 'border-rail text-muted-foreground hover:border-muted-foreground hover:text-foreground',

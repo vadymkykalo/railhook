@@ -12,7 +12,9 @@ import { cn } from '../../lib/utils';
  * own servers, with everything and no key. No prices — there are no paid plans to price yet, and
  * the cloud card says so in words rather than with a grid of placeholders.
  */
-const CARD = 'flex scroll-mt-24 flex-col gap-3 rounded-2xl border border-rail bg-card p-6 sm:p-7';
+const CARD = 'flex scroll-mt-24 flex-col gap-3 rounded-2xl border border-rail bg-card p-5 sm:p-7';
+/** A phone gets 40px buttons that fill the row; from sm they are the default size, side by side. */
+const CTA = 'max-sm:h-10 max-sm:flex-1';
 const PILL = 'self-start rounded-full bg-accent px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-[0.08em] text-primary';
 
 export default function RunSection() {
@@ -35,7 +37,7 @@ export default function RunSection() {
           </p>
           <p className="text-sm text-muted-foreground">{t('landing.run.cloud.later')}</p>
           <div className="mt-auto flex flex-wrap gap-2.5 pt-3">
-            <Button asChild>
+            <Button asChild className={CTA}>
               {isAuthenticated ? (
                 <Link to="/admin/dashboard">{t('landing.nav.goToDashboard')}</Link>
               ) : (
@@ -58,10 +60,10 @@ export default function RunSection() {
             ))}
           </ul>
           <div className="mt-auto flex flex-wrap gap-2.5 pt-3">
-            <Button asChild>
+            <Button asChild className={CTA}>
               <a href="#install">{t('landing.run.selfHosted.install')}</a>
             </Button>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className={CTA}>
               <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
                 <Github className="h-4 w-4" aria-hidden="true" />
                 {t('landing.run.selfHosted.github')}

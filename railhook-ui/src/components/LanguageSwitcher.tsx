@@ -57,7 +57,8 @@ export default function LanguageSwitcher({ variant = 'icon', className }: Langua
       role="group"
       aria-label={t('settings.language')}
       className={cn(
-        'relative inline-flex h-7 items-center rounded-md border border-rail bg-card p-0.5',
+        // Each half is a 40px tap target on a phone; the track is 28px from sm, as before.
+        'relative inline-flex h-7 items-center rounded-md border border-rail bg-card p-0.5 max-sm:h-auto',
         className
       )}
     >
@@ -78,7 +79,7 @@ export default function LanguageSwitcher({ variant = 'icon', className }: Langua
             aria-pressed={active}
             title={lang.name}
             className={cn(
-              'relative z-10 px-2 font-mono text-[11px] font-medium tracking-wider transition-colors',
+              'relative z-10 px-2 font-mono text-[11px] font-medium tracking-wider transition-colors max-sm:h-10 max-sm:px-3.5',
               active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
             )}
           >

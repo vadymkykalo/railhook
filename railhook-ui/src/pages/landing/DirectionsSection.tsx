@@ -25,7 +25,7 @@ function Direction({
 }) {
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl border border-rail bg-card">
-      <div className="grid content-start gap-3 p-6 pb-5 sm:p-7 sm:pb-5">
+      <div className="grid content-start gap-2.5 p-5 pb-4 sm:gap-3 sm:p-7 sm:pb-5">
         <p className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.08em] text-primary">
           <Icon className="h-3.5 w-3.5" aria-hidden="true" />
           {tag}
@@ -33,7 +33,7 @@ function Direction({
         <h3 className="text-[1.35rem] font-semibold tracking-[-0.01em] text-foreground">{title}</h3>
         <p className="text-muted-foreground">{body}</p>
       </div>
-      <div className="mt-auto border-t border-rail bg-muted/60 px-3 pb-4 pt-4 sm:px-5">{children}</div>
+      <div className="mt-auto border-t border-rail bg-muted/60 px-2.5 pb-3 pt-3 sm:px-5 sm:pb-4 sm:pt-4">{children}</div>
     </article>
   );
 }

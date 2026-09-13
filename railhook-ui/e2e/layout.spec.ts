@@ -63,7 +63,9 @@ async function checkPage(page: Page, path: string, isMobile: boolean) {
   // Pages that animate in settle within this; the check is about resting layout.
   await page.waitForTimeout(400);
 
-  const heading = page.locator('main h1, h1').first();
+  // The page's own title: an h1, or the h2 PageHeader draws on dashboard pages whose layout has no
+  // section heading (/admin/projects).
+  const heading = page.locator('h1, main h2').first();
   await expect(heading, `${path}: a heading is on screen`).toBeVisible();
   const box = await heading.boundingBox();
   const vw = page.viewportSize()!.width;
@@ -82,6 +84,53 @@ test.describe('public and auth pages fit the screen', () => {
       await checkPage(page, path, isMobile);
     });
   }
+});
+
+test.describe('the landing page on a phone', () => {
+  test.beforeEach(async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'phone-only checks');
+    await mockApi(page, { signedIn: false });
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('the install command stays on one line and scrolls instead of breaking inside the URL', async ({ page }) => {
+    // Seen on production: `$ curl -fsSL` / `https://railhook.io/instal` / `l.sh | bash`.
+    const box = page.getByTestId('install-command');
+    await expect(box).toBeVisible();
+    const m = await box.evaluate((el) => ({
+      height: el.getBoundingClientRect().height,
+      lineHeight: parseFloat(getComputedStyle(el).lineHeight),
+      whiteSpace: getComputedStyle(el).whiteSpace,
+      overflowX: getComputedStyle(el).overflowX,
+    }));
+    expect(m.whiteSpace).toBe('pre');
+    expect(m.overflowX).toMatch(/auto|scroll/);
+    // One line of text plus the vertical padding, not two or three lines.
+    expect(m.height).toBeLessThan(m.lineHeight * 2);
+  });
+
+  test('every button and non-inline link is at least 40px tall', async ({ page }) => {
+    // Scroll through once so sections that mount or reveal on view are laid out.
+    await page.evaluate(async () => {
+      for (let y = 0; y < document.body.scrollHeight; y += 600) {
+        window.scrollTo(0, y);
+        await new Promise((r) => setTimeout(r, 80));
+      }
+      window.scrollTo(0, 0);
+    });
+    const small = await page.evaluate(() =>
+      Array.from(document.querySelectorAll<HTMLElement>('a[href], button, [role=tab]'))
+        .filter((el) => {
+          const r = el.getBoundingClientRect();
+          const s = getComputedStyle(el);
+          return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'inline'
+            && !el.closest('[aria-hidden="true"]') && r.height < 40;
+        })
+        .map((el) => `${Math.round(el.getBoundingClientRect().height)}px ${el.tagName.toLowerCase()} "${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30)}"`),
+    );
+    expect(small).toEqual([]);
+  });
 });
 
 test.describe('dashboard pages fit the screen', () => {

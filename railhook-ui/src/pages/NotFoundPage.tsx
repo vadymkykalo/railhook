@@ -24,7 +24,7 @@ export default function NotFoundPage() {
           <Compass className="h-5 w-5 text-muted-foreground" aria-hidden />
         </div>
         <p className="mono-label">404</p>
-        <h2 className="mt-1 text-title">{t('notFound.title')}</h2>
+        <h1 className="mt-1 text-title">{t('notFound.title')}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{t('notFound.description')}</p>
         <p className="mt-3 overflow-x-auto rounded-md border border-rail bg-secondary/60 px-3 py-2 font-mono text-[12px] text-muted-foreground">
           {location.pathname}

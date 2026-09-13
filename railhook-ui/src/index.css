@@ -347,7 +347,9 @@
   mask-image: radial-gradient(ellipse 50% 58% at 50% 46%, transparent 0 42%, rgba(0, 0, 0, 0.45) 66%, #000 92%);
 }
 @media (max-width: 639px) {
-  .hero-backdrop { opacity: 0.55; }
+  /* Stronger than it used to be: at 0.55 the rails were all but invisible on a phone, and the
+     hero read as a blank page with a headline. The mask still keeps the words clear. */
+  .hero-backdrop { opacity: 0.85; }
 }
 
 /* ── The architecture diagram ────────────────────────────────────────────
