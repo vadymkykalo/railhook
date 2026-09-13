@@ -2672,6 +2672,7 @@
     "type": "Type"
   },
   "platformAdmin": {
+    "adminBadge": "Platform admin",
     "columns": {
       "account": "Account",
       "action": "Action",
@@ -2716,7 +2717,8 @@
       "usageEvents": "Events",
       "usageMembers": "Members",
       "usageOf": "{{current}} of {{limit}}",
-      "usageProjects": "Projects"
+      "usageProjects": "Projects",
+      "usageUnlimited": "{{current}} · Unlimited"
     },
     "eyebrow": "Platform admin",
     "loadFailed": "Could not load platform admin data",
@@ -2756,6 +2758,7 @@
       "description": "The platform admin panel needs a sign-in from the last 12 hours.",
       "title": "Sign in again to continue"
     },
+    "scope": "Only accounts listed in PLATFORM_ADMIN_EMAILS, with a verified address and a sign-in from the last 12 hours, see this panel. Everything here is read-only except suspending or reinstating an organization, which asks for its name and is written to its audit log.",
     "signIn": {
       "google": "Google",
       "password": "Password"
@@ -2780,6 +2783,7 @@
       "suspended": "{{name}} is suspended",
       "typeName": "Type {{name}} to confirm"
     },
+    "unlimited": "Unlimited",
     "unverified": "Not verified",
     "userStatus": {
       "active": "Active",

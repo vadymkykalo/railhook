@@ -14,7 +14,7 @@ import { usePlatformOrganizations } from '../api/queries';
 import { formatDate } from '../lib/date';
 import { FilterBar } from './tableParts';
 import {
-  EventsAgainstLimit, OrganizationStatusBadge, PlatformErrorState, useDebouncedValue,
+  EventsAgainstLimit, OrganizationStatusBadge, PlatformErrorState, PlatformScope, useDebouncedValue,
 } from './platformAdminParts';
 
 /** Every organization on the deployment, searchable by name or by a member's address. */
@@ -35,6 +35,7 @@ export default function PlatformOrganizationsPage() {
         eyebrow={data ? t('platformAdmin.organizations.count', { count: data.totalElements }) : t('platformAdmin.eyebrow')}
         description={t('platformAdmin.organizations.description')}
       />
+      <PlatformScope />
 
       <FilterBar>
         <Input

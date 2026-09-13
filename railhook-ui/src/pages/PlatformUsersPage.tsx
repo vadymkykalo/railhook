@@ -13,7 +13,7 @@ import { usePlatformUsers } from '../api/queries';
 import { formatDate, formatRelativeTime } from '../lib/date';
 import { FilterBar } from './tableParts';
 import {
-  PlatformErrorState, SignInMethods, UserStatusBadge, VerifiedBadge, useDebouncedValue,
+  PlatformAdminBadge, PlatformErrorState, PlatformScope, SignInMethods, UserStatusBadge, VerifiedBadge, useDebouncedValue,
 } from './platformAdminParts';
 
 /** Every account on the deployment, newest first. */
@@ -31,6 +31,7 @@ export default function PlatformUsersPage() {
         eyebrow={data ? t('platformAdmin.users.count', { count: data.totalElements }) : t('platformAdmin.eyebrow')}
         description={t('platformAdmin.users.description')}
       />
+      <PlatformScope />
 
       <FilterBar>
         <Input
@@ -69,6 +70,7 @@ export default function PlatformUsersPage() {
                   <TableCell className="max-w-[18rem]">
                     <p className="truncate font-mono text-[13px]" title={user.email}>{user.email}</p>
                     {user.fullName && <p className="truncate text-xs text-muted-foreground">{user.fullName}</p>}
+                    {user.platformAdmin && <div className="mt-1"><PlatformAdminBadge /></div>}
                   </TableCell>
                   <TableCell><VerifiedBadge verified={user.emailVerified} /></TableCell>
                   <TableCell><UserStatusBadge status={user.status} /></TableCell>

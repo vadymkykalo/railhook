@@ -8,7 +8,7 @@ import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { usePlatformOverview } from '../api/queries';
 import { formatDateTimeCompact, formatNumber, formatRelativeTime } from '../lib/date';
-import { PanelTitle, PlatformErrorState, SignInMethods, VerifiedBadge } from './platformAdminParts';
+import { PanelTitle, PlatformErrorState, PlatformScope, SignInMethods, VerifiedBadge } from './platformAdminParts';
 
 function Kpi({ label, value, hint }: { label: string; value: number; hint?: string }) {
   return (
@@ -33,6 +33,7 @@ export default function PlatformOverviewPage() {
           : t('platformAdmin.eyebrow')}
         description={t('platformAdmin.overview.description')}
       />
+      <PlatformScope />
 
       {isError ? (
         <PlatformErrorState error={error} onRetry={() => refetch()} retrying={isRefetching} />

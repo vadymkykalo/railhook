@@ -22,6 +22,7 @@ public class PlatformAdminUserService {
 
     private final UserRepository userRepository;
     private final PlatformAdminAccountFacts accountFacts;
+    private final PlatformAdminAccessService platformAdminAccessService;
 
     @SystemTenant("the platform admin's account list spans every organization and belongs to none")
     @Transactional(readOnly = true)
@@ -44,6 +45,7 @@ public class PlatformAdminUserService {
                 .organizations(organizations.getOrDefault(user.getId(), List.of()))
                 .createdAt(user.getCreatedAt())
                 .lastSeenAt(lastSeen.get(user.getId()))
+                .platformAdmin(platformAdminAccessService.isPlatformAdmin(user))
                 .build());
     }
 }

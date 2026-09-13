@@ -244,7 +244,8 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].email").value("some-customer@example.com"))
                 .andExpect(jsonPath("$.content[0].role").value("OWNER"))
-                .andExpect(jsonPath("$.content[0].signInMethods[0]").value("PASSWORD"));
+                .andExpect(jsonPath("$.content[0].signInMethods[0]").value("PASSWORD"))
+                .andExpect(jsonPath("$.content[0].platformAdmin").value(false));
 
         mockMvc.perform(get(org + "/projects").header("Authorization", auth))
                 .andExpect(status().isOk())
@@ -264,6 +265,40 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[0].organizations[0].role").value("OWNER"))
                 .andReturn();
         assertNoSecrets(users.getResponse().getContentAsString());
+    }
+
+    /**
+     * The operator's own account used to read as one more OWNER in the lists. The mark comes from
+     * the same rule the admin API applies — listed, verified and active — so a listed address
+     * nobody has proved is not called an admin.
+     */
+    @Test
+    public void theListsMarkPlatformAdminsByTheRuleThePanelEnforces() throws Exception {
+        Account admin = registerVerified(ADMIN_EMAIL);
+        Account unproved = register("operator-two@example.com");
+        User second = userRepository.findById(unproved.userId()).orElseThrow();
+        second.setEmailVerified(false);
+        userRepository.save(second);
+        registerVerified("not-listed@example.com");
+        String auth = "Bearer " + admin.token();
+
+        mockMvc.perform(get("/api/v1/admin/users").param("search", "operator-one").header("Authorization", auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].email").value(ADMIN_EMAIL))
+                .andExpect(jsonPath("$.content[0].platformAdmin").value(true));
+        mockMvc.perform(get("/api/v1/admin/users").param("search", "operator-two").header("Authorization", auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].email").value("operator-two@example.com"))
+                .andExpect(jsonPath("$.content[0].platformAdmin").value(false));
+        mockMvc.perform(get("/api/v1/admin/users").param("search", "not-listed").header("Authorization", auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].platformAdmin").value(false));
+
+        mockMvc.perform(get("/api/v1/admin/organizations/" + admin.organizationId() + "/members")
+                        .header("Authorization", auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].email").value(ADMIN_EMAIL))
+                .andExpect(jsonPath("$.content[0].platformAdmin").value(true));
     }
 
     @Test

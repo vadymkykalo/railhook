@@ -21,7 +21,7 @@ import type { AdminResourceUsage } from '../api/platformAdmin.api';
 import { formatDate, formatDateTimeCompact, formatNumber, formatRelativeTime } from '../lib/date';
 import { cn } from '../lib/utils';
 import {
-  OrganizationStatusBadge, PanelTitle, PlatformErrorState, SignInMethods, SuspensionDialog, VerifiedBadge,
+  OrganizationStatusBadge, PanelTitle, PlatformAdminBadge, PlatformErrorState, SignInMethods, SuspensionDialog, VerifiedBadge,
 } from './platformAdminParts';
 
 function BackLink() {
@@ -36,26 +36,29 @@ function BackLink() {
   );
 }
 
+/** One resource against the plan. No limit (billing off, self_hosted) reads as Unlimited, with no bar. */
 function UsageRow({ label, usage }: { label: string; usage: AdminResourceUsage }) {
   const { t } = useTranslation();
-  const percent = usage.limit > 0 ? Math.min(100, usage.percentUsed) : 0;
+  const unlimited = usage.limit <= 0;
+  const percent = unlimited ? 0 : Math.min(100, usage.percentUsed);
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 text-sm">
         <span>{label}</span>
         <span className="font-mono text-[13px] text-muted-foreground">
-          {t('platformAdmin.detail.usageOf', {
-            current: formatNumber(usage.current),
-            limit: usage.limit > 0 ? formatNumber(usage.limit) : '∞',
-          })}
+          {unlimited
+            ? t('platformAdmin.detail.usageUnlimited', { current: formatNumber(usage.current) })
+            : t('platformAdmin.detail.usageOf', { current: formatNumber(usage.current), limit: formatNumber(usage.limit) })}
         </span>
       </div>
-      <div className="mt-1.5 h-1.5 rounded-full bg-secondary" aria-hidden>
-        <div
-          className={cn('h-1.5 rounded-full', percent >= 100 ? 'bg-halt' : percent >= 80 ? 'bg-retry' : 'bg-primary')}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
+      {!unlimited && (
+        <div className="mt-1.5 h-1.5 rounded-full bg-secondary" aria-hidden>
+          <div
+            className={cn('h-1.5 rounded-full', percent >= 100 ? 'bg-halt' : percent >= 80 ? 'bg-retry' : 'bg-primary')}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -184,6 +187,7 @@ export default function PlatformOrganizationDetailPage() {
                     <TableCell className="max-w-[16rem]">
                       <p className="truncate font-mono text-[13px]" title={member.email ?? undefined}>{member.email ?? '—'}</p>
                       {member.fullName && <p className="truncate text-xs text-muted-foreground">{member.fullName}</p>}
+                      {member.platformAdmin && <div className="mt-1"><PlatformAdminBadge /></div>}
                     </TableCell>
                     <TableCell className="text-[13px]">{t(`members.roles.${member.role}`, { defaultValue: member.role })}</TableCell>
                     <TableCell>
