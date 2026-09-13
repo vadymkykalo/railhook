@@ -11,6 +11,7 @@ import { debugLinksApi } from '../api/debugLinks.api';
 import { useQuery } from '@tanstack/react-query';
 import { formatDateTime, formatRelativeTime } from '../lib/date';
 import { formatJson } from '../lib/json';
+import { formatBytes, sendEventCurl } from '../lib/publicSnippets';
 import { showSuccess, showApiError } from '../lib/toast';
 import PageSkeleton, { SkeletonTable } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
@@ -62,7 +63,7 @@ export default function EventDetailPage() {
 
   const generateCurl = () => {
     if (!event) return '';
-    return `curl -X POST \\\n  -H "Content-Type: application/json" \\\n  -H "X-API-Key: YOUR_API_KEY" \\\n  -d '${event.payload || '{}'}' \\\n  "https://your-api.com/api/v1/events"`;
+    return sendEventCurl({ payload: event.payload || '{}' });
   };
 
   const handleShareDebug = async () => {
@@ -160,7 +161,7 @@ export default function EventDetailPage() {
         {[
           { label: t('eventDetail.eventType'), value: event.eventType },
           { label: t('eventDetail.deliveriesCount'), value: String(event.deliveriesCreated ?? deliveries.length) },
-          { label: t('eventDetail.payloadSize'), value: event.payload ? `${(event.payload.length / 1024).toFixed(1)} KB` : '—' },
+          { label: t('eventDetail.payloadSize'), value: event.payload ? formatBytes(new TextEncoder().encode(event.payload).length) : '—' },
           { label: t('eventDetail.project'), value: event.projectId.substring(0, 8) },
         ].map((metric) => (
           <div key={metric.label} className="rounded-lg border border-rail bg-card px-4 py-3">

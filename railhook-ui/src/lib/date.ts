@@ -1,4 +1,5 @@
 import i18n from '../i18n';
+import { canonicalTimezone } from './publicSnippets';
 
 const LOCALE_MAP: Record<string, string> = {
   en: 'en-US',
@@ -12,7 +13,8 @@ function getLocale(): string {
 }
 
 export function getStoredTimezone(): string {
-  return localStorage.getItem(TZ_STORAGE_KEY) || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // canonicalTimezone: Chromium still reports Ukraine as the renamed `Europe/Kiev`.
+  return canonicalTimezone(localStorage.getItem(TZ_STORAGE_KEY) || Intl.DateTimeFormat().resolvedOptions().timeZone);
 }
 
 export function setStoredTimezone(tz: string): void {

@@ -3520,7 +3520,7 @@
     "lastHeartbeat": "Last heartbeat",
     "localPort": "Local port",
     "noTunnels": "No active tunnels",
-    "noTunnelsDesc": "Start a tunnel from the CLI with `railhook listen --port 3000` to forward requests to your local machine.",
+    "noTunnelsDesc": "Start a tunnel from the CLI with `railhook listen 3000` to forward requests to your local machine. Install the CLI with `curl -fsSL https://railhook.io/install-cli.sh | bash` and sign in with `railhook login` first.",
     "openCount": "Open · {{count}}",
     "refresh": "Refresh",
     "stats": {
