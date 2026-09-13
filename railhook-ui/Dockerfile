@@ -20,6 +20,13 @@ COPY railhook-ui/package*.json ./
 # Install dependencies
 RUN npm ci
 
+# Chromium for the prerender step. Alpine's package rather than a Puppeteer download:
+# puppeteer-core ships no browser, and the musl builds Puppeteer fetches do not run here.
+# It lives in the build stage only — the runtime image below is nginx and carries none of it.
+# Installed before the sources are copied, so a code change does not reinstall a browser.
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
 # Copy UI source files
 COPY railhook-ui/ .
 
@@ -45,11 +52,6 @@ ENV VITE_CONTACT_DOMAIN=$VITE_CONTACT_DOMAIN
 ENV VITE_CAPTCHA_SITE_KEY=$VITE_CAPTCHA_SITE_KEY
 ENV VITE_CAPTCHA_SCRIPT_URL=$VITE_CAPTCHA_SCRIPT_URL
 
-# Chromium for the prerender step. Alpine's package rather than a Puppeteer download:
-# puppeteer-core ships no browser, and the musl builds Puppeteer fetches do not run here.
-# It lives in the build stage only — the runtime image below is nginx and carries none of it.
-RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # A sitemap has to carry absolute URLs, so unlike everything else in this build it cannot
 # be origin-neutral. The committed copy names example.com — IANA reserves it precisely so
