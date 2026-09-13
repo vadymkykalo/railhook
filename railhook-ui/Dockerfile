@@ -105,6 +105,7 @@ COPY --from=docs /app/railhook-docs/dist /usr/share/nginx/html/docs
 
 # `curl -fsSL https://<host>/install.sh | bash` — the installer, served by the site it installs.
 COPY install.sh /usr/share/nginx/html/install.sh
+COPY railhook-cli/install.sh /usr/share/nginx/html/install-cli.sh
 
 # Copy nginx config
 COPY railhook-ui/nginx.conf /etc/nginx/conf.d/default.conf

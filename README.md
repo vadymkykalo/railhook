@@ -100,6 +100,10 @@ See [SDKs](https://railhook.io/docs/tools/sdks/).
 
 ## CLI
 
+```bash
+curl -fsSL https://railhook.io/install-cli.sh | bash
+```
+
 Receive webhooks on `localhost` while you develop — `railhook login`, then `railhook listen 3000`.
 `railhook events <projectId> --follow` tails events; `railhook replay <projectId> --dry-run` previews a replay.
 Install and usage: [CLI docs](https://railhook.io/docs/tools/cli/).

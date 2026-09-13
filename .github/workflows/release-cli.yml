@@ -64,7 +64,7 @@ jobs:
 
             ### Install
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/railhook-cli/install.sh | bash
+            curl -fsSL https://railhook.io/install-cli.sh | bash
             ```
 
             Or download `railhook-cli.jar` and run:

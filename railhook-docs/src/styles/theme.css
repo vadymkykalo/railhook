@@ -308,6 +308,33 @@ starlight-tabs [role='tab'][aria-selected='true'] {
   border-radius: var(--rh-radius-control);
 }
 
+/* ---------- previous / next ---------- */
+
+.pagination-links a {
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: var(--rh-radius-card);
+  box-shadow: none;
+  color: var(--rh-slate);
+  font-size: var(--sl-text-sm);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.pagination-links a:hover {
+  border-color: var(--rh-accent);
+  box-shadow: var(--sl-shadow-md);
+}
+
+.pagination-links .link-title {
+  color: var(--sl-color-white);
+  font-size: var(--sl-text-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.pagination-links a svg {
+  color: var(--rh-accent);
+}
+
 /* ---------- buttons ---------- */
 
 .sl-link-button {

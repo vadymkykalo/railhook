@@ -58,6 +58,11 @@ export default defineConfig({
       lastUpdated: true,
       sidebar,
       customCss: ['./src/styles/theme.css'],
+      // The header's theme and language pickers, drawn like the dashboard's instead of as native selects.
+      components: {
+        ThemeSelect: './src/components/ThemeToggle.astro',
+        LanguageSelect: './src/components/LanguageSwitch.astro',
+      },
       head: [
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' } },
@@ -84,6 +89,8 @@ export default defineConfig({
             editorActiveTabBackground: '#0E1020',
             editorActiveTabForeground: '#E6E8F2',
             editorActiveTabIndicatorBottomColor: '#1D4BFF',
+            // github-dark paints the top indicator in a red-orange — a status hue on chrome.
+            editorActiveTabIndicatorTopColor: 'transparent',
             terminalBackground: '#0E1020',
             terminalTitlebarBackground: '#0E1020',
             terminalTitlebarForeground: '#8A90A6',

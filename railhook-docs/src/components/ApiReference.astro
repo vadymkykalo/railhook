@@ -93,6 +93,15 @@ const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
     max-width: none;
   }
 
+  /* The "Test Request" client is a full-viewport fixed layer, but Starlight isolates .main-pane,
+     so no z-index inside it can rise above the fixed header (10) and sidebar (5) — they painted
+     over its top and left edges. While the client is open, the pane itself is lifted above them;
+     only then, so scrolled content never slides over the header. */
+  .main-pane:has(.scalar-client--open) {
+    position: relative;
+    z-index: 20;
+  }
+
   .railhook-api-reference {
     margin-top: 1.5rem;
     border: 1px solid var(--sl-color-hairline);
