@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.1] - 2026-09-13
+
+### Fixed
+
+- **The favicon renders.** `/favicon.svg` had `--` inside an XML comment, which makes the file
+  malformed; browsers refused it and kept showing whatever icon they had cached. A test now parses
+  every SVG the app and the docs ship.
+
 ## [2.18.0] - 2026-09-13
 
 ### Added
@@ -1792,7 +1800,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.18.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.18.1...HEAD
+[2.18.1]: https://github.com/vadymkykalo/railhook/compare/v2.18.0...v2.18.1
 [2.18.0]: https://github.com/vadymkykalo/railhook/compare/v2.17.2...v2.18.0
 [2.17.2]: https://github.com/vadymkykalo/railhook/compare/v2.17.1...v2.17.2
 [2.17.1]: https://github.com/vadymkykalo/railhook/compare/v2.17.0...v2.17.1
