@@ -32,18 +32,30 @@ describe('VITE_ build arguments', () => {
 
   it('finds the variables it is meant to be checking', () => {
     // If this ever empties out, every assertion below passes vacuously.
-    expect(documented.length).toBeGreaterThanOrEqual(5);
-    expect(documented).toContain('VITE_CAPTCHA_SITE_KEY');
+    expect(documented.length).toBeGreaterThanOrEqual(2);
+    expect(documented).toContain('VITE_API_URL');
   });
 
-  it('has no build-time contact domain: it is a runtime setting of the UI container', () => {
-    // Baked into the published image, a contact domain would put one deployment's mail
-    // addresses on every install of that image. RAILHOOK_CONTACT_DOMAIN replaced it, and
-    // nothing is kept for the old name.
-    const vite = read('railhook-ui/vite.config.ts');
-    const viteEnv = read('railhook-ui/src/vite-env.d.ts');
-    for (const [file, text] of Object.entries({ envDist, dockerfile, composeBuild, vite, viteEnv })) {
-      expect(text, file).not.toMatch(/VITE_CONTACT_DOMAIN/);
+  it('has nothing that differs between deployments: those are runtime settings of the UI container', () => {
+    // The published image runs railhook.io and every self-hosted install alike. A contact domain,
+    // public origin or CAPTCHA site key baked into it is either one deployment's value on all of
+    // them, or — what railhook.io did — a second, hand-built image that `railhook upgrade` never
+    // replaced, so a release shipped the API and left the site a version behind.
+    // RAILHOOK_CONTACT_DOMAIN, RAILHOOK_SITE_URL and RAILHOOK_CAPTCHA_* replaced them, and nothing
+    // is kept for the old names.
+    const files = {
+      envDist,
+      dockerfile,
+      composeBuild,
+      vite: read('railhook-ui/vite.config.ts'),
+      viteEnv: read('railhook-ui/src/vite-env.d.ts'),
+      csp: read('railhook-ui/src/lib/csp.ts'),
+      siteUrl: read('railhook-ui/src/lib/siteUrl.ts'),
+      captcha: read('railhook-ui/src/components/CaptchaWidget.tsx'),
+      docs: read('railhook-docs/astro.config.mjs'),
+    };
+    for (const [file, text] of Object.entries(files)) {
+      expect(text, file).not.toMatch(/VITE_(CONTACT_DOMAIN|SITE_URL|CAPTCHA_SITE_KEY|CAPTCHA_SCRIPT_URL)/);
     }
   });
 
@@ -88,31 +100,5 @@ describe('content-security-policy ownership', () => {
     expect(securityHeaders).toMatch(/add_header\s+X-Frame-Options/i);
     expect(securityHeaders).toMatch(/add_header\s+X-Content-Type-Options/i);
     expect(securityHeaders).toMatch(/add_header\s+Referrer-Policy/i);
-  });
-});
-
-/**
- * A deployment with a domain gets a sitemap that names it.
- *
- * The committed sitemap says example.com, and has to: IANA reserves that name so a
- * self-hosted image does not ship a list of pages asking a crawler to go index a stranger.
- * But nothing regenerated it at build time, so a deployment that set VITE_SITE_URL got
- * correct canonical tags and a sitemap still pointing at example.com — which is worse than
- * having none, because it is an instruction to a crawler rather than an omission.
- */
-describe('sitemap follows the configured origin', () => {
-  const dockerfile = readFileSync(join(repoRoot, 'railhook-ui/Dockerfile'), 'utf8');
-
-  it('the image regenerates the sitemap when a domain is configured', () => {
-    expect(dockerfile).toMatch(/SITE_URL="\$VITE_SITE_URL"\s+npm run seo:sitemap/);
-  });
-
-  it("and points robots.txt's Sitemap: line at the same origin", () => {
-    // A sitemap a crawler is never told about is a file nobody reads.
-    expect(dockerfile).toMatch(/robots\.txt/);
-  });
-
-  it('but leaves the placeholder alone when there is no domain', () => {
-    expect(dockerfile).toMatch(/if \[ -n "\$VITE_SITE_URL" \]/);
   });
 });
