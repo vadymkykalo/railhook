@@ -665,6 +665,8 @@
     "enable": "Enable",
     "enabled": "Enabled",
     "error": "An unexpected error occurred",
+    "filters": "Filters",
+    "hideFilters": "Hide filters",
     "learnMore": "Learn more",
     "loadErrorTitle": "Couldn't load this page",
     "loading": "Loading...",
