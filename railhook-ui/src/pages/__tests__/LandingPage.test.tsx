@@ -116,6 +116,16 @@ describe('LandingPage', () => {
     }
   });
 
+  it('draws the hero map with the vendors’ own logos, each one named in the map’s text alternative', () => {
+    renderLanding();
+    const map = screen.getByRole('img', { name: en.landing.map.aria });
+    const logos = Array.from(map.querySelectorAll('image')).map((image) => image.getAttribute('href'));
+    for (const [file, name] of [['stripe', 'Stripe'], ['github', 'GitHub'], ['shopify', 'Shopify'], ['slack', 'Slack']]) {
+      expect(logos, `the map should draw the ${name} logo`).toContain(`/logos/brand/${file}.svg`);
+      expect(en.landing.map.aria, `the map's text alternative should name ${name}`).toContain(name);
+    }
+  });
+
   it('shows the install command, exactly, with a copy button beside it', () => {
     renderLanding();
     const install = document.getElementById('install') as HTMLElement;
@@ -308,5 +318,110 @@ describe('Footer', () => {
       expect(within(row).queryByRole('link', { name: en.footer.connectEmail })).toBeNull();
       expect(row.querySelector('a[href^="mailto:"]')).toBeNull();
     });
+  });
+});
+
+/**
+ * The directions cards and the hero show delivery happening rather than naming it. What these
+ * hold in place: the finished picture is what a crawler, a test and a reader who asked for less
+ * motion get; the loop only runs on screen; and none of it is read out.
+ */
+describe('LandingPage motion', () => {
+  const realIO = window.IntersectionObserver;
+  const realMatchMedia = window.matchMedia;
+  const realGetContext = HTMLCanvasElement.prototype.getContext;
+
+  afterEach(() => {
+    window.IntersectionObserver = realIO;
+    window.matchMedia = realMatchMedia;
+    HTMLCanvasElement.prototype.getContext = realGetContext;
+  });
+
+  /** An observer that reports every observed element on screen at once. */
+  function everythingOnScreen() {
+    window.IntersectionObserver = class {
+      private readonly callback: IntersectionObserverCallback;
+      constructor(callback: IntersectionObserverCallback) {
+        this.callback = callback;
+      }
+      observe(target: Element) {
+        this.callback([{ isIntersecting: true, target } as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+      }
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return [];
+      }
+    } as unknown as typeof IntersectionObserver;
+    // jsdom has no canvas; the hero's backdrop must cope with a context it cannot get.
+    HTMLCanvasElement.prototype.getContext = (() => null) as typeof realGetContext;
+  }
+
+  function reducedMotion(reduce: boolean) {
+    window.matchMedia = ((query: string) => ({
+      matches: reduce && query.includes('reduce'),
+      media: query,
+      onchange: null,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+  }
+
+  it('shows both directions happening: one event to three customers, requests from real services checked on the way in', () => {
+    renderLanding();
+    const section = sectionTitled(en.landing.directions.title);
+    for (const host of ['acme.com', 'shop.io', 'crm.dev']) {
+      expect(section.textContent, `the send scene should deliver to ${host}`).toContain(host);
+    }
+    const logos = Array.from(section.querySelectorAll('image')).map((image) => image.getAttribute('href'));
+    for (const name of ['stripe', 'github', 'shopify']) {
+      expect(logos, `the receive scene should draw the ${name} logo`).toContain(`/logos/brand/${name}.svg`);
+    }
+  });
+
+  it('rests on the finished picture until it is on screen: every delivery arrived, genuine requests verified, a forged one refused', () => {
+    renderLanding();
+    const section = sectionTitled(en.landing.directions.title);
+    const scenes = section.querySelectorAll('[data-motion]');
+    expect(scenes).toHaveLength(2);
+    scenes.forEach((scene) => expect(scene).toHaveAttribute('data-motion', 'static'));
+    expect(section.textContent).toContain(en.landing.directions.scene.delivered);
+    expect(section.textContent).toContain(en.landing.directions.scene.verified);
+    expect(section.textContent).toContain(en.landing.directions.scene.rejected);
+  });
+
+  it('keeps each scene out of the accessibility tree and says in one sentence what it shows', () => {
+    renderLanding();
+    const section = sectionTitled(en.landing.directions.title);
+    section.querySelectorAll('[data-motion]').forEach((scene) => {
+      expect(scene.querySelector('svg')?.closest('[aria-hidden="true"]'), 'the drawing is decorative').not.toBeNull();
+    });
+    expect(within(section).getByText(en.landing.directions.scene.sendSummary)).toBeInTheDocument();
+    expect(within(section).getByText(en.landing.directions.scene.receiveSummary)).toBeInTheDocument();
+  });
+
+  it('plays once on screen, and never for a reader who asked for less motion', () => {
+    everythingOnScreen();
+    reducedMotion(false);
+    const first = renderLanding();
+    const running = document.querySelectorAll('[data-motion]');
+    expect(running.length).toBeGreaterThanOrEqual(3);
+    running.forEach((scene) => expect(scene, scene.tagName).toHaveAttribute('data-motion', 'running'));
+    first.unmount();
+
+    reducedMotion(true);
+    renderLanding();
+    document.querySelectorAll('[data-motion]').forEach((scene) => expect(scene, scene.tagName).toHaveAttribute('data-motion', 'static'));
+  });
+
+  it('delivers webhooks quietly behind the hero, silent to a screen reader', () => {
+    renderLanding();
+    const hero = screen.getByRole('heading', { name: 'Never lose a webhook' }).closest('section') as HTMLElement;
+    const backdrop = hero.querySelector('canvas');
+    expect(backdrop, 'the hero should have a delivery backdrop').not.toBeNull();
+    expect(backdrop).toHaveAttribute('aria-hidden', 'true');
   });
 });

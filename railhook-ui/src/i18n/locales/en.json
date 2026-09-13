@@ -1987,13 +1987,25 @@
       "readDocs": "Read the docs"
     },
     "directions": {
-      "customer": "Customer",
       "inBody": "One address per service. Railhook checks that Stripe or GitHub really sent it, then passes it on to your app.",
       "inTag": "Receive",
       "inTitle": "Webhooks from other services",
       "outBody": "Your customer adds a URL. Railhook delivers each event there, signed, and tries again if their server is down.",
       "outTag": "Send",
       "outTitle": "Webhooks for your customers",
+      "scene": {
+        "attempt": "attempt {{n}}",
+        "delivered": "delivered",
+        "invalidSignature": "invalid signature",
+        "receiveSummary": "Requests from Stripe, GitHub and Shopify are verified and passed to your app; a forged one is refused.",
+        "rejected": "rejected",
+        "retryIn": "retry in 1m",
+        "retrying": "retrying",
+        "sendSummary": "One event reaches three customers; one server is down, so Railhook retries and it arrives.",
+        "signatureOk": "signature verified",
+        "unknownSender": "Unknown",
+        "verified": "verified"
+      },
       "title": "Send and receive, in one place",
       "yourApp": "Your app"
     },
