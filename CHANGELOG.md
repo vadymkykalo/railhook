@@ -1740,7 +1740,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.10.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.17.0...HEAD
+[2.17.0]: https://github.com/vadymkykalo/railhook/compare/v2.16.6...v2.17.0
 [2.10.0]: https://github.com/vadymkykalo/railhook/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/vadymkykalo/railhook/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/vadymkykalo/railhook/compare/v2.8.0...v2.9.0
