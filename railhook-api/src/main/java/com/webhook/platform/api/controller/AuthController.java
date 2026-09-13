@@ -177,9 +177,9 @@ public class AuthController {
             HttpServletResponse httpResponse) {
         String refreshToken = cookieRefreshToken != null ? cookieRefreshToken :
                 (request != null ? request.getRefreshToken() : null);
-        // No email bucket applies here (unlike login) — bucket by the presented token
-        // too, so guessing/retrying is bounded per-token as well as per-IP.
-        if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), refreshToken)) {
+        // Its own budget, per token with a high per-IP ceiling: refresh runs on page loads, and
+        // sharing the sign-in bucket logged people out after ten of them in a minute.
+        if (!authRateLimiterService.allowRefresh(getClientIp(httpRequest), refreshToken)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
         try {

@@ -589,6 +589,18 @@
           "default": "5",
           "example": null,
           "description": "Auth rate limiting (per IP and per email, per minute)"
+        },
+        {
+          "name": "AUTH_RATE_LIMIT_REFRESH_PER_TOKEN_PER_MINUTE",
+          "default": "30",
+          "example": null,
+          "description": "Session refresh has its own budget, apart from sign-in: the dashboard refreshes on page loads,\nand sharing the 10-a-minute sign-in bucket logged people out. Per refresh token, and a per-IP\nceiling well above normal browsing so people behind one NAT are not throttled together."
+        },
+        {
+          "name": "AUTH_RATE_LIMIT_REFRESH_PER_IP_PER_MINUTE",
+          "default": "600",
+          "example": null,
+          "description": "Session refresh has its own budget, apart from sign-in: the dashboard refreshes on page loads,\nand sharing the 10-a-minute sign-in bucket logged people out. Per refresh token, and a per-IP\nceiling well above normal browsing so people behind one NAT are not throttled together."
         }
       ]
     },

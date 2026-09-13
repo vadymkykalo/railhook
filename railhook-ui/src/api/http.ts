@@ -11,6 +11,25 @@ export const EXPORT_TIMEOUT_MS = 120_000;
 type OnRefreshedCallback = (token: string) => void;
 type OnLogoutCallback = () => void;
 
+/** Waits before retrying a refresh that failed for a reason that is not the session itself. */
+export const REFRESH_RETRY_DELAYS_MS = [1_000, 3_000];
+
+function statusOf(err: unknown): number | undefined {
+  return (err as AxiosError | undefined)?.response?.status;
+}
+
+/** The server looked at the session and refused it: signing out is the right answer. */
+function isSessionRejected(err: unknown): boolean {
+  const status = statusOf(err);
+  return status === 401 || status === 403;
+}
+
+/** A rate limit, a restarting API or a dropped connection: worth another try. */
+function isTransientRefreshFailure(err: unknown): boolean {
+  const status = statusOf(err);
+  return status === undefined || status === 429 || status >= 500;
+}
+
 class HttpClient {
   private client: AxiosInstance;
   private token: string | null = null;
@@ -63,7 +82,7 @@ class HttpClient {
           this.isRefreshing = true;
 
           try {
-            const response = await this.client.post('/api/v1/auth/refresh', {});
+            const response = await this.refreshWithRetry();
 
             const { accessToken } = response.data;
 
@@ -76,10 +95,15 @@ class HttpClient {
             return this.client(originalRequest);
           } catch (refreshError) {
             this.refreshSubscribers = [];
-            this.token = null;
-            localStorage.removeItem('auth_user');
-            if (this.onLogout) {
-              this.onLogout();
+            // Log out only when the session itself was refused. A rate limit, an API restart or a
+            // dropped connection is not the end of a session, and treating it as one threw people
+            // to the sign-in screen for browsing quickly or for a deploy.
+            if (isSessionRejected(refreshError)) {
+              this.token = null;
+              localStorage.removeItem('auth_user');
+              if (this.onLogout) {
+                this.onLogout();
+              }
             }
             return Promise.reject(refreshError);
           } finally {
@@ -90,6 +114,19 @@ class HttpClient {
         return Promise.reject(error);
       }
     );
+  }
+
+  private async refreshWithRetry() {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.client.post('/api/v1/auth/refresh', {});
+      } catch (err) {
+        if (!isTransientRefreshFailure(err) || attempt >= REFRESH_RETRY_DELAYS_MS.length) {
+          throw err;
+        }
+        await new Promise((resolve) => setTimeout(resolve, REFRESH_RETRY_DELAYS_MS[attempt]));
+      }
+    }
   }
 
   setToken(token: string | null) {
