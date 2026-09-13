@@ -2707,7 +2707,6 @@
       "noAudit": "Nothing recorded yet.",
       "noOwner": "No active owner",
       "noProjects": "No projects.",
-      "owner": "Owner {{email}}",
       "projects": "Projects",
       "reinstate": "Reinstate",
       "suspend": "Suspend",

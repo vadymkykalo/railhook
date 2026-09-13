@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, LogIn, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
@@ -102,6 +102,43 @@ export function PlatformScope() {
     </p>
   );
 }
+
+/**
+ * An email address in the panel. Cut with an ellipsis rather than broken mid-word — a table cell
+ * ignores max-width, so the limit sits on this element — and the whole address is on hover. On a
+ * phone, where rows are stacked cards, it takes the width the card has.
+ */
+export function EmailText({ email, className }: { email: string | null | undefined; className?: string }) {
+  if (!email) return <span className="text-muted-foreground">—</span>;
+  return (
+    <span className={cn('block max-w-[15rem] truncate font-mono text-[13px] max-sm:max-w-full', className)} title={email}>
+      {email}
+    </span>
+  );
+}
+
+/**
+ * A link to one organization. One line with an ellipsis in a desktop table, the full name on
+ * hover; on a phone the name wraps at word boundaries instead of being cut off.
+ */
+export function OrganizationLink({ id, name, className }: { id: string; name: string; className?: string }) {
+  return (
+    <Link
+      to={`/admin/platform/organizations/${id}`}
+      title={name}
+      className={cn(
+        'block max-w-[15rem] truncate underline-offset-4 hover:underline',
+        'max-sm:max-w-full max-sm:whitespace-normal max-sm:break-words',
+        className,
+      )}
+    >
+      {name}
+    </Link>
+  );
+}
+
+/** Column titles stay on one line; a table wider than its card scrolls inside it instead. */
+export const PLATFORM_TABLE_HEADER = '[&_th]:whitespace-nowrap';
 
 /** An account the server counts as a platform admin, next to its row in the panel's lists. */
 export function PlatformAdminBadge() {

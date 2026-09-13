@@ -21,7 +21,7 @@ import type { AdminResourceUsage } from '../api/platformAdmin.api';
 import { formatDate, formatDateTimeCompact, formatNumber, formatRelativeTime } from '../lib/date';
 import { cn } from '../lib/utils';
 import {
-  OrganizationStatusBadge, PanelTitle, PlatformAdminBadge, PlatformErrorState, SignInMethods, SuspensionDialog, VerifiedBadge,
+  EmailText, OrganizationStatusBadge, PLATFORM_TABLE_HEADER, PanelTitle, PlatformAdminBadge, PlatformErrorState, SignInMethods, SuspensionDialog, VerifiedBadge,
 } from './platformAdminParts';
 
 function BackLink() {
@@ -109,13 +109,16 @@ export default function PlatformOrganizationDetailPage() {
         eyebrow={t('platformAdmin.detail.eyebrow', { plan: org.planName ?? '—', created: formatDate(org.createdAt) })}
         title={org.name}
         description={(
-          <span className="flex flex-wrap items-center gap-2">
+          <span className="flex min-w-0 flex-wrap items-center gap-2">
             <OrganizationStatusBadge organization={org} />
-            <span className="break-all font-mono text-[13px]">
-              {org.ownerEmail
-                ? t('platformAdmin.detail.owner', { email: org.ownerEmail })
-                : t('platformAdmin.detail.noOwner')}
-            </span>
+            {org.ownerEmail ? (
+              <span className="flex min-w-0 max-w-full items-baseline gap-1.5">
+                <span className="flex-shrink-0 text-[13px]">{t('platformAdmin.columns.owner')}</span>
+                <EmailText email={org.ownerEmail} className="max-w-[28rem]" />
+              </span>
+            ) : (
+              <span className="font-mono text-[13px]">{t('platformAdmin.detail.noOwner')}</span>
+            )}
           </span>
         )}
         actions={suspended ? (
@@ -171,7 +174,7 @@ export default function PlatformOrganizationDetailPage() {
             <SkeletonTable rows={4} />
           ) : (
             <Table>
-              <TableHeader>
+              <TableHeader className={PLATFORM_TABLE_HEADER}>
                 <TableRow>
                   <TableHead>{t('platformAdmin.columns.account')}</TableHead>
                   <TableHead>{t('platformAdmin.columns.role')}</TableHead>
@@ -184,9 +187,9 @@ export default function PlatformOrganizationDetailPage() {
               <TableBody>
                 {members.data.content.map((member) => (
                   <TableRow key={member.userId}>
-                    <TableCell className="max-w-[16rem]">
-                      <p className="truncate font-mono text-[13px]" title={member.email ?? undefined}>{member.email ?? '—'}</p>
-                      {member.fullName && <p className="truncate text-xs text-muted-foreground">{member.fullName}</p>}
+                    <TableCell>
+                      <EmailText email={member.email} />
+                      {member.fullName && <p className="max-w-[15rem] truncate text-xs text-muted-foreground max-sm:max-w-full" title={member.fullName}>{member.fullName}</p>}
                       {member.platformAdmin && <div className="mt-1"><PlatformAdminBadge /></div>}
                     </TableCell>
                     <TableCell className="text-[13px]">{t(`members.roles.${member.role}`, { defaultValue: member.role })}</TableCell>
@@ -252,7 +255,7 @@ export default function PlatformOrganizationDetailPage() {
             <EmptyState icon={FileText} title={t('platformAdmin.detail.noAudit')} className="rounded-none border-0 py-10" />
           ) : (
             <Table>
-              <TableHeader>
+              <TableHeader className={PLATFORM_TABLE_HEADER}>
                 <TableRow>
                   <TableHead>{t('platformAdmin.columns.time')}</TableHead>
                   <TableHead>{t('platformAdmin.columns.action')}</TableHead>
@@ -270,8 +273,8 @@ export default function PlatformOrganizationDetailPage() {
                     <TableCell className="font-mono text-[13px]">
                       {t(`auditLog.actions.${entry.action}`, { defaultValue: entry.action })}
                     </TableCell>
-                    <TableCell className="max-w-[14rem] truncate font-mono text-[13px] text-muted-foreground" title={entry.actorEmail ?? undefined}>
-                      {entry.actorEmail ?? '—'}
+                    <TableCell className="text-muted-foreground">
+                      <EmailText email={entry.actorEmail} />
                     </TableCell>
                     <TableCell>
                       <StatusBadge

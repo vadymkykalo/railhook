@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Users } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
@@ -13,7 +12,7 @@ import { usePlatformUsers } from '../api/queries';
 import { formatDate, formatRelativeTime } from '../lib/date';
 import { FilterBar } from './tableParts';
 import {
-  PlatformAdminBadge, PlatformErrorState, PlatformScope, SignInMethods, UserStatusBadge, VerifiedBadge, useDebouncedValue,
+  EmailText, OrganizationLink, PLATFORM_TABLE_HEADER, PlatformAdminBadge, PlatformErrorState, PlatformScope, SignInMethods, UserStatusBadge, VerifiedBadge, useDebouncedValue,
 } from './platformAdminParts';
 
 /** Every account on the deployment, newest first. */
@@ -53,7 +52,7 @@ export default function PlatformUsersPage() {
       ) : (
         <Card className="overflow-hidden">
           <Table>
-            <TableHeader>
+            <TableHeader className={PLATFORM_TABLE_HEADER}>
               <TableRow>
                 <TableHead>{t('platformAdmin.columns.account')}</TableHead>
                 <TableHead>{t('platformAdmin.columns.verified')}</TableHead>
@@ -67,28 +66,23 @@ export default function PlatformUsersPage() {
             <TableBody>
               {data.content.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell className="max-w-[18rem]">
-                    <p className="truncate font-mono text-[13px]" title={user.email}>{user.email}</p>
-                    {user.fullName && <p className="truncate text-xs text-muted-foreground">{user.fullName}</p>}
+                  <TableCell>
+                    <EmailText email={user.email} />
+                    {user.fullName && <p className="max-w-[15rem] truncate text-xs text-muted-foreground max-sm:max-w-full" title={user.fullName}>{user.fullName}</p>}
                     {user.platformAdmin && <div className="mt-1"><PlatformAdminBadge /></div>}
                   </TableCell>
                   <TableCell><VerifiedBadge verified={user.emailVerified} /></TableCell>
                   <TableCell><UserStatusBadge status={user.status} /></TableCell>
                   <TableCell><SignInMethods methods={user.signInMethods} /></TableCell>
-                  <TableCell className="max-w-[18rem]">
+                  <TableCell>
                     {user.organizations.length === 0 ? (
                       <span className="text-muted-foreground">{t('platformAdmin.users.noOrganization')}</span>
                     ) : (
                       <ul className="space-y-0.5">
                         {user.organizations.map((organization) => (
-                          <li key={organization.id} className="truncate text-[13px]">
-                            <Link
-                              to={`/admin/platform/organizations/${organization.id}`}
-                              className="underline-offset-4 hover:underline"
-                            >
-                              {organization.name}
-                            </Link>
-                            <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">
+                          <li key={organization.id} className="flex items-baseline gap-1.5 text-[13px] max-sm:justify-end">
+                            <OrganizationLink id={organization.id} name={organization.name} className="min-w-0" />
+                            <span className="flex-shrink-0 font-mono text-[11px] text-muted-foreground">
                               {t(`members.roles.${organization.role}`, { defaultValue: organization.role })}
                             </span>
                           </li>

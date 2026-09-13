@@ -125,6 +125,19 @@ describe('PlatformOverviewPage', () => {
   });
 });
 
+const LONG_EMAIL = 'olena.shulha.operations-escalations-team@railhook-enterprise-customers-europe.example.com';
+const LONG_ORG = 'Товариство з обмеженою відповідальністю «Київські цифрові платіжні сервіси та інтеграції»';
+
+/**
+ * A long address is cut with an ellipsis, never broken mid-word, and the whole of it is one hover
+ * away; a long name keeps its full text for the same reason.
+ */
+function expectShortenedWithFullValue(element: HTMLElement, full: string) {
+  expect(element).toHaveAttribute('title', full);
+  expect(element).toHaveClass('truncate');
+  expect(element).not.toHaveClass('break-all');
+}
+
 describe('PlatformOrganizationsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -138,6 +151,16 @@ describe('PlatformOrganizationsPage', () => {
 
     expect(await screen.findByRole('link', { name: 'Acme Corp' })).toHaveAttribute('href', '/admin/platform/organizations/org-9');
     expect(screen.getByText('owner@acme.example')).toBeInTheDocument();
+  });
+
+  it('shortens a long owner address and a long name without losing either', async () => {
+    vi.mocked(platformAdminApi.organizations).mockResolvedValue(page([{ ...ORG, name: LONG_ORG, ownerEmail: LONG_EMAIL }]));
+    renderPage(<PlatformOrganizationsPage />, {
+      path: '/admin/platform/organizations', initialEntry: '/admin/platform/organizations',
+    });
+
+    expectShortenedWithFullValue(await screen.findByText(LONG_EMAIL), LONG_EMAIL);
+    expect(screen.getByRole('link', { name: LONG_ORG })).toHaveAttribute('title', LONG_ORG);
   });
 
   it('shows an unlimited plan as Unlimited, not a fraction of nothing', async () => {
@@ -201,11 +224,17 @@ describe('PlatformOrganizationDetailPage', () => {
     expect(screen.getByText('Checkout')).toBeInTheDocument();
   });
 
+  it('shows the owner address in the header whole on hover, never broken mid-word', async () => {
+    vi.mocked(platformAdminApi.organization).mockResolvedValue({ ...ORG, ownerEmail: LONG_EMAIL });
+    renderDetail();
+    expectShortenedWithFullValue(await screen.findByText(LONG_EMAIL), LONG_EMAIL);
+  });
+
   it('marks the member who is a platform admin, and only that one', async () => {
     renderDetail();
     const operator = (await screen.findByText('ops@acme.example')).closest('tr')!;
     expect(within(operator).getByText('Platform admin')).toBeInTheDocument();
-    const owner = screen.getByText('owner@acme.example', { selector: 'p' }).closest('tr')!;
+    const owner = screen.getAllByText('owner@acme.example').map((el) => el.closest('tr')).find(Boolean)!;
     expect(within(owner).queryByText('Platform admin')).not.toBeInTheDocument();
   });
 
@@ -268,6 +297,18 @@ describe('PlatformUsersPage', () => {
     expect(await screen.findByText('ada@acme.example')).toBeInTheDocument();
     expect(screen.getByText('Not verified')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Acme Corp' })).toHaveAttribute('href', '/admin/platform/organizations/org-9');
+  });
+
+  it('shortens a long address and a long organization name without losing either', async () => {
+    vi.mocked(platformAdminApi.users).mockResolvedValue(page([{
+      id: 'u-3', email: LONG_EMAIL, fullName: null, emailVerified: true, status: 'ACTIVE',
+      signInMethods: ['PASSWORD'], organizations: [{ id: 'org-7', name: LONG_ORG, role: 'OWNER' }],
+      createdAt: '2026-09-01T00:00:00Z', lastSeenAt: null, platformAdmin: false,
+    }]));
+    renderPage(<PlatformUsersPage />, { path: '/admin/platform/users', initialEntry: '/admin/platform/users' });
+
+    expectShortenedWithFullValue(await screen.findByText(LONG_EMAIL), LONG_EMAIL);
+    expect(screen.getByRole('link', { name: LONG_ORG })).toHaveAttribute('title', LONG_ORG);
   });
 
   it('marks the accounts that are platform admins, and no other', async () => {
