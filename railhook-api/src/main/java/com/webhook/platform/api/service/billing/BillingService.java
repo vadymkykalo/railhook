@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.*;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.InvoiceResponse;
+import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.exception.ForbiddenException;
@@ -138,6 +139,9 @@ public class BillingService {
     /** The only plan an organization may put itself on without paying for it. */
     private static final String SELF_SERVICE_PLAN = "free";
 
+    /** The provider code of a deployment that takes no payments. */
+    public static final String NO_PAYMENT_PROVIDER = "noop";
+
     private void requireSelfAssignable(Plan plan, UUID organizationId) {
         if (!billingEnabled) {
             return;
@@ -166,6 +170,11 @@ public class BillingService {
         Organization org = findOrg();
         Plan plan = getPlanByName(planName);
         BillingProvider provider = providerRegistry.get(providerCode != null ? providerCode : providerRegistry.getDefault().getProviderCode());
+        // The no-op provider's "payment page" is the success URL itself, so a checkout through it
+        // would return the customer from a payment they never made.
+        if (NO_PAYMENT_PROVIDER.equals(provider.getProviderCode())) {
+            throw new ConflictException("Paid plans are not available on this deployment: no payment provider is configured.");
+        }
         BillingInterval interval = parseBillingInterval(billingInterval);
 
         // For providers that support customers (Stripe), create one if needed

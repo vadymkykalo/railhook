@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   data services, Caddy and the worker, the UI was down for about 45 seconds and the site answered
   502. Caddy's retry window is also 30 seconds now.
 - **The production deploy checks the version the site serves**, not only that it answers 200.
+- **A hosted deployment can enforce the free plan without a payment provider.** `BILLING_ENABLED=true`
+  with `BILLING_DEFAULT_PROVIDER=noop` used to be refused at startup, so a cloud with no paid plans
+  had to run with billing off — and billing off means no quotas at all. It is now the free-plan-only
+  mode: quotas are enforced, the plan catalog lists nothing priced, checkout is refused, and the
+  billing page shows no plan picker with nothing in it.
 
 ## [2.17.0] - 2026-09-13
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import '../../i18n';
+import i18n from 'i18next';
 import { renderPage } from '../../test/renderPage';
 import type {
   InvoiceResponse,
@@ -133,6 +134,19 @@ describe('BillingPage', () => {
     await screen.findByText(/enterprise/i);
     expect(await screen.findAllByText(/unlimited/i)).not.toHaveLength(0);
     expect(screen.queryByText('-1')).toBeNull();
+  });
+
+  it('offers no plan picker when the current plan is the only one on offer', async () => {
+    // A hosted deployment with no payment provider lists the free plan and nothing else. A
+    // "plans" section holding only the card marked Current, with a monthly/yearly toggle over
+    // it, is a choice with nothing to choose.
+    vi.mocked(billingApi.listPlans).mockResolvedValue([FREE]);
+    renderBilling();
+
+    await screen.findByText(/2[,.\s]?500/);
+    await waitFor(() => expect(billingApi.listPlans).toHaveBeenCalled());
+    expect(screen.queryByText(i18n.t('billing.availablePlans'))).toBeNull();
+    expect(screen.queryByRole('group', { name: i18n.t('billing.billingInterval') })).toBeNull();
   });
 
   it('shows usage against the limit', async () => {

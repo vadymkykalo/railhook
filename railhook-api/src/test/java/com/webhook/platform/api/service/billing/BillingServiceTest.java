@@ -7,6 +7,7 @@ import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.*;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.InvoiceResponse;
+import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -234,6 +235,26 @@ class BillingServiceTest {
         service.createCheckoutSession( "pro", "stripe", "YEARLY", "ok", "cancel");
 
         assertThat(stripeProvider.lastPaymentRequest.amountCents()).isEqualTo(99000L);
+    }
+
+    @Test
+    void createCheckoutSession_refusesWhenNothingCanTakeThePayment() {
+        // The no-op provider's payment page is the success URL itself: a checkout through it
+        // would send the customer "back from paying" having paid nothing. With no provider
+        // configured the deployment offers the free plan only, so the attempt is refused.
+        BillingService freeOnly = new BillingService(
+                true, new BillingProviderRegistry(List.of(new NoOpBillingProvider()), "noop"),
+                planRepository, organizationRepository, subscriptionRepository, invoiceRepository,
+                paymentRepository, entitlementService, lifecycleService);
+        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
+        when(planRepository.findByName("pro")).thenReturn(Optional.of(proPlan));
+
+        assertThatThrownBy(() -> freeOnly.createCheckoutSession("pro", null, "MONTHLY", "ok", "cancel"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Paid plans");
+        // Naming the no-op provider explicitly on a deployment that has a real one is the same.
+        assertThatThrownBy(() -> service.createCheckoutSession("pro", "noop", "MONTHLY", "ok", "cancel"))
+                .isInstanceOf(ConflictException.class);
     }
 
     // ── cancelSubscription ──────────────────────────────────────────

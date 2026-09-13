@@ -1431,13 +1431,13 @@
           "name": "BILLING_ENABLED",
           "default": "false",
           "example": null,
-          "description": "Enable plan-based quota enforcement (false = self-hosted, all unlimited).\n\nThis flag is the whole of what separates a hosted deployment from a self-hosted one:\nno separate build, no profile, no licence key. With APP_ENV=production, turning it on\ntherefore also requires EMAIL_ENABLED=true and a real BILLING_DEFAULT_PROVIDER, and the\nAPI refuses to start otherwise -- billing on with mail off is a paid tier behind an\naddress nobody proved they own, and billing on with the noop provider is plans enforced\nand never charged for."
+          "description": "Enable plan-based quota enforcement (false = self-hosted, all unlimited).\n\nThis flag is the whole of what separates a hosted deployment from a self-hosted one:\nno separate build, no profile, no licence key. With APP_ENV=production, turning it on\nalso requires EMAIL_ENABLED=true and CAPTCHA_SECRET_KEY, and the API refuses to start\notherwise -- a quota-limited tier behind unverified addresses and no challenge is a tier\nanyone can mint accounts on."
         },
         {
           "name": "BILLING_DEFAULT_PROVIDER",
           "default": "noop",
           "example": null,
-          "description": "Default billing provider: noop | stripe | wayforpay\nWhen BILLING_ENABLED=false, provider is ignored (NoOp used automatically)"
+          "description": "Default billing provider: noop | stripe | wayforpay\nWhen BILLING_ENABLED=false, provider is ignored (NoOp used automatically).\nWith BILLING_ENABLED=true and noop the deployment runs the free plan only: its quotas are\nenforced, the catalog lists no priced plan, and checkout is refused."
         },
         {
           "name": "STRIPE_SECRET_KEY",

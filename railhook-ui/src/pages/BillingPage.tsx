@@ -336,7 +336,7 @@ export default function BillingPage() {
           )}
 
           {/* What else it could be on */}
-          {!isSelfHosted && plans.length > 0 && (
+          {!isSelfHosted && plans.some((p) => p.name !== plan?.name) && (
             <FormSection title={t('billing.availablePlans')} description={t('billing.availablePlansDesc')}>
               <div className="inline-flex items-center gap-1 rounded-lg border border-rail p-1" role="group" aria-label={t('billing.billingInterval')}>
                 {([false, true] as const).map((yearly) => (
