@@ -1336,6 +1336,12 @@
           "description": "From address for verification emails.\n\nSet this to a domain you actually own before turning EMAIL_ENABLED on. Mail\nfrom a domain you do not control fails SPF and DKIM at the receiver, so\nverification mail lands in spam or is rejected outright — and the user is\nleft staring at a screen telling them to check an inbox nothing will reach.\nexample.com is a placeholder, not a default that works."
         },
         {
+          "name": "EMAIL_SUPPORT_ADDRESS",
+          "default": "",
+          "example": null,
+          "description": "Where a person is told to write when an email change on their account was not\nthem. It appears in the notice sent to the old address. Leave empty and the\nnotice says to contact the administrator of this installation instead."
+        },
+        {
           "name": "SMTP_HOST",
           "default": "localhost",
           "example": null,

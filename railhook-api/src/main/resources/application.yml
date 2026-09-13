@@ -328,6 +328,7 @@ app:
   email:
     enabled: ${EMAIL_ENABLED:false}
     from: ${EMAIL_FROM:noreply@example.com}
+    support-address: ${EMAIL_SUPPORT_ADDRESS:}
 
 spring.mail:
   host: ${SMTP_HOST:localhost}
