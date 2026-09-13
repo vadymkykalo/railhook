@@ -6,6 +6,8 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 
 Use this page to open the platform admin panel on your deployment: every organization and account in one place, usage against plan limits, recent sign-ups, and suspension. It is for the people who run the instance, not for your customers.
 
+Each deployment has its own panel and its own list of admins. A platform admin of your self-hosted instance sees only the organizations and accounts on that instance; on Railhook Cloud (railhook.io) the list belongs to the people who operate the service and is set in its deployment environment, and no customer account is ever on it.
+
 ## Who is a platform admin
 
 A person is a platform admin when all four of these hold, checked on the server for every admin request:
@@ -23,27 +25,45 @@ List only addresses you control, and make sure each person's account is protecte
 
 ## Turn it on
 
+Nobody is a platform admin until you name someone. There is no "first account to register becomes the admin": on a public instance that would be whoever finds the sign-up page first.
+
+The quickest way is to name the admins when you install:
+
+```bash
+curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --admin-email ops@example.com
+```
+
+Several addresses are separated by commas. The installer refuses anything that is not an email address. For an installation that already exists, run the installer with `--refresh --dir <install dir> --admin-email <addresses>`, then `./railhook start`.
+
+To set or change the list by hand:
+
 <Steps>
 
 1. **Sign up or sign in** at your Railhook address with the account you want to use, and verify the address.
 
-2. **List the address** in `.env` next to `docker-compose.yml`. Several addresses are separated by commas:
+2. **List the address** with the helper, which writes it to `.env` without printing it back:
 
-   ```bash title=".env"
-   PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com
+   ```bash
+   printf 'PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com\n' | ./railhook settings
    ```
 
    Addresses are compared without regard to case or surrounding spaces, and only whole addresses match.
 
-3. **Restart the API** so it reads the new value:
+3. **Recreate the API** so it reads the new value:
 
    ```bash
-   docker compose up -d api
+   ./railhook start
    ```
+
+   `./railhook restart` restarts the containers but does not re-read `.env`.
 
 4. **Sign in again.** A **Platform admin** entry appears at the bottom of the sidebar and opens `/admin/platform`.
 
 </Steps>
+
+<Aside type="caution">
+With email turned off, which is the default, registration marks an address verified without sending anything to it. Register the listed address yourself straight after installing, or turn email on, so nobody else can claim it first.
+</Aside>
 
 On Kubernetes, set the Helm value instead:
 
@@ -63,9 +83,15 @@ Leaving the variable empty, which is the default, turns the panel off: nobody se
 | **Organization detail** | Members with role, status and sign-in method, projects, usage against the plan, the organization's recent audit log, and suspend or reinstate |
 | **Users** | Every account: address, verified, status, sign-in methods, organizations, created and last activity |
 
+Platform admins are marked with a **Platform admin** badge in the Users list and in an organization's members.
+
+With billing turned off, which is the default on a self-hosted install, every organization is on the unlimited Self-Hosted plan and usage reads **Unlimited** instead of a limit.
+
 The panel never returns password hashes, tokens, API key material, endpoint secrets or payloads. The organization's audit log is shown without the request bodies it records.
 
 ## Suspending an organization
+
+Suspending and reinstating are the only changes the panel can make; everything else in it is read-only.
 
 Suspending stops an organization changing anything, event ingestion included, until it is reinstated. Its members can still sign in and read, and are shown the reason you give. A payment does not lift a suspension.
 

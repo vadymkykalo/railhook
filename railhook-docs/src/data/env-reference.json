@@ -302,7 +302,7 @@
           "name": "PLATFORM_ADMIN_EMAILS",
           "default": "",
           "example": null,
-          "description": "People who may open the platform admin panel (Platform admin in the dashboard's sidebar,\n/admin/platform) with their ordinary sign-in: a comma-separated list of email addresses.\nBeing listed is not enough on its own — the address must be verified, the account active,\nand the sign-in less than 12 hours old; every admin request is rate-limited and written to\nthe audit log. An organization OWNER is not a platform admin unless listed here. Encryption\nkey rotation stays on PLATFORM_ADMIN_TOKEN only.\nEmpty means nobody: no panel, and the admin API refuses every signed-in user.\nExample: PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com"
+          "description": "People who may open the platform admin panel (Platform admin in the dashboard's sidebar,\n/admin/platform) with their ordinary sign-in: a comma-separated list of email addresses.\nBeing listed is not enough on its own — the address must be verified, the account active,\nand the sign-in less than 12 hours old; every admin request is rate-limited and written to\nthe audit log. An organization OWNER is not a platform admin unless listed here. Encryption\nkey rotation stays on PLATFORM_ADMIN_TOKEN only.\nEmpty means nobody: no panel, and the admin API refuses every signed-in user. There is no\n\"first account becomes the admin\". install.sh --admin-email <address> sets it at install time\n(or with --refresh); later, pipe PLATFORM_ADMIN_EMAILS=<addresses> into ./railhook settings and\nrun ./railhook start.\nExample: PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com"
         }
       ]
     },
