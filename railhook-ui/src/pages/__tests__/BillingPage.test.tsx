@@ -126,6 +126,28 @@ describe('BillingPage', () => {
     expect(await screen.findAllByText(/free/i)).not.toHaveLength(0);
   });
 
+  it('shows the free plan price as $0 once, not "Free Free"', async () => {
+    renderBilling();
+
+    expect(await screen.findByText('$0/mo')).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { name: 'Free' });
+    expect(heading.parentElement?.textContent).toBe('Free$0/mo');
+  });
+
+  it('ticks exactly the features the plan returns', async () => {
+    // The feature list is the plan's own flags from the API, so it cannot claim more or less
+    // than the backend enforces.
+    vi.mocked(billingApi.getOrganizationBilling).mockResolvedValue({
+      ...BILLING,
+      plan: { ...FREE, features: { workflows: true, rules: true, replay: true, mTLS: true, tunnels: true } },
+    } as unknown as OrganizationBillingResponse);
+    renderBilling();
+
+    await screen.findByText('$0/mo');
+    expect(screen.queryAllByText(i18n.t('billing.notIncluded'))).toHaveLength(0);
+    expect(screen.getAllByText(i18n.t('billing.included'))).toHaveLength(5);
+  });
+
   it('renders an unlimited plan as unlimited, not as -1', async () => {
     // Every limit in the enterprise row is -1. Printed as a number it reads as a plan that
     // allows minus one project, and it is the whole of the self-hosted plan as well.
