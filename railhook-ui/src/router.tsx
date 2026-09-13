@@ -14,6 +14,7 @@ const ForgotPasswordPage = lazy(() => import('./auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./auth/ResetPasswordPage'));
 const AcceptInvitePage = lazy(() => import('./auth/AcceptInvitePage'));
 const DeviceApprovePage = lazy(() => import('./auth/DeviceApprovePage'));
+const AuthCallbackPage = lazy(() => import('./auth/AuthCallbackPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
@@ -112,6 +113,12 @@ export const router = createBrowserRouter([
   {
     path: '/device',
     element: <S><DeviceApprovePage /></S>,
+  },
+  /* Where the API sends the browser after "Continue with Google", with a one-time code to trade
+     for a session. */
+  {
+    path: '/auth/callback',
+    element: <S><AuthCallbackPage /></S>,
   },
   /* No /docs route: the docs are a separate static site (railhook-docs/) that nginx
      serves at /docs/ from this same image, so a link to them is a full page load,

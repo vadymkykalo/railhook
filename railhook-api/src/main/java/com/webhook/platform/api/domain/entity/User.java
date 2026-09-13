@@ -27,7 +27,8 @@ public class User {
     @Column(name = "full_name")
     private String fullName;
 
-    @Column(name = "password_hash", nullable = false)
+    /** Null for an account created through an identity provider, until its owner sets a password. */
+    @Column(name = "password_hash")
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)

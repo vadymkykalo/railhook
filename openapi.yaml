@@ -4103,6 +4103,41 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AuthResponse"
+  /api/v1/auth/oauth/exchange:
+    post:
+      tags:
+      - Authentication
+      summary: Exchange a sign-in code
+      description: "Trades the one-time code the Google sign-in callback put in the\
+        \ dashboard's URL for the same session a password sign-in returns: the access\
+        \ token in the body, the refresh token in its cookie. A code works once, within\
+        \ 60 seconds of the callback."
+      operationId: exchangeSignInCode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExchangeSignInCodeRequest"
+        required: true
+      responses:
+        "200":
+          description: Signed in
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: The code has been used or has expired
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "429":
+          description: Too many requests
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
   /api/v1/auth/logout:
     post:
       tags:
@@ -6043,6 +6078,88 @@ paths:
                   $ref: "#/components/schemas/SessionResponse"
       security:
       - bearerAuth: []
+  /api/v1/auth/providers:
+    get:
+      tags:
+      - Authentication
+      summary: List sign-in providers
+      description: "Which identity providers the sign-in and registration pages offer\
+        \ on this deployment. Public, because the pages ask before anyone has signed\
+        \ in."
+      operationId: providers
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SignInProvidersResponse"
+  /api/v1/auth/oauth/google/start:
+    get:
+      tags:
+      - Authentication
+      summary: Start signing in with Google
+      description: "Redirects the browser to Google. Signs in the account the Google\
+        \ identity belongs to, and creates one — with its own organization — when\
+        \ there is none. `returnTo` is a path on this site to land on afterwards;\
+        \ anything else is replaced with the dashboard. Answers 404 when Google sign-in\
+        \ is not configured."
+      operationId: startGoogleSignIn
+      parameters:
+      - name: intent
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: returnTo
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "302":
+          description: Redirect to Google
+        "404":
+          description: Google sign-in is not configured on this deployment
+        "429":
+          description: Too many requests
+  /api/v1/auth/oauth/google/callback:
+    get:
+      tags:
+      - Authentication
+      summary: Google sign-in callback
+      description: "Where Google returns the browser. Redirects to the dashboard's\
+        \ `/auth/callback` with a one-time code valid for 60 seconds, or back to the\
+        \ sign-in page with `error=google_…`. Tokens are never put in a URL."
+      operationId: googleSignInCallback
+      parameters:
+      - name: code
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: error
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: railhook_oauth_state
+        in: cookie
+        required: false
+        schema:
+          type: string
+      responses:
+        "302":
+          description: Redirect to the dashboard or back to the sign-in page
+        "404":
+          description: Google sign-in is not configured on this deployment
+        "429":
+          description: Too many requests
   /api/v1/auth/me:
     get:
       tags:
@@ -8544,6 +8661,15 @@ components:
           minLength: 1
       required:
       - refreshToken
+    ExchangeSignInCodeRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 128
+          minLength: 0
+      required:
+      - code
     LogoutRequest:
       type: object
       properties:
@@ -8786,6 +8912,8 @@ components:
           format: int64
         sort:
           $ref: "#/components/schemas/SortObject"
+        unpaged:
+          type: boolean
         paged:
           type: boolean
         pageNumber:
@@ -8794,8 +8922,6 @@ components:
         pageSize:
           type: integer
           format: int32
-        unpaged:
-          type: boolean
     SortObject:
       type: object
       properties:
@@ -10357,6 +10483,11 @@ components:
           format: date-time
         current:
           type: boolean
+    SignInProvidersResponse:
+      type: object
+      properties:
+        google:
+          type: boolean
     CurrentUserResponse:
       type: object
       properties:
@@ -10372,6 +10503,8 @@ components:
           - VIEWER
           - API_KEY
         emailDeliveryEnabled:
+          type: boolean
+        hasPassword:
           type: boolean
     AuditLogResponse:
       type: object

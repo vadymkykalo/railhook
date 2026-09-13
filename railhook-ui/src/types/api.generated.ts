@@ -1864,6 +1864,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/oauth/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange a sign-in code
+         * @description Trades the one-time code the Google sign-in callback put in the dashboard's URL for the same session a password sign-in returns: the access token in the body, the refresh token in its cookie. A code works once, within 60 seconds of the callback.
+         */
+        post: operations["exchangeSignInCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -2976,6 +2996,66 @@ export interface paths {
          * @description Returns every live sign-in for the authenticated user — browser sessions and CLI device-code grants alike — with the session making the request flagged as current. No token material is returned.
          */
         get: operations["listSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List sign-in providers
+         * @description Which identity providers the sign-in and registration pages offer on this deployment. Public, because the pages ask before anyone has signed in.
+         */
+        get: operations["providers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oauth/google/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start signing in with Google
+         * @description Redirects the browser to Google. Signs in the account the Google identity belongs to, and creates one — with its own organization — when there is none. `returnTo` is a path on this site to land on afterwards; anything else is replaced with the dashboard. Answers 404 when Google sign-in is not configured.
+         */
+        get: operations["startGoogleSignIn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oauth/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Google sign-in callback
+         * @description Where Google returns the browser. Redirects to the dashboard's `/auth/callback` with a one-time code valid for 60 seconds, or back to the sign-in page with `error=google_…`. Tokens are never put in a URL.
+         */
+        get: operations["googleSignInCallback"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4408,6 +4488,9 @@ export interface components {
         RefreshTokenRequest: {
             refreshToken: string;
         };
+        ExchangeSignInCodeRequest: {
+            code: string;
+        };
         LogoutRequest: {
             refreshToken?: string;
         };
@@ -4528,12 +4611,12 @@ export interface components {
             /** Format: int64 */
             offset?: number;
             sort?: components["schemas"]["SortObject"];
+            unpaged?: boolean;
             paged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
-            unpaged?: boolean;
         };
         SortObject: {
             empty?: boolean;
@@ -5448,12 +5531,16 @@ export interface components {
             expiresAt?: string;
             current?: boolean;
         };
+        SignInProvidersResponse: {
+            google?: boolean;
+        };
         CurrentUserResponse: {
             user?: components["schemas"]["UserResponse"];
             organization?: components["schemas"]["OrganizationResponse"];
             /** @enum {string} */
             role?: "OWNER" | "DEVELOPER" | "VIEWER" | "API_KEY";
             emailDeliveryEnabled?: boolean;
+            hasPassword?: boolean;
         };
         AuditLogResponse: {
             /** Format: uuid */
@@ -9058,6 +9145,48 @@ export interface operations {
             };
         };
     };
+    exchangeSignInCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExchangeSignInCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description The code has been used or has expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthResponse"];
+                };
+            };
+        };
+    };
     logout: {
         parameters: {
             query?: never;
@@ -10673,6 +10802,99 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["SessionResponse"][];
                 };
+            };
+        };
+    };
+    providers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SignInProvidersResponse"];
+                };
+            };
+        };
+    };
+    startGoogleSignIn: {
+        parameters: {
+            query?: {
+                intent?: string;
+                returnTo?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to Google */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Google sign-in is not configured on this deployment */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    googleSignInCallback: {
+        parameters: {
+            query?: {
+                code?: string;
+                state?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                railhook_oauth_state?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the dashboard or back to the sign-in page */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Google sign-in is not configured on this deployment */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

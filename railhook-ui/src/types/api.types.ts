@@ -47,6 +47,11 @@ export interface CurrentUserResponse {
    * invite or a reset "was sent" — it wasn't.
    */
   emailDeliveryEnabled: boolean;
+  /**
+   * False for an account created with "Continue with Google" that has never set a password.
+   * Changing a password needs the current one, so settings points to "Forgot password" instead.
+   */
+  hasPassword: boolean;
 }
 
 export interface OrganizationResponse {

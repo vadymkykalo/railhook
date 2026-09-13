@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.enums.SessionClient;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.ChangePasswordRequest;
 import com.webhook.platform.api.dto.CurrentUserResponse;
+import com.webhook.platform.api.dto.ExchangeSignInCodeRequest;
 import com.webhook.platform.api.dto.ForgotPasswordRequest;
 import com.webhook.platform.api.dto.LoginRequest;
 import com.webhook.platform.api.dto.LogoutRequest;
@@ -23,6 +24,7 @@ import com.webhook.platform.api.service.captcha.CaptchaVerifier;
 import com.webhook.platform.api.service.AuthService;
 import com.webhook.platform.api.service.SessionOrigin;
 import com.webhook.platform.api.service.AccountErasureService;
+import com.webhook.platform.api.service.ExternalSignInService;
 import com.webhook.platform.api.service.UserSessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -55,6 +57,7 @@ public class AuthController {
     private final AuthRateLimiterService authRateLimiterService;
     private final TrustedProxyResolver trustedProxyResolver;
     private final CaptchaVerifier captchaVerifier;
+    private final ExternalSignInService externalSignInService;
     private final boolean isProduction;
     private final int refreshCookieMaxAgeSeconds;
 
@@ -65,6 +68,7 @@ public class AuthController {
             AuthRateLimiterService authRateLimiterService,
             TrustedProxyResolver trustedProxyResolver,
             CaptchaVerifier captchaVerifier,
+            ExternalSignInService externalSignInService,
             @Value("${app.env:development}") String appEnv,
             @Value("${jwt.refresh-token-expiration:86400000}") long refreshTokenExpirationMs) {
         this.authService = authService;
@@ -73,6 +77,7 @@ public class AuthController {
         this.authRateLimiterService = authRateLimiterService;
         this.trustedProxyResolver = trustedProxyResolver;
         this.captchaVerifier = captchaVerifier;
+        this.externalSignInService = externalSignInService;
         this.isProduction = "production".equalsIgnoreCase(appEnv);
         // Derived from the token's own lifetime rather than hardcoded. The cookie used to be
         // pinned at seven days while the token it carries expires in one, so for six of those
@@ -136,6 +141,28 @@ public class AuthController {
             log.error("Login failed: {}", e.getMessage());
             throw e;
         }
+    }
+
+    @Operation(summary = "Exchange a sign-in code",
+            description = "Trades the one-time code the Google sign-in callback put in the dashboard's URL for the "
+                    + "same session a password sign-in returns: the access token in the body, the refresh token in "
+                    + "its cookie. A code works once, within 60 seconds of the callback.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Signed in"),
+            @ApiResponse(responseCode = "401", description = "The code has been used or has expired"),
+            @ApiResponse(responseCode = "429", description = "Too many requests")
+    })
+    @PostMapping("/oauth/exchange")
+    public ResponseEntity<AuthResponse> exchangeSignInCode(@Valid @RequestBody ExchangeSignInCodeRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+        if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getCode())) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+        }
+        AuthResponse response = externalSignInService.exchangeSignInHandoff(request.getCode(), originOf(httpRequest));
+        setRefreshTokenCookie(httpResponse, response.getRefreshToken());
+        response.setRefreshToken(null);
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Refresh token", description = "Exchanges a valid refresh token for new access and refresh tokens")

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import AuthLayout from './AuthLayout';
+import GoogleSignInButton from './GoogleSignInButton';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { authApi } from '../api/auth.api';
@@ -56,6 +57,7 @@ export default function LoginPage() {
         </>
       }
     >
+      <GoogleSignInButton intent="login" returnTo={redirectTo} />
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-1.5">
           <Label htmlFor="email">{t('auth.login.email')}</Label>

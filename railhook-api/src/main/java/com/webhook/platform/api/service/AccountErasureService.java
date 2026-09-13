@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.domain.enums.MembershipStatus;
 import com.webhook.platform.api.domain.enums.UserStatus;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
+import com.webhook.platform.api.domain.repository.UserIdentityRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.SystemTenant;
@@ -69,17 +70,20 @@ public class AccountErasureService {
     private final OrganizationService organizationService;
     private final UserSessionService userSessionService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final UserIdentityRepository userIdentityRepository;
 
     public AccountErasureService(UserRepository userRepository,
                                  MembershipRepository membershipRepository,
                                  OrganizationService organizationService,
                                  UserSessionService userSessionService,
-                                 TokenBlacklistService tokenBlacklistService) {
+                                 TokenBlacklistService tokenBlacklistService,
+                                 UserIdentityRepository userIdentityRepository) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.organizationService = organizationService;
         this.userSessionService = userSessionService;
         this.tokenBlacklistService = tokenBlacklistService;
+        this.userIdentityRepository = userIdentityRepository;
     }
 
     /**
@@ -112,6 +116,10 @@ public class AccountErasureService {
 
         anonymise(user);
         userRepository.save(user);
+        // The address is gone but a Google link is keyed on Google's own id for the person, which
+        // did not change. Left in place, "Continue with Google" would sign them straight back into
+        // the account they just erased.
+        userIdentityRepository.deleteByUserId(userId);
 
         // The session rows go, and the access tokens already issued are blacklisted: those are
         // stateless and would otherwise keep working until they expired on their own.

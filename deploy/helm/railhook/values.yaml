@@ -379,6 +379,14 @@ email:
     existingSecret: ""
     existingSecretPasswordKey: smtp-password
 
+# "Continue with Google" on the sign-in and registration pages. Off unless clientId is set and
+# existingSecret holds the client secret. In Google Cloud Console the OAuth client ("Web
+# application") must allow the redirect URI <app.baseUrl>/api/v1/auth/oauth/google/callback.
+googleSignIn:
+  clientId: ""
+  existingSecret: ""
+  existingSecretKey: client-secret
+
 # Secrets configuration
 secrets:
   # Encryption key for webhook secrets (32 characters)

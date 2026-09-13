@@ -14,6 +14,7 @@ const FAKE_USER: CurrentUserResponse = {
   // Matches the shipped default (EMAIL_ENABLED=false), so a page under test
   // renders the "nothing was sent" wording the majority of installs see.
   emailDeliveryEnabled: false,
+  hasPassword: true,
 };
 
 const FAKE_AUTH_STATE: AuthState = {
