@@ -12,8 +12,8 @@ import { fileURLToPath } from 'node:url';
 
 export const SITE_PLACEHOLDER = 'https://site-url.railhook.invalid';
 
-/** The site's own og-image.png, served by the same nginx at the root. */
-const SOCIAL_IMAGE = `${SITE_PLACEHOLDER}/og-image.png`;
+/** The site's social card (social-card.png), served by the same nginx at the root. */
+const SOCIAL_IMAGE = `${SITE_PLACEHOLDER}/social-card.png`;
 
 /** Starlight declares `twitter:card summary_large_image` on every page; this is the image it promises. */
 export const socialImageHead = [
