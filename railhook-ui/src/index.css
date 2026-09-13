@@ -439,33 +439,32 @@
 }
 .arch-end--start::after { top: 50%; bottom: 0; }
 .arch-end--end::after { bottom: 50%; }
-.arch-dot {
+.arch-wash {
+  background:
+    radial-gradient(hsl(var(--rail)) 1px, transparent 1px) 0 0 / 14px 14px,
+    radial-gradient(120% 90% at 0% 0%, hsl(var(--accent)) 0%, transparent 65%),
+    linear-gradient(160deg, hsl(var(--accent) / 0.6), hsl(var(--muted)));
+}
+/* One pulse travels the main rail, behind the tiles, captions and chevrons, so it shows only in
+   the gaps between them and never sits on top of a picture. */
+.arch-rail { position: relative; overflow: hidden; }
+.arch-rail::after {
+  content: '';
   position: absolute;
-  z-index: 1;
-  top: 0;
-  left: 50%;
+  left: -3px;
   width: 6px;
-  height: 6px;
+  height: 56px;
   border-radius: 9999px;
-  background: hsl(var(--primary));
-  translate: -50% -50%;
-  animation: arch-flow-y 3.6s linear infinite;
+  background: linear-gradient(transparent, hsl(var(--primary)), transparent);
+  animation: arch-pulse-y 3.2s linear infinite;
 }
-.arch-link--cross .arch-dot {
-  top: 50%;
-  left: 0;
-  animation-name: arch-flow-x;
-  animation-duration: 4.4s;
+@keyframes arch-pulse-y {
+  from { top: -56px; }
+  to { top: 100%; }
 }
-@keyframes arch-flow-y {
-  0% { top: 0; opacity: 0; }
-  25%, 75% { opacity: 1; }
-  100% { top: 100%; opacity: 0; }
-}
-@keyframes arch-flow-x {
-  0% { left: 0; opacity: 0; }
-  25%, 75% { opacity: 1; }
-  100% { left: 100%; opacity: 0; }
+@keyframes arch-pulse-x {
+  from { left: -56px; }
+  to { left: 100%; }
 }
 @media (min-width: 768px) {
   .arch-grid {
@@ -549,19 +548,18 @@
   }
   .arch-end--start::after { left: 50%; }
   .arch-end--end::after { right: 50%; }
-  .arch-dot {
-    top: 50%;
-    left: 0;
-    animation-name: arch-flow-x;
-  }
-  .arch-link--cross .arch-dot {
-    top: 0;
-    left: 50%;
-    animation-name: arch-flow-y;
+  .arch-rail { overflow: visible; }
+  .arch-rail::after {
+    top: -3px;
+    left: -56px;
+    width: 56px;
+    height: 4px;
+    background: linear-gradient(90deg, transparent, hsl(var(--primary)), transparent);
+    animation-name: arch-pulse-x;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .arch-dot { display: none; }
+  .arch-rail::after { display: none; }
 }
 
 /* Scrollbar */

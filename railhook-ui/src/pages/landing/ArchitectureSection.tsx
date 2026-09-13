@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { ChevronDown, Cloud, Code2, Cog, Globe, RotateCw, Server } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { RailhookIcon } from '../../components/icons/RailhookIcon';
@@ -91,13 +91,14 @@ function Cell({
 }
 
 /**
- * A connector: a chevron in a circle, and a dot travelling through. `cross` is the link to the
- * shared services, which runs across the main flow in both layouts.
+ * A connector: a chevron in a circle on the line. `cross` is the link to the shared services, which
+ * runs across the main flow in both layouts. The motion is not here: one pulse travels the main
+ * rail behind every tile and chevron (see `.arch-rail::after`), so nothing moving ever sits on top
+ * of a picture.
  */
-function Connector({ area, delay, cross = false, retry = false }: { area: string; delay: string; cross?: boolean; retry?: boolean }) {
+function Connector({ area, cross = false, retry = false }: { area: string; cross?: boolean; retry?: boolean }) {
   return (
     <div style={{ gridArea: area }} className={cn('arch-link relative', cross && 'arch-link--cross')}>
-      <span className="arch-dot" style={{ animationDelay: delay } as CSSProperties} />
       <span className="absolute left-1/2 top-1/2 z-[2] grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-rail bg-card text-primary shadow-card">
         {retry ? (
           <RotateCw className="h-2.5 w-2.5" strokeWidth={2.5} />
@@ -114,7 +115,8 @@ function ArchitectureDiagram() {
   const glyph = 'h-5 w-5 text-muted-foreground';
 
   return (
-    <figure className="m-0 rounded-2xl border border-rail bg-card p-5 shadow-card sm:p-6">
+    <figure className="arch-wash m-0 rounded-2xl border border-rail p-3 sm:p-5">
+      <div className="rounded-xl border border-rail bg-card p-4 shadow-card sm:p-5">
       <div role="img" aria-label={t('landing.architecture.diagramAria')} className="arch-grid">
         <div aria-hidden="true" className="arch-rail" />
         <div aria-hidden="true" className="arch-svc-rail" />
@@ -138,28 +140,28 @@ function ArchitectureDiagram() {
           </Group>
         </Cell>
 
-        <Connector area="c1" delay="0s" />
+        <Connector area="c1" />
         <Cell area="api" caption="Railhook API" strong balancedOnPhone className="arch-node-link">
           <span className="grid h-14 w-14 place-items-center rounded-[14px] bg-primary text-primary-foreground shadow-card ring-4 ring-accent">
             <RailhookIcon className="h-7 w-7" />
           </span>
         </Cell>
 
-        <Connector area="c2" delay="-0.9s" />
+        <Connector area="c2" />
         <Cell area="kfk" caption="Kafka">
           <Tile>
             <Logo name="apachekafka" mono />
           </Tile>
         </Cell>
 
-        <Connector area="c3" delay="-1.8s" retry />
+        <Connector area="c3" retry />
         <Cell area="wrk" caption={t('landing.architecture.worker')} balancedOnPhone className="arch-node-link">
           <Tile>
             <Cog className={glyph} strokeWidth={2} />
           </Tile>
         </Cell>
 
-        <Connector area="c4" delay="-2.7s" />
+        <Connector area="c4" />
         <Cell area="dst" caption={t('landing.architecture.endpoints')} className="arch-end arch-end--end">
           <Group className="grid-cols-3 md:grid-cols-2">
             <Tile>
@@ -174,8 +176,8 @@ function ArchitectureDiagram() {
           </Group>
         </Cell>
 
-        <Connector area="l1" delay="-0.4s" cross />
-        <Connector area="l2" delay="-2.1s" cross />
+        <Connector area="l1" cross />
+        <Connector area="l2" cross />
         <div className="arch-svc relative z-[1] flex flex-col items-center bg-card">
           <Group className="grid-cols-1 md:grid-cols-2">
             <Tile>
@@ -187,6 +189,7 @@ function ArchitectureDiagram() {
           </Group>
           <span className={cn(CAPTION, 'font-medium text-muted-foreground')}>{t('landing.architecture.shared')}</span>
         </div>
+      </div>
       </div>
     </figure>
   );
