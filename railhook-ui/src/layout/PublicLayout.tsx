@@ -1,32 +1,23 @@
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { RailhookIcon } from '../components/icons/RailhookIcon';
-import { RailRule } from '../pages/landing/primitives';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import ThemeToggle from '../components/ThemeToggle';
 import LandingNav from '../pages/landing/LandingNav';
 import { REPO_URL } from '../pages/landing/plans';
+import { WRAP } from '../pages/landing/primitives';
 
-const API_REFERENCE_URL = 'https://vadymkykalo.github.io/railhook/';
-
-/**
- * The chrome every public page shares.
- *
- * `nav` is opt-in because the documentation brings its own: a full-height
- * sidebar with a sticky bar of its own on small screens, which a second sticky
- * header would sit on top of. The footer is not opt-in — /docs used to render
- * outside this layout entirely, so the deepest page in the funnel was the one
- * page with no link back to pricing, the repository or a signup.
- */
 /**
  * A new public page starts at the top of itself.
  *
  * <p>`createBrowserRouter` leaves the scroll offset alone across a navigation, which is right
  * for an app shell whose panes scroll independently and wrong for a set of long marketing
- * pages: following "Pricing" from halfway down the home page landed on the pricing page at the
- * same offset, which is somewhere in its FAQ. The page looked like it had lost its top.
+ * pages: following a link from halfway down the home page landed on the next page at the
+ * same offset. The page looked like it had lost its top.
  *
- * <p>The landing page keeps its own effect because it has something extra to do — the nav still
- * links to `#security` and friends, and a hash has to win over this. Scrolling on layout rather
+ * <p>The landing page keeps its own effect because it has something extra to do — the nav
+ * links to `#run` and friends, and a hash has to win over this. Scrolling on layout rather
  * than after paint so the jump is never drawn.
  */
 function useScrollToTopOnNavigate() {
@@ -37,6 +28,10 @@ function useScrollToTopOnNavigate() {
   }, [pathname, hash]);
 }
 
+/**
+ * The chrome every public page shares. `nav` is opt-in because the documentation brings its
+ * own; the footer is not.
+ */
 export default function PublicLayout({ nav = true }: { nav?: boolean }) {
   useScrollToTopOnNavigate();
   return (
@@ -50,90 +45,85 @@ export default function PublicLayout({ nav = true }: { nav?: boolean }) {
   );
 }
 
-function FooterLink({ to, children }: { to: string; children: React.ReactNode }) {
+const LINK = 'text-sm text-muted-foreground transition-colors hover:text-foreground';
+
+function Column({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <h2 className="mono-label mb-3">{title}</h2>
+      <ul className="space-y-2">{children}</ul>
+    </div>
+  );
+}
+
+function RouteLink({ to, children }: { to: string; children: ReactNode }) {
   return (
     <li>
-      <Link to={to} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+      <Link to={to} className={LINK}>
         {children}
       </Link>
     </li>
   );
 }
 
-function FooterExternal({ href, children }: { href: string; children: React.ReactNode }) {
+/** Docs are a separate static site, so a full navigation, not a router link. */
+function PageLink({ href, external = false, children }: { href: string; external?: boolean; children: ReactNode }) {
   return (
     <li>
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
+      <a href={href} className={LINK} {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
         {children}
       </a>
     </li>
   );
 }
 
+/**
+ * The language and theme switches live here rather than in the header: they are set once, and
+ * the header is kept to the places a reader goes.
+ */
 export function Footer() {
   const { t } = useTranslation();
   return (
-    <footer>
-      <RailRule />
-      <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6">
-        <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-4">
+    <footer className="border-t border-rail bg-background">
+      <div className={`${WRAP} py-12`}>
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(4,minmax(0,1fr))]">
           <div>
             <Link to="/" className="mb-4 flex items-center gap-2.5">
-              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-                <RailhookIcon className="h-3.5 w-3.5 text-primary-foreground" />
+              <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-md bg-primary">
+                <RailhookIcon className="h-4 w-4 text-primary-foreground" />
               </span>
-              <span className="text-sm font-semibold">Railhook</span>
+              <span className="font-semibold text-foreground">Railhook</span>
             </Link>
-            <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">{t('footer.tagline')}</p>
+            <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">{t('footer.tagline')}</p>
           </div>
-          <div>
-            <h2 className="mono-label mb-3">{t('footer.product')}</h2>
-            <ul className="space-y-2">
-              <FooterLink to="/#capabilities">{t('footer.capabilities')}</FooterLink>
-              <FooterLink to="/#how-it-works">{t('footer.directions')}</FooterLink>
-              <FooterLink to="/#security">{t('footer.security')}</FooterLink>
-              <FooterLink to="/pricing">{t('footer.pricing')}</FooterLink>
-              <FooterLink to="/docs">{t('footer.documentation')}</FooterLink>
-            </ul>
-          </div>
-          <div>
-            <h2 className="mono-label mb-3">{t('footer.access')}</h2>
-            <ul className="space-y-2">
-              <FooterLink to="/register">{t('footer.createAccount')}</FooterLink>
-              <FooterLink to="/login">{t('footer.signIn')}</FooterLink>
-              <FooterLink to="/admin/dashboard">{t('footer.dashboard')}</FooterLink>
-              <FooterLink to="/contact">{t('footer.contact')}</FooterLink>
-              <FooterLink to="/#faq">{t('footer.faq')}</FooterLink>
-            </ul>
-          </div>
-          <div>
-            <h2 className="mono-label mb-3">{t('footer.selfHost')}</h2>
-            <ul className="space-y-2">
-              <FooterExternal href={REPO_URL}>{t('footer.sourceCode')}</FooterExternal>
-              <FooterExternal href={API_REFERENCE_URL}>{t('footer.apiReference')}</FooterExternal>
-              <FooterExternal href="https://www.npmjs.com/package/@railhook/node">Node.js SDK</FooterExternal>
-              <FooterExternal href="https://pypi.org/project/railhook/">Python SDK</FooterExternal>
-              <FooterExternal href="https://packagist.org/packages/railhook/php">PHP SDK</FooterExternal>
-            </ul>
-          </div>
+          <Column title={t('footer.product')}>
+            <RouteLink to="/#product">{t('footer.overview')}</RouteLink>
+            <RouteLink to="/#cloud">{t('footer.cloud')}</RouteLink>
+            <RouteLink to="/#self-host">{t('footer.selfHost')}</RouteLink>
+            <RouteLink to="/login">{t('footer.signIn')}</RouteLink>
+          </Column>
+          <Column title={t('footer.docs')}>
+            <PageLink href="/docs/">{t('footer.documentation')}</PageLink>
+            <PageLink href="/docs/start/quickstart/">{t('footer.quickstart')}</PageLink>
+            <PageLink href="/docs/self-hosting/overview/">{t('footer.selfHosting')}</PageLink>
+            <PageLink href="/docs/api-reference/">{t('footer.apiReference')}</PageLink>
+          </Column>
+          <Column title={t('footer.community')}>
+            <PageLink href={REPO_URL} external>{t('footer.github')}</PageLink>
+            <PageLink href={`${REPO_URL}/issues`} external>{t('footer.issues')}</PageLink>
+            <PageLink href={`${REPO_URL}/releases`} external>{t('footer.changelog')}</PageLink>
+            <PageLink href={`${REPO_URL}/blob/main/SECURITY.md`} external>{t('footer.security')}</PageLink>
+          </Column>
+          <Column title={t('footer.contact')}>
+            <RouteLink to="/contact">{t('footer.talkToUs')}</RouteLink>
+          </Column>
         </div>
-        <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-rail pt-6 sm:flex-row sm:items-center">
-          <p className="font-mono text-[11px] text-muted-foreground">
-            {t('footer.copyright', { year: new Date().getFullYear() })}
-          </p>
-          <a
-            href={REPO_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {t('footer.github')}
-          </a>
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-rail pt-6">
+          <p className="font-mono text-xs text-muted-foreground">{t('footer.copyright', { year: new Date().getFullYear() })}</p>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <ThemeToggle className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" />
+          </div>
         </div>
       </div>
     </footer>

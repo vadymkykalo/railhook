@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, redirect } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import AppLayout from './layout/AppLayout';
 import PublicLayout from './layout/PublicLayout';
@@ -15,7 +15,6 @@ const ResetPasswordPage = lazy(() => import('./auth/ResetPasswordPage'));
 const AcceptInvitePage = lazy(() => import('./auth/AcceptInvitePage'));
 const DeviceApprovePage = lazy(() => import('./auth/DeviceApprovePage'));
 const DocumentationPage = lazy(() => import('./pages/DocumentationPage'));
-const PricingPage = lazy(() => import('./pages/PricingPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
@@ -76,9 +75,10 @@ export const router = createBrowserRouter([
         path: '/',
         element: <S><LandingPage /></S>,
       },
+      /* There are no paid plans to price; old /pricing links land on how to run it. */
       {
         path: '/pricing',
-        element: <S><PricingPage /></S>,
+        loader: () => redirect('/#run'),
       },
       {
         path: '/contact',

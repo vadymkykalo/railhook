@@ -4,39 +4,22 @@ import { Github, Menu, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { RailhookIcon } from '../../components/icons/RailhookIcon';
 import { Button } from '../../components/ui/button';
-import ThemeToggle from '../../components/ThemeToggle';
-import LanguageSwitcher from '../../components/LanguageSwitcher';
 import { useAuth } from '../../auth/auth.store';
 import { REPO_URL } from './plans';
+import { WRAP } from './primitives';
 
 /**
- * Five items, each naming a decision rather than a component of the system.
+ * Eight things to press, at most: the logo, four places to go, the repository, and the two ways
+ * in. The header this replaced had eleven, including the language and theme switches — those
+ * are set once and now live in the footer.
  *
- * The set this replaces was `How it works · Reliability · Dashboard · Features
- * · Pricing`: "Reliability" and "Dashboard" are attributes of the product, not
- * questions a buyer arrives with, and "Features" pointed at an anchor called
- * `#quickstart` in a file called `QuickstartSection`. Reliability and the
- * dashboard now live inside "How it works" and "Product" respectively, which is
- * where a reader looks for them.
+ * Section links are router `Link`s to "/#id" because this header is also mounted on /contact,
+ * where a bare "#run" would point nowhere; `LandingPage` scrolls to the hash on arrival. Docs is a
+ * plain anchor: it is served as its own static site, not a route in this app.
  *
- * Pricing is a route, not an anchor: it is the link people paste into a chat.
- *
- * The anchors are `Link`s rather than bare `<a href>`s because this nav is also
- * mounted on /pricing and /contact, where an href to "/#security" is a full
- * document navigation. `LandingPage` scrolls to the hash on arrival, so a
- * client-side navigation lands in the same place at SPA cost.
+ * The menu button sits outside the `<nav>` landmark: it is not a destination, and on a wide
+ * screen it is not there at all.
  */
-const LINKS = [
-  { to: '/#capabilities', key: 'landing.nav.product' },
-  { to: '/#how-it-works', key: 'landing.nav.directions' },
-  { to: '/#security', key: 'landing.nav.security' },
-] as const;
-
-const ROUTES = [
-  { to: '/pricing', key: 'landing.nav.pricing' },
-  { to: '/docs', key: 'landing.nav.docs' },
-] as const;
-
 export default function LandingNav() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
@@ -61,133 +44,105 @@ export default function LandingNav() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  return (
-    <header className="sticky top-0 z-50 border-b border-rail bg-background/85 backdrop-blur-md">
-      <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-5 sm:px-6">
-        <div className="flex items-center gap-7">
-          <Link to="/" className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-              <RailhookIcon className="h-3.5 w-3.5 text-primary-foreground" />
-            </span>
-            <span className="text-[15px] font-semibold tracking-tight">Railhook</span>
-          </Link>
-          <ul className="hidden items-center gap-6 lg:flex">
-            {LINKS.map((link) => (
-              <li key={link.to}>
-                <Link
-                  to={link.to}
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {t(link.key)}
-                </Link>
-              </li>
-            ))}
-            {ROUTES.map((route) => (
-              <li key={route.to}>
-                <Link
-                  to={route.to}
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {t(route.key)}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
+  const sections = [
+    { to: '/#product', label: t('landing.nav.product') },
+    { to: '/#run', label: t('landing.nav.cloud') },
+    { to: '/#run', label: t('landing.nav.selfHost') },
+  ];
+  const linkClass = 'transition-colors hover:text-foreground';
+  const close = () => setOpen(false);
 
-        <div className="flex items-center gap-1.5">
-          <div className="hidden sm:flex sm:items-center sm:gap-1.5">
-            {/* The repository is a trust signal, not a step in the funnel: it
-                stays reachable, at the weight of an icon rather than a button. */}
+  return (
+    <header className="sticky top-0 z-50 border-b border-rail bg-background/90 backdrop-blur-md">
+      <div className={`${WRAP} flex h-16 items-center gap-2`}>
+        <nav aria-label={t('landing.nav.label')} className="flex min-w-0 flex-1 items-center gap-7">
+          <Link to="/" className="flex flex-none items-center gap-2.5 text-[17px] font-bold tracking-[-0.01em] text-foreground">
+            <span aria-hidden="true" className="grid h-[30px] w-[30px] place-items-center rounded-lg bg-primary">
+              <RailhookIcon className="h-[18px] w-[18px] text-primary-foreground" />
+            </span>
+            Railhook
+          </Link>
+
+          <ul className="hidden items-center gap-[22px] text-[14.5px] font-medium text-muted-foreground lg:flex">
+            {sections.map((s) => (
+              <li key={s.label}>
+                <Link to={s.to} className={linkClass}>
+                  {s.label}
+                </Link>
+              </li>
+            ))}
+            <li>
+              <a href="/docs/" className={linkClass}>
+                {t('landing.nav.docs')}
+              </a>
+            </li>
+          </ul>
+
+          <div className="ml-auto flex flex-none items-center gap-2 text-[14.5px] font-medium sm:gap-4">
             <a
               href={REPO_URL}
               target="_blank"
               rel="noopener noreferrer"
               aria-label={t('landing.nav.github')}
-              className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              className="hidden h-[34px] w-[34px] place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:grid"
             >
-              <Github className="h-4 w-4" aria-hidden="true" />
+              <Github className="h-[19px] w-[19px]" aria-hidden="true" />
             </a>
-            <LanguageSwitcher />
-            <ThemeToggle className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" />
-          </div>
-          {isAuthenticated ? (
-            <Link to="/admin/dashboard" className="hidden sm:block">
-              <Button size="sm">{t('landing.nav.goToDashboard')}</Button>
-            </Link>
-          ) : (
-            <>
-              <Link
-                to="/login"
-                className="hidden px-2 text-sm text-muted-foreground transition-colors hover:text-foreground sm:block"
-              >
+            {!isAuthenticated && (
+              <Link to="/login" className={`hidden text-foreground sm:block ${linkClass}`}>
                 {t('landing.nav.signIn')}
               </Link>
-              <Link to="/register" className="hidden sm:block">
-                <Button size="sm">{t('landing.nav.getStarted')}</Button>
-              </Link>
-            </>
-          )}
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            aria-controls="landing-mobile-nav"
-            aria-label={open ? t('landing.nav.closeMenu') : t('landing.nav.openMenu')}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:hidden"
-          >
-            {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
-          </button>
-        </div>
-      </nav>
+            )}
+            <Button asChild size="sm">
+              {isAuthenticated ? (
+                <Link to="/admin/dashboard">{t('landing.nav.goToDashboard')}</Link>
+              ) : (
+                <Link to="/register">{t('landing.nav.startFree')}</Link>
+              )}
+            </Button>
+          </div>
+        </nav>
+
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls="landing-mobile-nav"
+          aria-label={open ? t('landing.nav.closeMenu') : t('landing.nav.openMenu')}
+          className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+        >
+          {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+        </button>
+      </div>
 
       {open && (
-        <div id="landing-mobile-nav" className="border-t border-rail bg-background lg:hidden">
-          <ul className="mx-auto flex max-w-6xl flex-col px-5 py-2 sm:px-6">
-            {LINKS.map((link) => (
-              <li key={link.to}>
-                <Link
-                  to={link.to}
-                  onClick={() => setOpen(false)}
-                  className="block border-b border-rail py-3 text-[15px] text-foreground"
-                >
-                  {t(link.key)}
+        <div id="landing-mobile-nav" className="h-[calc(100dvh-4rem)] overflow-y-auto border-t border-rail bg-background lg:hidden">
+          <ul className={`${WRAP} flex flex-col py-2 text-[15px] text-foreground`}>
+            {sections.map((s) => (
+              <li key={s.label}>
+                <Link to={s.to} onClick={close} className="block border-b border-rail py-3">
+                  {s.label}
                 </Link>
               </li>
             ))}
-            {ROUTES.map((route) => (
-              <li key={route.to}>
-                <Link
-                  to={route.to}
-                  onClick={() => setOpen(false)}
-                  className="block border-b border-rail py-3 text-[15px] text-foreground"
-                >
-                  {t(route.key)}
-                </Link>
-              </li>
-            ))}
-            <li className="flex flex-col gap-2.5 py-4">
-              {isAuthenticated ? (
-                <Link to="/admin/dashboard" onClick={() => setOpen(false)}>
-                  <Button className="w-full">{t('landing.nav.goToDashboard')}</Button>
-                </Link>
-              ) : (
-                <>
-                  <Link to="/register" onClick={() => setOpen(false)}>
-                    <Button className="w-full">{t('landing.nav.getStarted')}</Button>
-                  </Link>
-                  <Link to="/login" onClick={() => setOpen(false)}>
-                    <Button variant="outline" className="w-full">
-                      {t('landing.nav.signIn')}
-                    </Button>
-                  </Link>
-                </>
-              )}
-              <div className="flex items-center gap-2 pt-1 sm:hidden">
-                <LanguageSwitcher />
-                <ThemeToggle className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" />
-              </div>
+            <li>
+              <a href="/docs/" className="block border-b border-rail py-3">
+                {t('landing.nav.docs')}
+              </a>
             </li>
+            <li>
+              <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 border-b border-rail py-3">
+                <Github className="h-4 w-4" aria-hidden="true" />
+                {t('landing.nav.github')}
+              </a>
+            </li>
+            {!isAuthenticated && (
+              <li>
+                <Link to="/login" onClick={close} className="block py-3">
+                  {t('landing.nav.signIn')}
+                </Link>
+              </li>
+            )}
           </ul>
         </div>
       )}
