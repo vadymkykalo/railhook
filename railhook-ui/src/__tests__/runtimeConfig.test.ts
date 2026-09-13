@@ -6,6 +6,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/** Every character a RegExp treats specially, backslash included. */
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 
@@ -107,7 +110,7 @@ describe('nginx serves the runtime config', () => {
     // Exact match, so it wins over the static-file regex and over the build-time
     // public/config.js that dist/ also carries.
     expect(body, 'location = /config.js').toBeDefined();
-    expect(body).toMatch(new RegExp(`^\\s*alias\\s+${OUT.replace(/\./g, '\\.')};`, 'm'));
+    expect(body).toMatch(new RegExp(`^\\s*alias\\s+${escapeRegExp(OUT)};`, 'm'));
   });
 
   it('never cached, since it changes with the container rather than the release', () => {
