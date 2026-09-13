@@ -13,8 +13,8 @@ type CopyState = 'idle' | 'copied' | 'failed';
  * One command for every server: a domain, a proxy in front, a port are installer flags the docs
  * explain, not a choice of methods to make before the reader has even started.
  *
- * With `label`, the hero's heading line (what it is, what it needs) sits above it; the closing
- * section repeats the bare command.
+ * With `label`, the hero's heading line (what it is, what it needs) sits above it. The page prints
+ * it once, in the hero.
  *
  * The `$` prompt is a pseudo-element, not text: a triple-click selects only the command, and the
  * page's text holds no dollar sign that could be mistaken for a price.

@@ -5,14 +5,15 @@ import DirectionsSection from './landing/DirectionsSection';
 import ReliabilitySection from './landing/ReliabilitySection';
 import ProductSection from './landing/ProductSection';
 import RunSection from './landing/RunSection';
-import ClosingSection from './landing/ClosingSection';
+import DeveloperSection from './landing/DeveloperSection';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 /**
  * Six sections, read by people who decide on outcomes as much as by the engineers who install:
  * the promise and both ways in (hero), what it does in either direction (directions), what
  * happens when the other side is down (reliability), what the team will look at (product), how
- * to run it — free in the cloud or on your own servers (run), and the ask again (closing).
+ * to run it — free in the cloud or on your own servers (run), and where an engineer starts, with
+ * the ask again (developer).
  *
  * The page it replaced had twelve sections, a pricing grid for plans that did not exist yet and
  * a mechanism on every screen. How retries, signatures and ordering work is in the docs; the
@@ -42,7 +43,7 @@ export default function LandingPage() {
       <ReliabilitySection />
       <ProductSection />
       <RunSection />
-      <ClosingSection />
+      <DeveloperSection />
     </>
   );
 }

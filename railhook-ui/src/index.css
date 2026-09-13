@@ -253,6 +253,92 @@
 }
 
 
+/* ── The developer band ──────────────────────────────────────────────────
+   The landing's last section sits on the ink surface in both themes. Two
+   slow cobalt glows drift behind it, and the code window wears a rotating
+   conic border in the accent's own shades — never a status hue. */
+.dev-band-arc {
+  position: absolute;
+  z-index: -1;
+  top: -34rem;
+  right: -26rem;
+  width: 64rem;
+  height: 64rem;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(closest-side, hsl(227.8 100% 55.7% / 0.30), hsl(227.8 100% 55.7% / 0.08) 58%, transparent 74%);
+  animation: dev-drift 24s ease-in-out infinite alternate;
+}
+.dev-band-arc::after {
+  content: '';
+  position: absolute;
+  inset: 18%;
+  border-radius: inherit;
+  border: 1px solid hsl(227.5 100% 71.8% / 0.14);
+}
+.dev-band-arc--low {
+  top: auto;
+  right: auto;
+  bottom: -40rem;
+  left: -30rem;
+  opacity: 0.6;
+  animation-duration: 31s;
+  animation-direction: alternate-reverse;
+}
+@keyframes dev-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-5rem, 4rem, 0) scale(1.08); }
+}
+
+.dev-glow {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 1px;
+  border-radius: 16px;
+  background: hsl(var(--rail));
+}
+.dev-glow::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: max(200%, 60rem);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background: conic-gradient(from 0deg, #1D4BFF, #6F8DFF 18%, #8BA3FF 26%, #1D4BFF 38%, transparent 50%, transparent 62%, #1D4BFF 76%, #6F8DFF 88%, #1D4BFF);
+  animation: dev-spin 10s linear infinite;
+}
+.dev-halo {
+  position: absolute;
+  inset: 8% 6%;
+  border-radius: 24px;
+  pointer-events: none;
+  background: radial-gradient(closest-side, hsl(227.8 100% 55.7% / 0.45), transparent);
+  filter: blur(40px);
+}
+@keyframes dev-spin {
+  to { rotate: 360deg; }
+}
+
+.dev-caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: -0.2em;
+  background: hsl(var(--primary));
+  animation: dev-blink 1s steps(1) infinite;
+}
+@keyframes dev-blink {
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dev-band-arc, .dev-glow::before, .dev-caret { animation: none; }
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

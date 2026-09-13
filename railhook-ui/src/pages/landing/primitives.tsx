@@ -120,7 +120,7 @@ export function SectionHeading({ id, title, lead }: { id?: string; title: string
   );
 }
 
-function prefersReducedMotion(): boolean {
+export function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined'
     && typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

@@ -1953,8 +1953,20 @@
     "successDesc": "You are now a member of the organization. Welcome aboard!"
   },
   "landing": {
-    "closing": {
-      "title": "Your first webhook, in a few minutes"
+    "developer": {
+      "title": "Built for developers",
+      "lead": "One API call sends an event. The rest is in the docs.",
+      "docsTitle": "Documentation",
+      "docsBody": "Guides for sending, receiving and running Railhook.",
+      "apiTitle": "API reference",
+      "apiBody": "Every endpoint, with requests you can try against your own instance.",
+      "standardTitle": "Standard Webhooks",
+      "standardBody": "Signatures any Standard Webhooks library can verify.",
+      "newTab": "opens in a new tab",
+      "codeTitle": "Send an event with one API call",
+      "languages": "Language",
+      "response": "2 deliveries created",
+      "readDocs": "Read the docs"
     },
     "directions": {
       "customer": "Customer",

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import LandingPage from '../LandingPage';
 import LandingNav from '../landing/LandingNav';
 import { Footer } from '../../layout/PublicLayout';
@@ -25,6 +25,25 @@ function renderLanding(auth: object = SIGNED_OUT) {
   return renderPage(<LandingPage />, { path: '/', initialEntry: '/', ...auth });
 }
 
+/**
+ * The page's prose, without its code samples. A PHP sample is full of `$` and a code block is
+ * not words a reader has to get through, so the price and word-count checks read everything
+ * except what sits inside `pre` and `code`.
+ */
+function proseText(): string {
+  const copy = document.body.cloneNode(true) as HTMLElement;
+  copy.querySelectorAll('pre, code').forEach((node) => node.remove());
+  return copy.textContent ?? '';
+}
+
+/** The developer band, asserted to be the page's last section. */
+function developerSection(container: HTMLElement): HTMLElement {
+  const section = screen.getByRole('heading', { name: en.landing.developer.title }).closest('section') as HTMLElement;
+  expect(section).not.toBeNull();
+  expect(container.lastElementChild).toBe(section);
+  return section;
+}
+
 beforeAll(() => {
   /* jsdom implements neither, and both are called on mount: the hash effect
      scrolls, and Reveal observes. */
@@ -47,7 +66,7 @@ describe('LandingPage', () => {
       en.landing.reliability.title,
       en.landing.product.title,
       en.landing.run.title,
-      en.landing.closing.title,
+      en.landing.developer.title,
     ];
     for (const name of headings) {
       expect(screen.getByRole('heading', { name }), `missing section: ${name}`).toBeInTheDocument();
@@ -101,7 +120,7 @@ describe('LandingPage', () => {
   it('prints no price, no plan grid and no "coming soon"', () => {
     renderLanding();
     expect(document.getElementById('plans')).toBeNull();
-    const text = document.body.textContent ?? '';
+    const text = proseText();
     expect(text).not.toContain('$');
     expect(text).not.toMatch(/coming soon|free forever/i);
     expect(text).not.toMatch(/per month|\/mo\b/i);
@@ -111,11 +130,80 @@ describe('LandingPage', () => {
     for (const lng of ['en', 'uk']) {
       await i18n.changeLanguage(lng);
       const { unmount } = renderLanding();
-      const words = (document.body.textContent ?? '').split(/\s+/).filter(Boolean);
+      // Code samples are not counted: see proseText().
+      const words = proseText().split(/\s+/).filter(Boolean);
       expect(words.length, `${lng}: ${words.length} words`).toBeLessThanOrEqual(600);
       unmount();
     }
     await i18n.changeLanguage('en');
+  });
+});
+
+describe('DeveloperSection', () => {
+  it('ends the page with the docs, the API reference and Standard Webhooks', () => {
+    const { container } = renderLanding();
+    const section = developerSection(container);
+    const hrefs = within(section).getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(hrefs).toEqual(expect.arrayContaining([
+      '/docs/',
+      '/docs/api-reference/',
+      'https://www.standardwebhooks.com/',
+    ]));
+    const external = within(section).getAllByRole('link')
+      .find((a) => a.getAttribute('href') === 'https://www.standardwebhooks.com/') as HTMLElement;
+    expect(external).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  it('switches the code sample between Node.js, Python, PHP and cURL', () => {
+    const { container } = renderLanding();
+    const section = developerSection(container);
+    const tablist = within(section).getByRole('tablist');
+    const tabs = within(tablist).getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Node.js', 'Python', 'PHP', 'cURL']);
+
+    const panel = () => within(section).getByRole('tabpanel');
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(panel().textContent).toContain("from '@railhook/node'");
+
+    fireEvent.click(tabs[1]);
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+    expect(panel().textContent).toContain('from railhook import Railhook');
+    expect(panel().textContent).not.toContain("from '@railhook/node'");
+
+    fireEvent.click(tabs[2]);
+    expect(panel().textContent).toContain('$client->events->send(');
+
+    fireEvent.click(tabs[3]);
+    expect(panel().textContent).toContain('curl -X POST');
+  });
+
+  it('moves between languages with the arrow keys', () => {
+    const { container } = renderLanding();
+    const tabs = within(within(developerSection(container)).getByRole('tablist')).getAllByRole('tab');
+
+    fireEvent.keyDown(tabs[0], { key: 'ArrowLeft' });
+    expect(tabs[3]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[3]).toHaveFocus();
+
+    fireEvent.keyDown(tabs[3], { key: 'ArrowRight' });
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[0]).toHaveFocus();
+  });
+
+  it('keeps sign-up in the last section, and prints the install command only in the hero', () => {
+    const { container } = renderLanding();
+    const section = developerSection(container);
+    expect(within(section).getByRole('link', { name: en.landing.hero.startFree })).toHaveAttribute('href', '/register');
+    expect(within(section).getByRole('link', { name: en.landing.developer.readDocs })).toHaveAttribute('href', '/docs/');
+    expect(section.textContent).not.toContain(INSTALL);
+    expect(document.body.textContent?.split(INSTALL).length).toBe(2);
+  });
+
+  it('sends a signed-in reader to the dashboard from the last section', () => {
+    const { container } = renderLanding({});
+    const section = developerSection(container);
+    expect(within(section).getByRole('link', { name: en.landing.nav.goToDashboard })).toHaveAttribute('href', '/admin/dashboard');
+    expect(within(section).queryByRole('link', { name: en.landing.hero.startFree })).toBeNull();
   });
 });
 
