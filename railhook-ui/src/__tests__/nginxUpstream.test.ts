@@ -180,6 +180,27 @@ describe('the API can be rolled', () => {
     );
   });
 
+  it('and a rewritten Caddyfile is actually the one Caddy is serving', () => {
+    // The Caddyfile is a bind mount, so `compose up -d` sees no change in it and does
+    // not recreate the container — Caddy goes on serving the config it parsed at
+    // startup. Writing the file was therefore only two thirds of the job: the retry
+    // reached the host's disk and would have sat there unused until something
+    // unrelated restarted Caddy.
+    //
+    // Validated before reloading, because a reload that fails leaves the old config
+    // running but a validate that fails says so before anything is attempted; and a
+    // failure here must not abort the upgrade, since the previous config is still
+    // serving and the images are the point of the exercise.
+    expect(installer).toMatch(/caddy validate/);
+    expect(installer).toMatch(/caddy reload/);
+    const reload = installer.slice(installer.indexOf('reload_caddy() {'));
+    expect(reload.slice(0, 1200), 'validate has to come first').toMatch(
+      /validate[\s\S]*reload/,
+    );
+    // Only when there is a Caddy to reload. An installation with no domain runs none.
+    expect(reload.slice(0, 1200)).toMatch(/ps .*caddy|caddy.*running|-q caddy/);
+  });
+
   it('and the retry actually reaches a host that already exists', () => {
     // The Caddyfile is written once, at install time, exactly like the helper was —
     // and `upgrade` refreshed neither. So the retry above shipped in 2.16.3 and the
