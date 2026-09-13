@@ -135,6 +135,45 @@ Rotation never extends the old key: if it was already due to expire sooner, that
 
 The request and response shapes for every auth endpoint are in the [API reference](/docs/api-reference/).
 
+## Sign in with Google
+
+"Continue with Google" appears on the sign-in and registration pages once the deployment has a Google OAuth client. One button does both jobs:
+
+- A Google account that matches no Railhook account gets one straight away, with the address marked verified and an organization it owns. A Google Workspace account names the organization after its domain (`acme.com` becomes **Acme**); a personal account gets **Your name's workspace**. Rename it in organization settings.
+- An account that signed up with a password and the same address gains Google as a second way in. The password keeps working.
+- The account is matched on Google's permanent id for the person, so changing the address on the Google account still signs in to the same Railhook account.
+
+An account created through Google has no password. To add one, use **Forgot password** on the sign-in page.
+
+<Steps>
+
+1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create an **OAuth client ID** of type **Web application**.
+
+2. Add the authorized redirect URI. It is your `APP_BASE_URL` followed by the callback path, and it has to match exactly:
+
+   ```text
+   https://railhook.example.com/api/v1/auth/oauth/google/callback
+   ```
+
+   For a local stack on port 8080, add `http://localhost:8080/api/v1/auth/oauth/google/callback` as well.
+
+3. On the **OAuth consent screen**, keep the scopes to `openid`, `email` and `profile`.
+
+4. Set both values on the API and restart it:
+
+   ```bash
+   GOOGLE_OAUTH_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
+   GOOGLE_OAUTH_CLIENT_SECRET=GOCSPX-...
+   ```
+
+   On Kubernetes, set `googleSignIn.clientId` and put the secret in the Secret named by `googleSignIn.existingSecret`.
+
+</Steps>
+
+<Aside type="note">
+The browser never sees a token in a URL. After Google, the API redirects to the dashboard with a one-time code that works once, within 60 seconds, and the dashboard trades it for a session with `POST /api/v1/auth/oauth/exchange`.
+</Aside>
+
 ## Next steps
 
 <CardGrid>

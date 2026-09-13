@@ -135,6 +135,45 @@ API-ключ належить одному проєкту. Ним надсила
 
 Форми запитів і відповідей для кожного ендпоінта автентифікації — у [довіднику API](/docs/uk/api-reference/).
 
+## Вхід через Google
+
+Кнопка «Продовжити з Google» з'являється на сторінках входу й реєстрації, щойно розгортання має OAuth-клієнт Google. Одна кнопка робить обидві речі:
+
+- Для облікового запису Google, якому не відповідає жоден обліковий запис Railhook, він створюється одразу: адреса позначена підтвердженою, і є власна організація. Для Google Workspace організація називається за доменом (`acme.com` стає **Acme**), для особистого облікового запису — **«Ім'я»'s workspace**. Назву можна змінити в налаштуваннях організації.
+- Обліковий запис, зареєстрований з паролем на ту саму адресу, отримує Google як другий спосіб входу. Пароль і далі працює.
+- Відповідність шукається за постійним ідентифікатором людини в Google, тож зміна адреси в обліковому записі Google веде до того самого облікового запису Railhook.
+
+Обліковий запис, створений через Google, не має пароля. Щоб додати його, скористайтеся **«Забули пароль?»** на сторінці входу.
+
+<Steps>
+
+1. У [Google Cloud Console](https://console.cloud.google.com/apis/credentials) створіть **OAuth client ID** типу **Web application**.
+
+2. Додайте дозволений redirect URI. Це ваш `APP_BASE_URL` плюс шлях callback, і він має збігатися точно:
+
+   ```text
+   https://railhook.example.com/api/v1/auth/oauth/google/callback
+   ```
+
+   Для локального стеку на порту 8080 додайте також `http://localhost:8080/api/v1/auth/oauth/google/callback`.
+
+3. На **OAuth consent screen** залиште лише області `openid`, `email` і `profile`.
+
+4. Задайте обидва значення для API і перезапустіть його:
+
+   ```bash
+   GOOGLE_OAUTH_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
+   GOOGLE_OAUTH_CLIENT_SECRET=GOCSPX-...
+   ```
+
+   У Kubernetes задайте `googleSignIn.clientId`, а секрет покладіть у Secret, названий у `googleSignIn.existingSecret`.
+
+</Steps>
+
+<Aside type="note">
+Браузер ніколи не бачить токен в URL. Після Google API перенаправляє на дашборд з одноразовим кодом, який діє один раз протягом 60 секунд, і дашборд обмінює його на сесію через `POST /api/v1/auth/oauth/exchange`.
+</Aside>
+
 ## Що далі
 
 <CardGrid>

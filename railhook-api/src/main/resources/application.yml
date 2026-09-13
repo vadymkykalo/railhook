@@ -371,6 +371,16 @@ captcha:
   secret-key: ${CAPTCHA_SECRET_KEY:}
   verify-url: ${CAPTCHA_VERIFY_URL:https://challenges.cloudflare.com/turnstile/v0/siteverify}
 
+google:
+  oauth:
+    # "Continue with Google" is offered only when both are set. The endpoints are Google's and are
+    # properties only so tests can point them at a stand-in.
+    client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
+    client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
+    authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+    token-uri: https://oauth2.googleapis.com/token
+    jwks-uri: https://www.googleapis.com/oauth2/v3/certs
+
 organization:
   # Suspension is asked on the write path of every request, ingest included; this is what
   # keeps it from being a row read per event. See SuspensionLookup.

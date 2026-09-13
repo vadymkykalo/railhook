@@ -115,7 +115,11 @@ public class SecurityConfig {
                                                                         "/api/v1/auth/forgot-password",
                                                                         "/api/v1/auth/reset-password",
                                                                         "/api/v1/auth/device/code",
-                                                                        "/api/v1/auth/device/token")
+                                                                        "/api/v1/auth/device/token",
+                                                                        "/api/v1/auth/providers",
+                                                                        "/api/v1/auth/oauth/google/start",
+                                                                        "/api/v1/auth/oauth/google/callback",
+                                                                        "/api/v1/auth/oauth/exchange")
                                                         .permitAll()
                                                         .requestMatchers("/api/v1/auth/**").authenticated()
                                                         .requestMatchers("/api/v1/orgs/**").authenticated()

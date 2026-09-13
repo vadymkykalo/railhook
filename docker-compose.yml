@@ -381,6 +381,10 @@ services:
       ORGANIZATION_SUSPENSION_CACHE_TTL_SECONDS: ${ORGANIZATION_SUSPENSION_CACHE_TTL_SECONDS:-60}
       CAPTCHA_SECRET_KEY: ${CAPTCHA_SECRET_KEY:-}
       CAPTCHA_VERIFY_URL: ${CAPTCHA_VERIFY_URL:-https://challenges.cloudflare.com/turnstile/v0/siteverify}
+      # "Continue with Google". Both set turns it on; the redirect URI Google must allow is
+      # APP_BASE_URL + /api/v1/auth/oauth/google/callback.
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
       BILLING_ENABLED: ${BILLING_ENABLED:-false}
       BILLING_DEFAULT_PROVIDER: ${BILLING_DEFAULT_PROVIDER:-noop}
       BILLING_RECONCILIATION_CRON: ${BILLING_RECONCILIATION_CRON:-0 0 */6 * * *}

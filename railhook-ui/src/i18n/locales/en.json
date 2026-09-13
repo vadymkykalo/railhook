@@ -354,6 +354,24 @@
     "title": "Audit Log"
   },
   "auth": {
+    "google": {
+      "backToSignIn": "Back to sign in",
+      "continue": "Continue with Google",
+      "errors": {
+        "generic": "Signing in with Google did not work. Please try again.",
+        "google_account_disabled": "This account has been disabled. Contact your organization's owner.",
+        "google_denied": "Google sign-in was cancelled.",
+        "google_exchange": "This sign-in link has expired or was already used. Please sign in again.",
+        "google_identity": "Google's answer could not be verified. Please try again.",
+        "google_state": "The sign-in took too long or was started in another browser. Please try again.",
+        "google_unavailable": "Google could not be reached. Please try again in a moment.",
+        "google_unverified_email": "The email address on your Google account is not verified, so it cannot be used here."
+      },
+      "failedTitle": "Could not sign you in",
+      "or": "or",
+      "renameOrganization": "We named your organization “{{name}}”. You can rename it in organization settings.",
+      "signingIn": "Signing you in…"
+    },
     "device": {
       "approve": "Approve",
       "approved": "Device authorized successfully!",
@@ -2880,6 +2898,10 @@
     "versions": "Versions"
   },
   "settings": {
+    "noPassword": {
+      "action": "Set a password",
+      "description": "You sign in with Google and have no password yet. To add one, request a link to set it."
+    },
     "accountStatus": "Account status",
     "changePassword": "Change Password",
     "changePasswordBtn": "Change password",

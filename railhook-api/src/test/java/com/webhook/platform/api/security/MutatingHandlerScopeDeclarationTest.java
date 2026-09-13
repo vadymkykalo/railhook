@@ -65,6 +65,9 @@ class MutatingHandlerScopeDeclarationTest {
             "AuthController.register",
             "AuthController.login",
             "AuthController.refreshToken",
+            // Public, like login: permitted without credentials in SecurityConfig, so no API key
+            // reaches it with a scope to check. The one-time code is the credential.
+            "AuthController.exchangeSignInCode",
             "AuthController.logout",
             "AuthController.verifyEmail",
             "AuthController.resendVerification",

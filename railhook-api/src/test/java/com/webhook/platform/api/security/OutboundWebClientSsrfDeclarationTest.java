@@ -58,7 +58,12 @@ class OutboundWebClientSsrfDeclarationTest {
 
             // Fixed vendor endpoints compiled into the provider, never operator- or user-supplied.
             "WayForPayBillingProvider",
-            "BillingAutoConfiguration"));
+            "BillingAutoConfiguration",
+
+            // Google's token and key-set endpoints: literal defaults in application.yml with no
+            // environment variable behind them, overridden only by tests. No request parameter or
+            // stored value names the host.
+            "GoogleSignInService"));
 
     @Test
     void everyOutboundClientAppliesTheConnectorOrIsListedWithAReason() throws IOException {

@@ -24,6 +24,19 @@ export const authApi = {
     return http.post<AuthResponse>('/api/v1/auth/login', data);
   },
 
+  /** Which identity providers this deployment offers. Public: the sign-in page asks first. */
+  providers: (): Promise<{ google: boolean }> => {
+    return http.get<{ google: boolean }>('/api/v1/auth/providers');
+  },
+
+  /**
+   * Trades the one-time code the Google callback put in the URL for a session, exactly like a
+   * password sign-in: access token in the body, refresh token in its cookie. Works once.
+   */
+  exchangeSignInCode: (code: string): Promise<AuthResponse> => {
+    return http.post<AuthResponse>('/api/v1/auth/oauth/exchange', { code });
+  },
+
   getCurrentUser: (): Promise<CurrentUserResponse> => {
     return http.get<CurrentUserResponse>('/api/v1/auth/me');
   },
