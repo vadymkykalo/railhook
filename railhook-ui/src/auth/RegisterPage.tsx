@@ -14,7 +14,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import IntentPicker from '../components/IntentPicker';
 import { writeIntent } from '../lib/onboarding';
-import PasswordStrengthIndicator, { passwordMeetsPolicy } from '../components/PasswordStrengthIndicator';
+import PasswordStrengthIndicator, { missingPasswordRules, passwordMeetsPolicy } from '../components/PasswordStrengthIndicator';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -187,6 +187,15 @@ export default function RegisterPage() {
             autoComplete="new-password"
           />
           <PasswordStrengthIndicator password={password} />
+          {/* The submit button stays disabled until every rule is met; say which one is left
+              rather than leave a disabled button to be puzzled over. */}
+          {password && !passwordMeetsPolicy(password) && (
+            <p role="status" className="text-xs font-medium text-halt">
+              {t('passwordStrength.missing', {
+                rules: missingPasswordRules(password).map((key) => t(key).toLowerCase()).join(', '),
+              })}
+            </p>
+          )}
         </div>
 
         {error && (

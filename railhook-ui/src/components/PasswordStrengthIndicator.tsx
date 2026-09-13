@@ -33,6 +33,11 @@ export function passwordMeetsPolicy(password: string): boolean {
   return RULES.every((r) => r.test(password));
 }
 
+/** The translation keys of the rules the password does not meet yet, in checklist order. */
+export function missingPasswordRules(password: string): string[] {
+  return RULES.filter((r) => !r.test(password)).map((r) => `passwordStrength.rules.${r.key}`);
+}
+
 /**
  * The meter reads in three steps, not four: rejected, not yet accepted,
  * accepted. "Fair" and "Good" are both "not yet strong", so they share a hue
@@ -82,12 +87,14 @@ export default function PasswordStrengthIndicator({ password, className }: Passw
       <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
         {results.map((r) => (
           <div key={r.key} className="flex items-center gap-1.5 text-[11px]">
+            {/* An unmet rule is what blocks the submit button, so it reads as a rejection, not as
+                a faint grey hint that is easy to take for "not applicable". */}
             {r.passed ? (
               <Check className="h-3 w-3 flex-shrink-0 text-ok" aria-hidden />
             ) : (
-              <X className="h-3 w-3 flex-shrink-0 text-muted-foreground/50" aria-hidden />
+              <X className="h-3 w-3 flex-shrink-0 text-halt" aria-hidden />
             )}
-            <span className={r.passed ? 'text-foreground' : 'text-muted-foreground'}>
+            <span className={r.passed ? 'text-foreground' : 'text-halt'}>
               {t(`passwordStrength.rules.${r.key}`)}
             </span>
           </div>

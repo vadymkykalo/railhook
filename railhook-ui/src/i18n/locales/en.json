@@ -2531,11 +2531,12 @@
   "passwordStrength": {
     "fair": "Fair",
     "good": "Good",
+    "missing": "Still needed: {{rules}}",
     "rules": {
       "digit": "Number",
       "lowercase": "Lowercase letter",
       "minLength": "At least 8 characters",
-      "special": "Special character",
+      "special": "Special character (! ? # …)",
       "uppercase": "Uppercase letter"
     },
     "strong": "Strong",
