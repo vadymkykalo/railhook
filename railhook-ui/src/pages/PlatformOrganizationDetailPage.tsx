@@ -229,7 +229,7 @@ export default function PlatformOrganizationDetailPage() {
           ) : !projects.data ? (
             <SkeletonTable rows={3} />
           ) : projects.data.content.length === 0 ? (
-            <EmptyState icon={FolderOpen} title={t('platformAdmin.detail.noProjects')} className="py-10" />
+            <EmptyState icon={FolderOpen} title={t('platformAdmin.detail.noProjects')} className="rounded-none border-0 py-10" />
           ) : (
             <ul className="divide-y divide-rail">
               {projects.data.content.map((project) => (
@@ -249,7 +249,7 @@ export default function PlatformOrganizationDetailPage() {
           ) : !audit.data ? (
             <SkeletonTable rows={4} />
           ) : audit.data.content.length === 0 ? (
-            <EmptyState icon={FileText} title={t('platformAdmin.detail.noAudit')} className="py-10" />
+            <EmptyState icon={FileText} title={t('platformAdmin.detail.noAudit')} className="rounded-none border-0 py-10" />
           ) : (
             <Table>
               <TableHeader>

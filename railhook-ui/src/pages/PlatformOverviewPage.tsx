@@ -78,7 +78,7 @@ export default function PlatformOverviewPage() {
           <Card className="mt-6 overflow-hidden">
             <PanelTitle title={t('platformAdmin.overview.recentSignups')} />
             {data.recentSignups.length === 0 ? (
-              <EmptyState icon={UserPlus} title={t('platformAdmin.overview.noSignups')} className="py-10" />
+              <EmptyState icon={UserPlus} title={t('platformAdmin.overview.noSignups')} className="rounded-none border-0 py-10" />
             ) : (
               <Table>
                 <TableHeader>
