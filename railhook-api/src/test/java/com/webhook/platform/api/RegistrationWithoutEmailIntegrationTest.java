@@ -85,6 +85,30 @@ public class RegistrationWithoutEmailIntegrationTest extends AbstractIntegration
     }
 
     @Test
+    public void aNewOrganizationStartsWithItsFirstProject() throws Exception {
+        RegisterRequest request = RegisterRequest.builder()
+                .email("firstproject@example.com")
+                .password("Test1234!")
+                .organizationName("First Project Co")
+                .build();
+
+        String body = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = objectMapper.readTree(body).get("accessToken").asText();
+
+        // Every section of the dashboard is scoped to a project. An account that starts with none
+        // lands on a sidebar where nothing leads anywhere until it has worked out that a project
+        // is the thing to make first.
+        mockMvc.perform(get("/api/v1/projects").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].name").value("My first project"));
+    }
+
+    @Test
     public void theDashboardIsUsableImmediatelyAfterRegistering() throws Exception {
         RegisterRequest request = RegisterRequest.builder()
                 .email("usable@example.com")

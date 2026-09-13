@@ -113,13 +113,24 @@ describe('DashboardPage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   }, TEST_TIMEOUT_MS);
 
-  it('leaves the single call to action to the empty state when there is no project', async () => {
-    // The card used to render a "create a project" row beside the page's own
-    // "create a project" button — two invitations to one act.
+  it('starts an organization with no project on the first step, with one call to action', async () => {
+    // A bare "no projects" panel said nothing about what comes after. The first step is shown
+    // with the path it opens, and there is exactly one way to take it.
     vi.mocked(projectsApi.list).mockResolvedValue([]);
     renderDashboard();
-    await screen.findByText(/no projects yet/i);
-    expect(screen.queryByText(/Getting started/i)).toBeNull();
+    expect(await screen.findByText('Create a project')).toBeInTheDocument();
+    expect(screen.getByText('Create an API key')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /create project/i })).toHaveLength(1);
+  });
+
+  it('creates the first project from the dashboard without leaving it', async () => {
+    vi.mocked(projectsApi.list).mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: /create project/i }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText(/project name/i)).toBeInTheDocument();
   });
 
   it('offers a way back after the getting-started card is dismissed', async () => {
@@ -145,11 +156,6 @@ describe('DashboardPage', () => {
     expect(container.querySelector('.animate-pulse')).toBeTruthy();
   });
 
-  it('renders the "no projects" onboarding empty state when the account genuinely has none', async () => {
-    vi.mocked(projectsApi.list).mockResolvedValue([]);
-    renderDashboard();
-    expect(await screen.findByText(/no projects yet/i)).toBeInTheDocument();
-  });
 
   it('renders populated stat cards when a project with data exists', async () => {
     vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);

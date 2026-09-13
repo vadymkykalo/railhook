@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { EVENT_ID, PROJECT_ID, mockApi } from './fixtures';
+import { EVENT_ID, PROJECT_ID, mockApi, mockNewOrganization } from './fixtures';
 
 /**
  * Every page fits its screen.
@@ -215,5 +215,43 @@ test.describe('dashboard pages fit the screen', () => {
     await expect(drawer).toBeVisible();
     const box = await drawer.boundingBox();
     expect(box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  });
+});
+
+/**
+ * Seen on production from a brand-new Google sign-up: "I can't click anything on the left until I
+ * create a project." Every rail entry led back to the projects list. With no project, an entry
+ * opens its own setup screen, which creates the project and carries on into the section.
+ */
+test.describe('a brand-new organization', () => {
+  test('can open a section from the rail, create a project there, and land in that section', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'the rail is a drawer on a phone; the flow is the same');
+    await mockNewOrganization(page);
+    await page.goto('/admin/projects');
+
+    await page.getByRole('navigation', { name: /navigation/i }).getByRole('link', { name: 'Events' }).click();
+    await expect(page).toHaveURL(/\/admin\/start\/events$/);
+    await expect(page.getByRole('main').getByRole('heading', { name: 'Events' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Create project' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Project Name').fill('Checkout');
+    await dialog.getByRole('button', { name: 'Create Project' }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/admin/projects/${PROJECT_ID}/events$`));
+  });
+
+  test('keeps page header actions inside the window on wide screens', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'desktop widths only');
+    await mockApi(page, { signedIn: true });
+    for (const width of [1280, 1440, 1920, 2560]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/admin/projects');
+      const action = page.getByRole('button', { name: 'New Project' });
+      await expect(action).toBeVisible();
+      const box = await action.boundingBox();
+      expect(box, `New Project at ${width}px`).not.toBeNull();
+      expect(box!.x + box!.width, `New Project right edge at ${width}px`).toBeLessThanOrEqual(width);
+    }
   });
 });

@@ -928,7 +928,6 @@
       "incidents": "Open incidents",
       "title": "Needs a human"
     },
-    "createProject": "Create project",
     "endpointHealth": {
       "deliveries": "{{count}} deliveries",
       "empty": "No endpoints configured",
@@ -952,8 +951,6 @@
       },
       "title": "In flight"
     },
-    "noProjects": "No projects yet",
-    "noProjectsDesc": "Create your first project to start sending webhooks and monitoring deliveries.",
     "openAnalytics": "Open analytics",
     "outcome": {
       "delivered": "Delivered",
@@ -3845,5 +3842,21 @@
       "required": "This field is required"
     },
     "version": "v{{version}}"
+  },
+  "setup": {
+    "createProject": "Create project",
+    "needsProject": "It lives inside a project. Create one to start — it takes a few seconds, and you land right back here.",
+    "needsProjectViewer": "It lives inside a project, and this organization has none yet. Ask an owner or developer to create one.",
+    "firstRunSubtitle": "Four steps from here to your first delivered webhook.",
+    "firstStep": "Create a project",
+    "firstStepDesc": "A project holds your endpoints, API keys and events — one per product or environment.",
+    "purpose": {
+      "connections": "Where your events go: endpoints, subscriptions, incoming sources and the rules between them.",
+      "events": "Every event your application sends or receives, with its payload and the deliveries it made.",
+      "deliveries": "Each attempt to deliver an event — retries, failures, and the failed messages you can send again.",
+      "workflows": "Automations that run a sequence of steps when an event arrives.",
+      "analytics": "How deliveries are going over time: success rate, latency, alerts and usage.",
+      "develop": "Tools for trying things out: send test events, shape payloads, and inspect what arrives."
+    }
   }
 }

@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
+import com.webhook.platform.api.domain.entity.Organization;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.IdempotencyPolicy;
 import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
@@ -28,18 +29,36 @@ public class ProjectService {
         this.projectRepository = projectRepository;
     }
 
+    /** What a brand-new organization's first project is called until its owner renames it. */
+    public static final String FIRST_PROJECT_NAME = "My first project";
+
     @Auditable(action = AuditAction.CREATE, resourceType = "Project")
     @Transactional
     public ProjectResponse createProject(ProjectRequest request) {
-        UUID organizationId = TenantContext.require();
-        Project project = Project.builder()
-                .name(request.getName())
-                .organizationId(organizationId)
-                .description(request.getDescription())
-                .build();
+        return ProjectResponse.of(save(TenantContext.require(), request.getName(), request.getDescription()));
+    }
 
-        project = projectRepository.saveAndFlush(project);
-        return ProjectResponse.of(project);
+    /**
+     * The project a new organization starts with, created while its account is registered.
+     *
+     * <p>Every section of the dashboard is scoped to a project, so an organization with none opens
+     * onto a sidebar where nothing leads anywhere until its owner has worked out that a project is
+     * the thing to make first. Registration runs before any tenant scope exists, so the
+     * organization is the row just created rather than the caller's; the project is built by the
+     * same {@link #save} the Projects page uses, and counts toward the plan's project quota like any
+     * other.
+     */
+    @Transactional
+    public ProjectResponse createFirstProject(Organization organization) {
+        return ProjectResponse.of(save(organization.getId(), FIRST_PROJECT_NAME, null));
+    }
+
+    private Project save(UUID owningOrganization, String name, String description) {
+        return projectRepository.saveAndFlush(Project.builder()
+                .name(name)
+                .organizationId(owningOrganization)
+                .description(description)
+                .build());
     }
 
     public ProjectResponse getProject(UUID id) {

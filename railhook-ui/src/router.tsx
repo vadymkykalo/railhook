@@ -20,6 +20,7 @@ const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ defaul
 const TermsPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.TermsPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
+const ProjectSetupPage = lazy(() => import('./pages/ProjectSetupPage'));
 const EndpointsPage = lazy(() => import('./pages/EndpointsPage'));
 const DeliveriesPage = lazy(() => import('./pages/DeliveriesPage'));
 const EventsPage = lazy(() => import('./pages/EventsPage'));
@@ -157,6 +158,11 @@ export const router = createBrowserRouter([
       {
         path: 'projects',
         element: <S><ProjectsPage /></S>,
+      },
+      {
+        // A section opened before the organization has a project: say what it is for and make one.
+        path: 'start/:segment',
+        element: <S><ProjectSetupPage /></S>,
       },
       {
         path: 'projects/:projectId/endpoints',

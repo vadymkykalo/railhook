@@ -44,8 +44,8 @@ export default function AppLayout() {
    * by saying "Select project" while exactly one existed.
    *
    * So the layout picks one up: the URL's, else the first the account has. With
-   * no projects at all there is nothing to fall back to and `/admin/projects`
-   * becomes the honest destination again — go make one.
+   * no projects at all each entry leads to its own setup screen
+   * (`/admin/start/<section>`), which creates the project and carries on there.
    */
   const { data: projects = [] } = useProjects();
   const projectId = routeProjectId ?? projects[0]?.id;

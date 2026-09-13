@@ -35,8 +35,13 @@ export interface NavSection extends NavEntry {
   tabs: NavEntry[];
 }
 
+/**
+ * With no project the destination is the section's own setup screen, not `/admin/projects`: every
+ * entry used to resolve to that one page, so a brand-new organization saw a rail of links that all
+ * led back to where it already was.
+ */
 const p = (projectId: string | undefined, segment: string) =>
-  projectId ? `/admin/projects/${projectId}/${segment}` : '/admin/projects';
+  projectId ? `/admin/projects/${projectId}/${segment}` : `/admin/start/${segment}`;
 
 const tab = (nameKey: string, segment: string, icon: React.ElementType, requiredRole?: Role): NavEntry => ({
   nameKey,
@@ -166,6 +171,7 @@ export function segmentOf(pathname: string): string {
   const afterAdmin = pathname.replace(/^\/admin\/?/, '');
   const parts = afterAdmin.split('/').filter(Boolean);
   if (parts[0] === 'projects' && parts.length >= 3) return parts[2];
+  if (parts[0] === 'start' && parts.length >= 2) return parts[1];
   return parts[0] ?? '';
 }
 

@@ -84,6 +84,34 @@ function body(url: URL): unknown {
   return {};
 }
 
+/**
+ * A brand-new organization: no project until the create call, then the one it made. The list
+ * answers from state so the dashboard's refetch after creating sees the new project, the way the
+ * real API would.
+ */
+export async function mockNewOrganization(page: Page) {
+  const created = { id: PROJECT_ID, name: 'Checkout', description: '', createdAt: '2026-09-13T12:00:00Z' };
+  let projects: unknown[] = [];
+  await page.addInitScript((user) => {
+    localStorage.setItem('auth_user', JSON.stringify(user));
+    localStorage.setItem('i18n_lng', 'en');
+  }, USER);
+  await page.route('**/api/v1/**', (route: Route) => {
+    const url = new URL(route.request().url());
+    const json = (data: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
+    if (/\/projects$/.test(url.pathname)) {
+      if (route.request().method() === 'POST') {
+        projects = [created];
+        return json(created);
+      }
+      return json(projects);
+    }
+    if (new RegExp(`/projects/${PROJECT_ID}$`).test(url.pathname)) return json(created);
+    if (/\/(events|deliveries|endpoints)$/.test(url.pathname)) return json(page0());
+    return json(body(url));
+  });
+}
+
 export async function mockApi(page: Page, { signedIn }: { signedIn: boolean }) {
   if (signedIn) {
     await page.addInitScript((user) => {
