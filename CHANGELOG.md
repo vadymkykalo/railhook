@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.0] - 2026-09-13
+
+### Added
+
+- **A new account starts with a project.** Registration and Google sign-up create "My first
+  project", so the dashboard opens ready to use. Without a project, every sidebar section still
+  opens: it says what it is for and offers "Create project", then continues to that section. The
+  overview shows a getting-started checklist.
+- **Platform admin panel** (`/admin/platform`) for operators whose verified email is in
+  `PLATFORM_ADMIN_EMAILS`: platform overview, every organization and user, usage against quotas,
+  recent sign-ups, and suspension with a typed confirmation. Every admin request is audited, rate
+  limited, and needs a sign-in from the last 12 hours; no secrets, keys or payloads are returned.
+- **Monitoring you switch on with one command.** `./railhook monitoring up` starts Grafana,
+  Prometheus, Loki, Alertmanager, node-exporter and cAdvisor for the installed release, with
+  dashboards for alerts, errors, logs, uptime, containers and the host, and email alerts for a
+  full disk, memory, 5xx and error spikes, failing deliveries, a stale backup, an expiring
+  certificate and a site that stops answering. Grafana has no default password and is the only
+  published port, on `127.0.0.1`; `MONITORING_DOMAIN` puts it behind Caddy.
+- **The production deploy proves the site works page by page** — landing, docs, auth pages,
+  legal pages, installers, runtime config, API and health — not only that `/` answers 200.
+
+### Security
+
+- Linear-time regular expressions in PII masking and transformation template validation (a crafted
+  payload could pin a thread); the PII preview is always `text/plain`.
+- Database dumps are written readable by their owner only.
+- The deploy step receives only the secrets it sends; third-party GitHub Actions are pinned to
+  commits.
+
+### Fixed
+
+- The Trivy scan installs a pinned version and retries, instead of failing a required check when
+  one download hiccups.
+
 ## [2.19.2] - 2026-09-13
 
 ### Fixed
@@ -1859,7 +1893,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.19.2...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.20.0...HEAD
+[2.20.0]: https://github.com/vadymkykalo/railhook/compare/v2.19.2...v2.20.0
 [2.19.2]: https://github.com/vadymkykalo/railhook/compare/v2.19.1...v2.19.2
 [2.19.1]: https://github.com/vadymkykalo/railhook/compare/v2.19.0...v2.19.1
 [2.19.0]: https://github.com/vadymkykalo/railhook/compare/v2.18.1...v2.19.0
