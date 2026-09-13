@@ -2760,9 +2760,7 @@
       "copyAria": "Copy the install command",
       "copyFailed": "Select to copy",
       "label": "Install in one command",
-      "requirementDocker": "Needs Docker and 4 GB of RAM",
-      "requirementHelm": "Needs a Kubernetes cluster — read the guide",
-      "tabsLabel": "Install method"
+      "requirementDocker": "Needs Docker and 4 GB of RAM"
     },
     "map": {
       "aria": "Events from Stripe, GitHub and Shopify flow through Railhook to your service, Slack and a customer's server. One delivery fails, waits, tries again and arrives.",

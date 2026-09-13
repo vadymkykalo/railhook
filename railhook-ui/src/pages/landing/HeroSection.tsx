@@ -42,7 +42,7 @@ export default function HeroSection() {
         </div>
         {!isAuthenticated && <p className="mt-3 text-sm text-muted-foreground">{t('landing.hero.cloudNote')}</p>}
 
-        <InstallCommand tabs id="install" className="mt-10" />
+        <InstallCommand label id="install" className="mt-10" />
       </div>
 
       {/* Not on a phone: at that width the map is either a sideways scroll or unreadably small,

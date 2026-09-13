@@ -62,6 +62,13 @@ describe('LandingPage', () => {
     expect(within(install).getByRole('button', { name: en.landing.install.copyAria })).toBeInTheDocument();
   });
 
+  it('offers one install command for every server, not a choice of methods', () => {
+    renderLanding();
+    const install = document.getElementById('install') as HTMLElement;
+    expect(within(install).queryByRole('tablist')).toBeNull();
+    expect(install.textContent).not.toMatch(/helm|make up|git clone/);
+  });
+
   it('offers the free cloud plan first and the install second', () => {
     renderLanding();
     expect(screen.getAllByRole('link', { name: en.landing.hero.startFree })[0]).toHaveAttribute('href', '/register');
