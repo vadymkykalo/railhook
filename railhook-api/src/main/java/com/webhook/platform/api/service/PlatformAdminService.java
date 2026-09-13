@@ -72,6 +72,7 @@ public class PlatformAdminService {
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
     private final PlatformAdminAccountFacts accountFacts;
+    private final PlatformAdminAccessService platformAdminAccessService;
     private final SuspensionLookup suspensionLookup;
     private final BillingOverviewService billingOverviewService;
     private final Clock clock;
@@ -188,6 +189,7 @@ public class PlatformAdminService {
                     .signInMethods(methods.getOrDefault(membership.getUserId(), List.of()))
                     .joinedAt(membership.getCreatedAt())
                     .lastSeenAt(lastSeen.get(membership.getUserId()))
+                    .platformAdmin(platformAdminAccessService.isPlatformAdmin(user))
                     .build();
         });
     }

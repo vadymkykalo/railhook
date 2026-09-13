@@ -150,12 +150,7 @@ groups:
       # DLQ rate above SLO threshold (>3% of deliveries)
       - alert: DlqRateHigh
         expr: |
-          (
-            rate(webhook_delivery_attempts_total{result="error"}[1h])
-            + rate(webhook_delivery_attempts_total{result="failure"}[1h])
-          )
-          /
-          rate(webhook_delivery_attempts_total[1h])
+          sum(rate(webhook_delivery_attempts_total{result=~"error|failure"}[1h])) / sum(rate(webhook_delivery_attempts_total[1h]))
           > 0.1
         for: 10m
         labels:
@@ -172,12 +167,7 @@ groups:
       # incoming_forward_attempts_total at all.
       - alert: IncomingForwardFailureRateHigh
         expr: |
-          (
-            rate(incoming_forward_attempts_total{result="error"}[1h])
-            + rate(incoming_forward_attempts_total{result="failure"}[1h])
-          )
-          /
-          rate(incoming_forward_attempts_total[1h])
+          sum(rate(incoming_forward_attempts_total{result=~"error|failure"}[1h])) / sum(rate(incoming_forward_attempts_total[1h]))
           > 0.1
         for: 10m
         labels:
@@ -304,8 +294,7 @@ groups:
     rules:
       - alert: ApiErrorRateHigh
         expr: |
-          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
-          /
+          (sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) or vector(0)) /
           sum(rate(http_server_requests_seconds_count[5m]))
           > 0.005
         for: 5m

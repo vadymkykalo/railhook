@@ -102,6 +102,17 @@ describe('PlatformOverviewPage', () => {
     expect(screen.getByRole('link', { name: 'Acme Corp' })).toHaveAttribute('href', '/admin/platform/organizations/org-9');
   });
 
+  it('says who sees the panel and the one thing it can change', async () => {
+    vi.mocked(platformAdminApi.overview).mockResolvedValue({
+      organizations: 1, suspendedOrganizations: 0, users: 1, signupsToday: 0, signups7d: 0, signups30d: 0,
+      eventsToday: 0, events30d: 0, deliveriesSucceeded24h: 0, deliveriesFailed24h: 0,
+      activeTunnels: 0, organizationsNearQuota: 0, generatedAt: '2026-09-13T12:00:00Z', recentSignups: [],
+    });
+    renderPage(<PlatformOverviewPage />, { path: '/admin/platform', initialEntry: '/admin/platform' });
+    expect(await screen.findByText(/Only accounts listed in PLATFORM_ADMIN_EMAILS/)).toBeInTheDocument();
+    expect(screen.getByText(/suspending or reinstating an organization/)).toBeInTheDocument();
+  });
+
   it('asks for a fresh sign-in instead of offering a retry that would fail the same way', async () => {
     vi.mocked(platformAdminApi.overview).mockRejectedValue({
       response: { status: 403, data: { error: 'reauthentication_required' } },
@@ -113,6 +124,19 @@ describe('PlatformOverviewPage', () => {
     expect(screen.queryByRole('button', { name: /Retry/ })).not.toBeInTheDocument();
   });
 });
+
+const LONG_EMAIL = 'olena.shulha.operations-escalations-team@railhook-enterprise-customers-europe.example.com';
+const LONG_ORG = 'Товариство з обмеженою відповідальністю «Київські цифрові платіжні сервіси та інтеграції»';
+
+/**
+ * A long address is cut with an ellipsis, never broken mid-word, and the whole of it is one hover
+ * away; a long name keeps its full text for the same reason.
+ */
+function expectShortenedWithFullValue(element: HTMLElement, full: string) {
+  expect(element).toHaveAttribute('title', full);
+  expect(element).toHaveClass('truncate');
+  expect(element).not.toHaveClass('break-all');
+}
 
 describe('PlatformOrganizationsPage', () => {
   beforeEach(() => {
@@ -127,6 +151,27 @@ describe('PlatformOrganizationsPage', () => {
 
     expect(await screen.findByRole('link', { name: 'Acme Corp' })).toHaveAttribute('href', '/admin/platform/organizations/org-9');
     expect(screen.getByText('owner@acme.example')).toBeInTheDocument();
+  });
+
+  it('shortens a long owner address and a long name without losing either', async () => {
+    vi.mocked(platformAdminApi.organizations).mockResolvedValue(page([{ ...ORG, name: LONG_ORG, ownerEmail: LONG_EMAIL }]));
+    renderPage(<PlatformOrganizationsPage />, {
+      path: '/admin/platform/organizations', initialEntry: '/admin/platform/organizations',
+    });
+
+    expectShortenedWithFullValue(await screen.findByText(LONG_EMAIL), LONG_EMAIL);
+    expect(screen.getByRole('link', { name: LONG_ORG })).toHaveAttribute('title', LONG_ORG);
+  });
+
+  it('shows an unlimited plan as Unlimited, not a fraction of nothing', async () => {
+    vi.mocked(platformAdminApi.organizations).mockResolvedValue(page([
+      { ...ORG, planName: 'self_hosted', eventsThisMonth: 42, eventsLimit: -1 },
+    ]));
+    renderPage(<PlatformOrganizationsPage />, {
+      path: '/admin/platform/organizations', initialEntry: '/admin/platform/organizations',
+    });
+    expect(await screen.findByText('Unlimited')).toBeInTheDocument();
+    expect(screen.queryByText(/∞/)).not.toBeInTheDocument();
   });
 
   it('searches by what was typed once typing stops', async () => {
@@ -153,7 +198,11 @@ describe('PlatformOrganizationDetailPage', () => {
     vi.mocked(platformAdminApi.members).mockResolvedValue(page([{
       userId: 'u-1', email: 'owner@acme.example', fullName: 'Ada', role: 'OWNER', membershipStatus: 'ACTIVE',
       emailVerified: true, userStatus: 'ACTIVE', signInMethods: ['PASSWORD', 'GOOGLE'],
-      joinedAt: '2026-09-01T00:00:00Z', lastSeenAt: null,
+      joinedAt: '2026-09-01T00:00:00Z', lastSeenAt: null, platformAdmin: false,
+    }, {
+      userId: 'u-2', email: 'ops@acme.example', fullName: null, role: 'OWNER', membershipStatus: 'ACTIVE',
+      emailVerified: true, userStatus: 'ACTIVE', signInMethods: ['GOOGLE'],
+      joinedAt: '2026-09-02T00:00:00Z', lastSeenAt: null, platformAdmin: true,
     }]));
     vi.mocked(platformAdminApi.projects).mockResolvedValue(page([{ id: 'p-1', name: 'Checkout', createdAt: '2026-09-01T00:00:00Z' }]));
     vi.mocked(platformAdminApi.auditLog).mockResolvedValue(page([]));
@@ -173,6 +222,40 @@ describe('PlatformOrganizationDetailPage', () => {
     expect(await screen.findByText('Ada')).toBeInTheDocument();
     expect(screen.getAllByText('Google').length).toBeGreaterThan(0);
     expect(screen.getByText('Checkout')).toBeInTheDocument();
+  });
+
+  it('shows the owner address in the header whole on hover, never broken mid-word', async () => {
+    vi.mocked(platformAdminApi.organization).mockResolvedValue({ ...ORG, ownerEmail: LONG_EMAIL });
+    renderDetail();
+    expectShortenedWithFullValue(await screen.findByText(LONG_EMAIL), LONG_EMAIL);
+  });
+
+  it('marks the member who is a platform admin, and only that one', async () => {
+    renderDetail();
+    const operator = (await screen.findByText('ops@acme.example')).closest('tr')!;
+    expect(within(operator).getByText('Platform admin')).toBeInTheDocument();
+    const owner = screen.getAllByText('owner@acme.example').map((el) => el.closest('tr')).find(Boolean)!;
+    expect(within(owner).queryByText('Platform admin')).not.toBeInTheDocument();
+  });
+
+  it('shows an unlimited plan as Unlimited', async () => {
+    const unlimited = { current: 5, limit: -1, percentUsed: 0 };
+    vi.mocked(platformAdminApi.usage).mockResolvedValue({
+      events: unlimited, endpoints: unlimited, projects: unlimited, members: unlimited,
+      rateLimitPerSecond: -1, retentionDays: -1, periodStart: '2026-09-01T00:00:00Z', periodEnd: '2026-10-01T00:00:00Z',
+    });
+    renderDetail();
+    expect((await screen.findAllByText(/Unlimited/)).length).toBe(4);
+    expect(screen.queryByText(/∞/)).not.toBeInTheDocument();
+  });
+
+  it('centres the empty projects and audit log inside their cards', async () => {
+    vi.mocked(platformAdminApi.projects).mockResolvedValue(page([]));
+    renderDetail();
+    for (const text of ['No projects.', 'Nothing recorded yet.']) {
+      const container = (await screen.findByText(text)).parentElement!;
+      expect(container).toHaveClass('flex', 'items-center', 'justify-center');
+    }
   });
 
   it('suspends only once the name is typed back and a reason is given', async () => {
@@ -196,17 +279,44 @@ describe('PlatformOrganizationDetailPage', () => {
 });
 
 describe('PlatformUsersPage', () => {
-  it('lists accounts with verification and their organizations', async () => {
+  beforeEach(() => {
     vi.mocked(platformAdminApi.users).mockResolvedValue(page([{
       id: 'u-1', email: 'ada@acme.example', fullName: 'Ada', emailVerified: false, status: 'PENDING_VERIFICATION',
       signInMethods: ['PASSWORD'], organizations: [{ id: 'org-9', name: 'Acme Corp', role: 'OWNER' }],
-      createdAt: '2026-09-01T00:00:00Z', lastSeenAt: null,
+      createdAt: '2026-09-01T00:00:00Z', lastSeenAt: null, platformAdmin: false,
+    }, {
+      id: 'u-2', email: 'ops@example.com', fullName: 'Operator', emailVerified: true, status: 'ACTIVE',
+      signInMethods: ['GOOGLE'], organizations: [{ id: 'org-1', name: 'Ops', role: 'OWNER' }],
+      createdAt: '2026-09-01T00:00:00Z', lastSeenAt: null, platformAdmin: true,
     }]));
+  });
 
+  it('lists accounts with verification and their organizations', async () => {
     renderPage(<PlatformUsersPage />, { path: '/admin/platform/users', initialEntry: '/admin/platform/users' });
 
     expect(await screen.findByText('ada@acme.example')).toBeInTheDocument();
     expect(screen.getByText('Not verified')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Acme Corp' })).toHaveAttribute('href', '/admin/platform/organizations/org-9');
+  });
+
+  it('shortens a long address and a long organization name without losing either', async () => {
+    vi.mocked(platformAdminApi.users).mockResolvedValue(page([{
+      id: 'u-3', email: LONG_EMAIL, fullName: null, emailVerified: true, status: 'ACTIVE',
+      signInMethods: ['PASSWORD'], organizations: [{ id: 'org-7', name: LONG_ORG, role: 'OWNER' }],
+      createdAt: '2026-09-01T00:00:00Z', lastSeenAt: null, platformAdmin: false,
+    }]));
+    renderPage(<PlatformUsersPage />, { path: '/admin/platform/users', initialEntry: '/admin/platform/users' });
+
+    expectShortenedWithFullValue(await screen.findByText(LONG_EMAIL), LONG_EMAIL);
+    expect(screen.getByRole('link', { name: LONG_ORG })).toHaveAttribute('title', LONG_ORG);
+  });
+
+  it('marks the accounts that are platform admins, and no other', async () => {
+    renderPage(<PlatformUsersPage />, { path: '/admin/platform/users', initialEntry: '/admin/platform/users' });
+
+    const operator = (await screen.findByText('ops@example.com')).closest('tr')!;
+    expect(within(operator).getByText('Platform admin')).toBeInTheDocument();
+    const customer = screen.getByText('ada@acme.example').closest('tr')!;
+    expect(within(customer).queryByText('Platform admin')).not.toBeInTheDocument();
   });
 });

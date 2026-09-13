@@ -28,6 +28,8 @@ Metrics are on separate management ports, inside the Docker network only, and ne
 
 They are deliberately not proxied to the public port: metrics would reveal endpoint names and traffic volume to anyone who asked.
 
+Both services always publish them, whether or not you run the bundled stack, so any Prometheus you already have can scrape these ports: HTTP request latency buckets, Kafka client metrics, and counters for events ingested, deliveries created, rules matched and retention cleanup. Their labels stay bounded — no organization, project or endpoint ids.
+
 ## The bundled stack
 
 `monitoring/` in the repository is a second Compose project: Grafana, Prometheus, Alertmanager, Loki and Promtail, node-exporter, cAdvisor and blackbox-exporter. It is off until you start it, and its memory limits add up to 1.5 GB.
@@ -45,7 +47,7 @@ Only Grafana publishes a port, on `127.0.0.1:3001`. Prometheus, Alertmanager and
    echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
    ```
 
-2. **Say where alerts go.** Email goes through the relay the platform already uses (`EMAIL_FROM`, `SMTP_*`) unless you set the `ALERTMANAGER_SMTP_*` variables.
+2. **Say where alerts go.** Email goes through the relay the platform already uses (`EMAIL_FROM`, `SMTP_*`) unless you set the `ALERTMANAGER_SMTP_*` variables. Each mail links to Grafana on `MONITORING_DOMAIN`; without a domain it says how to open Grafana through an SSH tunnel.
 
    ```bash
    echo "ALERTMANAGER_EMAIL_TO=you@example.com" >> .env

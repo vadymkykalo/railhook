@@ -53,8 +53,8 @@ Railhook exports far more series than anyone should watch. These answer the ques
 
 | Metric | Reading it |
 |---|---|
-| `events_ingested_total` | Events accepted |
-| `deliveries_created_total` | Deliveries created by fan-out. Divided by events, the average subscriptions per event. |
+| `events_ingested_total` | Events accepted, tagged `direction` (`outgoing` from `/api/v1/events`, `incoming` from `/ingress`) |
+| `deliveries_total` | Deliveries created by fan-out. Divided by events, the average subscriptions per event. |
 | `webhook_delivery_attempts_total` | Attempts. Far more attempts than deliveries means retries are doing a lot of work. |
 | `webhook_delivery_latency_ms` | Time the endpoint took to answer. A rising p95 is the endpoint's problem. |
 | `incoming_events_received_total`, `incoming_forward_attempts_total` | The same pair for incoming webhooks |

@@ -1,7 +1,7 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Loader2, LogIn } from 'lucide-react';
+import { Loader2, LogIn, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
@@ -19,6 +19,7 @@ import {
   type AdminUserStatus,
   type SignInMethod,
 } from '../api/platformAdmin.api';
+import { docsUrl } from '../lib/docsUrl';
 import { formatNumber } from '../lib/date';
 import { showApiError, showSuccess } from '../lib/toast';
 import { cn } from '../lib/utils';
@@ -79,6 +80,83 @@ export function PlatformErrorState({
   return <ErrorState error={error} fallbackKey="platformAdmin.loadFailed" onRetry={onRetry} retrying={retrying} />;
 }
 
+/**
+ * Who sees the panel and what it can change, said once at the top of each view. The wording
+ * follows the code: the rule PlatformAdminAccessService applies, and suspend/reinstate being the
+ * only writes the admin API has.
+ */
+export function PlatformScope() {
+  const { t, i18n } = useTranslation();
+  return (
+    <p className="mb-5 flex max-w-3xl items-start gap-2 text-[13px] text-muted-foreground">
+      <ShieldCheck className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden />
+      <span>
+        {t('platformAdmin.scope')}{' '}
+        <a
+          href={docsUrl(i18n.language, 'self-hosting/platform-admin')}
+          className="whitespace-nowrap text-foreground underline-offset-4 hover:underline"
+        >
+          {t('common.learnMore')}
+        </a>
+      </span>
+    </p>
+  );
+}
+
+/**
+ * An email address in the panel. Cut with an ellipsis rather than broken mid-word — a table cell
+ * ignores max-width, so the limit sits on this element — and the whole address is on hover. On a
+ * phone, where rows are stacked cards, it takes the width the card has.
+ */
+export function EmailText({ email, className }: { email: string | null | undefined; className?: string }) {
+  if (!email) return <span className="text-muted-foreground">—</span>;
+  return (
+    <span className={cn('block max-w-[13rem] truncate font-mono text-[13px] max-sm:max-w-full', className)} title={email}>
+      {email}
+    </span>
+  );
+}
+
+/**
+ * A link to one organization. One line with an ellipsis in a desktop table, the full name on
+ * hover; on a phone the name wraps at word boundaries instead of being cut off.
+ */
+export function OrganizationLink({ id, name, className }: { id: string; name: string; className?: string }) {
+  return (
+    <Link
+      to={`/admin/platform/organizations/${id}`}
+      title={name}
+      className={cn(
+        'block max-w-[12rem] truncate underline-offset-4 hover:underline',
+        'max-sm:max-w-full max-sm:whitespace-normal max-sm:break-words',
+        className,
+      )}
+    >
+      {name}
+    </Link>
+  );
+}
+
+/** Column titles stay on one line; a table wider than its card scrolls inside it instead. */
+export const PLATFORM_TABLE_HEADER = '[&_th]:whitespace-nowrap';
+
+/**
+ * Slightly tighter cells than the dashboard default, so the widest panel table fits its card at a
+ * 1440px screen. The phone layout sets its own cell padding and is not affected.
+ */
+export const PLATFORM_TABLE = '[&_td]:px-3 [&_th]:px-3';
+
+/** An account the server counts as a platform admin, next to its row in the panel's lists. */
+export function PlatformAdminBadge() {
+  const { t } = useTranslation();
+  return (
+    <span className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+      <ShieldCheck className="h-3 w-3" aria-hidden />
+      {t('platformAdmin.adminBadge')}
+    </span>
+  );
+}
+
 export function OrganizationStatusBadge({ organization }: { organization: AdminOrganization }) {
   const { t } = useTranslation();
   if (organization.suspendedAt) {
@@ -125,14 +203,27 @@ export function SignInMethods({ methods }: { methods: SignInMethod[] }) {
   );
 }
 
-/** Events this month against the plan's limit: the number, and a bar that warns from 80%. */
+/**
+ * Events this month against the plan's limit: the number, and a bar that warns from 80%. A plan
+ * without a limit — every organization on a deployment with billing off — says so, rather than
+ * showing a fraction of infinity and an empty bar.
+ */
 export function EventsAgainstLimit({ current, limit }: { current: number; limit: number }) {
-  const percent = limit > 0 ? Math.min(100, Math.round((current / limit) * 100)) : 0;
+  const { t } = useTranslation();
+  if (limit <= 0) {
+    return (
+      <div className="min-w-[7rem] font-mono text-[13px]">
+        {formatNumber(current)}
+        <span className="ml-1.5 font-sans text-xs text-muted-foreground">{t('platformAdmin.unlimited')}</span>
+      </div>
+    );
+  }
+  const percent = Math.min(100, Math.round((current / limit) * 100));
   return (
     <div className="min-w-[7rem]">
       <div className="font-mono text-[13px]">
         {formatNumber(current)}
-        <span className="text-muted-foreground"> / {limit > 0 ? formatNumber(limit) : '∞'}</span>
+        <span className="text-muted-foreground"> / {formatNumber(limit)}</span>
       </div>
       <div className="mt-1 h-1 w-full rounded-full bg-secondary" aria-hidden>
         <div

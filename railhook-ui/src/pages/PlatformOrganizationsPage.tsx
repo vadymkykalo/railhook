@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Building2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
@@ -14,7 +13,8 @@ import { usePlatformOrganizations } from '../api/queries';
 import { formatDate } from '../lib/date';
 import { FilterBar } from './tableParts';
 import {
-  EventsAgainstLimit, OrganizationStatusBadge, PlatformErrorState, useDebouncedValue,
+  EmailText, EventsAgainstLimit, OrganizationLink, OrganizationStatusBadge, PLATFORM_TABLE, PLATFORM_TABLE_HEADER, PlatformErrorState,
+  PlatformScope, useDebouncedValue,
 } from './platformAdminParts';
 
 /** Every organization on the deployment, searchable by name or by a member's address. */
@@ -35,6 +35,7 @@ export default function PlatformOrganizationsPage() {
         eyebrow={data ? t('platformAdmin.organizations.count', { count: data.totalElements }) : t('platformAdmin.eyebrow')}
         description={t('platformAdmin.organizations.description')}
       />
+      <PlatformScope />
 
       <FilterBar>
         <Input
@@ -68,8 +69,8 @@ export default function PlatformOrganizationsPage() {
         />
       ) : (
         <Card className="overflow-hidden">
-          <Table>
-            <TableHeader>
+          <Table className={PLATFORM_TABLE}>
+            <TableHeader className={PLATFORM_TABLE_HEADER}>
               <TableRow>
                 <TableHead>{t('platformAdmin.columns.organization')}</TableHead>
                 <TableHead>{t('platformAdmin.columns.plan')}</TableHead>
@@ -84,18 +85,12 @@ export default function PlatformOrganizationsPage() {
             <TableBody>
               {data.content.map((organization) => (
                 <TableRow key={organization.id}>
-                  <TableCell className="max-w-[16rem]">
-                    <Link
-                      to={`/admin/platform/organizations/${organization.id}`}
-                      className="block truncate font-medium underline-offset-4 hover:underline"
-                      title={organization.name}
-                    >
-                      {organization.name}
-                    </Link>
+                  <TableCell>
+                    <OrganizationLink id={organization.id} name={organization.name} className="font-medium" />
                   </TableCell>
                   <TableCell className="font-mono text-[13px]">{organization.planName ?? '—'}</TableCell>
-                  <TableCell className="max-w-[16rem] truncate font-mono text-[13px] text-muted-foreground" title={organization.ownerEmail ?? undefined}>
-                    {organization.ownerEmail ?? '—'}
+                  <TableCell className="text-muted-foreground">
+                    <EmailText email={organization.ownerEmail} />
                   </TableCell>
                   <TableCell className="text-right font-mono text-[13px]">{organization.memberCount}</TableCell>
                   <TableCell className="text-right font-mono text-[13px]">{organization.projectCount}</TableCell>

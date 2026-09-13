@@ -34,6 +34,11 @@ public class AdminUserResponse {
     private Instant createdAt;
     /** The most recent activity on any of the account's sessions; null when it has none left. */
     private Instant lastSeenAt;
+    /**
+     * Listed in PLATFORM_ADMIN_EMAILS, verified and active: the account half of the rule the admin
+     * API itself applies, so the panel marks exactly the people it would let in.
+     */
+    private boolean platformAdmin;
 
     @Data
     @Builder

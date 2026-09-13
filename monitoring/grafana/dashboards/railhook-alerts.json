@@ -416,7 +416,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "ALERTS{alertname!=\"Watchdog\"}",
+          "expr": "ALERTS{alertname!=\"Watchdog\"} or label_replace(sum(ALERTS{alertname=\"Watchdog\", alertstate=\"firing\"}) * 0, \"alertname\", \"No alerts firing\", \"\", \"\")",
           "refId": "A",
           "legendFormat": "",
           "instant": true,
@@ -548,7 +548,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "max by (alertname, severity) (ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\"})",
+          "expr": "max by (alertname, severity) (ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\"}) or label_replace(sum(ALERTS{alertname=\"Watchdog\", alertstate=\"firing\"}) * 0, \"alertname\", \"No alerts firing\", \"\", \"\")",
           "refId": "A",
           "legendFormat": "{{alertname}} ({{severity}})"
         }
@@ -603,7 +603,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "count by (severity) (ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\"})",
+          "expr": "count by (severity) (ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\"}) or label_replace(sum(ALERTS{alertname=\"Watchdog\", alertstate=\"firing\"}) * 0, \"severity\", \"none firing\", \"\", \"\")",
           "refId": "A",
           "legendFormat": "{{severity}}"
         }

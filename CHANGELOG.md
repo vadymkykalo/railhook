@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.1] - 2026-09-14
+
+### Fixed
+
+- **Every Grafana dashboard shows real data.** Before this release a third of the panels read
+  "No data" on a production host:
+  - **Containers:** cAdvisor 0.60 reads containers on Docker 29, which stores images through
+    containerd and left the old cAdvisor exporting nothing. OOM kills are counted from the
+    kernel, so "OOM kills (24h)" is real rather than a 0 with no source. CPU reads as a share of
+    the host's cores, and a recreated container is one line, not one per container id — so one
+    restart or OOM is one alert.
+  - **Kafka:** the api and worker publish their Kafka client metrics — consumer lag, records and
+    bytes consumed, fetch latency, send rate, queue time.
+  - **Latency:** HTTP requests carry latency buckets, so the p50–p99 panels have something to read.
+  - **Product counters** — events ingested (outgoing and incoming), duplicates, fan-out limits,
+    deliveries created, rules matched and dropped, retention cleanup — exist from start-up, so a
+    quiet deployment shows 0.
+  - **Errors, 5xx and alerts** panels show 0 or "No alerts firing" when nothing is wrong, instead
+    of "No data".
+  - "Total Delivery Attempts" reads the gauge under the name Prometheus exports.
+- **The delivery and incoming forward failure-rate alerts can fire.** Their expressions added two
+  series with different labels, which never matched, so they could not fire at all.
+- **The outbox depth gauge works.** Prometheus scrapes read it without a tenant scope, the count was
+  refused, and every scrape logged a warning and exported NaN — which also silenced the alert on
+  messages stuck sending.
+- **Logs are readable in Grafana.** One level vocabulary for every service (error, warn, info,
+  debug), no Spring Boot banner, one line per entry as level, logger and message with the stack
+  trace in the expanded view, and error counts named by service instead of "Value #A".
+- **The Host dashboard lists the server by name**, not by the node-exporter container's id
+  (`MONITORING_NODENAME`, defaulting to the machine's hostname).
+- **Alert mail you can read and act on.** The subject says what happened and where —
+  `[WARNING] The kernel killed a process for memory — railhook.io` — and a resolved alert says
+  RESOLVED. The body leads with the summary and description, then the labels. Its links go to
+  Grafana on `MONITORING_DOMAIN`; before, they pointed at Alertmanager and Prometheus, which are
+  not published, so they led nowhere. Without a domain the mail says how to open Grafana through
+  an SSH tunnel.
+- **The platform admin panel lays out properly.** Empty states sit centred inside their cards,
+  every table fits its card at 1440px, long email addresses and organization names end in "…"
+  with the full value on hover instead of breaking mid-word, and column titles stay on one line.
+
+### Changed
+
+- Two metrics carry the names Prometheus actually exports: `delivery_attempts_total` is now
+  `delivery_attempts_stored` (a gauge cannot end in `_total`) and `deliveries_created_total` is
+  now `deliveries_total` (Prometheus drops a trailing `_created`). A Prometheus of your own that
+  queried the old names found nothing under them before either.
+
+### Added
+
+- **Naming the platform admins on a self-hosted install:** `install.sh --admin-email you@company.com`
+  (several addresses separated by commas) writes `PLATFORM_ADMIN_EMAILS`, on a new install or with
+  `--refresh`. Without it nobody is a platform admin; no account becomes one by registering first.
+- **The platform admin panel says what it is.** Every view opens with who can see it and that the
+  only change it makes is suspending or reinstating an organization, linked to the docs. Platform
+  admins carry a "Platform admin" badge in the users and members lists, and a plan without limits
+  reads "Unlimited".
+- `make monitoring-check-queries` runs every dashboard and alert query against the running
+  monitoring stack and fails on any that return no data, apart from a short allow-list of panels
+  that stay empty until something happens.
+
 ## [2.20.0] - 2026-09-13
 
 ### Added
@@ -1923,7 +1983,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.20.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.20.1...HEAD
+[2.20.1]: https://github.com/vadymkykalo/railhook/compare/v2.20.0...v2.20.1
 [2.20.0]: https://github.com/vadymkykalo/railhook/compare/v2.19.2...v2.20.0
 [2.19.2]: https://github.com/vadymkykalo/railhook/compare/v2.19.1...v2.19.2
 [2.19.1]: https://github.com/vadymkykalo/railhook/compare/v2.19.0...v2.19.1

@@ -53,8 +53,8 @@ Railhook експортує набагато більше рядів, ніж в�
 
 | Метрика | Як читати |
 |---|---|
-| `events_ingested_total` | Прийняті події |
-| `deliveries_created_total` | Доставки, створені розгалуженням. Поділені на події — середня кількість підписок на подію. |
+| `events_ingested_total` | Прийняті події з тегом `direction` (`outgoing` з `/api/v1/events`, `incoming` з `/ingress`) |
+| `deliveries_total` | Доставки, створені розгалуженням. Поділені на події — середня кількість підписок на подію. |
 | `webhook_delivery_attempts_total` | Спроби. Спроб набагато більше, ніж доставок, — отже, повтори виконують багато роботи. |
 | `webhook_delivery_latency_ms` | Скільки ендпоінт відповідав. Зростання p95 — проблема ендпоінта. |
 | `incoming_events_received_total`, `incoming_forward_attempts_total` | Та сама пара для вхідних вебхуків |

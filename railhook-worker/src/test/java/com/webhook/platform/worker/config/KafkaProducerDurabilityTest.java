@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.config;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class KafkaProducerDurabilityTest {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> producerProperties() {
-        KafkaProducerConfig config = new KafkaProducerConfig();
+        KafkaProducerConfig config = new KafkaProducerConfig(new SimpleMeterRegistry());
         ReflectionTestUtils.setField(config, "bootstrapServers", "localhost:9092");
         DefaultKafkaProducerFactory<String, DeliveryMessage> factory =
                 (DefaultKafkaProducerFactory<String, DeliveryMessage>) config.producerFactory();

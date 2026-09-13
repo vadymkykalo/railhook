@@ -68,7 +68,7 @@ own name, and a `down` under it would stop the platform.
 | loki | `grafana/loki:3.0.0` | 320m | `monitoring` network |
 | promtail | `grafana/promtail:3.0.0` | 96m | `monitoring` network; Docker socket read-only |
 | node-exporter | `prom/node-exporter:v1.9.1` | 64m | `monitoring` network; host `/` read-only |
-| cadvisor | `gcr.io/cadvisor/cadvisor:v0.52.1` | 192m | `monitoring` network; `/sys`, Docker socket and `/var/lib/docker` read-only |
+| cadvisor | `ghcr.io/google/cadvisor:v0.60.5` | 192m | `monitoring` network; host root, `/var/run`, `/sys`, `/var/lib/docker` and `/var/lib/containerd` read-only; `CAP_SYSLOG` for OOM events |
 | blackbox | `prom/blackbox-exporter:v0.27.0` | 32m | `monitoring` network; platform network (to probe) |
 | backup-age | `busybox:1.36.1` | 8m | no network; backup directory read-only |
 

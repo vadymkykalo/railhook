@@ -106,7 +106,9 @@ groups:
       # count here.
       - alert: ContainerRestarting
         expr: |
-          changes(container_start_time_seconds{name!=""}[15m]) >= 2
+          # By name: a recreated container is a new series under the same name, and one
+          # container restarting should be one alert, not one per series.
+          sum by (name) (changes(container_start_time_seconds{name!=""}[15m])) >= 2
         labels:
           severity: warning
           component: containers
@@ -118,7 +120,8 @@ groups:
 
       - alert: ContainerOomKilled
         expr: |
-          increase(container_oom_events_total{name!=""}[15m]) > 0
+          # By name, like ContainerRestarting: one container hitting its limit is one alert.
+          sum by (name) (increase(container_oom_events_total{name!=""}[15m])) > 0
         labels:
           severity: warning
           component: containers
@@ -248,7 +251,7 @@ groups:
     rules:
       - alert: ErrorLogSpike
         expr: |
-          sum by (service) (railhook:log_lines:rate5m{level=~"error|fatal|panic|crit|alert|emerg"}) * 60 > 10
+          sum by (service) (railhook:log_lines:rate5m{level="error"}) * 60 > 10
         for: 10m
         labels:
           severity: warning

@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { UserPlus } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
@@ -8,7 +7,9 @@ import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { usePlatformOverview } from '../api/queries';
 import { formatDateTimeCompact, formatNumber, formatRelativeTime } from '../lib/date';
-import { PanelTitle, PlatformErrorState, SignInMethods, VerifiedBadge } from './platformAdminParts';
+import {
+  EmailText, OrganizationLink, PLATFORM_TABLE, PLATFORM_TABLE_HEADER, PanelTitle, PlatformErrorState, PlatformScope, SignInMethods, VerifiedBadge,
+} from './platformAdminParts';
 
 function Kpi({ label, value, hint }: { label: string; value: number; hint?: string }) {
   return (
@@ -33,6 +34,7 @@ export default function PlatformOverviewPage() {
           : t('platformAdmin.eyebrow')}
         description={t('platformAdmin.overview.description')}
       />
+      <PlatformScope />
 
       {isError ? (
         <PlatformErrorState error={error} onRetry={() => refetch()} retrying={isRefetching} />
@@ -77,10 +79,10 @@ export default function PlatformOverviewPage() {
           <Card className="mt-6 overflow-hidden">
             <PanelTitle title={t('platformAdmin.overview.recentSignups')} />
             {data.recentSignups.length === 0 ? (
-              <EmptyState icon={UserPlus} title={t('platformAdmin.overview.noSignups')} className="py-10" />
+              <EmptyState icon={UserPlus} title={t('platformAdmin.overview.noSignups')} className="rounded-none border-0 py-10" />
             ) : (
-              <Table>
-                <TableHeader>
+              <Table className={PLATFORM_TABLE}>
+                <TableHeader className={PLATFORM_TABLE_HEADER}>
                   <TableRow>
                     <TableHead>{t('platformAdmin.columns.account')}</TableHead>
                     <TableHead>{t('platformAdmin.columns.organization')}</TableHead>
@@ -92,19 +94,14 @@ export default function PlatformOverviewPage() {
                 <TableBody>
                   {data.recentSignups.map((signup) => (
                     <TableRow key={signup.userId}>
-                      <TableCell className="max-w-[18rem]">
-                        <p className="truncate font-mono text-[13px]" title={signup.email}>{signup.email}</p>
-                        {signup.fullName && <p className="truncate text-xs text-muted-foreground">{signup.fullName}</p>}
+                      <TableCell>
+                        <EmailText email={signup.email} />
+                        {signup.fullName && <p className="max-w-[13rem] truncate text-xs text-muted-foreground max-sm:max-w-full" title={signup.fullName}>{signup.fullName}</p>}
                       </TableCell>
-                      <TableCell className="max-w-[16rem] truncate">
-                        {signup.organizationId ? (
-                          <Link
-                            to={`/admin/platform/organizations/${signup.organizationId}`}
-                            className="underline-offset-4 hover:underline"
-                          >
-                            {signup.organizationName}
-                          </Link>
-                        ) : '—'}
+                      <TableCell>
+                        {signup.organizationId && signup.organizationName
+                          ? <OrganizationLink id={signup.organizationId} name={signup.organizationName} />
+                          : '—'}
                       </TableCell>
                       <TableCell><SignInMethods methods={signup.signInMethods} /></TableCell>
                       <TableCell><VerifiedBadge verified={signup.emailVerified} /></TableCell>

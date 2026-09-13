@@ -88,6 +88,8 @@ export interface AdminMember {
   signInMethods: SignInMethod[];
   joinedAt: string;
   lastSeenAt: string | null;
+  /** Listed in PLATFORM_ADMIN_EMAILS, verified and active — decided by the server. */
+  platformAdmin: boolean;
 }
 
 export interface AdminProject {
@@ -117,6 +119,8 @@ export interface AdminUser {
   organizations: { id: string; name: string; role: AdminRole }[];
   createdAt: string;
   lastSeenAt: string | null;
+  /** Listed in PLATFORM_ADMIN_EMAILS, verified and active — decided by the server. */
+  platformAdmin: boolean;
 }
 
 export interface OrganizationFilters {

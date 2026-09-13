@@ -176,8 +176,14 @@ class IngressServiceTest {
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
         stubHttpRequest();
 
+        assertThat(meterRegistry.get("events_ingested_total").tag("direction", "incoming").counter().count())
+                .as("registered before the first webhook, so a quiet deployment reads 0 rather than no data")
+                .isZero();
+
         IncomingEvent event = service.receiveWebhook("validtoken", "{\"test\":true}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
+        assertThat(meterRegistry.get("events_ingested_total").tag("direction", "incoming").counter().count())
+                .isEqualTo(1.0);
         assertThat(event.getId()).isEqualTo(eventId);
         assertThat(event.getIncomingSourceId()).isEqualTo(sourceId);
         assertThat(event.getBodyRaw()).isEqualTo("{\"test\":true}");

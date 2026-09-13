@@ -206,7 +206,7 @@
       "id": 4,
       "type": "stat",
       "title": "CPU, all containers",
-      "description": "CPU cores in use.",
+      "description": "Share of the host's CPU used by all containers together. 100% is every core busy.",
       "datasource": {
         "type": "prometheus",
         "uid": "railhook-prometheus"
@@ -223,14 +223,14 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name!=\"\"}[$__rate_interval]))",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{name!=\"\"}[$__rate_interval])) / scalar(count(node_cpu_seconds_total{mode=\"idle\"})) * 100",
           "refId": "A",
           "legendFormat": ""
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "percent",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -244,7 +244,7 @@
           "color": {
             "mode": "thresholds"
           },
-          "decimals": 2
+          "decimals": 1
         },
         "overrides": []
       },
@@ -285,7 +285,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "sum(changes(container_start_time_seconds{name!=\"\"}[1h])) or vector(0)",
+          "expr": "sum(changes(container_start_time_seconds{name!=\"\"}[1h]))",
           "refId": "A",
           "legendFormat": ""
         }
@@ -354,7 +354,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "sum(increase(container_oom_events_total{name!=\"\"}[24h])) or vector(0)",
+          "expr": "sum(increase(node_vmstat_oom_kill[24h]))",
           "refId": "A",
           "legendFormat": ""
         }
@@ -490,7 +490,7 @@
       "id": 9,
       "type": "timeseries",
       "title": "CPU by container",
-      "description": "CPU cores.",
+      "description": "Share of the host's CPU each container uses. 100% is every core busy.",
       "datasource": {
         "type": "prometheus",
         "uid": "railhook-prometheus"
@@ -507,14 +507,14 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"$container\"}[$__rate_interval]))",
+          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"$container\"}[$__rate_interval])) / scalar(count(node_cpu_seconds_total{mode=\"idle\"})) * 100",
           "refId": "A",
           "legendFormat": "{{name}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "percent",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
@@ -528,7 +528,8 @@
           },
           "color": {
             "mode": "palette-classic"
-          }
+          },
+          "decimals": 1
         },
         "overrides": []
       },
@@ -631,7 +632,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "container_memory_working_set_bytes{name=~\"$container\"} / (container_spec_memory_limit_bytes{name=~\"$container\"} > 0) * 100",
+          "expr": "max by (name) (container_memory_working_set_bytes{name=~\"$container\"} / (container_spec_memory_limit_bytes{name=~\"$container\"} > 0)) * 100",
           "refId": "A",
           "legendFormat": "{{name}}"
         }
@@ -694,7 +695,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "changes(container_start_time_seconds{name=~\"$container\"}[15m])",
+          "expr": "sum by (name) (changes(container_start_time_seconds{name=~\"$container\"}[15m]))",
           "refId": "A",
           "legendFormat": "{{name}}"
         }
@@ -894,7 +895,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"$container\"}[5m]))",
+          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"$container\"}[5m])) / scalar(count(node_cpu_seconds_total{mode=\"idle\"})) * 100",
           "refId": "C",
           "legendFormat": "",
           "instant": true,
@@ -929,7 +930,7 @@
               "name": "Container",
               "Value #A": "Memory",
               "Value #B": "Limit",
-              "Value #C": "CPU cores",
+              "Value #C": "CPU",
               "Value #D": "Started"
             }
           }
@@ -965,12 +966,16 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "CPU cores"
+              "options": "CPU"
             },
             "properties": [
               {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
                 "id": "decimals",
-                "value": 3
+                "value": 1
               }
             ]
           },

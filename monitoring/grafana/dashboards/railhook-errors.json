@@ -102,7 +102,7 @@
             "type": "loki",
             "uid": "railhook-loki"
           },
-          "expr": "sum by (service, level) (count_over_time({service=~\"$service\"} | level=~\"(?i)(error|fatal|panic|crit|alert|emerg|warn|warning)\" [$__interval]))",
+          "expr": "sum by (service, level) (count_over_time({service=~\"$service\"} | level=~\"error|warn\" [$__interval]))",
           "refId": "A",
           "legendFormat": "{{service}} {{level}}"
         }
@@ -161,10 +161,10 @@
             "type": "loki",
             "uid": "railhook-loki"
           },
-          "expr": "sum by (service) (count_over_time({service=~\"$service\"} | level=~\"(?i)(error|fatal|panic|crit|alert|emerg)\" [$__range]))",
+          "expr": "sum by (service) (count_over_time({service=~\"$service\"} | level=\"error\" [$__interval]))",
           "refId": "A",
           "legendFormat": "{{service}}",
-          "queryType": "instant"
+          "queryType": "range"
         }
       ],
       "fieldConfig": {
@@ -190,8 +190,7 @@
           },
           "color": {
             "mode": "thresholds"
-          },
-          "displayName": "${__field.labels.service}"
+          }
         },
         "overrides": []
       },
@@ -232,7 +231,7 @@
             "type": "loki",
             "uid": "railhook-loki"
           },
-          "expr": "topk(15, sum by (service, logger_name, message) (count_over_time({service=~\"api|worker\"} | level=~\"(?i)(error|fatal|panic|crit|alert|emerg)\" | json message=\"message\", logger_name=\"logger_name\" | __error__=\"\" [$__range])))",
+          "expr": "topk(15, sum by (service, logger_name, message) (count_over_time({service=~\"api|worker\"} | level=\"error\" | json message=\"message\", logger_name=\"logger_name\" | __error__=\"\" [$__range])))",
           "refId": "A",
           "legendFormat": "",
           "queryType": "instant",
@@ -307,7 +306,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "sum by (status) (rate(http_server_requests_seconds_count{job=\"railhook-api\", status=~\"[45]..\"}[$__rate_interval]))",
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{job=\"railhook-api\", status=~\"[45]..\"}[$__rate_interval])) or label_replace(sum(rate(http_server_requests_seconds_count{job=\"railhook-api\"}[$__rate_interval])) * 0, \"status\", \"none\", \"\", \"\")",
           "refId": "A",
           "legendFormat": "{{status}}"
         }
@@ -366,7 +365,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "sum(rate(http_server_requests_seconds_count{job=\"railhook-api\", status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=\"railhook-api\"}[5m])) * 100",
+          "expr": "(sum(rate(http_server_requests_seconds_count{job=\"railhook-api\", status=~\"5..\"}[5m])) or vector(0)) / (sum(rate(http_server_requests_seconds_count{job=\"railhook-api\"}[5m])) > 0) * 100 or sum(rate(http_server_requests_seconds_count{job=\"railhook-api\"}[5m])) * 0",
           "refId": "A",
           "legendFormat": "5xx %"
         }
@@ -425,7 +424,7 @@
             "type": "prometheus",
             "uid": "railhook-prometheus"
           },
-          "expr": "sum by (status, uri) (rate(http_server_requests_seconds_count{job=\"railhook-api\", status=~\"401|403|429\"}[$__rate_interval]))",
+          "expr": "sum by (status, uri) (rate(http_server_requests_seconds_count{job=\"railhook-api\", status=~\"401|403|429\"}[$__rate_interval])) or label_replace(sum(rate(http_server_requests_seconds_count{job=\"railhook-api\"}[$__rate_interval])) * 0, \"status\", \"none\", \"\", \"\")",
           "refId": "A",
           "legendFormat": "{{status}} {{uri}}"
         }
@@ -484,7 +483,7 @@
             "type": "loki",
             "uid": "railhook-loki"
           },
-          "expr": "sum by (status) (count_over_time({service=\"ui\"} | pattern `<_> - <_> [<_>] \"<method> <uri> <_>\" <status> <_>` | status=~\"[45]..\" [$__interval]))",
+          "expr": "sum by (status) (count_over_time({service=\"ui\"} | pattern `<_> - <_> [<_>] \"<method> <uri> <_>\" <status> <_>` | status=~\"[45]..\" [$__interval])) or label_replace(sum(count_over_time({service=\"ui\"} [$__interval])) * 0, \"status\", \"none\", \"\", \"\")",
           "refId": "A",
           "legendFormat": "{{status}}"
         }

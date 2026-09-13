@@ -2,6 +2,7 @@ package com.webhook.platform.worker.config;
 
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.MicrometerProducerListener;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 
@@ -18,6 +20,12 @@ import java.util.Map;
 
 @Configuration
 public class KafkaProducerConfig {
+
+    private final MeterRegistry meterRegistry;
+
+    public KafkaProducerConfig(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
@@ -50,9 +58,18 @@ public class KafkaProducerConfig {
         return configProps;
     }
 
+    /**
+     * Spring times template calls only. Send rate, queue time, batch size and connections reach
+     * Prometheus through this listener or not at all, so every factory here gets one.
+     */
+    private <V> ProducerFactory<String, V> measured(DefaultKafkaProducerFactory<String, V> factory) {
+        factory.addListener(new MicrometerProducerListener<>(meterRegistry));
+        return factory;
+    }
+
     @Bean
     public ProducerFactory<String, DeliveryMessage> producerFactory() {
-        return new DefaultKafkaProducerFactory<>(commonProducerProps());
+        return measured(new DefaultKafkaProducerFactory<>(commonProducerProps()));
     }
 
     @Bean
@@ -62,7 +79,7 @@ public class KafkaProducerConfig {
 
     @Bean
     public ProducerFactory<String, IncomingForwardMessage> incomingForwardProducerFactory() {
-        return new DefaultKafkaProducerFactory<>(commonProducerProps());
+        return measured(new DefaultKafkaProducerFactory<>(commonProducerProps()));
     }
 
     @Bean
@@ -72,7 +89,7 @@ public class KafkaProducerConfig {
 
     @Bean(name = "deadLetterKafkaTemplate")
     public KafkaOperations<String, Object> deadLetterKafkaTemplate() {
-        ProducerFactory<String, Object> producerFactory = new DefaultKafkaProducerFactory<>(commonProducerProps());
+        ProducerFactory<String, Object> producerFactory = measured(new DefaultKafkaProducerFactory<>(commonProducerProps()));
         return new KafkaTemplate<>(producerFactory);
     }
 }

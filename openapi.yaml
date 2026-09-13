@@ -11014,6 +11014,8 @@ components:
         lastSeenAt:
           type: string
           format: date-time
+        platformAdmin:
+          type: boolean
     OrganizationMembership:
       type: object
       properties:
@@ -11253,6 +11255,8 @@ components:
         lastSeenAt:
           type: string
           format: date-time
+        platformAdmin:
+          type: boolean
     PageAdminMemberResponse:
       type: object
       properties:

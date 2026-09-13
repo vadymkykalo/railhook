@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.config;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -85,7 +86,7 @@ class KafkaAckOrderingIntegrationTest {
     void committedOffset_neverRunsAheadOfIncompleteWork_whenAckedOutOfOrder() throws Exception {
         // KafkaConsumerConfig is instantiated directly (not via Spring context) so this
         // test exercises the exact container factory the worker registers in production.
-        KafkaConsumerConfig config = new KafkaConsumerConfig(mock(KafkaOperations.class));
+        KafkaConsumerConfig config = new KafkaConsumerConfig(mock(KafkaOperations.class), new SimpleMeterRegistry());
         ReflectionTestUtils.setField(config, "bootstrapServers", KAFKA.getBootstrapServers());
         ReflectionTestUtils.setField(config, "groupId", GROUP);
         ReflectionTestUtils.setField(config, "incomingGroupId", "unused-incoming-group");
