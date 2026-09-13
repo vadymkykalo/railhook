@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 import { DEFAULT_TIMEOUT_MS, EXPORT_TIMEOUT_MS, http } from '../http';
@@ -12,7 +12,7 @@ describe('http client session refresh', () => {
   type Reply = { status: number; data?: unknown };
   let refreshReplies: Reply[];
   let refreshCalls: number;
-  let onLogout: ReturnType<typeof vi.fn>;
+  let onLogout: Mock<() => void>;
   const client = (http as unknown as { client: { defaults: { adapter: unknown } } }).client;
   let originalAdapter: unknown;
 
@@ -27,7 +27,7 @@ describe('http client session refresh', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     refreshCalls = 0;
-    onLogout = vi.fn();
+    onLogout = vi.fn<() => void>();
     http.setOnLogout(onLogout);
     http.setToken('expired');
     originalAdapter = client.defaults.adapter;
