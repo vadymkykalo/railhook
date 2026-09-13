@@ -1,0 +1,88 @@
+---
+title: Platform admin panel
+description: Give the people who run your deployment a view of every organization and account, and what stops anyone else from getting it.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Use this page to open the platform admin panel on your deployment: every organization and account in one place, usage against plan limits, recent sign-ups, and suspension. It is for the people who run the instance, not for your customers.
+
+## Who is a platform admin
+
+A person is a platform admin when all four of these hold, checked on the server for every admin request:
+
+- Their email address is listed in `PLATFORM_ADMIN_EMAILS`.
+- The address is verified.
+- The account is active, not disabled.
+- They signed in less than 12 hours ago. After that the panel asks them to sign in again.
+
+An organization `OWNER` is not a platform admin. Owning an organization gives no access to any other organization, however the role is used.
+
+<Aside type="caution">
+List only addresses you control, and make sure each person's account is protected. The panel shows member addresses of every organization on the deployment.
+</Aside>
+
+## Turn it on
+
+<Steps>
+
+1. **Sign up or sign in** at your Railhook address with the account you want to use, and verify the address.
+
+2. **List the address** in `.env` next to `docker-compose.yml`. Several addresses are separated by commas:
+
+   ```bash title=".env"
+   PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com
+   ```
+
+   Addresses are compared without regard to case or surrounding spaces, and only whole addresses match.
+
+3. **Restart the API** so it reads the new value:
+
+   ```bash
+   docker compose up -d api
+   ```
+
+4. **Sign in again.** A **Platform admin** entry appears at the bottom of the sidebar and opens `/admin/platform`.
+
+</Steps>
+
+On Kubernetes, set the Helm value instead:
+
+```yaml title="values.yaml"
+platformAdmin:
+  emails: "ops@example.com,oncall@example.com"
+```
+
+Leaving the variable empty, which is the default, turns the panel off: nobody sees the entry and the admin API refuses every signed-in user.
+
+## What the panel shows
+
+| View | What it has |
+|---|---|
+| **Overview** | Organizations, accounts, sign-ups today, in 7 and in 30 days, events today and in 30 days, deliveries succeeded and failed in 24 hours, active tunnels, organizations at 80% or more of their monthly event limit, and the latest sign-ups |
+| **Organizations** | Name, plan, owner address, created, members, projects, events this month against the plan limit, and status. Search by name or by a member's address |
+| **Organization detail** | Members with role, status and sign-in method, projects, usage against the plan, the organization's recent audit log, and suspend or reinstate |
+| **Users** | Every account: address, verified, status, sign-in methods, organizations, created and last activity |
+
+The panel never returns password hashes, tokens, API key material, endpoint secrets or payloads. The organization's audit log is shown without the request bodies it records.
+
+## Suspending an organization
+
+Suspending stops an organization changing anything, event ingestion included, until it is reinstated. Its members can still sign in and read, and are shown the reason you give. A payment does not lift a suspension.
+
+The panel asks you to type the organization's name and a reason before it suspends or reinstates. The suspension records your own address as the person who did it.
+
+## What is recorded
+
+Every request to the admin API is rate-limited to 120 per minute per admin, and written to the audit log as `PLATFORM_ADMIN_ACCESS` with the admin, the address the request came from, the organization or account it concerned, and the outcome. These rows are kept apart from every organization's own audit log. A suspension or reinstatement is also written to the audit log of the organization it affected.
+
+## The operator token
+
+`PLATFORM_ADMIN_TOKEN` is a separate credential for scripts, sent in the `X-Platform-Admin-Token` header. It reaches the same admin API, and it is the only credential that can rotate encryption keys: a signed-in platform admin cannot. Leave it empty unless you need it. Both variables are described in the [configuration reference](/docs/self-hosting/configuration/), and every admin endpoint in the [API reference](/docs/api-reference/).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Configuration" href="/docs/self-hosting/configuration/" description="Every environment variable, including both platform admin settings." />
+  <LinkCard title="Organizations and roles" href="/docs/platform/organizations-rbac/" description="What organization members can do, and how tenants are kept apart." />
+  <LinkCard title="Monitoring" href="/docs/self-hosting/monitoring/" description="Health checks, metrics and alerts for the deployment itself." />
+</CardGrid>
