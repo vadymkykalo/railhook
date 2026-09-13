@@ -1309,12 +1309,23 @@ jobs:
           cache-from: type=gha,scope=ui
       
       - name: Install Trivy
+        env:
+          TRIVY_VERSION: v0.74.0
         run: |
-          # Same reason as the kubeconform download: fetch, then run.
-          curl -sfL --retry 5 --retry-delay 2 --retry-all-errors \
-            -o install-trivy.sh \
-            https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh
-          sudo sh install-trivy.sh -b /usr/local/bin
+          # Same reason as the kubeconform download: fetch, then run. Pinned, and the whole install
+          # is retried: the installer downloads the release tarball itself, and one TLS failure there
+          # (curl exit 35 on the 2.19.2 hotfix) left no trivy, so every scan step failed with
+          # "command not found" and a required check went red for reasons unrelated to the images.
+          for attempt in 1 2 3; do
+            if curl -sfL --retry 5 --retry-delay 2 --retry-all-errors \
+                 -o install-trivy.sh \
+                 "https://raw.githubusercontent.com/aquasecurity/trivy/${TRIVY_VERSION}/contrib/install.sh" \
+               && sudo sh install-trivy.sh -b /usr/local/bin "${TRIVY_VERSION}"; then
+              break
+            fi
+            echo "Trivy install attempt ${attempt} failed; retrying"
+            sleep $((attempt * 15))
+          done
           trivy --version
       
       - name: Download Trivy DBs
