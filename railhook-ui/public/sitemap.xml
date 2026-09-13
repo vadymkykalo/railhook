@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://example.com/</loc>
+    <loc>https://site-url.railhook.invalid/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://example.com/pricing</loc>
+    <loc>https://site-url.railhook.invalid/pricing</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://example.com/contact</loc>
+    <loc>https://site-url.railhook.invalid/contact</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
