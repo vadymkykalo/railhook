@@ -3,7 +3,6 @@ package com.webhook.platform.worker.config;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
-import com.webhook.platform.worker.service.ShutdownRejectedException;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -165,11 +164,6 @@ public class KafkaConsumerConfig {
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
             recoverer,
             new FixedBackOff(retryIntervalMs, maxRetries)
-        );
-
-        // ShutdownRejectedException: no point retrying on a dying instance — send straight to DLQ
-        errorHandler.addNotRetryableExceptions(
-                ShutdownRejectedException.class
         );
 
         errorHandler.setRetryListeners((record, ex, deliveryAttempt) ->
