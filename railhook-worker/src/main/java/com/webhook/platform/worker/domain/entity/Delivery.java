@@ -110,6 +110,13 @@ public class Delivery {
     @Column(name = "last_attempt_at")
     private Instant lastAttemptAt;
 
+    /**
+     * When a person last put this Delivery back on its Retry Ladder; null if never. Written by
+     * the api. The hard-cap escalation measures a Delivery's age from here when it is set.
+     */
+    @Column(name = "ladder_resumed_at")
+    private Instant ladderResumedAt;
+
     @Column(name = "succeeded_at")
     private Instant succeededAt;
 

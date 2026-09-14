@@ -30,13 +30,18 @@ import java.util.concurrent.atomic.AtomicLong;
  * whose Destination stayed unreachable, or whose Attempt row was stranded PENDING, sat there
  * indefinitely with no terminal state and no notification.
  *
- * <h2>Why the age is measured from the Incoming Event, not the Attempt row</h2>
+ * <h2>Why the age is measured from the Forward's attempt 1</h2>
  *
  * <p>Incoming inserts a new {@code incoming_forward_attempts} row per Attempt, so the newest
  * row's {@code created_at} is freshly stamped even for a Forward that has been retrying since
  * yesterday. Escalating on it would only ever catch the last few minutes of a long failure.
- * {@code incoming_events.received_at} is when the obligation was taken on, and is the true
- * analogue of {@code deliveries.created_at} on the Outgoing side.
+ *
+ * <p>Nor is it the Incoming Event's {@code received_at}, which it once was. A Failed Messages
+ * retry and a Replay each start a new Forward — its own session, its own attempt 1 — for a
+ * webhook that may have arrived last week, and ageing that Forward from the webhook's arrival sent
+ * it straight back to the DLQ on the next cycle, before a single Attempt. The attempt-1 row of the
+ * same session is when this obligation was taken on: the true analogue of
+ * {@code deliveries.created_at} on the Outgoing side.
  *
  * <h2>Its own cap, not the Delivery one</h2>
  *
@@ -98,7 +103,7 @@ public class StaleForwardEscalationService {
 
     private void refreshOldestPendingAge() {
         try {
-            Instant oldest = attemptRepository.findOldestPendingReceivedAt();
+            Instant oldest = attemptRepository.findOldestPendingForwardStartedAt();
             oldestPendingAgeSeconds.set(oldest != null
                     ? Math.max(0, Duration.between(oldest, Instant.now()).getSeconds())
                     : 0);
@@ -124,7 +129,7 @@ public class StaleForwardEscalationService {
                 }
                 attemptRepository.saveAll(stale);
 
-                log.warn("Hard-cap escalation: moved {} stale forwards (received before {}) to DLQ",
+                log.warn("Hard-cap escalation: moved {} stale forwards (started before {}) to DLQ",
                         stale.size(), cutoff);
                 return stale;
             });

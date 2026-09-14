@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,6 +27,10 @@ public class DeliverySpecification {
             }
             return cb.equal(root.get("status"), status);
         };
+    }
+
+    public static Specification<Delivery> hasStatusIn(Collection<DeliveryStatus> statuses) {
+        return (root, query, cb) -> root.get("status").in(statuses);
     }
 
     public static Specification<Delivery> hasEndpointId(UUID endpointId) {

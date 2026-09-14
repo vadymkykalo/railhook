@@ -78,7 +78,7 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
      */
     private Account register(String email) throws Exception {
         MvcResult result;
-        User existing = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        User existing = userRepository.findByEmail(email.toLowerCase(java.util.Locale.ROOT)).orElse(null);
         if (existing == null) {
             result = mockMvc.perform(post("/api/v1/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -102,7 +102,7 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
         String token = objectMapper.readValue(result.getResponse().getContentAsString(), AuthResponse.class)
                 .getAccessToken();
 
-        User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
+        User user = userRepository.findByEmail(email.toLowerCase(java.util.Locale.ROOT)).orElseThrow();
         MvcResult orgs = mockMvc.perform(get("/api/v1/orgs").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andReturn();

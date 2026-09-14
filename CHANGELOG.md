@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.7] - 2026-09-14
+
+### Upgrading
+
+- **Email addresses become case-insensitive, and the upgrade refuses to guess.** Existing
+  addresses are converted to lower case. If two accounts have addresses that differ only in case
+  or surrounding spaces, the migration stops, naming their user ids, and the API does not start
+  until all but one of them are changed or removed. Check first:
+  `select lower(btrim(email)), count(*) from users group by 1 having count(*) > 1;`
+
+### Changed
+
+- **A resend keeps the delivery's history.** Resending a delivery, alone or in bulk, no longer
+  resets its attempt count: it grants 3 more attempts, the first sent immediately, and later ones
+  wait at the step of the retry ladder the delivery had already reached. `fromAttempt=N` grants
+  the attempts that remained from attempt N. `maxAttempts` is capped at 100.
+- **Alert rule emails go only to verified members of the organization**, at most 10 per rule.
+  Other addresses are refused when the rule is saved.
+
+### Fixed
+
+- **A slow retry is no longer sent twice.** A retry that started more than five minutes after it
+  was scheduled, for example under consumer lag, could be reset and sent to your endpoint again
+  while the first attempt was still in flight.
+- **Resending a delivery that is still in progress answers 409** instead of sending it a second
+  time. Bulk resend without a status filter now picks only failed and abandoned deliveries.
+- **Retried deliveries older than four days stay retried.** They went straight back to Failed
+  Messages after a retry or resend; the age limit now counts from when you last retried the
+  delivery.
+- **Retrying or replaying an incoming webhook works after 24 hours.** The new forward gets its own
+  24-hour window instead of inheriting the age of the original webhook, and
+  `forward_oldest_pending_age_seconds` measures the same way.
+- **Starting a Time Machine replay returns immediately**, and the replay runs in the background.
+  Cancelling and the two-replays-per-project limit work while it runs, and one failing batch no
+  longer discards the whole session.
+- **A host that temporarily fails to resolve is retried.** A delivery or forward whose DNS lookup
+  fails goes onto the retry ladder, and lands in Failed Messages if it never resolves, instead of
+  failing permanently on the first error.
+- **A provider resend is answered 202.** A provider resending a webhook Railhook already accepted,
+  with the same provider event id, gets the stored event back, not 401 "replay attack", nor 429
+  when the organization is over quota. The signature is still verified.
+- **Form-encoded incoming webhooks verify.** Slack slash commands and interactivity, GitHub's form
+  content type and generic HMAC senders posting forms were refused with 401; they are now
+  verified, stored and forwarded as the exact bytes the provider sent.
+- **Stripe webhooks verify while a signing secret is being rolled.** Any of the `v1` signatures
+  Stripe sends may match.
+- **Nightly data retention completes.** An event with a failed workflow trigger made the whole
+  night's retention fail and roll back, every night. Batches now commit independently, so one
+  failure no longer undoes the rest.
+- **Plan retention keeps deliveries in flight.** Deliveries still pending or being retried, such
+  as those created by a replay of an older event, are no longer deleted.
+- **Usage and quota count incoming webhooks.** Monthly usage and quota checks now count incoming
+  webhooks as well as events, and stay accurate after a Redis error or eviction, for every
+  organization.
+- **Alerts notify again after they recover.** An alert now resolves itself when its condition
+  recovers, so the next outage notifies you instead of staying silent until someone resolves the
+  old alert by hand. Resolved alert events older than 90 days are removed daily.
+- **Email addresses are not case-sensitive.** A different-case copy of an existing address can no
+  longer be registered, and Google sign-in and email change no longer break when one exists.
+
+### Security
+
+- **More internal addresses are refused as destinations.** Destination and endpoint URLs pointing
+  at `[::]`, IPv6 multicast, or IPv6 forms of private IPv4 addresses (IPv4-mapped, NAT64, 6to4)
+  are refused, both when saved and at connect time.
+
 ## [2.20.6] - 2026-09-14
 
 ### Fixed

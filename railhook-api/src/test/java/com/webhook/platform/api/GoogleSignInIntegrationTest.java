@@ -169,6 +169,28 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void aCaseVariantOfTheAddressCannotBreakTheOwnersGoogleSignIn() throws Exception {
+        registerWithPassword("grace@navy.dev", "Navy");
+
+        // Someone tries to register the owner's address in other letters. It used to succeed, and
+        // the owner's Google sign-in then found two accounts and failed on every attempt.
+        RegisterRequest variant = RegisterRequest.builder()
+                .email("Grace@Navy.dev").password("Password1234!").organizationName("Squatter").build();
+        mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(variant)))
+                .andExpect(status().isConflict());
+
+        SignInStart start = start("/admin/projects");
+        nextIdToken = idToken(start.nonce(), Map.of("sub", "g-grace-navy", "email", "GRACE@navy.dev"));
+        Map<String, String> query = query(callback(start));
+        assertThat(query).doesNotContainKey("new");
+
+        String accessToken = exchange(query.get("code"));
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + accessToken))
+                .andExpect(jsonPath("$.organization.name").value("Navy"));
+    }
+
+    @Test
     void anUnverifiedAccountLosesAPasswordNobodyProvedWasTheirs() throws Exception {
         // Someone registers the victim's address with a password of their own and never verifies
         // it. When the real owner arrives through Google, the account must not keep a password the

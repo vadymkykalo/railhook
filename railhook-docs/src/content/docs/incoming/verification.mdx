@@ -22,7 +22,7 @@ A request that fails verification is answered `401` and is not stored.
 |---|---|---|
 | `GITHUB` | `X-Hub-Signature-256` | `sha256=` followed by the hex HMAC-SHA256 of the raw body. |
 | `GITLAB` | `X-Gitlab-Token` | The header must equal the secret. GitLab sends a token, not a signature. |
-| `STRIPE` | `Stripe-Signature` | `t=…,v1=…`: hex HMAC-SHA256 of `<t>.<raw body>`. `t` must be within 300 seconds of now. |
+| `STRIPE` | `Stripe-Signature` | `t=…,v1=…`: hex HMAC-SHA256 of `<t>.<raw body>`. `t` must be within 300 seconds of now. While a secret is being rolled Stripe sends one `v1` per secret; the request verifies if any of them matches. |
 | `SHOPIFY` | `X-Shopify-Hmac-SHA256` | Base64 HMAC-SHA256 of the raw body. |
 | `SLACK` | `X-Slack-Signature`, `X-Slack-Request-Timestamp` | `v0=` followed by the hex HMAC-SHA256 of `v0:<timestamp>:<raw body>`. The timestamp must be within 300 seconds of now. |
 | `TWILIO` | `X-Twilio-Signature` | Base64 HMAC-SHA1 with the auth token. For form-encoded requests it covers the URL followed by every parameter sorted by name; for other requests it covers the URL, and the `bodySHA256` query parameter must match the body. |
@@ -79,6 +79,8 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
 ## Replayed signatures
 
 A verified signature is remembered for a window, and a second request with the same signature inside that window is refused with `401`. For providers whose signature carries a timestamp this suppresses duplicates. For a bare hex digest it is the only protection against a captured request being sent again.
+
+A request carrying a provider event id that Railhook has already stored is a resend, not a replay: it still has to verify, and is then answered `202` with the stored event. See [provider resends](/docs/incoming/sources/#provider-resends).
 
 | Variable | Default |
 |---|---|

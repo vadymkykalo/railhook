@@ -19,18 +19,18 @@ Two operations are easy to confuse. Resending a delivery puts the same delivery 
 
 ## Resend one delivery
 
-`POST /api/v1/deliveries/{id}/replay` puts the delivery back to `PENDING` with its attempt count at zero and queues it. It answers `202`. A delivery that already succeeded is refused rather than sent twice.
+`POST /api/v1/deliveries/{id}/replay` puts the delivery back to `PENDING` and gives it 3 more attempts, the first sent straight away. It answers `202`. The attempt count and history are kept, so the new attempts are numbered after the old ones and wait at the step of the ladder the delivery already reached. A delivery that already succeeded is refused rather than sent twice, and one with an attempt under way is refused with `409` until that attempt finishes.
 
 Two query parameters change what it does:
 
 | Parameter | Effect |
 |---|---|
 | `dryRun=true` | Sends nothing. Returns the target URL, the event type, the payload, the `Idempotency-Key` that would go out, the previous attempts, and a plan: `WILL_SEND`, `SKIP` when the delivery already succeeded, or `BLOCKED` when the endpoint is disabled. |
-| `fromAttempt=N` | Sets the attempt count to N-1, so the next request is attempt N and later waits continue from that point of the ladder. N must be between 1 and the number of attempts already made. |
+| `fromAttempt=N` | Gives the delivery the attempts it had left from attempt N instead of 3: its maximum attempts minus N-1. N must be between 1 and the number of attempts already made. |
 
-Use `fromAttempt` when restarting at the one-minute wait is wrong, for example after a receiver was down for hours, or when you want the remaining attempts rather than a fresh set.
+Use `fromAttempt` when 3 attempts are not enough, for example after a receiver was down for hours: `fromAttempt=1` gives back as many attempts as the whole ladder has.
 
-To resend many deliveries at once, use `POST /api/v1/deliveries/bulk-replay` with up to 1000 `deliveryIds`, or with a `projectId` plus `status` and `endpointId` filters and a `limit` of up to 5000. The response says how many were replayed, how many were skipped, and whether more matched.
+To resend many deliveries at once, use `POST /api/v1/deliveries/bulk-replay` with up to 1000 `deliveryIds`, or with a `projectId` plus `status` and `endpointId` filters and a `limit` of up to 5000. Without `status`, only deliveries that failed or were moved to Failed Messages are resent. A delivery that succeeded or has an attempt under way is always skipped. The response says how many were replayed, how many were skipped, and whether more matched.
 
 To resend deliveries that were abandoned, you can also retry them from Failed Messages, see [Retries and failed messages](/docs/outgoing/retries/#failed-messages).
 

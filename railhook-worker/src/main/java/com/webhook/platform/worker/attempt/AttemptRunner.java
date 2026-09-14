@@ -101,6 +101,21 @@ public class AttemptRunner {
         // Before admission: no number of retries resolves an address we may not talk to.
         try {
             UrlValidator.validateWebhookUrl(ctx.url(), allowPrivateIps, allowedHosts);
+        } catch (UrlValidator.UnresolvableHostException e) {
+            // A name that did not resolve is not a refused address. It shared the terminal branch
+            // below, so one bad minute of DNS failed the obligation for good — outside the DLQ,
+            // where nobody is offered a retry. The lookup was an Attempt that really failed, so it
+            // costs a rung (invariant 5's converse) and takes no permit, having sent nothing.
+            String reason = "DNS_RESOLUTION_FAILED: " + e.getMessage();
+            log.warn("{}: {}", ctx.description(), reason);
+            try {
+                store.attemptStarting(claim);
+            } catch (Exception startFailure) {
+                log.error("{}: could not spend the rung for a failed lookup: {}",
+                        ctx.description(), startFailure.getMessage(), startFailure);
+            }
+            fail(store, metrics, claim, ctx, reason, null, null, elapsed(startedAt));
+            return;
         } catch (UrlValidator.InvalidUrlException e) {
             String reason = "SSRF_PROTECTION: " + e.getMessage();
             log.error("{}: {}", ctx.description(), reason);

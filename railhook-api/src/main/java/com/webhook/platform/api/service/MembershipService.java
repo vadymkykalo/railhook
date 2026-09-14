@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.audit.AuditAction;
+import com.webhook.platform.api.domain.EmailAddresses;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.enums.MembershipRole;
@@ -89,13 +90,14 @@ public class MembershipService {
             throw new ForbiddenException("Only owners can add members");
         }
 
-        boolean isNewUser = !userRepository.existsByEmail(request.getEmail());
+        String email = EmailAddresses.normalize(request.getEmail());
+        boolean isNewUser = !userRepository.existsByEmail(email);
 
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmail(email)
                 .orElseGet(() -> {
                     String tempPass = generateTemporaryPassword();
                     User newUser = User.builder()
-                            .email(request.getEmail())
+                            .email(email)
                             .passwordHash(passwordEncoder.encode(tempPass))
                             .status(UserStatus.ACTIVE)
                             .build();

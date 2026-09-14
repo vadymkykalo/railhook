@@ -23,16 +23,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -50,6 +50,7 @@ public class ReplayService {
     private final ObjectMapper objectMapper;
     private final DeliveryDispatch deliveryDispatch;
     private final SequenceGeneratorService sequenceGeneratorService;
+    private final ApplicationEventPublisher events;
     private final TransactionTemplate txTemplate;
 
     private final Counter replayEventsProcessedCounter;
@@ -76,6 +77,7 @@ public class ReplayService {
             ObjectMapper objectMapper,
             DeliveryDispatch deliveryDispatch,
             SequenceGeneratorService sequenceGeneratorService,
+            ApplicationEventPublisher events,
             PlatformTransactionManager transactionManager,
             MeterRegistry meterRegistry) {
         this.replaySessionRepository = replaySessionRepository;
@@ -87,7 +89,11 @@ public class ReplayService {
         this.objectMapper = objectMapper;
         this.deliveryDispatch = deliveryDispatch;
         this.sequenceGeneratorService = sequenceGeneratorService;
+        this.events = events;
         this.txTemplate = new TransactionTemplate(transactionManager);
+        // Each batch commits on its own whatever the caller holds: joined to an outer transaction,
+        // one failing batch marked all of it rollback-only.
+        this.txTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
         this.replayEventsProcessedCounter = Counter.builder("replay.events.processed")
                 .description("Total events processed by replay").register(meterRegistry);
@@ -161,7 +167,8 @@ public class ReplayService {
         session = replaySessionRepository.saveAndFlush(session);
         log.info("Created replay session {} for project {} — {} events", session.getId(), projectId, eventCount);
 
-        executeReplayAsync(session.getId());
+        // Run by ReplaySessionLauncher once this transaction commits, never on this thread.
+        events.publishEvent(new ReplaySessionCreated(session.getId()));
 
         return mapToResponse(session);
     }
@@ -204,17 +211,19 @@ public class ReplayService {
         return get(projectId, sessionId);
     }
 
-    // ========== Async execution ==========
+    // ========== Execution ==========
 
-    @Async("replayTaskExecutor")
-    public CompletableFuture<Void> executeReplayAsync(UUID sessionId) {
+    /**
+     * Runs a committed session to the end, batch by batch. Called by {@link ReplaySessionLauncher}
+     * on the replay executor; never throws, a failure is written to the session instead.
+     */
+    public void run(UUID sessionId) {
         try {
             executeReplay(sessionId);
         } catch (Exception e) {
             log.error("Replay session {} failed with unexpected error", sessionId, e);
             markFailed(sessionId, e.getMessage());
         }
-        return CompletableFuture.completedFuture(null);
     }
 
     private void executeReplay(UUID sessionId) {

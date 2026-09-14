@@ -13,10 +13,11 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.IntSupplier;
 
 @Service
 @Slf4j
@@ -27,6 +28,7 @@ public class DataRetentionService {
     private final TunnelRequestLogRepository tunnelRequestLogRepository;
     private final EventRepository eventRepository;
     private final MeterRegistry meterRegistry;
+    private final TransactionOperations transactions;
     private final int deliveryAttemptsRetentionDays;
     private final int successfulAttemptsRetentionDays;
     private final int incomingEventsRetentionDays;
@@ -46,6 +48,7 @@ public class DataRetentionService {
             TunnelRequestLogRepository tunnelRequestLogRepository,
             EventRepository eventRepository,
             MeterRegistry meterRegistry,
+            TransactionOperations transactions,
             @Value("${data-retention.delivery-attempts-retention-days:90}") int deliveryAttemptsRetentionDays,
             @Value("${data-retention.successful-attempts-retention-days:14}") int successfulAttemptsRetentionDays,
             @Value("${data-retention.incoming-events-retention-days:30}") int incomingEventsRetentionDays,
@@ -58,6 +61,7 @@ public class DataRetentionService {
         this.tunnelRequestLogRepository = tunnelRequestLogRepository;
         this.eventRepository = eventRepository;
         this.meterRegistry = meterRegistry;
+        this.transactions = transactions;
         this.deliveryAttemptsRetentionDays = deliveryAttemptsRetentionDays;
         this.successfulAttemptsRetentionDays = successfulAttemptsRetentionDays;
         this.incomingEventsRetentionDays = incomingEventsRetentionDays;
@@ -105,7 +109,6 @@ public class DataRetentionService {
     @SystemTenant
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
     @SchedulerLock(name = "cleanupOldSuccessfulAttempts", lockAtMostFor = "9m", lockAtLeastFor = "1m")
-    @Transactional
     public void cleanupOldSuccessfulAttempts() {
         Instant cutoffTime = Instant.now().minusSeconds(successfulAttemptsRetentionDays * 86400L);
         
@@ -115,7 +118,7 @@ public class DataRetentionService {
         int deletedInBatch;
         
         do {
-            deletedInBatch = deliveryAttemptRepository.deleteOldSuccessfulAttempts(cutoffTime, batchSize);
+            deletedInBatch = inOwnTransaction(() -> deliveryAttemptRepository.deleteOldSuccessfulAttempts(cutoffTime, batchSize));
             totalDeleted += deletedInBatch;
             
             if (deletedInBatch > 0) {
@@ -147,7 +150,6 @@ public class DataRetentionService {
     @SystemTenant
     @Scheduled(cron = "${data-retention.limit-enforcement-cron:0 */30 * * * *}")
     @SchedulerLock(name = "enforcePerDeliveryAttemptLimits", lockAtMostFor = "29m", lockAtLeastFor = "1m")
-    @Transactional
     public void enforcePerDeliveryAttemptLimits() {
         log.info("Starting per-delivery attempt limit enforcement (max {} per delivery)", maxAttemptsPerDelivery);
         
@@ -155,7 +157,7 @@ public class DataRetentionService {
         int deletedInBatch;
         
         do {
-            deletedInBatch = deliveryAttemptRepository.deleteExcessAttemptsPerDelivery(maxAttemptsPerDelivery, batchSize);
+            deletedInBatch = inOwnTransaction(() -> deliveryAttemptRepository.deleteExcessAttemptsPerDelivery(maxAttemptsPerDelivery, batchSize));
             totalDeleted += deletedInBatch;
             
             if (deletedInBatch > 0) {
@@ -180,7 +182,6 @@ public class DataRetentionService {
     @SystemTenant
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
     @SchedulerLock(name = "cleanupOldIncomingEvents", lockAtMostFor = "9m", lockAtLeastFor = "1m")
-    @Transactional
     public void cleanupOldIncomingEvents() {
         Instant cutoffTime = Instant.now().minusSeconds(incomingEventsRetentionDays * 86400L);
 
@@ -190,7 +191,7 @@ public class DataRetentionService {
         int deletedInBatch;
 
         do {
-            deletedInBatch = incomingEventRepository.deleteOldIncomingEvents(cutoffTime, batchSize);
+            deletedInBatch = inOwnTransaction(() -> incomingEventRepository.deleteOldIncomingEvents(cutoffTime, batchSize));
             totalDeleted += deletedInBatch;
 
             if (deletedInBatch > 0) {
@@ -225,7 +226,6 @@ public class DataRetentionService {
     @SystemTenant
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
     @SchedulerLock(name = "cleanupOldEvents", lockAtMostFor = "55m", lockAtLeastFor = "1m")
-    @Transactional
     public void cleanupOldEvents() {
         if (eventsRetentionDays < 0) {
             log.debug("Events cleanup: retention is unlimited, nothing to do");
@@ -238,7 +238,7 @@ public class DataRetentionService {
         int totalDeleted = 0;
         int deletedInBatch;
         do {
-            deletedInBatch = eventRepository.deleteOldEvents(cutoffTime, batchSize);
+            deletedInBatch = inOwnTransaction(() -> eventRepository.deleteOldEvents(cutoffTime, batchSize));
             totalDeleted += deletedInBatch;
         } while (deletedInBatch >= batchSize);
 
@@ -275,13 +275,12 @@ public class DataRetentionService {
     @SystemTenant
     @Scheduled(cron = "${data-retention.burst-cleanup-cron:0 0 */4 * * *}")
     @SchedulerLock(name = "burstCleanupSuccessfulAttempts", lockAtMostFor = "9m", lockAtLeastFor = "1m")
-    @Transactional
     public void burstCleanupSuccessfulAttempts() {
         Instant cutoffTime = Instant.now().minusSeconds(successfulAttemptsRetentionDays * 86400L);
         int totalDeleted = 0;
         int deletedInBatch;
         do {
-            deletedInBatch = deliveryAttemptRepository.deleteOldSuccessfulAttempts(cutoffTime, batchSize);
+            deletedInBatch = inOwnTransaction(() -> deliveryAttemptRepository.deleteOldSuccessfulAttempts(cutoffTime, batchSize));
             totalDeleted += deletedInBatch;
         } while (deletedInBatch >= batchSize);
 
@@ -300,6 +299,19 @@ public class DataRetentionService {
     // now partitioned weekly (V053) and PartitionMaintenanceService.dropExpiredPartitions()
     // drops whole expired partitions instead. tunnelRequestLogRepository.deleteByCreatedAtBefore()
     // is left in place for manual/ad-hoc use but is no longer scheduled.
+
+    /**
+     * Runs one delete batch in a transaction of its own.
+     *
+     * <p>These jobs used to be one transaction each, so a single batch that failed — a foreign key
+     * nobody expected, a statement timeout — rolled back every batch the run had already deleted,
+     * and the same row failed it again the next night. Committing per batch keeps what succeeded
+     * and bounds how long any lock is held.
+     */
+    private int inOwnTransaction(IntSupplier batch) {
+        Integer deleted = transactions.execute(status -> batch.getAsInt());
+        return deleted == null ? 0 : deleted;
+    }
 
     private void updateMetrics() {
         try {
