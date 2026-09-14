@@ -86,6 +86,7 @@ public class DeliveryController {
 
     @Operation(summary = "Replay delivery", description = "Re-sends a failed delivery. Use dryRun=true to preview without sending. Use fromAttempt=N to continue from a specific attempt.")
     @ApiResponse(responseCode = "202", description = "Replay initiated")
+    @ApiResponse(responseCode = "409", description = "An attempt at this delivery is under way")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
 @PostMapping("/{id}/replay")

@@ -209,6 +209,56 @@ class DeliveryRepositoryTest {
     }
 
     @Test
+    void claimRetryForProcessing_keepsASlowRetryOutOfTheStuckSweep() {
+        // The scheduler claimed this row six minutes ago and its message sat in the retry topic
+        // since. The consumer's CAS is the start of a real Attempt, so the stuck sweep must not
+        // treat the row as abandoned the moment the POST goes out — if it does, the scheduler
+        // re-claims it and a second request reaches the endpoint while the first is in flight.
+        createSharedEndpoint();
+        UUID publishedToken = UUID.randomUUID();
+        Instant scheduledAt = Instant.now().minus(6, java.time.temporal.ChronoUnit.MINUTES);
+        Delivery delivery = createAndPersistDelivery(Delivery.DeliveryStatus.PROCESSING, null, scheduledAt);
+        delivery.setClaimToken(publishedToken);
+        delivery.setLastAttemptAt(scheduledAt);
+        entityManager.flush();
+        entityManager.clear();
+
+        UUID consumerToken = UUID.randomUUID();
+        Delivery claimed = deliveryRepository.claimRetryForProcessing(delivery.getId(), publishedToken, consumerToken);
+        assertNotNull(claimed, "the consumer holds the published token, so its CAS must apply");
+        entityManager.clear();
+
+        int swept = deliveryRepository.resetStuckDeliveries(Instant.now().minus(5, java.time.temporal.ChronoUnit.MINUTES));
+
+        assertEquals(0, swept, "a retry claimed a moment ago is in flight, not stuck");
+        Delivery reloaded = deliveryRepository.findById(delivery.getId()).orElseThrow();
+        assertEquals(Delivery.DeliveryStatus.PROCESSING, reloaded.getStatus());
+        assertEquals(consumerToken, reloaded.getClaimToken());
+    }
+
+    @Test
+    void findStaleDeliveryIds_measuresAgeFromWhenTheDeliveryWasLastPutBackOnItsLadder() {
+        // A Delivery keeps its created_at when a person retries it from Failed Messages. Measured
+        // from created_at, one created five days ago was escalated back to DLQ at the next sweep,
+        // before its new attempts had a chance to run.
+        createSharedEndpoint();
+        Instant now = Instant.now();
+        Delivery neverResumed = persistPendingDelivery(now.minus(100, java.time.temporal.ChronoUnit.HOURS), null);
+        Delivery retriedJustNow = persistPendingDelivery(
+                now.minus(100, java.time.temporal.ChronoUnit.HOURS), now.minusSeconds(60));
+        Delivery retriedLongAgo = persistPendingDelivery(
+                now.minus(200, java.time.temporal.ChronoUnit.HOURS), now.minus(100, java.time.temporal.ChronoUnit.HOURS));
+        entityManager.flush();
+        entityManager.clear();
+
+        List<UUID> stale = deliveryRepository.findStaleDeliveryIds(now.minus(96, java.time.temporal.ChronoUnit.HOURS), 10);
+
+        assertTrue(stale.contains(neverResumed.getId()), "an old Delivery nobody touched is still escalated");
+        assertFalse(stale.contains(retriedJustNow.getId()), "a Delivery retried a minute ago is not stale");
+        assertTrue(stale.contains(retriedLongAgo.getId()), "a retry is not a permanent exemption from the cap");
+    }
+
+    @Test
     void findPendingRetryIds_shouldRespectPageSize() {
         // Arrange
         createSharedEndpoint();
@@ -226,6 +276,23 @@ class DeliveryRepositoryTest {
 
         // Assert
         assertEquals(5, ids.size());
+    }
+
+    private Delivery persistPendingDelivery(Instant createdAt, Instant ladderResumedAt) {
+        return entityManager.persist(Delivery.builder()
+                .organizationId(FIXTURE_ORG)
+                .id(UUID.randomUUID())
+                .eventId(UUID.randomUUID())
+                .endpointId(sharedEndpointId)
+                .subscriptionId(UUID.randomUUID())
+                .status(Delivery.DeliveryStatus.PENDING)
+                .attemptCount(7)
+                .maxAttempts(10)
+                .orderingEnabled(false)
+                .ladderResumedAt(ladderResumedAt)
+                .createdAt(createdAt)
+                .updatedAt(ladderResumedAt != null ? ladderResumedAt : createdAt)
+                .build());
     }
 
     private Delivery createAndPersistDelivery(Delivery.DeliveryStatus status, Instant nextRetryAt) {

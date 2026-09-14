@@ -29,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -57,6 +58,7 @@ class ReplayServiceTest {
     @Mock private ProjectRepository projectRepository;
     @Mock private SequenceGeneratorService sequenceGeneratorService;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private ApplicationEventPublisher events;
 
     private ReplayService replayService;
 
@@ -71,7 +73,7 @@ class ReplayServiceTest {
         replayService = new ReplayService(replaySessionRepository, eventRepository, subscriptionRepository,
                 deliveryRepository, outboxMessageRepository, projectRepository, new ObjectMapper(),
                 new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()),
-                sequenceGeneratorService, transactionManager, new SimpleMeterRegistry());
+                sequenceGeneratorService, events, transactionManager, new SimpleMeterRegistry());
 
         // @Value fields aren't populated outside a Spring context.
         ReflectionTestUtils.setField(replayService, "batchSize", 200);
@@ -226,11 +228,7 @@ class ReplayServiceTest {
     }
 
     @Test
-    void create_valid_savesPendingSessionAndTriggersAsyncExecution() {
-        ReplayService spyService = spy(replayService);
-        doReturn(java.util.concurrent.CompletableFuture.completedFuture(null))
-                .when(spyService).executeReplayAsync(any());
-
+    void create_valid_savesPendingSessionAndLeavesTheReplayToRunAfterCommit() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
         when(replaySessionRepository.countByProjectIdAndStatusIn(eq(projectId), anyList())).thenReturn(0L);
         when(eventRepository.countForReplay(any(), eq(projectId), any(), any())).thenReturn(5L);
@@ -240,11 +238,14 @@ class ReplayServiceTest {
             return s;
         });
 
-        ReplaySessionResponse response = spyService.create(projectId, validRequest(), userId);
+        ReplaySessionResponse response = replayService.create(projectId, validRequest(), userId);
 
         assertThat(response.getStatus()).isEqualTo(ReplaySessionStatus.PENDING);
         assertThat(response.getTotalEvents()).isEqualTo(5);
-        verify(spyService).executeReplayAsync(any());
+        // Announced, not run: this used to call the replay directly and a spy stubbed that call
+        // away, hiding that @Async never applied and the whole replay ran on the request thread.
+        verify(events).publishEvent(new ReplaySessionCreated(response.getId()));
+        verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), any(), anyInt());
 
         ArgumentCaptor<ReplaySession> captor = ArgumentCaptor.forClass(ReplaySession.class);
         verify(replaySessionRepository).saveAndFlush(captor.capture());
@@ -347,10 +348,10 @@ class ReplayServiceTest {
                 .isInstanceOf(ConflictException.class);
     }
 
-    // ─── executeReplayAsync — full state machine ────────────────────────
+    // ─── run — full state machine ───────────────────────────────────────
 
     @Test
-    void executeReplayAsync_noActiveSubscriptions_completesImmediatelyWithMessage() {
+    void run_noActiveSubscriptions_completesImmediatelyWithMessage() {
         UUID sessionId = UUID.randomUUID();
         ReplaySession session = ReplaySession.builder().id(sessionId).projectId(projectId)
                 .status(ReplaySessionStatus.PENDING)
@@ -360,7 +361,7 @@ class ReplayServiceTest {
         when(replaySessionRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
         when(subscriptionRepository.findByProjectIdAndEnabledTrue(projectId)).thenReturn(List.of());
 
-        replayService.executeReplayAsync(sessionId);
+        replayService.run(sessionId);
 
         assertThat(session.getStatus()).isEqualTo(ReplaySessionStatus.COMPLETED);
         assertThat(session.getErrorMessage()).contains("No active subscriptions");
@@ -368,7 +369,7 @@ class ReplayServiceTest {
     }
 
     @Test
-    void executeReplayAsync_matchingEvents_createsDeliveriesAndCompletesSession() {
+    void run_matchingEvents_createsDeliveriesAndCompletesSession() {
         UUID sessionId = UUID.randomUUID();
         UUID endpointId = UUID.randomUUID();
         ReplaySession session = ReplaySession.builder().id(sessionId).projectId(projectId)
@@ -396,7 +397,7 @@ class ReplayServiceTest {
         });
         when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
-        replayService.executeReplayAsync(sessionId);
+        replayService.run(sessionId);
 
         assertThat(session.getStatus()).isEqualTo(ReplaySessionStatus.COMPLETED);
         assertThat(session.getProcessedEvents()).isEqualTo(2);
@@ -418,7 +419,7 @@ class ReplayServiceTest {
     }
 
     @Test
-    void executeReplayAsync_endpointFilter_excludesNonMatchingSubscriptions() {
+    void run_endpointFilter_excludesNonMatchingSubscriptions() {
         UUID sessionId = UUID.randomUUID();
         UUID wantedEndpoint = UUID.randomUUID();
         UUID otherEndpoint = UUID.randomUUID();
@@ -448,7 +449,7 @@ class ReplayServiceTest {
         });
         when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
-        replayService.executeReplayAsync(sessionId);
+        replayService.run(sessionId);
 
         ArgumentCaptor<List<Delivery>> deliveriesCaptor = ArgumentCaptor.forClass(List.class);
         verify(deliveryRepository).saveAll(deliveriesCaptor.capture());
@@ -457,7 +458,7 @@ class ReplayServiceTest {
     }
 
     @Test
-    void executeReplayAsync_cancellingStatus_stopsLoopAndMarksCancelled() {
+    void run_cancellingStatus_stopsLoopAndMarksCancelled() {
         UUID sessionId = UUID.randomUUID();
         ReplaySession initial = ReplaySession.builder().id(sessionId).projectId(projectId)
                 .status(ReplaySessionStatus.PENDING)
@@ -474,7 +475,7 @@ class ReplayServiceTest {
                 .thenReturn(List.of(Subscription.builder().id(UUID.randomUUID()).endpointId(UUID.randomUUID())
                         .eventType("order.created").enabled(true).build()));
 
-        replayService.executeReplayAsync(sessionId);
+        replayService.run(sessionId);
 
         assertThat(initial.getStatus()).isEqualTo(ReplaySessionStatus.RUNNING); // set before the cancellation check
         assertThat(cancelling.getStatus()).isEqualTo(ReplaySessionStatus.CANCELLED);
@@ -484,7 +485,7 @@ class ReplayServiceTest {
     }
 
     @Test
-    void executeReplayAsync_sessionDeletedMidRun_stopsAndMarksCancelled() {
+    void run_sessionDeletedMidRun_stopsAndMarksCancelled() {
         UUID sessionId = UUID.randomUUID();
         ReplaySession initial = ReplaySession.builder().id(sessionId).projectId(projectId)
                 .status(ReplaySessionStatus.PENDING)
@@ -498,24 +499,25 @@ class ReplayServiceTest {
 
         // markCancelled looks the session up again via findById — since it's now
         // "deleted" (empty), the ifPresent no-ops; this must not throw.
-        replayService.executeReplayAsync(sessionId);
+        replayService.run(sessionId);
 
         verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), any(), anyInt());
     }
 
     @Test
-    void executeReplayAsync_findByIdMissingAtStart_throwsHandledByCaller() {
+    void run_findByIdMissingAtStart_throwsHandledByCaller() {
         UUID sessionId = UUID.randomUUID();
         when(replaySessionRepository.findById(sessionId)).thenReturn(Optional.empty());
 
-        // executeReplayAsync catches everything and routes to markFailed — since the
-        // session itself can't be found, markFailed's own findById().ifPresent() is
-        // also a no-op, so this must simply not throw out of executeReplayAsync.
-        assertThat(replayService.executeReplayAsync(sessionId)).isNotNull();
+        // run catches everything and routes to markFailed — since the session itself can't be
+        // found, markFailed's own findById().ifPresent() is also a no-op, so this must simply
+        // not throw out of run.
+        org.assertj.core.api.Assertions.assertThatCode(() -> replayService.run(sessionId))
+                .doesNotThrowAnyException();
     }
 
     @Test
-    void executeReplayAsync_batchProcessingThrows_countsAsErrorsAndContinues() {
+    void run_batchProcessingThrows_countsAsErrorsAndContinues() {
         UUID sessionId = UUID.randomUUID();
         ReplaySession session = ReplaySession.builder().id(sessionId).projectId(projectId)
                 .status(ReplaySessionStatus.PENDING)
@@ -533,7 +535,7 @@ class ReplayServiceTest {
                 .thenReturn(List.of(e1), List.of());
         when(deliveryRepository.saveAll(anyList())).thenThrow(new RuntimeException("db unavailable"));
 
-        replayService.executeReplayAsync(sessionId);
+        replayService.run(sessionId);
 
         // A whole-batch failure increments totalErrors by the batch size, but NOT
         // totalProcessed (that only happens inside the try block's success path) —
@@ -547,7 +549,7 @@ class ReplayServiceTest {
     }
 
     @Test
-    void executeReplayAsync_resumesFromLastProcessedEventId() {
+    void run_resumesFromLastProcessedEventId() {
         UUID sessionId = UUID.randomUUID();
         UUID lastProcessedId = UUID.randomUUID();
         Instant lastEventCreatedAt = Instant.now().minus(2, ChronoUnit.HOURS);
@@ -573,7 +575,7 @@ class ReplayServiceTest {
         when(eventRepository.findByCursorForReplay(any(), eq(projectId), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
 
-        replayService.executeReplayAsync(sessionId);
+        replayService.run(sessionId);
 
         verify(eventRepository).findById(lastProcessedId);
         assertThat(session.getStatus()).isEqualTo(ReplaySessionStatus.COMPLETED);

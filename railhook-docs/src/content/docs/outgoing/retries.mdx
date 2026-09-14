@@ -52,7 +52,7 @@ One attempt waits 30 seconds for a response unless the subscription sets `timeou
 
 ## The age cap
 
-A delivery still outstanding 96 hours after it was created is moved to Failed Messages whatever its attempt count. For incoming forwards the cap is 24 hours. The cap catches obligations that stopped moving; the ladder ends the ones that are failing.
+A delivery still outstanding 96 hours after it was created is moved to Failed Messages whatever its attempt count. A delivery you retried or resent by hand is measured from that moment instead, so an old delivery gets its new attempts. For incoming forwards the cap is 24 hours. The cap catches obligations that stopped moving; the ladder ends the ones that are failing.
 
 | Variable | Default | Direction |
 |---|---|---|
