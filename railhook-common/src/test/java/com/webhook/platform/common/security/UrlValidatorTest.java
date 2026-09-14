@@ -395,6 +395,26 @@ class UrlValidatorTest {
         assertTrue(UrlValidator.isBlockedTarget("[::]", InetAddress.getByName("::"), false, Collections.emptyList()));
     }
 
+    // ── a name that does not resolve is not a name that is refused ──────────────
+
+    @Test
+    void anUnresolvableHostIsReportedAsSuchAndNotAsABlockedTarget() {
+        // .invalid is reserved never to resolve. Failing to resolve says nothing about where the
+        // name points, so the delivery path has to be able to tell this apart from a refusal.
+        UrlValidator.InvalidUrlException e = assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("https://no-such-host.invalid/hook", false, Collections.emptyList())
+        );
+        assertInstanceOf(UrlValidator.UnresolvableHostException.class, e);
+    }
+
+    @Test
+    void aRefusedAddressIsNotReportedAsUnresolvable() {
+        UrlValidator.InvalidUrlException e = assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("http://10.0.0.1/hook", false, Collections.emptyList())
+        );
+        assertFalse(e instanceof UrlValidator.UnresolvableHostException);
+    }
+
     /** Built from bytes: InetAddress.getByName folds ::ffff:a.b.c.d into an Inet4Address. */
     private static InetAddress ipv6Mapped(int a, int b, int c, int d) throws Exception {
         byte[] bytes = new byte[16];

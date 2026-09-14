@@ -87,7 +87,10 @@ public class UrlValidator {
         } catch (InvalidUrlException e) {
             throw e;
         } catch (UnknownHostException e) {
-            throw new InvalidUrlException("Cannot resolve host: " + e.getMessage());
+            // Its own type, because not resolving is not a verdict: a resolver timeout or a
+            // record mid-change says nothing about where the name points. A caller configuring a
+            // URL may still refuse it; a caller delivering to one has to be able to try again.
+            throw new UnresolvableHostException("Cannot resolve host: " + e.getMessage());
         } catch (Exception e) {
             throw new InvalidUrlException("Invalid URL: " + e.getMessage());
         }
@@ -292,6 +295,12 @@ public class UrlValidator {
 
     public static class InvalidUrlException extends RuntimeException {
         public InvalidUrlException(String message) {
+            super(message);
+        }
+    }
+
+    public static class UnresolvableHostException extends InvalidUrlException {
+        public UnresolvableHostException(String message) {
             super(message);
         }
     }
