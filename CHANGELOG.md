@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A test endpoint keeps the body of what it captured.** The body was read twice — once to answer
   verification challenges, then again to store it, from a request whose stream was already spent —
   so every captured request was saved with an empty body.
+- **Sending events no longer counts against itself.** The worker's per-project delivery cap and
+  the API's per-project ingest limit used the same Redis key, so every delivery attempt spent a
+  permit from the ingest limit. A Free project sending 8 events a second against its 10-a-second
+  limit had over a third of them refused with 429, and the delivery cap meant to be 50 a second
+  was quietly held to the plan's 10. The two budgets now have keys of their own.
 
 ## [2.20.2] - 2026-09-14
 

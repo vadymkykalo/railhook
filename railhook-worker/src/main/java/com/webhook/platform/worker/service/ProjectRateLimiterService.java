@@ -38,7 +38,9 @@ import java.util.concurrent.atomic.AtomicLong;
 @Slf4j
 public class ProjectRateLimiterService {
 
-    private static final String KEY_PREFIX = "rate_limiter:project:";
+    // Not the API's rate_limiter:project: — sharing that key made every delivery attempt spend a
+    // permit of the plan's ingest limit, and fixed this cap at whichever rate was written first.
+    private static final String KEY_PREFIX = "rate_limiter:delivery:project:";
     private static final Duration KEY_TTL = Duration.ofHours(24);
 
     private final RedissonClient redissonClient;
