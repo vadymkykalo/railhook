@@ -14,6 +14,7 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -34,7 +35,8 @@ import java.util.Optional;
  * <ul>
  *   <li><b>Fire on the crossing, not on the condition.</b> A rule whose condition holds for an
  *       hour must produce one alert, not sixty. That is what the unresolved-event check does:
- *       while an alert for the rule is open, the rule stays quiet. Resolving it re-arms the rule.
+ *       while an alert for the rule is open, the rule stays quiet. The evaluator resolves that alert
+ *       itself once the condition stops holding, which re-arms the rule for the next crossing.
  *   <li><b>Every query runs as the rule's organization.</b> The scheduler is
  *       {@code @SystemTenant}, which switches Hibernate's tenant filter <i>off</i> — so counting
  *       deliveries here without re-entering the tenant would count every organization's
@@ -52,6 +54,9 @@ public class AlertEvaluatorService {
     private final DeliveryRepository deliveryRepository;
     private final DeliveryAttemptRepository attemptRepository;
     private final AlertService alertService;
+
+    /** How long resolved alert history is kept. */
+    private static final Duration RESOLVED_ALERT_RETENTION = Duration.ofDays(90);
 
     /** What the evaluator concluded about one rule: the measurement, and how to say it. */
     private record Breach(double currentValue, String message) {}
@@ -86,16 +91,39 @@ public class AlertEvaluatorService {
         }
     }
 
+    /**
+     * Alert history is kept for a while and then dropped. Only resolved events: an open one is
+     * what keeps its rule quiet, and deleting it would make the rule fire again for an outage
+     * it has already reported.
+     */
+    @SystemTenant("alert history of every organization past its retention window")
+    @Scheduled(cron = "0 30 3 * * *")
+    @SchedulerLock(name = "alert_event_purge", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
+    @Transactional
+    public void purgeResolvedAlertEvents() {
+        int deleted = eventRepository.deleteResolvedBefore(Instant.now().minus(RESOLVED_ALERT_RETENTION));
+        if (deleted > 0) {
+            log.info("Alert history: deleted {} resolved alert event(s) older than {} days",
+                    deleted, RESOLVED_ALERT_RETENTION.toDays());
+        }
+    }
+
     private boolean evaluateOne(AlertRule rule) {
         if (isSilenced(rule)) {
             return false;
         }
         return Boolean.TRUE.equals(TenantContext.callAs(rule.getOrganizationId(), () -> {
             // Checked inside the tenant, because AlertEvent is tenant-scoped too.
-            if (eventRepository.existsByAlertRuleIdAndResolvedFalse(rule.getId())) {
+            boolean open = eventRepository.existsByAlertRuleIdAndResolvedFalse(rule.getId());
+            Optional<Breach> breach = assess(rule);
+            if (open) {
+                // Nothing else resolves an alert but a person, so without this the first alert a
+                // rule raised kept it silent through every later outage.
+                if (breach.isEmpty()) {
+                    alertService.resolveRecovered(rule);
+                }
                 return false;
             }
-            Optional<Breach> breach = assess(rule);
             breach.ifPresent(b -> alertService.fireAlert(rule, b.currentValue(), b.message()));
             return breach.isPresent();
         }));

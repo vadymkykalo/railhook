@@ -43,6 +43,7 @@
       "namePlaceholder": "High failure rate",
       "severity": "Severity",
       "slackHint": "Create an Incoming Webhook in your Slack workspace settings to get the URL.",
+      "emailRecipientsHint": "Up to 10 addresses, separated by commas. Each must belong to a member of this organization who has verified it.",
       "slackWebhookUrl": "Slack Webhook URL",
       "threshold": "Threshold",
       "type": "Alert Type",
