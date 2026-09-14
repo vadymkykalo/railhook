@@ -5,6 +5,7 @@ import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthCookies;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
+import com.webhook.platform.api.service.ExternalSignInService;
 import com.webhook.platform.api.service.signin.GoogleSignInService;
 import com.webhook.platform.api.service.signin.OAuthStateCodec;
 import io.swagger.v3.oas.annotations.Operation;
@@ -104,10 +105,14 @@ public class GoogleSignInController {
                 state == null ? "google-callback" : state)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
-        String location = googleSignInService.complete(code, state, error, stateCookie);
+        GoogleSignInService.Completion completion = googleSignInService.complete(code, state, error, stateCookie);
         // Spent either way: a state is good for one callback.
         response.addHeader(HttpHeaders.SET_COOKIE, authCookies.clearedSignInState().toString());
-        return ResponseEntity.status(HttpStatus.FOUND).header(HttpHeaders.LOCATION, location).build();
+        if (completion.browserBinding() != null) {
+            response.addHeader(HttpHeaders.SET_COOKIE, authCookies.signInHandoff(
+                    completion.browserBinding(), ExternalSignInService.handoffLifetime()).toString());
+        }
+        return ResponseEntity.status(HttpStatus.FOUND).header(HttpHeaders.LOCATION, completion.location()).build();
     }
 
     private void requireEnabled() {

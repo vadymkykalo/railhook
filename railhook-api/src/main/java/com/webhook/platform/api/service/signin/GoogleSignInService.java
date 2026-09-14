@@ -105,11 +105,21 @@ public class GoogleSignInService {
     }
 
     /**
+     * Where the browser goes next, and — when the sign-in succeeded — the binding that browser must
+     * hold for the one-time code in that location to work ({@link ExternalSignInService#browserBindingFor}).
+     */
+    public record Completion(String location, String browserBinding) {
+        static Completion refused(String location) {
+            return new Completion(location, null);
+        }
+    }
+
+    /**
      * Finishes the sign-in Google has sent the browser back from. Always answers with a path on this
      * origin: the dashboard's callback with a one-time code, or the page the sign-in started on with
      * an error code. Nothing about the failure beyond that code leaves the server.
      */
-    public String complete(String code, String state, String error, String stateCookie) {
+    public Completion complete(String code, String state, String error, String stateCookie) {
         Optional<OAuthState> saved = stateCodec.decode(stateCookie);
         String startPage = saved.map(OAuthState::intent).filter("register"::equals).map(i -> "/register").orElse("/login");
         try {
@@ -140,13 +150,14 @@ public class GoogleSignInService {
             if (created) {
                 landing.queryParam("new", "1");
             }
-            return landing.build().encode().toUriString();
+            return new Completion(landing.build().encode().toUriString(),
+                    ExternalSignInService.browserBindingFor(handoff));
         } catch (SignInRejectedException e) {
             log.warn("Google sign-in refused: {} ({})", e.failure(), e.getMessage());
-            return startPage + "?error=" + e.failure().code();
+            return Completion.refused(startPage + "?error=" + e.failure().code());
         } catch (RuntimeException e) {
             log.error("Google sign-in failed", e);
-            return startPage + "?error=" + SignInFailure.UNAVAILABLE.code();
+            return Completion.refused(startPage + "?error=" + SignInFailure.UNAVAILABLE.code());
         }
     }
 

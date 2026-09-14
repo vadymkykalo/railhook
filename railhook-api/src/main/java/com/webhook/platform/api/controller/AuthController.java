@@ -143,20 +143,25 @@ public class AuthController {
     @Operation(summary = "Exchange a sign-in code",
             description = "Trades the one-time code the Google sign-in callback put in the dashboard's URL for the "
                     + "same session a password sign-in returns: the access token in the body, the refresh token in "
-                    + "its cookie. A code works once, within 60 seconds of the callback.")
+                    + "its cookie. A code works once, within 60 seconds of the callback, and only in the browser the "
+                    + "callback redirected: it must carry the `railhook_signin_handoff` cookie the callback set.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Signed in"),
-            @ApiResponse(responseCode = "401", description = "The code has been used or has expired"),
+            @ApiResponse(responseCode = "401", description = "The code has been used, has expired, or was opened in another browser"),
             @ApiResponse(responseCode = "429", description = "Too many requests")
     })
     @PostMapping("/oauth/exchange")
     public ResponseEntity<AuthResponse> exchangeSignInCode(@Valid @RequestBody ExchangeSignInCodeRequest request,
+            @CookieValue(value = AuthCookies.SIGN_IN_HANDOFF, required = false) String browserBinding,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
         if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getCode())) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
-        AuthResponse response = externalSignInService.exchangeSignInHandoff(request.getCode(), originOf(httpRequest));
+        // Good for one attempt, whatever its outcome, like the code it vouches for.
+        httpResponse.addHeader(HttpHeaders.SET_COOKIE, authCookies.clearedSignInHandoff().toString());
+        AuthResponse response = externalSignInService.exchangeSignInHandoff(
+                request.getCode(), browserBinding, originOf(httpRequest));
         setRefreshTokenCookie(httpResponse, response.getRefreshToken());
         response.setRefreshToken(null);
         return ResponseEntity.ok(response);

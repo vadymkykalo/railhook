@@ -64,6 +64,12 @@ public class SecurityConfig {
         public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
                 http
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
+                                // Nothing a browser attaches on its own authorizes a request: JWTs
+                                // and API keys arrive in headers. The one ambient credential, the
+                                // refresh_token cookie (AuthCookies), is SameSite, scoped to
+                                // /api/v1/auth, and alone only mints a token into a response the
+                                // CORS allowlist keeps a foreign origin from reading. The Google
+                                // sign-in code is bound to its browser by a cookie of its own.
                                 .csrf(csrf -> csrf.disable())
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))

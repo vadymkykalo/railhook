@@ -22,6 +22,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -164,10 +167,39 @@ public class ExternalSignInService {
         return code;
     }
 
+    /**
+     * What the browser that finished the sign-in is given to hold beside the code. A code alone
+     * is a link anyone can be sent: someone who stops their own sign-in short of the dashboard
+     * could otherwise hand theirs to another person and have them work inside the sender's
+     * account. A digest rather than the code, so the cookie is no use without the URL.
+     */
+    public static String browserBindingFor(String code) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(code.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
+    }
+
+    public static Duration handoffLifetime() {
+        return HANDOFF_LIFETIME;
+    }
+
+    /**
+     * Refuses a code presented without the binding its browser was given, before the code is
+     * consumed: a refused attempt from somewhere else must not spend the owner's sign-in.
+     */
     @SystemTenant("same as login: the membership read decides the organization the new token names")
     @Auditable(action = AuditAction.LOGIN, resourceType = "Auth")
     @Transactional
-    public AuthResponse exchangeSignInHandoff(String code, SessionOrigin origin) {
+    public AuthResponse exchangeSignInHandoff(String code, String browserBinding, SessionOrigin origin) {
+        if (browserBinding == null || !MessageDigest.isEqual(
+                browserBinding.getBytes(StandardCharsets.UTF_8),
+                browserBindingFor(code).getBytes(StandardCharsets.UTF_8))) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "This sign-in link was opened in a different browser. Sign in again.");
+        }
         String codeHash = CryptoUtils.hashApiKey(code);
         if (signInHandoffRepository.consume(codeHash, Instant.now()) == 0) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
