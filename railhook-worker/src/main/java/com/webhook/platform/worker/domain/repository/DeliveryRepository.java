@@ -96,6 +96,23 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
             @Param("expectedClaimToken") UUID expectedClaimToken,
             @Param("newClaimToken") UUID newClaimToken);
 
+    /**
+     * Returns a claimed row to its ladder, but only while it still carries the token it was
+     * claimed under.
+     *
+     * <p>For the retry scheduler's hand-back of a send it could not confirm. That send may still
+     * land and the consumer CAS the row onto its own token; the row is then the consumer's, and a
+     * write here must match nothing rather than fail. Saving the entity snapshot instead threw on
+     * the bumped version and rolled back every other row handed back beside it.
+     */
+    @Modifying
+    @Query(value = "UPDATE deliveries SET status = 'PENDING', claim_token = NULL, " +
+            "next_retry_at = :retryAt, updated_at = now(), version = version + 1 " +
+            "WHERE id = :id AND status = 'PROCESSING' AND claim_token = :claimToken", nativeQuery = true)
+    int handBackIfStillClaimed(@Param("id") UUID id,
+            @Param("claimToken") UUID claimToken,
+            @Param("retryAt") Instant retryAt);
+
     @Modifying
     @Query(value = "UPDATE deliveries SET attempt_count = attempt_count + 1, " +
             "updated_at = now(), version = version + 1 " +
