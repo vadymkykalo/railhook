@@ -49,6 +49,20 @@ class TunnelIngressControllerTest {
         assertEquals("attempt=2", sent.getValue().getQueryString());
     }
 
+    /**
+     * A tunnel whose CLI is not connected is temporarily unavailable, not a broken upstream. It
+     * answered 502, which a CDN replaces with its own "Bad gateway" page — on production the
+     * dead tunnel looked like the whole site was down — and which providers do not all retry.
+     */
+    @Test
+    void anOfflineTunnelAnswers503() throws Exception {
+        when(tunnelIngressService.forward(anyString(), any(), any()))
+                .thenReturn(new TunnelIngressService.Outcome.Refused("tunnel_offline", "Tunnel is not connected"));
+
+        mockMvc.perform(post("/tunnel/tun-abc123/webhooks/stripe").contentType("application/json").content("{}"))
+                .andExpect(status().isServiceUnavailable());
+    }
+
     @Test
     void stillForwardsTheBareSlug() throws Exception {
         mockMvc.perform(post("/tunnel/tun-abc123").contentType("application/json").content("{}"))

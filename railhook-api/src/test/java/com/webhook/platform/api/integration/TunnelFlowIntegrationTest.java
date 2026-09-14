@@ -224,7 +224,7 @@ class TunnelFlowIntegrationTest {
     }
 
     @Test
-    void disconnectFlow_wsCloses_tunnelUnregisteredAndSessionClosed() throws Exception {
+    void disconnectFlow_wsCloses_tunnelUnregisteredButSessionStaysOpen() throws Exception {
         when(tunnelSessionRepository.findByTunnelToken(tunnelToken))
                 .thenReturn(java.util.Optional.of(testSession));
         when(tunnelSessionRepository.save(any(TunnelSession.class)))
@@ -242,9 +242,30 @@ class TunnelFlowIntegrationTest {
         assertFalse(tunnelRegistry.isActive(publicSlug));
         assertEquals(0, tunnelRegistry.activeCount());
 
-        // Session should be closed in DB
-        verify(tunnelSessionRepository, atLeast(1)).save(argThat(s ->
-                s.getStatus() == TunnelStatus.CLOSED && s.getClosedAt() != null));
+        // A dropped socket is not a closed tunnel: the CLI closes it explicitly (DELETE /tunnels/{id})
+        // and a session nobody reconnects to expires by heartbeat. Closing it here made every API
+        // restart — each rolling deploy — end every developer's tunnel for good.
+        verify(tunnelSessionRepository, never()).save(argThat(s -> s.getStatus() == TunnelStatus.CLOSED));
+        assertEquals(TunnelStatus.ACTIVE, testSession.getStatus());
+    }
+
+    @Test
+    void reconnectFlow_sameTokenAfterADrop_registersTheTunnelAgain() throws Exception {
+        when(tunnelSessionRepository.findByTunnelToken(tunnelToken))
+                .thenReturn(java.util.Optional.of(testSession));
+        when(tunnelSessionRepository.save(any(TunnelSession.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        WebSocketSession first = createMockWsSession(tunnelToken);
+        webSocketHandler.afterConnectionEstablished(first);
+        webSocketHandler.afterConnectionClosed(first, CloseStatus.GOING_AWAY);
+        assertFalse(tunnelRegistry.isActive(publicSlug));
+
+        WebSocketSession second = createMockWsSession(tunnelToken);
+        webSocketHandler.afterConnectionEstablished(second);
+
+        verify(second, never()).close(any(CloseStatus.class));
+        assertTrue(tunnelRegistry.isActive(publicSlug), "the same public URL works again after the reconnect");
     }
 
     @Test
