@@ -15,7 +15,7 @@ Railhook accepts four credentials. This page shows which one to use, how to get 
 
 ## Access tokens
 
-Sign in with `POST /api/v1/auth/login`. The response body carries the `accessToken`. The refresh token does not appear in the body: it is set as an `HttpOnly` cookie named `refresh_token`, scoped to `/api/v1/auth`.
+Sign in with `POST /api/v1/auth/login`. The response body carries the `accessToken`. The refresh token does not appear in the body: it is set as an `HttpOnly` cookie named `refresh_token`, scoped to `/api/v1/auth`. The cookie is `Secure` when `APP_ENV=production` or `APP_BASE_URL` starts with `https://`, and `SameSite=Strict` in production (`Lax` otherwise).
 
 <Tabs syncKey="lang">
   <TabItem label="cURL">
@@ -192,7 +192,7 @@ An account created through Google has no password. To add one, use **Forgot pass
 </Steps>
 
 <Aside type="note">
-The browser never sees a token in a URL. After Google, the API redirects to the dashboard with a one-time code that works once, within 60 seconds, and the dashboard trades it for a session with `POST /api/v1/auth/oauth/exchange`.
+The browser never sees a token in a URL. After Google, the API redirects to the dashboard with a one-time code that works once, within 60 seconds, and the dashboard trades it for a session with `POST /api/v1/auth/oauth/exchange`. The code works only in the browser Google sent back: the callback also sets a short-lived `railhook_signin_handoff` cookie, and the exchange refuses a code that arrives without it. A sign-in link copied into another browser does nothing.
 </Aside>
 
 ## Next steps
