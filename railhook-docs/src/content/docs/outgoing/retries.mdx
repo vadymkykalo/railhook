@@ -22,7 +22,7 @@ A delivery is an obligation to get one event to one endpoint. Railhook keeps try
 |---|---|
 | `2xx` | `SUCCESS`. |
 | `408`, `429`, any `5xx` | Retried on the ladder. |
-| A connection error or a timeout | Retried on the ladder. |
+| A connection error, a timeout, or a host that does not resolve | Retried on the ladder. |
 | The transformation failed to apply | Retried on the ladder. The raw payload is never sent instead. |
 | Any other `4xx` | `FAILED` on the first attempt. A `400` or `404` says the request is wrong, and repeating it will not fix it. |
 | The endpoint cannot receive it, for example it is not verified, or its URL is refused by the private address check | `FAILED` without an attempt. |

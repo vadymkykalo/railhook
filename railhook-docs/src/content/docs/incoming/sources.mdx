@@ -123,11 +123,11 @@ The ingress answers a provider, not a person. Each code is what the provider's o
 | Status | Meaning |
 |---|---|
 | `202` | Accepted and stored. The body carries `requestId`. |
-| `401` | Verification is configured and the signature did not check out, or the same signature was already seen. Nothing is stored. |
+| `401` | Verification is configured and the signature did not check out, or a signature already seen arrived on a webhook that is not a resend of a stored one. Nothing is stored. |
 | `404` | No source has that token. |
 | `410` | The source exists but is disabled. |
 | `413` | The body is larger than the limit, 512 KB by default. |
-| `429` | The source's rate limit is spent, with `Retry-After: 1`. Also returned, without `Retry-After`, when the organization cannot accept more webhooks right now. |
+| `429` | The source's rate limit is spent, with `Retry-After: 1`. Also returned, without `Retry-After`, when the organization cannot accept more webhooks right now; a resend of a webhook already stored is still answered `202`. |
 
 | Variable | Default | Effect |
 |---|---|---|
