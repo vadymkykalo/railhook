@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every event and delivery in the dashboard until someone found the seed button. New projects now
   get the three built-in rules. Existing projects keep what they have — add the defaults from the
   project's PII rules page.
+- **A workflow created over the API opens in the builder.** The API describes a node as `id`,
+  `type` and `data`, and an edge as `source` and `target`; the canvas also needs a position and an
+  edge id, and threw "Cannot read properties of undefined (reading 'x')" on a workflow that had
+  neither. Nodes without a position are laid out left to right, and edges without an id get one.
 ## [2.20.2] - 2026-09-14
 
 ### Fixed
