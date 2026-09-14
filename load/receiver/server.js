@@ -29,9 +29,19 @@ const http = require('http');
 
 const PORT = Number(process.env.PORT || 9000);
 
+// Each slow response holds a socket and a timer for this long, so the control API will not
+// accept a delay that would pile them up for longer than any scenario waits.
+const MAX_SLOW_LATENCY_MS = 60000;
+
+function validLatency(value) {
+  return typeof value === 'number' && value >= 0 && value <= MAX_SLOW_LATENCY_MS;
+}
+
+const configuredLatency = Number(process.env.DEFAULT_SLOW_LATENCY_MS || 3000);
+
 const state = {
   mode: 'healthy', // healthy | slow | down
-  slowLatencyMs: Number(process.env.DEFAULT_SLOW_LATENCY_MS || 3000),
+  slowLatencyMs: validLatency(configuredLatency) ? configuredLatency : 3000,
   failRemaining: 0,
   received: [], // { seq, receivedAtMs, sentAtMs, latencyMs, type, headers }
 };
@@ -140,8 +150,12 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { error: 'mode must be healthy|slow|down' });
         return;
       }
+      if (body.latencyMs !== undefined && !validLatency(body.latencyMs)) {
+        sendJson(res, 400, { error: `latencyMs must be a number from 0 to ${MAX_SLOW_LATENCY_MS}` });
+        return;
+      }
       state.mode = body.mode;
-      if (typeof body.latencyMs === 'number') state.slowLatencyMs = body.latencyMs;
+      if (body.latencyMs !== undefined) state.slowLatencyMs = body.latencyMs;
       console.log(`[load-receiver] mode -> ${state.mode} (slowLatencyMs=${state.slowLatencyMs})`);
       sendJson(res, 200, { mode: state.mode, slowLatencyMs: state.slowLatencyMs });
       return;
@@ -181,7 +195,9 @@ const server = http.createServer(async (req, res) => {
 
     sendJson(res, 404, { error: 'not found' });
   } catch (err) {
-    sendJson(res, 500, { error: String(err && err.message ? err.message : err) });
+    // The detail goes to the receiver's own log, not back to whoever sent the request.
+    console.error('[load-receiver] request failed', err);
+    sendJson(res, 500, { error: 'load-receiver: request failed' });
   }
 });
 
