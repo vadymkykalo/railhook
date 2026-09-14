@@ -3,7 +3,6 @@ package com.webhook.platform.worker.consumer;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.service.BoundedAsyncExecutor;
-import com.webhook.platform.worker.service.ShutdownRejectedException;
 import com.webhook.platform.worker.service.WebhookDeliveryService;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -70,8 +69,6 @@ public class DeliveryConsumer {
         log.info("Received delivery from {}: deliveryId={}, endpointId={}",
                 topic, message.getDeliveryId(), message.getEndpointId());
 
-        rejectIfShuttingDown(message.getDeliveryId());
-
         backpressureDispatch.dispatch(
                 () -> webhookDeliveryService.processDelivery(message, false),
                 acknowledgment,
@@ -105,28 +102,11 @@ public class DeliveryConsumer {
         log.info("Received retry from {}: deliveryId={}, attempt={}",
                 topic, message.getDeliveryId(), message.getAttemptCount());
 
-        rejectIfShuttingDown(message.getDeliveryId());
-
         backpressureDispatch.dispatch(
                 () -> webhookDeliveryService.processDelivery(message, true),
                 acknowledgment,
                 "retry delivery " + message.getDeliveryId(),
                 () -> webhookDeliveryService.rescheduleForBackpressure(message.getDeliveryId(), true));
-    }
-
-    /**
-     * Checked on the Kafka consumer thread, before the message is ever handed to the
-     * async executor. Throwing here — rather than from inside the submitted task — is
-     * what lets {@code errorHandler.addNotRetryableExceptions(ShutdownRejectedException.class)}
-     * in KafkaConsumerConfig actually see the exception and route the message to the DLQ;
-     * a throw from inside the pool thread never reaches the container's error handler.
-     */
-    private void rejectIfShuttingDown(UUID deliveryId) {
-        if (webhookDeliveryService.isShuttingDown()) {
-            log.warn("Shutdown in progress, rejecting delivery {} before submission", deliveryId);
-            throw new ShutdownRejectedException(
-                    "Worker is shutting down, delivery " + deliveryId + " must be redelivered");
-        }
     }
 
     private String extractCorrelationId(byte[] correlationIdBytes) {

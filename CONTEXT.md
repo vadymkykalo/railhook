@@ -103,8 +103,10 @@ there are before the obligation is abandoned.
 _Avoid_: backoff policy, retry config
 
 **DLQ**:
-Where a Delivery or Forward lands once its Retry Ladder is exhausted: abandoned by
-Railhook, kept for a human to decide about.
+Where a Delivery or Forward lands once Railhook stops trying it but a person still could
+fix it: its Retry Ladder is exhausted, or its target answered with a status no further
+attempt will change. Abandoned by Railhook, kept for a human to decide about. What no person
+can make succeed by retrying — a refused address, a disabled target — ends FAILED instead.
 _Avoid_: dead letters, graveyard
 _In the UI_: **Failed Messages**. The term the code and this document use is DLQ; the
 term the product shows an operator is Failed Messages, because "DLQ" is vocabulary you

@@ -19,7 +19,11 @@ cd ~/railhook
 2. Pins `API_IMAGE_TAG`, `WORKER_IMAGE_TAG` and `UI_IMAGE_TAG` in `.env`.
 3. **Takes a database backup, and stops if that fails.**
 4. Replaces `docker-compose.yml` with the release's copy and keeps yours as `docker-compose.yml.previous`.
-5. Pulls the images, restarts every service except the API, then replaces the API containers one at a time.
+5. Pulls the images and restarts the database, broker, cache and dashboard.
+6. Replaces the API containers one at a time. The new API runs the release's migrations.
+7. Restarts the worker once the new API is serving.
+
+A worker from a new release does not start against an unmigrated schema. Started before the API has finished migrating, for example by `./railhook start` after a tag change, it waits up to 15 minutes and logs `Waiting for the API to migrate the schema`.
 
 With one API container, clients see about twenty seconds of `502` while the new one starts. Set `API_REPLICAS=2` in `.env` and the upgrade has no gap.
 

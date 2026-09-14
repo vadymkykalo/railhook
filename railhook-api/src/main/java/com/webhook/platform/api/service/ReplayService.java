@@ -4,10 +4,8 @@ import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.ReplaySessionStatus;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.ReplayEstimateResponse;
@@ -15,7 +13,6 @@ import com.webhook.platform.api.dto.ReplayRequest;
 import com.webhook.platform.api.dto.ReplaySessionResponse;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.NotFoundException;
-import com.webhook.platform.common.util.EventTypeMatcher;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -44,6 +41,8 @@ public class ReplayService {
     private final ReplaySessionRepository replaySessionRepository;
     private final EventRepository eventRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionMatchingCache subscriptionMatchingCache;
+    private final EventIntake eventIntake;
     private final DeliveryRepository deliveryRepository;
     private final OutboxMessageRepository outboxMessageRepository;
     private final ProjectRepository projectRepository;
@@ -71,6 +70,8 @@ public class ReplayService {
             ReplaySessionRepository replaySessionRepository,
             EventRepository eventRepository,
             SubscriptionRepository subscriptionRepository,
+            SubscriptionMatchingCache subscriptionMatchingCache,
+            EventIntake eventIntake,
             DeliveryRepository deliveryRepository,
             OutboxMessageRepository outboxMessageRepository,
             ProjectRepository projectRepository,
@@ -83,6 +84,8 @@ public class ReplayService {
         this.replaySessionRepository = replaySessionRepository;
         this.eventRepository = eventRepository;
         this.subscriptionRepository = subscriptionRepository;
+        this.subscriptionMatchingCache = subscriptionMatchingCache;
+        this.eventIntake = eventIntake;
         this.deliveryRepository = deliveryRepository;
         this.outboxMessageRepository = outboxMessageRepository;
         this.projectRepository = projectRepository;
@@ -236,23 +239,10 @@ public class ReplayService {
         replaySessionRepository.saveAndFlush(session);
 
         UUID projectId = session.getProjectId();
-        List<Subscription> subscriptions = findActiveSubscriptions(projectId, toRequest(session));
-
-        if (subscriptions.isEmpty()) {
-            session.setStatus(ReplaySessionStatus.COMPLETED);
-            session.setCompletedAt(Instant.now());
-            session.setErrorMessage("No active subscriptions found");
-            replaySessionRepository.saveAndFlush(session);
-            return;
-        }
-
-        // Filter subscriptions by endpointId if specified
-        if (session.getEndpointId() != null) {
-            subscriptions = subscriptions.stream()
-                    .filter(s -> s.getEndpointId().equals(session.getEndpointId()))
-                    .toList();
-        }
-        final List<Subscription> activeSubscriptions = subscriptions;
+        // Where each Event goes is decided per Event, by the same code a fresh ingest runs: a
+        // rule can route an Event to an endpoint no Subscription covers, so an empty Subscription
+        // list is no reason to stop.
+        final UUID endpointFilter = session.getEndpointId();
         final UUID sid = sessionId;
 
         // Cursor-based batch processing
@@ -293,7 +283,7 @@ public class ReplayService {
             final List<Event> currentBatch = batch;
             try {
                 BatchResult result = txTemplate.execute(status ->
-                        processBatch(currentBatch, activeSubscriptions, sid, projectId));
+                        processBatch(currentBatch, endpointFilter, sid, projectId));
                 if (result != null) {
                     totalProcessed += currentBatch.size();
                     totalDeliveries += result.deliveriesCreated;
@@ -331,70 +321,42 @@ public class ReplayService {
                 sessionId, totalProcessed, totalDeliveries, totalErrors);
     }
 
-    private BatchResult processBatch(List<Event> events, List<Subscription> subscriptions, UUID sessionId, UUID projectId) {
+    private BatchResult processBatch(List<Event> events, UUID endpointFilter, UUID sessionId, UUID projectId) {
         int errors = 0;
-
-        // Pre-partition subscriptions: exact index O(1) + wildcard list O(W)
-        // instead of scanning all M subscriptions per event O(N×M)
-        Map<String, List<Subscription>> exactIndex = new HashMap<>();
-        List<Subscription> wildcardSubs = new ArrayList<>();
-        for (Subscription sub : subscriptions) {
-            if (EventTypeMatcher.isWildcard(sub.getEventType())) {
-                wildcardSubs.add(sub);
-            } else {
-                exactIndex.computeIfAbsent(sub.getEventType(), k -> new ArrayList<>()).add(sub);
-            }
-        }
-
         List<Delivery> deliveriesToSave = new ArrayList<>();
 
         for (Event event : events) {
-            // O(1) exact matches
-            List<Subscription> matched = new ArrayList<>();
-            List<Subscription> exact = exactIndex.get(event.getEventType());
-            if (exact != null) {
-                matched.addAll(exact);
+            EventIntake.Decision decision;
+            try {
+                decision = eventIntake.decide(event);
+            } catch (IllegalArgumentException e) {
+                // A fresh ingest refuses an Event over the fan-out limit outright, so none of
+                // its endpoints get the replay either.
+                errors++;
+                log.warn("Event {} not replayed: {}", event.getId(), e.getMessage());
+                continue;
             }
-            // O(W) wildcard matches (W << M typically)
-            for (Subscription wsub : wildcardSubs) {
-                if (EventTypeMatcher.matches(wsub.getEventType(), event.getEventType())) {
-                    matched.add(wsub);
+            if (decision.dropped()) {
+                continue;
+            }
+
+            for (Delivery delivery : decision.deliveries()) {
+                if (endpointFilter != null && !endpointFilter.equals(delivery.getEndpointId())) {
+                    continue;
                 }
-            }
-
-            for (Subscription subscription : matched) {
-
                 try {
-                    Long sequenceNumber = null;
-                    boolean orderingEnabled = Boolean.TRUE.equals(subscription.getOrderingEnabled());
-
-                    if (orderingEnabled) {
-                        sequenceNumber = sequenceGeneratorService.nextSequence(subscription.getEndpointId());
+                    if (Boolean.TRUE.equals(delivery.getOrderingEnabled())) {
+                        delivery.setSequenceNumber(sequenceGeneratorService.nextSequence(delivery.getEndpointId()));
                     }
-
-                    Delivery delivery = Delivery.builder()
-                            .eventId(event.getId())
-                            .endpointId(subscription.getEndpointId())
-                            .subscriptionId(subscription.getId())
-                            .status(DeliveryStatus.PENDING)
-                            .attemptCount(0)
-                            .maxAttempts(subscription.getMaxAttempts() != null ? subscription.getMaxAttempts() : 7)
-                            .sequenceNumber(sequenceNumber)
-                            .orderingEnabled(orderingEnabled)
-                            .timeoutSeconds(subscription.getTimeoutSeconds() != null ? subscription.getTimeoutSeconds() : 30)
-                            .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays()
-                                    : RetryLadderDefaults.OUTGOING_DELAYS)
-                            .payloadTemplate(subscription.getPayloadTemplate())
-                            .customHeaders(subscription.getCustomHeaders())
-                            .transformationId(subscription.getTransformationId())
-                            .replaySessionId(sessionId)
-                            .build();
-
+                    // A new Delivery, not the original sent again: carrying the Event's key would
+                    // hand the receiver the key it already processed, and it would drop the replay.
+                    delivery.setIdempotencyKey(null);
+                    delivery.setReplaySessionId(sessionId);
                     deliveriesToSave.add(delivery);
                 } catch (Exception e) {
                     errors++;
-                    log.warn("Failed to create delivery for event {} subscription {}: {}",
-                            event.getId(), subscription.getId(), e.getMessage());
+                    log.warn("Failed to create delivery for event {} endpoint {}: {}",
+                            event.getId(), delivery.getEndpointId(), e.getMessage());
                 }
             }
         }
@@ -417,7 +379,7 @@ public class ReplayService {
         outboxMessageRepository.saveAll(outboxMessages);
         outboxMessageRepository.flush();
 
-        return new BatchResult(savedDeliveries.size() - errors, errors);
+        return new BatchResult(outboxMessages.size(), errors);
     }
 
     // ========== Helpers ==========
@@ -441,11 +403,20 @@ public class ReplayService {
         return eventRepository.countForReplay(TenantContext.require(), projectId, request.getFromDate(), request.getToDate());
     }
 
+    /**
+     * For the estimate only. Matched the way intake matches, patterns included; rules are not
+     * applied here, so the estimate does not know what a DROP or ROUTE will change.
+     */
     private List<Subscription> findActiveSubscriptions(UUID projectId, ReplayRequest request) {
-        if (request.getEventType() != null && !request.getEventType().isBlank()) {
-            return subscriptionRepository.findByProjectIdAndEventTypeAndEnabledTrue(projectId, request.getEventType());
+        List<Subscription> subscriptions = request.getEventType() != null && !request.getEventType().isBlank()
+                ? subscriptionMatchingCache.findMatching(projectId, request.getEventType())
+                : subscriptionRepository.findByProjectIdAndEnabledTrue(projectId);
+        if (request.getEndpointId() == null) {
+            return subscriptions;
         }
-        return subscriptionRepository.findByProjectIdAndEnabledTrue(projectId);
+        return subscriptions.stream()
+                .filter(s -> request.getEndpointId().equals(s.getEndpointId()))
+                .toList();
     }
 
     private void updateProgress(UUID sessionId, int processed, int deliveries, int errors, UUID lastEventId) {

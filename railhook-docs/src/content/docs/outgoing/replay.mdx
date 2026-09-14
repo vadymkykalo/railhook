@@ -38,7 +38,7 @@ To resend deliveries that were abandoned, you can also retry them from Failed Me
 
 <Steps>
 
-1. Estimate first. `POST /api/v1/projects/{projectId}/replay/estimate` takes the same body as the replay and creates nothing. It returns how many events match, how many active subscriptions match, how many deliveries would be created, and a warning when the range is too large.
+1. Estimate first. `POST /api/v1/projects/{projectId}/replay/estimate` takes the same body as the replay and creates nothing. It returns how many events match, how many active subscriptions match, patterns included, how many deliveries would be created, and a warning when the range is too large. The estimate does not apply rules, so a `DROP` or `ROUTE` rule makes the real number differ.
 
    ```bash
    curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/replay/estimate" \
@@ -53,7 +53,9 @@ To resend deliveries that were abandoned, you can also retry them from Failed Me
 
 </Steps>
 
-A replay creates one delivery for each stored event and each active subscription that matches. Ordered endpoints get fresh sequence numbers, so replayed deliveries wait behind live ones instead of colliding with them.
+A replay decides where each stored event goes the same way a newly sent event is decided: the active subscriptions that match its type, patterns such as `order.*` included, and the project's [rules](/docs/outgoing/rules/) as they are now. A `DROP` rule replays nothing for that event, a `ROUTE` action adds its endpoint, and a `TRANSFORM` action replaces the subscription's transformation. An event that would exceed the [fan-out limit](/docs/platform/errors-limits/#size-and-fan-out-limits) is not replayed to any endpoint and counts as an error on the session. With `endpointId`, only the deliveries to that endpoint are created.
+
+Ordered endpoints get fresh sequence numbers, so replayed deliveries wait behind live ones instead of colliding with them.
 
 | Limit | Value |
 |---|---|

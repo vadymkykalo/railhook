@@ -739,7 +739,7 @@ class WebhookDeliveryServiceTest {
     }
 
     @Test
-    void attemptDelivery_4xxNonRetryable_marksFailed_noRetryScheduled() throws Exception {
+    void attemptDelivery_4xxNonRetryable_goesToDlq_noRetryScheduled() throws Exception {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         httpServer.createContext("/hook", exchange -> {
             exchange.sendResponseHeaders(404, 0);
@@ -766,9 +766,11 @@ class WebhookDeliveryServiceTest {
 
             service.processDelivery(message, true);
 
-            verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.FAILED));
+            // Into Failed Messages, where a person can retry it once the endpoint is fixed; never
+            // FAILED, which Failed Messages does not list, and never the rest of the ladder.
+            verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.DLQ));
             verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
-            verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.DLQ));
+            verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.FAILED));
             verify(circuitBreakerService).recordFailure(eq(endpointId), any());
         } finally {
             httpServer.stop(0);

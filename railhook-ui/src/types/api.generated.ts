@@ -1919,7 +1919,7 @@ export interface paths {
         put?: never;
         /**
          * Exchange a sign-in code
-         * @description Trades the one-time code the Google sign-in callback put in the dashboard's URL for the same session a password sign-in returns: the access token in the body, the refresh token in its cookie. A code works once, within 60 seconds of the callback.
+         * @description Trades the one-time code the Google sign-in callback put in the dashboard's URL for the same session a password sign-in returns: the access token in the body, the refresh token in its cookie. A code works once, within 60 seconds of the callback, and only in the browser the callback redirected: it must carry the `railhook_signin_handoff` cookie the callback set.
          */
         post: operations["exchangeSignInCode"];
         delete?: never;
@@ -9767,7 +9767,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                railhook_signin_handoff?: string;
+            };
         };
         requestBody: {
             content: {
@@ -9784,7 +9786,7 @@ export interface operations {
                     "*/*": components["schemas"]["AuthResponse"];
                 };
             };
-            /** @description The code has been used or has expired */
+            /** @description The code has been used, has expired, or was opened in another browser */
             401: {
                 headers: {
                     [name: string]: unknown;

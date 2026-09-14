@@ -77,7 +77,8 @@ describe('PiiPreview', () => {
 
     const editor = screen.getByLabelText('payload');
     await user.clear(editor);
-    await user.type(editor, payload.replace('{', '{{'));
+    // userEvent reads { and [ as key descriptors; every one of them is doubled to type it literally.
+    await user.type(editor, payload.replace(/[{[]/g, '$&$&'));
     await user.click(screen.getByRole('button', { name: /Run preview/i }));
 
     expect(await screen.findByText(/Nothing was masked/i)).toBeInTheDocument();

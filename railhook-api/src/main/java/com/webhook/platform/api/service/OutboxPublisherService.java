@@ -36,6 +36,20 @@ import java.util.concurrent.atomic.AtomicLong;
 @Slf4j
 public class OutboxPublisherService {
 
+    static final int CLEANUP_PUBLISHED_BATCH = 5000;
+    static final int CLEANUP_DEAD_BATCH = 1000;
+
+    /**
+     * How many batches one hourly cleanup run deletes of each status before it stops: a million
+     * PUBLISHED rows an hour. Enough to keep up with any rate this publisher can reach, and a
+     * bound on the run so a backlog of millions finishes well inside the job's ten-minute
+     * {@code lockAtMostFor}; whatever is left goes to the next run.
+     */
+    static final int CLEANUP_MAX_BATCHES = 200;
+
+    /** Wall-clock bound on one run, half its {@code lockAtMostFor}, for a database slower than the batch count assumes. */
+    static final Duration CLEANUP_TIME_BUDGET = Duration.ofMinutes(5);
+
     private final OutboxMessageRepository outboxMessageRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final ObjectMapper objectMapper;
@@ -238,17 +252,13 @@ public class OutboxPublisherService {
     public void cleanupOldMessages() {
         // Stuck-SENDING recovery moved to the 30s retryFailedMessages() cycle — see
         // recoverStuckSendingMessages() below. Not duplicated here; this job just does deletes.
-        Instant publishedCutoff = Instant.now().minus(Duration.ofDays(3));
-        Integer deletedPublished = txTemplate.execute(status ->
-                outboxMessageRepository.deleteOldPublishedMessages(
-                        OutboxStatus.PUBLISHED.name(), publishedCutoff, 5000));
+        Instant deadline = Instant.now().plus(CLEANUP_TIME_BUDGET);
+        long deletedPublished = deleteInBatches(OutboxStatus.PUBLISHED,
+                Instant.now().minus(Duration.ofDays(3)), CLEANUP_PUBLISHED_BATCH, deadline);
+        long deletedDead = deleteInBatches(OutboxStatus.DEAD,
+                Instant.now().minus(Duration.ofDays(deadRetentionDays)), CLEANUP_DEAD_BATCH, deadline);
 
-        Instant deadCutoff = Instant.now().minus(Duration.ofDays(deadRetentionDays));
-        Integer deletedDead = txTemplate.execute(status ->
-                outboxMessageRepository.deleteOldPublishedMessages(
-                        OutboxStatus.DEAD.name(), deadCutoff, 1000));
-
-        if ((deletedPublished != null && deletedPublished > 0) || (deletedDead != null && deletedDead > 0)) {
+        if (deletedPublished > 0 || deletedDead > 0) {
             log.info("Outbox cleanup: deleted {} published, {} dead messages", deletedPublished, deletedDead);
         }
 
@@ -257,6 +267,28 @@ public class OutboxPublisherService {
         if (deadCount != null && deadCount > 0) {
             log.warn("Outbox has {} DEAD messages (exceeded max retries) awaiting purge", deadCount);
         }
+    }
+
+    /**
+     * Deletes rows of one status older than the cutoff until none are left or the run's budget
+     * is spent. It used to be one capped delete an hour — at most 120k PUBLISHED rows a day, so
+     * an installation publishing more than that grew the table for ever. Each batch commits on
+     * its own, so a long run never holds locks on what it has already deleted.
+     */
+    private long deleteInBatches(OutboxStatus status, Instant cutoff, int batchSize, Instant deadline) {
+        long total = 0;
+        for (int batch = 0; batch < CLEANUP_MAX_BATCHES && Instant.now().isBefore(deadline); batch++) {
+            Integer deleted = txTemplate.execute(tx ->
+                    outboxMessageRepository.deleteOldPublishedMessages(status.name(), cutoff, batchSize));
+            int count = deleted == null ? 0 : deleted;
+            total += count;
+            if (count < batchSize) {
+                return total;
+            }
+        }
+        log.info("Outbox cleanup: {} {} rows deleted this run and more remain; the next run continues",
+                total, status);
+        return total;
     }
 
     /**

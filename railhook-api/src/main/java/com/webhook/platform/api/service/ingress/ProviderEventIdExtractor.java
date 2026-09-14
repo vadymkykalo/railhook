@@ -25,6 +25,12 @@ public final class ProviderEventIdExtractor {
             "X-Twilio-Webhook-Id"        // Twilio
     );
 
+    // GitLab's per-delivery id, newest name first. Both carry the same value when both are sent.
+    private static final List<String> GITLAB_DELIVERY_ID_HEADERS = List.of(
+            "webhook-id",                // GitLab 19.0+
+            "Idempotency-Key"            // GitLab 17.4+
+    );
+
     private ProviderEventIdExtractor() {
     }
 
@@ -32,8 +38,10 @@ public final class ProviderEventIdExtractor {
      * Extract a provider-native immutable event ID from the request.
      * <p>
      * 1. Well-known HTTP headers (Stripe, GitHub, Shopify, Twilio, generic X-Webhook-Id).
-     * 2. Slack: extract {@code event_id} from JSON body (Slack does not send event ID in headers).
-     * 3. Returns {@code null} if no reliable event ID found — no dedup will be performed.
+     * 2. GitLab: {@code webhook-id}, then {@code Idempotency-Key}, on a request carrying
+     *    {@code X-Gitlab-Event}.
+     * 3. Slack: extract {@code event_id} from JSON body (Slack does not send event ID in headers).
+     * 4. Returns {@code null} if no reliable event ID found — no dedup will be performed.
      */
     public static String extract(HttpServletRequest request, String body) {
         // 1. Check well-known provider event ID headers
@@ -44,7 +52,22 @@ public final class ProviderEventIdExtractor {
             }
         }
 
-        // 2. Slack: event_id lives in the JSON body, not in headers
+        // 2. GitLab: an id that stays the same across automatic retries and a manual "Resend
+        // request" — webhook-id since GitLab 19.0 and, with the same value, Idempotency-Key since
+        // 17.4. Read only off a GitLab delivery: Idempotency-Key is a generic header whose meaning
+        // Railhook cannot vouch for from anyone else. Never X-Gitlab-Event-UUID, which GitLab
+        // gives every webhook in a recursive chain, so it would answer one event with another.
+        if (request.getHeader("X-Gitlab-Event") != null) {
+            for (String header : GITLAB_DELIVERY_ID_HEADERS) {
+                String value = request.getHeader(header);
+                if (value != null && !value.isBlank()) {
+                    return truncate(value.trim(), 255);
+                }
+            }
+            return null;
+        }
+
+        // 3. Slack: event_id lives in the JSON body, not in headers
         if (request.getHeader("X-Slack-Signature") != null) {
             return extractSlackEventId(body);
         }

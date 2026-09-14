@@ -4,7 +4,9 @@ import com.webhook.platform.api.domain.entity.Organization;
 import com.webhook.platform.api.domain.entity.Plan;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -26,6 +28,17 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
      */
     @Query("SELECT o FROM Organization o JOIN FETCH o.plan WHERE o.id = :id")
     Optional<Organization> findByIdWithPlan(@Param("id") UUID id);
+
+    /**
+     * Takes the Organization's row lock until the transaction ends.
+     *
+     * <p>For a limit enforced as count-then-insert: two requests that each count before either
+     * inserts both see room, so whoever checks the limit holds this first and the second waits
+     * for the first to commit — and then counts it.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Organization o WHERE o.id = :id")
+    Optional<Organization> lockById(@Param("id") UUID id);
 
     long countBySuspendedAtIsNotNull();
 

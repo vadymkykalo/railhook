@@ -84,12 +84,13 @@ class EventIngestServiceTest {
                 Project.builder().id(projectId).organizationId(UUID.randomUUID()).name("p").build()));
 
         service = new EventIngestService(
-                eventRepository, subscriptionMatchingCache,
+                eventRepository,
+                new EventIntake(subscriptionMatchingCache, ruleEngineService, entitlementService, objectMapper),
                 deliveryRepository,
                 outboxMessageRepository, workflowTriggerOutboxRepository,
                 objectMapper, new DeliveryDispatch(outboxMessageRepository, objectMapper), meterRegistry,
                 sequenceGeneratorService, new SchemaValidationGate(payloadSchemaValidator, objectMapper), projectRepository,
-                ruleEngineService, quotaCounterService, entitlementService,
+                quotaCounterService,
                 transactionManager, 262144L, 1024
         );
     }

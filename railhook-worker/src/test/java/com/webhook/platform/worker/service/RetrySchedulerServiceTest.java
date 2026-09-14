@@ -268,13 +268,14 @@ class RetrySchedulerServiceTest {
                 // Act & Assert - should not throw exception, delivery should be rescheduled
                 assertDoesNotThrow(() -> retrySchedulerService.scheduleRetries(0));
 
-                // Verify failed delivery is saved with new nextRetryAt (Phase 3)
-                @SuppressWarnings("unchecked")
-                ArgumentCaptor<List<Delivery>> deliveryCaptor = ArgumentCaptor.forClass(List.class);
-                verify(deliveryRepository, times(2)).saveAll(deliveryCaptor.capture());
-                // Phase 3 is the second saveAll — contains rescheduled delivery
-                List<List<Delivery>> allSaves = deliveryCaptor.getAllValues();
-                assertNotNull(allSaves.get(1).get(0).getNextRetryAt());
+                // Phase 3 hands the row back fenced on the token Phase 1 claimed it under, never
+                // by re-saving the Phase 1 snapshot.
+                verify(deliveryRepository, times(1)).saveAll(anyList());
+                assertNotNull(delivery.getNextRetryAt());
+                ArgumentCaptor<UUID> token = ArgumentCaptor.forClass(UUID.class);
+                verify(deliveryRepository).handBackIfStillClaimed(
+                                eq(delivery.getId()), token.capture(), eq(delivery.getNextRetryAt()));
+                assertNotNull(token.getValue());
                 // A failed send must revert the Phase 1 PROCESSING claim back to PENDING,
                 // otherwise the row sits unclaimable until the stuck-delivery sweep catches it.
                 assertEquals(Delivery.DeliveryStatus.PENDING, delivery.getStatus());
@@ -405,12 +406,9 @@ class RetrySchedulerServiceTest {
                 // Assert — delivery is rescheduled with nextRetryAt set and reverted to PENDING
                 assertNotNull(delivery.getNextRetryAt());
                 assertEquals(Delivery.DeliveryStatus.PENDING, delivery.getStatus());
-                // Verify it ends up in the failed batch (Phase 3 saveAll)
-                @SuppressWarnings("unchecked")
-                ArgumentCaptor<List<Delivery>> deliveryCaptor = ArgumentCaptor.forClass(List.class);
-                verify(deliveryRepository, times(2)).saveAll(deliveryCaptor.capture());
-                List<List<Delivery>> allSaves = deliveryCaptor.getAllValues();
-                assertTrue(allSaves.get(1).contains(delivery));
+                // Verify it is handed back in Phase 3
+                verify(deliveryRepository).handBackIfStillClaimed(
+                                eq(delivery.getId()), any(UUID.class), eq(delivery.getNextRetryAt()));
         }
 
         @Test

@@ -38,6 +38,12 @@ class TunnelServiceTest {
     @Mock
     private ProjectRepository projectRepository;
 
+    @Mock
+    private com.webhook.platform.api.domain.repository.OrganizationRepository organizationRepository;
+
+    @Mock
+    private com.webhook.platform.api.service.billing.EntitlementService entitlementService;
+
     @InjectMocks
     private TunnelService tunnelService;
 

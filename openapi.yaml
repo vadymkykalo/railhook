@@ -4287,8 +4287,15 @@ paths:
       description: "Trades the one-time code the Google sign-in callback put in the\
         \ dashboard's URL for the same session a password sign-in returns: the access\
         \ token in the body, the refresh token in its cookie. A code works once, within\
-        \ 60 seconds of the callback."
+        \ 60 seconds of the callback, and only in the browser the callback redirected:\
+        \ it must carry the `railhook_signin_handoff` cookie the callback set."
       operationId: exchangeSignInCode
+      parameters:
+      - name: railhook_signin_handoff
+        in: cookie
+        required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -4303,7 +4310,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuthResponse"
         "401":
-          description: The code has been used or has expired
+          description: "The code has been used, has expired, or was opened in another\
+            \ browser"
           content:
             '*/*':
               schema:

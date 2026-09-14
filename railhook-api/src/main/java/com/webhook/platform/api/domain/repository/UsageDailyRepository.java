@@ -18,12 +18,13 @@ public interface UsageDailyRepository extends JpaRepository<UsageDaily, UUID> {
     Optional<UsageDaily> findByProjectIdAndDate(UUID projectId, LocalDate date);
 
     /**
-     * Inserts the daily usage snapshot, relying on the {@code UNIQUE (project_id, date)}
-     * constraint (see V020__alerts_and_usage.sql) to make the check-then-insert atomic at the
-     * database level rather than depending on ShedLock (or an application-level exists-check
-     * that runs in its own transaction) to prevent a duplicate row. Returns the number of rows
-     * actually inserted: 1 on success, 0 if a row for this project/date already existed (a
-     * concurrent aggregation run won the race).
+     * Writes one project's day, or rewrites it. The {@code UNIQUE (project_id, date)} constraint
+     * (V020) makes this one atomic statement however many runs overlap.
+     *
+     * <p>A day is recounted while its Deliveries can still settle, so a rewrite replaces the
+     * success, failed and DLQ counts with what they are now. The counts of what was created that
+     * day — events, deliveries, incoming events and forwards — can only have fallen since through
+     * retention, so a rewrite keeps the larger number.
      *
      * <p>Native, so Hibernate's {@code @TenantId} discriminator does not reach it and cannot
      * stamp the row either — see this package's {@code package-info}. {@code organizationId} is
@@ -39,9 +40,16 @@ public interface UsageDailyRepository extends JpaRepository<UsageDaily, UUID> {
             :organizationId, :projectId, :date, :eventsCount, :deliveriesCount, :successfulDeliveries,
             :failedDeliveries, :dlqCount, :incomingEventsCount, :incomingForwardsCount
         )
-        ON CONFLICT (project_id, date) DO NOTHING
+        ON CONFLICT (project_id, date) DO UPDATE SET
+            events_count            = GREATEST(usage_daily.events_count, EXCLUDED.events_count),
+            deliveries_count        = GREATEST(usage_daily.deliveries_count, EXCLUDED.deliveries_count),
+            successful_deliveries   = EXCLUDED.successful_deliveries,
+            failed_deliveries       = EXCLUDED.failed_deliveries,
+            dlq_count               = EXCLUDED.dlq_count,
+            incoming_events_count   = GREATEST(usage_daily.incoming_events_count, EXCLUDED.incoming_events_count),
+            incoming_forwards_count = GREATEST(usage_daily.incoming_forwards_count, EXCLUDED.incoming_forwards_count)
         """, nativeQuery = true)
-    int upsertIfAbsent(
+    int upsert(
             @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("date") LocalDate date,

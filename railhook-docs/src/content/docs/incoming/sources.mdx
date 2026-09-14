@@ -127,7 +127,7 @@ The ingress answers a provider, not a person. Each code is what the provider's o
 | `404` | No source has that token. |
 | `410` | The source exists but is disabled. |
 | `413` | The body is larger than the limit, 512 KB by default. |
-| `429` | The source's rate limit is spent, with `Retry-After: 1`. Also returned, without `Retry-After`, when the organization cannot accept more webhooks right now; a resend of a webhook already stored is still answered `202`. |
+| `429` | The source's rate limit is spent, with `Retry-After: 1`. Also returned, with `Retry-After: 3600`, when the organization cannot accept more webhooks right now; a resend of a webhook already stored is still answered `202`. |
 
 | Variable | Default | Effect |
 |---|---|---|
@@ -143,6 +143,7 @@ Providers send the same webhook again. When a request carries an id Railhook rec
 | Generic | `X-Webhook-Id` header |
 | Stripe | `Stripe-Webhook-Id` header |
 | GitHub | `X-GitHub-Delivery` header |
+| GitLab | `webhook-id` header, or `Idempotency-Key` (GitLab 17.4 and later) |
 | Shopify | `X-Shopify-Webhook-Id` header |
 | Twilio | `X-Twilio-Webhook-Id` header |
 | Slack | `event_id` in the JSON body |
