@@ -63,7 +63,7 @@ public class ProjectService {
                 .build());
         // Every project starts masking email, phone and card numbers in the dashboard, as the docs
         // promise; a project with no rules showed customer addresses in full.
-        piiMaskingService.seedDefaultRules(project.getId(), owningOrganization);
+        piiMaskingService.seedDefaultRules(project.getId());
         return project;
     }
 

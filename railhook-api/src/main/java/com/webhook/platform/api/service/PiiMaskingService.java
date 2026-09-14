@@ -90,20 +90,19 @@ public class PiiMaskingService {
         log.info("Deleted PII masking rule '{}' from project {}", rule.getPatternName(), projectId);
     }
 
-    @Transactional
-    public void seedDefaultRules(UUID projectId) {
-        seedDefaultRules(projectId, null);
-    }
-
     /**
-     * The organization is given explicitly for a project created outside a tenant scope (the first
-     * project of an account made by Google sign-in); inside one, null lets Hibernate stamp it.
+     * The organization comes off the project row and is set explicitly, so the rules land in the
+     * right one even when the project was created outside a tenant scope (the first project of an
+     * account made by Google sign-in).
      */
     @Transactional
-    public void seedDefaultRules(UUID projectId, UUID organizationId) {
+    public void seedDefaultRules(UUID projectId) {
         if (!ruleRepository.findByProjectId(projectId).isEmpty()) {
             return;
         }
+        UUID organizationId = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("Project not found"))
+                .getOrganizationId();
 
         List<PiiMaskingRule> defaults = List.of(
                 PiiMaskingRule.builder()
