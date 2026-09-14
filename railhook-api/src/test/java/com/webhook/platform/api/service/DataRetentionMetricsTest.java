@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.TunnelRequestLogRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.util.List;
 
@@ -25,6 +26,7 @@ class DataRetentionMetricsTest {
     DataRetentionMetricsTest() {
         new DataRetentionService(mock(DeliveryAttemptRepository.class), mock(IncomingEventRepository.class),
                 mock(TunnelRequestLogRepository.class), mock(EventRepository.class), registry,
+                TransactionOperations.withoutTransaction(),
                 90, 14, 30, 7, 10, 90, 1000);
     }
 
