@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service.verification;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -33,27 +35,49 @@ public class ReplayDetectionService {
 
     private final StringRedisTemplate redisTemplate;
 
+    private final Counter checkUnavailable;
+
     public ReplayDetectionService(
             StringRedisTemplate redisTemplate,
-            @Value("${webhook.ingress.replay-window-minutes:5}") int replayWindowMinutes) {
+            @Value("${webhook.ingress.replay-window-minutes:5}") int replayWindowMinutes,
+            MeterRegistry meterRegistry) {
         this.replayCacheTtl = Duration.ofMinutes(replayWindowMinutes);
         this.redisTemplate = redisTemplate;
+        this.checkUnavailable = Counter.builder("incoming_replay_check_unavailable_total")
+                .description("Verified incoming webhooks accepted without a replay check because Redis did not answer")
+                .register(meterRegistry);
     }
 
     /**
      * Check if this signature has been seen recently (replay attack).
      * If not seen, mark it as seen for the TTL window.
      *
+     * <p>Fails open: when Redis does not answer, the answer is "not a replay". Deliberately, and
+     * unlike the ingress rate limit, which fails closed. That one stands between an
+     * unauthenticated URL and the database; this one only ever sees a request whose signature
+     * has already verified, so what an outage can let through is a genuine webhook delivered
+     * twice — and a provider that sends an event id is still deduplicated on it. Failing closed
+     * instead turned the Redis error into a 500, and a provider that does not retry (GitHub,
+     * GitLab) lost the webhook for good. The counter is how an operator sees the window.
+     *
      * @param sourceId unique identifier of the incoming source
      * @param signature the webhook signature to check
-     * @return true if this is a replay (already seen), false if first time
+     * @return true if this is a replay (already seen), false if first time or if Redis could not
+     *         be asked
      */
     public boolean isReplay(String sourceId, String signature) {
         String signatureHash = hashSignature(signature);
         String redisKey = REDIS_KEY_PREFIX + sourceId + ":" + signatureHash;
 
-        Boolean wasSet = redisTemplate.opsForValue()
-                .setIfAbsent(redisKey, "1", replayCacheTtl);
+        Boolean wasSet;
+        try {
+            wasSet = redisTemplate.opsForValue().setIfAbsent(redisKey, "1", replayCacheTtl);
+        } catch (RuntimeException e) {
+            checkUnavailable.increment();
+            log.error("Replay check unavailable, accepting the verified webhook without one: sourceId={}, error={}",
+                    sourceId, e.getMessage());
+            return false;
+        }
 
         if (Boolean.FALSE.equals(wasSet)) {
             log.warn("Replay attack detected: sourceId={}, signatureHash={}", sourceId, signatureHash);
@@ -76,7 +100,13 @@ public class ReplayDetectionService {
     public void unmark(String sourceId, String signature) {
         String signatureHash = hashSignature(signature);
         String redisKey = REDIS_KEY_PREFIX + sourceId + ":" + signatureHash;
-        redisTemplate.delete(redisKey);
+        try {
+            redisTemplate.delete(redisKey);
+        } catch (RuntimeException e) {
+            // Called while a failed persist is already on its way out. Throwing here would replace
+            // that error with a Redis one; the mark simply outlives its TTL instead.
+            log.error("Could not release replay marker: sourceId={}, error={}", sourceId, e.getMessage());
+        }
     }
 
     /**
