@@ -21,8 +21,10 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The Replay-session scoping of the claim, against a real Postgres.
@@ -119,6 +121,86 @@ class IncomingForwardAttemptRepositoryTest {
                 "the scheduler ignores rows without a next_retry_at, so recovery must set one");
         assertNull(attemptRepository.findById(fresh).orElseThrow().getNextRetryAt(),
                 "a Forward that has only just been received is still waiting for its dispatch message");
+    }
+
+    // ── the hard cap measures the Forward, not the webhook ─────────────────────────
+
+    @Test
+    void aDlqRetryOfAWebhookReceivedDaysAgoIsNotEscalatedTheMomentItIsCreated() {
+        // Failed Messages → Retry, and Replay, both start a fresh Forward — a new session with its
+        // own attempt 1 — for an Incoming Event that may have arrived last week. Measuring age
+        // from incoming_events.received_at made that brand-new Forward look days old, so the next
+        // escalation cycle put it straight back into the DLQ before a single Attempt was made.
+        UUID eventId = receivedAt(Instant.now().minus(3, ChronoUnit.DAYS));
+        UUID destinationId = UUID.randomUUID();
+        UUID retried = persist(eventId, destinationId, 1, UUID.randomUUID(), ForwardAttemptStatus.PENDING, null);
+
+        List<UUID> stale = attemptRepository.findStaleForwardAttemptIds(
+                Instant.now().minus(24, ChronoUnit.HOURS), 100);
+
+        assertFalse(stale.contains(retried), "a Forward created a moment ago is not 24h old");
+    }
+
+    @Test
+    void aForwardWhoseLadderBeganBeforeTheCutoffIsEscalatedEvenThoughItsNewestRowIsFresh() {
+        // Incoming writes a new row per Attempt, so the PENDING row is always recent. The age that
+        // counts is how long this Forward has been outstanding: since its own attempt 1.
+        UUID eventId = receivedAt(Instant.now().minus(30, ChronoUnit.HOURS));
+        UUID destinationId = UUID.randomUUID();
+        UUID first = persist(eventId, destinationId, 1, null, ForwardAttemptStatus.FAILED, null);
+        backdate(first, Instant.now().minus(30, ChronoUnit.HOURS));
+        UUID latest = persist(eventId, destinationId, 2, null, ForwardAttemptStatus.PENDING, Instant.now());
+
+        List<UUID> stale = attemptRepository.findStaleForwardAttemptIds(
+                Instant.now().minus(24, ChronoUnit.HOURS), 100);
+
+        assertTrue(stale.contains(latest));
+    }
+
+    @Test
+    void aReplaySessionIsAgedFromItsOwnFirstAttemptNotFromTheLiveLadder() {
+        UUID eventId = receivedAt(Instant.now().minus(30, ChronoUnit.HOURS));
+        UUID destinationId = UUID.randomUUID();
+        UUID live = persist(eventId, destinationId, 1, null, ForwardAttemptStatus.PENDING, Instant.now());
+        backdate(live, Instant.now().minus(30, ChronoUnit.HOURS));
+        UUID session = UUID.randomUUID();
+        UUID replayFirst = persist(eventId, destinationId, 1, session, ForwardAttemptStatus.FAILED, null);
+        backdate(replayFirst, Instant.now().minus(2, ChronoUnit.HOURS));
+        UUID replayLatest = persist(eventId, destinationId, 2, session, ForwardAttemptStatus.PENDING, Instant.now());
+
+        List<UUID> stale = attemptRepository.findStaleForwardAttemptIds(
+                Instant.now().minus(24, ChronoUnit.HOURS), 100);
+
+        assertTrue(stale.contains(live), "the live ladder has been outstanding for 30h");
+        assertFalse(stale.contains(replayLatest), "the Replay began 2h ago");
+    }
+
+    @Test
+    void theOldestPendingAgeGaugeIsNotInflatedByARetryOfAnOldWebhook() {
+        UUID eventId = receivedAt(Instant.now().minus(3, ChronoUnit.DAYS));
+        persist(eventId, UUID.randomUUID(), 1, UUID.randomUUID(), ForwardAttemptStatus.PENDING, null);
+
+        Instant oldest = attemptRepository.findOldestPendingForwardStartedAt();
+
+        assertNotNull(oldest);
+        assertTrue(oldest.isAfter(Instant.now().minus(1, ChronoUnit.HOURS)),
+                "the only outstanding Forward started just now, not when its webhook arrived: " + oldest);
+    }
+
+    /** The Incoming Event the attempts hang off, received at the given moment. */
+    private UUID receivedAt(Instant receivedAt) {
+        UUID id = UUID.randomUUID();
+        entityManager.getEntityManager()
+                .createNativeQuery("INSERT INTO incoming_events "
+                        + "(id, organization_id, incoming_source_id, request_id, method, received_at) "
+                        + "VALUES (:id, :org, :source, :requestId, 'POST', :receivedAt)")
+                .setParameter("id", id)
+                .setParameter("org", FIXTURE_ORG)
+                .setParameter("source", UUID.randomUUID())
+                .setParameter("requestId", id.toString())
+                .setParameter("receivedAt", receivedAt)
+                .executeUpdate();
+        return id;
     }
 
     private IncomingForwardAttempt only(List<IncomingForwardAttempt> rows) {

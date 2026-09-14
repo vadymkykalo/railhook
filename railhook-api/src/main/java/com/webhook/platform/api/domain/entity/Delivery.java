@@ -1,5 +1,6 @@
 package com.webhook.platform.api.domain.entity;
 
+import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.api.domain.enums.DeliveryOrigin;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
@@ -20,6 +21,17 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class Delivery {
+
+    /**
+     * How many more Attempts a person gets by sending a Delivery again by hand, from Failed
+     * Messages or from the Delivery itself.
+     *
+     * <p>The ladder is not restarted (see {@link #returnToLadder}), so these Attempts wait at the
+     * tier the Delivery already reached — for an abandoned one, the last. Three of them still fit
+     * inside the worker's 96-hour hard cap at the top of the jitter; a whole ladder's worth would
+     * be escalated before its last Attempts could run.
+     */
+    public static final int MANUAL_RETRY_ATTEMPTS = 3;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -114,6 +126,13 @@ public class Delivery {
     @Column(name = "last_attempt_at")
     private Instant lastAttemptAt;
 
+    /**
+     * When a person last put this Delivery back on its Retry Ladder; null if never. The worker's
+     * hard-cap escalation measures age from here when it is set, and from createdAt otherwise.
+     */
+    @Column(name = "ladder_resumed_at")
+    private Instant ladderResumedAt;
+
     @Column(name = "succeeded_at")
     private Instant succeededAt;
 
@@ -131,6 +150,27 @@ public class Delivery {
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
+
+    /**
+     * Puts this Delivery back on its Retry Ladder for {@code additionalAttempts} more Attempts,
+     * the first of which is sent as soon as it is announced.
+     *
+     * <p>attemptCount is carried forward, never reset. The ladder reads it to pick the next wait,
+     * and every recorded Attempt is numbered by it: restarting the count gives the history two
+     * attempt 1s, and "the latest attempt" stops being well defined. The headroom comes from
+     * maxAttempts instead, capped where a ladder stops being parseable — past that the worker
+     * would fail the Delivery for carrying an invalid ladder rather than attempt it.
+     *
+     * <p>Stamps ladderResumedAt, so the hard-cap escalation measures age from now rather than
+     * from createdAt.
+     */
+    public void returnToLadder(int additionalAttempts) {
+        this.status = DeliveryStatus.PENDING;
+        this.maxAttempts = Math.min(attemptCount + additionalAttempts, RetryLadder.MAX_ATTEMPTS_LIMIT);
+        this.nextRetryAt = null;
+        this.failedAt = null;
+        this.ladderResumedAt = Instant.now();
+    }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id", insertable = false, updatable = false)

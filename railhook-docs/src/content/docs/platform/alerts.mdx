@@ -31,6 +31,8 @@ This page covers **alert rules** created in the dashboard. They watch your deliv
 
 A rule fires when its condition **starts** to hold, not on every evaluation while it keeps holding. One outage produces one notification, not one a minute.
 
+When an evaluation finds the condition no longer holds, the open alert resolves itself. The next time the condition starts to hold is a new alert with a new notification, so you do not have to resolve alerts by hand to hear about the next outage.
+
 ## Settings that decide whether anyone acts
 
 | Setting | Default | Guidance |
@@ -47,7 +49,7 @@ One channel per rule. To notify two places, create two rules.
 | Channel | Sends to | Needs |
 |---|---|---|
 | `IN_APP` | A notification in the dashboard. The default. | Nothing |
-| `EMAIL` | One or more recipients | Email configured on the deployment: `EMAIL_ENABLED=true` and SMTP settings |
+| `EMAIL` | Up to 10 addresses, separated by commas. Each must belong to a member of the organization who has verified it; any other address is refused when the rule is saved. | Email configured on the deployment: `EMAIL_ENABLED=true` and SMTP settings |
 | `SLACK` | A Slack incoming webhook URL | The URL |
 | `WEBHOOK` | Any URL of yours, as a JSON `POST`. Use it to reach a pager, a ticket system or your own routing. | The URL |
 

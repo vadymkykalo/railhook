@@ -3967,6 +3967,12 @@ paths:
             '*/*':
               schema:
                 type: object
+        "409":
+          description: An attempt at this delivery is under way
+          content:
+            '*/*':
+              schema:
+                type: object
       security:
       - bearerAuth: []
       - apiKey: []
@@ -9473,14 +9479,14 @@ components:
           format: int64
         sort:
           $ref: "#/components/schemas/SortObject"
+        paged:
+          type: boolean
         pageNumber:
           type: integer
           format: int32
         pageSize:
           type: integer
           format: int32
-        paged:
-          type: boolean
         unpaged:
           type: boolean
     SortObject:

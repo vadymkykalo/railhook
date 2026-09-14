@@ -267,6 +267,31 @@ class DlqServiceTest {
     }
 
     @Test
+    void retryDeliveries_restartsTheHardCapClock() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
+
+        UUID deliveryId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        Delivery delivery = Delivery.builder().id(deliveryId).eventId(eventId)
+                .endpointId(UUID.randomUUID()).status(DeliveryStatus.DLQ)
+                .attemptCount(7).maxAttempts(7)
+                .createdAt(Instant.now().minus(java.time.Duration.ofDays(5)))
+                .build();
+        when(deliveryRepository.findByIdInAndStatus(List.of(deliveryId), DeliveryStatus.DLQ))
+                .thenReturn(List.of(delivery));
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(Event.builder().id(eventId).projectId(projectId).build()));
+        Instant before = Instant.now();
+
+        dlqService.retryDeliveries(projectId, List.of(deliveryId));
+
+        // The worker escalates a PENDING Delivery past the hard cap. Measured from createdAt, this
+        // five-day-old one went straight back to the DLQ at the next sweep.
+        ArgumentCaptor<Delivery> savedCaptor = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryRepository).save(savedCaptor.capture());
+        assertThat(savedCaptor.getValue().getLadderResumedAt()).isNotNull().isAfterOrEqualTo(before);
+    }
+
+    @Test
     void retryDeliveries_deliveryBelongsToDifferentProject_isSkipped() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
 

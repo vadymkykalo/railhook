@@ -14,8 +14,9 @@ import java.util.UUID;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
+    /** Addresses are stored normalized, so pass {@code EmailAddresses.normalize(address)}. */
     Optional<User> findByEmail(String email);
-    Optional<User> findByEmailIgnoreCase(String email);
+    /** Addresses are stored normalized, so pass {@code EmailAddresses.normalize(address)}. */
     boolean existsByEmail(String email);
     Optional<User> findByVerificationToken(String verificationToken);
     Optional<User> findByPasswordResetToken(String passwordResetToken);

@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
+import com.webhook.platform.api.domain.EmailAddresses;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.entity.Organization;
 import com.webhook.platform.api.domain.entity.Plan;
@@ -92,7 +93,8 @@ public class AuthService {
     @Auditable(action = AuditAction.REGISTER, resourceType = "Auth")
     @Transactional
     public AuthResponse register(RegisterRequest request, SessionOrigin origin) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        String email = EmailAddresses.normalize(request.getEmail());
+        if (userRepository.existsByEmail(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
         }
 
@@ -108,7 +110,7 @@ public class AuthService {
         String verificationToken = verificationIsDeliverable ? generateVerificationToken() : null;
 
         User user = User.builder()
-                .email(request.getEmail())
+                .email(email)
                 .fullName(request.getFullName())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .status(verificationIsDeliverable ? UserStatus.PENDING_VERIFICATION : UserStatus.ACTIVE)
@@ -134,7 +136,7 @@ public class AuthService {
     @SystemTenant("reads memberships to find which organization to issue a token for -- the answer is what a tenant scope would need as input")
     @Auditable(action = AuditAction.LOGIN, resourceType = "Auth")
     public AuthResponse login(LoginRequest request, SessionOrigin origin) {
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmail(EmailAddresses.normalize(request.getEmail()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
 
         // Before the password check, not after. Verifying first would still spend a BCrypt hash
@@ -495,7 +497,7 @@ public class AuthService {
     @SystemTenant("acts on a User by email address, with no authenticated caller")
     @Transactional
     public void resendVerification(String email) {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(EmailAddresses.normalize(email))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         if (Boolean.TRUE.equals(user.getEmailVerified())) {
@@ -557,7 +559,7 @@ public class AuthService {
     @Auditable(action = AuditAction.PASSWORD_RESET_REQUESTED, resourceType = "Auth")
     @Transactional
     public void forgotPassword(String email) {
-        User user = userRepository.findByEmail(email).orElse(null);
+        User user = userRepository.findByEmail(EmailAddresses.normalize(email)).orElse(null);
 
         // Always return success to prevent email enumeration
         if (user == null) {

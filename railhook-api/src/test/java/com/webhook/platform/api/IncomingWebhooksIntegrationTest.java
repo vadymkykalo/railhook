@@ -14,8 +14,20 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import com.webhook.platform.api.domain.entity.IncomingEvent;
+import com.webhook.platform.api.domain.repository.IncomingEventRepository;
+import com.webhook.platform.api.service.verification.ReplayDetectionService;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
@@ -32,6 +44,13 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private IncomingEventRepository incomingEventRepository;
+
+    /** Redis-backed, and there is no Redis here; unstubbed it answers "not seen before". */
+    @MockitoBean
+    private ReplayDetectionService replayDetectionService;
 
     private static String accessToken;
     private static UUID projectId;
@@ -412,6 +431,80 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.status").value("accepted"));
+    }
+
+    /**
+     * A form-encoded webhook — Slack slash commands and interactivity, GitHub's form content type,
+     * a generic HMAC sender posting a form — is signed over the bytes the sender wrote.
+     *
+     * <p>Spring's message conversion does not read those bytes for a form POST without a query
+     * string: it rebuilds a body from the parameters the container already parsed, re-encoded the
+     * way Java's URLEncoder encodes. {@code %20} comes back as {@code +}, lowercase hex as
+     * uppercase, so the rebuilt body hashed to something the sender never signed and every such
+     * webhook was refused with 401 — and a query string on the URL made it verify again.
+     */
+    @Test
+    @Order(35)
+    void ingress_formEncodedWebhook_isVerifiedStoredAndForwardedAsTheBytesThatWereSigned() throws Exception {
+        Assumptions.assumeTrue(ingressPathToken != null, "Source must be created first");
+        String secret = "form-hmac-secret";
+        IncomingSourceRequest enableHmac = IncomingSourceRequest.builder()
+                .name("GitHub Webhooks Updated")
+                .verificationMode(VerificationMode.HMAC_GENERIC)
+                .hmacSecret(secret)
+                .hmacHeaderName("X-Signature")
+                .hmacSignaturePrefix("")
+                .build();
+        mockMvc.perform(put("/api/v1/projects/" + projectId + "/incoming-sources/" + sourceId)
+                        .header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(enableHmac)))
+                .andExpect(status().isOk());
+
+        // Encoded the way a sender may encode it and Java's URLEncoder does not: %20 for a space,
+        // lowercase hex, an apostrophe escaped that URLEncoder would also escape but in uppercase.
+        String raw = "command=%2fdeploy&text=hello%20world&payload=%7b%22a%22%3a1%7d&user_name=o%27brien";
+        byte[] rawBytes = raw.getBytes(StandardCharsets.US_ASCII);
+        String signature = HexFormat.of().formatHex(hmacSha256(secret, rawBytes));
+
+        try {
+            MvcResult accepted = mockMvc.perform(post("/ingress/" + ingressPathToken)
+                            .header("X-Signature", signature)
+                            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                            .content(rawBytes))
+                    .andExpect(status().isAccepted())
+                    .andReturn();
+
+            String requestId = objectMapper.readTree(accepted.getResponse().getContentAsString())
+                    .get("requestId").asText();
+            IncomingEvent stored = incomingEventRepository
+                    .findByIncomingSourceId(sourceId, PageRequest.of(0, 100)).getContent().stream()
+                    .filter(e -> requestId.equals(e.getRequestId()))
+                    .findFirst()
+                    .orElseThrow();
+
+            // Forwarding sends body_raw, so this is also what the Destination receives.
+            assertEquals(raw, stored.getBodyRaw());
+            assertEquals(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(rawBytes)),
+                    stored.getBodySha256());
+            assertEquals(Boolean.TRUE, stored.getVerified());
+        } finally {
+            IncomingSourceRequest resetMode = IncomingSourceRequest.builder()
+                    .name("GitHub Webhooks Updated")
+                    .verificationMode(VerificationMode.NONE)
+                    .build();
+            mockMvc.perform(put("/api/v1/projects/" + projectId + "/incoming-sources/" + sourceId)
+                            .header("Authorization", auth())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(resetMode)))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    private static byte[] hmacSha256(String secret, byte[] data) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        return mac.doFinal(data);
     }
 
     // ==================== Incoming Events ====================

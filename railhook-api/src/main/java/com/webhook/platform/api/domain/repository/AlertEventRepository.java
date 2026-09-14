@@ -35,7 +35,19 @@ public interface AlertEventRepository extends JpaRepository<AlertEvent, UUID> {
     @Query("UPDATE AlertEvent e SET e.resolved = true, e.resolvedAt = :now WHERE e.id = :id AND e.projectId = :projectId")
     int resolveById(@Param("id") UUID id, @Param("projectId") UUID projectId, @Param("now") Instant now);
 
+    /**
+     * Resolves whatever is still open for one rule — what the evaluator does once the rule's
+     * condition has stopped holding, so the next crossing fires again.
+     */
     @Modifying
-    @Query(value = "DELETE FROM alert_events WHERE created_at < :cutoff", nativeQuery = true)
-    int deleteOlderThan(@Param("cutoff") Instant cutoff);
+    @Query("UPDATE AlertEvent e SET e.resolved = true, e.resolvedAt = :now WHERE e.alertRuleId = :ruleId AND e.resolved = false")
+    int resolveOpenByAlertRuleId(@Param("ruleId") UUID ruleId, @Param("now") Instant now);
+
+    /**
+     * Retention for alert history: resolved events older than the cutoff. An open one is kept
+     * however old it is, because it is what keeps its rule from firing again.
+     */
+    @Modifying
+    @Query(value = "DELETE FROM alert_events WHERE resolved = true AND created_at < :cutoff", nativeQuery = true)
+    int deleteResolvedBefore(@Param("cutoff") Instant cutoff);
 }

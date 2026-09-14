@@ -34,6 +34,16 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     long countByOrganizationId(UUID organizationId);
 
+    /**
+     * Which of these addresses belong to an active member of the organization in scope who has
+     * verified the address — the only people an alert rule may email. Addresses are compared as
+     * stored, which is lower case.
+     */
+    @Query("SELECT u.email FROM Membership m JOIN User u ON m.userId = u.id "
+            + "WHERE m.status = com.webhook.platform.api.domain.enums.MembershipStatus.ACTIVE "
+            + "AND u.emailVerified = true AND u.email IN :emails")
+    List<String> findVerifiedMemberEmailsIn(@Param("emails") Collection<String> emails);
+
     @Query("SELECT m, u FROM Membership m JOIN User u ON m.userId = u.id WHERE m.organizationId = :orgId")
     List<Object[]> findMembersWithUsers(@Param("orgId") UUID organizationId);
 

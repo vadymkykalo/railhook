@@ -53,6 +53,7 @@ class AlertRuleWebhookUrlValidationTest {
     @Mock private IncidentRepository incidentRepository;
     @Mock private IncidentTimelineRepository timelineRepository;
     @Mock private AlertNotificationService notificationService;
+    @Mock private com.webhook.platform.api.domain.repository.MembershipRepository membershipRepository;
 
     private AlertService service;
 
@@ -71,7 +72,7 @@ class AlertRuleWebhookUrlValidationTest {
         // enter a scope the way a request would.
         TenantContext.set(organizationId);
         service = new AlertService(ruleRepository, eventRepository, projectRepository,
-                incidentRepository, timelineRepository, notificationService,
+                incidentRepository, timelineRepository, notificationService, membershipRepository,
                 false, Collections.emptyList());
 
         when(projectRepository.findById(projectId))

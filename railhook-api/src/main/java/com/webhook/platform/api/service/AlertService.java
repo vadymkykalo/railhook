@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.audit.AuditAction;
+import com.webhook.platform.api.domain.EmailAddresses;
 import com.webhook.platform.api.domain.entity.AlertEvent;
 import com.webhook.platform.api.domain.entity.AlertRule;
 import com.webhook.platform.api.domain.entity.Incident;
@@ -15,6 +16,7 @@ import com.webhook.platform.api.domain.repository.AlertEventRepository;
 import com.webhook.platform.api.domain.repository.AlertRuleRepository;
 import com.webhook.platform.api.domain.repository.IncidentRepository;
 import com.webhook.platform.api.domain.repository.IncidentTimelineRepository;
+import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.AlertEventResponse;
 import com.webhook.platform.api.dto.AlertRuleRequest;
@@ -26,11 +28,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -43,6 +49,7 @@ public class AlertService {
     private final IncidentRepository incidentRepository;
     private final IncidentTimelineRepository timelineRepository;
     private final AlertNotificationService notificationService;
+    private final MembershipRepository membershipRepository;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
 
@@ -53,6 +60,7 @@ public class AlertService {
             IncidentRepository incidentRepository,
             IncidentTimelineRepository timelineRepository,
             AlertNotificationService notificationService,
+            MembershipRepository membershipRepository,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         this.ruleRepository = ruleRepository;
@@ -61,8 +69,23 @@ public class AlertService {
         this.incidentRepository = incidentRepository;
         this.timelineRepository = timelineRepository;
         this.notificationService = notificationService;
+        this.membershipRepository = membershipRepository;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
+    }
+
+    /**
+     * Resolves a rule's open alerts because its condition has stopped holding, which re-arms the
+     * rule for the next crossing. Called by the evaluator inside the rule's organization.
+     */
+    @Transactional
+    public int resolveRecovered(AlertRule rule) {
+        int resolved = eventRepository.resolveOpenByAlertRuleId(rule.getId(), Instant.now());
+        if (resolved > 0) {
+            log.info("Alert resolved: rule='{}', project={}; the condition no longer holds",
+                    rule.getName(), rule.getProjectId());
+        }
+        return resolved;
     }
 
     /**
@@ -88,11 +111,40 @@ public class AlertService {
                 .toList();
     }
 
+    /**
+     * An EMAIL rule mails every address on it about once a minute while its condition holds, under
+     * a subject the user wrote. Only the organization's own members, with the address verified, may
+     * be on the list; otherwise a rule is a way to send mail from this deployment to anyone.
+     *
+     * @return the list normalized and de-duplicated, or null when there is none
+     */
+    private String requireMemberRecipients(String recipients) {
+        if (recipients == null || recipients.isBlank()) {
+            return null;
+        }
+        List<String> addresses = EmailAddresses.splitList(recipients).stream().distinct().toList();
+        if (addresses.size() > AlertRuleRequest.MAX_EMAIL_RECIPIENTS
+                || !addresses.stream().allMatch(EmailAddresses::isPlausible)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Email recipients must be at most " + AlertRuleRequest.MAX_EMAIL_RECIPIENTS
+                            + " addresses, separated by commas");
+        }
+        Set<String> members = new HashSet<>(membershipRepository.findVerifiedMemberEmailsIn(addresses));
+        List<String> outsiders = addresses.stream().filter(address -> !members.contains(address)).toList();
+        if (!outsiders.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Alert emails can only go to members of this organization who have verified their "
+                            + "address. Not a verified member: " + String.join(", ", outsiders));
+        }
+        return String.join(",", addresses);
+    }
+
     @Auditable(action = AuditAction.CREATE, resourceType = "AlertRule")
     @Transactional
     public AlertRuleResponse createRule(UUID projectId, AlertRuleRequest request) {
         validateProjectAccess(projectId);
         validateNotificationUrl(request.getWebhookUrl());
+        String emailRecipients = requireMemberRecipients(request.getEmailRecipients());
 
         AlertRule rule = AlertRule.builder()
                 .projectId(projectId)
@@ -108,7 +160,7 @@ public class AlertService {
                 .muted(request.getMuted() != null ? request.getMuted() : false)
                 .snoozedUntil(request.getSnoozedUntil())
                 .webhookUrl(request.getWebhookUrl())
-                .emailRecipients(request.getEmailRecipients())
+                .emailRecipients(emailRecipients)
                 .build();
 
         rule = ruleRepository.save(rule);
@@ -138,7 +190,7 @@ public class AlertService {
         if (request.getMuted() != null) rule.setMuted(request.getMuted());
         if (request.getSnoozedUntil() != null) rule.setSnoozedUntil(request.getSnoozedUntil());
         if (request.getWebhookUrl() != null) rule.setWebhookUrl(request.getWebhookUrl().isBlank() ? null : request.getWebhookUrl());
-        if (request.getEmailRecipients() != null) rule.setEmailRecipients(request.getEmailRecipients().isBlank() ? null : request.getEmailRecipients());
+        if (request.getEmailRecipients() != null) rule.setEmailRecipients(requireMemberRecipients(request.getEmailRecipients()));
 
         rule = ruleRepository.save(rule);
         log.info("Updated alert rule '{}' for project {}", rule.getName(), projectId);

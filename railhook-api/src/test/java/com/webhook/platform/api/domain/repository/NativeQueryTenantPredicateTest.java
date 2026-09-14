@@ -81,6 +81,9 @@ class NativeQueryTenantPredicateTest {
             "IncomingEventRepository.deleteOldIncomingEvents",
             "EventRepository.deleteOldEvents",
             "OutboxMessageRepository.deleteOldPublishedMessages",
+            // AlertEvaluatorService.purgeResolvedAlertEvents, @SystemTenant: resolved alert
+            // history past its window, for every organization at once.
+            "AlertEventRepository.deleteResolvedBefore",
 
             // Table-size estimates driving the retention thresholds: pg_stat_user_tables and
             // COUNT(*) are properties of the table, not of an organization.
@@ -107,10 +110,9 @@ class NativeQueryTenantPredicateTest {
             "DeliveryRepository.findMaxSequenceNumberPerEndpointSince",
 
             // Unreferenced today, and listed rather than deleted because deleting a repository
-            // method is not this branch's business. Both are cross-tenant in shape — a retention
-            // delete by age, and the DEAD counterpart of the outbox's batch settlement — so
-            // whoever wires them up inherits the right answer rather than a red build.
-            "AlertEventRepository.deleteOlderThan",
+            // method is not this branch's business. It is cross-tenant in shape — the DEAD
+            // counterpart of the outbox's batch settlement — so whoever wires it up inherits the
+            // right answer rather than a red build.
             "OutboxMessageRepository.batchMarkDead"
     ));
 
