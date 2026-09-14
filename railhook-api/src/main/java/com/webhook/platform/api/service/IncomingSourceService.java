@@ -58,6 +58,19 @@ public class IncomingSourceService {
      * with a provider nothing verifies looked configured, and only threw once the provider
      * was already sending — by which point the webhooks it was rejecting were real.
      */
+    /**
+     * A secret with no mode is the intent to verify with it. Saving that as NONE accepted forged
+     * and unsigned requests on a source whose owner had handed over the signing secret.
+     */
+    private VerificationMode defaultVerificationMode(IncomingSourceRequest request) {
+        if (request.getHmacSecret() == null || request.getHmacSecret().isBlank()) {
+            return VerificationMode.NONE;
+        }
+        return verifierFactory.supportsProviderVerification(request.getProviderType())
+                ? VerificationMode.PROVIDER
+                : VerificationMode.HMAC_GENERIC;
+    }
+
     private void validateVerificationSettings(IncomingSource source) {
         VerificationMode mode = source.getVerificationMode();
         if (mode == VerificationMode.PROVIDER
@@ -114,7 +127,8 @@ public class IncomingSourceService {
                 .providerType(request.getProviderType() != null ? request.getProviderType() : ProviderType.GENERIC)
                 .status(IncomingSourceStatus.ACTIVE)
                 .ingressPathToken(ingressPathToken)
-                .verificationMode(request.getVerificationMode() != null ? request.getVerificationMode() : VerificationMode.NONE)
+                .verificationMode(request.getVerificationMode() != null ? request.getVerificationMode()
+                        : defaultVerificationMode(request))
                 .build();
 
         // Encrypt HMAC secret if provided

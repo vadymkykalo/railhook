@@ -129,6 +129,12 @@ public class LoginCommand implements Callable<Integer> {
             } else if (pollResponse.statusCode() == 410) {
                 err.println("\n✗ Device code expired");
                 return 1;
+            } else if (pollResponse.statusCode() == 429) {
+                // RFC 8628 slow_down: back off by five seconds rather than keep spending the
+                // server's budget at the same pace.
+                pollInterval += 5;
+                out.print(".");
+                out.flush();
             } else {
                 // Unexpected — continue polling
                 out.print("?");

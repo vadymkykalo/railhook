@@ -72,13 +72,20 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
 
     // ── PII Masking Rules CRUD ──
 
+    /**
+     * The docs promise every project starts masking email, phone and card numbers. Projects were
+     * created with no rules at all, so customer email addresses showed in full on every event and
+     * delivery until someone found the seed button — found on production.
+     */
     @Test
-    public void listRules_emptyByDefault() throws Exception {
+    public void newProject_startsWithTheBuiltinRules() throws Exception {
         mockMvc.perform(get(piiRulesUrl())
                         .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[?(@.patternName == 'email' && @.ruleType == 'BUILTIN' && @.enabled == true)]").exists())
+                .andExpect(jsonPath("$[?(@.patternName == 'phone')]").exists())
+                .andExpect(jsonPath("$[?(@.patternName == 'card')]").exists());
     }
 
     @Test

@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.3] - 2026-09-14
+
+### Fixed
+
+- **Rate limits count each visitor again, not each CDN edge.** Caddy, left at its default,
+  replaced `X-Forwarded-For` with the address that connected to it. Behind Cloudflare that address
+  is the edge, so everyone reaching the site through one edge shared one sign-in limit of ten a
+  minute, one registration limit, and one address in the audit log. The Caddyfile now passes the
+  header on intact, and the API alone decides which hop is the client, against
+  `WEBHOOK_TRUSTED_PROXIES` — walking from the right, so a forged entry on the left is ignored. An
+  upgrade rewrites the Caddyfile, so existing installations get this without editing anything.
+- **The CLI can be logged in again.** `railhook login` polls every five seconds, and each poll spent
+  the sign-in rate limit of the address it came from. The browser approving the code is on that same
+  address, so the approval was refused with "Too many requests" and the login never completed.
+  Polling now has a budget of its own, per device code; approve and deny keep the sign-in limit, and
+  the CLI backs off on a 429 instead of printing `?`.
+- **A tunnel URL takes a path.** `https://<host>/tunnel/<slug>/webhooks/stripe` answered the API's
+  own 404 and never reached the CLI: only the bare slug was routed. Every path below the slug is now
+  forwarded, and reaches the local application as `/webhooks/stripe`.
+- **A test endpoint keeps the body of what it captured.** The body was read twice — once to answer
+  verification challenges, then again to store it, from a request whose stream was already spent —
+  so every captured request was saved with an empty body.
+- **Sending events no longer counts against itself.** The worker's per-project delivery cap and
+  the API's per-project ingest limit used the same Redis key, so every delivery attempt spent a
+  permit from the ingest limit. A Free project sending 8 events a second against its 10-a-second
+  limit had over a third of them refused with 429, and the delivery cap meant to be 50 a second
+  was quietly held to the plan's 10. The two budgets now have keys of their own.
+- **The CLI no longer signs you out everywhere half an hour after logging in.** A refresh returned
+  the rotated refresh token only as a cookie. The CLI, which sends and reads the token in the body,
+  kept the one that refresh had just rotated away; its next refresh replayed it, and reuse
+  detection — correctly, for what it could see — revoked every session the user had, the browser's
+  included. A client that sends the token in the body now gets the rotated one back in the body.
+- **An incoming source created with a signing secret verifies with it.** Over the API, a source
+  given a secret but no `verificationMode` was saved with verification off — a Stripe source with
+  its signing secret accepted forged and unsigned requests alike. A secret without a mode now means
+  the provider's own verification (`PROVIDER`), or `HMAC_GENERIC` for a generic source. A source
+  created without a secret, and any mode set explicitly, are unchanged. The dashboard always sent a
+  mode and was not affected.
+- **Every new project masks email, phone and card numbers from the start.** The docs said so; the
+  code created projects with no masking rules at all, so customer email addresses showed in full on
+  every event and delivery in the dashboard until someone found the seed button. New projects now
+  get the three built-in rules. Existing projects keep what they have — add the defaults from the
+  project's PII rules page.
+- **A workflow created over the API opens in the builder.** The API describes a node as `id`,
+  `type` and `data`, and an edge as `source` and `target`; the canvas also needs a position and an
+  edge id, and threw "Cannot read properties of undefined (reading 'x')" on a workflow that had
+  neither. Nodes without a position are laid out left to right, and edges without an id get one.
+- **Kafka keeps its topics when its container is recreated.** The Compose service mounted a volume
+  at `/var/lib/kafka/data` but never told the broker to write there, so the log lived inside the
+  container: any change to Kafka's settings — the heap limit in 2.20.2, for one — recreated it and
+  took every topic, consumer offset and unread message with it. On production the two DLQ topics
+  did not come back, and the worker failed every minute to read them. The broker now writes to the
+  volume, and the worker creates any missing topic when it starts. Deliveries themselves are kept
+  in Postgres and were retried; what a recreate lost was in flight. The upgrade to this release
+  starts Kafka on the empty volume once.
 ## [2.20.2] - 2026-09-14
 
 ### Fixed

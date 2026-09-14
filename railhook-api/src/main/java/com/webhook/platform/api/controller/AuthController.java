@@ -192,7 +192,12 @@ public class AuthController {
             }
             AuthResponse response = authService.refreshToken(refreshToken, originOf(httpRequest));
             setRefreshTokenCookie(httpResponse, response.getRefreshToken());
-            response.setRefreshToken(null);
+            // A browser holds the token in its cookie, so it stays out of the body. A client that
+            // sent it in the body (the CLI) has no cookie jar: without it here it keeps the token
+            // this call just rotated away, replays it, and reuse detection revokes every session.
+            if (cookieRefreshToken != null) {
+                response.setRefreshToken(null);
+            }
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Token refresh failed: {}", e.getMessage());

@@ -33,7 +33,7 @@ Before your instance faces the internet, give it a domain and HTTPS. The install
     | Source ingress and CLI tunnel URLs | Follow `APP_BASE_URL`, so providers get `https://<your domain>/ingress/…` |
     | `DB_SSL_MODE` | `require` |
     | `LOG_LEVEL` | `WARN` |
-    | `WEBHOOK_TRUSTED_PROXIES` | `172.16.0.0/12`, so real client IPs reach the audit log |
+    | `WEBHOOK_TRUSTED_PROXIES` | `172.16.0.0/12`, so real client IPs reach the audit log and the per-IP rate limits. Behind a CDN such as Cloudflare, add the CDN's published address ranges too, or every visitor through one edge is counted as that edge |
 
     <Aside type="caution">
     Certificates live in the `caddy_data` volume. If you lose it, the certificate is issued again on the next start, and Let's Encrypt rate-limits that.

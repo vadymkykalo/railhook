@@ -573,6 +573,14 @@ cat > "${INSTALL_DIR}/Caddyfile" <<'CADDY'
 # not move the decision about what is public.
 {
 	email {$ACME_EMAIL}
+	# Pass X-Forwarded-For on as it arrived, with the connecting peer appended. Left at its
+	# default, Caddy replaces the header with that peer alone, and behind a CDN the peer is
+	# the CDN's edge: every visitor through one edge then shares one per-IP rate limit. Which
+	# hop is the real client is decided once, in the API, against WEBHOOK_TRUSTED_PROXIES —
+	# it walks the chain from the right, so a forged entry on the left changes nothing.
+	servers {
+		trusted_proxies static 0.0.0.0/0 ::/0
+	}
 }
 
 {$RAILHOOK_DOMAIN} {

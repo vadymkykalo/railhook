@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.BufferedReader;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -145,7 +144,7 @@ public class TestEndpointService {
      * endpoint's organization. Entering the scope first and opening the transaction within it is
      * the order that works — the same shape {@code IngressService} uses on the other public path.
      */
-    public CapturedRequestResponse captureRequest(String slug, HttpServletRequest request) {
+    public CapturedRequestResponse captureRequest(String slug, String body, HttpServletRequest request) {
         // Public path: the slug is the only identity a capture carries. Resolve the endpoint
         // without a tenant, then confine the capture itself to the organization that owns it so
         // the CapturedRequest row lands in the right tenant.
@@ -158,12 +157,10 @@ public class TestEndpointService {
 
         return TenantContext.callAs(endpoint.getOrganizationId(), () ->
                 new TransactionTemplate(transactionManager)
-                        .execute(status -> captureWithinTenant(endpoint, request)));
+                        .execute(status -> captureWithinTenant(endpoint, body, request)));
     }
 
-    private CapturedRequestResponse captureWithinTenant(TestEndpoint endpoint, HttpServletRequest request) {
-
-        String body = readBody(request);
+    private CapturedRequestResponse captureWithinTenant(TestEndpoint endpoint, String body, HttpServletRequest request) {
         // The same masking the ingress capture applies, rather than a second copy of the loop
         // without it. This one stored Authorization and Cookie verbatim and then rendered them
         // in the dashboard; masking at the write, because the dashboard is not the only reader
@@ -231,21 +228,6 @@ public class TestEndpointService {
             sb.append(SLUG_CHARS.charAt(RANDOM.nextInt(SLUG_CHARS.length())));
         }
         return sb.toString();
-    }
-
-    private String readBody(HttpServletRequest request) {
-        try {
-            BufferedReader reader = request.getReader();
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line).append("\n");
-            }
-            return sb.toString().trim();
-        } catch (Exception e) {
-            log.warn("Failed to read request body: {}", e.getMessage());
-            return "";
-        }
     }
 
     private String getClientIp(HttpServletRequest request) {

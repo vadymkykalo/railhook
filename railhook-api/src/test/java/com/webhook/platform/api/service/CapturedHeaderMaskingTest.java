@@ -78,7 +78,7 @@ class CapturedHeaderMaskingTest {
                 endpoints, captures, mock(ProjectRepository.class),
                 mock(TrustedProxyResolver.class), txManager);
 
-        service.captureRequest("abc", request);
+        service.captureRequest("abc", "{}", request);
 
         ArgumentCaptor<CapturedRequest> stored = ArgumentCaptor.forClass(CapturedRequest.class);
         verify(captures).saveAndFlush(stored.capture());

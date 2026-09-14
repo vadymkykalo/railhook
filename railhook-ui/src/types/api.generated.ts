@@ -84,6 +84,50 @@ export interface paths {
         patch: operations["handleTunnelRequestPatch"];
         trace?: never;
     };
+    "/tunnel/{slug}/**": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tunnel ingress
+         * @description Forward request through CLI tunnel to local application
+         */
+        get: operations["handleTunnelRequestGet_1"];
+        /**
+         * Tunnel ingress
+         * @description Forward request through CLI tunnel to local application
+         */
+        put: operations["handleTunnelRequestPut_1"];
+        /**
+         * Tunnel ingress
+         * @description Forward request through CLI tunnel to local application
+         */
+        post: operations["handleTunnelRequestPost_1"];
+        /**
+         * Tunnel ingress
+         * @description Forward request through CLI tunnel to local application
+         */
+        delete: operations["handleTunnelRequestDelete_1"];
+        /**
+         * Tunnel ingress
+         * @description Forward request through CLI tunnel to local application
+         */
+        options: operations["handleTunnelRequestOptions_1"];
+        /**
+         * Tunnel ingress
+         * @description Forward request through CLI tunnel to local application
+         */
+        head: operations["handleTunnelRequestHead_1"];
+        /**
+         * Tunnel ingress
+         * @description Forward request through CLI tunnel to local application
+         */
+        patch: operations["handleTunnelRequestPatch_1"];
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}": {
         parameters: {
             query?: never;
@@ -4814,11 +4858,11 @@ export interface components {
             /** Format: int64 */
             offset?: number;
             sort?: components["schemas"]["SortObject"];
-            paged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
+            paged?: boolean;
             unpaged?: boolean;
         };
         SortObject: {
@@ -6289,6 +6333,188 @@ export interface operations {
         };
     };
     handleTunnelRequestPatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    handleTunnelRequestGet_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    handleTunnelRequestPut_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    handleTunnelRequestPost_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    handleTunnelRequestDelete_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    handleTunnelRequestOptions_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    handleTunnelRequestHead_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    handleTunnelRequestPatch_1: {
         parameters: {
             query?: never;
             header?: never;

@@ -93,7 +93,8 @@ public class WebhookCaptureController {
             }
         }
 
-        CapturedRequestResponse captured = testEndpointService.captureRequest(slug, request);
+        // The body was read once, above; the request stream is spent and cannot give it again.
+        CapturedRequestResponse captured = testEndpointService.captureRequest(slug, body, request);
 
         return ResponseEntity.ok(WebhookCaptureResponse.builder()
                 .success(true)

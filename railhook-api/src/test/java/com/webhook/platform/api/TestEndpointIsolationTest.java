@@ -128,6 +128,23 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
         return UUID.fromString(json.get("id").asText());
     }
 
+    /**
+     * The body is what a test endpoint is for. The controller read it as {@code @RequestBody}, and
+     * the service then read the already-consumed request again and stored an empty string — found
+     * on production, where every captured request showed no body.
+     */
+    @Test
+    public void capturedRequest_keepsTheBodyAsSent() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId + "/requests")
+                        .header("Authorization", "Bearer " + orgAJwt))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode captured = objectMapper.readTree(result.getResponse().getContentAsString());
+        JsonNode first = captured.isArray() ? captured.get(0) : captured.path("content").get(0);
+        org.junit.jupiter.api.Assertions.assertEquals("{\"hello\":\"world\"}", first.get("body").asText());
+    }
+
     // ── org B's JWT must be denied on every one of the six handlers ──
 
     @Test

@@ -33,7 +33,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
     | Ingress-адреси джерел і адреси тунелів CLI | Беруться з `APP_BASE_URL`, тож провайдери отримують `https://<your domain>/ingress/…` |
     | `DB_SSL_MODE` | `require` |
     | `LOG_LEVEL` | `WARN` |
-    | `WEBHOOK_TRUSTED_PROXIES` | `172.16.0.0/12`, щоб до журналу аудиту потрапляли справжні IP клієнтів |
+    | `WEBHOOK_TRUSTED_PROXIES` | `172.16.0.0/12`, щоб до журналу аудиту й лімітів на IP потрапляли справжні IP клієнтів. За CDN, наприклад Cloudflare, додайте також опубліковані діапазони адрес CDN, інакше всіх відвідувачів, що прийшли через один edge, буде пораховано як цей edge |
 
     <Aside type="caution">
     Сертифікати зберігаються в томі `caddy_data`. Якщо його втратити, сертифікат буде видано знову під час наступного запуску, а Let's Encrypt обмежує частоту видачі.

@@ -58,11 +58,10 @@ public class DeviceAuthController {
     @PostMapping("/token")
     public ResponseEntity<AuthResponse> pollDeviceToken(@Valid @RequestBody DeviceTokenRequest request,
             HttpServletRequest httpRequest) {
-        // This endpoint is permitAll (no session yet) and the device_code is presented
-        // by an unauthenticated caller, so it is a brute-force target within the code's
-        // expiry window. Bucket by IP and by the presented device_code itself, reusing
-        // the same limiter as refresh/reset-password rather than a parallel one.
-        if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getDeviceCode())) {
+        // permitAll, so bounded by IP and by the presented device_code — but not on the sign-in
+        // bucket: the CLI polls twelve times a minute, and spending that bucket refused the
+        // browser approving the same code from the same address.
+        if (!authRateLimiterService.allowDevicePoll(getClientIp(httpRequest), request.getDeviceCode())) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
         AuthResponse response = deviceAuthService.pollDeviceToken(

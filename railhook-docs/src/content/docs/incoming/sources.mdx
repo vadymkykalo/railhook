@@ -102,7 +102,7 @@ Paste `ingressUrl` into the provider's webhook settings, then add at least one d
 | `name` | Required. Display name, up to 255 characters. |
 | `slug` | URL-friendly name, lower case letters, digits and dashes, up to 64 characters. Generated when left out. |
 | `providerType` | `GENERIC`, `GITHUB`, `GITLAB`, `STRIPE`, `SHOPIFY`, `SLACK` or `TWILIO`. |
-| `verificationMode` | `NONE`, `HMAC_GENERIC` or `PROVIDER`. See [Verification](/docs/incoming/verification/). |
+| `verificationMode` | `NONE`, `HMAC_GENERIC` or `PROVIDER`. Left out, it follows `hmacSecret`: with a secret, `PROVIDER` for a provider that has a preset and `HMAC_GENERIC` for `GENERIC`; without one, `NONE`. See [Verification](/docs/incoming/verification/). |
 | `hmacSecret` | The secret the provider signs with. Write-only: the API never returns it. |
 | `hmacHeaderName`, `hmacSignaturePrefix` | Where the signature is, for `HMAC_GENERIC`. |
 | `rateLimitPerSecond` | Requests per second this source accepts. |

@@ -90,21 +90,29 @@ public class PiiMaskingService {
         log.info("Deleted PII masking rule '{}' from project {}", rule.getPatternName(), projectId);
     }
 
+    /**
+     * The organization comes off the project row and is set explicitly, so the rules land in the
+     * right one even when the project was created outside a tenant scope (the first project of an
+     * account made by Google sign-in).
+     */
     @Transactional
     public void seedDefaultRules(UUID projectId) {
         if (!ruleRepository.findByProjectId(projectId).isEmpty()) {
             return;
         }
+        UUID organizationId = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("Project not found"))
+                .getOrganizationId();
 
         List<PiiMaskingRule> defaults = List.of(
                 PiiMaskingRule.builder()
-                        .projectId(projectId).ruleType(RuleType.BUILTIN)
+                        .projectId(projectId).organizationId(organizationId).ruleType(RuleType.BUILTIN)
                         .patternName("email").maskStyle(MaskStyle.PARTIAL).enabled(true).build(),
                 PiiMaskingRule.builder()
-                        .projectId(projectId).ruleType(RuleType.BUILTIN)
+                        .projectId(projectId).organizationId(organizationId).ruleType(RuleType.BUILTIN)
                         .patternName("phone").maskStyle(MaskStyle.PARTIAL).enabled(true).build(),
                 PiiMaskingRule.builder()
-                        .projectId(projectId).ruleType(RuleType.BUILTIN)
+                        .projectId(projectId).organizationId(organizationId).ruleType(RuleType.BUILTIN)
                         .patternName("card").maskStyle(MaskStyle.PARTIAL).enabled(true).build()
         );
         ruleRepository.saveAll(defaults);

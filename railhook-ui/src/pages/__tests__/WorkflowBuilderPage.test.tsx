@@ -94,6 +94,27 @@ describe('WorkflowBuilderPage', () => {
     expect(await screen.findByText('Route payments')).toBeInTheDocument();
   });
 
+  // The API documents a node as id, type and data; position is the canvas's own business. A
+  // workflow created that way — over the API or an SDK — had no position on its nodes, and the
+  // canvas threw "Cannot read properties of undefined (reading 'x')", found on production.
+  it('opens a workflow whose nodes carry no position', async () => {
+    vi.mocked(workflowsApi.get).mockResolvedValue({
+      ...WORKFLOW,
+      definition: {
+        nodes: [
+          { id: 'start', type: 'webhookTrigger', data: {} },
+          { id: 'reshape', type: 'transform', data: { template: '{"a":1}' } },
+        ],
+        edges: [{ source: 'start', target: 'reshape' }],
+      } as unknown as WorkflowResponse['definition'],
+    });
+
+    renderBuilder();
+
+    expect(await screen.findByText('Route payments')).toBeInTheDocument();
+    expect(screen.queryByText(/reading 'x'/)).not.toBeInTheDocument();
+  });
+
   it('offers every node type the canvas can draw', async () => {
     renderBuilder();
     await screen.findByText('Route payments');

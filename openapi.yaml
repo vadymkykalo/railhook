@@ -409,6 +409,175 @@ paths:
             '*/*':
               schema:
                 type: string
+  /tunnel/{slug}/**:
+    get:
+      tags:
+      - Tunnel Ingress
+      summary: Tunnel ingress
+      description: Forward request through CLI tunnel to local application
+      operationId: handleTunnelRequestGet_1
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+    put:
+      tags:
+      - Tunnel Ingress
+      summary: Tunnel ingress
+      description: Forward request through CLI tunnel to local application
+      operationId: handleTunnelRequestPut_1
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+    post:
+      tags:
+      - Tunnel Ingress
+      summary: Tunnel ingress
+      description: Forward request through CLI tunnel to local application
+      operationId: handleTunnelRequestPost_1
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+    delete:
+      tags:
+      - Tunnel Ingress
+      summary: Tunnel ingress
+      description: Forward request through CLI tunnel to local application
+      operationId: handleTunnelRequestDelete_1
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+    options:
+      tags:
+      - Tunnel Ingress
+      summary: Tunnel ingress
+      description: Forward request through CLI tunnel to local application
+      operationId: handleTunnelRequestOptions_1
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+    head:
+      tags:
+      - Tunnel Ingress
+      summary: Tunnel ingress
+      description: Forward request through CLI tunnel to local application
+      operationId: handleTunnelRequestHead_1
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+    patch:
+      tags:
+      - Tunnel Ingress
+      summary: Tunnel ingress
+      description: Forward request through CLI tunnel to local application
+      operationId: handleTunnelRequestPatch_1
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
   /api/v1/projects/{projectId}:
     get:
       tags:
@@ -9304,14 +9473,14 @@ components:
           format: int64
         sort:
           $ref: "#/components/schemas/SortObject"
-        paged:
-          type: boolean
         pageNumber:
           type: integer
           format: int32
         pageSize:
           type: integer
           format: int32
+        paged:
+          type: boolean
         unpaged:
           type: boolean
     SortObject:

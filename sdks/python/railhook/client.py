@@ -37,7 +37,7 @@ from .errors import (
 
 DEFAULT_BASE_URL = "http://localhost:8080"
 DEFAULT_TIMEOUT = 30
-SDK_VERSION = "2.20.2"
+SDK_VERSION = "2.20.3"
 
 
 class Railhook:

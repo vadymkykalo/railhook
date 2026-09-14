@@ -63,11 +63,20 @@ function WorkflowBuilderInner() {
   useEffect(() => {
     if (workflow?.definition) {
       const def = workflow.definition;
+      // The API documents a node as id, type and data, and an edge as source and target. Position
+      // and edge ids are the canvas's own; a workflow created over the API has neither, and the
+      // canvas throws on a node without a position. Lay those out left to right instead.
       if (def.nodes && Array.isArray(def.nodes)) {
-        setNodes(def.nodes as Node[]);
+        setNodes((def.nodes as Partial<Node>[]).map((node, index) => ({
+          ...node,
+          position: node.position ?? { x: 80 + index * 260, y: 160 },
+        }) as Node));
       }
       if (def.edges && Array.isArray(def.edges)) {
-        setEdges(def.edges as Edge[]);
+        setEdges((def.edges as Partial<Edge>[]).map((edge, index) => ({
+          ...edge,
+          id: edge.id ?? `${edge.source}-${edge.target}-${index}`,
+        }) as Edge));
       }
       setHasUnsaved(false);
     }

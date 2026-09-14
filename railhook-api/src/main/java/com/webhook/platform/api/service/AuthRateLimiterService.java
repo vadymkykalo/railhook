@@ -30,6 +30,11 @@ public class AuthRateLimiterService {
     static final int PLATFORM_ADMIN_PER_MINUTE = 120;
     private static final String REFRESH_IP_KEY_PREFIX = "rate_limiter:auth:refresh:ip:";
     private static final String REFRESH_TOKEN_KEY_PREFIX = "rate_limiter:auth:refresh:token:";
+    private static final String DEVICE_POLL_IP_KEY_PREFIX = "rate_limiter:auth:device_poll:ip:";
+    private static final String DEVICE_POLL_CODE_KEY_PREFIX = "rate_limiter:auth:device_poll:code:";
+    /** The CLI polls every five seconds, twelve a minute; the rest is room for a clock that drifts. */
+    static final int DEVICE_POLL_PER_CODE_PER_MINUTE = 20;
+    static final int DEVICE_POLL_PER_IP_PER_MINUTE = 120;
     private static final Duration KEY_TTL = Duration.ofMinutes(5);
 
     private final RedissonClient redissonClient;
@@ -133,6 +138,30 @@ public class AuthRateLimiterService {
         }
         if (token != null && !token.isBlank()) {
             return tryAcquire(REFRESH_TOKEN_KEY_PREFIX + CryptoUtils.hashApiKey(token), refreshPerTokenRateLimit);
+        }
+        return true;
+    }
+
+    /**
+     * A CLI waiting for its device code to be approved, on a budget of its own.
+     *
+     * <p>Polling used to go through {@link #allowTokenAction}, spending the per-IP sign-in bucket
+     * twelve times a minute against a limit of ten. The person approving that code in a browser is
+     * nearly always on the same address, so the approval itself was refused with a 429 and the CLI
+     * could not be logged in at all.
+     *
+     * <p>A device code is long and random, so guessing one is not what this bounds. Per code it is
+     * a client polling faster than the interval it was given; per IP, one peer cycling through
+     * codes. The sign-in bucket is left to approve and deny, where the short user code is the
+     * enumeration target.
+     */
+    public boolean allowDevicePoll(String ip, String deviceCode) {
+        if (!tryAcquire(DEVICE_POLL_IP_KEY_PREFIX + ip, DEVICE_POLL_PER_IP_PER_MINUTE)) {
+            return false;
+        }
+        if (deviceCode != null && !deviceCode.isBlank()) {
+            return tryAcquire(DEVICE_POLL_CODE_KEY_PREFIX + CryptoUtils.hashApiKey(deviceCode),
+                    DEVICE_POLL_PER_CODE_PER_MINUTE);
         }
         return true;
     }
