@@ -126,6 +126,44 @@ class IncomingSourceServiceTest {
         assertThat(saved.getHmacSecretIv()).isNotNull();
     }
 
+    /**
+     * A secret with no verificationMode used to save as NONE: a Stripe source created over the API
+     * with its signing secret accepted forged and unsigned webhooks alike — found on production.
+     * Supplying the secret is the intent to verify, so the mode follows from it.
+     */
+    @Test
+    void createSource_secretWithoutMode_verifiesWithTheProviderPreset() {
+        stubSave();
+
+        IncomingSourceResponse response = service.createSource(projectId, IncomingSourceRequest.builder()
+                .name("Stripe").providerType(ProviderType.STRIPE).hmacSecret("whsec_test").build());
+
+        assertThat(response.getVerificationMode()).isEqualTo(VerificationMode.PROVIDER);
+    }
+
+    @Test
+    void createSource_secretWithoutMode_onGenericVerifiesWithHmac() {
+        stubSave();
+
+        IncomingSourceResponse response = service.createSource(projectId, IncomingSourceRequest.builder()
+                .name("Custom").providerType(ProviderType.GENERIC).hmacSecret("shared-secret").build());
+
+        assertThat(response.getVerificationMode()).isEqualTo(VerificationMode.HMAC_GENERIC);
+    }
+
+    private void stubSave() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(sourceRepository.existsByProjectIdAndSlug(eq(projectId), anyString())).thenReturn(false);
+        when(sourceRepository.existsByIngressPathToken(anyString())).thenReturn(false);
+        when(sourceRepository.saveAndFlush(any(IncomingSource.class))).thenAnswer(inv -> {
+            IncomingSource s = inv.getArgument(0);
+            s.setId(sourceId);
+            s.setCreatedAt(Instant.now());
+            s.setUpdatedAt(Instant.now());
+            return s;
+        });
+    }
+
     @Test
     void createSource_defaultValues() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));

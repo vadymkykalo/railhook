@@ -39,7 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kept the one that refresh had just rotated away; its next refresh replayed it, and reuse
   detection — correctly, for what it could see — revoked every session the user had, the browser's
   included. A client that sends the token in the body now gets the rotated one back in the body.
-
+- **An incoming source created with a signing secret verifies with it.** Over the API, a source
+  given a secret but no `verificationMode` was saved with verification off — a Stripe source with
+  its signing secret accepted forged and unsigned requests alike. A secret without a mode now means
+  the provider's own verification (`PROVIDER`), or `HMAC_GENERIC` for a generic source. A source
+  created without a secret, and any mode set explicitly, are unchanged. The dashboard always sent a
+  mode and was not affected.
 ## [2.20.2] - 2026-09-14
 
 ### Fixed
