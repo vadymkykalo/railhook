@@ -113,6 +113,21 @@ describe('DashboardPage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   }, TEST_TIMEOUT_MS);
 
+  // Overview carries no project in its URL, and the page took the account's first project every
+  // time: open "load-test", click Overview, and the dashboard — and the rail with it — showed
+  // "test". Found on production. It opens on the project you were last in.
+  it('opens on the project you were last in, not the first one', async () => {
+    const OTHER: ProjectResponse = { ...PROJECT, id: 'project-other', name: 'Load test' };
+    vi.mocked(projectsApi.list).mockResolvedValue([PROJECT, OTHER]);
+    vi.mocked(dashboardApi.getProjectStats).mockResolvedValue(STATS);
+    localStorage.setItem('railhook:last-project', OTHER.id);
+
+    renderDashboard();
+
+    await waitFor(() => expect(dashboardApi.getProjectStats).toHaveBeenCalledWith(OTHER.id), { timeout: SETTLE_MS });
+    expect(dashboardApi.getProjectStats).not.toHaveBeenCalledWith(PROJECT.id);
+  }, TEST_TIMEOUT_MS);
+
   it('starts an organization with no project on the first step, with one call to action', async () => {
     // A bare "no projects" panel said nothing about what comes after. The first step is shown
     // with the path it opens, and there is exactly one way to take it.

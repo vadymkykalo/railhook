@@ -18,6 +18,7 @@ import Sidebar from './Sidebar';
 import SectionTabs from './SectionTabs';
 import { requiredRoleFor, sectionFor } from './nav.config';
 import { useProjects } from '../api/queries';
+import { projectToOpen, rememberProject } from '../lib/lastProject';
 
 const COLLAPSED_KEY = 'sidebar-collapsed';
 
@@ -45,12 +46,16 @@ export default function AppLayout() {
    * It reads as six broken buttons, and the switcher above them compounded it
    * by saying "Select project" while exactly one existed.
    *
-   * So the layout picks one up: the URL's, else the first the account has. With
-   * no projects at all each entry leads to its own setup screen
-   * (`/admin/start/<section>`), which creates the project and carries on there.
+   * So the layout picks one up: the URL's, else the one you were last in, else the
+   * first the account has. With no projects at all each entry leads to its own
+   * setup screen (`/admin/start/<section>`), which creates the project and carries on there.
    */
   const { data: projects = [] } = useProjects();
-  const projectId = routeProjectId ?? projects[0]?.id;
+  const projectId = routeProjectId ?? projectToOpen(projects);
+
+  useEffect(() => {
+    rememberProject(routeProjectId);
+  }, [routeProjectId]);
   const needsVerification = user?.user?.status === 'PENDING_VERIFICATION';
   const section = sectionFor(location.pathname);
 
