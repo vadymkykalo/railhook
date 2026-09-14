@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.5] - 2026-09-14
+
+### Fixed
+
+- **A workflow can no longer write into another organization's project.** A `createEvent` node
+  named its target project by id and nothing checked the id. Saved with another organization's
+  project, the workflow stored Events there, and they were delivered to that organization's
+  endpoints. Saving a workflow now refuses a project the caller cannot see, and an ingest into a
+  project outside the caller's organization is refused wherever it comes from.
+- **The workflow `delivery` node works.** It took the Event to send from `_eventId` in its input,
+  which nothing set, so every delivery node failed with a database error — and a workflow that set
+  `_eventId` itself could have sent another organization's Event to its own endpoint. The node now
+  records its input as an Event in the endpoint's project and delivers that; `eventType` in the
+  node's data names it (default `workflow.delivery`).
+- **Events a workflow creates count against the month's quota before they are created**, not only
+  after. Both the `createEvent` and `delivery` nodes check it, so a workflow cannot run past a limit
+  the API would have refused.
+
 ## [2.20.4] - 2026-09-14
 
 ### Fixed

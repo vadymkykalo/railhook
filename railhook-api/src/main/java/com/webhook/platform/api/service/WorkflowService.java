@@ -51,9 +51,36 @@ public class WorkflowService {
                 .orElseThrow(() -> new NotFoundException("Project not found"));
     }
 
+    /**
+     * Every project a createEvent node names has to be one the caller can see. Nothing checked it,
+     * so a workflow could be saved emitting Events into another organization's project. The same
+     * tenant-scoped lookup as the workflow's own project, so a foreign id is simply not found.
+     */
+    private void validateNodeProjects(Object definition) {
+        if (definition == null) {
+            return;
+        }
+        JsonNode nodes = objectMapper.valueToTree(definition).path("nodes");
+        for (JsonNode node : nodes) {
+            if (!"createEvent".equals(node.path("type").asText())) {
+                continue;
+            }
+            String target = node.path("data").path("projectId").asText("");
+            if (target.isBlank()) {
+                continue;
+            }
+            try {
+                validateProjectOwnership(UUID.fromString(target));
+            } catch (IllegalArgumentException e) {
+                throw new NotFoundException("Project not found");
+            }
+        }
+    }
+
     @Transactional
     public WorkflowResponse create(UUID projectId, WorkflowRequest request) {
         validateProjectOwnership(projectId);
+        validateNodeProjects(request.getDefinition());
 
         if (workflowRepository.existsByProjectIdAndName(projectId, request.getName())) {
             throw new ConflictException("Workflow with this name already exists");
@@ -124,6 +151,7 @@ public class WorkflowService {
         Workflow workflow = workflowRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Workflow not found"));
         validateProjectOwnership(workflow.getProjectId());
+        validateNodeProjects(request.getDefinition());
 
         // Check name uniqueness if changed
         if (!workflow.getName().equals(request.getName()) &&

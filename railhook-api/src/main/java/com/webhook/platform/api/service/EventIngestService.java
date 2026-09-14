@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -194,7 +195,11 @@ public class EventIngestService {
     private EventIngestResponse doIngestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey,
             List<Delivery> pendingSequenceAssignment, AtomicReference<UUID> organizationToCharge) {
         // Enforce idempotency policy
-        Project project = projectRepository.findById(projectId).orElse(null);
+        // Tenant-scoped: a project outside the caller's organization is not found, and the ingest
+        // stops. It used to carry on with a null project, so a workflow's createEvent node naming
+        // another organization's project stored an Event there.
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("Project not found"));
         if (project != null && project.getIdempotencyPolicy() == IdempotencyPolicy.REQUIRED && idempotencyKey == null) {
             throw new IllegalArgumentException(
                     "Idempotency-Key header is required for this project (policy: REQUIRED)");

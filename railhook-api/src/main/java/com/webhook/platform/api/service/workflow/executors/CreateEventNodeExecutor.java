@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.api.service.EventIngestService;
+import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.workflow.NodeExecutor;
 import com.webhook.platform.api.service.workflow.StepResult;
 import lombok.extern.slf4j.Slf4j;
@@ -29,10 +30,13 @@ import java.util.UUID;
 public class CreateEventNodeExecutor implements NodeExecutor {
 
     private final EventIngestService eventIngestService;
+    private final EntitlementService entitlementService;
     private final ObjectMapper objectMapper;
 
-    public CreateEventNodeExecutor(@Lazy EventIngestService eventIngestService, ObjectMapper objectMapper) {
+    public CreateEventNodeExecutor(@Lazy EventIngestService eventIngestService, EntitlementService entitlementService,
+            ObjectMapper objectMapper) {
         this.eventIngestService = eventIngestService;
+        this.entitlementService = entitlementService;
         this.objectMapper = objectMapper;
     }
 
@@ -78,6 +82,11 @@ public class CreateEventNodeExecutor implements NodeExecutor {
             } else {
                 eventData = input != null ? input : objectMapper.createObjectNode();
             }
+
+            // Charged like any other Event, so checked like one: this path used to charge without
+            // checking, and a workflow could create events past the month's quota.
+            entitlementService.checkEventQuota();
+
 
             // Create the event through full pipeline
             EventIngestRequest request = EventIngestRequest.builder()
