@@ -17,6 +17,7 @@ import com.webhook.platform.api.dto.UpdateProfileRequest;
 import com.webhook.platform.api.dto.UserResponse;
 import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.AuthCookies;
 import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
@@ -32,12 +33,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -60,8 +60,7 @@ public class AuthController {
     private final CaptchaVerifier captchaVerifier;
     private final ExternalSignInService externalSignInService;
     private final PlatformAdminAccessService platformAdminAccessService;
-    private final boolean isProduction;
-    private final int refreshCookieMaxAgeSeconds;
+    private final AuthCookies authCookies;
 
     public AuthController(
             AuthService authService,
@@ -72,8 +71,7 @@ public class AuthController {
             CaptchaVerifier captchaVerifier,
             ExternalSignInService externalSignInService,
             PlatformAdminAccessService platformAdminAccessService,
-            @Value("${app.env:development}") String appEnv,
-            @Value("${jwt.refresh-token-expiration:86400000}") long refreshTokenExpirationMs) {
+            AuthCookies authCookies) {
         this.authService = authService;
         this.userSessionService = userSessionService;
         this.accountErasureService = accountErasureService;
@@ -82,12 +80,7 @@ public class AuthController {
         this.captchaVerifier = captchaVerifier;
         this.externalSignInService = externalSignInService;
         this.platformAdminAccessService = platformAdminAccessService;
-        this.isProduction = "production".equalsIgnoreCase(appEnv);
-        // Derived from the token's own lifetime rather than hardcoded. The cookie used to be
-        // pinned at seven days while the token it carries expires in one, so for six of those
-        // days the browser kept presenting a token the server had already rejected — every
-        // refresh a guaranteed 401, and a cookie surviving long past anything it can authorise.
-        this.refreshCookieMaxAgeSeconds = (int) (refreshTokenExpirationMs / 1000);
+        this.authCookies = authCookies;
     }
 
     @Operation(summary = "Register new user", description = "Creates a new user account and organization")
@@ -452,22 +445,10 @@ public class AuthController {
     }
 
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
-        Cookie cookie = new Cookie("refresh_token", refreshToken);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(isProduction); // HTTPS only in production, allow HTTP for localhost dev
-        cookie.setPath("/api/v1/auth");
-        cookie.setMaxAge(refreshCookieMaxAgeSeconds);
-        cookie.setAttribute("SameSite", isProduction ? "Strict" : "Lax"); // Lax for dev cross-origin
-        response.addCookie(cookie);
+        response.addHeader(HttpHeaders.SET_COOKIE, authCookies.refreshToken(refreshToken).toString());
     }
 
     private void clearRefreshTokenCookie(HttpServletResponse response) {
-        Cookie cookie = new Cookie("refresh_token", "");
-        cookie.setHttpOnly(true);
-        cookie.setSecure(isProduction);
-        cookie.setPath("/api/v1/auth");
-        cookie.setMaxAge(0); // Expire immediately
-        cookie.setAttribute("SameSite", isProduction ? "Strict" : "Lax");
-        response.addCookie(cookie);
+        response.addHeader(HttpHeaders.SET_COOKIE, authCookies.clearedRefreshToken().toString());
     }
 }

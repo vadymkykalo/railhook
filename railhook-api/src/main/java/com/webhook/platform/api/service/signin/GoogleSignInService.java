@@ -35,7 +35,6 @@ import java.util.UUID;
 @Slf4j
 public class GoogleSignInService {
 
-    public static final String STATE_COOKIE = "railhook_oauth_state";
     public static final String CALLBACK_PATH = "/api/v1/auth/oauth/google/callback";
 
     private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(10);
