@@ -4,6 +4,7 @@ import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import com.webhook.platform.common.util.HeaderSanitizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.entity.DeliveryAttempt;
@@ -26,6 +27,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -44,6 +47,9 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     /** Ownership of one delivery row; {@code fence} is the token stamped when it was taken. */
     public record Claim(UUID deliveryId, UUID fence, Delivery delivery) {
     }
+
+    /** Set as a default on the shared WebClient (WebClientConfig); recorded here, since it is sent. */
+    private static final String USER_AGENT = "WebhookPlatform/1.0";
 
     private final DeliveryRepository deliveryRepository;
     private final DeliveryAttemptRepository deliveryAttemptRepository;
@@ -239,27 +245,47 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                 ? mtlsWebClientFactory.getWebClient(endpoint)
                 : defaultWebClient;
 
+        // One set of headers feeds both the request and the Attempt's record. They used to be
+        // written out twice, and the record lost X-Sequence-Number and Idempotency-Key while the
+        // request kept them.
+        Map<String, String> sent = new LinkedHashMap<>();
+        Map<String, String> recorded = new LinkedHashMap<>();
+        recorded.put("Content-Type", "application/json");
+        sent.put("X-Event-Id", event.getId().toString());
+        sent.put("X-Delivery-Id", delivery.getId().toString());
+        sent.put("X-Sequence-Number", sequenceHeader);
+        sent.put("Idempotency-Key", idempotencyKey);
+        recorded.putAll(sent);
+        if (signatures.legacy() != null) {
+            sent.put("X-Signature", signatures.legacy());
+            recorded.put("X-Signature", signatures.maskedLegacy());
+            sent.put("X-Timestamp", String.valueOf(signatures.timestampMillis()));
+            recorded.put("X-Timestamp", String.valueOf(signatures.timestampMillis()));
+        }
+        if (signatures.standard() != null) {
+            // Lower-case as the convention spells them; cosmetic on the wire.
+            sent.put("webhook-id", delivery.getId().toString());
+            recorded.put("webhook-id", delivery.getId().toString());
+            sent.put("webhook-timestamp", String.valueOf(signatures.timestampSeconds()));
+            recorded.put("webhook-timestamp", String.valueOf(signatures.timestampSeconds()));
+            sent.put("webhook-signature", signatures.standard());
+            recorded.put("webhook-signature", signatures.maskedStandard());
+        }
+        // The WebClient's default, which a custom header of the same name replaces.
+        recorded.put("User-Agent", USER_AGENT);
+
+        Map<String, String> custom = new LinkedHashMap<>();
+        AttemptSupport.collectCustomHeaders(custom, delivery.getCustomHeaders(), objectMapper);
+        recorded.putAll(HeaderSanitizer.sanitize(custom));
+
         return new RequestSpec(
                 client,
                 request -> {
-                    request.contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                            .header("X-Event-Id", event.getId().toString())
-                            .header("X-Delivery-Id", delivery.getId().toString())
-                            .header("X-Sequence-Number", sequenceHeader)
-                            .header("Idempotency-Key", idempotencyKey);
-                    if (signatures.legacy() != null) {
-                        request.header("X-Signature", signatures.legacy())
-                                .header("X-Timestamp", String.valueOf(signatures.timestampMillis()));
-                    }
-                    if (signatures.standard() != null) {
-                        // Lower-case as the convention spells them; cosmetic on the wire.
-                        request.header("webhook-id", delivery.getId().toString())
-                                .header("webhook-timestamp", String.valueOf(signatures.timestampSeconds()))
-                                .header("webhook-signature", signatures.standard());
-                    }
-                    AttemptSupport.addCustomHeaders(request, delivery.getCustomHeaders(), objectMapper);
+                    request.contentType(org.springframework.http.MediaType.APPLICATION_JSON);
+                    sent.forEach(request::header);
+                    custom.forEach(request::header);
                 },
-                recordedRequestHeaders(signatures, delivery));
+                recordedHeaders(recorded));
     }
 
     /**
@@ -396,22 +422,14 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         return AttemptSupport.fenceMatches(fresh.getClaimToken(), claim.fence());
     }
 
-    /** What the dashboard shows for this request. */
-    private String recordedRequestHeaders(DeliverySigner.Signatures signatures, Delivery delivery) {
-        StringBuilder json = new StringBuilder("{\"Content-Type\":\"application/json\"");
-        if (signatures.legacy() != null) {
-            json.append(",\"X-Signature\":\"").append(signatures.maskedLegacy()).append('"')
-                    .append(",\"X-Timestamp\":\"").append(signatures.timestampMillis()).append('"');
+    /** What the dashboard shows for this request; signatures and custom secrets already masked. */
+    private String recordedHeaders(Map<String, String> recorded) {
+        try {
+            return objectMapper.writeValueAsString(recorded);
+        } catch (Exception e) {
+            log.warn("Failed to serialise delivery request headers: {}", e.getMessage());
+            return null;
         }
-        json.append(",\"X-Event-Id\":\"").append(event.getId()).append('"')
-                .append(",\"X-Delivery-Id\":\"").append(delivery.getId()).append('"');
-        if (signatures.standard() != null) {
-            json.append(",\"webhook-id\":\"").append(delivery.getId()).append('"')
-                    .append(",\"webhook-timestamp\":\"").append(signatures.timestampSeconds()).append('"')
-                    .append(",\"webhook-signature\":\"").append(signatures.maskedStandard()).append('"');
-        }
-        json.append(",\"User-Agent\":\"WebhookPlatform/1.0\"}");
-        return json.toString();
     }
 
 }
