@@ -25,7 +25,7 @@ BEGIN
             HAVING count(*) > 1) groups;
 
     IF duplicates IS NOT NULL THEN
-        RAISE EXCEPTION 'V079 stopped: some accounts have email addresses that differ only in case or surrounding spaces, so they cannot all keep their address. Nothing was changed. For each group of user ids below, change the address of, or remove, all but one account, then start the API again: %', duplicates;
+        RAISE EXCEPTION 'V076 stopped: some accounts have email addresses that differ only in case or surrounding spaces, so they cannot all keep their address. Nothing was changed. For each group of user ids below, change the address of, or remove, all but one account, then start the API again: %', duplicates;
     END IF;
 END $$;
 

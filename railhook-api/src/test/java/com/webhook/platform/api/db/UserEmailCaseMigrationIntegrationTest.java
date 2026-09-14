@@ -23,8 +23,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class UserEmailCaseMigrationIntegrationTest extends AbstractIntegrationTest {
 
-    private static final MigrationVersion BEFORE = MigrationVersion.fromVersion("78");
-    private static final MigrationVersion CASE_INSENSITIVE_EMAIL = MigrationVersion.fromVersion("79");
+    private static final MigrationVersion BEFORE = MigrationVersion.fromVersion("75");
+    private static final MigrationVersion CASE_INSENSITIVE_EMAIL = MigrationVersion.fromVersion("76");
 
     @Test
     void refusesToRunWhileTwoAccountsDifferOnlyInCase_andNamesTheProblem() {
