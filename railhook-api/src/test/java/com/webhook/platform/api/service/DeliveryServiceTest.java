@@ -19,6 +19,7 @@ import com.webhook.platform.api.dto.BulkReplayResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
 import com.webhook.platform.api.dto.DryRunReplayResponse;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
@@ -37,6 +38,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -217,11 +219,28 @@ class DeliveryServiceTest {
     }
 
     @Test
-    void replayDelivery_failedDelivery_resetsStateAndPublishesOutbox() {
+    void replayDelivery_inFlight_isRefusedWithConflict() {
+        // A PROCESSING delivery has a request on the wire. Putting it back to PENDING and
+        // announcing it again sent a second request while the first was still in flight.
+        UUID deliveryId = UUID.randomUUID();
+        Delivery delivery = Delivery.builder().id(deliveryId).eventId(eventId).endpointId(UUID.randomUUID())
+                .status(DeliveryStatus.PROCESSING).claimToken(UUID.randomUUID()).attemptCount(2).build();
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+        stubOwnershipChain();
+
+        assertThatThrownBy(() -> deliveryService.replayDelivery(deliveryId, auth))
+                .isInstanceOf(ConflictException.class);
+        verify(deliveryRepository, never()).save(any());
+        verifyNoInteractions(outboxMessageRepository);
+    }
+
+    @Test
+    void replayDelivery_failedDelivery_carriesTheAttemptCountForwardAndPublishesOutbox() {
         UUID deliveryId = UUID.randomUUID();
         UUID endpointId = UUID.randomUUID();
         Delivery delivery = Delivery.builder().id(deliveryId).eventId(eventId).endpointId(endpointId)
-                .status(DeliveryStatus.DLQ).attemptCount(7).build();
+                .status(DeliveryStatus.DLQ).attemptCount(7).maxAttempts(7)
+                .failedAt(Instant.now()).build();
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
         stubOwnershipChain();
 
@@ -231,10 +250,13 @@ class DeliveryServiceTest {
         verify(deliveryRepository).save(savedCaptor.capture());
         Delivery saved = savedCaptor.getValue();
         assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
-        assertThat(saved.getAttemptCount()).isZero();
+        // Reset to zero, the next Attempt was recorded as a second attempt 1 and the history
+        // stopped being a sequence — the same reason a retry from the DLQ carries it forward.
+        assertThat(saved.getAttemptCount()).isEqualTo(7);
+        assertThat(saved.getMaxAttempts()).isEqualTo(10);
         assertThat(saved.getNextRetryAt()).isNull();
-        assertThat(saved.getLastAttemptAt()).isNull();
         assertThat(saved.getFailedAt()).isNull();
+        assertThat(saved.getLadderResumedAt()).isNotNull();
 
         ArgumentCaptor<OutboxMessage> outboxCaptor = ArgumentCaptor.forClass(OutboxMessage.class);
         verify(outboxMessageRepository).save(outboxCaptor.capture());
@@ -271,11 +293,24 @@ class DeliveryServiceTest {
     }
 
     @Test
-    void replayFromAttempt_valid_setsAttemptCountToFromAttemptMinusOne() {
+    void replayFromAttempt_inFlight_isRefusedWithConflict() {
+        UUID deliveryId = UUID.randomUUID();
+        Delivery delivery = Delivery.builder().id(deliveryId).eventId(eventId).endpointId(UUID.randomUUID())
+                .status(DeliveryStatus.PROCESSING).claimToken(UUID.randomUUID()).attemptCount(3).build();
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+        stubOwnershipChain();
+
+        assertThatThrownBy(() -> deliveryService.replayFromAttempt(deliveryId, 1, auth))
+                .isInstanceOf(ConflictException.class);
+        verify(deliveryRepository, never()).save(any());
+    }
+
+    @Test
+    void replayFromAttempt_valid_grantsTheAttemptsThatRemainedFromThatAttempt() {
         UUID deliveryId = UUID.randomUUID();
         UUID endpointId = UUID.randomUUID();
         Delivery delivery = Delivery.builder().id(deliveryId).eventId(eventId).endpointId(endpointId)
-                .status(DeliveryStatus.FAILED).attemptCount(5).build();
+                .status(DeliveryStatus.FAILED).attemptCount(5).maxAttempts(7).build();
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
         stubOwnershipChain();
 
@@ -283,7 +318,10 @@ class DeliveryServiceTest {
 
         ArgumentCaptor<Delivery> savedCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(savedCaptor.capture());
-        assertThat(savedCaptor.getValue().getAttemptCount()).isEqualTo(2); // fromAttempt - 1
+        // From attempt 3 of 7 there were 5 attempts left. The count is carried forward rather
+        // than wound back to 2, so attempts 3-5 are not recorded a second time.
+        assertThat(savedCaptor.getValue().getAttemptCount()).isEqualTo(5);
+        assertThat(savedCaptor.getValue().getMaxAttempts()).isEqualTo(10);
         assertThat(savedCaptor.getValue().getStatus()).isEqualTo(DeliveryStatus.PENDING);
 
         ArgumentCaptor<OutboxMessage> outboxCaptor = ArgumentCaptor.forClass(OutboxMessage.class);
@@ -396,6 +434,21 @@ class DeliveryServiceTest {
         assertThat(response.getReplayed()).isEqualTo(1);
         assertThat(response.getSkipped()).isEqualTo(2);
         verify(deliveryRepository, times(1)).save(any());
+    }
+
+    @Test
+    void bulkReplay_byIds_skipsDeliveriesInFlight() {
+        UUID inFlightId = UUID.randomUUID();
+        when(deliveryRepository.findById(inFlightId)).thenReturn(Optional.of(Delivery.builder().id(inFlightId)
+                .eventId(eventId).endpointId(UUID.randomUUID()).status(DeliveryStatus.PROCESSING).build()));
+        stubOwnershipChain();
+
+        BulkReplayResponse response = deliveryService.bulkReplayDeliveries(
+                List.of(inFlightId), null, null, null, null, auth);
+
+        assertThat(response.getReplayed()).isZero();
+        assertThat(response.getSkipped()).isEqualTo(1);
+        verify(deliveryRepository, never()).save(any());
     }
 
     @Test

@@ -27,6 +27,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
 
@@ -38,6 +39,14 @@ import java.util.UUID;
 public class DeliveryService {
 
     private static final int BULK_REPLAY_MAX_LIMIT = 5000;
+
+    /**
+     * What a bulk replay with no status filter selects. It used to mean "everything that has not
+     * succeeded", which took in PROCESSING rows with a request on the wire and PENDING rows
+     * waiting their turn on the ladder, and sent both again.
+     */
+    private static final List<DeliveryStatus> REPLAYED_WITHOUT_A_FILTER =
+            List.of(DeliveryStatus.FAILED, DeliveryStatus.DLQ);
 
     private final DeliveryRepository deliveryRepository;
     private final DeliveryAttemptRepository deliveryAttemptRepository;
@@ -153,30 +162,42 @@ public class DeliveryService {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
         validateDeliveryAccess(delivery, auth);
-        
+        requireReturnable(delivery);
+
+        delivery.returnToLadder(Delivery.MANUAL_RETRY_ATTEMPTS);
+        deliveryRepository.save(delivery);
+
+        deliveryDispatch.announce(delivery, resolveProjectId(delivery), DeliveryDispatch.Reason.REPLAYED);
+        log.info("Replayed delivery: {}", deliveryId);
+    }
+
+    /**
+     * A succeeded Delivery would reach its endpoint twice. A PROCESSING one has an Attempt under
+     * way: putting it back to PENDING and announcing it sent a second request while the first
+     * was still on the wire. An Attempt that really was lost is the stuck sweep's to recover.
+     */
+    private void requireReturnable(Delivery delivery) {
         if (delivery.getStatus() == DeliveryStatus.SUCCESS) {
             throw new IllegalArgumentException("Cannot replay successful delivery");
         }
-        
-        delivery.setStatus(DeliveryStatus.PENDING);
-        delivery.setAttemptCount(0);
-        delivery.setNextRetryAt(null);
-        delivery.setLastAttemptAt(null);
-        delivery.setFailedAt(null);
-        deliveryRepository.save(delivery);
-        
-        deliveryDispatch.announce(delivery, resolveProjectId(delivery), DeliveryDispatch.Reason.REPLAYED);
-        log.info("Replayed delivery: {}", deliveryId);
+        if (delivery.getStatus() == DeliveryStatus.PROCESSING) {
+            throw new ConflictException("Delivery is being attempted right now; replay it once that attempt finishes");
+        }
+    }
+
+    private static boolean isReturnable(Delivery delivery) {
+        return delivery.getStatus() != DeliveryStatus.SUCCESS
+                && delivery.getStatus() != DeliveryStatus.PROCESSING;
     }
 
     public List<DeliveryAttemptResponse> getDeliveryAttempts(UUID deliveryId, AuthContext auth) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
         validateDeliveryAccess(delivery, auth);
-        
+
         List<DeliveryAttempt> attempts = deliveryAttemptRepository
                 .findByDeliveryIdOrderByAttemptNumberAsc(deliveryId);
-        
+
         UUID projectId = resolveProjectId(delivery);
         return attempts.stream()
                 .map(a -> mapAttemptToResponse(a, projectId))
@@ -213,7 +234,7 @@ public class DeliveryService {
         for (UUID deliveryId : capped) {
             try {
                 Delivery delivery = deliveryRepository.findById(deliveryId).orElse(null);
-                if (delivery == null || delivery.getStatus() == DeliveryStatus.SUCCESS) {
+                if (delivery == null || !isReturnable(delivery)) {
                     skipped++;
                     continue;
                 }
@@ -248,10 +269,15 @@ public class DeliveryService {
 
         auth.validateProjectAccess(project.getId());
 
+        Specification<Delivery> statusScope = statusFilter == null
+                ? DeliverySpecification.hasStatusIn(REPLAYED_WITHOUT_A_FILTER)
+                : DeliverySpecification.hasStatus(statusFilter)
+                        .and(DeliverySpecification.notStatus(DeliveryStatus.SUCCESS))
+                        .and(DeliverySpecification.notStatus(DeliveryStatus.PROCESSING));
+
         Specification<Delivery> spec = Specification
                 .where(DeliverySpecification.hasProjectId(projectIdFilter))
-                .and(DeliverySpecification.notStatus(DeliveryStatus.SUCCESS))
-                .and(DeliverySpecification.hasStatus(statusFilter))
+                .and(statusScope)
                 .and(DeliverySpecification.hasEndpointId(endpointIdFilter));
 
         long totalMatched = deliveryRepository.count(spec);
@@ -283,11 +309,10 @@ public class DeliveryService {
     }
 
     private boolean enqueueReplay(Delivery delivery, UUID projectId) {
-        delivery.setStatus(DeliveryStatus.PENDING);
-        delivery.setAttemptCount(0);
-        delivery.setNextRetryAt(null);
-        delivery.setLastAttemptAt(null);
-        delivery.setFailedAt(null);
+        if (!isReturnable(delivery)) {
+            return false;
+        }
+        delivery.returnToLadder(Delivery.MANUAL_RETRY_ATTEMPTS);
         deliveryRepository.save(delivery);
 
         try {
@@ -316,7 +341,7 @@ public class DeliveryService {
                 .createdAt(attempt.getCreatedAt())
                 .build();
     }
-    
+
     private String truncate(String str, int maxLength) {
         if (str == null || str.length() <= maxLength) {
             return str;
@@ -380,20 +405,16 @@ public class DeliveryService {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
         validateDeliveryAccess(delivery, auth);
-
-        if (delivery.getStatus() == DeliveryStatus.SUCCESS) {
-            throw new IllegalArgumentException("Cannot replay successful delivery");
-        }
+        requireReturnable(delivery);
 
         if (fromAttempt < 1 || fromAttempt > delivery.getAttemptCount()) {
             throw new IllegalArgumentException("fromAttempt must be between 1 and " + delivery.getAttemptCount());
         }
 
-        delivery.setStatus(DeliveryStatus.PENDING);
-        delivery.setAttemptCount(fromAttempt - 1);
-        delivery.setNextRetryAt(null);
-        delivery.setLastAttemptAt(null);
-        delivery.setFailedAt(null);
+        // Grants what was left of the ladder from that attempt on. It used to wind the count back
+        // to fromAttempt - 1 instead, which recorded the attempts after it a second time under
+        // numbers already on the record.
+        delivery.returnToLadder(Math.max(1, delivery.getMaxAttempts() - (fromAttempt - 1)));
         deliveryRepository.save(delivery);
 
         deliveryDispatch.announce(delivery, resolveProjectId(delivery),

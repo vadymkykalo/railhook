@@ -39,16 +39,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DlqService {
 
-    /**
-     * How many more attempts a delivery retried out of the DLQ gets.
-     *
-     * <p>Added to the count it already has rather than replacing it: the attempt history stays
-     * a single ascending sequence, which is what {@code delivery_attempts}' uniqueness on
-     * {@code (delivery_id, attempt_number)} assumes and what makes "the latest attempt" a
-     * well-defined thing.</p>
-     */
-    private static final int DLQ_RETRY_ATTEMPTS = 3;
-
     /** Deliberately not "all of them in one statement" — see deleteDlqBatchByProjectId. */
     private static final int PURGE_BATCH_SIZE = 500;
 
@@ -136,7 +126,7 @@ public class DlqService {
             
             // What a human pressing "retry" is asking for: another go at the ladder, without
             // pretending the attempts it already made never happened.
-            delivery.returnToLadder(DLQ_RETRY_ATTEMPTS);
+            delivery.returnToLadder(Delivery.MANUAL_RETRY_ATTEMPTS);
             deliveryRepository.save(delivery);
             
             // Create outbox message for redelivery

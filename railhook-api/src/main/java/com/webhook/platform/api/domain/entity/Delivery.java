@@ -22,6 +22,17 @@ import java.util.UUID;
 @Builder
 public class Delivery {
 
+    /**
+     * How many more Attempts a person gets by sending a Delivery again by hand, from Failed
+     * Messages or from the Delivery itself.
+     *
+     * <p>The ladder is not restarted (see {@link #returnToLadder}), so these Attempts wait at the
+     * tier the Delivery already reached — for an abandoned one, the last. Three of them still fit
+     * inside the worker's 96-hour hard cap at the top of the jitter; a whole ladder's worth would
+     * be escalated before its last Attempts could run.
+     */
+    public static final int MANUAL_RETRY_ATTEMPTS = 3;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
