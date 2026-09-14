@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.4] - 2026-09-14
+
+### Fixed
+
+- **A CLI tunnel survives an API restart.** When the socket dropped — every rolling deploy drops
+  it — the server closed the tunnel session, and the CLI's reconnect was refused as "Tunnel
+  session not active". The tunnel stayed dead, and `railhook listen` had to be started again for a
+  new URL that every provider then had to be given. A dropped socket now leaves the session open:
+  the CLI reconnects to the same URL, a tunnel closed with Ctrl+C is still closed at once, and one
+  nobody comes back to expires after the heartbeat timeout.
+- **A tunnel that is not connected answers 503, not 502.** Behind a CDN a 502 is replaced by the
+  CDN's own "Bad gateway" page, so a stopped tunnel looked like the whole site was down; a 503 also
+  tells a provider to retry.
+
 ## [2.20.3] - 2026-09-14
 
 ### Fixed

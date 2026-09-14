@@ -30,7 +30,7 @@ The `railhook` CLI opens a tunnel from a public URL to a port on your machine, s
    railhook listen 3000
    ```
 
-   The CLI prints a public URL and forwards every request that reaches it to `http://localhost:3000`, then returns your response. The URL is a base: a path after it is kept, so `https://<host>/tunnel/<slug>/webhooks/stripe` reaches `http://localhost:3000/webhooks/stripe`. Use it as an endpoint while you develop. Press Ctrl+C to close it.
+   The CLI prints a public URL and forwards every request that reaches it to `http://localhost:3000`, then returns your response. The URL is a base: a path after it is kept, so `https://<host>/tunnel/<slug>/webhooks/stripe` reaches `http://localhost:3000/webhooks/stripe`. Use it as an endpoint while you develop. If the connection drops, the CLI reconnects to the same URL. Press Ctrl+C to close it.
 
 </Steps>
 
