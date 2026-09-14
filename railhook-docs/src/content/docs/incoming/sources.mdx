@@ -136,7 +136,7 @@ The ingress answers a provider, not a person. Each code is what the provider's o
 
 ## Provider resends
 
-Providers send the same webhook again. When a request carries an id Railhook recognises, a second arrival with the same id returns the stored event instead of forwarding it again:
+Providers send the same webhook again. When a request carries an id Railhook recognises, a second arrival with the same id is answered `202` with the stored event instead of forwarding it again. The signature is still verified, but a resend is refused neither because that signature was seen before nor because the organization cannot accept new webhooks right now. Railhook recognises these ids:
 
 | Provider | Id |
 |---|---|
