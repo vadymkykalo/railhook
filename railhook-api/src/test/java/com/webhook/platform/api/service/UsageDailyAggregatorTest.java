@@ -1,6 +1,5 @@
 package com.webhook.platform.api.service;
 
-import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.UsageDaily;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
@@ -34,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -88,6 +87,10 @@ class UsageDailyAggregatorTest {
         TenantContext.runAs(ORG_ID, () -> aggregator.aggregateForProject(projectId, date));
     }
 
+    private void recountIfUnsettled(UUID projectId, LocalDate date) {
+        TenantContext.runAs(ORG_ID, () -> aggregator.recountIfUnsettled(projectId, date));
+    }
+
     @BeforeEach
     void setUp() {
         when(txManager.getTransaction(any())).thenReturn(transactionStatus);
@@ -108,15 +111,25 @@ class UsageDailyAggregatorTest {
         when(incomingForwardAttemptRepository.countSuccessfulByProjectAndDateRange(eq(PROJECT_ID), any(), any())).thenReturn(forwards);
     }
 
+    private static UsageDaily row(LocalDate date, long deliveries, long success, long failed, long dlq) {
+        return UsageDaily.builder().projectId(PROJECT_ID).date(date)
+                .deliveriesCount(deliveries).successfulDeliveries(success)
+                .failedDeliveries(failed).dlqCount(dlq).build();
+    }
+
+    private void verifyWritten(LocalDate date, int times) {
+        verify(usageDailyRepository, times(times)).upsert(any(), eq(PROJECT_ID), eq(date),
+                anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
+    }
+
     @Test
     void aggregateForProject_runsInsideOneTransaction_evenWhenCalledDirectly() {
         // Calling the method directly on the POJO (no Spring proxy involved at all) is exactly
         // the self-invocation scenario that made the old @Transactional a no-op. If this were
         // still driven by @Transactional, none of txManager's methods would ever be invoked
         // here, because there'd be no proxy to trigger them.
-        when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, DATE)).thenReturn(Optional.empty());
         stubCounts(10, 8, 6, 1, 1, 3, 2);
-        when(usageDailyRepository.upsertIfAbsent(eq(ORG_ID), eq(PROJECT_ID), eq(DATE), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong()))
+        when(usageDailyRepository.upsert(eq(ORG_ID), eq(PROJECT_ID), eq(DATE), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong()))
                 .thenReturn(1);
 
         aggregate(PROJECT_ID, DATE);
@@ -127,14 +140,13 @@ class UsageDailyAggregatorTest {
     }
 
     @Test
-    void aggregateForProject_computesAndInsertsCorrectCounts() {
-        when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, DATE)).thenReturn(Optional.empty());
+    void aggregateForProject_computesAndWritesCorrectCounts() {
         stubCounts(10, 8, 6, 1, 1, 3, 2);
-        when(usageDailyRepository.upsertIfAbsent(ORG_ID, PROJECT_ID, DATE, 10, 8, 6, 1, 1, 3, 2)).thenReturn(1);
+        when(usageDailyRepository.upsert(ORG_ID, PROJECT_ID, DATE, 10, 8, 6, 1, 1, 3, 2)).thenReturn(1);
 
         aggregate(PROJECT_ID, DATE);
 
-        verify(usageDailyRepository).upsertIfAbsent(ORG_ID, PROJECT_ID, DATE, 10, 8, 6, 1, 1, 3, 2);
+        verify(usageDailyRepository).upsert(ORG_ID, PROJECT_ID, DATE, 10, 8, 6, 1, 1, 3, 2);
     }
 
     @Test
@@ -143,60 +155,70 @@ class UsageDailyAggregatorTest {
         // the @TenantId discriminator, which neither filters it nor fills it in. Losing the
         // value here is not a compile error and not a test failure anywhere else: it is a
         // constraint violation at 00:05, swallowed by the per-project catch in aggregateYesterday.
-        when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, DATE)).thenReturn(Optional.empty());
         stubCounts(1, 1, 1, 0, 0, 0, 0);
-        when(usageDailyRepository.upsertIfAbsent(any(), any(), any(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong()))
+        when(usageDailyRepository.upsert(any(), any(), any(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong()))
                 .thenReturn(1);
 
         aggregate(PROJECT_ID, DATE);
 
         ArgumentCaptor<UUID> organizationId = ArgumentCaptor.forClass(UUID.class);
-        verify(usageDailyRepository).upsertIfAbsent(organizationId.capture(), eq(PROJECT_ID), eq(DATE),
+        verify(usageDailyRepository).upsert(organizationId.capture(), eq(PROJECT_ID), eq(DATE),
                 anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
         assertEquals(ORG_ID, organizationId.getValue());
     }
 
     @Test
-    void aggregateForProject_alreadyAggregated_skipsWithoutQueryingCountsOrInserting() {
-        // The cheap short-circuit path: a prior run (or a duplicate scheduler trigger) already
-        // wrote this project/date. No point re-computing seven counts, and definitely no
-        // second insert attempt.
+    void aggregateForProject_recountsADayThatAlreadyHasARow() {
+        // The row written at 00:05 held whatever the Deliveries were at 00:05. Every one still on
+        // the retry ladder then was missing from that day's outcomes for good, because a day
+        // with a row was never counted again.
         when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, DATE))
-                .thenReturn(Optional.of(UsageDaily.builder()
-                        .projectId(PROJECT_ID).date(DATE).build()));
+                .thenReturn(Optional.of(row(DATE, 8, 5, 0, 0)));
+        stubCounts(10, 8, 7, 0, 1, 3, 2);
 
         aggregate(PROJECT_ID, DATE);
+
+        verify(usageDailyRepository).upsert(ORG_ID, PROJECT_ID, DATE, 10, 8, 7, 0, 1, 3, 2);
+    }
+
+    @Test
+    void recountIfUnsettled_recountsADayWhoseDeliveriesWereStillRetrying() {
+        when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, DATE))
+                .thenReturn(Optional.of(row(DATE, 8, 5, 1, 0)));
+        stubCounts(10, 8, 6, 1, 1, 3, 2);
+
+        recountIfUnsettled(PROJECT_ID, DATE);
+
+        verify(usageDailyRepository).upsert(ORG_ID, PROJECT_ID, DATE, 10, 8, 6, 1, 1, 3, 2);
+    }
+
+    @Test
+    void recountIfUnsettled_leavesASettledDayAlone() {
+        // Every Delivery of the day has an outcome: nothing left to change, so no seven queries.
+        when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, DATE))
+                .thenReturn(Optional.of(row(DATE, 8, 6, 1, 1)));
+
+        recountIfUnsettled(PROJECT_ID, DATE);
 
         verify(eventRepository, never()).countByProjectIdAndCreatedAtBetween(any(), any(), any());
-        verify(usageDailyRepository, never()).upsertIfAbsent(any(), any(), any(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
-        // Still ran inside a (no-op) transaction -- the point is atomicity of the check, not
-        // whether work happened.
+        verifyWritten(DATE, 0);
         verify(txManager).commit(transactionStatus);
     }
 
     @Test
-    void aggregateForProject_concurrentDuplicateRun_relinquishesToTheWinner_doesNotThrow() {
-        // This run's own findByProjectIdAndDate check (inside its own transaction) sees nothing
-        // yet, but by the time it INSERTs, a concurrent aggregation run (e.g. a second instance
-        // without ShedLock, or ShedLock's lockAtLeastFor racing a slow run) has already
-        // committed the row. The DB's UNIQUE (project_id, date) constraint -- not the
-        // application-level exists-check -- is what actually prevents the duplicate: ON
-        // CONFLICT DO NOTHING makes upsertIfAbsent return 0 instead of throwing.
+    void recountIfUnsettled_writesADayThatHasNoRowYet() {
+        // A project the sweep missed on the night — created mid-run, or a failure — is caught up
+        // on the next one instead of having no row for that day at all.
         when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, DATE)).thenReturn(Optional.empty());
-        stubCounts(5, 4, 3, 1, 0, 2, 1);
-        when(usageDailyRepository.upsertIfAbsent(eq(ORG_ID), eq(PROJECT_ID), eq(DATE), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong()))
-                .thenReturn(0);
+        stubCounts(4, 3, 3, 0, 0, 0, 0);
 
-        aggregate(PROJECT_ID, DATE);
+        recountIfUnsettled(PROJECT_ID, DATE);
 
-        verify(usageDailyRepository, times(1)).upsertIfAbsent(eq(ORG_ID), eq(PROJECT_ID), eq(DATE), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
-        verify(txManager).commit(transactionStatus);
-        verify(txManager, never()).rollback(any());
+        verify(usageDailyRepository).upsert(ORG_ID, PROJECT_ID, DATE, 4, 3, 3, 0, 0, 0, 0);
     }
 
     @Test
-    void aggregateForProject_midRunFailure_rollsBackAndNeverInserts() {
-        when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, DATE)).thenReturn(Optional.empty());
+    void aggregateForProject_midRunFailure_rollsBackAndNeverWrites() {
         when(eventRepository.countByProjectIdAndCreatedAtBetween(eq(PROJECT_ID), any(), any())).thenReturn(10L);
         when(deliveryRepository.countByProjectIdAndCreatedAtBetween(eq(PROJECT_ID), any(), any())).thenReturn(8L);
         // The third count query (SUCCESS) blows up mid-run, e.g. a transient DB error.
@@ -205,9 +227,9 @@ class UsageDailyAggregatorTest {
 
         assertThrows(RuntimeException.class, () -> aggregate(PROJECT_ID, DATE));
 
-        // No partial row: the insert is the very last statement in the transaction, so a
-        // failure before it means upsertIfAbsent is never even called.
-        verify(usageDailyRepository, never()).upsertIfAbsent(any(), any(), any(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
+        // No partial row: the write is the very last statement in the transaction, so a
+        // failure before it means upsert is never even called.
+        verifyWritten(DATE, 0);
         verify(txManager).rollback(transactionStatus);
         verify(txManager, never()).commit(any());
     }
@@ -225,23 +247,51 @@ class UsageDailyAggregatorTest {
     }
 
     @Test
+    void aggregateYesterday_revisitsEveryDayWhoseDeliveriesCanStillSettle() {
+        when(projectRepository.findLiveRefs(any())).thenReturn(List.of(ref(PROJECT_ID)));
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        LocalDate dayBefore = today.minusDays(2);
+        LocalDate settledOlder = today.minusDays(3);
+        LocalDate unsettledOlder = today.minusDays(4);
+        LocalDate missingOlder = today.minusDays(UsageDailyAggregator.RECOUNT_DAYS);
+        LocalDate outOfWindow = today.minusDays(UsageDailyAggregator.RECOUNT_DAYS + 1);
+
+        // Settled, but still inside the incoming Forward horizon: recounted all the same.
+        when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, dayBefore))
+                .thenReturn(Optional.of(row(dayBefore, 2, 2, 0, 0)));
+        when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, settledOlder))
+                .thenReturn(Optional.of(row(settledOlder, 2, 2, 0, 0)));
+        when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, unsettledOlder))
+                .thenReturn(Optional.of(row(unsettledOlder, 2, 1, 0, 0)));
+        when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, missingOlder)).thenReturn(Optional.empty());
+        stubCounts(2, 2, 2, 0, 0, 0, 0);
+
+        aggregator.aggregateYesterday();
+
+        verifyWritten(yesterday, 1);
+        verifyWritten(dayBefore, 1);
+        verifyWritten(settledOlder, 0);
+        verifyWritten(unsettledOlder, 1);
+        verifyWritten(missingOlder, 1);
+        verifyWritten(outOfWindow, 0);
+    }
+
+    @Test
     void aggregateYesterday_continuesToNextProjectAfterOneFails() {
         UUID projectA = UUID.randomUUID();
-        UUID projectB = UUID.randomUUID();
-        when(projectRepository.findLiveRefs(any())).thenReturn(List.of(ref(projectA), ref(projectB)), List.of());
+        when(projectRepository.findLiveRefs(any())).thenReturn(List.of(ref(projectA), ref(PROJECT_ID)), List.of());
 
-        LocalDate yesterday = LocalDate.now().minusDays(1);
-        when(usageDailyRepository.findByProjectIdAndDate(eq(projectA), eq(yesterday)))
+        when(eventRepository.countByProjectIdAndCreatedAtBetween(eq(projectA), any(), any()))
                 .thenThrow(new RuntimeException("boom"));
-        when(usageDailyRepository.findByProjectIdAndDate(eq(projectB), eq(yesterday)))
-                .thenReturn(Optional.of(UsageDaily.builder()
-                        .projectId(projectB).date(yesterday).build()));
+        when(usageDailyRepository.findByProjectIdAndDate(eq(projectA), any()))
+                .thenThrow(new RuntimeException("boom"));
+        stubCounts(1, 1, 1, 0, 0, 0, 0);
 
         aggregator.aggregateYesterday();
 
         // Project A's failure must not prevent project B from being processed.
-        verify(usageDailyRepository).findByProjectIdAndDate(projectA, yesterday);
-        verify(usageDailyRepository).findByProjectIdAndDate(projectB, yesterday);
+        verifyWritten(LocalDate.now().minusDays(1), 1);
     }
 
     @Test
@@ -250,10 +300,6 @@ class UsageDailyAggregatorTest {
         // deadline. On a few thousand projects that is a heap the scheduler does not need, and
         // the failure mode is the whole nightly run dying rather than one project's numbers
         // being wrong.
-        LocalDate yesterday = LocalDate.now().minusDays(1);
-        when(usageDailyRepository.findByProjectIdAndDate(any(), eq(yesterday)))
-                .thenReturn(Optional.of(UsageDaily.builder().date(yesterday).build()));
-
         // A full page means there may be more; the short one after it ends the walk.
         List<ProjectRef> fullPage = new ArrayList<>();
         for (int i = 0; i < UsageDailyAggregator.BATCH_SIZE; i++) {
@@ -266,8 +312,8 @@ class UsageDailyAggregatorTest {
         aggregator.aggregateYesterday();
 
         // Every project on both pages was visited, and nothing was held in memory but a page.
-        verify(usageDailyRepository).findByProjectIdAndDate(fullPage.get(0).getId(), yesterday);
-        verify(usageDailyRepository).findByProjectIdAndDate(onTheSecondPage, yesterday);
+        verify(eventRepository, atLeastOnce()).countByProjectIdAndCreatedAtBetween(eq(fullPage.get(0).getId()), any(), any());
+        verify(eventRepository, atLeastOnce()).countByProjectIdAndCreatedAtBetween(eq(onTheSecondPage), any(), any());
         verify(projectRepository, times(2)).findLiveRefs(any());
     }
 
