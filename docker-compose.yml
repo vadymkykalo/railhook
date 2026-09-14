@@ -134,6 +134,11 @@ services:
       KAFKA_MIN_INSYNC_REPLICAS: 1
       KAFKA_DEFAULT_REPLICATION_FACTOR: 1
       CLUSTER_ID: webhook-kafka-cluster
+      # Unset, the image's start script uses -Xmx1G -Xms1G: the whole default container limit,
+      # committed at start-up, with nothing left for metaspace, threads and network buffers. A
+      # single broker keeps its data in the page cache, not the heap. Keep this near half of
+      # KAFKA_MEMORY_LIMIT when raising either.
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xms512m -Xmx512m}
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
