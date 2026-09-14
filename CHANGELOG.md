@@ -54,6 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `type` and `data`, and an edge as `source` and `target`; the canvas also needs a position and an
   edge id, and threw "Cannot read properties of undefined (reading 'x')" on a workflow that had
   neither. Nodes without a position are laid out left to right, and edges without an id get one.
+- **Kafka keeps its topics when its container is recreated.** The Compose service mounted a volume
+  at `/var/lib/kafka/data` but never told the broker to write there, so the log lived inside the
+  container: any change to Kafka's settings — the heap limit in 2.20.2, for one — recreated it and
+  took every topic, consumer offset and unread message with it. On production the two DLQ topics
+  did not come back, and the worker failed every minute to read them. The broker now writes to the
+  volume, and the worker creates any missing topic when it starts. Deliveries themselves are kept
+  in Postgres and were retried; what a recreate lost was in flight. The upgrade to this release
+  starts Kafka on the empty volume once.
 ## [2.20.2] - 2026-09-14
 
 ### Fixed

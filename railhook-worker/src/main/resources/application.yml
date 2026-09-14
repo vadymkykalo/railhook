@@ -56,6 +56,9 @@ spring:
   
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    # Partitions for a topic the worker has to create because it is missing (KafkaTopicsConfig).
+    # The same variable kafka-init creates them with, so a recreated topic matches the rest.
+    num-partitions: ${KAFKA_NUM_PARTITIONS:12}
     producer:
       # Everything a producer actually runs on is built in KafkaProducerConfig, which assembles
       # its own property map - so acks and retries written here were never read by anything. The

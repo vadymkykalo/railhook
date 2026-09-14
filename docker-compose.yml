@@ -139,6 +139,10 @@ services:
       # single broker keeps its data in the page cache, not the heap. Keep this near half of
       # KAFKA_MEMORY_LIMIT when raising either.
       KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xms512m -Xmx512m}
+      # The volume below is only where the log lives if the broker is told so. Unset, the image
+      # writes to /tmp/kafka-logs inside the container, and recreating it — any change to this
+      # service's environment does — throws away every topic, offset and unread message.
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
@@ -474,6 +478,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS: ${KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS:-120000}
       KAFKA_PRODUCER_MAX_BLOCK_MS: ${KAFKA_PRODUCER_MAX_BLOCK_MS:-10000}
+      # Partitions for a topic the worker creates because it is missing (KafkaTopicsConfig).
+      KAFKA_NUM_PARTITIONS: ${KAFKA_NUM_PARTITIONS:-12}
       SCHEDULING_POOL_SIZE: ${SCHEDULING_POOL_SIZE:-8}
       MANAGEMENT_PORT: 8081
       # Literal, not a variable. Neither management port is published to the

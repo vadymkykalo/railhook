@@ -144,6 +144,9 @@ spec:
               value: "1"
             - name: CLUSTER_ID
               value: webhook-kafka-cluster
+            # Without it the broker writes to /tmp/kafka-logs, off the volume mounted below.
+            - name: KAFKA_LOG_DIRS
+              value: /var/lib/kafka/data
           ports:
             - containerPort: 9092
           readinessProbe:
