@@ -131,12 +131,18 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
     Instant findOldestPendingCreatedAtGlobal();
 
     /**
-     * Finds IDs of deliveries that have been in PENDING status since before the given cutoff.
-     * Used by StaleDeliveryEscalationService to hard-cap escalate stale deliveries to DLQ.
+     * PENDING Deliveries that have been on their Retry Ladder since before the cutoff, for the
+     * hard-cap escalation.
+     *
+     * <p>The ladder starts at created_at, or again at ladder_resumed_at when a person put the
+     * Delivery back on it. Measured from created_at alone, retrying a Delivery older than the cap
+     * sent it straight back to DLQ. ladder_resumed_at is never earlier than created_at, so the
+     * created_at predicate stays and keeps the partial index on it usable.
      */
     @Query(value = """
             SELECT d.id FROM deliveries d
             WHERE d.status = 'PENDING' AND d.created_at < :cutoff
+              AND (d.ladder_resumed_at IS NULL OR d.ladder_resumed_at < :cutoff)
             ORDER BY d.created_at ASC
             LIMIT :limit
             FOR UPDATE SKIP LOCKED

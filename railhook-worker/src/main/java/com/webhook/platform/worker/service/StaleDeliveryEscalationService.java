@@ -30,9 +30,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * <ol>
  *   <li>Periodically computes the age of the oldest pending delivery and exports it as a Prometheus gauge
  *       ({@code delivery_oldest_pending_age_seconds}) for alerting.</li>
- *   <li>Finds deliveries in PENDING state whose {@code created_at} is older than the hard-cap threshold
- *       (default 96h, comfortably past the default retry ladder's ~83h worst case) and
- *       escalates them to DLQ status.</li>
+ *   <li>Finds deliveries in PENDING state that have been on their retry ladder longer than the
+ *       hard-cap threshold (default 96h, comfortably past the default retry ladder's ~83h worst
+ *       case) and escalates them to DLQ status. The ladder starts at {@code created_at}, and again
+ *       at {@code ladder_resumed_at} when a person retried the delivery by hand.</li>
  *   <li>Publishes a DLQ notification to Kafka for each escalated delivery (best-effort).</li>
  * </ol>
  */

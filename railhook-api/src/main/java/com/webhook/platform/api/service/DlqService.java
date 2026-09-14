@@ -134,20 +134,9 @@ public class DlqService {
                 continue;
             }
             
-            // attemptCount is deliberately NOT reset to 0. The retry ladder reads it to decide
-            // the next delay, and delivery_attempts is keyed on (delivery_id, attempt_number):
-            // restarting the count makes the attempt this retry records collide in number with
-            // one already on the record, so the attempt history of a retried delivery reads as
-            // two attempt 1s and findTopByDeliveryIdOrderByAttemptNumberDesc becomes ambiguous
-            // about which is the latest. Continuing the count keeps the history a sequence.
-            //
-            // maxAttempts is raised instead, which is what a human pressing "retry" is asking
-            // for: give this delivery another go at the ladder, without pretending the
-            // attempts it already made never happened.
-            delivery.setStatus(DeliveryStatus.PENDING);
-            delivery.setMaxAttempts(delivery.getAttemptCount() + DLQ_RETRY_ATTEMPTS);
-            delivery.setNextRetryAt(null);
-            delivery.setFailedAt(null);
+            // What a human pressing "retry" is asking for: another go at the ladder, without
+            // pretending the attempts it already made never happened.
+            delivery.returnToLadder(DLQ_RETRY_ATTEMPTS);
             deliveryRepository.save(delivery);
             
             // Create outbox message for redelivery
