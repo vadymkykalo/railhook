@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   address, so the approval was refused with "Too many requests" and the login never completed.
   Polling now has a budget of its own, per device code; approve and deny keep the sign-in limit, and
   the CLI backs off on a 429 instead of printing `?`.
+- **A tunnel URL takes a path.** `https://<host>/tunnel/<slug>/webhooks/stripe` answered the API's
+  own 404 and never reached the CLI: only the bare slug was routed. Every path below the slug is now
+  forwarded, and reaches the local application as `/webhooks/stripe`.
+- **A test endpoint keeps the body of what it captured.** The body was read twice — once to answer
+  verification challenges, then again to store it, from a request whose stream was already spent —
+  so every captured request was saved with an empty body.
 
 ## [2.20.2] - 2026-09-14
 

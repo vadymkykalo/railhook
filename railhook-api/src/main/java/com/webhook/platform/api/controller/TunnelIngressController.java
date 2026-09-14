@@ -30,7 +30,8 @@ public class TunnelIngressController {
 
     private final TunnelIngressService tunnelIngressService;
 
-    @RequestMapping(value = "/{slug}", method = {RequestMethod.GET, RequestMethod.POST,
+    // A tunnel URL is a base: /tunnel/<slug>/webhooks/stripe reaches /webhooks/stripe locally.
+    @RequestMapping(value = {"/{slug}", "/{slug}/**"}, method = {RequestMethod.GET, RequestMethod.POST,
             RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE, RequestMethod.HEAD, RequestMethod.OPTIONS})
     @Operation(summary = "Tunnel ingress", description = "Forward request through CLI tunnel to local application")
     public ResponseEntity<String> handleTunnelRequest(
