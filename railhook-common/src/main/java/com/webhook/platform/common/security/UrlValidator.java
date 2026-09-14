@@ -123,26 +123,35 @@ public class UrlValidator {
     }
 
     public static boolean isPrivateOrLocalAddress(InetAddress address) {
+        // 0.0.0.0 and :: are not "nowhere": a connect() to either reaches the local host.
+        if (address.isAnyLocalAddress()) {
+            return true;
+        }
+
         if (address.isLoopbackAddress()) {
             return true;
         }
-        
+
         if (address.isLinkLocalAddress()) {
             return true;
         }
-        
+
         if (address.isSiteLocalAddress()) {
             return true;
         }
 
+        if (address.isMulticastAddress()) {
+            return true;
+        }
+
         byte[] addr = address.getAddress();
-        
+
         if (addr.length == 4) {
             return isPrivateIPv4(addr);
         } else if (addr.length == 16) {
             return isPrivateIPv6(addr);
         }
-        
+
         return false;
     }
 
@@ -210,26 +219,64 @@ public class UrlValidator {
     }
 
     private static boolean isPrivateIPv6(byte[] addr) {
+        // fe80::/10 - link-local.
         if (addr[0] == (byte) 0xfe && (addr[1] & 0xC0) == 0x80) {
             return true;
         }
-        
+
+        // fc00::/7 - unique local.
         if ((addr[0] & 0xfe) == 0xfc) {
             return true;
         }
-        
-        boolean allZero = true;
-        for (int i = 0; i < 15; i++) {
-            if (addr[i] != 0) {
-                allZero = false;
-                break;
-            }
-        }
-        if (allZero && addr[15] == 1) {
+
+        // ff00::/8 - multicast, refused for the same reason 224.0.0.0/4 is.
+        if (addr[0] == (byte) 0xff) {
             return true;
         }
 
+        // ::/96 - the unspecified address, loopback, and the deprecated IPv4-compatible form.
+        // None of it is a public target, so it is refused whole rather than decoded.
+        if (allZero(addr, 0, 12)) {
+            return true;
+        }
+
+        // The ranges below carry an IPv4 address inside them, and whatever translates them
+        // (the host stack, a NAT64 gateway, a 6to4 relay) delivers to that address. Judging them
+        // as IPv6 would let a literal like 64:ff9b::a9fe:a9fe reach the metadata service.
+
+        // ::ffff:0:0/96 - IPv4-mapped. Java folds most of these into Inet4Address on parse, but
+        // an address taken off a socket or built from bytes can still arrive in this form.
+        if (allZero(addr, 0, 10) && addr[10] == (byte) 0xff && addr[11] == (byte) 0xff) {
+            return isPrivateIPv4(Arrays.copyOfRange(addr, 12, 16));
+        }
+
+        // 64:ff9b::/96 - well-known NAT64 prefix.
+        if (addr[0] == 0x00 && addr[1] == 0x64 && addr[2] == (byte) 0xff && addr[3] == (byte) 0x9b) {
+            if (allZero(addr, 4, 12)) {
+                return isPrivateIPv4(Arrays.copyOfRange(addr, 12, 16));
+            }
+            // 64:ff9b:1::/48 - local-use NAT64: translates into whatever the operator's network
+            // routes, which is exactly what this guard exists to keep out of reach.
+            if (addr[4] == 0x00 && addr[5] == 0x01) {
+                return true;
+            }
+        }
+
+        // 2002::/16 - 6to4, the IPv4 address in the next 32 bits.
+        if (addr[0] == 0x20 && addr[1] == 0x02) {
+            return isPrivateIPv4(Arrays.copyOfRange(addr, 2, 6));
+        }
+
         return false;
+    }
+
+    private static boolean allZero(byte[] addr, int from, int to) {
+        for (int i = from; i < to; i++) {
+            if (addr[i] != 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static InetAddress[] resolveHost(String host) throws UnknownHostException {
