@@ -13,30 +13,32 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Redis-backed event counter for fast quota checks.
+ * Redis-backed counter of what an organization is charged for this month, for fast quota checks.
  *
- * <p>Key: {@code quota:events:{orgId}:{YYYY-MM}} → atomic long, TTL = end of next month. On every
- * event ingest → {@link #increment()}. On quota check → {@link #getCurrentCount()}. The database
- * is the source of truth; Redis only saves a {@code COUNT(*)} per ingest.
+ * <p>Key: {@code quota:events:{orgId}:{YYYY-MM}} → atomic long, TTL = end of next month. Every
+ * stored event and every stored incoming event → {@link #increment()}. On quota check →
+ * {@link #getCurrentCount()}. The database is the source of truth; Redis only saves a
+ * {@code COUNT(*)} per ingest.
  *
  * <p>Redis being unavailable is therefore a cache problem, not a correctness one — but only
- * because a lost write is treated as one. An increment that Redis refuses used to be logged at
- * DEBUG and forgotten: the counter stayed short by every event ingested during the outage, and
- * because the read path re-seeded from the database only when Redis held exactly {@code 0}, a
- * counter that came back short but non-zero was believed for the rest of the month. An
- * organization could pass a quota check it should have failed, and nothing said so. So:
+ * because a lost or reset value is treated as one. So:
  *
  * <ul>
  *   <li>every fall back to the database is counted on {@code quota_counter_fallback_total}, the
  *       same signal {@code RedisRateLimiterService} and {@code RedisConcurrencyControlService}
  *       publish for their own Redis outages;
- *   <li>an increment this instance could not apply arms a re-seed, and the next read replaces
- *       whatever Redis holds with the database count — which heals the shared key for every
- *       instance, not just this one;
+ *   <li>an increment this instance could not apply marks <em>that organization</em> for a re-seed,
+ *       and its next read replaces whatever Redis holds with the database count — which heals the
+ *       shared key for every instance, not just this one. One flag for all organizations let the
+ *       next organization to ask take the re-seed while the one that was short stayed short;
+ *   <li>an increment that finds no key — {@code incrementAndGet} answering 1 — re-seeds too.
+ *       Redis runs {@code allkeys-lru}, so a key can be evicted mid-month; without this it was
+ *       recreated at 1 and, existing again, believed for the rest of the month;
  *   <li>the read path asks whether the key <em>exists</em> rather than whether it is above zero,
  *       so an organization that has genuinely sent nothing this month is answered from Redis
  *       instead of counting rows on every check.
@@ -53,11 +55,11 @@ public class QuotaCounterService {
     private final Counter fallbacks;
 
     /**
-     * Set when this instance loses an increment, cleared by the re-seed that repairs it. Process-
-     * local on purpose: the instance that lost the write is the one that knows Redis is short, and
-     * its re-seed writes the database count back into the shared key for everybody else.
+     * Organizations this instance lost an increment for, each cleared by the re-seed that repairs
+     * it. Process-local on purpose: the instance that lost the write is the one that knows Redis is
+     * short, and its re-seed writes the database count back into the shared key for everybody else.
      */
-    private final AtomicBoolean reseedNeeded = new AtomicBoolean(false);
+    private final Set<UUID> reseedNeeded = ConcurrentHashMap.newKeySet();
 
     public QuotaCounterService(RedissonClient redissonClient,
                                EventRepository eventRepository,
@@ -70,37 +72,39 @@ public class QuotaCounterService {
     }
 
     /**
-     * Increment the event counter for the current organization. Called after the event is
-     * persisted, so a failure here never costs the caller their event — it costs the cache its
-     * accuracy, which the next read repairs.
+     * Increment the counter for the current organization. Called after the event is persisted, so
+     * a failure here never costs the caller their event — it costs the cache its accuracy, which
+     * the next read repairs.
      */
     public void increment() {
         UUID organizationId = TenantContext.require();
         try {
             RAtomicLong counter = redissonClient.getAtomicLong(currentKey());
             long val = counter.incrementAndGet();
-            // Set TTL on first increment (when counter transitions from 0→1)
             if (val == 1) {
-                counter.expire(ttlForCurrentMonth());
+                // The key did not exist. Either this is the month's first charge, where the
+                // database says 1 as well, or the key was evicted and 1 is wrong by everything
+                // before it. The count is committed already, so it includes this event.
+                seed(counter);
             }
         } catch (Exception e) {
             fallbacks.increment();
-            reseedNeeded.set(true);
+            reseedNeeded.add(organizationId);
             log.warn("Redis quota increment failed for org={}; the counter is now short and the next "
                     + "quota check will re-seed it from the database: {}", organizationId, e.getMessage());
         }
     }
 
     /**
-     * The current organization's event count for this month, from Redis where Redis can be
-     * trusted and from the database where it cannot.
+     * The current organization's count for this month, from Redis where Redis can be trusted and
+     * from the database where it cannot.
      */
     public long getCurrentCount() {
         UUID organizationId = TenantContext.require();
         try {
             RAtomicLong counter = redissonClient.getAtomicLong(currentKey());
 
-            if (reseedNeeded.compareAndSet(true, false)) {
+            if (reseedNeeded.remove(organizationId)) {
                 return seed(counter);
             }
             if (counter.isExists()) {
@@ -111,24 +115,24 @@ public class QuotaCounterService {
             fallbacks.increment();
             log.warn("Redis quota read failed for org={}, counting from the database instead: {}",
                     organizationId, e.getMessage());
-            return countEventsFromDb();
+            return countFromDb();
         }
     }
 
     /** Replaces whatever the key holds with the database count, and hands that count back. */
     private long seed(RAtomicLong counter) {
-        long dbCount = countEventsFromDb();
+        long dbCount = countFromDb();
         counter.set(dbCount);
         counter.expire(ttlForCurrentMonth());
         return dbCount;
     }
 
-    private long countEventsFromDb() {
+    private long countFromDb() {
         UUID organizationId = TenantContext.require();
         YearMonth ym = YearMonth.now(ZoneOffset.UTC);
         Instant monthStart = ym.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
         Instant monthEnd = ym.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-        return eventRepository.countByOrganizationIdAndCreatedAtBetween(organizationId, monthStart, monthEnd);
+        return eventRepository.countEventsAndIncomingEventsBetween(organizationId, monthStart, monthEnd);
     }
 
     private String currentKey() {

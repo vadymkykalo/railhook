@@ -77,9 +77,10 @@ class BillingOverviewServiceTest {
         assertThat(february.getPeriodEnd()).isEqualTo(Instant.parse("2026-03-01T00:00:00Z"));
     }
 
+    /** Incoming events are charged against the same quota, so the usage page counts them too. */
     @Test
     void eventsAreCountedInsideThatPeriod() {
-        when(eventRepository.countByOrganizationIdAndCreatedAtBetween(eq(ORG_ID), any(), any())).thenReturn(40L);
+        when(eventRepository.countEventsAndIncomingEventsBetween(eq(ORG_ID), any(), any())).thenReturn(40L);
 
         UsageResponse usage = serviceAt("2026-01-15T12:00:00Z").usage();
 
