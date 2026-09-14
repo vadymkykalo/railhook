@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.8] - 2026-09-15
+
+### Changed
+
+- **Time Machine replays apply the project's rules as they are now.** A replayed event goes
+  exactly where a fresh ingest of it would: a replay filtered by event type also reaches pattern
+  subscriptions such as `order.*`, a `DROP` rule replays nothing, a `ROUTE` rule adds its
+  endpoint, and a `TRANSFORM` rule replaces the subscription's transformation. An event over the
+  fan-out limit is replayed nowhere and counts as a session error. The estimate counts pattern
+  subscriptions but does not apply rules.
+
+### Fixed
+
+- **An upgrade no longer crashes the worker on a new migration.** `./railhook upgrade` replaces
+  the worker only after the new API has migrated. A worker started beside an API that is still
+  migrating (a fresh install, `./railhook start` after a tag change, a Helm upgrade) waits up to
+  15 minutes instead of exiting on `Schema validation: missing column`.
+- **One busy retry no longer holds up the others for five minutes.** When a retry the worker had
+  given up waiting on was picked up anyway, the other retries scheduled with it could stay in
+  progress until the stuck-delivery sweep; they are now rescheduled straight away.
+- **Delivery attempts show every header that was sent.** The request headers recorded for an
+  outgoing attempt now include `X-Sequence-Number`, `Idempotency-Key` and your custom headers
+  (secrets masked), as they already appeared on the wire.
+<!-- incoming -->
+- **Daily usage counts include deliveries that were still retrying at midnight.** Each night the
+  last five days are recounted until their deliveries settle, and a project missed on one night
+  is caught up on the next.
+- **A delivery that arrives while the worker is stopping is no longer sent to the dead-letter
+  topic.** It is delivered or redelivered as normal, instead of waiting an hour for the
+  stranded-delivery sweep.
+- **An alert notification is sent only once the alert is saved.** A failure while recording an
+  alert no longer leaves a Slack message, email or webhook already sent, followed by a duplicate
+  a minute later.
+- **The outbox table no longer grows without limit on busy installations.** Hourly cleanup now
+  deletes the whole backlog of published messages in batches, instead of at most 5,000 rows an
+  hour.
+- **The load-test receiver** caps its simulated delay at 60 seconds and no longer returns error
+  details.
+
+### Security
+
+- **A "Continue with Google" sign-in only completes in the browser that went through Google.** The
+  sign-in code is bound to that browser by a short-lived cookie, so a sign-in link someone sends
+  you can no longer sign you into their account.
+- **Sign-in cookies are Secure on any https deployment**, whenever `APP_BASE_URL` is https, not
+  only when `APP_ENV=production`. Plain-http installs keep non-Secure cookies, which browsers
+  would otherwise drop.
+
 ## [2.20.7] - 2026-09-14
 
 ### Upgrading
