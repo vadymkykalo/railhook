@@ -212,6 +212,78 @@ class IncomingAttemptStoreTest {
         assertThat(written.get(1).getReplaySessionId()).isEqualTo(session);
     }
 
+    // ── A Forward relays the bytes the provider sent ─────────────────────────────────
+
+    @Test
+    void anUntransformedForwardSendsTheBytesThatArrived() {
+        byte[] arrived = {(byte) 0x7B, (byte) 0xC0, (byte) 0xFF, 0x00, (byte) 0x7D};
+        IncomingEvent event = event("application/octet-stream", "{���}", arrived, null);
+        IncomingAttemptStore store = storeFor(destination(true), firstDispatch(), event);
+
+        String body = store.buildBody(claim(FENCE));
+
+        org.junit.jupiter.api.Assertions.assertArrayEquals(arrived, store.wireBody(claim(FENCE), body),
+                "the destination gets what the provider sent, not the decoded copy shown in the dashboard");
+    }
+
+    @Test
+    void aTransformedForwardSendsItsTransformedTextAsUtf8() {
+        IncomingDestination destination = destination(true);
+        destination.setPayloadTransform("$.data");
+        IncomingEvent event = event("application/json", "{\"data\":{\"name\":\"Zoë\"}}", null, null);
+        IncomingAttemptStore store = storeFor(destination, firstDispatch(), event);
+
+        String body = store.buildBody(claim(FENCE));
+
+        org.junit.jupiter.api.Assertions.assertArrayEquals(
+                "{\"name\":\"Zoë\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                store.wireBody(claim(FENCE), body));
+    }
+
+    // Tomcat does not decompress a request body, so a gzip body is stored and forwarded as gzip.
+    // Without the header the destination receives binary it has no way to know how to read.
+    @Test
+    void anUntransformedForwardCarriesTheContentEncodingItArrivedWith() {
+        IncomingEvent event = event("application/json", null, new byte[] {0x1f, (byte) 0x8b, 0x08},
+                "{\"content-type\":\"application/json\",\"content-encoding\":\"gzip\"}");
+        IncomingAttemptStore store = storeFor(destination(true), firstDispatch(), event);
+
+        String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
+
+        assertThat(recorded).contains("\"Content-Encoding\":\"gzip\"");
+    }
+
+    @Test
+    void aTransformedForwardDoesNotClaimTheProvidersContentEncoding() {
+        IncomingDestination destination = destination(true);
+        destination.setPayloadTransform("$.data");
+        IncomingEvent event = event("application/json", "{\"data\":1}", null,
+                "{\"content-encoding\":\"gzip\"}");
+        IncomingAttemptStore store = storeFor(destination, firstDispatch(), event);
+
+        String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
+
+        assertThat(recorded).doesNotContain("Content-Encoding");
+    }
+
+    private IncomingEvent event(String contentType, String bodyRaw, byte[] bodyBytes, String headersJson) {
+        return IncomingEvent.builder()
+                .id(EVENT_ID)
+                .incomingSourceId(UUID.randomUUID())
+                .requestId("req-1")
+                .contentType(contentType)
+                .bodyRaw(bodyRaw)
+                .bodyBytes(bodyBytes)
+                .headersJson(headersJson)
+                .build();
+    }
+
+    private IncomingAttemptStore storeFor(IncomingDestination destination, IncomingForwardMessage message,
+            IncomingEvent event) {
+        return new IncomingAttemptStore(attemptRepository, transactionTemplate, null, null, null,
+                new ObjectMapper(), null, null, message, event, destination);
+    }
+
     // ── Fixtures ─────────────────────────────────────────────────────────────────────
 
     private IncomingAttemptStore storeFor(IncomingDestination destination, IncomingForwardMessage message) {

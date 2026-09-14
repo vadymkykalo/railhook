@@ -46,6 +46,13 @@ public class IncomingEvent {
     @Column(name = "body_raw", columnDefinition = "TEXT")
     private String bodyRaw;
 
+    /**
+     * The body exactly as received, set only when {@link #bodyRaw} cannot reproduce it: bytes that
+     * are not valid UTF-8, or a NUL byte, which PostgreSQL text cannot hold (V080).
+     */
+    @Column(name = "body_bytes")
+    private byte[] bodyBytes;
+
     @Column(name = "body_sha256", length = 64)
     private String bodySha256;
 

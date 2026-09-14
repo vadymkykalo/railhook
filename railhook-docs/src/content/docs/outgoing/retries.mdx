@@ -13,8 +13,8 @@ A delivery is an obligation to get one event to one endpoint. Railhook keeps try
 | `PENDING` | Created, or waiting for its next attempt to be due. |
 | `PROCESSING` | Claimed by a worker for one attempt. A delivery left here by a worker that died is handed back to `PENDING`. |
 | `SUCCESS` | The endpoint answered `2xx`. Nothing more is sent. |
-| `FAILED` | Given up on before the ladder ran out, because another attempt cannot help. |
-| `DLQ` | The ladder ran out, or the delivery outlived the age cap. Shown in the dashboard as **Failed Messages**. |
+| `FAILED` | Given up on because nobody can make another attempt help: the URL is refused, or the endpoint cannot receive it. |
+| `DLQ` | The ladder ran out, the endpoint answered with a status another attempt will not change, or the delivery outlived the age cap. Shown in the dashboard as **Failed Messages**. |
 
 ## What earns another attempt
 
@@ -24,7 +24,7 @@ A delivery is an obligation to get one event to one endpoint. Railhook keeps try
 | `408`, `429`, any `5xx` | Retried on the ladder. |
 | A connection error, a timeout, or a host that does not resolve | Retried on the ladder. |
 | The transformation failed to apply | Retried on the ladder. The raw payload is never sent instead. |
-| Any other `4xx` | `FAILED` on the first attempt. A `400` or `404` says the request is wrong, and repeating it will not fix it. |
+| Any other `4xx`, or a `3xx` | `DLQ` on the first attempt, without the rest of the ladder. A `401`, a `404` or a redirect will not change on its own, but you can change it: fix the credentials or the URL, then retry from Failed Messages. Redirects are not followed. |
 | The endpoint cannot receive it, for example it is not verified, or its URL is refused by the private address check | `FAILED` without an attempt. |
 
 ## The retry ladders

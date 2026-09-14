@@ -148,8 +148,9 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         String slug = (String) session.getAttributes().get(ATTR_SLUG);
 
-        if (slug != null) {
-            tunnelRegistry.unregister(slug);
+        // Only while this socket was still the tunnel: a CLI that reconnected first has already
+        // registered its new socket under the slug, here and in Redis, and must keep both.
+        if (slug != null && tunnelRegistry.unregister(slug, session)) {
             redisTunnelCoordinator.unregisterSlug(slug);
         }
         // The session stays open. A dropped socket is not a closed tunnel: the CLI closes one

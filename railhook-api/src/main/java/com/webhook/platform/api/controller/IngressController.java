@@ -31,6 +31,9 @@ import static com.webhook.platform.api.filter.IngressRawBodyFilter.rawBody;
 @Tag(name = "Ingress", description = "Public incoming webhook ingress endpoint")
 public class IngressController {
 
+    /** How long an organization over its quota tells a provider to wait; see {@link #quotaExceeded}. */
+    static final String QUOTA_RETRY_AFTER_SECONDS = "3600";
+
     private final IngressService ingressService;
 
     public IngressController(IngressService ingressService) {
@@ -109,10 +112,16 @@ public class IngressController {
      * 429 rather than the 402 an authenticated caller gets, and with no detail: the sender is a
      * third-party provider, not the customer, and it has no business learning which plan the
      * customer is on or how much of it they have used.
+     *
+     * <p>{@code Retry-After} is an hour, not the time until the month rolls over. The refusal ends
+     * either then or the moment the customer changes plan, and nothing here can know which; days
+     * would push a provider that honours the header past its own retry window, and without one it
+     * guessed, and the providers that give up dropped the webhook.
      */
     @ExceptionHandler(QuotaExceededException.class)
     ResponseEntity<IngressResponse> quotaExceeded(QuotaExceededException e) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", QUOTA_RETRY_AFTER_SECONDS)
                 .body(IngressResponse.builder()
                         .error("quota_exceeded")
                         .message("This endpoint is not accepting webhooks right now.")

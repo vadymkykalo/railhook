@@ -96,7 +96,7 @@ Credentials are masked in the request headers the dashboard shows.
 
 ## What the destination receives
 
-The body is the webhook exactly as the provider sent it, with its original `Content-Type`, unless a transformation is configured. Railhook adds these headers:
+The body is the webhook exactly as the provider sent it, byte for byte, with its original `Content-Type` and, when it had one, `Content-Encoding`, unless a transformation is configured. A transformed body is sent as UTF-8. Railhook adds these headers:
 
 | Header | Value |
 |---|---|
@@ -113,7 +113,7 @@ Railhook uses the first of these that is set: the saved transformation `transfor
 
 ## When a destination does not answer
 
-Forwards follow the incoming retry ladder: 5 attempts with waits of 1 min, 5 min, 15 min and 1 h, jittered between 50% and 150%. `408`, `429`, any `5xx`, a connection error, a timeout and a destination host that does not resolve are retried; any other `4xx` fails the forward at once. A forward still outstanding 24 hours after it started is abandoned whatever its attempt count. A retry from Failed Messages or a replay starts a new forward, so its 24 hours count from the retry or replay, not from when the webhook arrived.
+Forwards follow the incoming retry ladder: 5 attempts with waits of 1 min, 5 min, 15 min and 1 h, jittered between 50% and 150%. `408`, `429`, any `5xx`, a connection error, a timeout and a destination host that does not resolve are retried; any other `4xx` or a `3xx` moves the forward to Failed Forwards at once, without the rest of the ladder, since it will not change until someone fixes the destination. Redirects are not followed. A forward still outstanding 24 hours after it started is abandoned whatever its attempt count. A retry from Failed Messages or a replay starts a new forward, so its 24 hours count from the retry or replay, not from when the webhook arrived.
 
 Abandoned forwards appear under **Failed Forwards**. Retrying one creates a new forward to the same destination, starting again from attempt 1. See [Retries and failed messages](/docs/outgoing/retries/).
 

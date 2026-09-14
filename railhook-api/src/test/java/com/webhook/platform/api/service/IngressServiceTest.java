@@ -196,6 +196,55 @@ class IngressServiceTest {
         verify(outboxMessageRepository, never()).saveAll(any());
     }
 
+    // body_raw is text decoded as UTF-8, which is what the dashboard shows and what a Forward used
+    // to send. For a body that is not UTF-8 that copy is lossy, so the bytes themselves are kept.
+    @Test
+    void aBodyThatIsNotUtf8IsKeptByteForByte() {
+        stubAcceptingSourceWithoutDestinations();
+        byte[] arrived = {(byte) 0x7B, (byte) 0xC0, (byte) 0xFF, (byte) 0x7D};
+
+        IncomingEvent event = service.receiveWebhook("validtoken", arrived, httpRequest);
+
+        assertThat(event.getBodyBytes()).isEqualTo(arrived);
+        assertThat(event.getBodyRaw()).as("still shown, with replacement characters").isNotNull();
+    }
+
+    // PostgreSQL text cannot hold a NUL byte, so a body carrying one failed the insert and the
+    // provider was answered 500 for a webhook that had verified.
+    @Test
+    void aBodyWithANulByteIsKeptAsBytesAndShownWithoutIt() {
+        stubAcceptingSourceWithoutDestinations();
+        byte[] arrived = "a\u0000b".getBytes(StandardCharsets.UTF_8);
+
+        IncomingEvent event = service.receiveWebhook("validtoken", arrived, httpRequest);
+
+        assertThat(event.getBodyBytes()).isEqualTo(arrived);
+        assertThat(event.getBodyRaw()).doesNotContain("\u0000");
+    }
+
+    @Test
+    void aUtf8BodyIsStoredOnceAsText() {
+        stubAcceptingSourceWithoutDestinations();
+
+        IncomingEvent event = service.receiveWebhook("validtoken",
+                "{\"name\":\"Zoë\"}".getBytes(StandardCharsets.UTF_8), httpRequest);
+
+        assertThat(event.getBodyRaw()).isEqualTo("{\"name\":\"Zoë\"}");
+        assertThat(event.getBodyBytes()).as("the text already encodes back to the same bytes").isNull();
+    }
+
+    private void stubAcceptingSourceWithoutDestinations() {
+        IncomingSource source = buildActiveSource();
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+    }
+
     @Test
     void receiveWebhook_success_withDestinations() {
         IncomingSource source = buildActiveSource();
@@ -564,6 +613,77 @@ class IngressServiceTest {
         IncomingEvent result = service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(result.getProviderEventId()).isEqualTo("evt_stripe_456");
+    }
+
+    // GitLab names each delivery with an id that "remains consistent across webhook retries":
+    // Idempotency-Key since 17.4, and webhook-id with the same value since 19.0. Without it a
+    // GitLab resend after the replay window was stored and forwarded a second time.
+    @Test
+    void aGitLabResendCarryingTheSameIdempotencyKeyReturnsTheStoredEvent() {
+        IncomingSource source = buildActiveSource();
+        IncomingEvent existing = IncomingEvent.builder()
+                .id(eventId).incomingSourceId(sourceId)
+                .requestId("old-req").method("POST")
+                .providerEventId("f5e5f430-f57b-4e6e-9fac-d9128cd7232f")
+                .receivedAt(Instant.now())
+                .build();
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Gitlab-Event")).thenReturn("Push Hook");
+        when(httpRequest.getHeader("X-Gitlab-Event-UUID")).thenReturn("13792a34-cac6-4fda-95a8-c58e00a3954e");
+        when(httpRequest.getHeader("Idempotency-Key")).thenReturn("f5e5f430-f57b-4e6e-9fac-d9128cd7232f");
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "f5e5f430-f57b-4e6e-9fac-d9128cd7232f"))
+                .thenReturn(Optional.of(existing));
+
+        IncomingEvent result = service.receiveWebhook("validtoken", "{\"object_kind\":\"push\"}".getBytes(StandardCharsets.UTF_8), httpRequest);
+
+        assertThat(result.getId()).isEqualTo(eventId);
+        verify(eventRepository, never()).save(any(IncomingEvent.class));
+        verify(forwardAttemptRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void aGitLabDeliveryIsKeyedByWebhookIdWhenGitLabSendsIt() {
+        IncomingSource source = buildActiveSource();
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(eq(sourceId), anyString()))
+                .thenReturn(Optional.empty());
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Gitlab-Event")).thenReturn("Push Hook");
+        when(httpRequest.getHeader("webhook-id")).thenReturn("msg_2b3c");
+
+        IncomingEvent result = service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
+
+        assertThat(result.getProviderEventId()).isEqualTo("msg_2b3c");
+    }
+
+    // X-Gitlab-Event-UUID looks like a delivery id but is not one: GitLab gives recursive webhooks
+    // the same value, so keying on it would answer a different event with a stored one.
+    @Test
+    void aGitLabEventUuidAloneIsNotTakenForADeliveryId() {
+        IncomingSource source = buildActiveSource();
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Gitlab-Event")).thenReturn("Pipeline Hook");
+        when(httpRequest.getHeader("X-Gitlab-Event-UUID")).thenReturn("13792a34-cac6-4fda-95a8-c58e00a3954e");
+
+        IncomingEvent result = service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
+
+        assertThat(result.getProviderEventId()).isNull();
+        verify(eventRepository, never()).findByIncomingSourceIdAndProviderEventId(any(), any());
     }
 
     @Test
