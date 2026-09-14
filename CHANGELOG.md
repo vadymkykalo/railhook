@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.3] - 2026-09-14
+
+### Fixed
+
+- **Rate limits count each visitor again, not each CDN edge.** Caddy, left at its default,
+  replaced `X-Forwarded-For` with the address that connected to it. Behind Cloudflare that address
+  is the edge, so everyone reaching the site through one edge shared one sign-in limit of ten a
+  minute, one registration limit, and one address in the audit log. The Caddyfile now passes the
+  header on intact, and the API alone decides which hop is the client, against
+  `WEBHOOK_TRUSTED_PROXIES` — walking from the right, so a forged entry on the left is ignored. An
+  upgrade rewrites the Caddyfile, so existing installations get this without editing anything.
+- **The CLI can be logged in again.** `railhook login` polls every five seconds, and each poll spent
+  the sign-in rate limit of the address it came from. The browser approving the code is on that same
+  address, so the approval was refused with "Too many requests" and the login never completed.
+  Polling now has a budget of its own, per device code; approve and deny keep the sign-in limit, and
+  the CLI backs off on a 429 instead of printing `?`.
+
 ## [2.20.2] - 2026-09-14
 
 ### Fixed

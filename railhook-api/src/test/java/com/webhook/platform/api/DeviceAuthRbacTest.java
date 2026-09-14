@@ -268,7 +268,7 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("the poll endpoint rate-limits")
     void pollEndpointRateLimits() throws Exception {
-        when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(false);
+        when(authRateLimiterService.allowDevicePoll(anyString(), any())).thenReturn(false);
 
         mockMvc.perform(post("/api/v1/auth/device/token")
                         .contentType(MediaType.APPLICATION_JSON)

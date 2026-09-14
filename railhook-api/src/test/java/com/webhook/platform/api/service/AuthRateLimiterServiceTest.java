@@ -97,6 +97,63 @@ class AuthRateLimiterServiceTest {
         verify(redissonClient, never()).getRateLimiter(startsWith("rate_limiter:auth:login:"));
     }
 
+    // ── Device code polling ────────────────────────────────────────
+    //
+    // The CLI polls /device/token every five seconds, twelve times a minute, and that poll used to
+    // spend the per-IP sign-in bucket (ten a minute). The person approving the code in a browser
+    // is almost always on the same address as the CLI, so their approval got the 429 — found on
+    // production, where nobody could log the CLI in. Polling has its own budget, per device code.
+
+    @Test
+    void allowDevicePoll_doesNotSpendTheSignInBucket() {
+        when(redissonClient.getRateLimiter(anyString()))
+                .thenThrow(new RuntimeException("Redis connection refused"));
+
+        for (int i = 0; i < AuthRateLimiterService.DEVICE_POLL_PER_CODE_PER_MINUTE; i++) {
+            assertTrue(service.allowDevicePoll("10.2.0.1", "device-code"),
+                    "poll " + (i + 1) + " at the CLI's own cadence must be allowed");
+        }
+        assertTrue(service.allowTokenAction("10.2.0.1", "USER-CODE"),
+                "approving the code from the same address must still have the sign-in bucket");
+    }
+
+    @Test
+    void allowDevicePoll_capsOneDeviceCode() {
+        when(redissonClient.getRateLimiter(anyString()))
+                .thenThrow(new RuntimeException("Redis connection refused"));
+
+        for (int i = 0; i < AuthRateLimiterService.DEVICE_POLL_PER_CODE_PER_MINUTE; i++) {
+            assertTrue(service.allowDevicePoll("10.2.0.2", "same-code"), "poll " + (i + 1));
+        }
+        assertFalse(service.allowDevicePoll("10.2.0.2", "same-code"),
+                "a client polling one code faster than any real CLI is still stopped");
+    }
+
+    @Test
+    void allowDevicePoll_hasAPerIpCeiling() {
+        when(redissonClient.getRateLimiter(anyString()))
+                .thenThrow(new RuntimeException("Redis connection refused"));
+
+        for (int i = 0; i < AuthRateLimiterService.DEVICE_POLL_PER_IP_PER_MINUTE; i++) {
+            assertTrue(service.allowDevicePoll("10.2.0.3", "code-" + i), "poll " + (i + 1));
+        }
+        assertFalse(service.allowDevicePoll("10.2.0.3", "code-final"),
+                "one peer cycling through device codes is still capped");
+    }
+
+    @Test
+    void allowDevicePoll_usesItsOwnKeys() {
+        RRateLimiter limiter = mock(RRateLimiter.class);
+        when(redissonClient.getRateLimiter(anyString())).thenReturn(limiter);
+        when(limiter.tryAcquire(1)).thenReturn(true);
+
+        assertTrue(service.allowDevicePoll("127.0.0.3", "a-device-code"));
+
+        verify(redissonClient).getRateLimiter("rate_limiter:auth:device_poll:ip:127.0.0.3");
+        verify(redissonClient).getRateLimiter(startsWith("rate_limiter:auth:device_poll:code:"));
+        verify(redissonClient, never()).getRateLimiter(startsWith("rate_limiter:auth:login:"));
+    }
+
     @Test
     void allowLogin_redisAvailable_shouldUseRedis() {
         RRateLimiter limiter = mock(RRateLimiter.class);

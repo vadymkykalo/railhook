@@ -100,6 +100,8 @@ public abstract class AbstractIntegrationTest {
         // Session refresh has its own budget (allowRefresh); unstubbed it is false and every
         // refresh in an integration test answers 429.
         when(authRateLimiterService.allowRefresh(anyString(), any())).thenReturn(true);
+        // Device-code polling too (allowDevicePoll): unstubbed, every CLI poll answers 429.
+        when(authRateLimiterService.allowDevicePoll(anyString(), any())).thenReturn(true);
         when(tokenBlacklistService.isBlacklisted(any())).thenReturn(false);
         when(tokenBlacklistService.isTokenRevokedByEpoch(any(), any())).thenReturn(false);
     }
