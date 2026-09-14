@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.2] - 2026-09-14
+
+### Fixed
+
+- **Kafka no longer fills its memory limit the moment it starts.** Without a heap setting, the
+  Kafka image reserves a 1G heap up front — the whole default 1G container limit — leaving nothing
+  for the rest of the JVM. A near-idle broker sat at 91% of its limit, one spike away from being
+  killed and taking deliveries down while it restarted. The broker now runs with a 512m heap
+  (Kafka keeps its data in the page cache, not the heap), set through `KAFKA_HEAP_OPTS` and
+  documented next to `KAFKA_MEMORY_LIMIT`.
+
 ## [2.20.1] - 2026-09-14
 
 ### Fixed
@@ -1983,7 +1994,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.20.1...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.20.2...HEAD
+[2.20.2]: https://github.com/vadymkykalo/railhook/compare/v2.20.1...v2.20.2
 [2.20.1]: https://github.com/vadymkykalo/railhook/compare/v2.20.0...v2.20.1
 [2.20.0]: https://github.com/vadymkykalo/railhook/compare/v2.19.2...v2.20.0
 [2.19.2]: https://github.com/vadymkykalo/railhook/compare/v2.19.1...v2.19.2

@@ -1638,22 +1638,28 @@
           "description": "Override memory limits per service (used in docker-compose.yml)"
         },
         {
+          "name": "KAFKA_HEAP_OPTS",
+          "default": null,
+          "example": "-Xms512m -Xmx512m",
+          "description": "The broker's JVM heap. It must fit well inside KAFKA_MEMORY_LIMIT — keep it near\nhalf: Kafka serves data from the page cache, and the rest of the limit is taken\nby metaspace, threads and network buffers. Raise both together."
+        },
+        {
           "name": "REDIS_MEMORY_LIMIT",
           "default": null,
           "example": "512m",
-          "description": "Override memory limits per service (used in docker-compose.yml)"
+          "description": "The broker's JVM heap. It must fit well inside KAFKA_MEMORY_LIMIT — keep it near\nhalf: Kafka serves data from the page cache, and the rest of the limit is taken\nby metaspace, threads and network buffers. Raise both together."
         },
         {
           "name": "API_MEMORY_LIMIT",
           "default": null,
           "example": "768m",
-          "description": "Override memory limits per service (used in docker-compose.yml)"
+          "description": "The broker's JVM heap. It must fit well inside KAFKA_MEMORY_LIMIT — keep it near\nhalf: Kafka serves data from the page cache, and the rest of the limit is taken\nby metaspace, threads and network buffers. Raise both together."
         },
         {
           "name": "WORKER_MEMORY_LIMIT",
           "default": null,
           "example": "768m",
-          "description": "Override memory limits per service (used in docker-compose.yml)"
+          "description": "The broker's JVM heap. It must fit well inside KAFKA_MEMORY_LIMIT — keep it near\nhalf: Kafka serves data from the page cache, and the rest of the limit is taken\nby metaspace, threads and network buffers. Raise both together."
         },
         {
           "name": "API_REPLICAS",
