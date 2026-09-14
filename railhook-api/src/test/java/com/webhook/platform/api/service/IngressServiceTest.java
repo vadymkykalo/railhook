@@ -875,6 +875,126 @@ class IngressServiceTest {
         verify(replayDetectionService, never()).unmark(any(), any());
     }
 
+    // ── A provider resending what was already accepted gets the stored event back ─────
+    //
+    // GitHub, Shopify, Twilio and the raw-hex generic HMAC sign the body alone, so a resend of an
+    // accepted webhook carries the very signature already remembered as seen. The replay check and
+    // the quota check both ran before dedup, so the provider's own retry was answered 401 "replay
+    // attack" (or 429) for a webhook Railhook already had — and a provider that keeps getting
+    // non-2xx eventually disables the endpoint.
+
+    private IncomingSource signedGenericSource(String secret) {
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        IncomingSource source = buildActiveSource();
+        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        source.setHmacHeaderName("X-Signature");
+        source.setHmacSignaturePrefix("");
+        return source;
+    }
+
+    private IncomingEvent acceptedEvent(String providerEventId) {
+        return IncomingEvent.builder()
+                .id(eventId).incomingSourceId(sourceId)
+                .requestId("first-req").method("POST")
+                .providerEventId(providerEventId)
+                .receivedAt(Instant.now())
+                .build();
+    }
+
+    @Test
+    void aResendOfAnAcceptedSignedWebhookReturnsTheStoredEventInsteadOfAReplayRejection() {
+        String secret = "my-hmac-secret";
+        String body = "{\"data\":1}";
+        String validHmac = computeHmac(secret, body);
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(signedGenericSource(secret)));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
+        when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_resent");
+        // The first delivery marked this signature as seen.
+        when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(true);
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_resent"))
+                .thenReturn(Optional.of(acceptedEvent("evt_resent")));
+
+        IncomingEvent result = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
+
+        assertThat(result.getId()).isEqualTo(eventId);
+        verify(eventRepository, never()).save(any(IncomingEvent.class));
+        verify(quotaCounterService, never()).increment();
+    }
+
+    @Test
+    void aResendThatDedupsDoesNotConsumeTheReplayMarker() {
+        String secret = "my-hmac-secret";
+        String body = "{\"data\":1}";
+        String validHmac = computeHmac(secret, body);
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(signedGenericSource(secret)));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
+        when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_resent");
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_resent"))
+                .thenReturn(Optional.of(acceptedEvent("evt_resent")));
+
+        service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
+
+        verify(replayDetectionService, never()).isReplay(any(), any());
+    }
+
+    @Test
+    void anOverQuotaOrganizationStillGetsTheStoredEventForAResend() {
+        // Nothing new is stored and nothing is charged, so there is nothing for the quota to refuse.
+        String secret = "my-hmac-secret";
+        String body = "{\"data\":1}";
+        String validHmac = computeHmac(secret, body);
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(signedGenericSource(secret)));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
+        when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_resent");
+        when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(true);
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_resent"))
+                .thenReturn(Optional.of(acceptedEvent("evt_resent")));
+        doThrow(new QuotaExceededException("events_per_month", 1000, 1000, "Free"))
+                .when(entitlementService).checkEventQuota();
+
+        IncomingEvent result = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
+
+        assertThat(result.getId()).isEqualTo(eventId);
+        verify(eventRepository, never()).save(any(IncomingEvent.class));
+    }
+
+    @Test
+    void aBadSignatureCarryingAKnownProviderEventIdIsRefusedAndNeverShownTheStoredEvent() {
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(signedGenericSource("my-hmac-secret")));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn("forged");
+        when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_resent");
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_resent"))
+                .thenReturn(Optional.of(acceptedEvent("evt_resent")));
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest))
+                .isInstanceOf(SignatureVerificationFailedException.class);
+        verify(eventRepository, never()).findByIncomingSourceIdAndProviderEventId(any(), any());
+    }
+
+    @Test
+    void anOverQuotaNewEventDoesNotBurnItsReplayMarker() {
+        // The quota is checked before the signature is marked as seen: otherwise the provider's
+        // retry, once the organization has room again, would be refused as a replay.
+        String secret = "my-hmac-secret";
+        String body = "{\"data\":2}";
+        String validHmac = computeHmac(secret, body);
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(signedGenericSource(secret)));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
+        doThrow(new QuotaExceededException("events_per_month", 1000, 1000, "Free"))
+                .when(entitlementService).checkEventQuota();
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest))
+                .isInstanceOf(QuotaExceededException.class);
+        verify(replayDetectionService, never()).isReplay(any(), any());
+    }
+
     private String computeHmac(String secret, String body) {
         try {
             javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");

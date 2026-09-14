@@ -136,14 +136,9 @@ public class IngressService {
     private IncomingEvent receiveVerifiedWebhook(IncomingSource source, byte[] body, HttpServletRequest request) {
         enforceRateLimit(source);
         enforcePayloadSize(body);
-        // An Incoming Event is an Event the Organization is charged for, same as one it posts to
-        // /events itself. This runs inside the Source's tenant scope, which is the only thing on
-        // this path that names an organization: ingress is unauthenticated, so the AuthContext
-        // @RequireQuota resolves against does not exist here and the annotation would no-op.
-        entitlementService.checkEventQuota();
 
         RequestMetadata meta = extractMetadata(body, request);
-        VerificationOutcome verification = verifyAndCheckReplay(source, body, request);
+        VerificationOutcome verification = verify(source, body, request);
 
         // Block immediately when signature verification is configured and not verified
         if (source.getVerificationMode() != VerificationMode.NONE && !Boolean.TRUE.equals(verification.verified())) {
@@ -164,6 +159,14 @@ public class IngressService {
 
         // Dedup: if same source + same provider event ID already exists, return existing
         // (idempotent). Plain read, no explicit transaction needed.
+        //
+        // Ahead of the quota and the replay check, and behind verification. A provider resending
+        // an event it already delivered — GitHub, Shopify, Twilio and a raw-hex HMAC all sign the
+        // body alone, so the resend carries the very signature already marked as seen — was
+        // answered 401 "replay attack", or 429 once the organization was over quota, for a webhook
+        // Railhook already had. Neither check has anything to protect here: nothing is stored or
+        // charged. Verification still comes first, or a forged request could learn which provider
+        // ids exist.
         if (providerEventId != null) {
             var existing = eventRepository.findByIncomingSourceIdAndProviderEventId(source.getId(), providerEventId);
             if (existing.isPresent()) {
@@ -173,6 +176,15 @@ public class IngressService {
                 return existing.get();
             }
         }
+
+        // An Incoming Event is an Event the Organization is charged for, same as one it posts to
+        // /events itself. This runs inside the Source's tenant scope, which is the only thing on
+        // this path that names an organization: ingress is unauthenticated, so the AuthContext
+        // @RequireQuota resolves against does not exist here and the annotation would no-op.
+        // Before the replay check, because that one marks the signature as seen: refused here, the
+        // provider's retry once there is room again must not be taken for a replay.
+        entitlementService.checkEventQuota();
+        rejectReplay(source, verification);
 
         try {
             IncomingEvent stored = transactionTemplate.execute(status ->
@@ -286,14 +298,11 @@ public class IngressService {
      * attacker could send a webhook with a known providerEventId but invalid signature; if we
      * dedup/persist first, the poisoned record blocks the real webhook.
      *
-     * <p>Unified replay detection for ALL verifiers (Generic, Stripe, GitHub, Slack, Shopify):
-     * after successful verification, check if this exact signature was already seen. Key =
-     * sourceId + SHA256(replayKey). TTL = 5 min (matches provider timestamp tolerance). The
-     * check marks the signature as seen as a side effect -- if the write that's
-     * supposed to follow never commits, the caller must release this mark via
-     * {@link #releaseReplayMarkerAfterFailedPersist}.
+     * <p>Marks nothing. Replay detection is {@link #rejectReplay}, run separately and only for a
+     * webhook that dedup did not resolve, because marking is a side effect a resend must not
+     * trip over.
      */
-    private VerificationOutcome verifyAndCheckReplay(IncomingSource source, byte[] body, HttpServletRequest request) {
+    private VerificationOutcome verify(IncomingSource source, byte[] body, HttpServletRequest request) {
         Boolean verified = null;
         String verificationError = null;
         String replayKey = null;
@@ -314,16 +323,28 @@ public class IngressService {
             }
         }
 
-        if (Boolean.TRUE.equals(verified) && replayKey != null) {
-            if (replayDetectionService.isReplay(source.getId().toString(), replayKey)) {
-                meterRegistry.counter("incoming_events_rejected_total",
-                        "reason", "replay_detected").increment();
-                log.warn("Replay attack detected for source {}", source.getId());
-                throw new SignatureVerificationFailedException("Replay attack detected: signature already seen");
-            }
-        }
-
         return new VerificationOutcome(verified, verificationError, replayKey);
+    }
+
+    /**
+     * Unified replay detection for ALL verifiers (Generic, Stripe, GitHub, Slack, Shopify): a
+     * verified signature already seen is refused. Key = sourceId + SHA256(replayKey). TTL = 5 min
+     * (matches provider timestamp tolerance).
+     *
+     * <p>Only reached by a webhook that is about to be stored — dedup has already answered a
+     * resend that carries a provider event id — so what it still refuses is a captured request
+     * sent again as though it were new. The check marks the signature as seen as a side effect;
+     * if the write that's supposed to follow never commits, the caller must release this mark via
+     * {@link #releaseReplayMarkerAfterFailedPersist}.
+     */
+    private void rejectReplay(IncomingSource source, VerificationOutcome verification) {
+        if (Boolean.TRUE.equals(verification.verified()) && verification.replayKey() != null
+                && replayDetectionService.isReplay(source.getId().toString(), verification.replayKey())) {
+            meterRegistry.counter("incoming_events_rejected_total",
+                    "reason", "replay_detected").increment();
+            log.warn("Replay attack detected for source {}", source.getId());
+            throw new SignatureVerificationFailedException("Replay attack detected: signature already seen");
+        }
     }
 
     private void releaseReplayMarkerAfterFailedPersist(IncomingSource source, VerificationOutcome verification) {
