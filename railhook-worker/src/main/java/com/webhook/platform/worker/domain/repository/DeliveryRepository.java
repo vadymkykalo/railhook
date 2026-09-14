@@ -81,9 +81,15 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
      *
      * <p>The Delivery comes back so the winner needs no second read, and so a claim that applied
      * to nothing is distinguishable from a missing row.
+     *
+     * <p>{@code last_attempt_at} is restamped because this, not the scheduler's claim, is when
+     * the Attempt starts. The stuck sweep measures from it: left at the scheduler's time, a
+     * message that waited out the sweep threshold in the retry topic was reset to PENDING while
+     * its POST was on the wire, re-claimed, and sent a second time. From here the Attempt is
+     * bounded by the 60-second request timeout, well inside that threshold.
      */
     @Query(value = "UPDATE deliveries SET claim_token = :newClaimToken, " +
-            "updated_at = now(), version = version + 1 " +
+            "last_attempt_at = now(), updated_at = now(), version = version + 1 " +
             "WHERE id = :id AND status = 'PROCESSING' AND claim_token = :expectedClaimToken " +
             "RETURNING *", nativeQuery = true)
     Delivery claimRetryForProcessing(@Param("id") UUID id,

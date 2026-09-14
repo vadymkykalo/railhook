@@ -209,6 +209,34 @@ class DeliveryRepositoryTest {
     }
 
     @Test
+    void claimRetryForProcessing_keepsASlowRetryOutOfTheStuckSweep() {
+        // The scheduler claimed this row six minutes ago and its message sat in the retry topic
+        // since. The consumer's CAS is the start of a real Attempt, so the stuck sweep must not
+        // treat the row as abandoned the moment the POST goes out — if it does, the scheduler
+        // re-claims it and a second request reaches the endpoint while the first is in flight.
+        createSharedEndpoint();
+        UUID publishedToken = UUID.randomUUID();
+        Instant scheduledAt = Instant.now().minus(6, java.time.temporal.ChronoUnit.MINUTES);
+        Delivery delivery = createAndPersistDelivery(Delivery.DeliveryStatus.PROCESSING, null, scheduledAt);
+        delivery.setClaimToken(publishedToken);
+        delivery.setLastAttemptAt(scheduledAt);
+        entityManager.flush();
+        entityManager.clear();
+
+        UUID consumerToken = UUID.randomUUID();
+        Delivery claimed = deliveryRepository.claimRetryForProcessing(delivery.getId(), publishedToken, consumerToken);
+        assertNotNull(claimed, "the consumer holds the published token, so its CAS must apply");
+        entityManager.clear();
+
+        int swept = deliveryRepository.resetStuckDeliveries(Instant.now().minus(5, java.time.temporal.ChronoUnit.MINUTES));
+
+        assertEquals(0, swept, "a retry claimed a moment ago is in flight, not stuck");
+        Delivery reloaded = deliveryRepository.findById(delivery.getId()).orElseThrow();
+        assertEquals(Delivery.DeliveryStatus.PROCESSING, reloaded.getStatus());
+        assertEquals(consumerToken, reloaded.getClaimToken());
+    }
+
+    @Test
     void findPendingRetryIds_shouldRespectPageSize() {
         // Arrange
         createSharedEndpoint();
