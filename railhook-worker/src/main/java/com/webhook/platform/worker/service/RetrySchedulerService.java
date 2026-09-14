@@ -121,6 +121,13 @@ public class RetrySchedulerService {
 
         log.info("Claimed {} deliveries for retry dispatch", claimed.size());
 
+        // Read before a hand-back clears it on the entity: the token is what proves a row is
+        // still this scheduler's to write.
+        Map<UUID, UUID> claimedUnder = new HashMap<>();
+        for (Delivery delivery : claimed) {
+            claimedUnder.put(delivery.getId(), delivery.getClaimToken());
+        }
+
         // Phase 2: outside the transaction, Kafka I/O.
         Map<UUID, CompletableFuture<SendResult<String, DeliveryMessage>>> futures = new HashMap<>();
         Map<UUID, String> deliveryTopics = new HashMap<>();
@@ -160,7 +167,7 @@ public class RetrySchedulerService {
         }
 
         if (futures.isEmpty()) {
-            rescheduleAll(claimed, "Send not initiated");
+            rescheduleAll(claimed, claimedUnder, "Send not initiated");
             return;
         }
 
@@ -215,14 +222,10 @@ public class RetrySchedulerService {
             }
         }
 
-        transactionTemplate.executeWithoutResult(tx -> {
-            if (!failedDeliveries.isEmpty()) {
-                deliveryRepository.saveAll(failedDeliveries);
-            }
-            if (!circuitBreakerSkipped.isEmpty()) {
-                deliveryRepository.saveAll(circuitBreakerSkipped);
-            }
-        });
+        List<Delivery> handedBack = new ArrayList<>(failedDeliveries.size() + circuitBreakerSkipped.size());
+        handedBack.addAll(failedDeliveries);
+        handedBack.addAll(circuitBreakerSkipped);
+        handBack(handedBack, claimedUnder);
 
         governor.recordResult(sentDeliveries, failedDeliveries.size());
 
@@ -231,11 +234,35 @@ public class RetrySchedulerService {
                 effectiveBatch, pendingCount);
     }
 
-    private void rescheduleAll(List<Delivery> deliveries, String reason) {
+    private void rescheduleAll(List<Delivery> deliveries, Map<UUID, UUID> claimedUnder, String reason) {
         for (Delivery d : deliveries) {
             rescheduleDelivery(d, reason);
         }
-        transactionTemplate.executeWithoutResult(tx -> deliveryRepository.saveAll(deliveries));
+        handBack(deliveries, claimedUnder);
+    }
+
+    /**
+     * Writes the hand-backs, each fenced on the token Phase 1 claimed the row under.
+     *
+     * <p>A send reported as failed or timed out may still reach the consumer, which then owns the
+     * row; that row matches nothing and is left to it. The rows around it are written regardless:
+     * saving the Phase 1 snapshots together let one bumped version roll the whole batch back, and
+     * every row in it sat PROCESSING until the stuck sweep.
+     */
+    private void handBack(List<Delivery> deliveries, Map<UUID, UUID> claimedUnder) {
+        if (deliveries.isEmpty()) {
+            return;
+        }
+        transactionTemplate.executeWithoutResult(tx -> {
+            for (Delivery delivery : deliveries) {
+                int written = deliveryRepository.handBackIfStillClaimed(
+                        delivery.getId(), claimedUnder.get(delivery.getId()), delivery.getNextRetryAt());
+                if (written == 0) {
+                    log.info("Delivery {} was taken over before its hand-back (its retry message landed), "
+                            + "leaving it to the consumer", delivery.getId());
+                }
+            }
+        });
     }
 
     private void rescheduleDelivery(Delivery delivery, String reason) {
