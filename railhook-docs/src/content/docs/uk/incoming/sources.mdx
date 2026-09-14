@@ -102,7 +102,7 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
 | `name` | Обов'язкове. Назва для відображення, до 255 символів. |
 | `slug` | Назва для URL: малі літери, цифри й дефіси, до 64 символів. Генерується, якщо не вказати. |
 | `providerType` | `GENERIC`, `GITHUB`, `GITLAB`, `STRIPE`, `SHOPIFY`, `SLACK` або `TWILIO`. |
-| `verificationMode` | `NONE`, `HMAC_GENERIC` або `PROVIDER`. Див. [Перевірка вхідних вебхуків](/docs/uk/incoming/verification/). |
+| `verificationMode` | `NONE`, `HMAC_GENERIC` або `PROVIDER`. Якщо не вказати, залежить від `hmacSecret`: із секретом — `PROVIDER` для провайдера з готовою схемою і `HMAC_GENERIC` для `GENERIC`; без секрету — `NONE`. Див. [Перевірка вхідних вебхуків](/docs/uk/incoming/verification/). |
 | `hmacSecret` | Секрет, яким підписує провайдер. Лише для запису: API ніколи його не повертає. |
 | `hmacHeaderName`, `hmacSignaturePrefix` | Де знаходиться підпис, для `HMAC_GENERIC`. |
 | `rateLimitPerSecond` | Скільки запитів за секунду приймає це джерело. |
