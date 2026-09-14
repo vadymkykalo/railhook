@@ -203,6 +203,42 @@ class AttemptRunnerTest {
         }
 
         @Test
+        @DisplayName("a host that does not resolve is retried on the ladder, not failed for good")
+        void unresolvableHostIsRetried() {
+            // A resolver timeout or a DNS record mid-change used to land in the same catch as an
+            // SSRF refusal, and both are terminal — so one bad minute of DNS failed the Delivery
+            // or Forward outright, outside the DLQ, where nobody is offered a retry. Not resolving
+            // says nothing about where the name points; only a refused address is final.
+            FakeStore store = new FakeStore("https://no-such-host.invalid/hook");
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.Retry.class, store.finalizations.get(0));
+            assertEquals(0, store.terminallyFailedCalls);
+            assertEquals(1, store.records.size(), "the failed lookup must leave a trace");
+            assertNull(store.records.get(0).statusCode());
+            assertFalse(store.records.get(0).errorMessage().contains("SSRF_PROTECTION"),
+                    "an unresolvable name is not a refused target and must not be reported as one");
+        }
+
+        @Test
+        @DisplayName("an unresolvable host spends a rung, so the ladder still ends in the DLQ")
+        void unresolvableHostSpendsARungAndAbandonsOnTheLast() {
+            // Invariant 5's converse: the lookup was an Attempt that really failed. Without the
+            // rung, Outgoing's attempt count never moves and the ladder is never exhausted.
+            FakeStore store = new FakeStore("https://no-such-host.invalid/hook");
+            store.attemptNumber = 3;
+            store.ladder = RetryLadder.parse("60", 3);
+
+            runner.run(store, metrics);
+
+            assertEquals(1, store.attemptStartingCalls);
+            assertInstanceOf(Finalization.Abandoned.class, store.finalizations.get(0));
+            assertEquals(1, store.abandonedCalls);
+            verify(concurrency, never()).tryAcquireForTenant(any(UUID.class));
+        }
+
+        @Test
         @DisplayName("a terminal failure whose finalisation did not apply releases nothing")
         void refusedTerminalReleasesNothing() {
             respond(422, "unprocessable");

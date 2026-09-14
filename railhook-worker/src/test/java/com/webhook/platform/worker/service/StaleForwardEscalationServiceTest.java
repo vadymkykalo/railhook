@@ -171,7 +171,7 @@ class StaleForwardEscalationServiceTest {
     @DisplayName("the oldest-pending gauge reports the age of the oldest Forward, not of an attempt row")
     void gaugeMeasuresFromTheIncomingEvent() {
         Instant received = Instant.now().minus(Duration.ofHours(5));
-        when(attemptRepository.findOldestPendingReceivedAt()).thenReturn(received);
+        when(attemptRepository.findOldestPendingForwardStartedAt()).thenReturn(received);
         when(attemptRepository.findStaleForwardAttemptIds(any(Instant.class), anyInt())).thenReturn(List.of());
 
         service.runEscalation();
@@ -183,7 +183,7 @@ class StaleForwardEscalationServiceTest {
     @Test
     @DisplayName("no pending Forwards reports zero rather than leaving the last value standing")
     void gaugeResetsWhenNothingPending() {
-        when(attemptRepository.findOldestPendingReceivedAt()).thenReturn(null);
+        when(attemptRepository.findOldestPendingForwardStartedAt()).thenReturn(null);
         when(attemptRepository.findStaleForwardAttemptIds(any(Instant.class), anyInt())).thenReturn(List.of());
 
         service.runEscalation();
