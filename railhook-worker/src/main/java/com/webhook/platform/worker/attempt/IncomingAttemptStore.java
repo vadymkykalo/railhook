@@ -417,7 +417,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             return retry.reason();
         }
         if (outcome instanceof Finalization.Abandoned abandoned) {
-            return "Max attempts reached: " + abandoned.reason();
+            // As given: an abandon is no longer only an exhausted ladder, and the Runner says which.
+            return abandoned.reason();
         }
         if (outcome instanceof Finalization.TerminallyFailed failed) {
             return failed.reason();

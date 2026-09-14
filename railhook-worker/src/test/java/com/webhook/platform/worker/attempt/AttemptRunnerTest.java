@@ -171,23 +171,22 @@ class AttemptRunnerTest {
     class TerminalRelease {
 
         @Test
-        @DisplayName("a non-retryable status runs the terminal side effect")
+        @DisplayName("a non-retryable status runs the abandon side effect, which releases the cursor")
         void nonRetryableStatusReleases() {
             respond(422, "unprocessable");
             FakeStore store = new FakeStore(baseUrl);
 
             runner.run(store, metrics);
 
-            assertInstanceOf(Finalization.TerminallyFailed.class, store.finalizations.get(0));
-            // Succeeded and Abandoned both released the ordering buffer; TerminallyFailed
-            // released nothing. It is the outcome for a non-retryable 4xx — much the commonest
-            // terminal case — for a disabled or deleted endpoint, and for an SSRF rejection.
-            // On an ordering-enabled endpoint the cursor then stuck at N-1 permanently:
-            // canDeliver stayed false for every later delivery, getReadyDeliveries could never
-            // release anything, and orderingHold fell through to a BETWEEN scan whose upper
-            // bound grew without limit. FIFO quietly degraded to no delivery at all.
-            assertEquals(1, store.terminallyFailedCalls,
+            assertInstanceOf(Finalization.Abandoned.class, store.finalizations.get(0));
+            // A non-retryable 4xx is much the commonest way a Delivery stops before its ladder
+            // ends. When it ended TerminallyFailed and that released nothing, an ordering-enabled
+            // endpoint's cursor stuck at N-1 permanently: canDeliver stayed false for every later
+            // delivery and FIFO quietly degraded to no delivery at all. It now goes to the DLQ,
+            // and whichever side effect runs has to release what the Attempt was holding.
+            assertEquals(1, store.abandonedCalls,
                     "nothing else ever releases the ordering cursor for this delivery");
+            assertEquals(0, store.terminallyFailedCalls);
         }
 
         @Test
@@ -239,7 +238,7 @@ class AttemptRunnerTest {
         }
 
         @Test
-        @DisplayName("a terminal failure whose finalisation did not apply releases nothing")
+        @DisplayName("a non-retryable status whose finalisation did not apply releases nothing")
         void refusedTerminalReleasesNothing() {
             respond(422, "unprocessable");
             FakeStore store = new FakeStore(baseUrl);
@@ -247,9 +246,11 @@ class AttemptRunnerTest {
 
             runner.run(store, metrics);
 
-            assertEquals(0, store.terminallyFailedCalls,
+            assertInstanceOf(Finalization.Abandoned.class, store.finalizations.get(0));
+            assertEquals(0, store.abandonedCalls,
                     "releasing the cursor for a row another attempt now owns would let a "
-                            + "successor through early — the same invariant as success and abandonment");
+                            + "successor through early — the same invariant as success");
+            assertEquals(0, store.terminallyFailedCalls);
         }
     }
 
@@ -340,16 +341,38 @@ class AttemptRunnerTest {
             assertEquals(0, store.abandonedCalls);
         }
 
+        // A 4xx or a 3xx is an answer another attempt will not change, so it does not burn the
+        // ladder — but a person can change it: rotate the token back, finish the deploy, fix the
+        // URL. It used to end FAILED, which Failed Messages does not list, so the only way back
+        // was a Replay nobody was told to run. The DLQ is where Railhook keeps what it gave up
+        // on for a human to decide about.
         @Test
-        @DisplayName("a non-retryable status fails terminally rather than burning the ladder")
-        void nonRetryableIsTerminal() {
-            respond(400, "bad request");
+        @DisplayName("a non-retryable 4xx goes to DLQ at once instead of burning the ladder")
+        void nonRetryableClientErrorAbandonsWithoutTheLadder() {
+            respond(404, "not found");
+            FakeStore store = new FakeStore(baseUrl);
+            store.attemptNumber = 1;
+            store.ladder = RetryLadder.parse("60,300", 5);
+
+            runner.run(store, metrics);
+
+            assertEquals(1, store.finalizations.size());
+            assertInstanceOf(Finalization.Abandoned.class, store.finalizations.get(0));
+            assertEquals(1, store.abandonedCalls, "the DLQ side effect runs, as it does for an exhausted ladder");
+            assertEquals(0, store.terminallyFailedCalls);
+            assertEquals(1, metrics.failures);
+        }
+
+        @Test
+        @DisplayName("a redirect goes to DLQ at once: redirects are not followed")
+        void redirectAbandonsWithoutTheLadder() {
+            respond(301, "");
             FakeStore store = new FakeStore(baseUrl);
 
             runner.run(store, metrics);
 
-            assertInstanceOf(Finalization.TerminallyFailed.class, store.finalizations.get(0));
-            assertEquals(1, metrics.failures);
+            assertInstanceOf(Finalization.Abandoned.class, store.finalizations.get(0));
+            assertEquals(1, store.abandonedCalls);
         }
 
         @Test

@@ -235,6 +235,19 @@ public class AttemptRunner {
         }
     }
 
+    /**
+     * Hands the obligation to the DLQ, where a person decides about it — under invariant 2, as a
+     * successor is: the side effect runs only if this Attempt's own finalisation applied.
+     */
+    private <C> void abandon(AttemptStore<C> store, C claim, AttemptContext ctx, String reason) {
+        if (store.finalise(claim, new Finalization.Abandoned(reason))) {
+            store.onAbandoned(claim);
+        } else {
+            log.warn("{}: abandon did not apply — the obligation is owned by another attempt now: {}",
+                    ctx.description(), reason);
+        }
+    }
+
     private <C> boolean defer(AttemptStore<C> store, C claim, AttemptContext ctx,
             long baseSeconds, long maxSeconds, String reason) {
         long delay = RetryPolicy.backoffWithJitter(ctx.attemptNumber(), baseSeconds, maxSeconds);
@@ -326,8 +339,14 @@ public class AttemptRunner {
             circuitBreaker.recordFailure(ctx.targetKey(), new RuntimeException("HTTP " + status));
             retryOrAbandon(store, claim, ctx, "Retryable HTTP " + status);
         } else {
+            // Abandoned, not terminally failed. A 3xx or a 4xx is an answer no further attempt
+            // changes, so the rest of the ladder is skipped — but a person can change it: a token
+            // rotated back, a deploy that finished, a URL fixed to the one it redirects to. FAILED
+            // is for what nobody can fix by retrying (a refused address, a disabled target), and
+            // Failed Messages does not list it, so a 401 or a 404 used to end where no one was
+            // offered a retry and only a Replay brought it back.
             circuitBreaker.recordFailure(ctx.targetKey(), new RuntimeException("Non-retryable HTTP " + status));
-            terminallyFail(store, claim, "Non-retryable HTTP " + status);
+            abandon(store, claim, ctx, "Non-retryable HTTP " + status);
         }
     }
 
@@ -343,9 +362,7 @@ public class AttemptRunner {
         if (ctx.ladder().isExhausted(ctx.attemptNumber())) {
             log.warn("{}: ladder exhausted after {} attempts, abandoning: {}",
                     ctx.description(), ctx.attemptNumber(), reason);
-            if (store.finalise(claim, new Finalization.Abandoned(reason))) {
-                store.onAbandoned(claim);
-            }
+            abandon(store, claim, ctx, "Max attempts reached: " + reason);
             return;
         }
 
