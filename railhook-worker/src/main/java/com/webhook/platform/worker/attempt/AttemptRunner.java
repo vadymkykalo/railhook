@@ -146,7 +146,7 @@ public class AttemptRunner {
             RequestSpec spec = store.buildRequest(claim, body);
             requestHeaders = spec.recordedHeaders();
 
-            Response response = send(spec, ctx, body);
+            Response response = send(spec, ctx, store.wireBody(claim, body));
 
             if (response == null) {
                 // Otherwise the obligation stays claimed until the stuck sweep picks it up.
@@ -261,7 +261,12 @@ public class AttemptRunner {
         return false;
     }
 
-    private Response send(RequestSpec spec, AttemptContext ctx, String body) {
+    /**
+     * Sends {@code body} as bytes. A String handed to WebClient is encoded again on the way out,
+     * with whatever charset the Content-Type names — so a body that was not UTF-8 when it arrived
+     * left as something else. Bytes are written as they are.
+     */
+    private Response send(RequestSpec spec, AttemptContext ctx, byte[] body) {
         WebClient.RequestBodySpec request = spec.client().post().uri(ctx.url());
         spec.headers().accept(request);
 
@@ -275,7 +280,7 @@ public class AttemptRunner {
         AtomicReference<String> headersSeen = new AtomicReference<>("{}");
 
         // Invariant 1: the mono produces the raw HTTP outcome and nothing else.
-        Mono<Response> exchange = request.bodyValue(body != null ? body : "")
+        Mono<Response> exchange = request.bodyValue(body != null ? body : new byte[0])
                 .exchangeToMono(response -> {
                     int status = response.statusCode().value();
                     String headers = serialiseHeaders(response.headers().asHttpHeaders());

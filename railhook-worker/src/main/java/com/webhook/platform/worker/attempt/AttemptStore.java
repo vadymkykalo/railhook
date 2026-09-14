@@ -39,6 +39,18 @@ public interface AttemptStore<C> {
     String buildBody(C claim);
 
     /**
+     * The bytes that go on the wire for {@code body}, which is what {@link #buildBody} returned.
+     *
+     * <p>The body is recorded and signed as text, but it is sent as bytes, so nothing between the
+     * store and the socket re-encodes it or adds a charset to the Content-Type. The default is the
+     * text's UTF-8 encoding; a store holding the exact bytes a body arrived with hands those back
+     * instead.
+     */
+    default byte[] wireBody(C claim, String body) {
+        return body != null ? body.getBytes(java.nio.charset.StandardCharsets.UTF_8) : new byte[0];
+    }
+
+    /**
      * Called immediately before the request goes out. Outgoing consumes an attempt here, so a
      * crash mid-send still counts against the Ladder; Incoming's row already carries its number.
      */

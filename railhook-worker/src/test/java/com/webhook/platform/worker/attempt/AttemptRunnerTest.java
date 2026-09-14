@@ -657,6 +657,56 @@ class AttemptRunnerTest {
      * point: these tests assert observable outcomes through the interface rather than reaching
      * past it into either direction's tables.
      */
+    // ── the wire ───────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("what goes on the wire")
+    class Wire {
+
+        private final java.util.concurrent.atomic.AtomicReference<byte[]> receivedBody =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        private final java.util.concurrent.atomic.AtomicReference<String> receivedContentType =
+                new java.util.concurrent.atomic.AtomicReference<>();
+
+        private void capture() {
+            server.createContext("/hook", exchange -> {
+                receivedBody.set(exchange.getRequestBody().readAllBytes());
+                receivedContentType.set(exchange.getRequestHeaders().getFirst("Content-Type"));
+                exchange.sendResponseHeaders(200, -1);
+                exchange.close();
+            });
+        }
+
+        // A forward relays somebody else's webhook, so the destination must get the bytes the
+        // provider sent. The body used to travel as a String and be re-encoded on the way out, so
+        // a body that was not UTF-8 — another charset, binary, gzip — arrived altered.
+        @Test
+        @DisplayName("the bytes the store hands over arrive exactly, even when they are not UTF-8")
+        void bytesArriveUnchanged() {
+            capture();
+            FakeStore store = new FakeStore(baseUrl);
+            store.contentType = "application/octet-stream";
+            store.wireBytes = new byte[] {(byte) 0xC0, (byte) 0xFF, 0x00, 0x41};
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.Succeeded.class, store.finalizations.get(0));
+            org.junit.jupiter.api.Assertions.assertArrayEquals(store.wireBytes, receivedBody.get());
+        }
+
+        @Test
+        @DisplayName("the Content-Type the store sets arrives as set, with no charset added")
+        void contentTypeArrivesAsSet() {
+            capture();
+            FakeStore store = new FakeStore(baseUrl);
+            store.contentType = "text/plain";
+
+            runner.run(store, metrics);
+
+            assertEquals("text/plain", receivedContentType.get());
+        }
+    }
+
     private static final class FakeStore implements AttemptStore<String> {
 
         private final String url;
@@ -670,6 +720,8 @@ class AttemptRunnerTest {
         PayloadTransformException bodyFailure;
         int timeoutSeconds = 5;
         RuntimeException recordAttemptFailure;
+        String contentType;
+        byte[] wireBytes;
 
         final List<Finalization> finalizations = new ArrayList<>();
         final List<AttemptRecord> records = new ArrayList<>();
@@ -695,7 +747,17 @@ class AttemptRunnerTest {
         @Override
         public RequestSpec buildRequest(String claim, String body) {
             return new RequestSpec(WebClient.builder().build(),
-                    request -> request.header("X-Test", "1"), "{\"X-Test\":\"1\"}");
+                    request -> {
+                        request.header("X-Test", "1");
+                        if (contentType != null) {
+                            request.header("Content-Type", contentType);
+                        }
+                    }, "{\"X-Test\":\"1\"}");
+        }
+
+        @Override
+        public byte[] wireBody(String claim, String body) {
+            return wireBytes != null ? wireBytes : AttemptStore.super.wireBody(claim, body);
         }
 
         @Override

@@ -201,6 +201,15 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         // a header handed to the request builder cannot be read back off it.
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Content-Type", contentType);
+        if (!isTransformed()) {
+            // The bytes go on unchanged, so what they are encoded with has to go with them: a gzip
+            // body arrives compressed (nothing in front of ingress decompresses a request), and
+            // without the header the Destination holds binary it cannot know how to read.
+            String contentEncoding = arrivedHeader("Content-Encoding");
+            if (contentEncoding != null) {
+                headers.put("Content-Encoding", contentEncoding);
+            }
+        }
         headers.put("X-Incoming-Event-Id", event.getId().toString());
         if (event.getRequestId() != null) {
             headers.put("X-Incoming-Request-Id", event.getRequestId());
@@ -211,6 +220,45 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         AttemptSupport.collectCustomHeaders(headers, destination.getCustomHeadersJson(), objectMapper);
 
         return new RequestSpec(webClient, request -> headers.forEach(request::header), recorded(headers));
+    }
+
+    /**
+     * The bytes the provider sent, when the Forward is not transformed and the Incoming Event kept
+     * them — which it does whenever its text copy could not reproduce them. Otherwise the text,
+     * encoded as UTF-8: for a body that was valid UTF-8 that is the same bytes, and a transformed
+     * body is text Railhook produced.
+     */
+    @Override
+    public byte[] wireBody(Claim claim, String body) {
+        if (!isTransformed() && event.getBodyBytes() != null) {
+            return event.getBodyBytes();
+        }
+        return AttemptStore.super.wireBody(claim, body);
+    }
+
+    private boolean isTransformed() {
+        return destination.getTransformationId() != null
+                || (destination.getPayloadTransform() != null && !destination.getPayloadTransform().isBlank());
+    }
+
+    /** A header as the provider sent it, read back off the stored request, by name in any case. */
+    @SuppressWarnings("unchecked")
+    private String arrivedHeader(String name) {
+        if (event.getHeadersJson() == null) {
+            return null;
+        }
+        try {
+            Map<String, String> arrived = objectMapper.readValue(event.getHeadersJson(), Map.class);
+            for (Map.Entry<String, String> header : arrived.entrySet()) {
+                if (header.getKey().equalsIgnoreCase(name)) {
+                    return header.getValue();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not read the stored request headers of incoming event {}: {}",
+                    event.getId(), e.getMessage());
+        }
+        return null;
     }
 
     /**

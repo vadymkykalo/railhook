@@ -196,6 +196,55 @@ class IngressServiceTest {
         verify(outboxMessageRepository, never()).saveAll(any());
     }
 
+    // body_raw is text decoded as UTF-8, which is what the dashboard shows and what a Forward used
+    // to send. For a body that is not UTF-8 that copy is lossy, so the bytes themselves are kept.
+    @Test
+    void aBodyThatIsNotUtf8IsKeptByteForByte() {
+        stubAcceptingSourceWithoutDestinations();
+        byte[] arrived = {(byte) 0x7B, (byte) 0xC0, (byte) 0xFF, (byte) 0x7D};
+
+        IncomingEvent event = service.receiveWebhook("validtoken", arrived, httpRequest);
+
+        assertThat(event.getBodyBytes()).isEqualTo(arrived);
+        assertThat(event.getBodyRaw()).as("still shown, with replacement characters").isNotNull();
+    }
+
+    // PostgreSQL text cannot hold a NUL byte, so a body carrying one failed the insert and the
+    // provider was answered 500 for a webhook that had verified.
+    @Test
+    void aBodyWithANulByteIsKeptAsBytesAndShownWithoutIt() {
+        stubAcceptingSourceWithoutDestinations();
+        byte[] arrived = "a\u0000b".getBytes(StandardCharsets.UTF_8);
+
+        IncomingEvent event = service.receiveWebhook("validtoken", arrived, httpRequest);
+
+        assertThat(event.getBodyBytes()).isEqualTo(arrived);
+        assertThat(event.getBodyRaw()).doesNotContain("\u0000");
+    }
+
+    @Test
+    void aUtf8BodyIsStoredOnceAsText() {
+        stubAcceptingSourceWithoutDestinations();
+
+        IncomingEvent event = service.receiveWebhook("validtoken",
+                "{\"name\":\"Zoë\"}".getBytes(StandardCharsets.UTF_8), httpRequest);
+
+        assertThat(event.getBodyRaw()).isEqualTo("{\"name\":\"Zoë\"}");
+        assertThat(event.getBodyBytes()).as("the text already encodes back to the same bytes").isNull();
+    }
+
+    private void stubAcceptingSourceWithoutDestinations() {
+        IncomingSource source = buildActiveSource();
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+    }
+
     @Test
     void receiveWebhook_success_withDestinations() {
         IncomingSource source = buildActiveSource();

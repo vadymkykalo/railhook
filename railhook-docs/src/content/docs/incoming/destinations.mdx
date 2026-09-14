@@ -96,7 +96,7 @@ Credentials are masked in the request headers the dashboard shows.
 
 ## What the destination receives
 
-The body is the webhook exactly as the provider sent it, with its original `Content-Type`, unless a transformation is configured. Railhook adds these headers:
+The body is the webhook exactly as the provider sent it, byte for byte, with its original `Content-Type` and, when it had one, `Content-Encoding`, unless a transformation is configured. A transformed body is sent as UTF-8. Railhook adds these headers:
 
 | Header | Value |
 |---|---|
