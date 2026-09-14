@@ -36,7 +36,48 @@ function renderAt(path: string) {
  */
 const SETTLE_MS = 8_000;
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  localStorage.clear();
+});
+
+describe('the project the rail falls back to', () => {
+  // Clicking Overview left "load-test" for "test": a page without a project in its URL took the
+  // account's first project, whichever one you had been working in. Found on production.
+  it('is the project you were last in, not the first one', async () => {
+    vi.mocked(projectsApi.list).mockResolvedValue([
+      project('first-project', 'test'),
+      project(TEST_PROJECT_ID, 'load-test'),
+    ]);
+    localStorage.setItem('railhook:last-project', TEST_PROJECT_ID);
+    renderAt('/admin/dashboard');
+
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: /Deliveries/i }))
+        .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/deliveries`), { timeout: SETTLE_MS });
+  });
+
+  it('remembers a project once you open it', async () => {
+    vi.mocked(projectsApi.list).mockResolvedValue([
+      project('first-project', 'test'),
+      project(TEST_PROJECT_ID, 'load-test'),
+    ]);
+    renderAt(`/admin/projects/${TEST_PROJECT_ID}/endpoints`);
+
+    await waitFor(() => expect(localStorage.getItem('railhook:last-project')).toBe(TEST_PROJECT_ID),
+      { timeout: SETTLE_MS });
+  });
+
+  it('is the first project again when the remembered one no longer exists', async () => {
+    vi.mocked(projectsApi.list).mockResolvedValue([project(TEST_PROJECT_ID, 'Production')]);
+    localStorage.setItem('railhook:last-project', 'deleted-project');
+    renderAt('/admin/dashboard');
+
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: /Deliveries/i }))
+        .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/deliveries`), { timeout: SETTLE_MS });
+  });
+});
 
 describe('the rail without a project in the URL', () => {
   it('still points every entry at a real project', async () => {

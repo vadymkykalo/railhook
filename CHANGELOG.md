@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.6] - 2026-09-14
+
+### Fixed
+
+- **Overview stays on the project you were in.** Overview, the projects list and the
+  organization pages carry no project in their URL, and they fell back to the account's first
+  project: working in one project and clicking Overview switched the dashboard, and the sidebar's
+  project with it, to another. The dashboard now remembers the project you last opened, in this
+  browser, and falls back to the first one only when that project no longer exists.
+
 ## [2.20.5] - 2026-09-14
 
 ### Fixed

@@ -8,6 +8,7 @@ import {
   useAnalytics, useDashboardStats, useDeliveries, useOpenIncidentCount,
   useProjects, useUnresolvedAlertCount,
 } from '../api/queries';
+import { projectToOpen, rememberProject } from '../lib/lastProject';
 import type { DeliveryFilters } from '../api/deliveries.api';
 import { formatDateTime, formatDateTimeShort, formatRelativeTime, formatTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
@@ -91,9 +92,15 @@ export default function DashboardPage() {
   } = useProjects();
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
 
+  // The project you were last in, not the account's first: Overview has no project in its URL.
   useEffect(() => {
-    if (projects.length > 0 && !selectedProjectId) setSelectedProjectId(projects[0].id);
+    if (projects.length > 0 && !selectedProjectId) setSelectedProjectId(projectToOpen(projects) ?? '');
   }, [projects, selectedProjectId]);
+
+  const selectProject = (id: string) => {
+    setSelectedProjectId(id);
+    rememberProject(id);
+  };
 
   const projectId = selectedProjectId || undefined;
 
@@ -180,7 +187,7 @@ export default function DashboardPage() {
                 <Select
                   aria-label={t('dashboard.projectPicker')}
                   value={selectedProjectId}
-                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  onChange={(e) => selectProject(e.target.value)}
                 >
                   {projects.map((project) => (
                     <option key={project.id} value={project.id}>{project.name}</option>
