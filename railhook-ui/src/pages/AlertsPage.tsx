@@ -605,6 +605,7 @@ export default function AlertsPage() {
               <div className="space-y-2">
                 <Label htmlFor="alert-email">{t('alerts.form.emailRecipients')}</Label>
                 <Input id="alert-email" value={formEmailRecipients} onChange={(e) => setFormEmailRecipients(e.target.value)} placeholder="ops@company.com, dev@company.com" />
+                <p className="text-xs text-muted-foreground">{t('alerts.form.emailRecipientsHint')}</p>
               </div>
             )}
           </div>

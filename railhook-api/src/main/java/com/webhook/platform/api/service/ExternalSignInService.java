@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
+import com.webhook.platform.api.domain.EmailAddresses;
 import com.webhook.platform.api.domain.entity.SignInHandoff;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.entity.UserIdentity;
@@ -89,7 +90,7 @@ public class ExternalSignInService {
             return Optional.of(user.getId());
         }
 
-        Optional<User> byAddress = userRepository.findByEmailIgnoreCase(identity.email());
+        Optional<User> byAddress = userRepository.findByEmail(EmailAddresses.normalize(identity.email()));
         if (byAddress.isEmpty()) {
             return Optional.empty();
         }

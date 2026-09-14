@@ -8,19 +8,26 @@ import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Scheduled job that enforces per-plan retention limits.
- * <p>
- * Runs daily at 03:00 UTC. For each organization whose plan has a finite
- * {@code max_retention_days}, deletes events (and their cascaded deliveries /
- * delivery_attempts) that are older than the cutoff.
- * <p>
- * Deletions happen in batches to avoid long locks. Self-hosted plans
- * ({@code max_retention_days = -1}) are skipped (unlimited retention).
- * <p>
- * When {@code billing.enabled=false}, the scheduler is a no-op.
+ *
+ * <p>Runs daily at 03:00 UTC. For each organization whose plan has a finite
+ * {@code max_retention_days}, deletes events older than the cutoff. One statement per batch is
+ * enough: deliveries, their attempts and workflow trigger rows all cascade from the event.
+ *
+ * <p>An event with a delivery still PENDING or PROCESSING is kept however old the event is. A
+ * replay builds fresh deliveries for events already in the store, so an event near the end of a
+ * short plan window can carry a delivery that is mid-retry or claimed right now; deleting it
+ * would take the delivery and its attempts out from under the pipeline.
+ *
+ * <p>Every batch commits on its own. When the job was one transaction, a single batch that failed
+ * rolled back everything the night had already deleted, and the same row failed it again the
+ * next night.
+ *
+ * <p>Self-hosted plans ({@code max_retention_days = -1}) are skipped, and when
+ * {@code billing.enabled=false} the scheduler is a no-op.
  */
 @Service
 @RequiredArgsConstructor
@@ -29,7 +36,25 @@ public class RetentionCleanupScheduler {
 
     private static final int BATCH_SIZE = 1000;
 
+    private static final String DELETE_EXPIRED_EVENTS_BATCH = """
+        DELETE FROM events
+        WHERE id IN (
+            SELECT e.id FROM events e
+            JOIN organizations o ON e.organization_id = o.id
+            JOIN plans pl ON o.plan_id = pl.id
+            WHERE pl.max_retention_days > 0
+              AND e.created_at < NOW() - make_interval(days => pl.max_retention_days)
+              AND NOT EXISTS (
+                  SELECT 1 FROM deliveries d
+                   WHERE d.event_id = e.id
+                     AND d.status IN ('PENDING', 'PROCESSING')
+              )
+            LIMIT :batchSize
+        )
+        """;
+
     private final EntitlementService entitlementService;
+    private final TransactionTemplate transactionTemplate;
 
     @PersistenceContext
     private EntityManager em;
@@ -37,80 +62,22 @@ public class RetentionCleanupScheduler {
     @SystemTenant
     @Scheduled(cron = "0 0 3 * * *")
     @SchedulerLock(name = "retention_cleanup", lockAtMostFor = "PT55M", lockAtLeastFor = "PT5M")
-    @Transactional
     public void cleanup() {
         if (!entitlementService.isBillingEnabled()) return;
 
-        // Step 1: delete delivery_attempts for expired events
-        int totalAttempts = deleteInBatches("""
-            DELETE FROM delivery_attempts
-            WHERE id IN (
-                SELECT da.id FROM delivery_attempts da
-                JOIN deliveries d ON da.delivery_id = d.id
-                JOIN events e ON d.event_id = e.id
-                JOIN projects p ON e.project_id = p.id
-                JOIN organizations o ON p.organization_id = o.id
-                JOIN plans pl ON o.plan_id = pl.id
-                WHERE pl.max_retention_days > 0
-                  AND e.created_at < NOW() - (pl.max_retention_days || ' days')::interval
-                LIMIT :batchSize
-            )
-            """);
-
-        // Step 2: delete deliveries for expired events
-        int totalDeliveries = deleteInBatches("""
-            DELETE FROM deliveries
-            WHERE id IN (
-                SELECT d.id FROM deliveries d
-                JOIN events e ON d.event_id = e.id
-                JOIN projects p ON e.project_id = p.id
-                JOIN organizations o ON p.organization_id = o.id
-                JOIN plans pl ON o.plan_id = pl.id
-                WHERE pl.max_retention_days > 0
-                  AND e.created_at < NOW() - (pl.max_retention_days || ' days')::interval
-                  AND NOT EXISTS (
-                      SELECT 1 FROM delivery_attempts da WHERE da.delivery_id = d.id
-                  )
-                LIMIT :batchSize
-            )
-            """);
-
-        // Step 3: delete expired events (no remaining deliveries)
-        int totalEvents = deleteInBatches("""
-            DELETE FROM events
-            WHERE id IN (
-                SELECT e.id FROM events e
-                JOIN projects p ON e.project_id = p.id
-                JOIN organizations o ON p.organization_id = o.id
-                JOIN plans pl ON o.plan_id = pl.id
-                WHERE pl.max_retention_days > 0
-                  AND e.created_at < NOW() - (pl.max_retention_days || ' days')::interval
-                  AND NOT EXISTS (
-                      SELECT 1 FROM deliveries d WHERE d.event_id = e.id
-                  )
-                LIMIT :batchSize
-            )
-            """);
-
-        if (totalAttempts + totalDeliveries + totalEvents > 0) {
-            log.info("Retention cleanup: deleted {} attempts, {} deliveries, {} events",
-                    totalAttempts, totalDeliveries, totalEvents);
-        }
-    }
-
-    private int deleteInBatches(String sql) {
-        int total = 0;
+        int totalEvents = 0;
         int deleted;
         do {
-            deleted = em.createNativeQuery(sql)
+            Integer batch = transactionTemplate.execute(status -> em.createNativeQuery(DELETE_EXPIRED_EVENTS_BATCH)
                     .setParameter("batchSize", BATCH_SIZE)
-                    .executeUpdate();
-            total += deleted;
-            if (deleted > 0) {
-                em.flush();
-                em.clear();
-            }
+                    .executeUpdate());
+            deleted = batch == null ? 0 : batch;
+            totalEvents += deleted;
         } while (deleted >= BATCH_SIZE);
-        return total;
+
+        if (totalEvents > 0) {
+            log.info("Retention cleanup: deleted {} events past their plan's retention, "
+                    + "with their deliveries and attempts", totalEvents);
+        }
     }
 }

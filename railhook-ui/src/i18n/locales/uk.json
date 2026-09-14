@@ -43,6 +43,7 @@
       "namePlaceholder": "Висока частка невдач",
       "severity": "Важливість",
       "slackHint": "Створіть Incoming Webhook у налаштуваннях вашого Slack-воркспейсу, щоб отримати URL.",
+      "emailRecipientsHint": "До 10 адрес через кому. Кожна має належати учаснику цієї організації, який її підтвердив.",
       "slackWebhookUrl": "Slack Webhook URL",
       "threshold": "Поріг",
       "type": "Тип сповіщення",

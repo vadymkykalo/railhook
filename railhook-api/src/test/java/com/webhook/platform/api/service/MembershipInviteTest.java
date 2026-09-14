@@ -124,6 +124,22 @@ class MembershipInviteTest {
     }
 
     @Test
+    void invitingACaseVariantOfAnExistingAddressAddsThatAccount_notANewOne() {
+        User existing = new User();
+        existing.setId(UUID.randomUUID());
+        existing.setEmail("known@example.com");
+        when(userRepository.existsByEmail("known@example.com")).thenReturn(true);
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(existing));
+
+        MemberResponse response = membershipService.addMember(
+                AddMemberRequest.builder().email(" Known@Example.com").role(MembershipRole.VIEWER).build(),
+                MembershipRole.OWNER);
+
+        assertThat(response.getStatus()).isEqualTo(MembershipStatus.ACTIVE);
+        assertThat(response.getUserId()).isEqualTo(existing.getId());
+    }
+
+    @Test
     void reissuingAnInviteMintsAFreshTokenAndPushesTheExpiryOut() {
         Membership pending = pendingInvite();
         String staleHash = pending.getInviteTokenHash();

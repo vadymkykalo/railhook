@@ -1,5 +1,6 @@
 package com.webhook.platform.api.domain.entity;
 
+import com.webhook.platform.api.domain.EmailAddresses;
 import com.webhook.platform.api.domain.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -69,4 +70,14 @@ public class User {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    /**
+     * Whatever path writes an account, its address is stored in the one spelling lookups use, so
+     * the unique index on lower(email) and an exact match by address agree.
+     */
+    @PrePersist
+    @PreUpdate
+    void normalizeEmail() {
+        email = EmailAddresses.normalize(email);
+    }
 }

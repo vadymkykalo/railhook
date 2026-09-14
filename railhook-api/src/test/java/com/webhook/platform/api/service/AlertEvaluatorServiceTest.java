@@ -96,18 +96,80 @@ class AlertEvaluatorServiceTest {
     }
 
     @Test
-    @DisplayName("while an alert for the rule is unresolved, the rule stays quiet")
+    @DisplayName("while an alert for the rule is unresolved and the condition still holds, the rule stays quiet")
     void firesOnTheCrossingNotEveryTick() {
         AlertRule rule = rule(AlertType.FAILURE_RATE, 50.0);
         given(rule);
         when(eventRepository.existsByAlertRuleIdAndResolvedFalse(rule.getId())).thenReturn(true);
+        when(deliveryRepository.countByProjectIdAndCreatedAtBetween(eq(projectId), any(), any()))
+                .thenReturn(10L);
+        when(deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
+                eq(projectId), eq(DeliveryStatus.FAILED), any(), any())).thenReturn(8L);
 
         evaluator.evaluate();
 
         /* The condition is still true — that is the point. A rule whose condition holds for an
-           hour must produce one alert, not sixty; resolving the event is what re-arms it. */
+           hour must produce one alert, not sixty, and the open one must stay open. */
         verify(alertService, never()).fireAlert(any(), anyDouble(), anyString());
-        verify(deliveryRepository, never()).countByProjectIdAndCreatedAtBetween(any(), any(), any());
+        verify(alertService, never()).resolveRecovered(any());
+    }
+
+    @Test
+    @DisplayName("fire once per crossing: breach fires, recovery resolves, the next breach fires again")
+    void firesAgainAfterTheConditionRecovers() {
+        AlertRule rule = rule(AlertType.DLQ_THRESHOLD, 5.0);
+        given(rule);
+        java.util.concurrent.atomic.AtomicBoolean open = new java.util.concurrent.atomic.AtomicBoolean(false);
+        when(eventRepository.existsByAlertRuleIdAndResolvedFalse(rule.getId())).thenAnswer(inv -> open.get());
+        when(alertService.fireAlert(any(), anyDouble(), anyString())).thenAnswer(inv -> {
+            open.set(true);
+            return null;
+        });
+        when(alertService.resolveRecovered(rule)).thenAnswer(inv -> {
+            open.set(false);
+            return 1;
+        });
+
+        when(deliveryRepository.countDlqByProjectIdSince(eq(projectId), any())).thenReturn(9L);
+        evaluator.evaluate();
+        evaluator.evaluate();
+        verify(alertService, org.mockito.Mockito.times(1)).fireAlert(eq(rule), eq(9.0), anyString());
+
+        when(deliveryRepository.countDlqByProjectIdSince(eq(projectId), any())).thenReturn(0L);
+        evaluator.evaluate();
+        /* Nobody resolved it by hand. Until the evaluator did this itself, an alert fired once
+           and then the rule was silent for good: every later outage found the old event still
+           open and said nothing. */
+        verify(alertService).resolveRecovered(rule);
+        assertThat(open.get()).as("the open alert is resolved once the condition stops holding").isFalse();
+
+        when(deliveryRepository.countDlqByProjectIdSince(eq(projectId), any())).thenReturn(7L);
+        evaluator.evaluate();
+        verify(alertService).fireAlert(eq(rule), eq(7.0), anyString());
+    }
+
+    @Test
+    @DisplayName("a rule with nothing open and nothing breached resolves nothing")
+    void quietRuleResolvesNothing() {
+        AlertRule rule = rule(AlertType.DLQ_THRESHOLD, 5.0);
+        given(rule);
+        when(deliveryRepository.countDlqByProjectIdSince(eq(projectId), any())).thenReturn(0L);
+
+        evaluator.evaluate();
+
+        verify(alertService, never()).resolveRecovered(any());
+    }
+
+    @Test
+    @DisplayName("resolved alert events past the retention window are purged")
+    void purgesOldResolvedAlertEvents() {
+        Instant before = Instant.now().minus(java.time.Duration.ofDays(90));
+
+        evaluator.purgeResolvedAlertEvents();
+
+        var cutoff = org.mockito.ArgumentCaptor.forClass(Instant.class);
+        verify(eventRepository).deleteResolvedBefore(cutoff.capture());
+        assertThat(cutoff.getValue()).isBetween(before.minusSeconds(60), before.plusSeconds(60));
     }
 
     @Test

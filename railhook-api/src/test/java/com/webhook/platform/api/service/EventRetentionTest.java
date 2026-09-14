@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionOperations;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -55,7 +56,7 @@ class EventRetentionTest {
     private DataRetentionService service(int eventsRetentionDays) {
         return new DataRetentionService(
                 deliveryAttemptRepository, incomingEventRepository, tunnelRequestLogRepository,
-                eventRepository, meterRegistry,
+                eventRepository, meterRegistry, TransactionOperations.withoutTransaction(),
                 // attempts, successfulAttempts, incoming, tunnelLog, maxPerDelivery, events, batch
                 90, 14, 30, 7, 10, eventsRetentionDays, 1000);
     }

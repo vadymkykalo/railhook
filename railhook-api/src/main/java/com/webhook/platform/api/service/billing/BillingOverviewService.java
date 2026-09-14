@@ -118,8 +118,9 @@ public class BillingOverviewService {
         return organizationBilling();
     }
 
+    /** The same count the quota check re-seeds from, so the page and the refusal agree. */
     private long eventsIn(BillingPeriod period, UUID organizationId) {
-        return eventRepository.countByOrganizationIdAndCreatedAtBetween(
+        return eventRepository.countEventsAndIncomingEventsBetween(
                 organizationId, period.start(), period.end());
     }
 

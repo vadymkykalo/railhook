@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.domain.EmailAddresses;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.domain.entity.EmailChangeRequest;
 import com.webhook.platform.api.domain.entity.User;
@@ -99,7 +100,7 @@ public class EmailChangeService {
     public EmailChangeResponse requestChange(UUID userId, ChangeEmailRequest request, String refreshToken,
                                              String clientIp) {
         User user = requireUser(userId);
-        String newEmail = request.getNewEmail().trim();
+        String newEmail = EmailAddresses.normalize(request.getNewEmail());
         if (newEmail.equalsIgnoreCase(user.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "That is already your email address");
         }
@@ -253,7 +254,7 @@ public class EmailChangeService {
 
     /** The same refusal, word for word, that registration gives for an address in use. */
     private void requireAvailable(String email, UUID userId) {
-        userRepository.findByEmailIgnoreCase(email)
+        userRepository.findByEmail(EmailAddresses.normalize(email))
                 .filter(other -> !other.getId().equals(userId))
                 .ifPresent(other -> {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");

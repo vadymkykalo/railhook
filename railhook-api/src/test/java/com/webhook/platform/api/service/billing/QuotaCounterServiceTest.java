@@ -20,6 +20,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -76,7 +77,7 @@ class QuotaCounterServiceTest {
     @Test
     void countsAFallbackWhenRedisRefusesTheRead() {
         when(counter.isExists()).thenThrow(new IllegalStateException("Redis is down"));
-        when(eventRepository.countByOrganizationIdAndCreatedAtBetween(any(), any(), any())).thenReturn(41L);
+        when(eventRepository.countEventsAndIncomingEventsBetween(any(), any(), any())).thenReturn(41L);
 
         assertThat(service.getCurrentCount()).isEqualTo(41L);
         assertThat(fallbackCount()).isEqualTo(1.0);
@@ -88,13 +89,13 @@ class QuotaCounterServiceTest {
         when(counter.get()).thenReturn(0L);
 
         assertThat(service.getCurrentCount()).isZero();
-        verify(eventRepository, never()).countByOrganizationIdAndCreatedAtBetween(any(), any(), any());
+        verify(eventRepository, never()).countEventsAndIncomingEventsBetween(any(), any(), any());
     }
 
     @Test
     void aMissingKeyIsSeededFromTheDatabase() {
         when(counter.isExists()).thenReturn(false);
-        when(eventRepository.countByOrganizationIdAndCreatedAtBetween(any(), any(), any())).thenReturn(17L);
+        when(eventRepository.countEventsAndIncomingEventsBetween(any(), any(), any())).thenReturn(17L);
 
         assertThat(service.getCurrentCount()).isEqualTo(17L);
         verify(counter).set(17L);
@@ -108,7 +109,7 @@ class QuotaCounterServiceTest {
         // Redis is back, and holding a value that is short by every increment it missed.
         when(counter.isExists()).thenReturn(true);
         when(counter.get()).thenReturn(3L);
-        when(eventRepository.countByOrganizationIdAndCreatedAtBetween(any(), any(), any())).thenReturn(900L);
+        when(eventRepository.countEventsAndIncomingEventsBetween(any(), any(), any())).thenReturn(900L);
 
         assertThat(service.getCurrentCount()).isEqualTo(900L);
         verify(counter).set(900L);
@@ -121,12 +122,59 @@ class QuotaCounterServiceTest {
 
         when(counter.isExists()).thenReturn(true);
         when(counter.get()).thenReturn(900L);
-        when(eventRepository.countByOrganizationIdAndCreatedAtBetween(any(), any(), any())).thenReturn(900L);
+        when(eventRepository.countEventsAndIncomingEventsBetween(any(), any(), any())).thenReturn(900L);
 
         service.getCurrentCount();
         service.getCurrentCount();
         service.getCurrentCount();
 
-        verify(eventRepository).countByOrganizationIdAndCreatedAtBetween(any(), any(Instant.class), any(Instant.class));
+        verify(eventRepository).countEventsAndIncomingEventsBetween(any(), any(Instant.class), any(Instant.class));
+    }
+
+    @Test
+    void aDroppedIncrementReseedsTheOrganizationThatLostIt_notWhicheverAsksNext() {
+        UUID orgA = orgId;
+        UUID orgB = UUID.randomUUID();
+        when(counter.incrementAndGet()).thenThrow(new IllegalStateException("Redis is down"));
+        service.increment();
+
+        // Redis is back. B holds a trustworthy value; A's is short by the increment it missed.
+        when(counter.isExists()).thenReturn(true);
+        when(counter.get()).thenReturn(5L);
+        when(eventRepository.countEventsAndIncomingEventsBetween(eq(orgA), any(), any())).thenReturn(900L);
+        when(eventRepository.countEventsAndIncomingEventsBetween(eq(orgB), any(), any())).thenReturn(5L);
+
+        TenantContext.set(orgB);
+        assertThat(service.getCurrentCount()).isEqualTo(5L);
+        verify(eventRepository, never()).countEventsAndIncomingEventsBetween(eq(orgB), any(), any());
+
+        TenantContext.set(orgA);
+        assertThat(service.getCurrentCount())
+                .as("A's lost increment must still force A's re-seed after B has asked")
+                .isEqualTo(900L);
+        verify(counter).set(900L);
+    }
+
+    @Test
+    void aKeyTheIncrementHadToRecreateIsReseeded_notBelievedAtOne() {
+        // The month's key was evicted under memory pressure: incrementAndGet creates it afresh at
+        // 1, and from then on it exists and is believed.
+        when(counter.incrementAndGet()).thenReturn(1L);
+        when(eventRepository.countEventsAndIncomingEventsBetween(eq(orgId), any(), any())).thenReturn(4_200L);
+
+        service.increment();
+
+        verify(counter).set(4_200L);
+    }
+
+    @Test
+    void theDatabaseCountIncludesIncomingEvents() {
+        // Both directions charge the counter (EventIngestService and IngressService), so the count
+        // a re-seed or a fallback replaces it with has to include both, or every re-seed forgives
+        // an organization its incoming webhooks for the month so far.
+        when(counter.isExists()).thenReturn(false);
+        when(eventRepository.countEventsAndIncomingEventsBetween(eq(orgId), any(), any())).thenReturn(33L);
+
+        assertThat(service.getCurrentCount()).isEqualTo(33L);
     }
 }

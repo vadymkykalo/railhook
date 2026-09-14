@@ -40,11 +40,23 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     @Query("SELECT COUNT(e) FROM Event e WHERE e.projectId = :projectId AND e.createdAt BETWEEN :from AND :to")
     long countByProjectIdAndCreatedAtBetween(@Param("projectId") UUID projectId, @Param("from") Instant from, @Param("to") Instant to);
 
+    /**
+     * What an organization has been charged for over a half-open window: its events and its
+     * incoming events together.
+     *
+     * <p>Both directions charge the same monthly quota — EventIngestService for an event,
+     * IngressService for an incoming webhook that was stored — so the database count that re-seeds
+     * the Redis counter, stands in for it when Redis is down, and is shown on the usage page has to
+     * count both. Counting only {@code events} let every re-seed forgive the month's incoming
+     * webhooks, and showed a usage figure that disagreed with the quota check refusing requests.
+     */
     @Query(value = """
-        SELECT COUNT(*) FROM events e
-        WHERE e.organization_id = :orgId AND e.created_at >= :from AND e.created_at < :to
+        SELECT (SELECT COUNT(*) FROM events e
+                 WHERE e.organization_id = :orgId AND e.created_at >= :from AND e.created_at < :to)
+             + (SELECT COUNT(*) FROM incoming_events ie
+                 WHERE ie.organization_id = :orgId AND ie.received_at >= :from AND ie.received_at < :to)
         """, nativeQuery = true)
-    long countByOrganizationIdAndCreatedAtBetween(@Param("orgId") UUID organizationId, @Param("from") Instant from, @Param("to") Instant to);
+    long countEventsAndIncomingEventsBetween(@Param("orgId") UUID organizationId, @Param("from") Instant from, @Param("to") Instant to);
 
     @Query(value = """
         SELECT 
