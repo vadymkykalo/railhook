@@ -180,6 +180,50 @@ class WebhookVerifierTest {
         assertThat(result.error()).contains("missing t or v1");
     }
 
+    /**
+     * While a secret is being rolled Stripe signs with every live secret and sends one v1 per
+     * secret. Only the last v1 was kept, so whenever the one this Source's secret produced was not
+     * last, a genuine event was refused.
+     */
+    @Test
+    void stripe_severalSignatures_theValidOneFirst_verifies() {
+        StripeVerifier verifier = new StripeVerifier();
+        long timestamp = Instant.now().getEpochSecond();
+        String valid = hmacSha256Hex(SECRET, timestamp + "." + BODY);
+        String signedWithTheOtherSecret = hmacSha256Hex("whsec_the_other_secret", timestamp + "." + BODY);
+        String header = "t=" + timestamp + ",v1=" + valid + ",v1=" + signedWithTheOtherSecret;
+        when(request.getHeader("Stripe-Signature")).thenReturn(header);
+
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
+
+        assertThat(result.verified()).isTrue();
+        assertThat(result.replayKey()).isEqualTo(header);
+    }
+
+    @Test
+    void stripe_severalSignatures_theValidOneLast_verifies() {
+        StripeVerifier verifier = new StripeVerifier();
+        long timestamp = Instant.now().getEpochSecond();
+        String valid = hmacSha256Hex(SECRET, timestamp + "." + BODY);
+        when(request.getHeader("Stripe-Signature"))
+                .thenReturn("t=" + timestamp + ",v0=legacy,v1=" + "0".repeat(64) + ",v1=" + valid);
+
+        assertThat(verifier.verify(SECRET, BODY_BYTES, request).verified()).isTrue();
+    }
+
+    @Test
+    void stripe_severalSignatures_noneValid_fails() {
+        StripeVerifier verifier = new StripeVerifier();
+        long timestamp = Instant.now().getEpochSecond();
+        when(request.getHeader("Stripe-Signature"))
+                .thenReturn("t=" + timestamp + ",v1=" + "0".repeat(64) + ",v1=" + "f".repeat(64));
+
+        var result = verifier.verify(SECRET, BODY_BYTES, request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("mismatch");
+    }
+
     @Test
     void stripe_mismatch() {
         StripeVerifier verifier = new StripeVerifier();

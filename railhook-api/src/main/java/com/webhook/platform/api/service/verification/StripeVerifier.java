@@ -5,6 +5,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Stripe webhook signature verifier.
@@ -25,7 +27,10 @@ public class StripeVerifier implements WebhookVerificationStrategy {
         }
 
         String timestamp = null;
-        String signature = null;
+        // Every v1, not the last one: while a secret is being rolled Stripe signs with each live
+        // secret and sends one v1 per secret, in no order this Source can rely on. Keeping only
+        // the last refused a genuine event whenever the matching signature came earlier.
+        List<String> signatures = new ArrayList<>();
 
         for (String part : header.split(",")) {
             String[] kv = part.trim().split("=", 2);
@@ -33,12 +38,12 @@ public class StripeVerifier implements WebhookVerificationStrategy {
                 if ("t".equals(kv[0])) {
                     timestamp = kv[1];
                 } else if ("v1".equals(kv[0])) {
-                    signature = kv[1];
+                    signatures.add(kv[1]);
                 }
             }
         }
 
-        if (timestamp == null || signature == null) {
+        if (timestamp == null || signatures.isEmpty()) {
             return VerificationResult.failure("Invalid Stripe-Signature format: missing t or v1");
         }
 
@@ -54,11 +59,15 @@ public class StripeVerifier implements WebhookVerificationStrategy {
         }
 
         // Stripe signs: "<timestamp>.<body>" — joined as bytes, so the body is not re-encoded.
-        String computed = GenericHmacVerifier.computeHmacSha256(secret, timestamp + ".", body);
+        byte[] computed = GenericHmacVerifier.computeHmacSha256(secret, timestamp + ".", body)
+                .getBytes(StandardCharsets.UTF_8);
 
-        boolean valid = MessageDigest.isEqual(
-                computed.getBytes(StandardCharsets.UTF_8),
-                signature.getBytes(StandardCharsets.UTF_8));
+        // No early exit: each candidate is compared in constant time and the loop runs over all
+        // of them, so the response time says nothing about which one matched.
+        boolean valid = false;
+        for (String signature : signatures) {
+            valid |= MessageDigest.isEqual(computed, signature.getBytes(StandardCharsets.UTF_8));
+        }
         return valid ? VerificationResult.success(header) : VerificationResult.failure("Stripe signature mismatch");
     }
 }
