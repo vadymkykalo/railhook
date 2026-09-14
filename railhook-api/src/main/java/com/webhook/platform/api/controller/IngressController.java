@@ -21,6 +21,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+
+import static com.webhook.platform.api.filter.IngressRawBodyFilter.rawBody;
+
 @RestController
 @RequestMapping("/ingress")
 @Slf4j
@@ -52,9 +56,9 @@ public class IngressController {
     })
     // Described as a plain string, not as what springdoc infers from byte[]. It would write
     // `format: byte`, which in OpenAPI means base64 — and a provider reading that would encode a
-    // payload nobody asked them to encode. The parameter is byte[] so the signature is checked
-    // against what was sent; the wire format is unchanged and the documentation has to keep
-    // saying so.
+    // payload nobody asked them to encode. The body is read as raw bytes so the signature is
+    // checked against what was sent; the wire format is unchanged and the documentation has to
+    // keep saying so.
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             description = "The provider's payload, exactly as they send it. Signatures are "
                     + "verified over these bytes, so nothing re-encodes them in transit.",
@@ -62,13 +66,13 @@ public class IngressController {
     @PostMapping("/{token}")
     public ResponseEntity<IngressResponse> receiveWebhook(
             @PathVariable("token") String token,
-            // byte[], not String. Spring decodes a String parameter with whatever charset the
-            // Content-Type declares, and every verifier then encoded it back as UTF-8 — so a
-            // sender that used anything else had its genuine signature rejected, with nothing in
-            // the request to say why. The bytes are what was signed.
-            @RequestBody(required = false) byte[] body,
-            HttpServletRequest request) {
-        IncomingEvent event = ingressService.receiveWebhook(token, body, request);
+            HttpServletRequest request) throws IOException {
+        // Bytes, not a String: Spring decodes a String parameter with whatever charset the
+        // Content-Type declares, and every verifier then encoded it back as UTF-8 — so a sender
+        // that used anything else had its genuine signature rejected. And not @RequestBody byte[]
+        // either: for a form POST that is a body Spring rebuilt from parsed parameters rather than
+        // the one that was signed. IngressRawBodyFilter kept the original.
+        IncomingEvent event = ingressService.receiveWebhook(token, rawBody(request), request);
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(IngressResponse.builder()
                         .status("accepted")
