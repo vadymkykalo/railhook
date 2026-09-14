@@ -194,6 +194,39 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     }
 
     /**
+     * A client that presents its refresh token in the body has no cookie jar to receive the
+     * rotated one, so the rotated token has to come back in the body.
+     *
+     * <p>It used to be removed from the body unconditionally. The CLI refreshes this way and keeps
+     * the token it already has when the body carries none — the token that refresh had just rotated
+     * away. Its next refresh replayed it, reuse detection treated that as theft, and every session
+     * the user had was revoked, browser included. Found on production, half an hour after a CLI
+     * login.
+     */
+    @Test
+    public void testRefreshWithBodyTokenReturnsTheRotatedTokenInTheBody() throws Exception {
+        AuthResponse tokens = registerAndCaptureTokens("refresh-body-client@example.com");
+
+        MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RefreshTokenRequest(tokens.getRefreshToken()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").exists())
+                .andReturn();
+        AuthResponse refreshed = objectMapper.readValue(
+                refreshResult.getResponse().getContentAsString(), AuthResponse.class);
+
+        org.junit.jupiter.api.Assertions.assertNotNull(refreshed.getRefreshToken(),
+                "a body client must receive the rotated refresh token");
+        org.junit.jupiter.api.Assertions.assertNotEquals(tokens.getRefreshToken(), refreshed.getRefreshToken());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RefreshTokenRequest(refreshed.getRefreshToken()))))
+                .andExpect(status().isOk());
+    }
+
+    /**
      * Reuse detection: replaying a refresh token that has already been rotated away
      * (i.e. it is blacklisted) must not just 401 -- it must revoke the whole token family
      * via tokenBlacklistService.revokeAllUserTokens, since replay of a rotated-away token

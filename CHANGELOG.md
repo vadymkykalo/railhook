@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   permit from the ingest limit. A Free project sending 8 events a second against its 10-a-second
   limit had over a third of them refused with 429, and the delivery cap meant to be 50 a second
   was quietly held to the plan's 10. The two budgets now have keys of their own.
+- **The CLI no longer signs you out everywhere half an hour after logging in.** A refresh returned
+  the rotated refresh token only as a cookie. The CLI, which sends and reads the token in the body,
+  kept the one that refresh had just rotated away; its next refresh replayed it, and reuse
+  detection — correctly, for what it could see — revoked every session the user had, the browser's
+  included. A client that sends the token in the body now gets the rotated one back in the body.
 
 ## [2.20.2] - 2026-09-14
 
