@@ -104,7 +104,7 @@ The ingress limit is higher because what a provider sends is not yours to shrink
 
 ## Responses at an ingress URL
 
-An ingress URL answers the provider that sent the webhook, not you, so its responses are shorter: a successful receive is `202` with `status` and `requestId`, and an error carries `error` and `message` without `status`. When a deployment with plans runs out of quota, the ingress URL answers `429` with no detail, so a provider never learns anything about your plan.
+An ingress URL answers the provider that sent the webhook, not you, so its responses are shorter: a successful receive is `202` with `status` and `requestId`, and an error carries `error` and `message` without `status`. When a deployment with plans runs out of quota, the ingress URL answers `429` with `Retry-After: 3600` and no detail, so a provider never learns anything about your plan.
 
 ## Next steps
 
