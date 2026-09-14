@@ -255,8 +255,10 @@ public class AlertService {
         log.warn("Alert fired: rule='{}', project={}, current={}, threshold={}",
                 rule.getName(), rule.getProjectId(), currentValue, rule.getThresholdValue());
 
-        // Send notification (Slack / Webhook / Email) — async, fire-and-forget
-        notificationService.dispatch(rule, event);
+        // Slack / webhook / email — only once this alert is stored. Sent from the middle of the
+        // transaction, a failure in anything below rolled the alert back after the message had
+        // already gone, and the next evaluation a minute later sent it again.
+        notifyAfterCommit(rule, event);
 
         // Auto-create incident for CRITICAL severity alerts
         if (rule.getSeverity() == AlertSeverity.CRITICAL) {
@@ -280,6 +282,20 @@ public class AlertService {
         }
 
         return event;
+    }
+
+    private void notifyAfterCommit(AlertRule rule, AlertEvent event) {
+        if (!org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            notificationService.dispatch(rule, event);
+            return;
+        }
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        notificationService.dispatch(rule, event);
+                    }
+                });
     }
 
     // ─── Mappers ────────────────────────────────────────────────────────

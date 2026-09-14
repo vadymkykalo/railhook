@@ -3,9 +3,11 @@ package com.webhook.platform.api.service;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
+import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
 import com.webhook.platform.api.dto.TunnelSessionResponse;
+import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +32,8 @@ public class TunnelService {
 
     private final TunnelSessionRepository tunnelSessionRepository;
     private final ProjectRepository projectRepository;
+    private final OrganizationRepository organizationRepository;
+    private final EntitlementService entitlementService;
 
     @Value("${webhook.ingress-base-url:http://localhost:8080}")
     private String ingressBaseUrl;
@@ -50,6 +54,7 @@ public class TunnelService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                             "Project not found"));
         }
+        enforceActiveTunnelLimit(organizationId);
 
         String tunnelToken = generateSecureToken();
         String publicSlug = generateSlug();
@@ -70,6 +75,24 @@ public class TunnelService {
         log.info("Tunnel session created: id={}, slug={}, user={}, org={}",
                 session.getId(), publicSlug, userId, organizationId);
         return session;
+    }
+
+    /**
+     * The active-tunnel limit, checked where the insert happens and under the Organization's row
+     * lock.
+     *
+     * <p>The check used to run only in {@code @RequireQuota}, before this transaction began: a
+     * count with nothing held between it and the insert, so two CLIs opening at once both counted
+     * zero and both got a tunnel on a plan that allows one. Holding the lock, the second open
+     * waits for the first to commit and then counts it. The early check stays where it was — it
+     * still refuses the ordinary case without opening a transaction.
+     */
+    private void enforceActiveTunnelLimit(UUID organizationId) {
+        if (!entitlementService.isBillingEnabled()) {
+            return;
+        }
+        organizationRepository.lockById(organizationId);
+        entitlementService.checkTunnelLimit();
     }
 
     @Transactional

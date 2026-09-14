@@ -332,7 +332,7 @@ app:
   # Declared explicitly so ${app.env} resolves through a real key rather than relying on
   # Spring's relaxed binding of the bare APP_ENV environment variable. Both spellings are
   # in use — ProductionSafetyValidator reads ${APP_ENV}, SecurityConfigValidator and
-  # AuthController read ${app.env} — and AuthController picks the refresh cookie's
+  # AuthCookies read ${app.env} — and AuthCookies picks the sign-in cookies'
   # Secure/SameSite policy from it, so a resolution that silently fell back to the default
   # would downgrade cookie security in production without any startup error.
   env: ${APP_ENV:development}

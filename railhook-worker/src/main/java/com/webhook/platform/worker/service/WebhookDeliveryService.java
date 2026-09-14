@@ -34,7 +34,6 @@ public class WebhookDeliveryService {
     private final TransactionTemplate transactionTemplate;
 
     private final AtomicInteger inFlightCount = new AtomicInteger(0);
-    private volatile boolean shuttingDown = false;
 
     public WebhookDeliveryService(
             AttemptRunner attemptRunner,
@@ -49,15 +48,16 @@ public class WebhookDeliveryService {
         this.transactionTemplate = transactionTemplate;
     }
 
+    /**
+     * Only reports. By the time this runs the Kafka containers have already stopped — they stop
+     * in the lifecycle phase, before any {@code @PreDestroy} — so no new record can arrive, and
+     * the in-flight ones are drained by the executor pools after this. A record polled but not
+     * acked is redelivered from the committed offset by whichever consumer takes the partition.
+     */
     @PreDestroy
     public void onShutdown() {
-        shuttingDown = true;
-        log.info("Graceful shutdown initiated, {} in-flight deliveries (handled by Kafka container shutdown)",
+        log.info("Graceful shutdown: {} in-flight deliveries left for the executor pools to drain",
                 inFlightCount.get());
-    }
-
-    public boolean isShuttingDown() {
-        return shuttingDown;
     }
 
     public void processDelivery(DeliveryMessage message, boolean isRetry) {

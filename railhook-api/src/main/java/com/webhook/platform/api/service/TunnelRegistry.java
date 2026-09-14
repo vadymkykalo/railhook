@@ -12,8 +12,6 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
-import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.*;
 
 /**
@@ -25,13 +23,19 @@ import java.util.concurrent.*;
 @Component
 public class TunnelRegistry {
 
+    /** The error a request carries when the socket it was sent down closed before an answer came. */
+    public static final String DISCONNECTED = "tunnel_disconnected";
+
     private final ObjectMapper objectMapper;
 
     /** slug → WebSocketSession */
     private final ConcurrentHashMap<String, WebSocketSession> activeTunnels = new ConcurrentHashMap<>();
 
-    /** requestId → CompletableFuture<TunnelResponseMessage> */
-    private final ConcurrentHashMap<String, CompletableFuture<TunnelResponseMessage>> pendingRequests = new ConcurrentHashMap<>();
+    /** requestId → the request waiting for the CLI, and which socket it went down */
+    private final ConcurrentHashMap<String, Pending> pendingRequests = new ConcurrentHashMap<>();
+
+    private record Pending(String sessionId, CompletableFuture<TunnelResponseMessage> answer) {
+    }
 
     private static final int REQUEST_TIMEOUT_SECONDS = 30;
     private static final int MAX_PENDING_REQUESTS = 1000;
@@ -51,9 +55,41 @@ public class TunnelRegistry {
         log.info("Tunnel registered: slug={}, sessionId={}", slug, session.getId());
     }
 
-    public void unregister(String slug) {
-        activeTunnels.remove(slug);
-        log.info("Tunnel unregistered: slug={}", slug);
+    /**
+     * The given socket has closed. Fails every request still waiting on it, and removes the slug
+     * only while it still names this socket.
+     *
+     * <p>Both halves are about a socket, not a slug. A request sent down a closed socket has nobody
+     * left to answer it, and waiting out the timeout made the caller a 504 thirty seconds later —
+     * after the provider's own timeout, so it resent a request the local app might still receive.
+     * And a CLI that reconnects before the old socket's close callback runs, as it does across an
+     * API restart, has already put its new socket under the same slug; removing by slug alone took
+     * the live tunnel down with the dead one.
+     *
+     * @return whether the slug was removed, i.e. this socket was still the tunnel
+     */
+    public boolean unregister(String slug, WebSocketSession session) {
+        boolean removed = activeTunnels.remove(slug, session);
+        int failed = failRequestsOn(session.getId());
+        log.info("Tunnel socket closed: slug={}, sessionId={}, unregistered={}, inFlightFailed={}",
+                slug, session.getId(), removed, failed);
+        return removed;
+    }
+
+    private int failRequestsOn(String sessionId) {
+        int failed = 0;
+        for (var entry : pendingRequests.entrySet()) {
+            Pending pending = entry.getValue();
+            if (pending.sessionId().equals(sessionId) && pendingRequests.remove(entry.getKey(), pending)) {
+                pending.answer().complete(TunnelResponseMessage.builder()
+                        .requestId(entry.getKey())
+                        .statusCode(502)
+                        .error(DISCONNECTED)
+                        .build());
+                failed++;
+            }
+        }
+        return failed;
     }
 
     public boolean isActive(String slug) {
@@ -63,7 +99,8 @@ public class TunnelRegistry {
 
     /**
      * Forward an HTTP request through the tunnel and wait for the CLI's response.
-     * Returns null if the tunnel is not connected or the request times out.
+     * Returns null if the tunnel is not connected or the request times out; a response carrying
+     * {@link #DISCONNECTED} if the tunnel's socket closed while the request was waiting.
      */
     public TunnelResponseMessage forwardRequest(String slug, TunnelRequestMessage request) {
         WebSocketSession session = activeTunnels.get(slug);
@@ -79,7 +116,7 @@ public class TunnelRegistry {
 
         String requestId = request.getRequestId();
         CompletableFuture<TunnelResponseMessage> future = new CompletableFuture<>();
-        pendingRequests.put(requestId, future);
+        pendingRequests.put(requestId, new Pending(session.getId(), future));
 
         try {
             TunnelMessage message = TunnelMessage.tunnelRequest(request);
@@ -105,9 +142,9 @@ public class TunnelRegistry {
      * Called when the CLI sends back a response through WebSocket.
      */
     public void completeRequest(String requestId, TunnelResponseMessage response) {
-        CompletableFuture<TunnelResponseMessage> future = pendingRequests.remove(requestId);
-        if (future != null) {
-            future.complete(response);
+        Pending pending = pendingRequests.remove(requestId);
+        if (pending != null) {
+            pending.answer().complete(response);
         } else {
             log.warn("No pending request found for requestId={}", requestId);
         }

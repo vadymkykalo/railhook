@@ -262,16 +262,19 @@ public class IngressService {
 
     private record RequestMetadata(String requestId, String method, String path, String queryParams,
                                     String contentType, String clientIp, String userAgent,
-                                    String headersJson, String bodySha256, String body) {
+                                    String headersJson, String bodySha256, String body, byte[] bodyBytes) {
     }
 
     /**
-     * Decodes the body once, here, for the copy that is stored and shown to an operator.
+     * Decodes the body once, here, for the copy that is stored and shown to an operator, and keeps
+     * the bytes themselves whenever that copy cannot reproduce them.
      *
      * <p>Everything that has to agree with the sender byte for byte — the signature and the
-     * digest — is computed from {@code body} itself and never from this String. A body that is
-     * not valid UTF-8 is stored with replacement characters, which is a lossy record of a
-     * request that was still verified correctly; the digest beside it is over the real bytes.
+     * digest — is computed from {@code body} itself and never from this String. So is a Forward:
+     * for a body that is valid UTF-8 the text encodes back to exactly what arrived, and for any
+     * other body — another charset, binary, gzip — the bytes are stored beside it, because the
+     * text holds replacement characters. A NUL byte is valid UTF-8 but not something PostgreSQL
+     * text can hold, so such a body keeps its bytes too and its text shows the NUL replaced.
      */
     private RequestMetadata extractMetadata(byte[] body, HttpServletRequest request) {
         String requestId = UUID.randomUUID().toString();
@@ -285,9 +288,31 @@ public class IngressService {
                 ? rawUserAgent.substring(0, 512) : rawUserAgent;
         String headersJson = HeaderSanitizer.toJson(request, objectMapper);
         String bodySha256 = computeSha256(body);
-        String storedBody = body != null ? new String(body, StandardCharsets.UTF_8) : null;
+
+        String storedBody = null;
+        byte[] bodyBytes = null;
+        if (body != null) {
+            storedBody = decodeUtf8Exactly(body);
+            if (storedBody == null || storedBody.indexOf('\u0000') >= 0) {
+                bodyBytes = body;
+                storedBody = new String(body, StandardCharsets.UTF_8).replace('\u0000', '\uFFFD');
+            }
+        }
         return new RequestMetadata(requestId, method, path, queryParams, contentType, clientIp, userAgent,
-                headersJson, bodySha256, storedBody);
+                headersJson, bodySha256, storedBody, bodyBytes);
+    }
+
+    /** The body as UTF-8 text, or null when it is not valid UTF-8 and decoding would lose bytes. */
+    private static String decodeUtf8Exactly(byte[] body) {
+        try {
+            return StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                    .decode(java.nio.ByteBuffer.wrap(body))
+                    .toString();
+        } catch (java.nio.charset.CharacterCodingException e) {
+            return null;
+        }
     }
 
     private record VerificationOutcome(Boolean verified, String verificationError, String replayKey) {
@@ -385,6 +410,7 @@ public class IngressService {
                 .queryParams(meta.queryParams())
                 .headersJson(meta.headersJson())
                 .bodyRaw(meta.body())
+                .bodyBytes(meta.bodyBytes())
                 .bodySha256(meta.bodySha256())
                 .providerEventId(providerEventId)
                 .contentType(meta.contentType())

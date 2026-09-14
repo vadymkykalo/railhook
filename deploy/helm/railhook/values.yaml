@@ -158,6 +158,18 @@ worker:
     periodSeconds: 5
     timeoutSeconds: 3
     failureThreshold: 3
+
+  # A worker from a new release waits for the api to finish migrating before it validates the
+  # schema — up to 15 minutes (MigratedSchemaGate) — and a Helm upgrade rolls both Deployments at
+  # once. The liveness probe does not start until this one passes, so a worker that is waiting is
+  # not killed as hung. 96 x 10s outlasts the wait; MigratedSchemaGateTest fails if it stops.
+  startupProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: 8081
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 96
   
   hpa:
     enabled: true

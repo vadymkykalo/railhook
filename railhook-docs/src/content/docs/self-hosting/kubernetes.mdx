@@ -111,7 +111,7 @@ For production defaults (more replicas, autoscaling, disruption budgets, network
 
 | Topic | Behaviour |
 |---|---|
-| Migrations | Run inside the API pod at startup. Replicas starting together wait on a PostgreSQL advisory lock, so each migration is applied once |
+| Migrations | Run inside the API pod at startup. Replicas starting together wait on a PostgreSQL advisory lock, so each migration is applied once. A worker pod from a new release waits up to 15 minutes for them before it starts, and its startup probe allows that wait |
 | Kafka topics | Created by a post-install and post-upgrade hook job. Set `kafka.topicPartitions` and `kafka.topicReplicationFactor` |
 | Backups | `backup.enabled: true` adds a CronJob that writes `pg_dump` files to a PVC and prunes old ones |
 | Metrics | On the named `management` port (8082 for the API, 8081 for the worker), never published outside the cluster |

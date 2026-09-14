@@ -2,9 +2,7 @@ package com.webhook.platform.worker.attempt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -33,17 +31,11 @@ final class AttemptSupport {
         return rowToken == null ? claimFence == null : rowToken.equals(claimFence);
     }
 
-    /** Host, Content-Length and Transfer-Encoding belong to the transport, not to the caller. */
-    static void addCustomHeaders(WebClient.RequestBodySpec request, String customHeadersJson,
-            ObjectMapper objectMapper) {
-        Map<String, String> collected = new LinkedHashMap<>();
-        collectCustomHeaders(collected, customHeadersJson, objectMapper);
-        collected.forEach(request::header);
-    }
-
     /**
-     * The same selection, into a map the caller still owns — a store that has to record what it
-     * sent needs the headers before they disappear into the request builder.
+     * A Delivery's or Destination's custom headers, into a map the caller still owns — a store
+     * records what it sent, so it needs the headers before they disappear into the request
+     * builder. Host, Content-Length and Transfer-Encoding belong to the transport, not to the
+     * caller, and are left out.
      */
     @SuppressWarnings("unchecked")
     static void collectCustomHeaders(Map<String, String> into, String customHeadersJson,

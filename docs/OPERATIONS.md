@@ -420,6 +420,15 @@ problem is the *code* (roll the images back and carry on) or the *schema* (resto
 `./railhook upgrade` takes that backup for you and refuses to continue if it fails, because
 continuing is the only genuinely bad option at that point.
 
+**Order: the API migrates, then the worker starts.** Only the API runs Flyway; the worker starts
+with `ddl-auto: validate`. `./railhook upgrade` therefore replaces the worker after the new API is
+serving. Everywhere else — a fresh install, `./railhook start` after a tag change, a Helm upgrade
+that rolls both Deployments at once — the worker holds its own start until
+`flyway_schema_history` reaches the highest migration its build bundles (`MigratedSchemaGate`),
+logging `Waiting for the API to migrate the schema` every 30 seconds, and exits after 15 minutes.
+The chart's worker `startupProbe` covers that wait. A worker that exits with this message has an
+API of a different release, or one whose migration failed: read the API's log first.
+
 **Upgrade drill (CI):** `.github/workflows/ci.yml`'s `upgrade-smoke` job installs the last
 release tag, registers an account, creates a project and an API key, ingests an event, then
 swaps in the images built from the branch and checks the rows survived and ingest still works —

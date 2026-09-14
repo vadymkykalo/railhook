@@ -45,6 +45,13 @@ public class IncomingEvent {
     @Column(name = "body_raw", columnDefinition = "TEXT")
     private String bodyRaw;
 
+    /**
+     * The body exactly as received, set only when {@link #bodyRaw} cannot reproduce it (V077). A
+     * Forward that is not transformed sends these bytes when they are set.
+     */
+    @Column(name = "body_bytes")
+    private byte[] bodyBytes;
+
     @Column(name = "content_type", length = 255)
     private String contentType;
 

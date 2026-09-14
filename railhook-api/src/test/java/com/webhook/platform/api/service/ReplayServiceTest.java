@@ -18,6 +18,8 @@ import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.service.DeliveryDispatch;
+import com.webhook.platform.api.service.billing.EntitlementService;
+import com.webhook.platform.api.service.rules.RuleEngineService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +61,8 @@ class ReplayServiceTest {
     @Mock private SequenceGeneratorService sequenceGeneratorService;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private ApplicationEventPublisher events;
+    @Mock private RuleEngineService ruleEngineService;
+    @Mock private EntitlementService entitlementService;
 
     private ReplayService replayService;
 
@@ -69,8 +73,16 @@ class ReplayServiceTest {
     @BeforeEach
     void setUp() {
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(entitlementService.getMaxFanoutForProject(any())).thenReturn(100);
+
+        // The real matching and intake over mocked repositories: replay has to decide the way
+        // ingest does, so stubbing the decision away would test nothing.
+        SubscriptionMatchingCache matchingCache =
+                new SubscriptionMatchingCache(subscriptionRepository, new SimpleMeterRegistry());
+        EventIntake intake = new EventIntake(matchingCache, ruleEngineService, entitlementService, new ObjectMapper());
 
         replayService = new ReplayService(replaySessionRepository, eventRepository, subscriptionRepository,
+                matchingCache, intake,
                 deliveryRepository, outboxMessageRepository, projectRepository, new ObjectMapper(),
                 new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()),
                 sequenceGeneratorService, events, transactionManager, new SimpleMeterRegistry());
@@ -178,19 +190,23 @@ class ReplayServiceTest {
     }
 
     @Test
-    void estimate_withEventTypeFilter_usesFilteredCountAndSubscriptionQuery() {
+    void estimate_withEventTypeFilter_countsPatternSubscriptionsToo() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
         ReplayRequest request = ReplayRequest.builder()
                 .fromDate(Instant.now().minus(1, ChronoUnit.DAYS)).toDate(Instant.now())
                 .eventType("order.created").build();
         when(eventRepository.countForReplayWithEventType(any(), eq(projectId), any(), any(), eq("order.created")))
                 .thenReturn(3L);
-        when(subscriptionRepository.findByProjectIdAndEventTypeAndEnabledTrue(projectId, "order.created"))
-                .thenReturn(List.of(Subscription.builder().id(UUID.randomUUID()).build()));
+        when(subscriptionRepository.findByProjectIdAndEnabledTrue(projectId)).thenReturn(List.of(
+                Subscription.builder().id(UUID.randomUUID()).endpointId(UUID.randomUUID()).eventType("order.created").build(),
+                Subscription.builder().id(UUID.randomUUID()).endpointId(UUID.randomUUID()).eventType("order.*").build(),
+                Subscription.builder().id(UUID.randomUUID()).endpointId(UUID.randomUUID()).eventType("invoice.paid").build()));
 
         ReplayEstimateResponse response = replayService.estimate(projectId, request);
 
         assertThat(response.getTotalEvents()).isEqualTo(3L);
+        assertThat(response.getActiveSubscriptions()).isEqualTo(2);
+        assertThat(response.getEstimatedDeliveries()).isEqualTo(6L);
         verify(eventRepository, never()).countForReplay(any(), any(), any(), any());
     }
 
@@ -351,21 +367,30 @@ class ReplayServiceTest {
     // ─── run — full state machine ───────────────────────────────────────
 
     @Test
-    void run_noActiveSubscriptions_completesImmediatelyWithMessage() {
+    void run_nothingMatchesTheEvents_completesWithoutDeliveries() {
+        // No Subscription is no longer a reason to stop before reading events: a rule can route
+        // an Event to an endpoint no Subscription covers, and only the Event can say.
         UUID sessionId = UUID.randomUUID();
         ReplaySession session = ReplaySession.builder().id(sessionId).projectId(projectId)
                 .status(ReplaySessionStatus.PENDING)
                 .fromDate(Instant.now().minus(1, ChronoUnit.DAYS)).toDate(Instant.now())
-                .totalEvents(5).build();
+                .totalEvents(1).build();
         when(replaySessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
         when(replaySessionRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
         when(subscriptionRepository.findByProjectIdAndEnabledTrue(projectId)).thenReturn(List.of());
+        Event e1 = Event.builder().id(UUID.randomUUID()).projectId(projectId).eventType("order.created")
+                .createdAt(Instant.now()).build();
+        when(eventRepository.findByCursorForReplay(any(), eq(projectId), any(), any(), any(), any(), anyInt()))
+                .thenReturn(List.of(e1), List.of());
+        when(deliveryRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
         replayService.run(sessionId);
 
         assertThat(session.getStatus()).isEqualTo(ReplaySessionStatus.COMPLETED);
-        assertThat(session.getErrorMessage()).contains("No active subscriptions");
-        verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), any(), anyInt());
+        assertThat(session.getProcessedEvents()).isEqualTo(1);
+        assertThat(session.getDeliveriesCreated()).isZero();
+        assertThat(session.getErrors()).isZero();
     }
 
     @Test
@@ -562,8 +587,6 @@ class ReplayServiceTest {
                 .build();
         when(replaySessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
         when(replaySessionRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-        // Needs at least one active subscription — the resume lookup only runs
-        // *after* the subscriptions.isEmpty() short-circuit in executeReplay().
         when(subscriptionRepository.findByProjectIdAndEnabledTrue(projectId))
                 .thenReturn(List.of(Subscription.builder().id(UUID.randomUUID()).endpointId(UUID.randomUUID())
                         .eventType("order.created").enabled(true).build()));

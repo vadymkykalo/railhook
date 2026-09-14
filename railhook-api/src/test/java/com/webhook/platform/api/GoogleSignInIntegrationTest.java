@@ -55,6 +55,7 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
 
     private static final String CLIENT_ID = "test-client.apps.googleusercontent.com";
     private static final String STATE_COOKIE = "railhook_oauth_state";
+    private static final String HANDOFF_COOKIE = "railhook_signin_handoff";
     private static final KeyPair GOOGLE_KEYS = rsa();
     private static final Map<String, String> LAST_TOKEN_REQUEST = new ConcurrentHashMap<>();
     private static volatile String nextIdToken;
@@ -77,6 +78,9 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    /** What the browser that went through the last {@link #callback} holds. */
+    private Cookie handoffCookie;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -249,8 +253,38 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
 
         exchange(code);
         mockMvc.perform(post("/api/v1/auth/oauth/exchange").contentType(MediaType.APPLICATION_JSON)
+                        .cookie(handoffCookie)
                         .content("{\"code\":\"" + code + "\"}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void aSignInCodeOnlyWorksInTheBrowserGoogleSentBack() throws Exception {
+        // Login CSRF: someone finishes a Google sign-in of their own, stops before the dashboard
+        // spends the code, and sends the link to someone else. Opened there, it must not sign that
+        // person into the sender's account.
+        SignInStart attacker = start("/admin/projects");
+        nextIdToken = idToken(attacker.nonce(), Map.of("sub", "g-mallory", "email", "mallory@example.dev"));
+        String code = query(callback(attacker)).get("code");
+        Cookie attackersBrowser = handoffCookie;
+
+        mockMvc.perform(post("/api/v1/auth/oauth/exchange").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + code + "\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.accessToken").doesNotExist());
+
+        // A victim who went through a sign-in of their own holds a handoff cookie too, for their code.
+        SignInStart victim = start("/admin/projects");
+        nextIdToken = idToken(victim.nonce(), Map.of("sub", "g-victim", "email", "victim@example.dev"));
+        callback(victim);
+        mockMvc.perform(post("/api/v1/auth/oauth/exchange").contentType(MediaType.APPLICATION_JSON)
+                        .cookie(handoffCookie)
+                        .content("{\"code\":\"" + code + "\"}"))
+                .andExpect(status().isUnauthorized());
+
+        // The refusals did not spend the code: the browser it was issued to still signs in.
+        handoffCookie = attackersBrowser;
+        exchange(code);
     }
 
     @Test
@@ -325,7 +359,10 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
         return new SignInStart(location, query.get("state"), query.get("nonce"), cookie);
     }
 
-    /** Google's redirect back, carrying the state it was given. Returns where the API sends the browser. */
+    /**
+     * Google's redirect back, carrying the state it was given. Returns where the API sends the
+     * browser, and keeps the handoff cookie that browser now holds for {@link #exchange}.
+     */
     private String callback(SignInStart start) throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/auth/oauth/google/callback")
                         .param("code", "google-code-" + start.state()).param("state", start.state())
@@ -335,12 +372,15 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
         Cookie cleared = result.getResponse().getCookie(STATE_COOKIE);
         assertThat(cleared).as("state cookie is cleared").isNotNull();
         assertThat(cleared.getMaxAge()).isZero();
+        handoffCookie = result.getResponse().getCookie(HANDOFF_COOKIE);
         return result.getResponse().getHeader("Location");
     }
 
     private String exchange(String code) throws Exception {
+        assertThat(handoffCookie).as("handoff cookie from the callback").isNotNull();
         MvcResult result = mockMvc.perform(post("/api/v1/auth/oauth/exchange")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .cookie(handoffCookie)
                         .content("{\"code\":\"" + code + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").exists())

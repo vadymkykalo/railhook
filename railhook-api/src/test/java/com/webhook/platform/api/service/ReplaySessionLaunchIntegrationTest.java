@@ -146,7 +146,6 @@ class ReplaySessionLaunchIntegrationTest extends AbstractIntegrationTest {
         assertThat(finished.getDeliveriesCreated()).isEqualTo(2);
     }
 
-    /** No event type: a filtered replay loads only exact-type subscriptions, not the pattern. */
     private ReplayRequest replayRequest() {
         return ReplayRequest.builder()
                 .fromDate(seededAt.minusSeconds(3600))

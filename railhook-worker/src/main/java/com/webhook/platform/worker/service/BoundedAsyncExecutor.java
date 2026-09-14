@@ -101,11 +101,6 @@ public class BoundedAsyncExecutor {
                 try {
                     task.run();
                     ack.acknowledge();
-                } catch (ShutdownRejectedException e) {
-                    // Callers check shutdown on the consumer thread, where a throw reaches
-                    // the container's error handler. Rethrowing here would only escape onto a
-                    // pool thread no container ever sees, so log and do not ack.
-                    log.warn("{}: shutdown rejected, not acking: id={}", name, id);
                 } catch (Exception e) {
                     // Do not ack. With asyncAcks on, an unacked record stalls this partition
                     // until a rebalance rather than losing the work: a visible, recoverable

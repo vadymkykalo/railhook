@@ -1,19 +1,13 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.exception.NotFoundException;
-import com.webhook.platform.common.retry.RetryLadderDefaults;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
-import com.webhook.platform.api.domain.enums.DeliveryOrigin;
-import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.IdempotencyPolicy;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
-import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.billing.QuotaCounterService;
-import com.webhook.platform.api.service.rules.RuleEngineService;
 import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
 import com.webhook.platform.common.util.PayloadCompressionUtil;
 import io.micrometer.core.instrument.Counter;
@@ -37,7 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class EventIngestService {
 
     private final EventRepository eventRepository;
-    private final SubscriptionMatchingCache subscriptionMatchingCache;
+    private final EventIntake eventIntake;
     private final DeliveryRepository deliveryRepository;
     private final OutboxMessageRepository outboxMessageRepository;
     private final WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository;
@@ -53,16 +47,14 @@ public class EventIngestService {
     private final SequenceGeneratorService sequenceGeneratorService;
     private final SchemaValidationGate schemaValidationGate;
     private final ProjectRepository projectRepository;
-    private final RuleEngineService ruleEngineService;
     private final QuotaCounterService quotaCounterService;
-    private final EntitlementService entitlementService;
     private final TransactionTemplate transactionTemplate;
     private final long maxPayloadSizeBytes;
     private final int compressionThresholdBytes;
 
     public EventIngestService(
             EventRepository eventRepository,
-            SubscriptionMatchingCache subscriptionMatchingCache,
+            EventIntake eventIntake,
             DeliveryRepository deliveryRepository,
             OutboxMessageRepository outboxMessageRepository,
             WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository,
@@ -72,14 +64,12 @@ public class EventIngestService {
             SequenceGeneratorService sequenceGeneratorService,
             SchemaValidationGate schemaValidationGate,
             ProjectRepository projectRepository,
-            RuleEngineService ruleEngineService,
             QuotaCounterService quotaCounterService,
-            EntitlementService entitlementService,
             PlatformTransactionManager transactionManager,
             @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes,
             @Value("${webhook.payload-compression-threshold-bytes:1024}") int compressionThresholdBytes) {
         this.eventRepository = eventRepository;
-        this.subscriptionMatchingCache = subscriptionMatchingCache;
+        this.eventIntake = eventIntake;
         this.deliveryRepository = deliveryRepository;
         this.outboxMessageRepository = outboxMessageRepository;
         this.workflowTriggerOutboxRepository = workflowTriggerOutboxRepository;
@@ -101,9 +91,7 @@ public class EventIngestService {
         this.sequenceGeneratorService = sequenceGeneratorService;
         this.schemaValidationGate = schemaValidationGate;
         this.projectRepository = projectRepository;
-        this.ruleEngineService = ruleEngineService;
         this.quotaCounterService = quotaCounterService;
-        this.entitlementService = entitlementService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
         this.compressionThresholdBytes = compressionThresholdBytes;
@@ -230,53 +218,30 @@ public class EventIngestService {
         }
         log.info("Created event: {} for project: {}", event.getId(), projectId);
 
-        // ── Rules Engine evaluation ────────────────────────────────────
-        // A rules-engine failure degrades to "no rules matched" rather than failing an Event
-        // the caller has already been accepted: routing is an enhancement, delivery is the
-        // product.
-        List<RuleEngineService.RuleMatch> ruleMatches = List.of();
-        try {
-            JsonNode eventJson = objectMapper.readTree(event.getDecompressedPayload());
-            ruleMatches = ruleEngineService.evaluate(projectId, request.getType(), eventJson, event.getId());
-            if (!ruleMatches.isEmpty()) {
-                rulesMatchedCounter.increment(ruleMatches.size());
-            }
-        } catch (Exception e) {
-            log.warn("Rules engine evaluation failed for event {}: {} — proceeding without rules",
-                    event.getId(), e.getMessage());
-        }
-
         // ── Decide, then commit ────────────────────────────────────────
-        // Everything above this point gathers inputs; IntakePlanner turns them into a decision
-        // with no side effects of its own, and everything below carries that decision out. The
-        // routing rules used to be interleaved with their own writes, which is why none of them
-        // had a test — see IntakePlanner.
-        List<Subscription> subscriptions = subscriptionMatchingCache.findMatching(projectId, request.getType());
-        log.info("Found {} matching subscriptions for event type: {}", subscriptions.size(), request.getType());
-
-        IntakePlan plan;
+        // EventIntake gathers the rules and Subscriptions and turns them into a decision with no
+        // writes of its own; everything below carries that decision out. Replay decides through
+        // the same code, so a replayed Event goes where this one went.
+        EventIntake.Decision decision;
         try {
-            plan = IntakePlanner.plan(subscriptions, ruleMatches,
-                    entitlementService.getMaxFanoutForProject(projectId));
+            decision = eventIntake.decide(event);
         } catch (IllegalArgumentException e) {
             log.warn("Fanout limit exceeded for event type '{}' in project {}: {}",
                     request.getType(), projectId, e.getMessage());
             fanoutLimitedCounter.increment();
             throw e;
         }
+        if (decision.rulesMatched() > 0) {
+            rulesMatchedCounter.increment(decision.rulesMatched());
+        }
 
-        if (plan.dropped()) {
+        if (decision.dropped()) {
             log.info("Rule DROP action — skipping deliveries for event {}", event.getId());
             rulesDroppedCounter.increment();
             return buildResponse(event, 0, schemaWarnings);
         }
 
-        List<Delivery> deliveriesToSave = new ArrayList<>(plan.deliveries().size());
-        for (IntakePlan.PlannedDelivery planned : plan.deliveries()) {
-            deliveriesToSave.add(toDelivery(event, planned, subscriptions));
-        }
-
-        List<Delivery> savedDeliveries = deliveryRepository.saveAll(deliveriesToSave);
+        List<Delivery> savedDeliveries = deliveryRepository.saveAll(decision.deliveries());
 
         for (Delivery delivery : savedDeliveries) {
             if (Boolean.TRUE.equals(delivery.getOrderingEnabled())) {
@@ -294,7 +259,7 @@ public class EventIngestService {
         deliveriesCreatedCounter.increment(deliveriesCreated);
 
         log.info("Created {} deliveries for event: {} (rules matched: {})",
-                deliveriesCreated, event.getId(), ruleMatches.size());
+                deliveriesCreated, event.getId(), decision.rulesMatched());
 
         // ── Workflow trigger outbox — durable, same TX as event + deliveries ──
         int depth = WorkflowTriggerService.getCurrentDepth() + 1;
@@ -336,58 +301,6 @@ public class EventIngestService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to serialize event payload", e);
         }
-    }
-
-    /**
-     * Turns one {@link IntakePlan.PlannedDelivery} into a row. The plan already resolved which
-     * transformation applies and whether the endpoint was reached twice; what is left here is
-     * inheriting retry settings from the Subscription, which a rule ROUTE has none of.
-     */
-    private Delivery toDelivery(Event event, IntakePlan.PlannedDelivery planned,
-            List<Subscription> subscriptions) {
-        Subscription subscription = planned.subscriptionId() == null ? null
-                : subscriptions.stream()
-                        .filter(sub -> sub.getId().equals(planned.subscriptionId()))
-                        .findFirst()
-                        .orElse(null);
-
-        String suffix = subscription != null ? "-" + planned.endpointId() : "-rule-" + planned.endpointId();
-        String deliveryIdempotencyKey = event.getIdempotencyKey() != null
-                ? event.getIdempotencyKey() + suffix
-                : null;
-
-        Delivery.DeliveryBuilder builder = Delivery.builder()
-                .eventId(event.getId())
-                .endpointId(planned.endpointId())
-                .subscriptionId(planned.subscriptionId())
-                .status(DeliveryStatus.PENDING)
-                .attemptCount(0)
-                // Ordering-enabled deliveries are saved without a sequence number here — it is
-                // generated and backfilled only after this transaction commits, see
-                // assignSequenceNumbersPostCommit. The worker enforces ordering only once both
-                // orderingEnabled and sequenceNumber are set, so a Delivery is simply delivered
-                // unordered in the narrow window before that backfill lands.
-                .sequenceNumber(null)
-                .orderingEnabled(planned.orderingEnabled())
-                .transformationId(planned.transformationId())
-                .idempotencyKey(deliveryIdempotencyKey);
-
-        if (subscription != null) {
-            builder.maxAttempts(subscription.getMaxAttempts() != null ? subscription.getMaxAttempts()
-                            : RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS)
-                    .timeoutSeconds(subscription.getTimeoutSeconds() != null ? subscription.getTimeoutSeconds() : 30)
-                    .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays()
-                            : RetryLadderDefaults.OUTGOING_DELAYS)
-                    .payloadTemplate(subscription.getPayloadTemplate())
-                    .customHeaders(subscription.getCustomHeaders());
-        } else {
-            builder.deliveryOrigin(DeliveryOrigin.RULE)
-                    .maxAttempts(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS)
-                    .timeoutSeconds(30)
-                    .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS);
-        }
-
-        return builder.build();
     }
 
     private EventIngestResponse buildResponse(Event event, int deliveriesCreated) {

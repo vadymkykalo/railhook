@@ -2,18 +2,18 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.SignInProvidersResponse;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.security.AuthCookies;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
+import com.webhook.platform.api.service.ExternalSignInService;
 import com.webhook.platform.api.service.signin.GoogleSignInService;
 import com.webhook.platform.api.service.signin.OAuthStateCodec;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,21 +34,19 @@ import org.springframework.web.server.ResponseStatusException;
 @Tag(name = "Authentication", description = "User registration and login")
 public class GoogleSignInController {
 
-    private static final String STATE_COOKIE_PATH = "/api/v1/auth/oauth/google";
-
     private final GoogleSignInService googleSignInService;
     private final AuthRateLimiterService authRateLimiterService;
     private final TrustedProxyResolver trustedProxyResolver;
-    private final boolean isProduction;
+    private final AuthCookies authCookies;
 
     public GoogleSignInController(GoogleSignInService googleSignInService,
                                   AuthRateLimiterService authRateLimiterService,
                                   TrustedProxyResolver trustedProxyResolver,
-                                  @Value("${app.env:development}") String appEnv) {
+                                  AuthCookies authCookies) {
         this.googleSignInService = googleSignInService;
         this.authRateLimiterService = authRateLimiterService;
         this.trustedProxyResolver = trustedProxyResolver;
-        this.isProduction = "production".equalsIgnoreCase(appEnv);
+        this.authCookies = authCookies;
     }
 
     @Operation(summary = "List sign-in providers",
@@ -80,7 +78,8 @@ public class GoogleSignInController {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
         GoogleSignInService.Start start = googleSignInService.start(intent, returnTo);
-        response.addCookie(stateCookie(start.stateCookie(), (int) OAuthStateCodec.LIFETIME.toSeconds()));
+        response.addHeader(HttpHeaders.SET_COOKIE,
+                authCookies.signInState(start.stateCookie(), OAuthStateCodec.LIFETIME).toString());
         return ResponseEntity.status(HttpStatus.FOUND).header(HttpHeaders.LOCATION, start.authorizationUrl()).build();
     }
 
@@ -98,7 +97,7 @@ public class GoogleSignInController {
             @RequestParam(value = "code", required = false) String code,
             @RequestParam(value = "state", required = false) String state,
             @RequestParam(value = "error", required = false) String error,
-            @CookieValue(value = GoogleSignInService.STATE_COOKIE, required = false) String stateCookie,
+            @CookieValue(value = AuthCookies.SIGN_IN_STATE, required = false) String stateCookie,
             HttpServletRequest request,
             HttpServletResponse response) {
         requireEnabled();
@@ -106,29 +105,19 @@ public class GoogleSignInController {
                 state == null ? "google-callback" : state)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
-        String location = googleSignInService.complete(code, state, error, stateCookie);
+        GoogleSignInService.Completion completion = googleSignInService.complete(code, state, error, stateCookie);
         // Spent either way: a state is good for one callback.
-        response.addCookie(stateCookie("", 0));
-        return ResponseEntity.status(HttpStatus.FOUND).header(HttpHeaders.LOCATION, location).build();
+        response.addHeader(HttpHeaders.SET_COOKIE, authCookies.clearedSignInState().toString());
+        if (completion.browserBinding() != null) {
+            response.addHeader(HttpHeaders.SET_COOKIE, authCookies.signInHandoff(
+                    completion.browserBinding(), ExternalSignInService.handoffLifetime()).toString());
+        }
+        return ResponseEntity.status(HttpStatus.FOUND).header(HttpHeaders.LOCATION, completion.location()).build();
     }
 
     private void requireEnabled() {
         if (!googleSignInService.isEnabled()) {
             throw new NotFoundException("Google sign-in is not configured on this deployment");
         }
-    }
-
-    /**
-     * SameSite=Lax in every environment: Google's redirect back is a cross-site top-level
-     * navigation, which is exactly the request Lax still sends the cookie on and Strict does not.
-     */
-    private Cookie stateCookie(String value, int maxAgeSeconds) {
-        Cookie cookie = new Cookie(GoogleSignInService.STATE_COOKIE, value);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(isProduction);
-        cookie.setPath(STATE_COOKIE_PATH);
-        cookie.setMaxAge(maxAgeSeconds);
-        cookie.setAttribute("SameSite", "Lax");
-        return cookie;
     }
 }

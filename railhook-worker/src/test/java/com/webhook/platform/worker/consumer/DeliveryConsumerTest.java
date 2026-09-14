@@ -1,8 +1,11 @@
 package com.webhook.platform.worker.consumer;
 
 import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.worker.attempt.AttemptRunner;
+import com.webhook.platform.worker.attempt.DeliveryAttemptMetrics;
+import com.webhook.platform.worker.attempt.OutgoingAttemptStoreFactory;
+import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import com.webhook.platform.worker.service.BoundedAsyncExecutor;
-import com.webhook.platform.worker.service.ShutdownRejectedException;
 import com.webhook.platform.worker.service.WebhookDeliveryService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
@@ -10,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.support.Acknowledgment;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -39,21 +43,7 @@ class DeliveryConsumerTest {
     }
 
     @Test
-    void consumeDispatch_shouldThrowBeforeAcking_whenShuttingDown() {
-        when(webhookDeliveryService.isShuttingDown()).thenReturn(true);
-        DeliveryMessage message = dispatchMessage();
-        Acknowledgment ack = mock(Acknowledgment.class);
-
-        assertThrows(ShutdownRejectedException.class,
-                () -> consumer.consumeDispatch(message, "key", "deliveries.dispatch", null, ack));
-
-        verify(ack, never()).acknowledge();
-        verify(webhookDeliveryService, never()).processDelivery(any(), anyBoolean());
-    }
-
-    @Test
     void consumeDispatch_shouldSubmitNormally_whenNotShuttingDown() throws Exception {
-        when(webhookDeliveryService.isShuttingDown()).thenReturn(false);
         DeliveryMessage message = dispatchMessage();
         Acknowledgment ack = mock(Acknowledgment.class);
 
@@ -64,17 +54,35 @@ class DeliveryConsumerTest {
         verify(ack).acknowledge();
     }
 
+    /**
+     * A record the listener still receives while the worker stops is an ordinary record. The
+     * shutdown flag used to turn it into a not-retryable exception, which the error handler sends
+     * straight to the dead-letter topic — a topic nothing consumes — while the Delivery waited an
+     * hour for the stranded-PENDING sweep.
+     */
     @Test
-    void consumeRetry_shouldThrowBeforeAcking_whenShuttingDown() {
-        when(webhookDeliveryService.isShuttingDown()).thenReturn(true);
-        DeliveryMessage message = dispatchMessage();
-        Acknowledgment ack = mock(Acknowledgment.class);
+    void aRecordArrivingWhileTheWorkerStops_isDelivered_notSentToTheDeadLetterTopic() {
+        AttemptRunner runner = mock(AttemptRunner.class);
+        WebhookDeliveryService stopping = new WebhookDeliveryService(
+                runner, mock(OutgoingAttemptStoreFactory.class), mock(DeliveryAttemptMetrics.class),
+                mock(DeliveryRepository.class), mock(TransactionTemplate.class));
+        stopping.onShutdown();
+        DeliveryConsumer consumerOfAStoppingWorker =
+                new DeliveryConsumer(stopping, asyncExecutor, mock(KafkaListenerEndpointRegistry.class));
 
-        assertThrows(ShutdownRejectedException.class,
-                () -> consumer.consumeRetry(message, "key", "deliveries.retry.1m", null, ack));
+        DeliveryMessage dispatch = dispatchMessage();
+        Acknowledgment dispatchAck = mock(Acknowledgment.class);
+        assertDoesNotThrow(() -> consumerOfAStoppingWorker.consumeDispatch(
+                dispatch, "key", "deliveries.dispatch", null, dispatchAck));
 
-        verify(ack, never()).acknowledge();
-        verify(webhookDeliveryService, never()).processDelivery(any(), anyBoolean());
+        DeliveryMessage retry = dispatchMessage();
+        Acknowledgment retryAck = mock(Acknowledgment.class);
+        assertDoesNotThrow(() -> consumerOfAStoppingWorker.consumeRetry(
+                retry, "key", "deliveries.retry.1m", null, retryAck));
+
+        verify(dispatchAck, timeout(5000)).acknowledge();
+        verify(retryAck, timeout(5000)).acknowledge();
+        verify(runner, timeout(5000).times(2)).run(any(), any());
     }
 
     @Test
@@ -83,7 +91,6 @@ class DeliveryConsumerTest {
         // rejected record must be explicitly rescheduled and acked, not left unacked.
         fillExecutorPool();
 
-        when(webhookDeliveryService.isShuttingDown()).thenReturn(false);
         DeliveryMessage message = dispatchMessage();
         Acknowledgment ack = mock(Acknowledgment.class);
 
@@ -98,7 +105,6 @@ class DeliveryConsumerTest {
     void consumeRetry_shouldRescheduleAndAck_whenExecutorFull() throws Exception {
         fillExecutorPool();
 
-        when(webhookDeliveryService.isShuttingDown()).thenReturn(false);
         DeliveryMessage message = dispatchMessage();
         Acknowledgment ack = mock(Acknowledgment.class);
 
