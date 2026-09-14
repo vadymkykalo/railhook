@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   endpoint, and a `TRANSFORM` rule replaces the subscription's transformation. An event over the
   fan-out limit is replayed nowhere and counts as a session error. The estimate counts pattern
   subscriptions but does not apply rules.
+- **A destination or endpoint answering 3xx or 4xx lands in Failed Messages.** Both outgoing
+  deliveries and incoming forwards used to end as failed, where nothing offers a retry, so a 401
+  after a token rotation or a 404 during a deploy could only be recovered by a replay. They now go
+  straight to Failed Messages without using the rest of the retry ladder, ready to retry once the
+  credentials or URL are fixed, and dead-letter alerts count them.
 
 ### Fixed
 
@@ -30,7 +35,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Delivery attempts show every header that was sent.** The request headers recorded for an
   outgoing attempt now include `X-Sequence-Number`, `Idempotency-Key` and your custom headers
   (secrets masked), as they already appeared on the wire.
-<!-- incoming -->
+- **Forwards carry exactly what the provider sent.** Bodies that are not UTF-8 (other charsets,
+  binary, gzip) reach the destination byte for byte with their `Content-Encoding`, and a body
+  containing a NUL byte is accepted instead of answered `500`.
+- **A GitLab resend is no longer forwarded twice.** Railhook reads GitLab's delivery id
+  (`webhook-id`, or `Idempotency-Key` from GitLab 17.4), so a retry or a manual Resend is answered
+  with the stored event.
+- **A dropped tunnel fails its requests at once, and the tunnel limit holds.** A request in flight
+  when the CLI disconnects is answered `502` immediately instead of `504` after 30 seconds, a quick
+  reconnect keeps its tunnel, and concurrent opens can no longer exceed the plan's active-tunnel
+  limit.
+- **An over-quota ingress refusal says when to retry.** The `429` for an organization that cannot
+  accept more webhooks now carries `Retry-After: 3600`.
+- **A Redis hiccup no longer rejects verified webhooks.** When replay detection cannot reach Redis,
+  a webhook whose signature verified is accepted instead of answered `500`, and
+  `incoming_replay_check_unavailable_total` counts each one.
 - **Daily usage counts include deliveries that were still retrying at midnight.** Each night the
   last five days are recounted until their deliveries settle, and a project missed on one night
   is caught up on the next.
