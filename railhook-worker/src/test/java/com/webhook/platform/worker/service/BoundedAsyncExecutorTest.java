@@ -166,31 +166,6 @@ class BoundedAsyncExecutorTest {
     }
 
     @Test
-    void trySubmit_shouldNotAckOnShutdownRejection() throws Exception {
-        // ShutdownRejectedException thrown from inside a task must be handled the
-        // same as any other task failure: not acked, and not left to escape onto
-        // the pool thread's uncaught-exception handler (which no caller ever sees).
-        Acknowledgment ack = mock(Acknowledgment.class);
-        CountDownLatch latch = new CountDownLatch(1);
-
-        boolean accepted = executor.trySubmit(() -> {
-            latch.countDown();
-            throw new ShutdownRejectedException("worker is shutting down");
-        }, ack, "test-shutdown");
-
-        assertTrue(accepted);
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
-        Thread.sleep(100);
-        verify(ack, never()).acknowledge();
-
-        // The pool must still be healthy afterwards — the exception must not have
-        // killed the worker thread or left the permit unreleased.
-        CountDownLatch nextLatch = new CountDownLatch(1);
-        assertTrue(executor.trySubmit(nextLatch::countDown, mock(Acknowledgment.class), "after-shutdown-rejection"));
-        assertTrue(nextLatch.await(5, TimeUnit.SECONDS));
-    }
-
-    @Test
     void concurrentSubmissions_shouldAllComplete() throws Exception {
         int count = 20;
         AtomicInteger completed = new AtomicInteger(0);

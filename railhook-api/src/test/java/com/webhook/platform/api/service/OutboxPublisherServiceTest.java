@@ -313,6 +313,43 @@ class OutboxPublisherServiceTest {
         verify(outboxMessageRepository, never()).recoverStuckSendingMessages(any(Instant.class));
     }
 
+    @Test
+    void cleanupOldMessages_keepsDeletingUntilTheBacklogIsGone() {
+        // One capped delete an hour was at most 120k PUBLISHED rows a day. An installation
+        // publishing more than that grew the table without bound: each run took its 5000 and
+        // left the rest for an hour later, which never caught up.
+        when(outboxMessageRepository.deleteOldPublishedMessages(eq("PUBLISHED"), any(Instant.class), anyInt()))
+                .thenReturn(5000, 5000, 5000, 120);
+        when(outboxMessageRepository.deleteOldPublishedMessages(eq("DEAD"), any(Instant.class), anyInt()))
+                .thenReturn(1000, 7);
+        when(outboxMessageRepository.countByStatus(any())).thenReturn(0L);
+
+        service.cleanupOldMessages();
+
+        verify(outboxMessageRepository, times(4))
+                .deleteOldPublishedMessages(eq("PUBLISHED"), any(Instant.class), eq(5000));
+        verify(outboxMessageRepository, times(2))
+                .deleteOldPublishedMessages(eq("DEAD"), any(Instant.class), eq(1000));
+        // Each batch commits on its own, so a long run holds no lock on rows it already deleted.
+        verify(txManager, atLeast(6)).commit(any());
+    }
+
+    @Test
+    void cleanupOldMessages_stopsAtItsBatchBudget_andLeavesTheRestForTheNextRun() {
+        // A backlog of millions must not hold the ShedLock past lockAtMostFor: another
+        // instance would then start deleting the same rows beside it.
+        when(outboxMessageRepository.deleteOldPublishedMessages(anyString(), any(Instant.class), anyInt()))
+                .thenAnswer(inv -> inv.getArgument(2));
+        when(outboxMessageRepository.countByStatus(any())).thenReturn(0L);
+
+        service.cleanupOldMessages();
+
+        verify(outboxMessageRepository, times(OutboxPublisherService.CLEANUP_MAX_BATCHES))
+                .deleteOldPublishedMessages(eq("PUBLISHED"), any(Instant.class), anyInt());
+        verify(outboxMessageRepository, times(OutboxPublisherService.CLEANUP_MAX_BATCHES))
+                .deleteOldPublishedMessages(eq("DEAD"), any(Instant.class), anyInt());
+    }
+
     private OutboxMessage createTestMessage() {
         OutboxMessage message = new OutboxMessage();
         message.setId(UUID.randomUUID());

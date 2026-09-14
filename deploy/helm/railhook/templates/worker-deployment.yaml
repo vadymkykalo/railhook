@@ -84,6 +84,10 @@ spec:
               value: {{ include "railhook.worker.managementPort" . | quote }}
             - name: MANAGEMENT_ADDRESS
               value: "0.0.0.0"
+          {{- with .Values.worker.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           livenessProbe:
             {{- toYaml .Values.worker.livenessProbe | nindent 12 }}
           readinessProbe:

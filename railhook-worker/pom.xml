@@ -245,6 +245,38 @@
                     </execution>
                 </executions>
             </plugin>
+            <!--
+              The API's migration files, bundled so the worker knows the schema version it was
+              built for (MigratedSchemaGate reads only their names). Copied at build time from the
+              module that owns them, so a new migration cannot be forgotten here. The Docker build
+              copies the whole reactor, so railhook-api's sources are present there too.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>bundle-expected-migrations</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/db/expected-migrations</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/../railhook-api/src/main/resources/db/migration</directory>
+                                    <includes>
+                                        <include>V*__*.sql</include>
+                                    </includes>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <!-- See railhook-api/pom.xml for why this was bumped. -->

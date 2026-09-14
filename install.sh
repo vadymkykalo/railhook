@@ -1103,12 +1103,11 @@ case "${1:-help}" in
 
         compose pull
 
-        # Everything except the API first, one service per call. All of them in a single
+        # The infrastructure and the UI first, one service per call. All of them in a single
         # `up` left the UI stopped while Compose worked through the rest — about 45 seconds
         # of 502 on the 2.17.0 deploy, longer than Caddy's retry window. On its own, with the
         # image already pulled, the UI swap is a couple of seconds and Caddy's retry covers
-        # it. The worker goes last: invisible to a customer while it restarts, since a
-        # Delivery is durable in Postgres and Kafka and comes back to the ladder.
+        # it.
         #
         # Only services the active profiles enable. Naming one on the command line switches
         # its profile on, so an install without a domain would start Caddy, and one on an
@@ -1118,10 +1117,18 @@ case "${1:-help}" in
             printf '%s\n' "$active" | grep -qx "$1" || return 0
             compose up -d --no-deps "$1" || { echo "Could not start $1 — see ./railhook logs $1" >&2; exit 1; }
         }
-        for svc in postgres kafka redis ui caddy worker; do up_one "$svc"; done
+        for svc in postgres kafka redis ui caddy; do up_one "$svc"; done
 
-        # The API is the one a customer notices, because it is what accepts webhooks.
-        roll_api
+        # The API is the one a customer notices, because it is what accepts webhooks. It is
+        # also the only service that runs migrations, so it goes before the worker.
+        roll_api || { echo "The API did not come up; the worker was left on the release it was running." >&2; exit 1; }
+
+        # The worker last, once the new API has migrated. A new worker started before that
+        # validates its entities against the old schema and exits ("Schema validation: missing
+        # column") — which is what the 2.20.7 deploy did while this loop still started it
+        # first. Invisible to a customer while it restarts: a Delivery is durable in Postgres
+        # and Kafka and comes back to the ladder.
+        up_one worker
 
         # Only where someone turned monitoring on. Its failure is not the upgrade's.
         if [ -f monitoring/docker-compose.yml ] && [ -n "${git_ref:-}" ]; then
