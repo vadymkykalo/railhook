@@ -92,19 +92,28 @@ public class PiiMaskingService {
 
     @Transactional
     public void seedDefaultRules(UUID projectId) {
+        seedDefaultRules(projectId, null);
+    }
+
+    /**
+     * The organization is given explicitly for a project created outside a tenant scope (the first
+     * project of an account made by Google sign-in); inside one, null lets Hibernate stamp it.
+     */
+    @Transactional
+    public void seedDefaultRules(UUID projectId, UUID organizationId) {
         if (!ruleRepository.findByProjectId(projectId).isEmpty()) {
             return;
         }
 
         List<PiiMaskingRule> defaults = List.of(
                 PiiMaskingRule.builder()
-                        .projectId(projectId).ruleType(RuleType.BUILTIN)
+                        .projectId(projectId).organizationId(organizationId).ruleType(RuleType.BUILTIN)
                         .patternName("email").maskStyle(MaskStyle.PARTIAL).enabled(true).build(),
                 PiiMaskingRule.builder()
-                        .projectId(projectId).ruleType(RuleType.BUILTIN)
+                        .projectId(projectId).organizationId(organizationId).ruleType(RuleType.BUILTIN)
                         .patternName("phone").maskStyle(MaskStyle.PARTIAL).enabled(true).build(),
                 PiiMaskingRule.builder()
-                        .projectId(projectId).ruleType(RuleType.BUILTIN)
+                        .projectId(projectId).organizationId(organizationId).ruleType(RuleType.BUILTIN)
                         .patternName("card").maskStyle(MaskStyle.PARTIAL).enabled(true).build()
         );
         ruleRepository.saveAll(defaults);

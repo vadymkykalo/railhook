@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the provider's own verification (`PROVIDER`), or `HMAC_GENERIC` for a generic source. A source
   created without a secret, and any mode set explicitly, are unchanged. The dashboard always sent a
   mode and was not affected.
+- **Every new project masks email, phone and card numbers from the start.** The docs said so; the
+  code created projects with no masking rules at all, so customer email addresses showed in full on
+  every event and delivery in the dashboard until someone found the seed button. New projects now
+  get the three built-in rules. Existing projects keep what they have — add the defaults from the
+  project's PII rules page.
 ## [2.20.2] - 2026-09-14
 
 ### Fixed

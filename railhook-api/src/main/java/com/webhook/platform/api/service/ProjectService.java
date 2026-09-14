@@ -24,9 +24,11 @@ import java.util.stream.Collectors;
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
+    private final PiiMaskingService piiMaskingService;
 
-    public ProjectService(ProjectRepository projectRepository) {
+    public ProjectService(ProjectRepository projectRepository, PiiMaskingService piiMaskingService) {
         this.projectRepository = projectRepository;
+        this.piiMaskingService = piiMaskingService;
     }
 
     /** What a brand-new organization's first project is called until its owner renames it. */
@@ -54,11 +56,15 @@ public class ProjectService {
     }
 
     private Project save(UUID owningOrganization, String name, String description) {
-        return projectRepository.saveAndFlush(Project.builder()
+        Project project = projectRepository.saveAndFlush(Project.builder()
                 .name(name)
                 .organizationId(owningOrganization)
                 .description(description)
                 .build());
+        // Every project starts masking email, phone and card numbers in the dashboard, as the docs
+        // promise; a project with no rules showed customer addresses in full.
+        piiMaskingService.seedDefaultRules(project.getId(), owningOrganization);
+        return project;
     }
 
     public ProjectResponse getProject(UUID id) {
