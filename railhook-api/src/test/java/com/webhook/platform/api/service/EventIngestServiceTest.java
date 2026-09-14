@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Event;
 import com.webhook.platform.api.domain.entity.Project;
+import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Subscription;
 import com.webhook.platform.api.domain.repository.*;
@@ -78,6 +79,9 @@ class EventIngestServiceTest {
         when(entitlementService.getMaxFanoutForProject(any())).thenReturn(5);
 
         when(subscriptionMatchingCache.findMatching(any(), any())).thenReturn(List.of());
+        // The project is found in the caller's organization unless a test says otherwise.
+        when(projectRepository.findById(any())).thenReturn(Optional.of(
+                Project.builder().id(projectId).organizationId(UUID.randomUUID()).name("p").build()));
 
         service = new EventIngestService(
                 eventRepository, subscriptionMatchingCache,
@@ -108,6 +112,22 @@ class EventIngestServiceTest {
                 .payload("{\"key\":\"value\"}")
                 .createdAt(Instant.now())
                 .build();
+    }
+
+    /**
+     * A project the caller's organization cannot see is refused, not written to. The lookup is
+     * tenant-scoped, and the ingest used to carry on past an empty result: a workflow's createEvent
+     * node naming another organization's project stored an Event there and delivered it to that
+     * organization's endpoints.
+     */
+    @Test
+    void ingestEvent_projectNotInTheCallersOrganization_isRefused() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
+        stubTransactionTemplate();
+
+        assertThatThrownBy(() -> service.ingestEvent(projectId, buildRequest("order.created"), null))
+                .isInstanceOf(NotFoundException.class);
+        verify(eventRepository, never()).saveAndFlush(any(Event.class));
     }
 
     @Test

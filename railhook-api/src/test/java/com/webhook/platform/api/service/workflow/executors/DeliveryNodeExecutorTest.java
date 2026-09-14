@@ -4,14 +4,19 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Endpoint;
+import com.webhook.platform.api.domain.entity.Event;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
+import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
+import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.service.workflow.StepResult;
 import com.webhook.platform.api.service.DeliveryDispatch;
+import com.webhook.platform.api.service.billing.EntitlementService;
+import com.webhook.platform.api.service.billing.QuotaCounterService;
 import com.webhook.platform.common.constants.KafkaTopics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,6 +46,12 @@ class DeliveryNodeExecutorTest {
     private DeliveryRepository deliveryRepository;
     @Mock
     private OutboxMessageRepository outboxMessageRepository;
+    @Mock
+    private EventRepository eventRepository;
+    @Mock
+    private EntitlementService entitlementService;
+    @Mock
+    private QuotaCounterService quotaCounterService;
 
     private final ObjectMapper mapper = new ObjectMapper();
     private DeliveryNodeExecutor executor;
@@ -50,8 +61,14 @@ class DeliveryNodeExecutorTest {
     void setUp() {
         transactionManager = mock(PlatformTransactionManager.class);
         lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
-        executor = new DeliveryNodeExecutor(endpointRepository, deliveryRepository, mapper,
-                new DeliveryDispatch(outboxMessageRepository, mapper), transactionManager);
+        lenient().when(eventRepository.saveAndFlush(any(Event.class))).thenAnswer(inv -> {
+            Event e = inv.getArgument(0);
+            e.setId(UUID.randomUUID());
+            return e;
+        });
+        executor = new DeliveryNodeExecutor(endpointRepository, deliveryRepository, eventRepository,
+                entitlementService, quotaCounterService, mapper,
+                new DeliveryDispatch(outboxMessageRepository, mapper), transactionManager, 262144L, 1024);
     }
 
     private JsonNode json(String raw) throws Exception {
@@ -69,7 +86,7 @@ class DeliveryNodeExecutorTest {
 
         assertThat(result.status()).isEqualTo(StepStatus.FAILED);
         assertThat(result.errorMessage()).contains("endpointId is required");
-        verifyNoInteractions(endpointRepository, deliveryRepository, outboxMessageRepository);
+        verifyNoInteractions(endpointRepository, deliveryRepository, outboxMessageRepository, eventRepository);
     }
 
     @Test
@@ -112,11 +129,17 @@ class DeliveryNodeExecutorTest {
         StepResult result = executor.execute(json("{\"endpointId\":\"" + endpointId + "\"}"), json("{}"));
 
         assertThat(result.status()).isEqualTo(StepStatus.SKIPPED);
-        verifyNoInteractions(deliveryRepository, outboxMessageRepository);
+        verifyNoInteractions(deliveryRepository, outboxMessageRepository, eventRepository);
     }
 
+    /**
+     * A Delivery points at an Event, and the worker sends that Event's payload. The node took the
+     * Event from {@code _eventId} in its input, which nothing on the server set — so every delivery
+     * node failed on the NOT NULL column, seen on production. The node now records its own input as
+     * an Event in the endpoint's project and delivers that.
+     */
     @Test
-    void enabledEndpoint_createsDeliveryAndOutboxMessage() throws Exception {
+    void enabledEndpoint_deliversItsInputAsAnEventInTheEndpointsProject() throws Exception {
         UUID endpointId = UUID.randomUUID();
         UUID projectId = UUID.randomUUID();
         Endpoint endpoint = Endpoint.builder()
@@ -130,7 +153,7 @@ class DeliveryNodeExecutorTest {
             return d;
         });
 
-        JsonNode input = json("{}");
+        JsonNode input = json("{\"order\":\"A-1\",\"amount\":42}");
         StepResult result = executor.execute(json("{\"endpointId\":\"" + endpointId + "\"}"), input);
 
         assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
@@ -139,12 +162,18 @@ class DeliveryNodeExecutorTest {
         assertThat(result.output().get("endpointUrl").asText()).isEqualTo("https://example.com/hook");
         assertThat(result.output().get("status").asText()).isEqualTo("PENDING");
 
+        ArgumentCaptor<Event> eventCaptor = ArgumentCaptor.forClass(Event.class);
+        verify(eventRepository).saveAndFlush(eventCaptor.capture());
+        Event savedEvent = eventCaptor.getValue();
+        assertThat(savedEvent.getProjectId()).isEqualTo(projectId);
+        assertThat(savedEvent.getPayload()).contains("A-1");
+
         ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(deliveryCaptor.capture());
         Delivery savedDelivery = deliveryCaptor.getValue();
         assertThat(savedDelivery.getEndpointId()).isEqualTo(endpointId);
         assertThat(savedDelivery.getStatus()).isEqualTo(DeliveryStatus.PENDING);
-        assertThat(savedDelivery.getEventId()).isNull();
+        assertThat(savedDelivery.getEventId()).isEqualTo(savedEvent.getId());
 
         ArgumentCaptor<OutboxMessage> outboxCaptor = ArgumentCaptor.forClass(OutboxMessage.class);
         verify(outboxMessageRepository).save(outboxCaptor.capture());
@@ -154,10 +183,15 @@ class DeliveryNodeExecutorTest {
         assertThat(outbox.getProjectId()).isEqualTo(projectId);
     }
 
+    /**
+     * {@code _eventId} came from the workflow's input, which a customer controls. Delivered as is, it
+     * pointed the Delivery at any organization's Event, and the worker — which loads Events without a
+     * tenant filter — would have sent that payload to the caller's endpoint.
+     */
     @Test
-    void input_withEventId_isForwardedToDelivery() throws Exception {
+    void input_withEventId_isIgnored() throws Exception {
         UUID endpointId = UUID.randomUUID();
-        UUID eventId = UUID.randomUUID();
+        UUID someoneElsesEvent = UUID.randomUUID();
         Endpoint endpoint = Endpoint.builder().id(endpointId).projectId(UUID.randomUUID())
                 .url("https://example.com/hook").enabled(true).build();
         when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
@@ -167,12 +201,27 @@ class DeliveryNodeExecutorTest {
             return d;
         });
 
-        JsonNode input = json("{\"_eventId\":\"" + eventId + "\"}");
+        JsonNode input = json("{\"_eventId\":\"" + someoneElsesEvent + "\"}");
         executor.execute(json("{\"endpointId\":\"" + endpointId + "\"}"), input);
 
         ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(deliveryCaptor.capture());
-        assertThat(deliveryCaptor.getValue().getEventId()).isEqualTo(eventId);
+        assertThat(deliveryCaptor.getValue().getEventId()).isNotNull().isNotEqualTo(someoneElsesEvent);
+    }
+
+    /** The Event the node records is charged like any other, so it is checked like any other. */
+    @Test
+    void overQuota_failsBeforeWritingAnything() throws Exception {
+        UUID endpointId = UUID.randomUUID();
+        Endpoint endpoint = Endpoint.builder().id(endpointId).projectId(UUID.randomUUID())
+                .url("https://example.com/hook").enabled(true).build();
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        doThrow(new QuotaExceededException("events", 10000, 10000, "free")).when(entitlementService).checkEventQuota();
+
+        StepResult result = executor.execute(json("{\"endpointId\":\"" + endpointId + "\"}"), json("{}"));
+
+        assertThat(result.status()).isEqualTo(StepStatus.FAILED);
+        verifyNoInteractions(eventRepository, deliveryRepository, outboxMessageRepository);
     }
 
     @Test

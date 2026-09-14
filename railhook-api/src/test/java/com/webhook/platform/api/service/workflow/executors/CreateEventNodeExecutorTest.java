@@ -28,12 +28,33 @@ class CreateEventNodeExecutorTest {
     @Mock
     private EventIngestService eventIngestService;
 
+    @Mock
+    private com.webhook.platform.api.service.billing.EntitlementService entitlementService;
+
     private final ObjectMapper mapper = new ObjectMapper();
     private CreateEventNodeExecutor executor;
 
     @BeforeEach
     void setUp() {
-        executor = new CreateEventNodeExecutor(eventIngestService, mapper);
+        executor = new CreateEventNodeExecutor(eventIngestService, entitlementService, mapper);
+    }
+
+    /**
+     * An Event a workflow creates is an Event the organization is charged for, and it was charged
+     * without ever being checked: a workflow — up to three deep — could create events past the
+     * month's quota that the API would have refused.
+     */
+    @Test
+    void overQuota_failsWithoutCreatingTheEvent() throws Exception {
+        org.mockito.Mockito.doThrow(new com.webhook.platform.api.exception.QuotaExceededException(
+                        "events", 10000, 10000, "free"))
+                .when(entitlementService).checkEventQuota();
+
+        StepResult result = executor.execute(
+                json("{\"projectId\":\"" + UUID.randomUUID() + "\",\"eventType\":\"order.created\"}"), json("{}"));
+
+        assertThat(result.status()).isEqualTo(StepStatus.FAILED);
+        verifyNoInteractions(eventIngestService);
     }
 
     private JsonNode json(String raw) throws Exception {
