@@ -70,7 +70,9 @@ class TunnelFlowIntegrationTest {
         tunnelSessionRepository = mock(com.webhook.platform.api.domain.repository.TunnelSessionRepository.class);
         projectRepository = mock(com.webhook.platform.api.domain.repository.ProjectRepository.class);
 
-        tunnelService = new TunnelService(tunnelSessionRepository, projectRepository);
+        tunnelService = new TunnelService(tunnelSessionRepository, projectRepository,
+                mock(com.webhook.platform.api.domain.repository.OrganizationRepository.class),
+                mock(com.webhook.platform.api.service.billing.EntitlementService.class));
         org.springframework.test.util.ReflectionTestUtils.setField(tunnelService, "ingressBaseUrl", "http://localhost:8080");
         org.springframework.test.util.ReflectionTestUtils.setField(tunnelService, "heartbeatTimeoutSeconds", 120);
 
@@ -94,12 +96,6 @@ class TunnelFlowIntegrationTest {
                 .lastHeartbeat(java.time.Instant.now())
                 .createdAt(java.time.Instant.now())
                 .build();
-    }
-
-    @AfterEach
-    void tearDown() {
-        // Ensure no lingering state
-        tunnelRegistry.unregister(publicSlug);
     }
 
     @Test
