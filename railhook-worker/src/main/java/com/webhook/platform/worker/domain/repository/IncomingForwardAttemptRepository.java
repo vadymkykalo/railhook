@@ -109,28 +109,45 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
                         @Param("claimToken") UUID claimToken);
 
         /**
-         * Age of the longest-outstanding Forward, measured from when the webhook arrived — not
-         * from the attempt row, which Incoming re-creates per Attempt.
+         * When the longest-outstanding Forward started: the {@code created_at} of attempt 1 in the
+         * same (Incoming Event, Destination, Replay session).
+         *
+         * <p>Not the PENDING row's own {@code created_at}, which Incoming re-creates per Attempt,
+         * and not the Incoming Event's {@code received_at}: a Failed Messages retry or a Replay
+         * starts a new Forward for a webhook that may have arrived days ago, and ageing it from
+         * the arrival made it look that old before its first Attempt. Every Forward, however it
+         * was started, begins its Ladder at attempt 1 inside its session, so that row is when the
+         * obligation was taken on. A missing attempt 1 falls back to the row itself.
          */
         @Query(value = """
-                        SELECT MIN(e.received_at) FROM incoming_forward_attempts a
-                        JOIN incoming_events e ON e.id = a.incoming_event_id
+                        SELECT MIN(COALESCE(f.created_at, a.created_at)) FROM incoming_forward_attempts a
+                        LEFT JOIN incoming_forward_attempts f
+                            ON f.incoming_event_id = a.incoming_event_id
+                            AND f.destination_id = a.destination_id
+                            AND f.attempt_number = 1
+                            AND f.replay_session_id IS NOT DISTINCT FROM a.replay_session_id
                         WHERE a.status = 'PENDING'
                         """, nativeQuery = true)
-        Instant findOldestPendingReceivedAt();
+        Instant findOldestPendingForwardStartedAt();
 
         /**
-         * PENDING Attempts whose Incoming Event arrived before the cutoff, oldest first.
+         * PENDING Attempts whose Forward started before the cutoff, oldest first — started as
+         * {@link #findOldestPendingForwardStartedAt} defines it.
          *
          * <p>{@code FOR UPDATE OF a SKIP LOCKED} because the caller publishes a DLQ
          * notification per row: without it two worker replicas would select the same rows and
-         * each emit a duplicate notification for the same Forward.
+         * each emit a duplicate notification for the same Forward. Only {@code a} is locked, which
+         * is also what Postgres requires of the outer join.
          */
         @Query(value = """
                         SELECT a.id FROM incoming_forward_attempts a
-                        JOIN incoming_events e ON e.id = a.incoming_event_id
-                        WHERE a.status = 'PENDING' AND e.received_at < :cutoff
-                        ORDER BY e.received_at ASC
+                        LEFT JOIN incoming_forward_attempts f
+                            ON f.incoming_event_id = a.incoming_event_id
+                            AND f.destination_id = a.destination_id
+                            AND f.attempt_number = 1
+                            AND f.replay_session_id IS NOT DISTINCT FROM a.replay_session_id
+                        WHERE a.status = 'PENDING' AND COALESCE(f.created_at, a.created_at) < :cutoff
+                        ORDER BY COALESCE(f.created_at, a.created_at) ASC
                         LIMIT :limit
                         FOR UPDATE OF a SKIP LOCKED
                         """, nativeQuery = true)
