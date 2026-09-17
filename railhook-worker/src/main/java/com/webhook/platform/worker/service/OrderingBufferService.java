@@ -197,6 +197,11 @@ public class OrderingBufferService {
 
     /**
      * Deliveries whose turn has come: sequential numbers starting from the next expected one.
+     *
+     * <p>Also drops every entry the cursor has already passed. Only the entry at the next expected
+     * sequence used to leave, so a Delivery that parked and was then sent by the scheduler rather
+     * than by this trigger stayed in forever; each park refreshes the whole key's TTL, so a busy
+     * ordered endpoint's buffer never expired and only grew.
      */
     public List<UUID> getReadyDeliveries(UUID endpointId) {
         Long lastDelivered = getLastDeliveredSequence(endpointId);
@@ -204,6 +209,7 @@ public class OrderingBufferService {
         
         String key = BUFFER_KEY_PREFIX + endpointId;
         RScoredSortedSet<String> buffer = redissonClient.getScoredSortedSet(key);
+        buffer.removeRangeByScore(Double.NEGATIVE_INFINITY, true, nextExpected, false);
         
         List<UUID> ready = new ArrayList<>();
         
