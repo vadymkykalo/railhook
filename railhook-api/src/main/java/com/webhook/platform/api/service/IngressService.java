@@ -14,6 +14,7 @@ import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
+import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
@@ -68,6 +69,7 @@ public class IngressService {
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final EntitlementService entitlementService;
     private final QuotaCounterService quotaCounterService;
+    private final ProjectRepository projectRepository;
     private final long maxPayloadSizeBytes;
     private final int defaultRateLimitPerSecond;
 
@@ -88,6 +90,7 @@ public class IngressService {
             EncryptionKeyRegistry encryptionKeyRegistry,
             EntitlementService entitlementService,
             QuotaCounterService quotaCounterService,
+            ProjectRepository projectRepository,
             @Value("${webhook.incoming.max-payload-size-bytes:524288}") long maxPayloadSizeBytes,
             @Value("${webhook.incoming.rate-limit-per-second:100}") int defaultRateLimitPerSecond) {
         this.sourceRepository = sourceRepository;
@@ -109,6 +112,7 @@ public class IngressService {
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.entitlementService = entitlementService;
         this.quotaCounterService = quotaCounterService;
+        this.projectRepository = projectRepository;
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
         this.defaultRateLimitPerSecond = defaultRateLimitPerSecond;
 
@@ -212,6 +216,11 @@ public class IngressService {
     private IncomingSource resolveActiveSource(String token) {
         IncomingSource source = sourceRepository.findByIngressPathToken(token)
                 .orElseThrow(() -> new SourceNotFoundException("Invalid ingress token"));
+        // A Source outlives its project's deletion as a row, not as an address: a deleted project
+        // is not found, so neither is anything that sends to it.
+        if (!projectRepository.existsById(source.getProjectId())) {
+            throw new SourceNotFoundException("Invalid ingress token");
+        }
         if (source.getStatus() != IncomingSourceStatus.ACTIVE) {
             throw new SourceDisabledException("Source is disabled");
         }

@@ -154,6 +154,9 @@ public class TestEndpointService {
         if (endpoint.getExpiresAt().isBefore(Instant.now())) {
             throw new NotFoundException("Test endpoint expired");
         }
+        if (!TenantContext.callAsSystem(() -> projectRepository.existsById(endpoint.getProjectId()))) {
+            throw new NotFoundException("Test endpoint not found");
+        }
 
         return TenantContext.callAs(endpoint.getOrganizationId(), () ->
                 new TransactionTemplate(transactionManager)

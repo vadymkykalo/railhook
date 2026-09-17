@@ -15,6 +15,7 @@ import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
+import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
@@ -88,6 +89,8 @@ class IngressServiceTest {
     private EntitlementService entitlementService;
     @Mock
     private QuotaCounterService quotaCounterService;
+    @Mock
+    private ProjectRepository projectRepository;
 
     private IngressService service;
     private WebhookVerifierFactory verifierFactory;
@@ -109,6 +112,7 @@ class IngressServiceTest {
         // Every Source now has a rate limit — its own or the configured default — and the limiter
         // is fail-closed, so a test that says nothing about it would be rejected before it starts.
         when(rateLimiterService.tryAcquireForSourceFailClosed(any(UUID.class), anyInt())).thenReturn(true);
+        when(projectRepository.existsById(any())).thenReturn(true);
         encryptionKeyRegistry = createTestRegistry(ENCRYPTION_KEY, ENCRYPTION_SALT);
         verifierFactory = new WebhookVerifierFactory("http://localhost:8080");
         TrustedProxyResolver clientIpResolver = new TrustedProxyResolver(
@@ -118,7 +122,7 @@ class IngressServiceTest {
                 forwardAttemptRepository, outboxMessageRepository,
                 objectMapper, new ForwardDispatch(objectMapper), meterRegistry, verifierFactory, replayDetectionService, rateLimiterService,
                 clientIpResolver, transactionManager,
-                encryptionKeyRegistry, entitlementService, quotaCounterService, 524288, DEFAULT_RATE_LIMIT
+                encryptionKeyRegistry, entitlementService, quotaCounterService, projectRepository, 524288, DEFAULT_RATE_LIMIT
         );
     }
 
