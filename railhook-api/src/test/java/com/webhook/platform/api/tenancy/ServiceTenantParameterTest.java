@@ -76,6 +76,10 @@ class ServiceTenantParameterTest {
             // is at most one of them, and may be none. AccountErasureService is @SystemTenant
             // for the same reason.
             "OrganizationService.deleteOrganizationById",
+            // Its only caller, closing the tunnels of the organization being deleted there. The
+            // target's own scope cannot be entered instead: deleteOrganizationById is already
+            // inside the erasure's transaction, and a scope entered inside one is refused.
+            "TunnelService.closeSessionsOfOrganization",
 
             "PlanLookup.forOrganization",
             "PlanLookup.evict",
