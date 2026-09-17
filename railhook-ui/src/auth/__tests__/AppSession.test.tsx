@@ -5,6 +5,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 import { http } from '../../api/http';
+import { destinationAfterSignIn } from '../../lib/signInDestination';
 
 /** The app's own QueryClient, as the page under the router sees it. */
 const seen = vi.hoisted(() => ({ queryClient: null as QueryClient | null }));
@@ -57,6 +58,7 @@ describe('App session', () => {
     calls = [];
     overrides = {};
     localStorage.clear();
+    sessionStorage.clear();
     http.setToken(null);
     originalAdapter = client.defaults.adapter;
     const adapter: AxiosAdapter = (config) => {
@@ -131,6 +133,22 @@ describe('App session', () => {
     await screen.findByText('signed out');
 
     expect(seen.queryClient!.getQueryData(['projects'])).toBeUndefined();
+  });
+
+  it.each([
+    ['signs out', async () => { await userEvent.click(screen.getByRole('button', { name: 'sign out' })); }],
+    ['is signed out by the server', async () => {
+      overrides = { '/api/v1/projects': 401, '/api/v1/auth/refresh': 401 };
+      await act(async () => { await http.get('/api/v1/projects').catch(() => undefined); });
+    }],
+  ])('does not hand the page a person %s on to whoever signs in next', async (_, endSession) => {
+    await renderSignedIn();
+
+    await endSession();
+    await screen.findByText('signed out');
+
+    const from = '/admin/projects/their-project/endpoints';
+    expect(destinationAfterSignIn({ redirect: null, from, userId: 'someone-new' }, '/admin/projects')).toBe('/admin/projects');
   });
 
   it('forgets everything cached when the session ends on its own', async () => {
