@@ -9,6 +9,7 @@ import com.webhook.platform.api.domain.repository.TestEndpointRepository;
 import com.webhook.platform.api.dto.CapturedRequestResponse;
 import com.webhook.platform.api.dto.TestEndpointRequest;
 import com.webhook.platform.api.dto.TestEndpointResponse;
+import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.SuspensionCheck;
@@ -76,7 +77,7 @@ public class TestEndpointService {
         validateProjectOwnership(projectId);
         long count = testEndpointRepository.countByProjectId(projectId);
         if (count >= maxPerProject) {
-            throw new IllegalStateException("Maximum test endpoints limit reached (" + maxPerProject + ")");
+            throw new ConflictException("Maximum test endpoints limit reached (" + maxPerProject + ")");
         }
 
         int ttlHours = request.getTtlHours() != null ? request.getTtlHours() : 24;

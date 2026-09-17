@@ -350,6 +350,35 @@ class OutboxPublisherServiceTest {
                 .deleteOldPublishedMessages(eq("DEAD"), any(Instant.class), anyInt());
     }
 
+    @Test
+    void aSendAcknowledgedAfterTheBatchWaitStillMarksItsRowPublished() throws Exception {
+        // The batch waits batchSendTimeoutSeconds (1s here) and then settles what it has. An ack
+        // that arrives after that used to be added to a list nobody read again: the row stayed
+        // SENDING, recovery handed it back to PENDING 300s later, and the message went to Kafka a
+        // second time although the first send had landed.
+        OutboxMessage message = createTestMessage();
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(List.of(message));
+        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
+                .thenReturn(DeliveryMessage.builder().deliveryId(UUID.randomUUID()).build());
+        CompletableFuture<SendResult<String, Object>> slowAck = new CompletableFuture<>();
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(slowAck);
+        when(outboxMessageRepository.findFailedMessagesForRetry(
+                anyString(), anyInt(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(Collections.emptyList());
+
+        service.publishPendingMessages();
+        verify(outboxMessageRepository, never()).batchMarkPublished(anyList(), any(Instant.class));
+
+        @SuppressWarnings("unchecked")
+        SendResult<String, Object> sendResult = mock(SendResult.class);
+        slowAck.complete(sendResult);
+        service.retryFailedMessages();
+
+        verify(outboxMessageRepository).batchMarkPublished(eq(List.of(message.getId())), any(Instant.class));
+    }
+
     private OutboxMessage createTestMessage() {
         OutboxMessage message = new OutboxMessage();
         message.setId(UUID.randomUUID());

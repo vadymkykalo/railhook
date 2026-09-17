@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionOperations;
 
+import java.time.Clock;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +27,7 @@ class DataRetentionMetricsTest {
     DataRetentionMetricsTest() {
         new DataRetentionService(mock(DeliveryAttemptRepository.class), mock(IncomingEventRepository.class),
                 mock(TunnelRequestLogRepository.class), mock(EventRepository.class), registry,
-                TransactionOperations.withoutTransaction(),
+                TransactionOperations.withoutTransaction(), Clock.systemUTC(),
                 90, 14, 30, 7, 10, 90, 1000);
     }
 

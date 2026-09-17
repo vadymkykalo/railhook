@@ -15,6 +15,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntSupplier;
@@ -23,12 +25,22 @@ import java.util.function.IntSupplier;
 @Slf4j
 public class DataRetentionService {
 
+    /*
+     * Each run's wall-clock budget, a few minutes inside its lockAtMostFor. A run that outlived the
+     * lock kept deleting while the next replica's run, now free to take the lock, started on the
+     * same rows. The margin is for the batch already under way when the budget runs out.
+     */
+    static final Duration NINE_MINUTE_LOCK_BUDGET = Duration.ofMinutes(7);
+    static final Duration LIMIT_ENFORCEMENT_BUDGET = Duration.ofMinutes(25);
+    static final Duration EVENTS_CLEANUP_BUDGET = Duration.ofMinutes(50);
+
     private final DeliveryAttemptRepository deliveryAttemptRepository;
     private final IncomingEventRepository incomingEventRepository;
     private final TunnelRequestLogRepository tunnelRequestLogRepository;
     private final EventRepository eventRepository;
     private final MeterRegistry meterRegistry;
     private final TransactionOperations transactions;
+    private final Clock clock;
     private final int deliveryAttemptsRetentionDays;
     private final int successfulAttemptsRetentionDays;
     private final int incomingEventsRetentionDays;
@@ -49,6 +61,7 @@ public class DataRetentionService {
             EventRepository eventRepository,
             MeterRegistry meterRegistry,
             TransactionOperations transactions,
+            Clock clock,
             @Value("${data-retention.delivery-attempts-retention-days:90}") int deliveryAttemptsRetentionDays,
             @Value("${data-retention.successful-attempts-retention-days:14}") int successfulAttemptsRetentionDays,
             @Value("${data-retention.incoming-events-retention-days:30}") int incomingEventsRetentionDays,
@@ -62,6 +75,7 @@ public class DataRetentionService {
         this.eventRepository = eventRepository;
         this.meterRegistry = meterRegistry;
         this.transactions = transactions;
+        this.clock = clock;
         this.deliveryAttemptsRetentionDays = deliveryAttemptsRetentionDays;
         this.successfulAttemptsRetentionDays = successfulAttemptsRetentionDays;
         this.incomingEventsRetentionDays = incomingEventsRetentionDays;
@@ -114,17 +128,8 @@ public class DataRetentionService {
         
         log.info("Starting successful delivery attempts cleanup (2xx status) for attempts older than {}", cutoffTime);
         
-        int totalDeleted = 0;
-        int deletedInBatch;
-        
-        do {
-            deletedInBatch = inOwnTransaction(() -> deliveryAttemptRepository.deleteOldSuccessfulAttempts(cutoffTime, batchSize));
-            totalDeleted += deletedInBatch;
-            
-            if (deletedInBatch > 0) {
-                log.debug("Deleted {} successful attempts in batch", deletedInBatch);
-            }
-        } while (deletedInBatch >= batchSize);
+        long totalDeleted = deleteInBatches("successful attempts cleanup", NINE_MINUTE_LOCK_BUDGET,
+                () -> deliveryAttemptRepository.deleteOldSuccessfulAttempts(cutoffTime, batchSize));
         
         if (totalDeleted > 0) {
             Counter.builder("delivery_attempts_cleanup_total")
@@ -153,17 +158,8 @@ public class DataRetentionService {
     public void enforcePerDeliveryAttemptLimits() {
         log.info("Starting per-delivery attempt limit enforcement (max {} per delivery)", maxAttemptsPerDelivery);
         
-        int totalDeleted = 0;
-        int deletedInBatch;
-        
-        do {
-            deletedInBatch = inOwnTransaction(() -> deliveryAttemptRepository.deleteExcessAttemptsPerDelivery(maxAttemptsPerDelivery, batchSize));
-            totalDeleted += deletedInBatch;
-            
-            if (deletedInBatch > 0) {
-                log.debug("Deleted {} excess attempts in batch", deletedInBatch);
-            }
-        } while (deletedInBatch >= batchSize);
+        long totalDeleted = deleteInBatches("per-delivery attempt limit enforcement", LIMIT_ENFORCEMENT_BUDGET,
+                () -> deliveryAttemptRepository.deleteExcessAttemptsPerDelivery(maxAttemptsPerDelivery, batchSize));
         
         if (totalDeleted > 0) {
             Counter.builder("delivery_attempts_cleanup_total")
@@ -187,17 +183,8 @@ public class DataRetentionService {
 
         log.info("Starting incoming events cleanup for events older than {}", cutoffTime);
 
-        int totalDeleted = 0;
-        int deletedInBatch;
-
-        do {
-            deletedInBatch = inOwnTransaction(() -> incomingEventRepository.deleteOldIncomingEvents(cutoffTime, batchSize));
-            totalDeleted += deletedInBatch;
-
-            if (deletedInBatch > 0) {
-                log.debug("Deleted {} incoming events in batch", deletedInBatch);
-            }
-        } while (deletedInBatch >= batchSize);
+        long totalDeleted = deleteInBatches("incoming events cleanup", NINE_MINUTE_LOCK_BUDGET,
+                () -> incomingEventRepository.deleteOldIncomingEvents(cutoffTime, batchSize));
 
         if (totalDeleted > 0) {
             Counter.builder("incoming_events_cleanup_total")
@@ -235,12 +222,8 @@ public class DataRetentionService {
         Instant cutoffTime = Instant.now().minusSeconds(eventsRetentionDays * 86400L);
         log.info("Starting events cleanup for events older than {}", cutoffTime);
 
-        int totalDeleted = 0;
-        int deletedInBatch;
-        do {
-            deletedInBatch = inOwnTransaction(() -> eventRepository.deleteOldEvents(cutoffTime, batchSize));
-            totalDeleted += deletedInBatch;
-        } while (deletedInBatch >= batchSize);
+        long totalDeleted = deleteInBatches("events cleanup", EVENTS_CLEANUP_BUDGET,
+                () -> eventRepository.deleteOldEvents(cutoffTime, batchSize));
 
         if (totalDeleted > 0) {
             Counter.builder("events_cleanup_total")
@@ -277,12 +260,8 @@ public class DataRetentionService {
     @SchedulerLock(name = "burstCleanupSuccessfulAttempts", lockAtMostFor = "9m", lockAtLeastFor = "1m")
     public void burstCleanupSuccessfulAttempts() {
         Instant cutoffTime = Instant.now().minusSeconds(successfulAttemptsRetentionDays * 86400L);
-        int totalDeleted = 0;
-        int deletedInBatch;
-        do {
-            deletedInBatch = inOwnTransaction(() -> deliveryAttemptRepository.deleteOldSuccessfulAttempts(cutoffTime, batchSize));
-            totalDeleted += deletedInBatch;
-        } while (deletedInBatch >= batchSize);
+        long totalDeleted = deleteInBatches("burst successful attempts cleanup", NINE_MINUTE_LOCK_BUDGET,
+                () -> deliveryAttemptRepository.deleteOldSuccessfulAttempts(cutoffTime, batchSize));
 
         if (totalDeleted > 0) {
             Counter.builder("delivery_attempts_cleanup_total")
@@ -299,6 +278,26 @@ public class DataRetentionService {
     // now partitioned weekly (V053) and PartitionMaintenanceService.dropExpiredPartitions()
     // drops whole expired partitions instead. tunnelRequestLogRepository.deleteByCreatedAtBefore()
     // is left in place for manual/ad-hoc use but is no longer scheduled.
+
+    /**
+     * Deletes batch after batch until one comes back short or the budget is spent; whatever is
+     * left goes to the next run.
+     */
+    private long deleteInBatches(String job, Duration budget, IntSupplier batch) {
+        Instant deadline = clock.instant().plus(budget);
+        long total = 0;
+        int deleted;
+        do {
+            deleted = inOwnTransaction(batch);
+            total += deleted;
+            if (deleted >= batchSize && !clock.instant().isBefore(deadline)) {
+                log.info("{}: stopped after {} rows at its {}-minute budget; the next run continues",
+                        job, total, budget.toMinutes());
+                break;
+            }
+        } while (deleted >= batchSize);
+        return total;
+    }
 
     /**
      * Runs one delete batch in a transaction of its own.
