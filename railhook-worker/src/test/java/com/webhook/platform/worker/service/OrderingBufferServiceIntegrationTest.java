@@ -1,10 +1,16 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.worker.domain.entity.OrderingCursor;
+import com.webhook.platform.worker.domain.repository.OrderingCursorRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.RedisConnectionException;
+import org.redisson.client.codec.Codec;
 import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -24,7 +30,15 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.AdditionalAnswers.delegatesTo;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 
 /**
  * The Ordering Buffer and the cursor against real Redis and real Postgres, through the Spring bean
@@ -61,11 +75,14 @@ class OrderingBufferServiceIntegrationTest {
 
     @TestConfiguration
     static class RedisConfig {
-        @Bean(destroyMethod = "shutdown")
+        // A mock delegating to a real client rather than a spy of one: Redisson calls itself from
+        // its own threads, and stubbing a spy while that happens is not safe.
+        @Bean(destroyMethod = "")
         RedissonClient redissonClient() {
             Config config = new Config();
             config.useSingleServer().setAddress("redis://" + REDIS.getHost() + ":" + REDIS.getMappedPort(6379));
-            return Redisson.create(config);
+            REAL_REDISSON = Redisson.create(config);
+            return mock(RedissonClient.class, delegatesTo(REAL_REDISSON));
         }
 
         @Bean
@@ -76,6 +93,30 @@ class OrderingBufferServiceIntegrationTest {
 
     @Autowired
     private OrderingBufferService orderingBuffer;
+
+    @Autowired
+    private OrderingCursorRepository cursorRepository;
+
+    private static RedissonClient REAL_REDISSON;
+
+    @Autowired
+    private RedissonClient redissonClient;
+
+    @AfterEach
+    void redisBackUp() {
+        reset(redissonClient);
+    }
+
+    @AfterAll
+    static void disconnect() {
+        if (REAL_REDISSON != null) {
+            REAL_REDISSON.shutdown();
+        }
+    }
+
+    private static RedisConnectionException redisDown() {
+        return new RedisConnectionException("Unable to connect to Redis server");
+    }
 
     @Test
     void aParkedDeliveryThatSucceedsWithoutBeingTriggeredLeavesTheBuffer() {
@@ -94,5 +135,40 @@ class OrderingBufferServiceIntegrationTest {
 
         assertEquals(0, orderingBuffer.getBufferSize(endpointId),
                 "a Delivery behind the cursor is no longer waiting; left in, a busy endpoint's buffer grows forever");
+    }
+
+    @Test
+    void theCursorIsReadFromPostgresWhileRedisIsDown() {
+        UUID endpointId = UUID.randomUUID();
+        orderingBuffer.markDelivered(endpointId, 5);
+        doThrow(redisDown()).when(redissonClient).getBucket(anyString(), any(Codec.class));
+
+        // A claimed Delivery is PROCESSING by the time the gate asks; an exception here leaves it
+        // for the stuck sweep, every sweep, until the hard cap abandons it.
+        assertEquals(5L, assertDoesNotThrow(() -> orderingBuffer.getLastDeliveredSequence(endpointId)));
+        assertTrue(assertDoesNotThrow(() -> orderingBuffer.canDeliver(endpointId, 6)));
+    }
+
+    @Test
+    void parkingAndReleasingWhileRedisIsDownDoNotThrow() {
+        UUID endpointId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        doThrow(redisDown()).when(redissonClient).getScoredSortedSet(anyString());
+
+        assertDoesNotThrow(() -> orderingBuffer.bufferDelivery(endpointId, deliveryId, 3));
+        assertDoesNotThrow(() -> orderingBuffer.removeFromBuffer(endpointId, deliveryId));
+        assertTrue(assertDoesNotThrow(() -> orderingBuffer.getReadyDeliveries(endpointId)).isEmpty());
+    }
+
+    @Test
+    void aRedisFailureDoesNotRollBackThePostgresCursor() {
+        UUID endpointId = UUID.randomUUID();
+        doThrow(redisDown()).when(redissonClient).getScript(any(Codec.class));
+
+        assertDoesNotThrow(() -> orderingBuffer.markDelivered(endpointId, 7));
+
+        assertEquals(7L, cursorRepository.findById(endpointId)
+                .map(OrderingCursor::getLastDeliveredSequence)
+                .orElse(null));
     }
 }
