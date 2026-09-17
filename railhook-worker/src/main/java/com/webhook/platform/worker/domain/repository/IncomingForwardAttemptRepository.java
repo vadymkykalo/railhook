@@ -109,6 +109,24 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
                         @Param("claimToken") UUID claimToken);
 
         /**
+         * Locks the row for the rest of the caller's transaction, but only while it is still held
+         * under {@code fence} in one of {@code statuses}. Returns 0 when it is not.
+         *
+         * <p>For {@code finalise}, which reads the row before it writes it: the write is an UPDATE
+         * by id, so a stuck sweep committed in between would be overwritten. Taking the row lock
+         * here re-checks the Claim against what is committed, and keeps it that way until the
+         * write commits. A no-op assignment, because an UPDATE is what takes the lock and waits out
+         * a concurrent writer before re-evaluating the predicate.
+         */
+        @Modifying
+        @Query(value = "UPDATE incoming_forward_attempts SET claim_token = claim_token " +
+                        "WHERE id = :id AND status IN (:statuses) " +
+                        "AND claim_token IS NOT DISTINCT FROM CAST(:fence AS uuid)", nativeQuery = true)
+        int holdIfStillClaimed(@Param("id") UUID id,
+                        @Param("statuses") List<String> statuses,
+                        @Param("fence") UUID fence);
+
+        /**
          * Returns a row the retry scheduler claimed to its ladder, but only while it is still
          * that claim: PROCESSING, on the {@code started_at} the scheduler stamped, and not yet
          * taken by a consumer, whose claim writes a token and a new {@code started_at}.

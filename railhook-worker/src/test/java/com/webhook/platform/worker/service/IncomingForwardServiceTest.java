@@ -136,6 +136,8 @@ class IncomingForwardServiceTest {
     @BeforeEach
     void setUp() {
         stubTransactionTemplate();
+        // Nobody else is writing: the row lock finds the row as the read left it.
+        lenient().when(attemptRepository.holdIfStillClaimed(any(), any(), any())).thenReturn(1);
 
         // Tenant isolation guards — permissive by default
         when(projectRateLimiterService.tryAcquire(any(UUID.class))).thenReturn(true);
