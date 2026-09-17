@@ -61,7 +61,7 @@ public class SchemaController {
             @PathVariable("projectId") UUID projectId,
             @PathVariable("eventTypeId") UUID eventTypeId,
             AuthContext auth) {
-        return ResponseEntity.ok(schemaRegistryService.getEventType(eventTypeId));
+        return ResponseEntity.ok(schemaRegistryService.getEventType(projectId, eventTypeId));
     }
 
     @Operation(summary = "Update event type", description = "Updates event type description")
@@ -74,7 +74,7 @@ public class SchemaController {
             @Valid @RequestBody EventTypeCatalogRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        return ResponseEntity.ok(schemaRegistryService.updateEventType(eventTypeId, request));
+        return ResponseEntity.ok(schemaRegistryService.updateEventType(projectId, eventTypeId, request));
     }
 
     @Operation(summary = "Delete event type", description = "Deletes event type and all its schema versions")
@@ -87,7 +87,7 @@ public class SchemaController {
             @PathVariable("eventTypeId") UUID eventTypeId,
             AuthContext auth) {
         auth.requireWriteAccess();
-        schemaRegistryService.deleteEventType(eventTypeId);
+        schemaRegistryService.deleteEventType(projectId, eventTypeId);
         return ResponseEntity.noContent().build();
     }
 
@@ -99,7 +99,7 @@ public class SchemaController {
             @PathVariable("projectId") UUID projectId,
             @PathVariable("eventTypeId") UUID eventTypeId,
             AuthContext auth) {
-        return ResponseEntity.ok(schemaRegistryService.listSchemaVersions(eventTypeId));
+        return ResponseEntity.ok(schemaRegistryService.listSchemaVersions(projectId, eventTypeId));
     }
 
     @Operation(summary = "Create schema version", description = "Uploads a new JSON Schema version (created as DRAFT)")
@@ -114,7 +114,7 @@ public class SchemaController {
             AuthContext auth) {
         auth.requireWriteAccess();
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(schemaRegistryService.createSchemaVersion(eventTypeId, request, auth.userId()));
+                .body(schemaRegistryService.createSchemaVersion(projectId, eventTypeId, request, auth.userId()));
     }
 
     @Operation(summary = "Get schema version", description = "Returns schema version details")
@@ -124,7 +124,7 @@ public class SchemaController {
             @PathVariable("eventTypeId") UUID eventTypeId,
             @PathVariable("versionId") UUID versionId,
             AuthContext auth) {
-        return ResponseEntity.ok(schemaRegistryService.getSchemaVersion(versionId));
+        return ResponseEntity.ok(schemaRegistryService.getSchemaVersion(projectId, eventTypeId, versionId));
     }
 
     @Operation(summary = "Promote schema to ACTIVE", description = "Promotes a DRAFT schema to ACTIVE, deprecating the previous active version")
@@ -137,7 +137,7 @@ public class SchemaController {
             @PathVariable("versionId") UUID versionId,
             AuthContext auth) {
         auth.requireWriteAccess();
-        return ResponseEntity.ok(schemaRegistryService.promoteSchema(versionId));
+        return ResponseEntity.ok(schemaRegistryService.promoteSchema(projectId, eventTypeId, versionId));
     }
 
     @Operation(summary = "Deprecate schema version", description = "Sets schema version status to DEPRECATED")
@@ -150,7 +150,7 @@ public class SchemaController {
             @PathVariable("versionId") UUID versionId,
             AuthContext auth) {
         auth.requireWriteAccess();
-        return ResponseEntity.ok(schemaRegistryService.deprecateSchema(versionId));
+        return ResponseEntity.ok(schemaRegistryService.deprecateSchema(projectId, eventTypeId, versionId));
     }
 
     // ── Schema Changes ──
@@ -169,6 +169,6 @@ public class SchemaController {
             @PathVariable("projectId") UUID projectId,
             @PathVariable("eventTypeId") UUID eventTypeId,
             AuthContext auth) {
-        return ResponseEntity.ok(schemaRegistryService.listSchemaChanges(eventTypeId));
+        return ResponseEntity.ok(schemaRegistryService.listSchemaChanges(projectId, eventTypeId));
     }
 }

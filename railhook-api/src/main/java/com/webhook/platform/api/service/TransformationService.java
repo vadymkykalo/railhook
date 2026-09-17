@@ -110,11 +110,15 @@ public class TransformationService {
         return mapToResponse(transformation);
     }
 
-    public TransformationResponse get(UUID id) {
-        Transformation transformation = transformationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Transformation not found"));
-        validateProjectOwnership(transformation.getProjectId());
+    public TransformationResponse get(UUID projectId, UUID id) {
+        Transformation transformation = requireTransformation(projectId, id);
         return mapToResponse(transformation);
+    }
+
+    /** Another project's transformation is "not found", like a missing one - the URL names the project. */
+    private Transformation requireTransformation(UUID projectId, UUID id) {
+        return transformationRepository.findByIdAndProjectId(id, projectId)
+                .orElseThrow(() -> new NotFoundException("Transformation not found"));
     }
 
     public List<TransformationResponse> list(UUID projectId) {
@@ -138,10 +142,8 @@ public class TransformationService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Transformation")
     @Transactional
-    public TransformationResponse update(UUID id, TransformationRequest request) {
-        Transformation transformation = transformationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Transformation not found"));
-        validateProjectOwnership(transformation.getProjectId());
+    public TransformationResponse update(UUID projectId, UUID id, TransformationRequest request) {
+        Transformation transformation = requireTransformation(projectId, id);
 
         if (request.getName() != null && !request.getName().isBlank()) {
             if (transformationRepository.existsByProjectIdAndNameAndIdNot(
@@ -169,10 +171,8 @@ public class TransformationService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "Transformation")
     @Transactional
-    public void delete(UUID id) {
-        Transformation transformation = transformationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Transformation not found"));
-        validateProjectOwnership(transformation.getProjectId());
+    public void delete(UUID projectId, UUID id) {
+        Transformation transformation = requireTransformation(projectId, id);
 
         long subCount = subscriptionRepository.countByTransformationId(id);
         long destCount = incomingDestinationRepository.countByTransformationId(id);

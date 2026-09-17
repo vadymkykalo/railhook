@@ -61,9 +61,11 @@ public class IncomingSourceController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<IncomingSourceResponse> getSource(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
-        IncomingSourceResponse response = sourceService.getSource(id);
+        auth.validateProjectAccess(projectId);
+        IncomingSourceResponse response = sourceService.getSource(projectId, id);
         return ResponseEntity.ok(response);
     }
 
@@ -87,11 +89,13 @@ public class IncomingSourceController {
     @RequireAccess(AccessLevel.WRITE)
 @PutMapping("/{id}")
     public ResponseEntity<IncomingSourceResponse> updateSource(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             @Valid @RequestBody IncomingSourceRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        IncomingSourceResponse response = sourceService.updateSource(id, request);
+        auth.validateProjectAccess(projectId);
+        IncomingSourceResponse response = sourceService.updateSource(projectId, id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -101,10 +105,12 @@ public class IncomingSourceController {
     @RequireAccess(AccessLevel.WRITE)
 @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSource(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
-        sourceService.deleteSource(id);
+        auth.validateProjectAccess(projectId);
+        sourceService.deleteSource(projectId, id);
         return ResponseEntity.noContent().build();
     }
 }

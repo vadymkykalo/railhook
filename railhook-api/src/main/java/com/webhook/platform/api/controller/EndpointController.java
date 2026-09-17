@@ -69,9 +69,11 @@ public class EndpointController {
     @Operation(summary = "Get endpoint", description = "Returns endpoint details by ID")
     @GetMapping("/{id}")
     public ResponseEntity<EndpointResponse> getEndpoint(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
-        EndpointResponse response = endpointService.getEndpoint(id);
+        auth.validateProjectAccess(projectId);
+        EndpointResponse response = endpointService.getEndpoint(projectId, id);
         return ResponseEntity.ok(response);
     }
 
@@ -91,11 +93,13 @@ public class EndpointController {
     @RequireAccess(AccessLevel.WRITE)
 @PutMapping("/{id}")
     public ResponseEntity<EndpointResponse> updateEndpoint(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             @Valid @RequestBody EndpointRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        EndpointResponse response = endpointService.updateEndpoint(id, request);
+        auth.validateProjectAccess(projectId);
+        EndpointResponse response = endpointService.updateEndpoint(projectId, id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -105,10 +109,12 @@ public class EndpointController {
     @RequireAccess(AccessLevel.WRITE)
 @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteEndpoint(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
-        endpointService.deleteEndpoint(id);
+        auth.validateProjectAccess(projectId);
+        endpointService.deleteEndpoint(projectId, id);
         return ResponseEntity.noContent().build();
     }
 
@@ -117,18 +123,19 @@ public class EndpointController {
     @RequireAccess(AccessLevel.WRITE)
 @PostMapping("/{id}/rotate-secret")
     public ResponseEntity<EndpointResponse> rotateSecret(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
-        EndpointResponse response = endpointService.rotateSecret(id);
+        auth.validateProjectAccess(projectId);
+        EndpointResponse response = endpointService.rotateSecret(projectId, id);
         log.info("Rotated secret for endpoint {}", id);
         return ResponseEntity.ok(response);
     }
 
     // Fires a real outbound request from the platform, signed with the endpoint's own
-    // secret — the same capability rotate-secret above is guarded for. Tenancy was already
-    // safe (endpointService.testEndpoint validates project ownership), but scope and role
-    // were not checked at all, so a Viewer or a READ_ONLY key could drive it.
+    // secret — the same capability rotate-secret above is guarded for, so it carries the same
+    // scope and role requirements a Viewer or a READ_ONLY key cannot meet.
     @Operation(summary = "Test endpoint", description = "Sends a test webhook to verify endpoint connectivity")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
@@ -139,7 +146,7 @@ public class EndpointController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        EndpointTestResponse response = endpointService.testEndpoint(id);
+        EndpointTestResponse response = endpointService.testEndpoint(projectId, id);
         log.info("Tested endpoint {}: success={}, latency={}ms", id, response.isSuccess(), response.getLatencyMs());
         return ResponseEntity.ok(response);
     }
@@ -188,7 +195,7 @@ public class EndpointController {
         // Mutates verification_status, exactly like skip-verification below.
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        var result = verificationService.verify(id);
+        var result = verificationService.verify(projectId, id);
         log.info("Verification attempt for endpoint {}: success={}", id, result.success());
         
         return ResponseEntity.ok(new VerificationResponse(
@@ -211,10 +218,10 @@ public class EndpointController {
         auth.validateProjectAccess(projectId);
         
         String reason = request != null ? request.reason() : "Skipped by administrator";
-        var endpoint = verificationService.skipVerification(id, reason);
+        var endpoint = verificationService.skipVerification(projectId, id, reason);
         log.info("Skipped verification for endpoint {}: {}", id, reason);
         
-        return ResponseEntity.ok(endpointService.getEndpoint(id));
+        return ResponseEntity.ok(endpointService.getEndpoint(projectId, id));
     }
 
     public record VerificationResponse(boolean success, String message, String status) {}

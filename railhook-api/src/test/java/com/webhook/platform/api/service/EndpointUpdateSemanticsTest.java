@@ -58,8 +58,6 @@ class EndpointUpdateSemanticsTest {
                 endpointRepository, projectRepository, WebClient.builder(), buildRegistry(),
                 true, Collections.emptyList(), false);
 
-        when(projectRepository.findById(projectId))
-                .thenReturn(Optional.of(Project.builder().id(projectId).name("p").build()));
         when(endpointRepository.saveAndFlush(any(Endpoint.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -91,7 +89,7 @@ class EndpointUpdateSemanticsTest {
                 .allowedSourceIps("203.0.113.4")
                 .signatureScheme(SignatureScheme.LEGACY)
                 .build();
-        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(endpointRepository.findByIdAndProjectId(endpointId, projectId)).thenReturn(Optional.of(endpoint));
         return endpoint;
     }
 
@@ -105,7 +103,7 @@ class EndpointUpdateSemanticsTest {
     void anUpdateThatMentionsNeitherLeavesTheDescriptionAndTheRateLimitAlone() {
         Endpoint endpoint = existing();
 
-        service.updateEndpoint(endpointId, urlOnly());
+        service.updateEndpoint(projectId, endpointId, urlOnly());
 
         assertThat(endpoint.getDescription()).isEqualTo("the one the team relies on");
         assertThat(endpoint.getRateLimitPerSecond()).isEqualTo(25);
@@ -119,7 +117,7 @@ class EndpointUpdateSemanticsTest {
         EndpointRequest request = urlOnly();
         request.setDescription("");
 
-        service.updateEndpoint(endpointId, request);
+        service.updateEndpoint(projectId, endpointId, request);
 
         assertThat(endpoint.getDescription()).isNull();
     }
@@ -130,7 +128,7 @@ class EndpointUpdateSemanticsTest {
         EndpointRequest request = urlOnly();
         request.setRateLimitPerSecond(0);
 
-        service.updateEndpoint(endpointId, request);
+        service.updateEndpoint(projectId, endpointId, request);
 
         assertThat(endpoint.getRateLimitPerSecond()).isNull();
     }
@@ -141,7 +139,7 @@ class EndpointUpdateSemanticsTest {
         EndpointRequest request = urlOnly();
         request.setAllowedSourceIps("  ");
 
-        service.updateEndpoint(endpointId, request);
+        service.updateEndpoint(projectId, endpointId, request);
 
         assertThat(endpoint.getAllowedSourceIps()).isNull();
     }
@@ -153,7 +151,7 @@ class EndpointUpdateSemanticsTest {
         request.setDescription("renamed");
         request.setRateLimitPerSecond(90);
 
-        service.updateEndpoint(endpointId, request);
+        service.updateEndpoint(projectId, endpointId, request);
 
         assertThat(endpoint.getDescription()).isEqualTo("renamed");
         assertThat(endpoint.getRateLimitPerSecond()).isEqualTo(90);
@@ -164,6 +162,9 @@ class EndpointUpdateSemanticsTest {
         EndpointRequest request = urlOnly();
         request.setRateLimitPerSecond(0);
         request.setDescription("  ");
+
+        when(projectRepository.findById(projectId))
+                .thenReturn(Optional.of(Project.builder().id(projectId).name("p").build()));
 
         var response = service.createEndpoint(projectId, request);
 

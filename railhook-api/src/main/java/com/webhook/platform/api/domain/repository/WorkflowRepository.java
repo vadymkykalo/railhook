@@ -6,10 +6,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface WorkflowRepository extends JpaRepository<Workflow, UUID> {
+
+    Optional<Workflow> findByIdAndProjectId(UUID id, UUID projectId);
 
     List<Workflow> findByProjectIdOrderByCreatedAtDesc(UUID projectId);
 

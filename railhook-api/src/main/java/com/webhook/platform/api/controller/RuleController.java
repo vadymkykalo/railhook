@@ -56,7 +56,7 @@ public class RuleController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(ruleService.get(id));
+        return ResponseEntity.ok(ruleService.get(projectId, id));
     }
 
     @Operation(operationId = "listRules", summary = "List rules", description = "Returns all rules for the project ordered by priority")
@@ -80,7 +80,7 @@ public class RuleController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(ruleService.update(id, request));
+        return ResponseEntity.ok(ruleService.update(projectId, id, request));
     }
 
     @Operation(operationId = "deleteRule", summary = "Delete rule", description = "Removes a rule and all its actions")
@@ -94,7 +94,7 @@ public class RuleController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        ruleService.delete(id);
+        ruleService.delete(projectId, id);
         return ResponseEntity.noContent().build();
     }
 
@@ -111,6 +111,6 @@ public class RuleController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         boolean enabled = body.getOrDefault("enabled", true);
-        return ResponseEntity.ok(ruleService.toggleEnabled(id, enabled));
+        return ResponseEntity.ok(ruleService.toggleEnabled(projectId, id, enabled));
     }
 }

@@ -6755,6 +6755,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -6777,6 +6778,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -6803,6 +6805,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -6823,6 +6826,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -7039,6 +7043,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
+                sourceId: string;
                 id: string;
             };
             cookie?: never;
@@ -7070,6 +7076,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
+                sourceId: string;
                 id: string;
             };
             cookie?: never;
@@ -7105,6 +7113,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
+                sourceId: string;
                 id: string;
             };
             cookie?: never;
@@ -7125,6 +7135,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -7156,6 +7167,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -7191,6 +7203,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -7261,6 +7274,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -7283,6 +7297,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -7309,6 +7324,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -8433,6 +8449,7 @@ export interface operations {
             };
             header?: never;
             path: {
+                projectId: string;
                 sourceId: string;
             };
             cookie?: never;
@@ -8455,6 +8472,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 sourceId: string;
             };
             cookie?: never;
@@ -8879,6 +8897,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;

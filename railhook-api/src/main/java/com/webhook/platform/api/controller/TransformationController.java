@@ -53,7 +53,7 @@ public class TransformationController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(transformationService.get(id));
+        return ResponseEntity.ok(transformationService.get(projectId, id));
     }
 
     @Operation(operationId = "listTransformations", summary = "List transformations", description = "Returns all transformations for the project")
@@ -76,7 +76,7 @@ public class TransformationController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(transformationService.update(id, request));
+        return ResponseEntity.ok(transformationService.update(projectId, id, request));
     }
 
     @Operation(operationId = "deleteTransformation", summary = "Delete transformation", description = "Removes a transformation (subscriptions/destinations referencing it will have transformation_id set to NULL)")
@@ -90,7 +90,7 @@ public class TransformationController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        transformationService.delete(id);
+        transformationService.delete(projectId, id);
         return ResponseEntity.noContent().build();
     }
 }

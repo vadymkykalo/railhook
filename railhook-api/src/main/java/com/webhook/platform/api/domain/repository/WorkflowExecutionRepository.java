@@ -12,10 +12,13 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface WorkflowExecutionRepository extends JpaRepository<WorkflowExecution, UUID> {
+
+    Optional<WorkflowExecution> findByIdAndWorkflowId(UUID id, UUID workflowId);
 
     Page<WorkflowExecution> findByWorkflowIdOrderByStartedAtDesc(UUID workflowId, Pageable pageable);
 

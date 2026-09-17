@@ -180,12 +180,12 @@ class SubscriptionServiceTest {
                 .id(subId).projectId(projectId).endpointId(endpointId).eventType("order.created")
                 .enabled(true).orderingEnabled(false).maxAttempts(7).timeoutSeconds(30)
                 .retryDelays("60").createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        when(subscriptionRepository.findById(subId)).thenReturn(Optional.of(existing));
+        when(subscriptionRepository.findByIdAndProjectId(subId, projectId)).thenReturn(Optional.of(existing));
 
         SubscriptionRequest request = SubscriptionRequest.builder()
                 .endpointId(foreignEndpoint.getId()).build();
 
-        assertThatThrownBy(() -> service.updateSubscription(subId, request))
+        assertThatThrownBy(() -> service.updateSubscription(projectId, subId, request))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Endpoint does not belong to this project");
     }
@@ -199,12 +199,12 @@ class SubscriptionServiceTest {
                 .id(subId).projectId(projectId).endpointId(endpointId).eventType("order.created")
                 .enabled(true).orderingEnabled(false).maxAttempts(7).timeoutSeconds(30)
                 .retryDelays("60").createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        when(subscriptionRepository.findById(subId)).thenReturn(Optional.of(existing));
+        when(subscriptionRepository.findByIdAndProjectId(subId, projectId)).thenReturn(Optional.of(existing));
 
         SubscriptionRequest request = SubscriptionRequest.builder()
                 .transformationId(foreignTransformation.getId()).build();
 
-        assertThatThrownBy(() -> service.updateSubscription(subId, request))
+        assertThatThrownBy(() -> service.updateSubscription(projectId, subId, request))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Transformation does not belong to this project");
     }
@@ -272,11 +272,11 @@ class SubscriptionServiceTest {
                 .enabled(true).orderingEnabled(false).maxAttempts(7).timeoutSeconds(30)
                 .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS)
                 .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        when(subscriptionRepository.findById(subId)).thenReturn(Optional.of(existing));
+        when(subscriptionRepository.findByIdAndProjectId(subId, projectId)).thenReturn(Optional.of(existing));
 
         SubscriptionRequest request = SubscriptionRequest.builder().retryDelays("not,a,ladder").build();
 
-        assertThatThrownBy(() -> service.updateSubscription(subId, request))
+        assertThatThrownBy(() -> service.updateSubscription(projectId, subId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("retryDelays");
 

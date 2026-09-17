@@ -1,7 +1,6 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.Endpoint;
-import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.EndpointRequest;
@@ -69,8 +68,6 @@ class EndpointVerificationResetTest {
                 endpointRepository, projectRepository, WebClient.builder(), registry,
                 true, ALLOWED_HOSTS, true);
 
-        when(projectRepository.findById(projectId))
-                .thenReturn(Optional.of(Project.builder().id(projectId).name("p").build()));
         when(endpointRepository.saveAndFlush(any(Endpoint.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -78,9 +75,9 @@ class EndpointVerificationResetTest {
     @DisplayName("re-pointing a verified endpoint at a new URL sends it back to PENDING")
     void changingUrlResetsVerification() {
         Endpoint endpoint = verifiedEndpoint();
-        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(endpointRepository.findByIdAndProjectId(endpointId, projectId)).thenReturn(Optional.of(endpoint));
 
-        service.updateEndpoint(endpointId, EndpointRequest.builder()
+        service.updateEndpoint(projectId, endpointId, EndpointRequest.builder()
                 .url(MOVED_URL)
                 .build());
 
@@ -100,9 +97,9 @@ class EndpointVerificationResetTest {
     void unchangedUrlKeepsVerification() {
         Endpoint endpoint = verifiedEndpoint();
         Instant completedAt = endpoint.getVerificationCompletedAt();
-        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(endpointRepository.findByIdAndProjectId(endpointId, projectId)).thenReturn(Optional.of(endpoint));
 
-        service.updateEndpoint(endpointId, EndpointRequest.builder()
+        service.updateEndpoint(projectId, endpointId, EndpointRequest.builder()
                 .url(ORIGINAL_URL)
                 .description("renamed, nothing else")
                 .build());
@@ -119,9 +116,9 @@ class EndpointVerificationResetTest {
         Endpoint endpoint = verifiedEndpoint();
         endpoint.setVerificationStatus(Endpoint.VerificationStatus.SKIPPED);
         endpoint.setVerificationSkipReason("verification was disabled when this was created");
-        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(endpointRepository.findByIdAndProjectId(endpointId, projectId)).thenReturn(Optional.of(endpoint));
 
-        service.updateEndpoint(endpointId, EndpointRequest.builder()
+        service.updateEndpoint(projectId, endpointId, EndpointRequest.builder()
                 .url(ELSEWHERE_URL)
                 .build());
 
@@ -140,9 +137,9 @@ class EndpointVerificationResetTest {
 
         Endpoint endpoint = verifiedEndpoint();
         endpoint.setVerificationStatus(Endpoint.VerificationStatus.SKIPPED);
-        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(endpointRepository.findByIdAndProjectId(endpointId, projectId)).thenReturn(Optional.of(endpoint));
 
-        noVerification.updateEndpoint(endpointId, EndpointRequest.builder()
+        noVerification.updateEndpoint(projectId, endpointId, EndpointRequest.builder()
                 .url(MOVED_URL)
                 .build());
 
