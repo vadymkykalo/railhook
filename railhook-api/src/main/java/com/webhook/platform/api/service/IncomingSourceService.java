@@ -153,11 +153,15 @@ public class IncomingSourceService {
         return mapToResponse(source);
     }
 
-    public IncomingSourceResponse getSource(UUID id) {
-        IncomingSource source = sourceRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Incoming source not found"));
-        validateProjectOwnership(source.getProjectId());
+    public IncomingSourceResponse getSource(UUID projectId, UUID id) {
+        IncomingSource source = requireSource(projectId, id);
         return mapToResponse(source);
+    }
+
+    /** Another project's source is "not found", like a missing one - the URL names the project. */
+    private IncomingSource requireSource(UUID projectId, UUID id) {
+        return sourceRepository.findByIdAndProjectId(id, projectId)
+                .orElseThrow(() -> new NotFoundException("Incoming source not found"));
     }
 
     public Page<IncomingSourceResponse> listSources(UUID projectId, Pageable pageable) {
@@ -168,10 +172,8 @@ public class IncomingSourceService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "IncomingSource")
     @Transactional
-    public IncomingSourceResponse updateSource(UUID id, IncomingSourceRequest request) {
-        IncomingSource source = sourceRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Incoming source not found"));
-        validateProjectOwnership(source.getProjectId());
+    public IncomingSourceResponse updateSource(UUID projectId, UUID id, IncomingSourceRequest request) {
+        IncomingSource source = requireSource(projectId, id);
 
         source.setName(request.getName());
 
@@ -217,10 +219,8 @@ public class IncomingSourceService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "IncomingSource")
     @Transactional
-    public void deleteSource(UUID id) {
-        IncomingSource source = sourceRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Incoming source not found"));
-        validateProjectOwnership(source.getProjectId());
+    public void deleteSource(UUID projectId, UUID id) {
+        IncomingSource source = requireSource(projectId, id);
         source.setStatus(IncomingSourceStatus.DISABLED);
         sourceRepository.save(source);
         log.info("Disabled incoming source: id={}", id);

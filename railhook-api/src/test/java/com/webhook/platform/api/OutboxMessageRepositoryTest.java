@@ -3,9 +3,14 @@ package com.webhook.platform.api;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
+import com.webhook.platform.api.service.OutboxPublisherService;
+import com.webhook.platform.api.tenancy.TenantContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -16,6 +21,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 /**
  * Both native queries below partition on {@code COALESCE(project_id::text, kafka_key)}.
@@ -101,6 +107,36 @@ public class OutboxMessageRepositoryTest extends AbstractIntegrationTest {
         OutboxMessage after = outboxMessageRepository.findById(saved.getId()).orElseThrow();
         assertEquals(OutboxStatus.PENDING, after.getStatus());
         assertEquals(1, after.getRetryCount(), "a recovery is an attempt that did not land");
+    }
+
+    @Test
+    void aRowThatNeverGetsASendOutcomeStopsCyclingOnceItsRetriesAreSpent() {
+        // Counting the recovery was half the fix: the PENDING claim ignores retry_count and
+        // promoteExhaustedToDead only looks at FAILED, so the count grew and the row still cycled
+        // PENDING -> SENDING -> PENDING for ever. Driven through the publisher's own retry cycle,
+        // with a real database, because the claim, the recovery and the promotion have to agree.
+        int maxRetries = 5;
+        OutboxPublisherService publisher = new OutboxPublisherService(
+                outboxMessageRepository, mock(KafkaTemplate.class),
+                new ObjectMapper(), new SimpleMeterRegistry(),
+                transactionManager, 100, maxRetries, 90, 0, 1, 30, 10);
+
+        OutboxMessage lastChance = pendingMessage(UUID.randomUUID());
+        lastChance.setStatus(OutboxStatus.SENDING);
+        lastChance.setRetryCount(maxRetries - 1);
+        OutboxMessage exhausted = outboxMessageRepository.saveAndFlush(lastChance);
+
+        OutboxMessage firstTime = pendingMessage(UUID.randomUUID());
+        firstTime.setStatus(OutboxStatus.SENDING);
+        OutboxMessage recoverable = outboxMessageRepository.saveAndFlush(firstTime);
+
+        TenantContext.runAsSystem(publisher::retryFailedMessages);
+        entityManager.clear();
+
+        assertEquals(OutboxStatus.DEAD,
+                outboxMessageRepository.findById(exhausted.getId()).orElseThrow().getStatus());
+        assertEquals(OutboxStatus.PENDING,
+                outboxMessageRepository.findById(recoverable.getId()).orElseThrow().getStatus());
     }
 
     @Test

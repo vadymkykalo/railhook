@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import AppLayout from './layout/AppLayout';
 import PublicLayout from './layout/PublicLayout';
 import ProtectedRoute from './auth/ProtectedRoute';
+import RouteErrorScreen from './components/RouteErrorScreen';
 
 // Lazy-loaded pages — each becomes its own chunk
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -78,276 +79,282 @@ function S({ children }: { children: React.ReactNode }) {
 }
 
 export const router = createBrowserRouter([
+  /* One pathless root so every route, public ones included, shares an errorElement. */
   {
-    element: <PublicLayout />,
+    errorElement: <RouteErrorScreen />,
     children: [
       {
-        path: '/',
-        element: <S><LandingPage /></S>,
-      },
-      /* There are no paid plans to price; old /pricing links land on how to run it. */
-      {
-        path: '/pricing',
-        loader: () => redirect('/#run'),
-      },
-      {
-        path: '/contact',
-        element: <S><ContactPage /></S>,
-      },
-      {
-        path: '/privacy',
-        element: <S><PrivacyPage /></S>,
-      },
-      {
-        path: '/terms',
-        element: <S><TermsPage /></S>,
-      },
-    ],
-  },
-  {
-    path: '/login',
-    element: <S><LoginPage /></S>,
-  },
-  {
-    path: '/register',
-    element: <S><RegisterPage /></S>,
-  },
-  {
-    path: '/verify-email',
-    element: <S><VerifyEmailPage /></S>,
-  },
-  /* The two links an email change mails: confirm from the new address, "this wasn't me" from
-     the old one. Public, because either can be opened with no session. */
-  {
-    path: '/confirm-email-change',
-    element: <S><ConfirmEmailChangePage /></S>,
-  },
-  {
-    path: '/cancel-email-change',
-    element: <S><CancelEmailChangePage /></S>,
-  },
-  {
-    path: '/forgot-password',
-    element: <S><ForgotPasswordPage /></S>,
-  },
-  {
-    path: '/reset-password',
-    element: <S><ResetPasswordPage /></S>,
-  },
-  {
-    path: '/accept-invite',
-    element: <S><AcceptInvitePage /></S>,
-  },
-  {
-    path: '/device',
-    element: <S><DeviceApprovePage /></S>,
-  },
-  /* Where the API sends the browser after "Continue with Google", with a one-time code to trade
-     for a session. */
-  {
-    path: '/auth/callback',
-    element: <S><AuthCallbackPage /></S>,
-  },
-  /* No /docs route: the docs are a separate static site (railhook-docs/) that nginx
-     serves at /docs/ from this same image, so a link to them is a full page load,
-     never a router navigation. */
-  /* No child route below states a role. `/admin` requires a session, and what
-     each destination requires beyond that is declared once in nav.config's
-     `requiredRoleFor` — which AppLayout applies around the outlet, and which the
-     sidebar and tab strip filter from. Two hand-kept lists is how the personal
-     profile page came to be shown to everyone and guarded at OWNER. */
-  {
-    path: '/admin',
-    element: (
-      <ProtectedRoute>
-        <AppLayout />
-      </ProtectedRoute>
-    ),
-    children: [
-      {
-        index: true,
-        element: <Navigate to="dashboard" replace />,
+        element: <PublicLayout />,
+        children: [
+          {
+            path: '/',
+            element: <S><LandingPage /></S>,
+          },
+          /* There are no paid plans to price; old /pricing links land on how to run it. */
+          {
+            path: '/pricing',
+            loader: () => redirect('/#run'),
+          },
+          {
+            path: '/contact',
+            element: <S><ContactPage /></S>,
+          },
+          {
+            path: '/privacy',
+            element: <S><PrivacyPage /></S>,
+          },
+          {
+            path: '/terms',
+            element: <S><TermsPage /></S>,
+          },
+        ],
       },
       {
-        path: 'dashboard',
-        element: <S><DashboardPage /></S>,
+        path: '/login',
+        element: <S><LoginPage /></S>,
       },
       {
-        path: 'projects',
-        element: <S><ProjectsPage /></S>,
+        path: '/register',
+        element: <S><RegisterPage /></S>,
       },
       {
-        // A section opened before the organization has a project: say what it is for and make one.
-        path: 'start/:segment',
-        element: <S><ProjectSetupPage /></S>,
+        path: '/verify-email',
+        element: <S><VerifyEmailPage /></S>,
+      },
+      /* The two links an email change mails: confirm from the new address, "this wasn't me" from
+         the old one. Public, because either can be opened with no session. */
+      {
+        path: '/confirm-email-change',
+        element: <S><ConfirmEmailChangePage /></S>,
       },
       {
-        path: 'projects/:projectId/endpoints',
-        element: <S><EndpointsPage /></S>,
+        path: '/cancel-email-change',
+        element: <S><CancelEmailChangePage /></S>,
       },
       {
-        path: 'projects/:projectId/deliveries',
-        element: <S><DeliveriesPage /></S>,
+        path: '/forgot-password',
+        element: <S><ForgotPasswordPage /></S>,
       },
       {
-        path: 'projects/:projectId/events',
-        element: <S><EventsPage /></S>,
+        path: '/reset-password',
+        element: <S><ResetPasswordPage /></S>,
       },
       {
-        path: 'projects/:projectId/subscriptions',
-        element: <S><SubscriptionsPage /></S>,
+        path: '/accept-invite',
+        element: <S><AcceptInvitePage /></S>,
       },
       {
-        path: 'projects/:projectId/api-keys',
-        element: <S><ApiKeysPage /></S>,
+        path: '/device',
+        element: <S><DeviceApprovePage /></S>,
+      },
+      /* Where the API sends the browser after "Continue with Google", with a one-time code to trade
+         for a session. */
+      {
+        path: '/auth/callback',
+        element: <S><AuthCallbackPage /></S>,
+      },
+      /* No /docs route: the docs are a separate static site (railhook-docs/) that nginx
+         serves at /docs/ from this same image, so a link to them is a full page load,
+         never a router navigation. */
+      /* No child route below states a role. `/admin` requires a session, and what
+         each destination requires beyond that is declared once in nav.config's
+         `requiredRoleFor` — which AppLayout applies around the outlet, and which the
+         sidebar and tab strip filter from. Two hand-kept lists is how the personal
+         profile page came to be shown to everyone and guarded at OWNER. */
+      {
+        path: '/admin',
+        element: (
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          {
+            index: true,
+            element: <Navigate to="dashboard" replace />,
+          },
+          {
+            path: 'dashboard',
+            element: <S><DashboardPage /></S>,
+          },
+          {
+            path: 'projects',
+            element: <S><ProjectsPage /></S>,
+          },
+          {
+            // A section opened before the organization has a project: say what it is for and make one.
+            path: 'start/:segment',
+            element: <S><ProjectSetupPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/endpoints',
+            element: <S><EndpointsPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/deliveries',
+            element: <S><DeliveriesPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/events',
+            element: <S><EventsPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/subscriptions',
+            element: <S><SubscriptionsPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/api-keys',
+            element: <S><ApiKeysPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/analytics',
+            element: <S><AnalyticsPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/replay',
+            element: <S><ReplayPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/dlq',
+            element: <S><DlqPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/incoming-dlq',
+            element: <S><IncomingDlqPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/test-endpoints',
+            element: <S><TestEndpointsPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/incoming-sources',
+            element: <S><IncomingSourcesPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/incoming-sources/:sourceId',
+            element: <S><IncomingSourceDetailPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/incoming-events',
+            element: <S><IncomingEventsPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/schemas',
+            element: <S><SchemasPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/pii-rules',
+            element: <S><PiiRulesPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/event-diff',
+            element: <S><EventDiffPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/alerts',
+            element: <S><AlertsPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/usage',
+            element: <S><UsagePage /></S>,
+          },
+          {
+            path: 'projects/:projectId/events/:eventId',
+            element: <S><EventDetailPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/incidents',
+            element: <S><IncidentsPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/rules',
+            element: <S><RulesPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/transformations',
+            element: <S><TransformationsPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/transform-studio',
+            element: <S><TransformStudioPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/connection-setup',
+            element: <S><ConnectionSetupPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/connections',
+            element: <S><ConnectionsPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/workflows',
+            element: <S><WorkflowsPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/workflows/:workflowId',
+            element: <S><WorkflowBuilderPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/test-console',
+            element: <S><TestConsolePage /></S>,
+          },
+          {
+            path: 'tunnels',
+            element: <S><TunnelsPage /></S>,
+          },
+          {
+            path: 'members',
+            element: <S><MembersPage /></S>,
+          },
+          {
+            path: 'audit-log',
+            element: <S><AuditLogPage /></S>,
+          },
+          {
+            path: 'settings',
+            element: <S><SettingsPage /></S>,
+          },
+          {
+            path: 'org-settings',
+            element: <S><OrgSettingsPage /></S>,
+          },
+          {
+            path: 'billing',
+            element: <S><BillingPage /></S>,
+          },
+          /* The platform admin panel: for the people who run the deployment, not an organization
+             role. The gate reads `platformAdmin` from /auth/me; the API checks it again, with the
+             sign-in's age, on every request. */
+          {
+            path: 'platform',
+            element: <S><PlatformAdminGate><PlatformOverviewPage /></PlatformAdminGate></S>,
+          },
+          {
+            path: 'platform/organizations',
+            element: <S><PlatformAdminGate><PlatformOrganizationsPage /></PlatformAdminGate></S>,
+          },
+          {
+            path: 'platform/organizations/:organizationId',
+            element: <S><PlatformAdminGate><PlatformOrganizationDetailPage /></PlatformAdminGate></S>,
+          },
+          {
+            path: 'platform/users',
+            element: <S><PlatformAdminGate><PlatformUsersPage /></PlatformAdminGate></S>,
+          },
+          {
+            path: '*',
+            element: <S><NotFoundPage /></S>,
+          },
+        ],
       },
       {
-        path: 'projects/:projectId/analytics',
-        element: <S><AnalyticsPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/replay',
-        element: <S><ReplayPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/dlq',
-        element: <S><DlqPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/incoming-dlq',
-        element: <S><IncomingDlqPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/test-endpoints',
-        element: <S><TestEndpointsPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/incoming-sources',
-        element: <S><IncomingSourcesPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/incoming-sources/:sourceId',
-        element: <S><IncomingSourceDetailPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/incoming-events',
-        element: <S><IncomingEventsPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/schemas',
-        element: <S><SchemasPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/pii-rules',
-        element: <S><PiiRulesPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/event-diff',
-        element: <S><EventDiffPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/alerts',
-        element: <S><AlertsPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/usage',
-        element: <S><UsagePage /></S>,
-      },
-      {
-        path: 'projects/:projectId/events/:eventId',
-        element: <S><EventDetailPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/incidents',
-        element: <S><IncidentsPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/rules',
-        element: <S><RulesPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/transformations',
-        element: <S><TransformationsPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/transform-studio',
-        element: <S><TransformStudioPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/connection-setup',
-        element: <S><ConnectionSetupPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/connections',
-        element: <S><ConnectionsPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/workflows',
-        element: <S><WorkflowsPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/workflows/:workflowId',
-        element: <S><WorkflowBuilderPage /></S>,
-      },
-      {
-        path: 'projects/:projectId/test-console',
-        element: <S><TestConsolePage /></S>,
-      },
-      {
-        path: 'tunnels',
-        element: <S><TunnelsPage /></S>,
-      },
-      {
-        path: 'members',
-        element: <S><MembersPage /></S>,
-      },
-      {
-        path: 'audit-log',
-        element: <S><AuditLogPage /></S>,
-      },
-      {
-        path: 'settings',
-        element: <S><SettingsPage /></S>,
-      },
-      {
-        path: 'org-settings',
-        element: <S><OrgSettingsPage /></S>,
-      },
-      {
-        path: 'billing',
-        element: <S><BillingPage /></S>,
-      },
-      /* The platform admin panel: for the people who run the deployment, not an organization
-         role. The gate reads `platformAdmin` from /auth/me; the API checks it again, with the
-         sign-in's age, on every request. */
-      {
-        path: 'platform',
-        element: <S><PlatformAdminGate><PlatformOverviewPage /></PlatformAdminGate></S>,
-      },
-      {
-        path: 'platform/organizations',
-        element: <S><PlatformAdminGate><PlatformOrganizationsPage /></PlatformAdminGate></S>,
-      },
-      {
-        path: 'platform/organizations/:organizationId',
-        element: <S><PlatformAdminGate><PlatformOrganizationDetailPage /></PlatformAdminGate></S>,
-      },
-      {
-        path: 'platform/users',
-        element: <S><PlatformAdminGate><PlatformUsersPage /></PlatformAdminGate></S>,
+        path: '/shared/debug/:token',
+        element: <S><SharedDebugPage /></S>,
       },
       {
         path: '*',
         element: <S><NotFoundPage /></S>,
       },
     ],
-  },
-  {
-    path: '/shared/debug/:token',
-    element: <S><SharedDebugPage /></S>,
-  },
-  {
-    path: '*',
-    element: <S><NotFoundPage /></S>,
   },
 ]);

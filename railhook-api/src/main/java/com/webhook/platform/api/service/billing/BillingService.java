@@ -32,6 +32,11 @@ import java.util.stream.Collectors;
 @Slf4j
 public class BillingService {
 
+    private static final List<PaymentStatus> SETTLED_BY_SUCCESS = List.of(
+            PaymentStatus.SUCCEEDED, PaymentStatus.REFUNDED, PaymentStatus.PARTIALLY_REFUNDED);
+    private static final List<PaymentStatus> SETTLED_BY_FAILURE = List.of(
+            PaymentStatus.FAILED, PaymentStatus.SUCCEEDED, PaymentStatus.REFUNDED, PaymentStatus.PARTIALLY_REFUNDED);
+
     private final boolean billingEnabled;
     private final BillingProviderRegistry providerRegistry;
     private final PlanRepository planRepository;
@@ -298,7 +303,10 @@ public class BillingService {
 
         switch (event.eventType()) {
             case "invoice.paid", "payment.succeeded" -> {
-                if (subscription != null) {
+                if (subscription != null && alreadySettled(provider, subscription, event, SETTLED_BY_SUCCESS)) {
+                    log.info("Billing webhook: payment {} already recorded as succeeded, ignoring replay",
+                            event.externalPaymentId());
+                } else if (subscription != null) {
                     BillingPayment payment = BillingPayment.builder()
                             .organizationId(subscription.getOrganizationId())
                             .subscriptionId(subscription.getId())
@@ -335,7 +343,10 @@ public class BillingService {
                 }
             }
             case "invoice.payment_failed", "payment.failed" -> {
-                if (subscription != null) {
+                if (subscription != null && alreadySettled(provider, subscription, event, SETTLED_BY_FAILURE)) {
+                    log.info("Billing webhook: payment {} already recorded, ignoring failure callback",
+                            event.externalPaymentId());
+                } else if (subscription != null) {
                     BillingPayment payment = BillingPayment.builder()
                             .organizationId(subscription.getOrganizationId())
                             .subscriptionId(subscription.getId())
@@ -384,6 +395,24 @@ public class BillingService {
             }
             default -> log.debug("Unhandled billing webhook event: {}", event.eventType());
         }
+    }
+
+    /**
+     * A provider callback is signed but carries no nonce, so the same signed "succeeded" callback
+     * can be delivered again — by the provider's own retries or by anyone who kept a copy — and each
+     * delivery would renew the period once more. The recorded payment is the idempotency record:
+     * a callback for a payment already settled in a way that outranks it is a replay. The
+     * organization row lock serialises concurrent deliveries of the same callback, so the check
+     * and the insert that follows it cannot interleave.
+     */
+    private boolean alreadySettled(BillingProvider provider, BillingSubscription subscription,
+                                   BillingProvider.BillingWebhookEvent event, List<PaymentStatus> settledBy) {
+        if (event.externalPaymentId() == null) {
+            return false;
+        }
+        organizationRepository.lockById(subscription.getOrganizationId());
+        return paymentRepository.existsByProviderCodeAndExternalPaymentIdAndStatusIn(
+                provider.getProviderCode(), event.externalPaymentId(), settledBy);
     }
 
     // ── Subscription history ────────────────────────────────────────

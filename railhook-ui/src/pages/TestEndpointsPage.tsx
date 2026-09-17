@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Trash2, Copy, RefreshCw, Loader2, Clock, ChevronDown, ChevronRight, Eraser, Inbox, TestTube } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -56,16 +56,20 @@ export default function TestEndpointsPage() {
     }
   }, [projectId]);
 
+  // Only the latest load may write: switching endpoints while one is still loading used to let
+  // the earlier, slower answer land on top of the endpoint now selected.
+  const latestRequestsLoad = useRef(0);
   const loadRequests = useCallback(async (endpointId: string) => {
     if (!projectId) return;
+    const load = ++latestRequestsLoad.current;
     try {
       setLoadingRequests(true);
       const data = await testEndpointsApi.getRequests(projectId, endpointId);
-      setRequests(data.content);
+      if (load === latestRequestsLoad.current) setRequests(data.content);
     } catch (err: any) {
-      showApiError(err, 'testEndpoints.toast.loadRequestsFailed');
+      if (load === latestRequestsLoad.current) showApiError(err, 'testEndpoints.toast.loadRequestsFailed');
     } finally {
-      setLoadingRequests(false);
+      if (load === latestRequestsLoad.current) setLoadingRequests(false);
     }
   }, [projectId]);
 

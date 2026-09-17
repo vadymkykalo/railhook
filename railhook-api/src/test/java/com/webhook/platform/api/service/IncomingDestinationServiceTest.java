@@ -64,7 +64,8 @@ class IncomingDestinationServiceTest {
                 destinationRepository, sourceRepository,
                 transformationRepository,
                 registry,
-                true, List.of()
+                true, List.of(),
+                new RetryLadderEscalationCap(96, 24)
         );
         source = IncomingSource.builder()
                 .id(sourceId).projectId(projectId).name("src")
@@ -86,7 +87,7 @@ class IncomingDestinationServiceTest {
     }
 
     private void stubOwnership() {
-        when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
+        when(sourceRepository.findByIdAndProjectId(sourceId, projectId)).thenReturn(Optional.of(source));
     }
 
 
@@ -125,7 +126,7 @@ class IncomingDestinationServiceTest {
                 .retryDelays("30,60")
                 .build();
 
-        IncomingDestinationResponse response = service.createDestination(sourceId, request);
+        IncomingDestinationResponse response = service.createDestination(projectId, sourceId, request);
 
         assertThat(response.getId()).isEqualTo(destId);
         assertThat(response.getUrl()).isEqualTo("https://example.com/hook");
@@ -155,7 +156,7 @@ class IncomingDestinationServiceTest {
                 .url("https://example.com/hook")
                 .build();
 
-        IncomingDestinationResponse response = service.createDestination(sourceId, request);
+        IncomingDestinationResponse response = service.createDestination(projectId, sourceId, request);
 
         assertThat(response.getAuthType()).isEqualTo(IncomingAuthType.NONE);
         assertThat(response.isEnabled()).isTrue();
@@ -167,18 +168,19 @@ class IncomingDestinationServiceTest {
     @Test
     void getDestination_success() {
         IncomingDestination dest = buildDest();
-        when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
+        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(dest));
         stubOwnership();
 
-        IncomingDestinationResponse response = service.getDestination(destId);
+        IncomingDestinationResponse response = service.getDestination(projectId, sourceId, destId);
         assertThat(response.getUrl()).isEqualTo("https://example.com/hook");
     }
 
     @Test
     void getDestination_notFound() {
-        when(destinationRepository.findById(destId)).thenReturn(Optional.empty());
+        stubOwnership();
+        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getDestination(destId))
+        assertThatThrownBy(() -> service.getDestination(projectId, sourceId, destId))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -188,16 +190,16 @@ class IncomingDestinationServiceTest {
         when(destinationRepository.findByIncomingSourceId(eq(sourceId), any()))
                 .thenReturn(new PageImpl<>(List.of(buildDest())));
 
-        Page<IncomingDestinationResponse> page = service.listDestinations(sourceId, PageRequest.of(0, 20));
+        Page<IncomingDestinationResponse> page = service.listDestinations(projectId, sourceId, PageRequest.of(0, 20));
         assertThat(page.getTotalElements()).isEqualTo(1);
     }
 
     @Test
     void updateDestination_success() {
         IncomingDestination dest = buildDest();
-        when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
+        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(dest));
         stubOwnership();
-        when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         IncomingDestinationRequest request = IncomingDestinationRequest.builder()
                 .url("https://updated.com/hook")
@@ -206,7 +208,7 @@ class IncomingDestinationServiceTest {
                 .maxAttempts(10)
                 .build();
 
-        IncomingDestinationResponse response = service.updateDestination(destId, request);
+        IncomingDestinationResponse response = service.updateDestination(projectId, sourceId, destId, request);
 
         assertThat(response.getUrl()).isEqualTo("https://updated.com/hook");
         assertThat(response.getAuthType()).isEqualTo(IncomingAuthType.BASIC);
@@ -232,7 +234,7 @@ class IncomingDestinationServiceTest {
                 .transformationId(transformId.toString())
                 .build();
 
-        assertThatThrownBy(() -> service.createDestination(sourceId, request))
+        assertThatThrownBy(() -> service.createDestination(projectId, sourceId, request))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Transformation does not belong to this project");
     }
@@ -258,14 +260,14 @@ class IncomingDestinationServiceTest {
                 .transformationId(transformId.toString())
                 .build();
 
-        IncomingDestinationResponse response = service.createDestination(sourceId, request);
+        IncomingDestinationResponse response = service.createDestination(projectId, sourceId, request);
         assertThat(response.getTransformationId()).isEqualTo(transformId);
     }
 
     @Test
     void updateDestination_foreignTransformation_throwsForbidden() {
         IncomingDestination dest = buildDest();
-        when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
+        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(dest));
         stubOwnership();
 
         UUID foreignProjectId = UUID.randomUUID();
@@ -280,7 +282,7 @@ class IncomingDestinationServiceTest {
                 .transformationId(transformId.toString())
                 .build();
 
-        assertThatThrownBy(() -> service.updateDestination(destId, request))
+        assertThatThrownBy(() -> service.updateDestination(projectId, sourceId, destId, request))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Transformation does not belong to this project");
     }
@@ -289,13 +291,13 @@ class IncomingDestinationServiceTest {
     void updateDestination_blankTransformationId_detachesTheTemplate() {
         IncomingDestination dest = buildDest();
         dest.setTransformationId(UUID.randomUUID());
-        when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
-        when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(dest));
+        lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
         stubOwnership();
 
         // Same signal that clears payloadTransform. There used to be none for this field, so a
         // destination that acquired a transformation was stuck with one for good.
-        service.updateDestination(destId, IncomingDestinationRequest.builder()
+        service.updateDestination(projectId, sourceId, destId, IncomingDestinationRequest.builder()
                 .url("https://example.com/hook")
                 .transformationId("")
                 .build());
@@ -309,11 +311,11 @@ class IncomingDestinationServiceTest {
         IncomingDestination dest = buildDest();
         UUID attached = UUID.randomUUID();
         dest.setTransformationId(attached);
-        when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
-        when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(dest));
+        lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
         stubOwnership();
 
-        service.updateDestination(destId, IncomingDestinationRequest.builder()
+        service.updateDestination(projectId, sourceId, destId, IncomingDestinationRequest.builder()
                 .url("https://example.com/hook")
                 .build());
 
@@ -323,10 +325,10 @@ class IncomingDestinationServiceTest {
     @Test
     void updateDestination_malformedTransformationId_isRefused() {
         IncomingDestination dest = buildDest();
-        when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
+        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(dest));
         stubOwnership();
 
-        assertThatThrownBy(() -> service.updateDestination(destId, IncomingDestinationRequest.builder()
+        assertThatThrownBy(() -> service.updateDestination(projectId, sourceId, destId, IncomingDestinationRequest.builder()
                 .url("https://example.com/hook")
                 .transformationId("not-a-uuid")
                 .build()))
@@ -337,10 +339,10 @@ class IncomingDestinationServiceTest {
     @Test
     void deleteDestination_success() {
         IncomingDestination dest = buildDest();
-        when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
+        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(dest));
         stubOwnership();
 
-        service.deleteDestination(destId);
+        service.deleteDestination(projectId, sourceId, destId);
 
         verify(destinationRepository).delete(dest);
     }
@@ -377,7 +379,7 @@ class IncomingDestinationServiceTest {
                 .retryDelays("60,oops,900")
                 .build();
 
-        assertThatThrownBy(() -> service.createDestination(sourceId, request))
+        assertThatThrownBy(() -> service.createDestination(projectId, sourceId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("retryDelays")
                 .hasMessageContaining("tier 2");
@@ -394,7 +396,7 @@ class IncomingDestinationServiceTest {
                 .maxAttempts(0)
                 .build();
 
-        assertThatThrownBy(() -> service.createDestination(sourceId, request))
+        assertThatThrownBy(() -> service.createDestination(projectId, sourceId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("maxAttempts");
     }
@@ -414,7 +416,7 @@ class IncomingDestinationServiceTest {
                 .url("https://example.com/hook")
                 .build();
 
-        service.createDestination(sourceId, request);
+        service.createDestination(projectId, sourceId, request);
 
         ArgumentCaptor<IncomingDestination> saved = ArgumentCaptor.forClass(IncomingDestination.class);
         verify(destinationRepository).saveAndFlush(saved.capture());
@@ -429,5 +431,46 @@ class IncomingDestinationServiceTest {
         // read why.
         assertThat(RetryLadderDefaults.INCOMING_DELAYS).isNotEqualTo(RetryLadderDefaults.OUTGOING_DELAYS);
         assertThat(RetryLadderDefaults.INCOMING_MAX_ATTEMPTS).isLessThan(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS);
+    }
+
+    // A custom ladder longer than the forward escalation cap was accepted, and the Forward was
+    // then moved to the DLQ by age before its later tiers ever ran.
+
+    @Test
+    void createDestination_ladderOutlivingTheEscalationCap_throws() {
+        stubOwnership();
+
+        lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        // 5 attempts at 6h each: up to 45h with jitter, against a 24h cap.
+        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .retryDelays("21600")
+                .maxAttempts(5)
+                .build();
+
+        assertThatThrownBy(() -> service.createDestination(projectId, sourceId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("24h");
+
+        verify(destinationRepository, never()).saveAndFlush(any(IncomingDestination.class));
+    }
+
+    @Test
+    void updateDestination_lengtheningTheLadderPastTheEscalationCap_throws() {
+        IncomingDestination existing = buildDest();
+        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(existing));
+        lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        stubOwnership();
+
+        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .retryDelays("86400")
+                .build();
+
+        assertThatThrownBy(() -> service.updateDestination(projectId, sourceId, destId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("retryDelays");
+
+        verify(destinationRepository, never()).saveAndFlush(any(IncomingDestination.class));
     }
 }

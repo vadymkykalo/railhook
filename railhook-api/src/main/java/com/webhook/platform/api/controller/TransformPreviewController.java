@@ -39,11 +39,11 @@ public class TransformPreviewController {
             @Valid @RequestBody TransformPreviewRequest request,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(transformPreviewService.preview(request));
+        return ResponseEntity.ok(transformPreviewService.preview(projectId, request));
     }
 
-    // Unlike /transform-preview above, which only ever touches caller-supplied sample
-    // input, this returns a real X-Signature computed with the endpoint's signing secret.
+    // Unlike /transform-preview above, which only ever renders a template against
+    // caller-supplied sample input, this returns a real X-Signature computed with the endpoint's signing secret.
     // That is a write-level capability: holding it lets the caller mint a payload the
     // destination will accept as genuine. Guard it like one.
     @Operation(summary = "Dry-run delivery", description = "Simulate a full delivery: transform payload, compute HMAC signature, build headers — without actually sending the request")

@@ -26,6 +26,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -72,7 +73,7 @@ class MembershipSuspensionTest {
         // production cost of 12 would add ~200ms per test for no assertion's benefit.
         membershipService = new MembershipService(
                 userRepository, membershipRepository, emailService, tokenBlacklistService,
-                new BCryptPasswordEncoder(4));
+                new BCryptPasswordEncoder(4), mock(TunnelService.class));
 
         membership = new Membership();
         membership.setUserId(memberId);

@@ -3917,7 +3917,7 @@ export interface components {
             hmacSignaturePrefix?: string;
             /**
              * Format: int32
-             * @description Rate limit per second for ingress endpoint (null = unlimited)
+             * @description Rate limit per second for the ingress URL, at most the plan's own (null = the default limit)
              * @example 100
              */
             rateLimitPerSecond?: number;
@@ -4525,6 +4525,18 @@ export interface components {
             type: string;
             data: components["schemas"]["JsonNode"];
         };
+        DeliveryStatusCounts: {
+            /** Format: int32 */
+            pending?: number;
+            /** Format: int32 */
+            processing?: number;
+            /** Format: int32 */
+            success?: number;
+            /** Format: int32 */
+            failed?: number;
+            /** Format: int32 */
+            dlq?: number;
+        };
         EventResponse: {
             /** Format: uuid */
             id?: string;
@@ -4536,6 +4548,7 @@ export interface components {
             createdAt?: string;
             /** Format: int32 */
             deliveriesCreated?: number;
+            deliveryCounts?: components["schemas"]["DeliveryStatusCounts"];
             schemaWarnings?: string[];
         };
         VerificationResponse: {
@@ -6755,6 +6768,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -6777,6 +6791,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -6803,6 +6818,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -6823,6 +6839,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -7039,6 +7056,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
+                sourceId: string;
                 id: string;
             };
             cookie?: never;
@@ -7070,6 +7089,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
+                sourceId: string;
                 id: string;
             };
             cookie?: never;
@@ -7105,6 +7126,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
+                sourceId: string;
                 id: string;
             };
             cookie?: never;
@@ -7125,6 +7148,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -7156,6 +7180,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -7191,6 +7216,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -7261,6 +7287,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -7283,6 +7310,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -7309,6 +7337,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;
@@ -8433,6 +8462,7 @@ export interface operations {
             };
             header?: never;
             path: {
+                projectId: string;
                 sourceId: string;
             };
             cookie?: never;
@@ -8455,6 +8485,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 sourceId: string;
             };
             cookie?: never;
@@ -8879,6 +8910,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                projectId: string;
                 id: string;
             };
             cookie?: never;

@@ -133,11 +133,15 @@ public class RedisConcurrencyControlService {
         try {
             RPermitExpirableSemaphore semaphore = redissonClient.getPermitExpirableSemaphore(key);
             
+            // setPermits, not trySetPermits: the latter writes only when the key is absent, so a
+            // changed limit never reached a semaphore that traffic kept alive. setPermits counts
+            // the permits in flight and moves the total to the limit, which is a no-op when it
+            // already agrees.
             if (initializedSemaphores.getIfPresent(key) == null) {
-                semaphore.trySetPermits(limit);
+                semaphore.setPermits(limit);
                 initializedSemaphores.put(key, Boolean.TRUE);
             }
-            
+
             // leaseTime bounds how long a permit can be held without release() being called.
             // Without it an orphaned permit (crashed pod, or a code path that throws before
             // the caller's finally) never comes back until the whole semaphore key's 24h TTL
@@ -154,6 +158,14 @@ public class RedisConcurrencyControlService {
             // also outlasted the lease below, so a permit expired while still in use and the
             // cap this class exists to enforce quietly stopped holding.
             String permitId = semaphore.tryAcquire(0, permitLeaseSeconds, TimeUnit.SECONDS);
+            if (permitId == null) {
+                // A refusal is also what a semaphore that is no longer there looks like: Redis
+                // runs allkeys-lru and may restart empty, and a missing key has zero permits.
+                // Trusting the local "initialised" mark would defer every attempt here until it
+                // expired, so the limit is re-asserted and the permit asked for once more.
+                semaphore.setPermits(limit);
+                permitId = semaphore.tryAcquire(0, permitLeaseSeconds, TimeUnit.SECONDS);
+            }
             if (permitId != null) {
                 acquiredPermits.put(threadKey, permitId);
                 semaphore.expire(KEY_TTL);

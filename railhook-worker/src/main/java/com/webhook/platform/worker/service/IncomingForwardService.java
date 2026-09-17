@@ -115,35 +115,43 @@ public class IncomingForwardService {
      * Hands a Forward back to the retry ladder when the executor pool is full, so the consumer can
      * ack instead of leaving the record unacked and stalling the partition.
      *
-     * <p>Both entry states are handed back the same way: a dispatch row is still PENDING and a
-     * retry row is already PROCESSING. Either way {@code next_retry_at} must be set — the
-     * scheduler ignores rows without one, so acking without stamping it strands the Forward.
+     * <p>Either way {@code next_retry_at} must be set — the scheduler ignores rows without one, so
+     * acking without stamping it strands the Forward.
+     *
+     * <p>Only the Claim this message would have taken is handed back, matched the way
+     * {@code IncomingAttemptStore} claims: a retry message on the {@code started_at} it was
+     * published with, anything else on a row still PENDING. Another copy of the message may hold
+     * the row with its POST on the wire, and taking it away lost that copy's 2xx and sent the
+     * Forward again. A retry message without {@code started_at} cannot tell which copy it is,
+     * and leaves the row to the stuck sweep.
      */
     public void rescheduleForBackpressure(IncomingForwardMessage message) {
         UUID eventId = message.getIncomingEventId();
         UUID destinationId = message.getDestinationId();
         int attemptNumber = resolveAttemptNumber(message);
+        boolean fencedRetry = message.getAttemptCount() != null && message.getAttemptCount() > 0
+                && !message.isReplay();
+        long delaySec = ThreadLocalRandom.current().nextLong(5, 16);
+        Instant retryAt = Instant.now().plusSeconds(delaySec);
 
-        transactionTemplate.executeWithoutResult(tx -> {
-            IncomingForwardAttempt attempt = findAttempt(eventId, destinationId,
-                    message.getReplaySessionId(), attemptNumber);
-            if (attempt == null) {
-                log.debug("Forward attempt {} for eventId={}, destId={} disappeared before backpressure reschedule",
-                        attemptNumber, eventId, destinationId);
-                return;
-            }
-            if (attempt.getStatus() != ForwardAttemptStatus.PENDING
-                    && attempt.getStatus() != ForwardAttemptStatus.PROCESSING) {
-                log.debug("Forward attempt {} for eventId={}, destId={} is already {} — skipping backpressure reschedule",
-                        attemptNumber, eventId, destinationId, attempt.getStatus());
-                return;
-            }
-            long delaySec = ThreadLocalRandom.current().nextLong(5, 16);
-            attempt.handBackTo(Instant.now().plusSeconds(delaySec));
-            attemptRepository.save(attempt);
-            log.warn("Executor pool full, rescheduled forward eventId={}, destId={} via retry ladder in {}s "
-                    + "instead of leaving it unacked", eventId, destinationId, delaySec);
-        });
+        if (fencedRetry && message.getStartedAt() == null) {
+            log.warn("Executor pool full for retry forward eventId={}, destId={} with no started_at; "
+                    + "leaving it to the stuck sweep", eventId, destinationId);
+            return;
+        }
+        Integer written = transactionTemplate.execute(tx -> fencedRetry
+                ? attemptRepository.handBackIfStillClaimed(eventId, destinationId, attemptNumber,
+                        message.getReplaySessionId(), message.getStartedAt(), retryAt)
+                : attemptRepository.scheduleIfUnclaimed(eventId, destinationId, attemptNumber,
+                        message.getReplaySessionId(), retryAt));
+        if (written == null || written == 0) {
+            log.debug("Forward attempt {} for eventId={}, destId={} is not in the state this message would claim "
+                    + "(another copy holds it, or it is done), skipping backpressure reschedule",
+                    attemptNumber, eventId, destinationId);
+            return;
+        }
+        log.warn("Executor pool full, rescheduled forward eventId={}, destId={} via retry ladder in {}s "
+                + "instead of leaving it unacked", eventId, destinationId, delaySec);
     }
 
     private int resolveAttemptNumber(IncomingForwardMessage message) {
@@ -176,15 +184,5 @@ public class IncomingForwardService {
             attempt.failWith(reason);
             attemptRepository.save(attempt);
         });
-    }
-
-    private IncomingForwardAttempt findAttempt(UUID eventId, UUID destinationId, UUID replaySessionId,
-            int attemptNumber) {
-        return attemptRepository
-                .findForwardAttempts(eventId, destinationId, replaySessionId)
-                .stream()
-                .filter(a -> a.getAttemptNumber() == attemptNumber)
-                .findFirst()
-                .orElse(null);
     }
 }

@@ -38,6 +38,7 @@ public class RedisTunnelCoordinator {
     private static final Duration SLUG_TTL = Duration.ofMinutes(3);
     private static final String REQUEST_TOPIC_PREFIX = "tunnel:req:";
     private static final String RESPONSE_TOPIC_PREFIX = "tunnel:resp:";
+    private static final String DISCONNECT_TOPIC = "tunnel:disconnect";
     private static final int REMOTE_TIMEOUT_SECONDS = 25;
 
     private final RedissonClient redissonClient;
@@ -50,6 +51,7 @@ public class RedisTunnelCoordinator {
 
     private int requestListenerId;
     private int responseListenerId;
+    private int disconnectListenerId;
 
     private final Counter localForwardCounter;
     private final Counter remoteForwardCounter;
@@ -104,6 +106,9 @@ public class RedisTunnelCoordinator {
             handleRemoteResponse(message);
         });
 
+        disconnectListenerId = redissonClient.getTopic(DISCONNECT_TOPIC).addListener(String.class,
+                (channel, slug) -> tunnelRegistry.disconnect(slug));
+
         log.info("Tunnel coordinator listening on topics: req={}, resp={}",
                 REQUEST_TOPIC_PREFIX + instanceId, RESPONSE_TOPIC_PREFIX + instanceId);
     }
@@ -113,6 +118,7 @@ public class RedisTunnelCoordinator {
         try {
             redissonClient.getTopic(REQUEST_TOPIC_PREFIX + instanceId).removeListener(requestListenerId);
             redissonClient.getTopic(RESPONSE_TOPIC_PREFIX + instanceId).removeListener(responseListenerId);
+            redissonClient.getTopic(DISCONNECT_TOPIC).removeListener(disconnectListenerId);
         } catch (Exception e) {
             log.warn("Error cleaning up tunnel coordinator listeners: {}", e.getMessage());
         }
@@ -140,6 +146,20 @@ public class RedisTunnelCoordinator {
             log.debug("Unregistered slug from Redis: slug={}", slug);
         } catch (Exception e) {
             log.warn("Failed to unregister slug from Redis: slug={}, error={}", slug, e.getMessage());
+        }
+    }
+
+    /**
+     * Ends a tunnel wherever its socket is. The owner key goes before the broadcast, so the slug
+     * stops resolving cluster-wide before the message reaches the instance holding the socket.
+     */
+    public void disconnect(String slug) {
+        tunnelRegistry.disconnect(slug);
+        unregisterSlug(slug);
+        try {
+            redissonClient.getTopic(DISCONNECT_TOPIC).publish(slug);
+        } catch (Exception e) {
+            log.warn("Failed to broadcast tunnel disconnect: slug={}, error={}", slug, e.getMessage());
         }
     }
 

@@ -4,6 +4,7 @@ import com.webhook.platform.worker.attempt.AttemptRunner;
 import java.time.Clock;
 import com.webhook.platform.worker.attempt.DeliveryAttemptMetrics;
 import com.webhook.platform.worker.attempt.OutgoingAttemptStoreFactory;
+import com.webhook.platform.worker.attempt.ProjectStatusLookup;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -64,14 +65,6 @@ import static org.mockito.Mockito.*;
  * and is pinned by {@code AttemptRunnerTest} against a fake store, with no infrastructure. The
  * two suites therefore overlap in what they assert and not in what they cover: delete a case
  * here and the store loses its only test.
- */
-
-/**
- * Covers WebhookDeliveryService.rescheduleForBackpressure — the fix for
- * DeliveryConsumer's executor-full path, which used to leave the Kafka record unacked
- * and rely on redelivery that MANUAL acks don't actually provide. See DeliveryConsumerTest
- * for the consumer-side wiring (reschedule-then-ack) and KafkaAckOrderingIntegrationTest
- * for the underlying offset-ordering fix.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -134,93 +127,13 @@ class WebhookDeliveryServiceTest {
     private WebhookDeliveryService newService(WebClient webClient, MeterRegistry registry, AttemptRunner runner) {
         OutgoingAttemptStoreFactory storeFactory = new OutgoingAttemptStoreFactory(
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
+                activeProjects(),
                 transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
                 mtlsWebClientFactory, transformationCacheService, payloadTransformService,
                 new ObjectMapper(), webClient, registry, Clock.systemUTC(),
                 ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
         return new WebhookDeliveryService(runner, storeFactory, new DeliveryAttemptMetrics(registry),
                 deliveryRepository, transactionTemplate);
-    }
-
-    private Delivery pendingDelivery(UUID id) {
-        return Delivery.builder()
-                .id(id)
-                .status(Delivery.DeliveryStatus.PENDING)
-                .attemptCount(0)
-                .maxAttempts(5)
-                .updatedAt(Instant.now().minusSeconds(60))
-                .build();
-    }
-
-    private Delivery processingDelivery(UUID id) {
-        return Delivery.builder()
-                .id(id)
-                .status(Delivery.DeliveryStatus.PROCESSING)
-                .attemptCount(1)
-                .maxAttempts(5)
-                .updatedAt(Instant.now().minusSeconds(60))
-                .build();
-    }
-
-    @Test
-    void rescheduleForBackpressure_dispatchPath_reschedulesPendingDelivery() {
-        UUID id = UUID.randomUUID();
-        when(deliveryRepository.findById(id)).thenReturn(Optional.of(pendingDelivery(id)));
-
-        service.rescheduleForBackpressure(id, false);
-
-        ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveryRepository).save(captor.capture());
-        Delivery saved = captor.getValue();
-        assertEquals(Delivery.DeliveryStatus.PENDING, saved.getStatus());
-        assertTrue(saved.getNextRetryAt() != null && saved.getNextRetryAt().isAfter(Instant.now()),
-                "next_retry_at must be set to a near-future instant so RetrySchedulerService picks it up");
-    }
-
-    @Test
-    void rescheduleForBackpressure_retryPath_revertsProcessingClaimToPending() {
-        UUID id = UUID.randomUUID();
-        when(deliveryRepository.findById(id)).thenReturn(Optional.of(processingDelivery(id)));
-
-        service.rescheduleForBackpressure(id, true);
-
-        ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveryRepository).save(captor.capture());
-        Delivery saved = captor.getValue();
-        assertEquals(Delivery.DeliveryStatus.PENDING, saved.getStatus());
-        assertTrue(saved.getNextRetryAt() != null && saved.getNextRetryAt().isAfter(Instant.now()));
-    }
-
-    @Test
-    void rescheduleForBackpressure_dispatchPath_noOp_whenAlreadyClaimed() {
-        // A different pool thread already claimed it (PENDING -> PROCESSING) between the
-        // executor-full rejection and this call — nothing to reschedule.
-        UUID id = UUID.randomUUID();
-        when(deliveryRepository.findById(id)).thenReturn(Optional.of(processingDelivery(id)));
-
-        service.rescheduleForBackpressure(id, false);
-
-        verify(deliveryRepository, never()).save(any());
-    }
-
-    @Test
-    void rescheduleForBackpressure_retryPath_noOp_whenNoLongerProcessing() {
-        UUID id = UUID.randomUUID();
-        when(deliveryRepository.findById(id)).thenReturn(Optional.of(pendingDelivery(id)));
-
-        service.rescheduleForBackpressure(id, true);
-
-        verify(deliveryRepository, never()).save(any());
-    }
-
-    @Test
-    void rescheduleForBackpressure_noOp_whenDeliveryMissing() {
-        UUID id = UUID.randomUUID();
-        when(deliveryRepository.findById(id)).thenReturn(Optional.empty());
-
-        service.rescheduleForBackpressure(id, false);
-
-        verify(deliveryRepository, never()).save(any());
     }
 
     /**
@@ -1267,7 +1180,7 @@ class WebhookDeliveryServiceTest {
 
         // Nothing was sent, and no permit was ever taken: the check runs before admission.
         verify(concurrencyControlService, never()).tryAcquireForTarget(endpointId);
-        verify(deliveryRepository, never()).incrementAttemptCount(any());
+        verify(deliveryRepository, never()).incrementAttemptCount(any(), any());
     }
 
     @Test
@@ -1299,5 +1212,20 @@ class WebhookDeliveryServiceTest {
         service.processDelivery(message, true);
 
         verify(projectRateLimiterService).tryAcquire(endpoint.getProjectId());
+    }
+
+    /** Every Project active: whether a Project may still be sent for is not what this test is about. */
+    private static ProjectStatusLookup activeProjects() {
+        return new ProjectStatusLookup(null) {
+            @Override
+            public ProjectStatus forProject(UUID projectId) {
+                return ProjectStatus.ACTIVE;
+            }
+
+            @Override
+            public ProjectStatus forSource(UUID sourceId) {
+                return ProjectStatus.ACTIVE;
+            }
+        };
     }
 }

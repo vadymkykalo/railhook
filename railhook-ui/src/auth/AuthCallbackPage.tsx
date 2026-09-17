@@ -8,16 +8,7 @@ import { http } from '../api/http';
 import { useAuth } from './auth.store';
 import { showSuccess } from '../lib/toast';
 import { Button } from '../components/ui/button';
-
-const DEFAULT_DESTINATION = '/admin/dashboard';
-
-/** Same rule the API applies: a path on this site, nothing a browser would read as another host. */
-function safeDestination(value: string | null): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
-    return DEFAULT_DESTINATION;
-  }
-  return value;
-}
+import { safeDestination } from '../lib/signInDestination';
 
 /**
  * Where the API sends the browser after "Continue with Google". The URL carries a one-time code,

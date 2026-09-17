@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
@@ -156,6 +156,25 @@ describe('WorkflowBuilderPage', () => {
     await screen.findByText('Route payments');
     // Whether it is live is the one fact that changes what this page means.
     await waitFor(() => expect(document.body.textContent).toMatch(/disabled|вимкнено/i));
+  });
+
+  it('keeps unsaved canvas edits when the workflow is enabled or disabled', async () => {
+    renderBuilder();
+    await screen.findByText('Route payments');
+
+    // An unsaved edit: select the node, delete it with the keyboard.
+    fireEvent.click(await screen.findByText('Reshape'));
+    fireEvent.keyDown(window, { key: 'Delete' });
+    await waitFor(() => expect(screen.queryByText('Reshape')).not.toBeInTheDocument());
+    expect(screen.getByText(/unsaved/i)).toBeInTheDocument();
+
+    vi.mocked(workflowsApi.toggle).mockResolvedValue({ ...WORKFLOW, enabled: true } as never);
+    vi.mocked(workflowsApi.get).mockResolvedValue({ ...WORKFLOW, enabled: true });
+    fireEvent.click(screen.getByRole('button', { name: /^disabled$/i }));
+
+    await screen.findByRole('button', { name: /^enabled$/i });
+    expect(screen.getByText(/unsaved/i)).toBeInTheDocument();
+    expect(screen.queryByText('Reshape')).not.toBeInTheDocument();
   });
 
   it('renders something rather than a blank page when the workflow fails to load', async () => {

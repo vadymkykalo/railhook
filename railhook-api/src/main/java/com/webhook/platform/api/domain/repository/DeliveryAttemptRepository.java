@@ -61,13 +61,28 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
         """, nativeQuery = true)
     int deleteOldSuccessfulAttempts(@Param("cutoffTime") Instant cutoffTime, @Param("limit") int limit);
     
+    /**
+     * The window runs only over deliveries already known to be over the limit. It used to number
+     * every row of delivery_attempts, sorted by delivery, for each batch of a run — a full sort of
+     * the largest table every thirty minutes, once per thousand rows deleted. The candidates are
+     * counted off the delivery_id index without sorting or reading the rows, and at most
+     * {@code limit} are taken, which fills a batch since each has at least one row to delete.
+     */
     @Modifying(clearAutomatically = true)
     @Query(value = """
-        WITH rows_to_delete AS (
+        WITH over_limit AS (
+            SELECT delivery_id
+            FROM delivery_attempts
+            GROUP BY delivery_id
+            HAVING COUNT(*) > :maxAttemptsPerDelivery
+            LIMIT :limit
+        ),
+        rows_to_delete AS (
             SELECT id FROM (
-                SELECT id, 
-                       ROW_NUMBER() OVER (PARTITION BY delivery_id ORDER BY attempt_number DESC) as rn
-                FROM delivery_attempts
+                SELECT da.id,
+                       ROW_NUMBER() OVER (PARTITION BY da.delivery_id ORDER BY da.attempt_number DESC) as rn
+                FROM delivery_attempts da
+                WHERE da.delivery_id IN (SELECT delivery_id FROM over_limit)
             ) t
             WHERE t.rn > :maxAttemptsPerDelivery
             LIMIT :limit

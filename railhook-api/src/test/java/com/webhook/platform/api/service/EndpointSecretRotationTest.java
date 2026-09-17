@@ -1,7 +1,6 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.Endpoint;
-import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
@@ -63,8 +62,6 @@ class EndpointSecretRotationTest {
                 endpointRepository, projectRepository, WebClient.builder(), registry,
                 true, Collections.emptyList(), false);
 
-        when(projectRepository.findById(projectId))
-                .thenReturn(Optional.of(Project.builder().id(projectId).name("p").build()));
         when(endpointRepository.saveAndFlush(any(Endpoint.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -73,10 +70,10 @@ class EndpointSecretRotationTest {
     void retiredSecretStaysValid() {
         String original = "the_secret_the_customer_deployed";
         Endpoint endpoint = endpointWithSecret(original);
-        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(endpointRepository.findByIdAndProjectId(endpointId, projectId)).thenReturn(Optional.of(endpoint));
 
         Instant before = Instant.now();
-        String newSecret = service.rotateSecret(endpointId).getSecret();
+        String newSecret = service.rotateSecret(projectId, endpointId).getSecret();
 
         assertThat(endpoint.getSecretRotatedAt())
                 .as("the window has to start somewhere")
@@ -105,9 +102,9 @@ class EndpointSecretRotationTest {
         Endpoint endpoint = endpointWithSecret("original");
         String ciphertextBefore = endpoint.getSecretEncrypted();
         String ivBefore = endpoint.getSecretIv();
-        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(endpointRepository.findByIdAndProjectId(endpointId, projectId)).thenReturn(Optional.of(endpoint));
 
-        service.rotateSecret(endpointId);
+        service.rotateSecret(projectId, endpointId);
 
         /* A straight ciphertext copy would look right and decrypt today. It breaks after the
            next encryption-key rotation, when encryption_key_version moves on and the copied
@@ -123,10 +120,10 @@ class EndpointSecretRotationTest {
     @DisplayName("a second rotation retires the secret from the first, not the one before it")
     void secondRotationShiftsTheWindow() {
         Endpoint endpoint = endpointWithSecret("first");
-        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(endpointRepository.findByIdAndProjectId(endpointId, projectId)).thenReturn(Optional.of(endpoint));
 
-        String second = service.rotateSecret(endpointId).getSecret();
-        service.rotateSecret(endpointId);
+        String second = service.rotateSecret(projectId, endpointId).getSecret();
+        service.rotateSecret(projectId, endpointId);
 
         String kept = registry.decryptWithFallback(
                 endpoint.getSecretPreviousEncrypted(),
@@ -142,9 +139,9 @@ class EndpointSecretRotationTest {
     void undecryptableSecretStillRotates() {
         Endpoint endpoint = endpointWithSecret("original");
         endpoint.setSecretEncrypted("not-base64-ciphertext");
-        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(endpointRepository.findByIdAndProjectId(endpointId, projectId)).thenReturn(Optional.of(endpoint));
 
-        String newSecret = service.rotateSecret(endpointId).getSecret();
+        String newSecret = service.rotateSecret(projectId, endpointId).getSecret();
 
         /* Rotating is how an operator recovers from an unreadable secret, so it must not be
            the one thing they cannot do. And no window is opened: a secret nobody can read is

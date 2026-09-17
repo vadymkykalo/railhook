@@ -16,6 +16,8 @@ import org.redisson.api.RScoredSortedSet;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.Codec;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -106,7 +108,8 @@ class OrderingBufferServiceTest {
             }
         });
 
-        service = new OrderingBufferService(redissonClient, cursorRepository, meterRegistry,
+        service = new OrderingBufferService(redissonClient, cursorRepository,
+                new TransactionTemplate(mock(PlatformTransactionManager.class)), meterRegistry,
                 GAP_TIMEOUT_SECONDS, 24, 10);
     }
 

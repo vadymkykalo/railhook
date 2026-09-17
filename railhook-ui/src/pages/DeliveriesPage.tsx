@@ -55,11 +55,10 @@ function dateRangeOptions(t: (key: string) => string) {
   return DATE_RANGE_VALUES.map((value) => ({ value, label: t(labelKeys[value]) }));
 }
 
-/** Trailing window bound to a coarse (minute) grain so the upper bound keeps
- * advancing as time passes without changing — and re-fetching — on every render. */
-function dateRangeBounds(dateRange: string, nowMinute: number): { fromDate?: string; toDate?: string } {
-  const now = nowMinute * 60_000;
-  const toDate = new Date(now).toISOString();
+/** Trailing window: the lower bound moves on a minute grain so the key does not change on
+ * every render, and there is no upper bound, so a delivery created after the last tick — in the
+ * current minute — is not cut off. */
+function dateRangeBounds(dateRange: string, nowMinute: number): { fromDate?: string } {
   const spanMs: Record<string, number> = {
     '24h': 24 * 60 * 60 * 1000,
     '7d': 7 * 24 * 60 * 60 * 1000,
@@ -67,7 +66,7 @@ function dateRangeBounds(dateRange: string, nowMinute: number): { fromDate?: str
   };
   const span = spanMs[dateRange];
   if (!span) return {};
-  return { fromDate: new Date(now - span).toISOString(), toDate };
+  return { fromDate: new Date(nowMinute * 60_000 - span).toISOString() };
 }
 
 /** What the status badge says under itself: why this delivery is where it is. */
@@ -122,7 +121,7 @@ export default function DeliveriesPage() {
   const { data: filteredEvent } = useEvent(projectId, eventIdFilter || undefined);
   const filteredEventType = filteredEvent?.eventType ?? null;
 
-  const { fromDate, toDate } = dateRangeBounds(dateRange, nowMinute);
+  const { fromDate } = dateRangeBounds(dateRange, nowMinute);
   const {
     data: deliveriesData, isLoading: deliveriesLoading, isError: deliveriesIsError, error: deliveriesError, refetch: refetchDeliveries,
   } = useDeliveries(projectId, {
@@ -134,14 +133,16 @@ export default function DeliveriesPage() {
     eventId: eventIdFilter || undefined,
     eventType: debouncedSearch || undefined,
     fromDate: eventIdFilter ? undefined : fromDate,
-    toDate: eventIdFilter ? undefined : toDate,
   });
   const deliveries = useMemo(() => deliveriesData?.content ?? [], [deliveriesData]);
   const totalElements = deliveriesData?.totalElements ?? 0;
   const totalPages = deliveriesData?.totalPages ?? 0;
 
-  const loading = projectLoading || deliveriesLoading;
-  const isError = projectIsError || deliveriesIsError;
+  // The skeleton is for the first load only. A later key change (filter, page, the minute tick)
+  // keeps the previous rows via keepPreviousData, so the open details sheet and the bulk replay
+  // dialog below stay mounted instead of being unmounted with the page.
+  const loading = (projectLoading && !project) || (deliveriesLoading && !deliveriesData);
+  const isError = (projectIsError && !project) || (deliveriesIsError && !deliveriesData);
   const retry = () => { refetchProject(); refetchDeliveries(); };
 
   const bulkReplayMutation = useBulkReplayDeliveries();

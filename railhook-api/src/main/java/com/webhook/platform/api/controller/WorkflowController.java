@@ -61,7 +61,7 @@ public class WorkflowController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(workflowService.get(id));
+        return ResponseEntity.ok(workflowService.get(projectId, id));
     }
 
     @Operation(operationId = "listWorkflows", summary = "List workflows",
@@ -88,7 +88,7 @@ public class WorkflowController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(workflowService.update(id, request));
+        return ResponseEntity.ok(workflowService.update(projectId, id, request));
     }
 
     @Operation(operationId = "deleteWorkflow", summary = "Delete workflow",
@@ -103,7 +103,7 @@ public class WorkflowController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        workflowService.delete(id);
+        workflowService.delete(projectId, id);
         return ResponseEntity.noContent().build();
     }
 
@@ -120,7 +120,7 @@ public class WorkflowController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         boolean enabled = body.getOrDefault("enabled", true);
-        return ResponseEntity.ok(workflowService.toggleEnabled(id, enabled));
+        return ResponseEntity.ok(workflowService.toggleEnabled(projectId, id, enabled));
     }
 
     @Operation(summary = "Manually trigger workflow with test payload",
@@ -138,7 +138,7 @@ public class WorkflowController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(workflowService.manualTrigger(id, testPayload));
+        return ResponseEntity.ok(workflowService.manualTrigger(projectId, id, testPayload));
     }
 
     // ── Executions ──────────────────────────────────────────────────────
@@ -153,7 +153,7 @@ public class WorkflowController {
             @RequestParam(defaultValue = "20") int size,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(workflowService.listExecutions(id, page, size));
+        return ResponseEntity.ok(workflowService.listExecutions(projectId, id, page, size));
     }
 
     @Operation(summary = "Get execution details with step results",
@@ -166,6 +166,6 @@ public class WorkflowController {
             @PathVariable("executionId") UUID executionId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(workflowService.getExecution(executionId));
+        return ResponseEntity.ok(workflowService.getExecution(projectId, id, executionId));
     }
 }

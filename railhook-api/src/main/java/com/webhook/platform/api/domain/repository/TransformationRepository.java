@@ -5,10 +5,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface TransformationRepository extends JpaRepository<Transformation, UUID> {
+    Optional<Transformation> findByIdAndProjectId(UUID id, UUID projectId);
     List<Transformation> findByProjectIdOrderByNameAsc(UUID projectId);
     List<Transformation> findByProjectIdAndEnabledTrueOrderByNameAsc(UUID projectId);
     boolean existsByProjectIdAndName(UUID projectId, String name);

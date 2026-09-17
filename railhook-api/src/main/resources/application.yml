@@ -370,6 +370,16 @@ entitlement:
     rate-limit-per-second: ${ENTITLEMENT_DEFAULT_RATE_LIMIT:100}
     max-fanout-per-event: ${ENTITLEMENT_DEFAULT_MAX_FANOUT:50}
 
+# The worker's escalation caps, read here too: a Subscription's or Destination's own retry ladder
+# is refused when it would still be retrying once its obligation is escalated to the DLQ.
+delivery:
+  escalation:
+    hard-cap-hours: ${DELIVERY_ESCALATION_HARD_CAP_HOURS:96}
+
+forward:
+  escalation:
+    hard-cap-hours: ${FORWARD_ESCALATION_HARD_CAP_HOURS:24}
+
 ordering:
   # How far back SequenceReconciliationService looks for "recently active" ordering-enabled
   # endpoints when comparing the Redis sequence counter against the durable high-water mark.

@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,7 +55,7 @@ class MembershipRevokesSessionsTest {
         TenantContext.set(organizationId);
 
         membershipService = new MembershipService(
-                userRepository, membershipRepository, emailService, tokenBlacklistService, new BCryptPasswordEncoder(4));
+                userRepository, membershipRepository, emailService, tokenBlacklistService, new BCryptPasswordEncoder(4), mock(TunnelService.class));
 
         membership = new Membership();
         membership.setUserId(memberId);

@@ -75,6 +75,7 @@ public class AccountErasureService {
     private final UserIdentityRepository userIdentityRepository;
     private final EmailChangeRequestRepository emailChangeRequestRepository;
     private final VerificationEmailSendRepository verificationEmailSendRepository;
+    private final TunnelService tunnelService;
 
     public AccountErasureService(UserRepository userRepository,
                                  MembershipRepository membershipRepository,
@@ -83,7 +84,8 @@ public class AccountErasureService {
                                  TokenBlacklistService tokenBlacklistService,
                                  UserIdentityRepository userIdentityRepository,
                                  EmailChangeRequestRepository emailChangeRequestRepository,
-                                 VerificationEmailSendRepository verificationEmailSendRepository) {
+                                 VerificationEmailSendRepository verificationEmailSendRepository,
+                                 TunnelService tunnelService) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.organizationService = organizationService;
@@ -92,6 +94,7 @@ public class AccountErasureService {
         this.userIdentityRepository = userIdentityRepository;
         this.emailChangeRequestRepository = emailChangeRequestRepository;
         this.verificationEmailSendRepository = verificationEmailSendRepository;
+        this.tunnelService = tunnelService;
     }
 
     /**
@@ -138,6 +141,9 @@ public class AccountErasureService {
         // stateless and would otherwise keep working until they expired on their own.
         userSessionService.revokeAllSessions(userId);
         tokenBlacklistService.revokeAllUserTokens(userId);
+        // A tunnel's CLI authenticated once with its own token and never presents an access token,
+        // so neither revocation above reaches it.
+        tunnelService.closeAllSessionsOfUserEverywhere(userId);
 
         log.info("GDPR ERASE: user {} erased", userId);
     }

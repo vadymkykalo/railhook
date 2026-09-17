@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.entity.UserSession;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.domain.enums.MembershipStatus;
 import com.webhook.platform.api.domain.enums.SessionClient;
 import com.webhook.platform.api.domain.enums.UserStatus;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
@@ -149,6 +150,30 @@ class OrganizationSwitchTest {
 
         assertThatThrownBy(() -> authService.switchOrganization(userId, to(strangerOrgId), refreshToken))
                 .isInstanceOf(ForbiddenException.class);
+
+        assertThat(session.getOrganizationId()).isEqualTo(homeOrgId);
+        verify(userSessionService, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("a membership the organization suspended is refused exactly like no membership, and nothing is minted")
+    void refusesASuspendedMembership() {
+        when(userSessionService.findByRefreshJti(session.getRefreshTokenJti()))
+                .thenReturn(Optional.of(session));
+        Membership suspended = membership(clientOrgId, MembershipRole.DEVELOPER);
+        suspended.setStatus(MembershipStatus.DISABLED);
+        when(membershipRepository.findByUserIdAndOrganizationId(userId, clientOrgId))
+                .thenReturn(Optional.of(suspended));
+        // Lenient: reached only if the suspension is ignored and a token is about to be minted.
+        org.mockito.Mockito.lenient().when(userRepository.findById(userId)).thenReturn(Optional.of(user()));
+
+        /* Login and refresh both skip a DISABLED membership, so a member suspended by one
+           organization could still sign in through another one they belong to and switch
+           straight back into the one that suspended them. Same message as a non-member, so the
+           answer does not reveal that a suspended membership exists. */
+        assertThatThrownBy(() -> authService.switchOrganization(userId, to(clientOrgId), refreshToken))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("You are not a member of that organization");
 
         assertThat(session.getOrganizationId()).isEqualTo(homeOrgId);
         verify(userSessionService, never()).save(any());

@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.9] - 2026-09-17
+
+### Security
+
+- **An API key reaches only its own project.** A key for one project could read, change or delete
+  another project's endpoints, subscriptions, rules, transformations, schemas, workflows, incoming
+  sources and destinations in the same organization through its own project's URLs, including
+  rotating another project's endpoint secret and getting the new secret back. Such a request now
+  answers `404`, and a workflow can no longer point at another project's endpoint.
+- **A suspended member can no longer switch back into the organization.** Signing in to another
+  organization and switching back issued a fresh token for the suspended membership.
+- **Deleting a project stops it.** Its API keys are revoked and refused, and its events, incoming
+  webhooks and test captures are refused, instead of continuing to run while no longer counting
+  towards the plan. Deliveries and forwards already queued for it are no longer sent: they end as
+  failed.
+- **A suspended organization stops receiving.** `/ingress` answers `403` (not `410`, so providers
+  keep their subscriptions for when the suspension is lifted), and test captures and tunnels are
+  refused. Its queued deliveries and forwards are held, and sent once the suspension is lifted.
+- **API keys can no longer create, rotate or revoke API keys.** Managing keys needs a signed-in
+  user, so a leaked key cannot mint replacements that outlive its revocation.
+- **Reusing a rotated refresh token ends every session**, not just the access tokens.
+- **Owner and API-key roles cannot be granted through the member endpoints.**
+- **mTLS clients are built separately per endpoint.** Two endpoints' clients built at the same
+  moment could share one endpoint's client certificate.
+- **WayForPay callbacks are bound to their signed order reference and deduplicated**, so a
+  replayed or altered callback cannot renew or mark past due a subscription it does not belong to.
+- **A closed tunnel is disconnected** across every instance, and a tunnel response is accepted
+  only from the tunnel's own connection. A member's tunnels close when they are removed or
+  suspended, an organization's when it is deleted, and a person's everywhere when their account is
+  erased.
+
+### Changed
+
+- **Plan limits hold under concurrent creates** for projects, endpoints and members, and an
+  incoming source's rate limit is capped at the plan's.
+- **A retry ladder longer than the escalation cap is refused** (96 hours outgoing, 24 hours
+  incoming) instead of being moved to Failed Messages before its later retries run.
+- **Failed Messages lost its search and date filters**, which the API never applied: a "select
+  all" after filtering acted on every failed message.
+
+### Fixed
+
+- **Fewer duplicate deliveries.** A delivery handed back when the worker was saturated, an incoming
+  retry whose send landed late, a Kafka acknowledgement arriving after the outbox stopped waiting,
+  and a concurrent sweep during an incoming forward's completion could each send a webhook twice.
+- **One malformed Kafka record no longer stops a consumer.** It goes to the dead-letter topic
+  byte for byte, and a record sent there no longer stalls the rest of its partition.
+- **Rate limits and concurrency limits take effect when changed**, recover when Redis evicts or
+  loses their keys, and the global limit no longer falls back to per-instance after 24 hours.
+- **Ordered endpoints keep delivering while Redis is unavailable**, and their buffer no longer
+  grows without bound.
+- **Replays interrupted by a restart are marked failed** instead of staying running and holding
+  the project's replay slots, and a replay is no longer run on the request thread when the pool is
+  busy.
+- **Retention no longer scans every delivery attempt per batch**, and every retention loop stops
+  before its lock expires.
+- **Incoming events with forwards still in progress are kept by retention.**
+- **A uniqueness conflict answers `409` and an unknown sort property `400`**, instead of `500`.
+- **A token issued in the same second as a password change is no longer rejected.**
+- **The dashboard:**
+  - Several tabs refreshing a session at once no longer sign the person out everywhere.
+  - Requests waiting on a failed session refresh fail instead of spinning forever.
+  - Signing out clears everything cached for that person.
+  - Every event shows its exact delivery status, on any page and however many endpoints it fans
+    out to.
+  - Invite and CLI sign-in links survive signing in or registering first.
+  - A changed role or organization is picked up without signing out.
+  - Lists keep their rows while the next page loads, and the delivery panel no longer closes
+    every minute.
+  - Each failed action shows one error toast, not two.
+  - Large integers in JSON are no longer rounded when formatted.
+  - Imported endpoints keep their signature scheme and show their new secrets.
+  - A page opened across a deploy reloads instead of showing a blank error.
+  - The test console no longer mixes results of earlier sends.
+  - Enabling a workflow keeps unsaved canvas edits.
+
 ## [2.20.8] - 2026-09-15
 
 ### Changed

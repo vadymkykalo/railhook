@@ -13,6 +13,7 @@ import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.MemberResponse;
 import com.webhook.platform.api.service.EmailService;
 import com.webhook.platform.api.service.MembershipService;
+import com.webhook.platform.api.service.TunnelService;
 import com.webhook.platform.api.service.TokenBlacklistService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.junit.jupiter.api.AfterEach;
@@ -151,7 +152,7 @@ class InviteTokenLeakTest {
         EmailService emailService = mock(EmailService.class);
 
         MembershipService membershipService = new MembershipService(
-                userRepository, membershipRepository, emailService, mock(TokenBlacklistService.class), new BCryptPasswordEncoder(4));
+                userRepository, membershipRepository, emailService, mock(TokenBlacklistService.class), new BCryptPasswordEncoder(4), mock(TunnelService.class));
 
         UUID orgId = UUID.randomUUID();
         String email = "new-invitee@example.com";
@@ -195,7 +196,7 @@ class InviteTokenLeakTest {
         EmailService emailService = mock(EmailService.class);
 
         MembershipService membershipService = new MembershipService(
-                userRepository, membershipRepository, emailService, mock(TokenBlacklistService.class), new BCryptPasswordEncoder(4));
+                userRepository, membershipRepository, emailService, mock(TokenBlacklistService.class), new BCryptPasswordEncoder(4), mock(TunnelService.class));
 
         UUID orgId = UUID.randomUUID();
         String email = "existing-user@example.com";

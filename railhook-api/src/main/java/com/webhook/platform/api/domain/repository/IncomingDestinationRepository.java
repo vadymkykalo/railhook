@@ -11,10 +11,13 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface IncomingDestinationRepository extends JpaRepository<IncomingDestination, UUID> {
+
+    Optional<IncomingDestination> findByIdAndIncomingSourceId(UUID id, UUID incomingSourceId);
 
     List<IncomingDestination> findByIncomingSourceId(UUID incomingSourceId);
 

@@ -2,6 +2,7 @@ package com.webhook.platform.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -230,6 +231,68 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/orgs")
                         .header("X-API-Key", apiKey))
                 .andExpect(status().isForbidden());
+    }
+
+    // ── API Key restrictions: a key cannot manage keys ──
+    //
+    // A leaked READ_WRITE key could otherwise mint fresh, non-expiring keys for its project,
+    // or rotate the legitimate ones away, and outlive its own revocation.
+
+    @Test
+    public void apiKey_createApiKey_forbidden() throws Exception {
+        mockMvc.perform(post("/api/v1/projects/" + projectId + "/api-keys")
+                        .header("X-API-Key", readWriteApiKey())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ApiKeyRequest.builder().name("minted-by-key").build())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void apiKey_rotateApiKey_forbidden() throws Exception {
+        UUID target = createApiKeyWithJwt("rotate-target");
+        mockMvc.perform(post("/api/v1/projects/" + projectId + "/api-keys/" + target + "/rotate")
+                        .header("X-API-Key", readWriteApiKey()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void apiKey_revokeApiKey_forbidden() throws Exception {
+        UUID target = createApiKeyWithJwt("revoke-target");
+        mockMvc.perform(delete("/api/v1/projects/" + projectId + "/api-keys/" + target)
+                        .header("X-API-Key", readWriteApiKey()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void jwt_rotateAndRevokeApiKey() throws Exception {
+        UUID target = createApiKeyWithJwt("jwt-managed");
+        mockMvc.perform(post("/api/v1/projects/" + projectId + "/api-keys/" + target + "/rotate")
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isCreated());
+        mockMvc.perform(delete("/api/v1/projects/" + projectId + "/api-keys/" + target)
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isNoContent());
+    }
+
+    private String readWriteApiKey() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/projects/" + projectId + "/api-keys")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ApiKeyRequest.builder()
+                                .name("read-write-key").scope(ApiKeyScope.READ_WRITE).build())))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("key").asText();
+    }
+
+    private UUID createApiKeyWithJwt(String name) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/projects/" + projectId + "/api-keys")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ApiKeyRequest.builder().name(name).build())))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
     }
 
     // ── API Key restrictions: cross-project access denied ──

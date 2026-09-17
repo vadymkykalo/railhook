@@ -88,7 +88,8 @@ public class DeliveryDryRunService {
         String resolvedTemplate = null;
 
         if (request.getTransformationId() != null) {
-            Optional<Transformation> transformOpt = transformationRepository.findById(request.getTransformationId());
+            Optional<Transformation> transformOpt =
+                    transformationRepository.findByIdAndProjectId(request.getTransformationId(), projectId);
             if (transformOpt.isEmpty()) {
                 errors.add("Transformation not found: " + request.getTransformationId());
             } else {

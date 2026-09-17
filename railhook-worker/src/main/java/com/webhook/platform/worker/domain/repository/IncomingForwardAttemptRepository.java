@@ -109,6 +109,78 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
                         @Param("claimToken") UUID claimToken);
 
         /**
+         * Returns a retry Attempt to its ladder, but only while it still carries the
+         * {@code started_at} its retry message was published with. Once a copy of that message
+         * has claimed the row, {@code started_at} has moved on and this matches nothing.
+         */
+        @Modifying
+        @Query(value = "UPDATE incoming_forward_attempts SET status = 'PENDING', started_at = NULL, " +
+                        "claim_token = NULL, next_retry_at = :retryAt " +
+                        "WHERE incoming_event_id = :eventId AND destination_id = :destinationId " +
+                        "AND attempt_number = :attemptNumber AND status = 'PROCESSING' " +
+                        "AND started_at = :expectedStartedAt " +
+                        "AND replay_session_id IS NOT DISTINCT FROM CAST(:replaySessionId AS uuid)",
+                        nativeQuery = true)
+        int handBackIfStillClaimed(@Param("eventId") UUID eventId,
+                        @Param("destinationId") UUID destinationId,
+                        @Param("attemptNumber") int attemptNumber,
+                        @Param("replaySessionId") UUID replaySessionId,
+                        @Param("expectedStartedAt") Instant expectedStartedAt,
+                        @Param("retryAt") Instant retryAt);
+
+        /**
+         * Puts an unclaimed Attempt on its ladder at {@code retryAt}, for a message that claims
+         * PENDING and could not be run. Matches nothing once any copy of it has claimed the row.
+         */
+        @Modifying
+        @Query(value = "UPDATE incoming_forward_attempts SET next_retry_at = :retryAt " +
+                        "WHERE incoming_event_id = :eventId AND destination_id = :destinationId " +
+                        "AND attempt_number = :attemptNumber AND status = 'PENDING' " +
+                        "AND replay_session_id IS NOT DISTINCT FROM CAST(:replaySessionId AS uuid)",
+                        nativeQuery = true)
+        int scheduleIfUnclaimed(@Param("eventId") UUID eventId,
+                        @Param("destinationId") UUID destinationId,
+                        @Param("attemptNumber") int attemptNumber,
+                        @Param("replaySessionId") UUID replaySessionId,
+                        @Param("retryAt") Instant retryAt);
+
+        /**
+         * Locks the row for the rest of the caller's transaction, but only while it is still held
+         * under {@code fence} in one of {@code statuses}. Returns 0 when it is not.
+         *
+         * <p>For {@code finalise}, which reads the row before it writes it: the write is an UPDATE
+         * by id, so a stuck sweep committed in between would be overwritten. Taking the row lock
+         * here re-checks the Claim against what is committed, and keeps it that way until the
+         * write commits. A no-op assignment, because an UPDATE is what takes the lock and waits out
+         * a concurrent writer before re-evaluating the predicate.
+         */
+        @Modifying
+        @Query(value = "UPDATE incoming_forward_attempts SET claim_token = claim_token " +
+                        "WHERE id = :id AND status IN (:statuses) " +
+                        "AND claim_token IS NOT DISTINCT FROM CAST(:fence AS uuid)", nativeQuery = true)
+        int holdIfStillClaimed(@Param("id") UUID id,
+                        @Param("statuses") List<String> statuses,
+                        @Param("fence") UUID fence);
+
+        /**
+         * Returns a row the retry scheduler claimed to its ladder, but only while it is still
+         * that claim: PROCESSING, on the {@code started_at} the scheduler stamped, and not yet
+         * taken by a consumer, whose claim writes a token and a new {@code started_at}.
+         *
+         * <p>For a send the scheduler could not confirm. It may still land, and the consumer then
+         * owns the row — possibly already finalised — so a hand-back must match nothing rather
+         * than write the scheduler's snapshot over it.
+         */
+        @Modifying
+        @Query(value = "UPDATE incoming_forward_attempts SET status = 'PENDING', started_at = NULL, " +
+                        "claim_token = NULL, next_retry_at = :retryAt " +
+                        "WHERE id = :id AND status = 'PROCESSING' AND started_at = :claimedAt " +
+                        "AND claim_token IS NULL", nativeQuery = true)
+        int handBackSchedulerClaim(@Param("id") UUID id,
+                        @Param("claimedAt") Instant claimedAt,
+                        @Param("retryAt") Instant retryAt);
+
+        /**
          * When the longest-outstanding Forward started: the {@code created_at} of attempt 1 in the
          * same (Incoming Event, Destination, Replay session).
          *

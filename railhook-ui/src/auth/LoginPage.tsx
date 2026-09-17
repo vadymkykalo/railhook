@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import AuthLayout from './AuthLayout';
 import GoogleSignInButton from './GoogleSignInButton';
@@ -11,6 +11,9 @@ import { useAuth } from './auth.store';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { destinationAfterSignIn, safeDestination } from '../lib/signInDestination';
+
+const DEFAULT_DESTINATION = '/admin/projects';
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -21,7 +24,12 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
-  const redirectTo = (location.state as any)?.from || '/admin/projects';
+  const [searchParams] = useSearchParams();
+  // An invite or a CLI approval sends a signed-out visitor here with ?redirect=; a protected page
+  // sends the path it was on as state.from.
+  const redirect = searchParams.get('redirect');
+  const from = (location.state as { from?: unknown } | null)?.from;
+  const returnTo = redirect ? safeDestination(redirect, DEFAULT_DESTINATION) : undefined;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +42,7 @@ export default function LoginPage() {
       const user = await authApi.getCurrentUser();
       login(authResponse.accessToken, user);
       showSuccess(t('auth.login.welcomeBack'));
-      navigate(redirectTo);
+      navigate(destinationAfterSignIn({ redirect, from, userId: user.user?.id }, DEFAULT_DESTINATION));
     } catch (err: any) {
       // A 403 with no message of ours is Spring refusing this page's Origin (CORS_ALLOWED_ORIGINS).
       // The generic toast for 403 says "no permission", which is wrong about a person who has not
@@ -61,13 +69,16 @@ export default function LoginPage() {
       footer={
         <>
           {t('auth.login.noAccount')}{' '}
-          <Link to="/register" className="font-medium text-primary hover:underline">
+          <Link to={returnTo ? `/register?redirect=${encodeURIComponent(returnTo)}` : '/register'} className="font-medium text-primary hover:underline">
             {t('auth.login.createAccount')}
           </Link>
         </>
       }
     >
-      <GoogleSignInButton intent="login" returnTo={redirectTo} />
+      <GoogleSignInButton
+        intent="login"
+        returnTo={returnTo ?? (typeof from === 'string' ? safeDestination(from, DEFAULT_DESTINATION) : DEFAULT_DESTINATION)}
+      />
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-1.5">
           <Label htmlFor="email">{t('auth.login.email')}</Label>

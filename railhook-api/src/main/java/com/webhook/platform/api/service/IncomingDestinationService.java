@@ -42,6 +42,7 @@ public class IncomingDestinationService {
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
+    private final RetryLadderEscalationCap retryLadderEscalationCap;
 
     public IncomingDestinationService(
             IncomingDestinationRepository destinationRepository,
@@ -49,21 +50,26 @@ public class IncomingDestinationService {
             TransformationRepository transformationRepository,
             EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
+            RetryLadderEscalationCap retryLadderEscalationCap) {
         this.destinationRepository = destinationRepository;
         this.sourceRepository = sourceRepository;
         this.transformationRepository = transformationRepository;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
+        this.retryLadderEscalationCap = retryLadderEscalationCap;
     }
 
     /**
-     * Turns "no such source here" into a 404, and hands back the row.
+     * Turns "no such source in this project" into a 404, and hands back the row.
      *
      * <p>{@code IncomingSource} carries {@code @TenantId}, so this lookup only sees sources inside
-     * the caller's organization: a foreign source id is indistinguishable from a missing one,
-     * which is intended.
+     * the caller's organization, and the project narrows it to the one in the URL: another
+     * organization's source and another project's are both indistinguishable from a missing one,
+     * which is intended. The organization alone was not enough - an API key is confined to the
+     * project in the URL, and could otherwise add a destination to, or re-point one of, any
+     * project's source.
      *
      * <p>It was called {@code validateSourceOwnership}, and it bound a
      * {@code TenantContext.require()} organization id and the source's {@code Project} and
@@ -72,9 +78,15 @@ public class IncomingDestinationService {
      * not, and a reader looking for where ownership is enforced found a method that looked like
      * the answer.
      */
-    private IncomingSource requireSource(UUID sourceId) {
-        return sourceRepository.findById(sourceId)
+    private IncomingSource requireSource(UUID projectId, UUID sourceId) {
+        return sourceRepository.findByIdAndProjectId(sourceId, projectId)
                 .orElseThrow(() -> new NotFoundException("Incoming source not found"));
+    }
+
+    private IncomingDestination requireDestination(UUID projectId, UUID sourceId, UUID id) {
+        requireSource(projectId, sourceId);
+        return destinationRepository.findByIdAndIncomingSourceId(id, sourceId)
+                .orElseThrow(() -> new NotFoundException("Incoming destination not found"));
     }
 
     /**
@@ -104,8 +116,9 @@ public class IncomingDestinationService {
 
     @Auditable(action = AuditAction.CREATE, resourceType = "IncomingDestination")
     @Transactional
-    public IncomingDestinationResponse createDestination(UUID sourceId, IncomingDestinationRequest request) {
-        IncomingSource source = requireSource(sourceId);
+    public IncomingDestinationResponse createDestination(UUID projectId, UUID sourceId,
+                                                         IncomingDestinationRequest request) {
+        IncomingSource source = requireSource(projectId, sourceId);
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
         UUID transformationId = parseTransformationId(request.getTransformationId());
         if (transformationId != null) {
@@ -142,20 +155,19 @@ public class IncomingDestinationService {
             destination.setEncryptionKeyVersion(encrypted.getKeyVersion());
         }
 
+        retryLadderEscalationCap.requireIncomingFits(destination.getRetryDelays(), destination.getMaxAttempts());
         destination = destinationRepository.saveAndFlush(destination);
         log.info("Created incoming destination: id={}, sourceId={}, url={}", destination.getId(), sourceId, request.getUrl());
         return mapToResponse(destination);
     }
 
-    public IncomingDestinationResponse getDestination(UUID id) {
-        IncomingDestination destination = destinationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Incoming destination not found"));
-        requireSource(destination.getIncomingSourceId());
+    public IncomingDestinationResponse getDestination(UUID projectId, UUID sourceId, UUID id) {
+        IncomingDestination destination = requireDestination(projectId, sourceId, id);
         return mapToResponse(destination);
     }
 
-    public Page<IncomingDestinationResponse> listDestinations(UUID sourceId, Pageable pageable) {
-        requireSource(sourceId);
+    public Page<IncomingDestinationResponse> listDestinations(UUID projectId, UUID sourceId, Pageable pageable) {
+        requireSource(projectId, sourceId);
         Page<IncomingDestination> page = destinationRepository.findByIncomingSourceId(sourceId, pageable);
 
         Set<UUID> transformationIds = page.getContent().stream()
@@ -171,10 +183,10 @@ public class IncomingDestinationService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "IncomingDestination")
     @Transactional
-    public IncomingDestinationResponse updateDestination(UUID id, IncomingDestinationRequest request) {
-        IncomingDestination destination = destinationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Incoming destination not found"));
-        IncomingSource source = requireSource(destination.getIncomingSourceId());
+    public IncomingDestinationResponse updateDestination(UUID projectId, UUID sourceId, UUID id,
+                                                         IncomingDestinationRequest request) {
+        IncomingSource source = requireSource(projectId, sourceId);
+        IncomingDestination destination = requireDestination(projectId, sourceId, id);
 
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
 
@@ -224,6 +236,7 @@ public class IncomingDestinationService {
             destination.setTransformationId(requested);
         }
 
+        retryLadderEscalationCap.requireIncomingFits(destination.getRetryDelays(), destination.getMaxAttempts());
         destination = destinationRepository.saveAndFlush(destination);
         log.info("Updated incoming destination: id={}", id);
         return mapToResponse(destination);
@@ -231,10 +244,8 @@ public class IncomingDestinationService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "IncomingDestination")
     @Transactional
-    public void deleteDestination(UUID id) {
-        IncomingDestination destination = destinationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Incoming destination not found"));
-        requireSource(destination.getIncomingSourceId());
+    public void deleteDestination(UUID projectId, UUID sourceId, UUID id) {
+        IncomingDestination destination = requireDestination(projectId, sourceId, id);
         destinationRepository.delete(destination);
         log.info("Deleted incoming destination: id={}", id);
     }

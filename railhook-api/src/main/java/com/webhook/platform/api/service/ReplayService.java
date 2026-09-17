@@ -229,14 +229,28 @@ public class ReplayService {
         }
     }
 
+    /**
+     * For a session whose replay could not be handed to the executor. Called after the creating
+     * transaction has committed, so in a transaction of its own: joined to that one, the write
+     * would never be committed.
+     */
+    public void failToStart(UUID sessionId, String reason) {
+        txTemplate.executeWithoutResult(status -> markFailed(sessionId, reason));
+    }
+
     private void executeReplay(UUID sessionId) {
+        Integer started = txTemplate.execute(status -> replaySessionRepository.markStarted(
+                sessionId, ReplaySessionStatus.PENDING, ReplaySessionStatus.RUNNING, Instant.now()));
         ReplaySession session = replaySessionRepository.findById(sessionId)
                 .orElseThrow(() -> new IllegalStateException("Replay session not found: " + sessionId));
-
-        // Transition to RUNNING
-        session.setStatus(ReplaySessionStatus.RUNNING);
-        session.setStartedAt(Instant.now());
-        replaySessionRepository.saveAndFlush(session);
+        if (started == null || started == 0) {
+            if (session.getStatus() == ReplaySessionStatus.CANCELLING) {
+                markCancelled(sessionId);
+            }
+            log.info("Replay session {} is {} by the time its replay starts; not running it",
+                    sessionId, session.getStatus());
+            return;
+        }
 
         UUID projectId = session.getProjectId();
         // Where each Event goes is decided per Event, by the same code a fresh ingest runs: a

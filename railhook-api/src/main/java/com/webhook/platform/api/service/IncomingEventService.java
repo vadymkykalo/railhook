@@ -18,6 +18,7 @@ import com.webhook.platform.api.dto.IncomingBulkReplayRequest;
 import com.webhook.platform.api.dto.IncomingBulkReplayResponse;
 import com.webhook.platform.api.dto.IncomingEventResponse;
 import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
+import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
@@ -156,7 +157,7 @@ public class IncomingEventService {
                 .findByIncomingSourceIdAndEnabledTrue(event.getIncomingSourceId());
 
         if (destinations.isEmpty()) {
-            throw new IllegalStateException("No enabled destinations for this source");
+            throw new ConflictException("No enabled destinations for this source");
         }
 
         UUID projectId = resolveProjectIdFromSource(event.getIncomingSourceId());
@@ -205,7 +206,7 @@ public class IncomingEventService {
         List<IncomingDestination> destinations = destinationRepository
                 .findByIncomingSourceIdAndEnabledTrue(request.getSourceId());
         if (destinations.isEmpty()) {
-            throw new IllegalStateException("No enabled destinations for this source");
+            throw new ConflictException("No enabled destinations for this source");
         }
 
         int maxEvents = request.getMaxEvents() != null ? Math.min(request.getMaxEvents(), 5000) : 1000;

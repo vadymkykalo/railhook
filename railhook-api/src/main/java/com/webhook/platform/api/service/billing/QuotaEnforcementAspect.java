@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service.billing;
 
 import com.webhook.platform.api.domain.entity.Project;
+import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
@@ -9,12 +10,17 @@ import com.webhook.platform.api.security.JwtAuthenticationToken;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import java.lang.annotation.Annotation;
@@ -41,18 +47,20 @@ public class QuotaEnforcementAspect {
 
     private final EntitlementService entitlementService;
     private final ProjectRepository projectRepository;
+    private final OrganizationRepository organizationRepository;
+    private final PlatformTransactionManager transactionManager;
 
     // ── @RequireQuota ─────────────────────────────────────────────
 
-    @Before("@annotation(requireQuota)")
-    public void enforceQuota(JoinPoint joinPoint, RequireQuota requireQuota) {
-        if (!entitlementService.isBillingEnabled()) return;
+    @Around("@annotation(requireQuota)")
+    public Object enforceQuota(ProceedingJoinPoint joinPoint, RequireQuota requireQuota) throws Throwable {
+        if (!entitlementService.isBillingEnabled()) return joinPoint.proceed();
 
         UUID orgId = resolveOrganizationId(joinPoint);
         if (orgId == null) {
             log.warn("@RequireQuota on {} — cannot resolve organizationId, skipping",
                     joinPoint.getSignature().toShortString());
-            return;
+            return joinPoint.proceed();
         }
 
         QuotaType quota = requireQuota.value();
@@ -64,14 +72,43 @@ public class QuotaEnforcementAspect {
                 if (projectId == null) {
                     log.warn("@RequireQuota(ENDPOINTS_PER_PROJECT) on {} but no projectId found",
                             joinPoint.getSignature().toShortString());
-                    return;
+                    return joinPoint.proceed();
                 }
-                entitlementService.checkEndpointLimit(projectId);
+                return underOrganizationLock(orgId, () -> entitlementService.checkEndpointLimit(projectId), joinPoint);
             }
-            case PROJECTS -> entitlementService.checkProjectLimit();
-            case MEMBERS -> entitlementService.checkMemberLimit();
+            case PROJECTS -> {
+                return underOrganizationLock(orgId, entitlementService::checkProjectLimit, joinPoint);
+            }
+            case MEMBERS -> {
+                return underOrganizationLock(orgId, entitlementService::checkMemberLimit, joinPoint);
+            }
             case TUNNELS -> entitlementService.checkTunnelLimit();
         }
+        return joinPoint.proceed();
+    }
+
+    /**
+     * Runs the count and the create it guards in one transaction holding the Organization's row
+     * lock, which the create's own transaction joins.
+     *
+     * <p>A count taken before the create's transaction, with nothing held between it and the
+     * insert, let requests released together at one below the limit all count below it and all
+     * get through. Holding the lock, the second create waits for the first to commit and then
+     * counts it — the same lock the active-tunnel limit takes.
+     */
+    private Object underOrganizationLock(UUID orgId, Runnable check, ProceedingJoinPoint joinPoint) throws Throwable {
+        TransactionStatus transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
+        Object result;
+        try {
+            organizationRepository.lockById(orgId);
+            check.run();
+            result = joinPoint.proceed();
+        } catch (Throwable failure) {
+            transactionManager.rollback(transaction);
+            throw failure;
+        }
+        transactionManager.commit(transaction);
+        return result;
     }
 
     // ── @RequireFeature ───────────────────────────────────────────

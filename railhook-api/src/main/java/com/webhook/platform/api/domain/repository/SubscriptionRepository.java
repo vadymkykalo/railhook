@@ -8,10 +8,13 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface SubscriptionRepository extends JpaRepository<Subscription, UUID> {
+
+    Optional<Subscription> findByIdAndProjectId(UUID id, UUID projectId);
     List<Subscription> findByProjectIdAndEventTypeAndEnabledTrue(UUID projectId, String eventType);
     List<Subscription> findByProjectIdAndEnabledTrue(UUID projectId);
     List<Subscription> findByProjectId(UUID projectId);

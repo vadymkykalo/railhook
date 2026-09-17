@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { projectsApi } from './projects.api';
 import { endpointsApi } from './endpoints.api';
 import { deliveriesApi, type DeliveryFilters, type BulkReplayRequest } from './deliveries.api';
@@ -213,6 +213,7 @@ export function useEndpointsPaged(projectId: string | undefined, page: number, s
         queryKey: queryKeys.endpoints.paged(projectId!, page, size),
         queryFn: () => endpointsApi.listPaged(projectId!, page, size),
         enabled: !!projectId,
+        placeholderData: keepPreviousData,
     });
 }
 
@@ -271,6 +272,7 @@ export function useDeliveries(projectId: string | undefined, filters: DeliveryFi
         queryKey: queryKeys.deliveries.list(projectId!, filters),
         queryFn: () => deliveriesApi.listByProject(projectId!, filters),
         enabled: !!projectId,
+        placeholderData: keepPreviousData,
         // Poll only while there are deliveries still in flight — replaces the
         // page-level setInterval + eslint-disable react-hooks/exhaustive-deps.
         refetchInterval: (query) => {
@@ -297,6 +299,14 @@ export function useEvents(projectId: string | undefined, page: number, size = 20
         queryKey: [...queryKeys.events.list(projectId!, page, size, sort), eventType ?? ''],
         queryFn: () => eventsApi.listByProject(projectId!, { page, size, sort, eventType }),
         enabled: !!projectId,
+        placeholderData: keepPreviousData,
+        // Each row's delivery counts move while its deliveries are still in flight.
+        refetchInterval: (query) => {
+            const inFlight = query.state.data?.content?.some(
+                (e) => (e.deliveryCounts?.pending ?? 0) + (e.deliveryCounts?.processing ?? 0) > 0
+            );
+            return inFlight ? 5000 : false;
+        },
     });
 }
 
@@ -432,6 +442,7 @@ export function useDlq(projectId: string | undefined, page: number, size = 20, f
         queryKey: queryKeys.dlq.list(projectId!, page, size, filters),
         queryFn: () => dlqApi.list(projectId!, page, size, filters),
         enabled: !!projectId,
+        placeholderData: keepPreviousData,
     });
 }
 
@@ -474,6 +485,7 @@ export function useIncomingDlq(projectId: string | undefined, page: number, size
         queryKey: queryKeys.incomingDlq.list(projectId!, page, size, filters),
         queryFn: () => incomingDlqApi.list(projectId!, page, size, filters),
         enabled: !!projectId,
+        placeholderData: keepPreviousData,
     });
 }
 
@@ -604,6 +616,7 @@ export function useIncomingEvents(projectId: string | undefined, filters: Incomi
         queryKey: queryKeys.incomingEvents.list(projectId!, filters),
         queryFn: () => incomingEventsApi.list(projectId!, filters),
         enabled: !!projectId,
+        placeholderData: keepPreviousData,
     });
 }
 

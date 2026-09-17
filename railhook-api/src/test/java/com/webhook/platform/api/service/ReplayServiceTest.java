@@ -73,6 +73,9 @@ class ReplayServiceTest {
     @BeforeEach
     void setUp() {
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        // The session a run() is handed is PENDING unless a test says otherwise.
+        when(replaySessionRepository.markStarted(any(), eq(ReplaySessionStatus.PENDING),
+                eq(ReplaySessionStatus.RUNNING), any())).thenReturn(1);
         when(entitlementService.getMaxFanoutForProject(any())).thenReturn(100);
 
         // The real matching and intake over mocked repositories: replay has to decide the way
@@ -502,7 +505,9 @@ class ReplayServiceTest {
 
         replayService.run(sessionId);
 
-        assertThat(initial.getStatus()).isEqualTo(ReplaySessionStatus.RUNNING); // set before the cancellation check
+        // Started before the cancellation check.
+        verify(replaySessionRepository).markStarted(eq(sessionId), eq(ReplaySessionStatus.PENDING),
+                eq(ReplaySessionStatus.RUNNING), any());
         assertThat(cancelling.getStatus()).isEqualTo(ReplaySessionStatus.CANCELLED);
         assertThat(cancelling.getCancelledAt()).isNotNull();
         // Never even fetches a batch once cancellation is observed.

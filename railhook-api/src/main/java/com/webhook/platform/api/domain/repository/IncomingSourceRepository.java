@@ -12,6 +12,7 @@ import java.util.UUID;
 
 @Repository
 public interface IncomingSourceRepository extends JpaRepository<IncomingSource, UUID> {
+    Optional<IncomingSource> findByIdAndProjectId(UUID id, UUID projectId);
 
     Optional<IncomingSource> findByIngressPathToken(String ingressPathToken);
 

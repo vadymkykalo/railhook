@@ -192,6 +192,19 @@ class DeliveryEndToEndIntegrationTest {
         wireMock.resetAll();
     }
 
+    /**
+     * The two tables every Attempt reads for whether its Project may still be sent for, which the
+     * schema derived from the worker's entities does not contain: the worker keeps no entity for
+     * either. Empty, so every Project here reads as active. The query itself is proved against the
+     * real migrations by {@code ProjectStatusAttemptIntegrationTest}.
+     */
+    @BeforeEach
+    void projectStatusTables() {
+        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS organizations (id UUID PRIMARY KEY, suspended_at TIMESTAMPTZ)");
+        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS projects "
+                + "(id UUID PRIMARY KEY, organization_id UUID NOT NULL, deleted_at TIMESTAMP)");
+    }
+
     @Autowired
     private DeliveryRepository deliveryRepository;
     @Autowired

@@ -21,6 +21,8 @@ public interface TunnelSessionRepository extends JpaRepository<TunnelSession, UU
 
     long countByStatus(TunnelStatus status);
 
+    List<TunnelSession> findByStatus(TunnelStatus status);
+
     List<TunnelSession> findByOrganizationIdAndStatus(UUID organizationId, TunnelStatus status);
 
     List<TunnelSession> findByUserIdAndStatus(UUID userId, TunnelStatus status);

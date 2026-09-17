@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import '../../i18n';
@@ -130,5 +130,19 @@ describe('IncomingDlqPage', () => {
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     expect(screen.queryByText(/no abandoned forwards/i)).not.toBeInTheDocument();
+  });
+  it('keeps the rows on screen while the next page loads', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(incomingDlqApi.getStats).mockResolvedValue(POPULATED_STATS);
+    vi.mocked(incomingDlqApi.list)
+      .mockResolvedValueOnce({ ...populatedPage([DLQ_ITEM]), totalElements: 40, totalPages: 2 })
+      .mockReturnValue(new Promise(() => {}));
+    renderIncomingDlq();
+    await screen.findByText('Stripe');
+
+    fireEvent.click(screen.getByRole('button', { name: /^next$/i }));
+
+    await waitFor(() => expect(incomingDlqApi.list).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Stripe')).toBeInTheDocument();
   });
 });

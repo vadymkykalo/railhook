@@ -12,6 +12,7 @@ import com.webhook.platform.api.domain.repository.SubscriptionRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.dto.TransformationRequest;
 import com.webhook.platform.api.dto.TransformationResponse;
+import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -110,11 +111,15 @@ public class TransformationService {
         return mapToResponse(transformation);
     }
 
-    public TransformationResponse get(UUID id) {
-        Transformation transformation = transformationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Transformation not found"));
-        validateProjectOwnership(transformation.getProjectId());
+    public TransformationResponse get(UUID projectId, UUID id) {
+        Transformation transformation = requireTransformation(projectId, id);
         return mapToResponse(transformation);
+    }
+
+    /** Another project's transformation is "not found", like a missing one - the URL names the project. */
+    private Transformation requireTransformation(UUID projectId, UUID id) {
+        return transformationRepository.findByIdAndProjectId(id, projectId)
+                .orElseThrow(() -> new NotFoundException("Transformation not found"));
     }
 
     public List<TransformationResponse> list(UUID projectId) {
@@ -138,10 +143,8 @@ public class TransformationService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Transformation")
     @Transactional
-    public TransformationResponse update(UUID id, TransformationRequest request) {
-        Transformation transformation = transformationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Transformation not found"));
-        validateProjectOwnership(transformation.getProjectId());
+    public TransformationResponse update(UUID projectId, UUID id, TransformationRequest request) {
+        Transformation transformation = requireTransformation(projectId, id);
 
         if (request.getName() != null && !request.getName().isBlank()) {
             if (transformationRepository.existsByProjectIdAndNameAndIdNot(
@@ -169,10 +172,8 @@ public class TransformationService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "Transformation")
     @Transactional
-    public void delete(UUID id) {
-        Transformation transformation = transformationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Transformation not found"));
-        validateProjectOwnership(transformation.getProjectId());
+    public void delete(UUID projectId, UUID id) {
+        Transformation transformation = requireTransformation(projectId, id);
 
         long subCount = subscriptionRepository.countByTransformationId(id);
         long destCount = incomingDestinationRepository.countByTransformationId(id);
@@ -180,7 +181,7 @@ public class TransformationService {
             List<String> refs = new java.util.ArrayList<>();
             if (subCount > 0) refs.add(subCount + " subscription" + (subCount > 1 ? "s" : ""));
             if (destCount > 0) refs.add(destCount + " destination" + (destCount > 1 ? "s" : ""));
-            throw new IllegalStateException("Cannot delete transformation: it is referenced by " + String.join(" and ", refs));
+            throw new ConflictException("Cannot delete transformation: it is referenced by " + String.join(" and ", refs));
         }
 
         transformationRepository.delete(transformation);

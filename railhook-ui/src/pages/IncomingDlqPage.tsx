@@ -62,7 +62,8 @@ export default function IncomingDlqPage() {
   const totalElements = dlqData?.totalElements ?? 0;
   const totalPages = dlqData?.totalPages ?? 0;
 
-  const loading = projectLoading || dlqLoading;
+  // First load only; a page change keeps the previous rows (keepPreviousData).
+  const loading = (projectLoading && !project) || (dlqLoading && !dlqData);
   const isError = projectIsError || dlqIsError;
   const retry = () => { refetchProject(); refetchDlq(); refetchStats(); };
 

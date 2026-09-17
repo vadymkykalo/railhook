@@ -38,7 +38,9 @@ public class AsyncConfig {
         executor.setMaxPoolSize(4);
         executor.setQueueCapacity(10);
         executor.setThreadNamePrefix("replay-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        // Abort, never CallerRuns: the caller is an after-commit callback on a request thread, and
+        // ReplaySessionLauncher fails the session when this pool has no room.
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
         executor.setTaskDecorator(TENANT_DECORATOR);
         executor.initialize();
         return executor;

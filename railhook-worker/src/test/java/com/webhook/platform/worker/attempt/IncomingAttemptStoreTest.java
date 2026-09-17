@@ -52,9 +52,11 @@ class IncomingAttemptStoreTest {
     void setUp() {
         lenient().when(transactionTemplate.execute(any())).thenAnswer(inv ->
                 inv.getArgument(0, TransactionCallback.class).doInTransaction(null));
+        // Nobody else is writing: the row lock finds the row as the read left it.
+        lenient().when(attemptRepository.holdIfStillClaimed(any(), any(), any())).thenReturn(1);
 
         store = new IncomingAttemptStore(
-                attemptRepository, transactionTemplate,
+                attemptRepository, activeProjects(), transactionTemplate,
                 null, null, null, null, null, null, null, null, null);
     }
 
@@ -280,7 +282,7 @@ class IncomingAttemptStoreTest {
 
     private IncomingAttemptStore storeFor(IncomingDestination destination, IncomingForwardMessage message,
             IncomingEvent event) {
-        return new IncomingAttemptStore(attemptRepository, transactionTemplate, null, null, null,
+        return new IncomingAttemptStore(attemptRepository, activeProjects(), transactionTemplate, null, null, null,
                 new ObjectMapper(), null, null, message, event, destination);
     }
 
@@ -294,7 +296,7 @@ class IncomingAttemptStoreTest {
                 .contentType("application/json")
                 .bodyRaw("{}")
                 .build();
-        return new IncomingAttemptStore(attemptRepository, transactionTemplate, null, null, null,
+        return new IncomingAttemptStore(attemptRepository, activeProjects(), transactionTemplate, null, null, null,
                 new ObjectMapper(), null, null, message, event, destination);
     }
 
@@ -371,5 +373,20 @@ class IncomingAttemptStoreTest {
         ArgumentCaptor<IncomingForwardAttempt> captor = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
         verify(attemptRepository, times(2)).save(captor.capture());
         return captor.getAllValues();
+    }
+
+    /** Every Project active: whether a Project may still be sent for is not what this test is about. */
+    private static ProjectStatusLookup activeProjects() {
+        return new ProjectStatusLookup(null) {
+            @Override
+            public ProjectStatus forProject(UUID projectId) {
+                return ProjectStatus.ACTIVE;
+            }
+
+            @Override
+            public ProjectStatus forSource(UUID sourceId) {
+                return ProjectStatus.ACTIVE;
+            }
+        };
     }
 }

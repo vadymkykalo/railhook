@@ -3,6 +3,9 @@ package com.webhook.platform.api.dto;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
 import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
+import com.webhook.platform.api.dto.validation.WithinPlanRateLimit;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -49,6 +52,9 @@ public class IncomingSourceRequest {
     @Size(max = 50, message = "HMAC signature prefix must be at most 50 characters")
     private String hmacSignaturePrefix;
 
-    @Schema(description = "Rate limit per second for ingress endpoint (null = unlimited)", example = "100")
+    @Schema(description = "Rate limit per second for the ingress URL, at most the plan's own (null = the default limit)", example = "100")
+    @Min(value = 1, message = "Rate limit must be at least 1")
+    @Max(value = 10000, message = "Rate limit must be at most 10000")
+    @WithinPlanRateLimit
     private Integer rateLimitPerSecond;
 }

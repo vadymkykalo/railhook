@@ -11,9 +11,21 @@ import reactor.netty.resources.ConnectionProvider;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 @DisplayName("MtlsWebClientFactory Tests")
 class MtlsWebClientFactoryTest {
@@ -181,6 +193,56 @@ class MtlsWebClientFactoryTest {
         WebClient second = factory.getWebClient(endpoint);
 
         assertNotSame(first, second, "Should create new WebClient after manual invalidation");
+    }
+
+    // -----------------------------------------------------------------------
+    // Tenant isolation between clients built at the same time
+    // -----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Building an mTLS client never configures the builder every client is built from")
+    void buildingAnMtlsClientLeavesTheSharedBuilderUnconfigured() {
+        // The connector carries one endpoint's client certificate and trusted CA. Set on the
+        // shared builder, a build racing another could pick up the other's connector, and
+        // endpoint A's cached client then presented tenant B's certificate.
+        WebClient.Builder shared = spy(WebClient.builder());
+        MtlsWebClientFactory isolated = new MtlsWebClientFactory(
+                encryptionKeyRegistry, true, List.of(), shared, ConnectionProvider.newConnection());
+
+        isolated.getWebClient(createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, null));
+        isolated.getWebClient(createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, TEST_CERT_PEM));
+
+        verify(shared, never()).clientConnector(any());
+    }
+
+    @Test
+    @DisplayName("Two callers missing the cache together share one client for the endpoint")
+    void concurrentCacheMissesBuildOneClient() throws Exception {
+        // Whoever reaches the build holds the gate open briefly for the other caller. With a
+        // read-then-put cache both builds run and the callers leave with different clients; with
+        // an atomic populate the second caller waits for the first and is handed its client.
+        CountDownLatch bothBuilding = new CountDownLatch(2);
+        EncryptionKeyRegistry gated = spy(encryptionKeyRegistry);
+        doAnswer(inv -> {
+            bothBuilding.countDown();
+            bothBuilding.await(500, TimeUnit.MILLISECONDS);
+            return inv.callRealMethod();
+        }).when(gated).decryptWithFallback(any(), any(), anyInt());
+        MtlsWebClientFactory racing = new MtlsWebClientFactory(
+                gated, true, List.of(), WebClient.builder(), ConnectionProvider.newConnection());
+        Endpoint endpoint = createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, null);
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<WebClient> first = pool.submit(() -> racing.getWebClient(endpoint));
+            Future<WebClient> second = pool.submit(() -> racing.getWebClient(endpoint));
+
+            WebClient firstClient = first.get(10, TimeUnit.SECONDS);
+            assertSame(firstClient, second.get(10, TimeUnit.SECONDS));
+            assertSame(firstClient, racing.getWebClient(endpoint), "and it is the client the cache kept");
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     // -----------------------------------------------------------------------

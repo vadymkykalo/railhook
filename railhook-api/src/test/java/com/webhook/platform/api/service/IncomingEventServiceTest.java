@@ -15,6 +15,7 @@ import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.IncomingEventResponse;
 import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
+import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
@@ -223,7 +224,7 @@ class IncomingEventServiceTest {
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.replayEvent(eventId, auth))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("No enabled destinations");
     }
 

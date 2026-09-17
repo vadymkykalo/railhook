@@ -36,6 +36,7 @@ public class OutgoingAttemptStoreFactory {
     private final DeliveryAttemptRepository deliveryAttemptRepository;
     private final EndpointRepository endpointRepository;
     private final EventRepository eventRepository;
+    private final ProjectStatusLookup projectStatusLookup;
     private final TransactionTemplate transactionTemplate;
     private final OrderingBufferService orderingBufferService;
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
@@ -61,6 +62,7 @@ public class OutgoingAttemptStoreFactory {
             DeliveryAttemptRepository deliveryAttemptRepository,
             EndpointRepository endpointRepository,
             EventRepository eventRepository,
+            ProjectStatusLookup projectStatusLookup,
             TransactionTemplate transactionTemplate,
             OrderingBufferService orderingBufferService,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
@@ -77,6 +79,7 @@ public class OutgoingAttemptStoreFactory {
         this.deliveryAttemptRepository = deliveryAttemptRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
+        this.projectStatusLookup = projectStatusLookup;
         this.transactionTemplate = transactionTemplate;
         this.orderingBufferService = orderingBufferService;
         this.kafkaTemplate = kafkaTemplate;
@@ -95,7 +98,7 @@ public class OutgoingAttemptStoreFactory {
     public OutgoingAttemptStore create(DeliveryMessage message, boolean isRetry) {
         return new OutgoingAttemptStore(
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
-                transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
+                projectStatusLookup, transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
                 mtlsWebClientFactory, transformationCacheService, payloadTransformService,
                 objectMapper, outgoingWebClient, orderingGapTimeoutCounter, clock,
                 orderingBufferRescheduleDelaySeconds, message, isRetry);

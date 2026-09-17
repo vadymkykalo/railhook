@@ -45,11 +45,13 @@ public class IncomingDestinationController {
     @RequireAccess(AccessLevel.WRITE)
 @PostMapping
     public ResponseEntity<IncomingDestinationResponse> createDestination(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("sourceId") UUID sourceId,
             @Valid @RequestBody IncomingDestinationRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        IncomingDestinationResponse response = destinationService.createDestination(sourceId, request);
+        auth.validateProjectAccess(projectId);
+        IncomingDestinationResponse response = destinationService.createDestination(projectId, sourceId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -60,19 +62,24 @@ public class IncomingDestinationController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<IncomingDestinationResponse> getDestination(
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("sourceId") UUID sourceId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
-        IncomingDestinationResponse response = destinationService.getDestination(id);
+        auth.validateProjectAccess(projectId);
+        IncomingDestinationResponse response = destinationService.getDestination(projectId, sourceId, id);
         return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "List destinations", description = "Returns paginated destinations for the incoming source")
     @GetMapping
     public ResponseEntity<Page<IncomingDestinationResponse>> listDestinations(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("sourceId") UUID sourceId,
             @PageableDefault(size = 20) @ParameterObject Pageable pageable,
             AuthContext auth) {
-        Page<IncomingDestinationResponse> response = destinationService.listDestinations(sourceId, pageable);
+        auth.validateProjectAccess(projectId);
+        Page<IncomingDestinationResponse> response = destinationService.listDestinations(projectId, sourceId, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -85,11 +92,14 @@ public class IncomingDestinationController {
     @RequireAccess(AccessLevel.WRITE)
 @PutMapping("/{id}")
     public ResponseEntity<IncomingDestinationResponse> updateDestination(
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("sourceId") UUID sourceId,
             @PathVariable("id") UUID id,
             @Valid @RequestBody IncomingDestinationRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        IncomingDestinationResponse response = destinationService.updateDestination(id, request);
+        auth.validateProjectAccess(projectId);
+        IncomingDestinationResponse response = destinationService.updateDestination(projectId, sourceId, id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -99,10 +109,13 @@ public class IncomingDestinationController {
     @RequireAccess(AccessLevel.WRITE)
 @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteDestination(
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("sourceId") UUID sourceId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
-        destinationService.deleteDestination(id);
+        auth.validateProjectAccess(projectId);
+        destinationService.deleteDestination(projectId, sourceId, id);
         return ResponseEntity.noContent().build();
     }
 }

@@ -1,5 +1,6 @@
 package com.webhook.platform.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -30,6 +31,9 @@ public class HttpErrorMappingIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     public void wrongMethodIs405AndSaysWhatIsAllowed() throws Exception {
@@ -72,5 +76,37 @@ public class HttpErrorMappingIntegrationTest extends AbstractIntegrationTest {
         // retry storm against us.
         mockMvc.perform(get("/ingress/whatever"))
                 .andExpect(status().isMethodNotAllowed());
+    }
+
+    @Test
+    public void sortingByAPropertyTheResourceDoesNotHaveIs400() throws Exception {
+        String token = registerAndLogin("sort-bogus@example.com");
+        String projectId = createProject(token);
+
+        mockMvc.perform(get("/api/v1/projects/" + projectId + "/events")
+                        .param("sort", "bogus")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_parameter"));
+    }
+
+    private String registerAndLogin(String email) throws Exception {
+        String body = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"Test1234!\","
+                                + "\"organizationName\":\"Sort Co\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body).get("accessToken").asText();
+    }
+
+    private String createProject(String token) throws Exception {
+        String body = mockMvc.perform(post("/api/v1/projects")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Sort Project\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body).get("id").asText();
     }
 }

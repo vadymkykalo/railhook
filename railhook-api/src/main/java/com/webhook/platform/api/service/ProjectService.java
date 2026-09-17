@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.entity.Organization;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.IdempotencyPolicy;
 import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
+import com.webhook.platform.api.domain.repository.ApiKeyRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.ProjectRequest;
 import com.webhook.platform.api.dto.ProjectResponse;
@@ -25,10 +26,13 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final PiiMaskingService piiMaskingService;
+    private final ApiKeyRepository apiKeyRepository;
 
-    public ProjectService(ProjectRepository projectRepository, PiiMaskingService piiMaskingService) {
+    public ProjectService(ProjectRepository projectRepository, PiiMaskingService piiMaskingService,
+            ApiKeyRepository apiKeyRepository) {
         this.projectRepository = projectRepository;
         this.piiMaskingService = piiMaskingService;
+        this.apiKeyRepository = apiKeyRepository;
     }
 
     /** What a brand-new organization's first project is called until its owner renames it. */
@@ -120,8 +124,14 @@ public class ProjectService {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        project.setDeletedAt(Instant.now());
+        Instant now = Instant.now();
+        project.setDeletedAt(now);
         projectRepository.save(project);
+
+        // A deleted project already authenticates nothing. Revoking its keys as well means that
+        // stays true for anything that reads a key without going through the project, and that
+        // the key list says so.
+        apiKeyRepository.findByProjectIdAndRevokedAtIsNull(id).forEach(key -> key.setRevokedAt(now));
     }
 
 }

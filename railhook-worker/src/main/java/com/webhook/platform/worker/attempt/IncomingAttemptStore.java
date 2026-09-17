@@ -21,6 +21,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +59,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     }
 
     private final IncomingForwardAttemptRepository attemptRepository;
+    private final ProjectStatusLookup projectStatusLookup;
     private final TransactionTemplate transactionTemplate;
     private final TransformationCacheService transformationCacheService;
     private final PayloadTransformService payloadTransformService;
@@ -72,6 +74,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
 
     public IncomingAttemptStore(
             IncomingForwardAttemptRepository attemptRepository,
+            ProjectStatusLookup projectStatusLookup,
             TransactionTemplate transactionTemplate,
             TransformationCacheService transformationCacheService,
             PayloadTransformService payloadTransformService,
@@ -83,6 +86,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             IncomingEvent event,
             IncomingDestination destination) {
         this.attemptRepository = attemptRepository;
+        this.projectStatusLookup = projectStatusLookup;
         this.transactionTemplate = transactionTemplate;
         this.transformationCacheService = transformationCacheService;
         this.payloadTransformService = payloadTransformService;
@@ -156,6 +160,16 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         if (!Boolean.TRUE.equals(destination.getEnabled())) {
             return terminal(claim, "Destination is disabled");
         }
+        // Deleting a Project or suspending an Organization touches no Source or Destination under
+        // it, so both read as live here. The same two outcomes the Outgoing store gives them.
+        ProjectStatusLookup.ProjectStatus projectStatus =
+                projectStatusLookup.forSource(destination.getIncomingSourceId());
+        if (projectStatus == ProjectStatusLookup.ProjectStatus.DELETED) {
+            return terminal(claim, "Project has been deleted");
+        }
+        if (projectStatus == ProjectStatusLookup.ProjectStatus.ORGANIZATION_SUSPENDED) {
+            return deferred(claim, "Organization is suspended");
+        }
 
         RetryLadder ladder;
         try {
@@ -178,6 +192,18 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 destination.getUrl(),
                 AttemptSupport.clampTimeout(destination.getTimeoutSeconds()));
         return new ClaimResult.Claimed<>(claim, context);
+    }
+
+    /**
+     * Hands the Forward back under its fencing token, unattempted, until {@link
+     * ProjectStatusLookup#SUSPENSION_RECHECK} from now.
+     */
+    private ClaimResult<Claim> deferred(Claim claim, String reason) {
+        Instant until = Instant.now().plus(ProjectStatusLookup.SUSPENSION_RECHECK);
+        log.info("Forward eventId={}, destId={} will not be attempted before {}: {}",
+                claim.eventId(), claim.destinationId(), until, reason);
+        finalise(claim, new Finalization.Deferred(until, reason));
+        return new ClaimResult.Deferred<>(until, reason);
     }
 
     /** Fails the Forward under its fencing token and reports that there is nothing to attempt. */
@@ -347,7 +373,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                         && attempt.getStatus() != ForwardAttemptStatus.PROCESSING) {
                     return false;
                 }
-                if (!stillHoldsClaim(claim, attempt)) {
+                if (!stillHoldsClaim(claim, attempt,
+                        ForwardAttemptStatus.PENDING, ForwardAttemptStatus.PROCESSING)) {
                     return false;
                 }
                 attempt.handBackTo(deferred.until());
@@ -362,7 +389,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 return false;
             }
 
-            if (!stillHoldsClaim(claim, attempt)) {
+            if (!stillHoldsClaim(claim, attempt, ForwardAttemptStatus.PROCESSING)) {
                 log.warn("Attempt {} for eventId={}, destId={} was reclaimed while this attempt was in "
                                 + "flight — refusing to finalise a row another attempt now owns",
                         claim.attemptNumber(), claim.eventId(), claim.destinationId());
@@ -393,8 +420,18 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return Boolean.TRUE.equals(applied);
     }
 
-    private boolean stillHoldsClaim(Claim claim, IncomingForwardAttempt attempt) {
-        return AttemptSupport.fenceMatches(attempt.getClaimToken(), claim.fence());
+    /**
+     * Whether the Claim owns the row, re-checked under the row lock. The read that found the row
+     * is a snapshot, and the write that follows is an UPDATE by id: a stuck sweep committed in
+     * between used to be overwritten, and a Retry queued a successor beside the one the sweep had
+     * already handed back.
+     */
+    private boolean stillHoldsClaim(Claim claim, IncomingForwardAttempt attempt, ForwardAttemptStatus... statuses) {
+        if (!AttemptSupport.fenceMatches(attempt.getClaimToken(), claim.fence())) {
+            return false;
+        }
+        List<String> names = Arrays.stream(statuses).map(Enum::name).toList();
+        return attemptRepository.holdIfStillClaimed(attempt.getId(), names, claim.fence()) == 1;
     }
 
     /**

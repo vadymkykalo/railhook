@@ -33,6 +33,8 @@ export default function SharedDebugPage() {
     if (!token) return;
     try {
       setLoading(true);
+      // A retry that succeeds must not go on showing the failure before it.
+      setError(null);
       const response = await debugLinksApi.viewPublic(token);
       setData(response);
     } catch (err: any) {
