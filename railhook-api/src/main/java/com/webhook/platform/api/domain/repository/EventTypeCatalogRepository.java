@@ -10,6 +10,8 @@ import java.util.UUID;
 
 @Repository
 public interface EventTypeCatalogRepository extends JpaRepository<EventTypeCatalog, UUID> {
+
+    Optional<EventTypeCatalog> findByIdAndProjectId(UUID id, UUID projectId);
     List<EventTypeCatalog> findByProjectIdOrderByNameAsc(UUID projectId);
     Optional<EventTypeCatalog> findByProjectIdAndName(UUID projectId, String name);
     boolean existsByProjectIdAndName(UUID projectId, String name);

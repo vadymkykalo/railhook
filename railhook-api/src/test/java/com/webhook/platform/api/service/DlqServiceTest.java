@@ -166,12 +166,31 @@ class DlqServiceTest {
         Delivery delivery = Delivery.builder().id(deliveryId).status(DeliveryStatus.DLQ)
                 .eventId(UUID.randomUUID()).endpointId(UUID.randomUUID()).build();
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+        stubEventIn(delivery, projectId);
         when(deliveryAttemptRepository.findTopByDeliveryIdOrderByAttemptNumberDesc(deliveryId))
                 .thenReturn(Optional.empty());
 
         DlqItemResponse response = dlqService.getDlqItem(projectId, deliveryId);
 
         assertThat(response.getDeliveryId()).isEqualTo(deliveryId);
+    }
+
+    @Test
+    void getDlqItem_deliveryOfAnotherProject_throwsNotFoundWithoutRevealingItsStatus() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
+        UUID deliveryId = UUID.randomUUID();
+        Delivery delivery = Delivery.builder().id(deliveryId).status(DeliveryStatus.SUCCESS)
+                .eventId(UUID.randomUUID()).endpointId(UUID.randomUUID()).build();
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+        stubEventIn(delivery, UUID.randomUUID());
+
+        assertThatThrownBy(() -> dlqService.getDlqItem(projectId, deliveryId))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    private void stubEventIn(Delivery delivery, UUID eventProjectId) {
+        when(eventRepository.findById(delivery.getEventId())).thenReturn(Optional.of(
+                Event.builder().id(delivery.getEventId()).projectId(eventProjectId).eventType("order.created").build()));
     }
 
     @Test
@@ -188,8 +207,10 @@ class DlqServiceTest {
     void getDlqItem_deliveryNotInDlq_throwsIllegalArgument() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
         UUID deliveryId = UUID.randomUUID();
-        Delivery delivery = Delivery.builder().id(deliveryId).status(DeliveryStatus.SUCCESS).build();
+        Delivery delivery = Delivery.builder().id(deliveryId).status(DeliveryStatus.SUCCESS)
+                .eventId(UUID.randomUUID()).build();
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+        stubEventIn(delivery, projectId);
 
         assertThatThrownBy(() -> dlqService.getDlqItem(projectId, deliveryId))
                 .isInstanceOf(IllegalArgumentException.class)

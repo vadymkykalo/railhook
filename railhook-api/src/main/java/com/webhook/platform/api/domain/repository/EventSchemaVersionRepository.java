@@ -13,6 +13,8 @@ import java.util.UUID;
 
 @Repository
 public interface EventSchemaVersionRepository extends JpaRepository<EventSchemaVersion, UUID> {
+
+    Optional<EventSchemaVersion> findByIdAndEventTypeId(UUID id, UUID eventTypeId);
     List<EventSchemaVersion> findByEventTypeIdOrderByVersionDesc(UUID eventTypeId);
 
     Optional<EventSchemaVersion> findByEventTypeIdAndVersion(UUID eventTypeId, int version);

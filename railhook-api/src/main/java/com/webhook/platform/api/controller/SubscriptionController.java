@@ -51,9 +51,11 @@ public class SubscriptionController {
     @Operation(summary = "Get subscription", description = "Returns subscription details")
     @GetMapping("/{id}")
     public ResponseEntity<SubscriptionResponse> getSubscription(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
-        SubscriptionResponse response = subscriptionService.getSubscription(id);
+        auth.validateProjectAccess(projectId);
+        SubscriptionResponse response = subscriptionService.getSubscription(projectId, id);
         return ResponseEntity.ok(response);
     }
 
@@ -72,11 +74,13 @@ public class SubscriptionController {
     @RequireAccess(AccessLevel.WRITE)
 @PutMapping("/{id}")
     public ResponseEntity<SubscriptionResponse> updateSubscription(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             @Valid @RequestBody SubscriptionRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        SubscriptionResponse response = subscriptionService.updateSubscription(id, request);
+        auth.validateProjectAccess(projectId);
+        SubscriptionResponse response = subscriptionService.updateSubscription(projectId, id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -85,11 +89,13 @@ public class SubscriptionController {
     @RequireAccess(AccessLevel.WRITE)
 @PatchMapping("/{id}")
     public ResponseEntity<SubscriptionResponse> patchSubscription(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             @RequestBody SubscriptionRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        SubscriptionResponse response = subscriptionService.updateSubscription(id, request);
+        auth.validateProjectAccess(projectId);
+        SubscriptionResponse response = subscriptionService.updateSubscription(projectId, id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -99,10 +105,12 @@ public class SubscriptionController {
     @RequireAccess(AccessLevel.WRITE)
 @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSubscription(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
-        subscriptionService.deleteSubscription(id);
+        auth.validateProjectAccess(projectId);
+        subscriptionService.deleteSubscription(projectId, id);
         return ResponseEntity.noContent().build();
     }
 }

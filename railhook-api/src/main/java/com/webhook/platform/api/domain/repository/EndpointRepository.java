@@ -9,10 +9,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
+
+    Optional<Endpoint> findByIdAndProjectId(UUID id, UUID projectId);
+
     List<Endpoint> findByProjectId(UUID projectId);
     Page<Endpoint> findByProjectIdAndDeletedAtIsNull(UUID projectId, Pageable pageable);
     long countByProjectIdAndDeletedAtIsNull(UUID projectId);

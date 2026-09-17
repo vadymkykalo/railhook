@@ -207,10 +207,9 @@ class IncomingSourceServiceTest {
     @Test
     void getSource_success() {
         IncomingSource source = buildSource();
-        when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(sourceRepository.findByIdAndProjectId(sourceId, projectId)).thenReturn(Optional.of(source));
 
-        IncomingSourceResponse response = service.getSource(sourceId);
+        IncomingSourceResponse response = service.getSource(projectId, sourceId);
 
         assertThat(response.getId()).isEqualTo(sourceId);
         assertThat(response.getName()).isEqualTo("GitHub Webhooks");
@@ -218,9 +217,9 @@ class IncomingSourceServiceTest {
 
     @Test
     void getSource_notFound() {
-        when(sourceRepository.findById(sourceId)).thenReturn(Optional.empty());
+        when(sourceRepository.findByIdAndProjectId(sourceId, projectId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getSource(sourceId))
+        assertThatThrownBy(() -> service.getSource(projectId, sourceId))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -240,8 +239,7 @@ class IncomingSourceServiceTest {
     @Test
     void updateSource_success() {
         IncomingSource source = buildSource();
-        when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(sourceRepository.findByIdAndProjectId(sourceId, projectId)).thenReturn(Optional.of(source));
         when(sourceRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         IncomingSourceRequest request = IncomingSourceRequest.builder()
@@ -250,7 +248,7 @@ class IncomingSourceServiceTest {
                 .status(IncomingSourceStatus.DISABLED)
                 .build();
 
-        IncomingSourceResponse response = service.updateSource(sourceId, request);
+        IncomingSourceResponse response = service.updateSource(projectId, sourceId, request);
 
         assertThat(response.getName()).isEqualTo("Updated Name");
         assertThat(response.getProviderType()).isEqualTo(ProviderType.STRIPE);
@@ -260,10 +258,9 @@ class IncomingSourceServiceTest {
     @Test
     void deleteSource_softDeletes() {
         IncomingSource source = buildSource();
-        when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(sourceRepository.findByIdAndProjectId(sourceId, projectId)).thenReturn(Optional.of(source));
 
-        service.deleteSource(sourceId);
+        service.deleteSource(projectId, sourceId);
 
         assertThat(source.getStatus()).isEqualTo(IncomingSourceStatus.DISABLED);
         verify(sourceRepository).save(source);
@@ -353,8 +350,7 @@ class IncomingSourceServiceTest {
         IncomingSource existing = buildSource();
         existing.setProviderType(ProviderType.GENERIC);
         existing.setVerificationMode(VerificationMode.NONE);
-        when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(existing));
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(sourceRepository.findByIdAndProjectId(sourceId, projectId)).thenReturn(Optional.of(existing));
 
         IncomingSourceRequest request = new IncomingSourceRequest();
         request.setVerificationMode(VerificationMode.PROVIDER);
@@ -362,7 +358,7 @@ class IncomingSourceServiceTest {
         /* The request alone looks harmless — it names no provider. It is the combination
            with the provider already on the row that is unverifiable, which is why the check
            runs against the merged state. */
-        assertThatThrownBy(() -> service.updateSource(sourceId, request))
+        assertThatThrownBy(() -> service.updateSource(projectId, sourceId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("no built-in verifier");
     }

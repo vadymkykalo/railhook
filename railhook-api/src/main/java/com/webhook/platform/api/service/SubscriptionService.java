@@ -64,6 +64,12 @@ public class SubscriptionService {
                 .orElseThrow(() -> new NotFoundException("Project not found"));
     }
 
+    /** Another project's subscription is "not found", like a missing one - the URL names the project. */
+    private Subscription requireSubscription(UUID projectId, UUID id) {
+        return subscriptionRepository.findByIdAndProjectId(id, projectId)
+                .orElseThrow(() -> new NotFoundException("Subscription not found"));
+    }
+
     private void validateEndpointBelongsToProject(UUID endpointId, UUID projectId) {
         Endpoint endpoint = endpointRepository.findById(endpointId)
                 .orElseThrow(() -> new NotFoundException("Endpoint not found"));
@@ -124,10 +130,8 @@ public class SubscriptionService {
         return mapToResponse(subscription);
     }
 
-    public SubscriptionResponse getSubscription(UUID id) {
-        Subscription subscription = subscriptionRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Subscription not found"));
-        validateProjectOwnership(subscription.getProjectId());
+    public SubscriptionResponse getSubscription(UUID projectId, UUID id) {
+        Subscription subscription = requireSubscription(projectId, id);
         return mapToResponse(subscription);
     }
 
@@ -149,10 +153,8 @@ public class SubscriptionService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Subscription")
     @Transactional
-    public SubscriptionResponse updateSubscription(UUID id, SubscriptionRequest request) {
-        Subscription subscription = subscriptionRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Subscription not found"));
-        validateProjectOwnership(subscription.getProjectId());
+    public SubscriptionResponse updateSubscription(UUID projectId, UUID id, SubscriptionRequest request) {
+        Subscription subscription = requireSubscription(projectId, id);
         
         if (request.getEndpointId() != null) {
             validateEndpointBelongsToProject(request.getEndpointId(), subscription.getProjectId());
@@ -199,10 +201,8 @@ public class SubscriptionService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "Subscription")
     @Transactional
-    public void deleteSubscription(UUID id) {
-        Subscription subscription = subscriptionRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Subscription not found"));
-        validateProjectOwnership(subscription.getProjectId());
+    public void deleteSubscription(UUID projectId, UUID id) {
+        Subscription subscription = requireSubscription(projectId, id);
         subscriptionRepository.deleteById(id);
         subscriptionMatchingCache.evict(subscription.getProjectId());
     }
