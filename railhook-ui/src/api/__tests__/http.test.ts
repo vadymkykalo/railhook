@@ -85,6 +85,21 @@ describe('http client session refresh', () => {
     expect(refreshCalls).toBe(1);
     expect(onLogout).toHaveBeenCalledTimes(1);
   });
+
+  it('fails the requests queued behind a refresh that fails, instead of leaving them pending forever', async () => {
+    refreshReplies = [{ status: 401 }];
+    const first = http.get('/api/v1/projects');
+    const queued = http.get('/api/v1/endpoints');
+    const outcome = (p: Promise<unknown>) => p.then(() => 'resolved', () => 'rejected');
+    const firstOutcome = outcome(first);
+    const queuedOutcome = outcome(queued);
+    await vi.runAllTimersAsync();
+
+    expect(await firstOutcome).toBe('rejected');
+    const pending = Symbol('pending');
+    expect(await Promise.race([queuedOutcome, Promise.resolve().then(() => pending)])).toBe('rejected');
+    expect(refreshCalls).toBe(1);
+  });
 });
 
 /**

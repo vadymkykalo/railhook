@@ -8,7 +8,6 @@ export const DEFAULT_TIMEOUT_MS = 30_000;
 /** Exports stream a whole dataset; they are the one call that may legitimately outlast the rest. */
 export const EXPORT_TIMEOUT_MS = 120_000;
 
-type OnRefreshedCallback = (token: string) => void;
 type OnLogoutCallback = () => void;
 
 /** Waits before retrying a refresh that failed for a reason that is not the session itself. */
@@ -33,8 +32,7 @@ function isTransientRefreshFailure(err: unknown): boolean {
 class HttpClient {
   private client: AxiosInstance;
   private token: string | null = null;
-  private isRefreshing = false;
-  private refreshSubscribers: OnRefreshedCallback[] = [];
+  private refreshInFlight: Promise<string> | null = null;
   private onLogout: OnLogoutCallback | null = null;
 
   constructor() {
@@ -69,51 +67,50 @@ class HttpClient {
           !originalRequest.url?.includes('/api/v1/auth/refresh') &&
           !originalRequest.url?.includes('/api/v1/auth/login')
         ) {
-          if (this.isRefreshing) {
-            return new Promise((resolve) => {
-              this.refreshSubscribers.push((newToken: string) => {
-                originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                resolve(this.client(originalRequest));
-              });
-            });
-          }
-
           originalRequest._retry = true;
-          this.isRefreshing = true;
-
-          try {
-            const response = await this.refreshWithRetry();
-
-            const { accessToken } = response.data;
-
-            this.token = accessToken;
-
-            this.refreshSubscribers.forEach((cb) => cb(accessToken));
-            this.refreshSubscribers = [];
-
-            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-            return this.client(originalRequest);
-          } catch (refreshError) {
-            this.refreshSubscribers = [];
-            // Log out only when the session itself was refused. A rate limit, an API restart or a
-            // dropped connection is not the end of a session, and treating it as one threw people
-            // to the sign-in screen for browsing quickly or for a deploy.
-            if (isSessionRejected(refreshError)) {
-              this.token = null;
-              localStorage.removeItem('auth_user');
-              if (this.onLogout) {
-                this.onLogout();
-              }
-            }
-            return Promise.reject(refreshError);
-          } finally {
-            this.isRefreshing = false;
-          }
+          const accessToken = await this.refreshSession();
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return this.client(originalRequest);
         }
 
         return Promise.reject(error);
       }
     );
+  }
+
+  /**
+   * One refresh at a time, shared by every request that met a 401 while it runs. Each of them
+   * settles with it: a queue that was only ever resolved left the requests behind a failed
+   * refresh pending forever, with their buttons disabled and their spinners turning.
+   */
+  private refreshSession(): Promise<string> {
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.runRefresh().finally(() => {
+        this.refreshInFlight = null;
+      });
+    }
+    return this.refreshInFlight;
+  }
+
+  private async runRefresh(): Promise<string> {
+    try {
+      const response = await this.refreshWithRetry();
+      const { accessToken } = response.data;
+      this.token = accessToken;
+      return accessToken;
+    } catch (refreshError) {
+      // Log out only when the session itself was refused. A rate limit, an API restart or a
+      // dropped connection is not the end of a session, and treating it as one threw people
+      // to the sign-in screen for browsing quickly or for a deploy.
+      if (isSessionRejected(refreshError)) {
+        this.token = null;
+        localStorage.removeItem('auth_user');
+        if (this.onLogout) {
+          this.onLogout();
+        }
+      }
+      throw refreshError;
+    }
   }
 
   private async refreshWithRetry() {
