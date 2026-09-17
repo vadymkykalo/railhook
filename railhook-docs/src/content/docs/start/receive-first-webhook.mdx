@@ -66,7 +66,8 @@ export PROJECT_ID=...
 |---|---|
 | `202` | Accepted and stored |
 | `401` | Verification is configured and the signature did not match. Nothing is stored |
-| `404` | No source has that token |
+| `403` | The organization is suspended |
+| `404` | No source has that token, or its project has been deleted |
 | `410` | The source exists but is disabled |
 | `413` | The body is larger than the incoming size limit |
 | `429` | The source's per-second rate limit is used up |
