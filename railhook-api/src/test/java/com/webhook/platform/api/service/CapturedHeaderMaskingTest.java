@@ -66,6 +66,8 @@ class CapturedHeaderMaskingTest {
         endpoint.setExpiresAt(Instant.now().plusSeconds(3600));
         endpoint.setRequestCount(0);
         when(endpoints.findBySlug("abc")).thenReturn(Optional.of(endpoint));
+        ProjectRepository projects = mock(ProjectRepository.class);
+        when(projects.existsById(endpoint.getProjectId())).thenReturn(true);
         when(captures.saveAndFlush(any(CapturedRequest.class)))
                 .thenAnswer(call -> {
                     CapturedRequest row = call.getArgument(0);
@@ -75,8 +77,8 @@ class CapturedHeaderMaskingTest {
                 });
 
         TestEndpointService service = new TestEndpointService(
-                endpoints, captures, mock(ProjectRepository.class),
-                mock(TrustedProxyResolver.class), txManager);
+                endpoints, captures, projects,
+                mock(TrustedProxyResolver.class), txManager, organizationId -> java.util.Optional.empty());
 
         service.captureRequest("abc", "{}", request);
 

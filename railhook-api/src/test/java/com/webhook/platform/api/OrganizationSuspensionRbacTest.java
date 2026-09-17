@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.RegisterRequest;
 import com.webhook.platform.api.service.SuspensionLookup;
+import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +16,12 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -205,6 +212,102 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
         assertThat(organizationRepository.findById(tenant.organizationId()).orElseThrow().isSuspended())
                 .isTrue();
         assertThat(suspensionLookup.forOrganization(tenant.organizationId())).isPresent();
+    }
+
+    // ── What suspension does to traffic nobody signs in for ────────
+
+    private UUID createProject(Tenant tenant) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/projects")
+                        .header("Authorization", "Bearer " + tenant.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Public paths\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
+    }
+
+    private void suspend(Tenant tenant) throws Exception {
+        mockMvc.perform(post("/api/v1/admin/organizations/" + tenant.organizationId() + "/suspend")
+                        .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"chargeback fraud\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void aSuspendedOrganizationsSourceStopsTakingWebhooks() throws Exception {
+        when(redisRateLimiterService.tryAcquireForSourceFailClosed(any(UUID.class), anyInt())).thenReturn(true);
+        Tenant tenant = registerTenant("suspension-ingress@example.com");
+        UUID projectId = createProject(tenant);
+        MvcResult source = mockMvc.perform(post("/api/v1/projects/" + projectId + "/incoming-sources")
+                        .header("Authorization", "Bearer " + tenant.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Suspended source\",\"slug\":\"suspended-source\","
+                                + "\"providerType\":\"GENERIC\",\"verificationMode\":\"NONE\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String token = objectMapper.readTree(source.getResponse().getContentAsString())
+                .get("ingressPathToken").asText();
+
+        mockMvc.perform(post("/ingress/" + token).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isAccepted());
+
+        suspend(tenant);
+
+        // Answered as a disabled Source is, and without the reason: the sender is a third-party
+        // provider, not the customer the reason was written for.
+        mockMvc.perform(post("/ingress/" + token).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.error").value("disabled"))
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("chargeback"))));
+    }
+
+    @Test
+    public void aSuspendedOrganizationsTestEndpointStopsCapturing() throws Exception {
+        when(redisRateLimiterService.tryAcquireForSlug(anyString(), anyInt())).thenReturn(true);
+        Tenant tenant = registerTenant("suspension-hook@example.com");
+        UUID projectId = createProject(tenant);
+        MvcResult endpoint = mockMvc.perform(post("/api/v1/projects/" + projectId + "/test-endpoints")
+                        .header("Authorization", "Bearer " + tenant.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Suspended capture\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String slug = objectMapper.readTree(endpoint.getResponse().getContentAsString()).get("slug").asText();
+
+        mockMvc.perform(post("/hook/" + slug).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+
+        suspend(tenant);
+
+        mockMvc.perform(post("/hook/" + slug).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void aSuspendedOrganizationsTunnelStopsForwarding() throws Exception {
+        when(redisRateLimiterService.tryAcquireForSlug(anyString(), anyInt())).thenReturn(true);
+        Tenant tenant = registerTenant("suspension-tunnel@example.com");
+        MvcResult tunnel = mockMvc.perform(post("/api/v1/tunnels")
+                        .header("Authorization", "Bearer " + tenant.token())
+                        .param("localPort", "3000"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String slug = objectMapper.readTree(tunnel.getResponse().getContentAsString()).get("publicSlug").asText();
+        when(redisTunnelCoordinator.isActiveInCluster(slug)).thenReturn(true);
+        when(redisTunnelCoordinator.forwardRequest(org.mockito.ArgumentMatchers.eq(slug), any()))
+                .thenReturn(TunnelResponseMessage.builder().statusCode(200).body("ok").build());
+
+        mockMvc.perform(post("/tunnel/" + slug + "/webhooks").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+
+        suspend(tenant);
+
+        mockMvc.perform(post("/tunnel/" + slug + "/webhooks").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+        // Refused before it reaches the developer's machine, not after.
+        verify(redisTunnelCoordinator, times(1)).forwardRequest(org.mockito.ArgumentMatchers.eq(slug), any());
     }
 
     // ── What the operator can see about one tenant ─────────────────

@@ -3,6 +3,7 @@ package com.webhook.platform.api.service;
 import com.webhook.platform.api.domain.entity.TunnelRequestLog;
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.repository.TunnelRequestLogRepository;
+import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
@@ -11,6 +12,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.concurrent.Executor;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
@@ -50,6 +52,7 @@ public class TunnelIngressService {
     private final TunnelBandwidthService bandwidthService;
     private final MeterRegistry meterRegistry;
     private final Executor tunnelMeteringExecutor;
+    private final SuspensionCheck suspensionCheck;
 
     public TunnelIngressService(TunnelService tunnelService,
             RedisTunnelCoordinator redisTunnelCoordinator,
@@ -57,7 +60,8 @@ public class TunnelIngressService {
             TunnelRequestLogRepository requestLogRepository,
             TunnelBandwidthService bandwidthService,
             MeterRegistry meterRegistry,
-            @Qualifier("tunnelMeteringExecutor") Executor tunnelMeteringExecutor) {
+            @Qualifier("tunnelMeteringExecutor") Executor tunnelMeteringExecutor,
+            SuspensionCheck suspensionCheck) {
         this.tunnelService = tunnelService;
         this.redisTunnelCoordinator = redisTunnelCoordinator;
         this.rateLimiterService = rateLimiterService;
@@ -65,6 +69,7 @@ public class TunnelIngressService {
         this.bandwidthService = bandwidthService;
         this.meterRegistry = meterRegistry;
         this.tunnelMeteringExecutor = tunnelMeteringExecutor;
+        this.suspensionCheck = suspensionCheck;
     }
 
     public Outcome forward(String slug, TunnelRequestMessage request, String body) {
@@ -79,13 +84,29 @@ public class TunnelIngressService {
             return refuse("payload_too_large", "payload_too_large", "Request body exceeds maximum size");
         }
 
+        // A tunnel request authenticates nothing — the slug in the URL is the only thing naming an
+        // organization — so the session lookup runs unscoped. It used to happen only afterwards,
+        // for metering; it now happens first, because a suspended organization's tunnel is
+        // refused here, where the interceptor that refuses its writes never runs.
+        TunnelSession session;
+        try {
+            session = TenantContext.callAsSystem(() -> tunnelService.getActiveBySlug(slug));
+        } catch (ResponseStatusException e) {
+            return refuse("offline", "tunnel_offline", "Tunnel is not connected");
+        }
+        if (suspensionCheck.suspensionReason(session.getOrganizationId()).isPresent()) {
+            log.warn("Tunnel request refused: organization {} is suspended (slug={})",
+                    session.getOrganizationId(), slug);
+            return refuse("suspended", "tunnel_suspended", "This tunnel is not accepting requests");
+        }
+
         long startMs = System.currentTimeMillis();
         TunnelResponseMessage response = redisTunnelCoordinator.forwardRequest(slug, request);
         int durationMs = (int) (System.currentTimeMillis() - startMs);
 
         int requestSize = body != null ? body.length() : 0;
         int responseSize = response != null && response.getBody() != null ? response.getBody().length() : 0;
-        recordAsync(slug, request, requestSize, responseSize, response, durationMs);
+        recordAsync(session, slug, request, requestSize, responseSize, response, durationMs);
 
         if (response == null) {
             outcomeCounter("timeout").increment();
@@ -107,16 +128,13 @@ public class TunnelIngressService {
     /**
      * Best-effort, off the response path.
      *
-     * <p>A tunnel request authenticates nothing — the slug in the URL is the only thing naming an
-     * organization — so the session lookup runs unscoped and everything after it runs inside the
-     * organization that owns the tunnel. Without that, the save fails on an unresolved tenant and
-     * metering quietly stops.
+     * <p>Runs inside the organization that owns the tunnel. Without that, the save fails on an
+     * unresolved tenant and metering quietly stops.
      */
-    private void recordAsync(String slug, TunnelRequestMessage request, int requestSize,
+    private void recordAsync(TunnelSession session, String slug, TunnelRequestMessage request, int requestSize,
             int responseSize, TunnelResponseMessage response, int durationMs) {
         tunnelMeteringExecutor.execute(() -> {
             try {
-                TunnelSession session = TenantContext.callAsSystem(() -> tunnelService.getActiveBySlug(slug));
                 TenantContext.runAs(session.getOrganizationId(), () -> {
                     bandwidthService.recordBytes(requestSize + responseSize);
                     requestLogRepository.save(TunnelRequestLog.builder()

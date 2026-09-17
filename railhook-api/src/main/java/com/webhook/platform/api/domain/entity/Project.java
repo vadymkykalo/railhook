@@ -5,14 +5,26 @@ import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.TenantId;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * A project, and only a live one.
+ *
+ * <p>Deleting a project stamps {@code deleted_at} and keeps the row. For as long as only the
+ * project list read that column, a deleted project went on working everywhere else: its API keys
+ * authenticated, its sources took webhooks, its endpoints could still be edited — some fifty
+ * lookups by id, each one a place to forget the check. The restriction puts the check where no
+ * lookup can forget it, {@code findById} and {@code existsById} included, so a deleted project
+ * answers exactly as a project that never existed does.
+ */
 @Entity
 @Table(name = "projects")
+@SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter
 @NoArgsConstructor

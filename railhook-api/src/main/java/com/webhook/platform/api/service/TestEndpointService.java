@@ -9,7 +9,9 @@ import com.webhook.platform.api.domain.repository.TestEndpointRepository;
 import com.webhook.platform.api.dto.CapturedRequestResponse;
 import com.webhook.platform.api.dto.TestEndpointRequest;
 import com.webhook.platform.api.dto.TestEndpointResponse;
+import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.tenancy.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,6 +44,7 @@ public class TestEndpointService {
     private final ProjectRepository projectRepository;
     private final TrustedProxyResolver trustedProxyResolver;
     private final PlatformTransactionManager transactionManager;
+    private final SuspensionCheck suspensionCheck;
 
     @Value("${test-endpoint.base-url:http://localhost:8080}")
     private String baseUrl;
@@ -153,6 +156,14 @@ public class TestEndpointService {
 
         if (endpoint.getExpiresAt().isBefore(Instant.now())) {
             throw new NotFoundException("Test endpoint expired");
+        }
+        if (!TenantContext.callAsSystem(() -> projectRepository.existsById(endpoint.getProjectId()))) {
+            throw new NotFoundException("Test endpoint not found");
+        }
+        // Public, so the interceptor that refuses a suspended organization's writes never runs
+        // here; and the caller is whoever holds the URL, so the reason stays with the customer.
+        if (suspensionCheck.suspensionReason(endpoint.getOrganizationId()).isPresent()) {
+            throw new ForbiddenException("This test endpoint is not accepting requests.");
         }
 
         return TenantContext.callAs(endpoint.getOrganizationId(), () ->

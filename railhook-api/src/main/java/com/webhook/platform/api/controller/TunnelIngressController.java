@@ -65,6 +65,7 @@ public class TunnelIngressController {
             // Temporarily unavailable, not a broken upstream: a 502 is replaced by a CDN's own
             // error page, and providers retry a 503.
             case "tunnel_offline" -> HttpStatus.SERVICE_UNAVAILABLE;
+            case "tunnel_suspended" -> HttpStatus.FORBIDDEN;
             default -> HttpStatus.BAD_GATEWAY;
         };
     }
