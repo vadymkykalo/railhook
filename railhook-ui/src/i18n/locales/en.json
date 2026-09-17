@@ -1934,6 +1934,7 @@
     "create": "Create Source",
     "createDialog": {
       "description": "Configure a new incoming webhook source to receive events from external providers",
+      "hmacHeaderCannotClear": "A signature header cannot be removed once set. Enter the header your provider signs in, or X-Signature for the default.",
       "hmacHeaderName": "Signature Header",
       "hmacHeaderPlaceholder": "X-Hub-Signature-256",
       "hmacPrefixPlaceholder": "sha256=",

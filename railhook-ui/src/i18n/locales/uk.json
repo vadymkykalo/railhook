@@ -1934,6 +1934,7 @@
     "create": "Створити джерело",
     "createDialog": {
       "description": "Налаштуйте нове вхідне webhook джерело для отримання подій від зовнішніх провайдерів",
+      "hmacHeaderCannotClear": "Заголовок підпису не можна видалити після встановлення. Вкажіть заголовок, у якому провайдер надсилає підпис, або X-Signature для типового.",
       "hmacHeaderName": "Заголовок підпису",
       "hmacHeaderPlaceholder": "X-Hub-Signature-256",
       "hmacPrefixPlaceholder": "sha256=",

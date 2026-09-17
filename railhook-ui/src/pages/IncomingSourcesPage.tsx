@@ -88,6 +88,7 @@ export default function IncomingSourcesPage() {
   const [formHmacHeader, setFormHmacHeader] = useState('');
   const [formHmacPrefix, setFormHmacPrefix] = useState('');
   const [formRateLimit, setFormRateLimit] = useState('');
+  const [headerCannotBeCleared, setHeaderCannotBeCleared] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const saving = createSource.isPending || updateSource.isPending;
@@ -102,6 +103,7 @@ export default function IncomingSourcesPage() {
     setFormHmacHeader('');
     setFormHmacPrefix('');
     setFormRateLimit('');
+    setHeaderCannotBeCleared(false);
     setShowDialog(true);
   };
 
@@ -114,12 +116,22 @@ export default function IncomingSourcesPage() {
     setFormHmacSecret('');
     setFormHmacHeader(source.hmacHeaderName || '');
     setFormHmacPrefix(source.hmacSignaturePrefix || '');
-    setFormRateLimit(source.rateLimitPerSecond?.toString() || '');
+    setFormRateLimit(source.rateLimitPerSecond ? source.rateLimitPerSecond.toString() : '');
+    setHeaderCannotBeCleared(false);
     setShowDialog(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    // The update API skips a field sent as null, so "clear" needs a value it will store. A prefix
+    // clears with "" and a rate limit with 0 (no limit of its own: the default applies). A
+    // header has no such value — "" would make every signature check look for a header named
+    // nothing — so clearing one is refused here instead of reported as saved.
+    if (editSource?.hmacHeaderName && formVerification === 'HMAC_GENERIC' && !formHmacHeader.trim()) {
+      setHeaderCannotBeCleared(true);
+      return;
+    }
+    setHeaderCannotBeCleared(false);
     const data: IncomingSourceRequest = {
       name: formName,
       slug: formSlug || undefined,
@@ -127,8 +139,8 @@ export default function IncomingSourcesPage() {
       verificationMode: formVerification,
       hmacSecret: formHmacSecret || undefined,
       hmacHeaderName: formHmacHeader || undefined,
-      hmacSignaturePrefix: formHmacPrefix || undefined,
-      rateLimitPerSecond: formRateLimit ? parseInt(formRateLimit) : null,
+      hmacSignaturePrefix: editSource ? formHmacPrefix : formHmacPrefix || undefined,
+      rateLimitPerSecond: formRateLimit ? parseInt(formRateLimit) : editSource ? 0 : null,
     };
 
     try {
@@ -398,7 +410,14 @@ export default function IncomingSourcesPage() {
                         id="src-hmac-header" className="font-mono text-sm"
                         placeholder={t('incomingSources.createDialog.hmacHeaderPlaceholder')}
                         value={formHmacHeader} onChange={(e) => setFormHmacHeader(e.target.value)} disabled={saving}
+                        aria-invalid={headerCannotBeCleared || undefined}
+                        aria-describedby={headerCannotBeCleared ? 'src-hmac-header-error' : undefined}
                       />
+                      {headerCannotBeCleared && (
+                        <p id="src-hmac-header-error" role="alert" className="text-xs text-halt">
+                          {t('incomingSources.createDialog.hmacHeaderCannotClear')}
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="src-hmac-prefix">{t('incomingSources.createDialog.hmacSignaturePrefix')}</Label>
