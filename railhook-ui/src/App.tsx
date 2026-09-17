@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { RouterProvider } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import ThemedToaster from './components/ThemedToaster';
 import { AuthContext, AuthState } from './auth/auth.store';
 import { router } from './router';
@@ -9,25 +9,9 @@ import { authApi } from './api/auth.api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import type { CurrentUserResponse } from './types/api.types';
 import BootSplash from './components/BootSplash';
-import { showApiError } from './lib/toast';
+import { createQueryClient } from './lib/queryClient';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
-      retry: 1,
-      refetchOnWindowFocus: true,
-    },
-    mutations: {
-      // The net under mutations that define no onError of their own. It used to
-      // reach into the response shape by hand and fall back to a hardcoded
-      // English sentence — the same job showApiError already does, in the
-      // reader's language, with the HTTP-status map and toast de-duplication.
-      onError: (error: unknown) => showApiError(error, 'toast.errors.unhandledMutation'),
-    },
-  },
-});
+const queryClient = createQueryClient();
 
 export default function App() {
   const [user, setUser] = useState<CurrentUserResponse | null>(null);
