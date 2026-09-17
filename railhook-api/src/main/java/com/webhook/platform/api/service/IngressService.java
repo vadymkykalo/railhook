@@ -15,6 +15,7 @@ import com.webhook.platform.api.domain.repository.IncomingForwardAttemptReposito
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
@@ -70,6 +71,7 @@ public class IngressService {
     private final EntitlementService entitlementService;
     private final QuotaCounterService quotaCounterService;
     private final ProjectRepository projectRepository;
+    private final SuspensionCheck suspensionCheck;
     private final long maxPayloadSizeBytes;
     private final int defaultRateLimitPerSecond;
 
@@ -91,6 +93,7 @@ public class IngressService {
             EntitlementService entitlementService,
             QuotaCounterService quotaCounterService,
             ProjectRepository projectRepository,
+            SuspensionCheck suspensionCheck,
             @Value("${webhook.incoming.max-payload-size-bytes:524288}") long maxPayloadSizeBytes,
             @Value("${webhook.incoming.rate-limit-per-second:100}") int defaultRateLimitPerSecond) {
         this.sourceRepository = sourceRepository;
@@ -113,6 +116,7 @@ public class IngressService {
         this.entitlementService = entitlementService;
         this.quotaCounterService = quotaCounterService;
         this.projectRepository = projectRepository;
+        this.suspensionCheck = suspensionCheck;
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
         this.defaultRateLimitPerSecond = defaultRateLimitPerSecond;
 
@@ -223,6 +227,14 @@ public class IngressService {
         }
         if (source.getStatus() != IncomingSourceStatus.ACTIVE) {
             throw new SourceDisabledException("Source is disabled");
+        }
+        // Ingest is what a suspension most needs to stop, and this path authenticates nobody, so
+        // the interceptor that refuses a suspended organization's writes never sees it. Answered
+        // as a disabled Source is: the sender is a provider, not the customer the reason is for.
+        if (suspensionCheck.suspensionReason(source.getOrganizationId()).isPresent()) {
+            log.warn("Rejecting incoming webhook: organization {} is suspended (sourceId={})",
+                    source.getOrganizationId(), source.getId());
+            throw new SourceDisabledException("Organization is suspended");
         }
         return source;
     }

@@ -78,7 +78,7 @@ class CapturedHeaderMaskingTest {
 
         TestEndpointService service = new TestEndpointService(
                 endpoints, captures, projects,
-                mock(TrustedProxyResolver.class), txManager);
+                mock(TrustedProxyResolver.class), txManager, organizationId -> java.util.Optional.empty());
 
         service.captureRequest("abc", "{}", request);
 

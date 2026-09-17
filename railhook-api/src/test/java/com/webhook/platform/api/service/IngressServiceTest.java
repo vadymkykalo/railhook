@@ -16,6 +16,7 @@ import com.webhook.platform.api.domain.repository.IncomingForwardAttemptReposito
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
@@ -91,6 +92,8 @@ class IngressServiceTest {
     private QuotaCounterService quotaCounterService;
     @Mock
     private ProjectRepository projectRepository;
+    @Mock
+    private SuspensionCheck suspensionCheck;
 
     private IngressService service;
     private WebhookVerifierFactory verifierFactory;
@@ -122,7 +125,7 @@ class IngressServiceTest {
                 forwardAttemptRepository, outboxMessageRepository,
                 objectMapper, new ForwardDispatch(objectMapper), meterRegistry, verifierFactory, replayDetectionService, rateLimiterService,
                 clientIpResolver, transactionManager,
-                encryptionKeyRegistry, entitlementService, quotaCounterService, projectRepository, 524288, DEFAULT_RATE_LIMIT
+                encryptionKeyRegistry, entitlementService, quotaCounterService, projectRepository, suspensionCheck, 524288, DEFAULT_RATE_LIMIT
         );
     }
 
