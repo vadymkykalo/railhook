@@ -67,29 +67,29 @@ public class MtlsWebClientFactory {
         }
 
         Instant endpointUpdatedAt = endpoint.getUpdatedAt();
-        CachedClient cached = mtlsClientCache.getIfPresent(endpoint.getId());
-        
-        // Invalidate cache if endpoint was updated after cache entry was created
-        if (cached != null && endpointUpdatedAt != null 
-                && cached.updatedAt() != null 
-                && endpointUpdatedAt.isAfter(cached.updatedAt())) {
-            log.info("mTLS config changed for endpoint {}, invalidating cached client", endpoint.getId());
-            mtlsClientCache.invalidate(endpoint.getId());
-            cached = null;
-        }
-        
-        if (cached != null) {
-            return cached.webClient();
-        }
-        
-        try {
-            WebClient client = createMtlsWebClient(endpoint);
-            mtlsClientCache.put(endpoint.getId(), new CachedClient(client, endpointUpdatedAt));
-            return client;
-        } catch (Exception e) {
-            log.error("Failed to create mTLS WebClient for endpoint {}: {}", endpoint.getId(), e.getMessage());
-            throw new RuntimeException("Failed to create mTLS client", e);
-        }
+
+        // One compute per endpoint, so callers that miss the cache together wait for a single
+        // build instead of each building a client and the last put deciding which one stays.
+        return mtlsClientCache.asMap().compute(endpoint.getId(), (id, cached) -> {
+            if (cached != null && !isStale(cached, endpointUpdatedAt)) {
+                return cached;
+            }
+            if (cached != null) {
+                log.info("mTLS config changed for endpoint {}, replacing cached client", id);
+            }
+            try {
+                return new CachedClient(createMtlsWebClient(endpoint), endpointUpdatedAt);
+            } catch (Exception e) {
+                log.error("Failed to create mTLS WebClient for endpoint {}: {}", id, e.getMessage());
+                throw new RuntimeException("Failed to create mTLS client", e);
+            }
+        }).webClient();
+    }
+
+    private static boolean isStale(CachedClient cached, Instant endpointUpdatedAt) {
+        return endpointUpdatedAt != null
+                && cached.updatedAt() != null
+                && endpointUpdatedAt.isAfter(cached.updatedAt());
     }
 
     public void invalidateCache(UUID endpointId) {
@@ -141,7 +141,9 @@ public class MtlsWebClientFactory {
 
         log.info("Created mTLS WebClient for endpoint {}", endpoint.getId());
 
-        return webClientBuilder
+        // A copy: the connector holds this endpoint's certificate, and configured on the injected
+        // builder it leaked into whichever client was built from it next.
+        return webClientBuilder.clone()
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .build();
     }
