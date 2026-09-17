@@ -253,6 +253,36 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
         verify(tokenBlacklistService).revokeAllUserTokens(eq(userId));
     }
 
+    /**
+     * Revoking the access tokens is not enough on reuse: the session rows stayed active, so
+     * whichever party held the newest refresh token -- quite possibly the thief, who is the one
+     * racing to refresh -- carried on minting fresh pairs indefinitely.
+     */
+    @Test
+    public void testReplayingRotatedRefreshTokenAlsoEndsTheRotatedSuccessor() throws Exception {
+        when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
+
+        AuthResponse tokens = registerAndCaptureTokens("refresh-reuse-ends-sessions@example.com");
+        String original = tokens.getRefreshToken();
+
+        MvcResult rotated = mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", original)))
+                .andExpect(status().isOk())
+                .andReturn();
+        String successor = rotated.getResponse().getCookie("refresh_token").getValue();
+
+        // The Redis blacklist is mocked; mark the rotated-away jti the way refresh just did.
+        when(tokenBlacklistService.isBlacklisted(eq(jwtUtil.getJtiFromToken(original)))).thenReturn(true);
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", original)))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", successor)))
+                .andExpect(status().isUnauthorized());
+    }
+
     private AuthResponse registerAndCaptureTokens(String email) throws Exception {
         RegisterRequest registerRequest = RegisterRequest.builder()
                 .email(email)

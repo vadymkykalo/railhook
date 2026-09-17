@@ -332,9 +332,11 @@ public class AuthService {
             // prior refresh, or explicitly revoked via logout). A rotated-away token being
             // replayed is the signature of a stolen refresh token racing the legitimate
             // client, so treat it as a compromised token family and kill every token the
-            // user currently holds, not just this one.
-            tokenBlacklistService.revokeAllUserTokens(userId);
-            log.warn("Rejected reuse of already-rotated/revoked refresh token for user {}; revoked all tokens", userId);
+            // user currently holds, not just this one. The session rows go too: revoking only
+            // the access tokens left whoever holds the newest refresh token -- possibly the
+            // thief -- refreshing indefinitely.
+            userSessionService.revokeAllSessions(userId);
+            log.warn("Rejected reuse of already-rotated/revoked refresh token for user {}; revoked all sessions", userId);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token has been revoked");
         }
 
