@@ -109,6 +109,42 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
                         @Param("claimToken") UUID claimToken);
 
         /**
+         * Returns a retry Attempt to its ladder, but only while it still carries the
+         * {@code started_at} its retry message was published with. Once a copy of that message
+         * has claimed the row, {@code started_at} has moved on and this matches nothing.
+         */
+        @Modifying
+        @Query(value = "UPDATE incoming_forward_attempts SET status = 'PENDING', started_at = NULL, " +
+                        "claim_token = NULL, next_retry_at = :retryAt " +
+                        "WHERE incoming_event_id = :eventId AND destination_id = :destinationId " +
+                        "AND attempt_number = :attemptNumber AND status = 'PROCESSING' " +
+                        "AND started_at = :expectedStartedAt " +
+                        "AND replay_session_id IS NOT DISTINCT FROM CAST(:replaySessionId AS uuid)",
+                        nativeQuery = true)
+        int handBackIfStillClaimed(@Param("eventId") UUID eventId,
+                        @Param("destinationId") UUID destinationId,
+                        @Param("attemptNumber") int attemptNumber,
+                        @Param("replaySessionId") UUID replaySessionId,
+                        @Param("expectedStartedAt") Instant expectedStartedAt,
+                        @Param("retryAt") Instant retryAt);
+
+        /**
+         * Puts an unclaimed Attempt on its ladder at {@code retryAt}, for a message that claims
+         * PENDING and could not be run. Matches nothing once any copy of it has claimed the row.
+         */
+        @Modifying
+        @Query(value = "UPDATE incoming_forward_attempts SET next_retry_at = :retryAt " +
+                        "WHERE incoming_event_id = :eventId AND destination_id = :destinationId " +
+                        "AND attempt_number = :attemptNumber AND status = 'PENDING' " +
+                        "AND replay_session_id IS NOT DISTINCT FROM CAST(:replaySessionId AS uuid)",
+                        nativeQuery = true)
+        int scheduleIfUnclaimed(@Param("eventId") UUID eventId,
+                        @Param("destinationId") UUID destinationId,
+                        @Param("attemptNumber") int attemptNumber,
+                        @Param("replaySessionId") UUID replaySessionId,
+                        @Param("retryAt") Instant retryAt);
+
+        /**
          * When the longest-outstanding Forward started: the {@code created_at} of attempt 1 in the
          * same (Incoming Event, Destination, Replay session).
          *

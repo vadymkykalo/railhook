@@ -113,6 +113,15 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
             @Param("claimToken") UUID claimToken,
             @Param("retryAt") Instant retryAt);
 
+    /**
+     * Puts an unclaimed Delivery on its ladder at {@code retryAt}, for a dispatch message that
+     * could not be run. Matches nothing once any copy of that message has claimed the row.
+     */
+    @Modifying
+    @Query(value = "UPDATE deliveries SET next_retry_at = :retryAt, updated_at = now(), version = version + 1 " +
+            "WHERE id = :id AND status = 'PENDING' AND claim_token IS NULL", nativeQuery = true)
+    int scheduleIfUnclaimed(@Param("id") UUID id, @Param("retryAt") Instant retryAt);
+
     @Modifying
     @Query(value = "UPDATE deliveries SET attempt_count = attempt_count + 1, " +
             "updated_at = now(), version = version + 1 " +

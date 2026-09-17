@@ -4,6 +4,8 @@ import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -13,9 +15,11 @@ import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.MicrometerProducerListener;
 import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.support.serializer.DelegatingByTypeSerializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Configuration
@@ -87,9 +91,19 @@ public class KafkaProducerConfig {
         return new KafkaTemplate<>(incomingForwardProducerFactory());
     }
 
+    /**
+     * Carries both kinds of dead letter: a record the listener failed on, whose value is a message,
+     * and a record whose value never deserialized, which arrives here as the bytes that were read.
+     * Those bytes go out as they are; through the JSON serializer they became a base64 string, and
+     * the DLQ no longer held what had been on the topic.
+     */
     @Bean(name = "deadLetterKafkaTemplate")
     public KafkaOperations<String, Object> deadLetterKafkaTemplate() {
-        ProducerFactory<String, Object> producerFactory = measured(new DefaultKafkaProducerFactory<>(commonProducerProps()));
+        Map<Class<?>, Serializer<?>> byType = new LinkedHashMap<>();
+        byType.put(byte[].class, new ByteArraySerializer());
+        byType.put(Object.class, new JsonSerializer<>());
+        ProducerFactory<String, Object> producerFactory = measured(new DefaultKafkaProducerFactory<>(
+                commonProducerProps(), new StringSerializer(), new DelegatingByTypeSerializer(byType, true)));
         return new KafkaTemplate<>(producerFactory);
     }
 }

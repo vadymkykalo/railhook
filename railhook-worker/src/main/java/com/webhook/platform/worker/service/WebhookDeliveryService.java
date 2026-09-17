@@ -4,7 +4,6 @@ import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.attempt.AttemptRunner;
 import com.webhook.platform.worker.attempt.DeliveryAttemptMetrics;
 import com.webhook.platform.worker.attempt.OutgoingAttemptStoreFactory;
-import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -78,27 +77,33 @@ public class WebhookDeliveryService {
      * until every lower offset is acked, leaving it unacked stalls the whole partition rather than
      * merely delaying it. Kafka's job for the record is done either way — the retry ladder, not
      * redelivery, drives reprocessing — so the row is rescheduled and the caller acks.
+     *
+     * <p>Only the Claim this message would have taken is handed back. Kafka delivers a message
+     * more than once, and another copy may hold the row with its POST on the wire: taken from it,
+     * that copy's 2xx could not finalise and the ladder sent the webhook again. So a retry
+     * message hands back only while the row still carries the token it was published with, and a
+     * dispatch message only a row nobody has claimed. A retry message without a token cannot tell
+     * which copy it is, and leaves the row to the stuck sweep.
      */
-    public void rescheduleForBackpressure(UUID deliveryId, boolean isRetry) {
-        transactionTemplate.executeWithoutResult(tx -> {
-            Delivery delivery = deliveryRepository.findById(deliveryId).orElse(null);
-            if (delivery == null) {
-                log.debug("Delivery {} disappeared before backpressure reschedule", deliveryId);
-                return;
-            }
-            Delivery.DeliveryStatus expected = isRetry
-                    ? Delivery.DeliveryStatus.PROCESSING
-                    : Delivery.DeliveryStatus.PENDING;
-            if (delivery.getStatus() != expected) {
-                log.debug("Delivery {} no longer {} (already handled?), skipping backpressure reschedule",
-                        deliveryId, expected);
-                return;
-            }
-            long delaySec = ThreadLocalRandom.current().nextLong(5, 16);
-            delivery.handBackTo(Instant.now().plusSeconds(delaySec));
-            deliveryRepository.save(delivery);
-            log.warn("Executor pool full, rescheduled delivery {} via retry ladder in {}s instead of leaving it unacked",
-                    deliveryId, delaySec);
-        });
+    public void rescheduleForBackpressure(DeliveryMessage message, boolean isRetry) {
+        UUID deliveryId = message.getDeliveryId();
+        long delaySec = ThreadLocalRandom.current().nextLong(5, 16);
+        Instant retryAt = Instant.now().plusSeconds(delaySec);
+
+        if (isRetry && message.getClaimToken() == null) {
+            log.warn("Executor pool full for retry delivery {} with no claim token; leaving it to the stuck sweep",
+                    deliveryId);
+            return;
+        }
+        Integer written = transactionTemplate.execute(tx -> isRetry
+                ? deliveryRepository.handBackIfStillClaimed(deliveryId, message.getClaimToken(), retryAt)
+                : deliveryRepository.scheduleIfUnclaimed(deliveryId, retryAt));
+        if (written == null || written == 0) {
+            log.debug("Delivery {} is not in the state this message would claim (another copy holds it, "
+                    + "or it is done), skipping backpressure reschedule", deliveryId);
+            return;
+        }
+        log.warn("Executor pool full, rescheduled delivery {} via retry ladder in {}s instead of leaving it unacked",
+                deliveryId, delaySec);
     }
 }

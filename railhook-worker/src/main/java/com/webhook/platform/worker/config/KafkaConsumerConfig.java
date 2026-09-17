@@ -20,6 +20,7 @@ import org.springframework.kafka.core.MicrometerConsumerListener;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.util.backoff.FixedBackOff;
 
@@ -89,7 +90,12 @@ public class KafkaConsumerConfig {
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
+        // A value that does not parse fails inside poll(), where there is no record for the error
+        // handler to dead-letter: the container seeks back and re-polls it forever, and the rest
+        // of its partition waits behind it. Wrapped, the failure travels as a header on a record
+        // with a null value, which the error handler parks on the DLQ with the original bytes.
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
+        props.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, JsonDeserializer.class);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.webhook.platform.common.dto");
@@ -165,6 +171,11 @@ public class KafkaConsumerConfig {
             recoverer,
             new FixedBackOff(retryIntervalMs, maxRetries)
         );
+        // Retry the failed record in place rather than seek the rest of the batch back. The
+        // records behind a seek stay in asyncAcks' list of offsets awaiting an ack, which never
+        // comes because the partition is paused until it does: a record parked on the DLQ left
+        // everything behind it unconsumed until a rebalance.
+        errorHandler.setSeekAfterError(false);
 
         errorHandler.setRetryListeners((record, ex, deliveryAttempt) ->
                 log.warn("Kafka retry attempt {} for topic={}, partition={}, offset={}, key={}, error={}",

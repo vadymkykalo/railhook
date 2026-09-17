@@ -73,7 +73,7 @@ public class DeliveryConsumer {
                 () -> webhookDeliveryService.processDelivery(message, false),
                 acknowledgment,
                 "delivery " + message.getDeliveryId(),
-                () -> webhookDeliveryService.rescheduleForBackpressure(message.getDeliveryId(), false));
+                () -> webhookDeliveryService.rescheduleForBackpressure(message, false));
     }
 
     @KafkaListener(
@@ -106,7 +106,7 @@ public class DeliveryConsumer {
                 () -> webhookDeliveryService.processDelivery(message, true),
                 acknowledgment,
                 "retry delivery " + message.getDeliveryId(),
-                () -> webhookDeliveryService.rescheduleForBackpressure(message.getDeliveryId(), true));
+                () -> webhookDeliveryService.rescheduleForBackpressure(message, true));
     }
 
     private String extractCorrelationId(byte[] correlationIdBytes) {
