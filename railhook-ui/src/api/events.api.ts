@@ -1,5 +1,5 @@
 import { http } from './http';
-import type { PageResponse } from '../types/api.types';
+import type { EventResponse, PageResponse } from '../types/api.types';
 
 export interface SendEventRequest {
   type: string;
@@ -11,19 +11,7 @@ export interface SendEventRequest {
   data: unknown;
 }
 
-export interface EventResponse {
-  id: string;
-  projectId: string;
-  eventType: string;
-  payload: string;
-  createdAt: string;
-  deliveriesCreated?: number;
-  /**
-   * Schema-validation errors the event was accepted despite, under a project whose policy is
-   * WARN. Only a test-event response carries them; a stored event read back does not.
-   */
-  schemaWarnings?: string[];
-}
+export type { EventResponse } from '../types/api.types';
 
 export interface EventFilters {
   page?: number;

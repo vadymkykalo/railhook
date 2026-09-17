@@ -126,8 +126,8 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     List<DeliveryStatus> findRecentOutcomesByEndpointId(
             @Param("endpointId") UUID endpointId, Pageable pageable);
 
-    @Query("SELECT d.eventId, COUNT(d) FROM Delivery d WHERE d.eventId IN :eventIds GROUP BY d.eventId")
-    List<Object[]> countByEventIds(@Param("eventIds") List<UUID> eventIds);
+    @Query("SELECT d.eventId, d.status, COUNT(d) FROM Delivery d WHERE d.eventId IN :eventIds GROUP BY d.eventId, d.status")
+    List<Object[]> countByEventIdsAndStatus(@Param("eventIds") List<UUID> eventIds);
 
     List<Delivery> findByIdInAndStatus(List<UUID> ids, DeliveryStatus status);
 
