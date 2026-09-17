@@ -7763,8 +7763,11 @@ components:
         rateLimitPerSecond:
           type: integer
           format: int32
-          description: Rate limit per second for ingress endpoint (null = unlimited)
+          description: "Rate limit per second for the ingress URL, at most the plan's\
+            \ own (null = the default limit)"
           example: 100
+          maximum: 10000
+          minimum: 1
       required:
       - name
     IncomingSourceResponse:
@@ -9489,14 +9492,14 @@ components:
           $ref: "#/components/schemas/SortObject"
         paged:
           type: boolean
-        pageNumber:
-          type: integer
-          format: int32
+        unpaged:
+          type: boolean
         pageSize:
           type: integer
           format: int32
-        unpaged:
-          type: boolean
+        pageNumber:
+          type: integer
+          format: int32
     SortObject:
       type: object
       properties:

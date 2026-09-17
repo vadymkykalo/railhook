@@ -3917,7 +3917,7 @@ export interface components {
             hmacSignaturePrefix?: string;
             /**
              * Format: int32
-             * @description Rate limit per second for ingress endpoint (null = unlimited)
+             * @description Rate limit per second for the ingress URL, at most the plan's own (null = the default limit)
              * @example 100
              */
             rateLimitPerSecond?: number;
@@ -4859,11 +4859,11 @@ export interface components {
             offset?: number;
             sort?: components["schemas"]["SortObject"];
             paged?: boolean;
-            /** Format: int32 */
-            pageNumber?: number;
+            unpaged?: boolean;
             /** Format: int32 */
             pageSize?: number;
-            unpaged?: boolean;
+            /** Format: int32 */
+            pageNumber?: number;
         };
         SortObject: {
             empty?: boolean;
