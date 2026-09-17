@@ -109,6 +109,24 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
                         @Param("claimToken") UUID claimToken);
 
         /**
+         * Returns a row the retry scheduler claimed to its ladder, but only while it is still
+         * that claim: PROCESSING, on the {@code started_at} the scheduler stamped, and not yet
+         * taken by a consumer, whose claim writes a token and a new {@code started_at}.
+         *
+         * <p>For a send the scheduler could not confirm. It may still land, and the consumer then
+         * owns the row — possibly already finalised — so a hand-back must match nothing rather
+         * than write the scheduler's snapshot over it.
+         */
+        @Modifying
+        @Query(value = "UPDATE incoming_forward_attempts SET status = 'PENDING', started_at = NULL, " +
+                        "claim_token = NULL, next_retry_at = :retryAt " +
+                        "WHERE id = :id AND status = 'PROCESSING' AND started_at = :claimedAt " +
+                        "AND claim_token IS NULL", nativeQuery = true)
+        int handBackIfStillClaimed(@Param("id") UUID id,
+                        @Param("claimedAt") Instant claimedAt,
+                        @Param("retryAt") Instant retryAt);
+
+        /**
          * When the longest-outstanding Forward started: the {@code created_at} of attempt 1 in the
          * same (Incoming Event, Destination, Replay session).
          *

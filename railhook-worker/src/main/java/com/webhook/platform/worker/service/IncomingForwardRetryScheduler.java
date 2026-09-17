@@ -161,7 +161,6 @@ public class IncomingForwardRetryScheduler {
                 CompletableFuture<SendResult<String, IncomingForwardMessage>> future = futures.get(attempt.getId());
                 if (future == null) {
                     // Send was not initiated, revert to PENDING
-                    attempt.handBackTo(Instant.now().plusSeconds(rescheduleWithJitter(30)));
                     failed.add(attempt);
                     continue;
                 }
@@ -169,7 +168,6 @@ public class IncomingForwardRetryScheduler {
                 try {
                     if (!future.isDone()) {
                         // Timed out, revert to PENDING
-                        attempt.handBackTo(Instant.now().plusSeconds(rescheduleWithJitter(30)));
                         failed.add(attempt);
                         continue;
                     }
@@ -195,17 +193,11 @@ public class IncomingForwardRetryScheduler {
                 } catch (Exception e) {
                     log.error("Failed to schedule incoming forward retry: attemptId={}: {}",
                             attempt.getId(), e.getMessage());
-                    attempt.handBackTo(Instant.now().plusSeconds(rescheduleWithJitter(30)));
                     failed.add(attempt);
                 }
             }
 
-            // Persist results in a short transaction
-            transactionTemplate.executeWithoutResult(tx -> {
-                if (!failed.isEmpty()) {
-                    attemptRepository.saveAll(failed);
-                }
-            });
+            handBack(failed);
 
             // ── Governor feedback ──
             governor.recordResult(sentCount, failed.size());
@@ -216,6 +208,29 @@ public class IncomingForwardRetryScheduler {
         } catch (Exception e) {
             log.error("Error polling incoming forward retries: {}", e.getMessage(), e);
         }
+    }
+
+    /**
+     * Writes the hand-backs, each fenced on the {@code started_at} Phase 1 claimed the row under.
+     *
+     * <p>A send reported as failed or timed out may still reach the consumer, which then claims
+     * the row and may already have finalised it. Saving the Phase 1 snapshots merged PROCESSING
+     * back over that, then PENDING, and the scheduler sent the Forward again.
+     */
+    private void handBack(List<IncomingForwardAttempt> attempts) {
+        if (attempts.isEmpty()) {
+            return;
+        }
+        transactionTemplate.executeWithoutResult(tx -> {
+            for (IncomingForwardAttempt attempt : attempts) {
+                int written = attemptRepository.handBackIfStillClaimed(attempt.getId(), attempt.getStartedAt(),
+                        Instant.now().plusSeconds(rescheduleWithJitter(30)));
+                if (written == 0) {
+                    log.info("Forward attempt {} was taken over before its hand-back (its retry message landed), "
+                            + "leaving it to the consumer", attempt.getId());
+                }
+            }
+        });
     }
 
     private long countPendingRetries() {
