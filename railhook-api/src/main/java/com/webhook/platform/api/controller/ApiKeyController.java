@@ -48,6 +48,9 @@ public class ApiKeyController {
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody ApiKeyRequest request,
             AuthContext auth) {
+        // Managing keys takes a signed-in user: a key that could create, rotate or revoke keys
+        // lets one leak mint non-expiring successors and outlive its own revocation.
+        auth.requireJwt();
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         ApiKeyResponse response = apiKeyService.createApiKey(projectId, request);
@@ -79,6 +82,7 @@ public class ApiKeyController {
             @PathVariable("apiKeyId") UUID apiKeyId,
             @Valid @RequestBody(required = false) ApiKeyRotateRequest request,
             AuthContext auth) {
+        auth.requireJwt();
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         ApiKeyResponse response = apiKeyService.rotateApiKey(projectId, apiKeyId, request);
@@ -95,6 +99,7 @@ public class ApiKeyController {
             @PathVariable("projectId") UUID projectId,
             @PathVariable("apiKeyId") UUID apiKeyId,
             AuthContext auth) {
+        auth.requireJwt();
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         apiKeyService.revokeApiKey(projectId, apiKeyId);
