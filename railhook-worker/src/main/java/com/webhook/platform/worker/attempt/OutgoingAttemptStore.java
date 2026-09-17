@@ -311,8 +311,13 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
 
     @Override
     public void attemptStarting(Claim claim) {
-        transactionTemplate.executeWithoutResult(tx ->
-                deliveryRepository.incrementAttemptCount(claim.deliveryId()));
+        Integer spent = transactionTemplate.execute(tx ->
+                deliveryRepository.incrementAttemptCount(claim.deliveryId(), claim.fence()));
+        if (spent == null || spent == 0) {
+            // Its finalisation will not apply either, so it queues nothing.
+            log.warn("Delivery {} was reclaimed before its attempt started; the rung stays with the "
+                    + "attempt that holds it now", claim.deliveryId());
+        }
         claim.delivery().setAttemptCount(claim.delivery().getAttemptCount() + 1);
     }
 

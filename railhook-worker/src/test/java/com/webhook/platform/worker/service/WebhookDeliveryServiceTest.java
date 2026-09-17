@@ -1267,7 +1267,7 @@ class WebhookDeliveryServiceTest {
 
         // Nothing was sent, and no permit was ever taken: the check runs before admission.
         verify(concurrencyControlService, never()).tryAcquireForTarget(endpointId);
-        verify(deliveryRepository, never()).incrementAttemptCount(any());
+        verify(deliveryRepository, never()).incrementAttemptCount(any(), any());
     }
 
     @Test
