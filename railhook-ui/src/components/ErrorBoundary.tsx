@@ -48,56 +48,58 @@ export class ErrorBoundary extends Component<Props, State> {
     }
   }
 
-  handleReset = () => {
-    this.setState({ hasError: false, error: null });
-    window.location.href = '/admin/dashboard';
-  };
-
-  handleReload = () => {
-    window.location.reload();
-  };
-
   render() {
     if (this.state.hasError) {
-      const page = this.props.variant === 'page';
-      return (
-        <div
-          className={
-            page
-              ? 'flex min-h-[60vh] items-center justify-center p-6'
-              : 'flex min-h-screen items-center justify-center bg-background p-6'
-          }
-        >
-          <div role="alert" className="w-full max-w-md text-center">
-            <div className="mx-auto mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-halt/30 bg-halt-soft">
-              <AlertTriangle className="h-5 w-5 text-halt" aria-hidden />
-            </div>
-            {page ? (
-              <h2 className="text-title">{i18n.t('errorBoundary.title')}</h2>
-            ) : (
-              <h1 className="text-title">{i18n.t('errorBoundary.title')}</h1>
-            )}
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              {i18n.t('errorBoundary.description')}
-            </p>
-            {this.state.error && (
-              <pre className="mt-5 max-h-32 overflow-auto rounded-md border border-rail bg-card p-3 text-left font-mono text-xs text-muted-foreground">
-                {this.state.error.message}
-              </pre>
-            )}
-            <div className="mt-6 flex items-center justify-center gap-2">
-              <Button variant="outline" onClick={this.handleReload}>
-                <RefreshCw className="h-4 w-4" aria-hidden /> {i18n.t('errorBoundary.reloadPage')}
-              </Button>
-              <Button onClick={this.handleReset}>
-                {i18n.t('errorBoundary.goToDashboard')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      );
+      return <ErrorFallback error={this.state.error} variant={this.props.variant} />;
     }
 
     return this.props.children;
   }
+}
+
+/**
+ * What a failure looks like, shared by the render boundary above and by the router's
+ * `errorElement` — which catches what never reaches a component boundary, such as a lazy page
+ * whose chunk a new deploy has removed.
+ */
+export function ErrorFallback({ error, variant }: { error: Error | null; variant?: 'app' | 'page' }) {
+  const page = variant === 'page';
+  const reload = () => window.location.reload();
+  const goToDashboard = () => { window.location.href = '/admin/dashboard'; };
+  return (
+    <div
+      className={
+        page
+          ? 'flex min-h-[60vh] items-center justify-center p-6'
+          : 'flex min-h-screen items-center justify-center bg-background p-6'
+      }
+    >
+      <div role="alert" className="w-full max-w-md text-center">
+        <div className="mx-auto mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-halt/30 bg-halt-soft">
+          <AlertTriangle className="h-5 w-5 text-halt" aria-hidden />
+        </div>
+        {page ? (
+          <h2 className="text-title">{i18n.t('errorBoundary.title')}</h2>
+        ) : (
+          <h1 className="text-title">{i18n.t('errorBoundary.title')}</h1>
+        )}
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          {i18n.t('errorBoundary.description')}
+        </p>
+        {error && (
+          <pre className="mt-5 max-h-32 overflow-auto rounded-md border border-rail bg-card p-3 text-left font-mono text-xs text-muted-foreground">
+            {error.message}
+          </pre>
+        )}
+        <div className="mt-6 flex items-center justify-center gap-2">
+          <Button variant="outline" onClick={reload}>
+            <RefreshCw className="h-4 w-4" aria-hidden /> {i18n.t('errorBoundary.reloadPage')}
+          </Button>
+          <Button onClick={goToDashboard}>
+            {i18n.t('errorBoundary.goToDashboard')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }

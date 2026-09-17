@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showWarning } from '../lib/toast';
 import { endpointsApi } from '../api/endpoints.api';
 import { subscriptionsApi, type SubscriptionRequest } from '../api/subscriptions.api';
-import type { EndpointRequest } from '../types/api.types';
+import type { EndpointRequest, SignatureScheme } from '../types/api.types';
+import { SecretField } from '../pages/ConnectionSetupPage';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
@@ -23,6 +24,8 @@ interface ExportedConfig {
     enabled: boolean;
     rateLimitPerSecond?: number;
     allowedSourceIps?: string;
+    /** Absent in files exported before the scheme was; the server default then applies. */
+    signatureScheme?: SignatureScheme;
   }>;
   subscriptions: Array<{
     endpointUrl: string;
@@ -41,7 +44,13 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
   const { t } = useTranslation();
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ endpoints: number; subscriptions: number; errors: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{
+    endpoints: number;
+    subscriptions: number;
+    errors: string[];
+    /** A secret is never exported, so each imported endpoint gets a new one — shown here, once. */
+    secrets: Array<{ url: string; secret: string }>;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = async () => {
@@ -64,6 +73,7 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
           enabled: e.enabled,
           rateLimitPerSecond: e.rateLimitPerSecond,
           allowedSourceIps: e.allowedSourceIps,
+          signatureScheme: e.signatureScheme,
         })),
         subscriptions: subscriptions.map(s => ({
           endpointUrl: endpointMap.get(s.endpointId)?.url || '',
@@ -100,6 +110,7 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
     const errors: string[] = [];
     let endpointsCreated = 0;
     let subscriptionsCreated = 0;
+    const secrets: Array<{ url: string; secret: string }> = [];
 
     try {
       const text = await file.text();
@@ -129,9 +140,11 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
             enabled: ep.enabled,
             rateLimitPerSecond: ep.rateLimitPerSecond,
             allowedSourceIps: ep.allowedSourceIps,
+            signatureScheme: ep.signatureScheme,
           };
           const created = await endpointsApi.create(projectId, req);
           urlToEndpointId.set(created.url, created.id);
+          if (created.secret) secrets.push({ url: created.url, secret: created.secret });
           endpointsCreated++;
         } catch (err: any) {
           errors.push(t('configExport.toast.endpointFailed', {
@@ -171,7 +184,7 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
         }
       }
 
-      setImportResult({ endpoints: endpointsCreated, subscriptions: subscriptionsCreated, errors });
+      setImportResult({ endpoints: endpointsCreated, subscriptions: subscriptionsCreated, errors, secrets });
 
       if (errors.length === 0) {
         showSuccess(t('configExport.toast.imported', { endpoints: endpointsCreated, subscriptions: subscriptionsCreated }));
@@ -246,6 +259,18 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
                   )}
                 </ul>
               )}
+            </div>
+          )}
+
+          {importResult && importResult.secrets.length > 0 && (
+            <div className="space-y-3 rounded-lg border border-rail p-3">
+              <div>
+                <p className="text-sm font-medium">{t('configExport.newSecrets.title')}</p>
+                <p className="text-xs text-muted-foreground">{t('configExport.newSecrets.hint')}</p>
+              </div>
+              {importResult.secrets.map(({ url, secret }) => (
+                <SecretField key={url} label={url} secret={secret} />
+              ))}
             </div>
           )}
         </div>

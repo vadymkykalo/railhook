@@ -98,12 +98,20 @@ export function resolveErrorMessage(err: unknown, fallbackKey: string): string {
   return t(fallbackKey);
 }
 
+const reportedErrors = new WeakSet<object>();
+
+/** Whether showApiError has already put this error object in front of the user. */
+export function wasErrorReported(err: unknown): boolean {
+  return !!err && typeof err === 'object' && reportedErrors.has(err);
+}
+
 /**
  * Show an error toast from an API error.
  * Priority: API message → HTTP status mapping → fallback i18n key.
  * Automatically deduplicates identical errors.
  */
 export function showApiError(err: unknown, fallbackKey: string, options?: ToastOptions) {
+  if (err && typeof err === 'object') reportedErrors.add(err);
   const apiMsg = extractApiMessage(err);
   const message = resolveErrorMessage(err, fallbackKey);
 

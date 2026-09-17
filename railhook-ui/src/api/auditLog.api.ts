@@ -1,4 +1,5 @@
 import { http } from './http';
+import { withJsonErrorBody } from './blobErrorBody';
 
 export interface AuditLogEntry {
   id: string;
@@ -48,6 +49,6 @@ export const auditLogApi = {
     http.get<AuditLogPage>(`/api/v1/audit-log?page=${page}&size=${size}${buildFilterParams(filters)}`),
 
   exportCsv: async (filters?: AuditLogFilters): Promise<Blob> => {
-    return http.getBlob(`/api/v1/audit-log/export?_=1${buildFilterParams(filters)}`);
+    return withJsonErrorBody(http.getBlob(`/api/v1/audit-log/export?_=1${buildFilterParams(filters)}`));
   },
 };

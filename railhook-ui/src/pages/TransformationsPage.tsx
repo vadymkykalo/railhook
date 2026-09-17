@@ -91,7 +91,7 @@ export default function TransformationsPage() {
         }
         result = result.replace(match[0], typeof value === 'object' ? JSON.stringify(value) : String(value));
       }
-      return JSON.stringify(JSON.parse(result), null, 2);
+      return isValidJson(result) ? formatJson(result) : null;
     } catch {
       return null;
     }

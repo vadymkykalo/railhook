@@ -130,7 +130,9 @@ export default function EventsPage() {
 
   const visibleRows = statusFilter ? rows.filter((r) => r.status === statusFilter) : rows;
 
-  const loading = eventsLoading;
+  // First load only: a search or page change keeps the previous rows (keepPreviousData), so
+  // the search input the user is typing into is not unmounted by a skeleton.
+  const loading = eventsLoading && !eventsData;
   const isError = projectIsError || eventsIsError;
   const retry = () => { refetchProject(); refetchEvents(); };
 

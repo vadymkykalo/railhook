@@ -715,6 +715,10 @@
     "importResult": "Created {{endpoints}} endpoints, {{subscriptions}} subscriptions",
     "importing": "Importing...",
     "moreErrors": "...and {{count}} more errors",
+    "newSecrets": {
+      "hint": "An export never contains secrets, so each imported endpoint was given a new one. Copy them now: they are not shown again.",
+      "title": "Signing secrets for the imported endpoints"
+    },
     "selectProject": "Select project",
     "title": "Config Export / Import",
     "toast": {
@@ -1239,8 +1243,6 @@
     "deselectItem": "Deselect row",
     "endpointFiltered": "Endpoint",
     "filterEndpoint": "Filter by Endpoint",
-    "filterFrom": "From Date",
-    "filterTo": "To Date",
     "ladderExhausted": "Retry ladder exhausted after {{count}} attempts",
     "ladderExhausted_few": "Retry ladder exhausted after {{count}} attempts",
     "ladderExhausted_many": "Retry ladder exhausted after {{count}} attempts",
@@ -1265,7 +1267,6 @@
     "retry": "Retry",
     "retryCount": "Retry ({{count}})",
     "searchActive": "Search",
-    "searchPlaceholder": "Search by event type or ID...",
     "selectAll": "Select all",
     "selectItem": "Select row",
     "subtitle": "Failed deliveries for <strong>{{project}}</strong>",
@@ -1933,6 +1934,7 @@
     "create": "Create Source",
     "createDialog": {
       "description": "Configure a new incoming webhook source to receive events from external providers",
+      "hmacHeaderCannotClear": "A signature header cannot be removed once set. Enter the header your provider signs in, or X-Signature for the default.",
       "hmacHeaderName": "Signature Header",
       "hmacHeaderPlaceholder": "X-Hub-Signature-256",
       "hmacPrefixPlaceholder": "sha256=",

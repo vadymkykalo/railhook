@@ -715,6 +715,10 @@
     "importResult": "Створено {{endpoints}} ендпоінтів, {{subscriptions}} підписок",
     "importing": "Імпорт...",
     "moreErrors": "...та ще {{count}} помилок",
+    "newSecrets": {
+      "hint": "Експорт ніколи не містить секретів, тому кожен імпортований ендпоінт отримав новий. Скопіюйте їх зараз: більше вони не показуватимуться.",
+      "title": "Секрети підпису для імпортованих ендпоінтів"
+    },
     "selectProject": "Оберіть проєкт",
     "title": "Експорт / Імпорт конфігурації",
     "toast": {
@@ -1239,8 +1243,6 @@
     "deselectItem": "Скасувати вибір рядка",
     "endpointFiltered": "Ендпоінт",
     "filterEndpoint": "Фільтр за ендпоінтом",
-    "filterFrom": "Від дати",
-    "filterTo": "До дати",
     "ladderExhausted": "Драбину повторів вичерпано після {{count}} спроб",
     "ladderExhausted_few": "Драбину повторів вичерпано після {{count}} спроб",
     "ladderExhausted_many": "Драбину повторів вичерпано після {{count}} спроб",
@@ -1265,7 +1267,6 @@
     "retry": "Повторити",
     "retryCount": "Повторити ({{count}})",
     "searchActive": "Пошук",
-    "searchPlaceholder": "Пошук за типом події або ID...",
     "selectAll": "Вибрати всі",
     "selectItem": "Вибрати рядок",
     "subtitle": "Невдалі доставки для <strong>{{project}}</strong>",
@@ -1933,6 +1934,7 @@
     "create": "Створити джерело",
     "createDialog": {
       "description": "Налаштуйте нове вхідне webhook джерело для отримання подій від зовнішніх провайдерів",
+      "hmacHeaderCannotClear": "Заголовок підпису не можна видалити після встановлення. Вкажіть заголовок, у якому провайдер надсилає підпис, або X-Signature для типового.",
       "hmacHeaderName": "Заголовок підпису",
       "hmacHeaderPlaceholder": "X-Hub-Signature-256",
       "hmacPrefixPlaceholder": "sha256=",
