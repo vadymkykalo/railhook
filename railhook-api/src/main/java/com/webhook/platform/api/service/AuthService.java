@@ -247,7 +247,7 @@ public class AuthService {
      * <p>The two things this must not do, which is most of what it is:
      *
      * <ul>
-     *   <li><b>Mint for an organization the caller is not in.</b> The target arrives as caller
+     *   <li><b>Mint for an organization the caller is not in</b>, or was suspended from. The target arrives as caller
      *       input — the only endpoint where that is the point rather than a smell — so nothing is
      *       issued until a {@code Membership} joining this user to this organization has been
      *       found, and the role on the new token comes from <em>that row</em>, never from the
@@ -265,6 +265,10 @@ public class AuthService {
 
         Membership membership = membershipRepository
                 .findByUserIdAndOrganizationId(userId, request.getOrganizationId())
+                // The same rule login and refresh apply. Without it, a member suspended here but
+                // still active elsewhere signs in there and switches straight back. Refused with
+                // the non-member message, so the answer does not say a suspension exists.
+                .filter(m -> m.getStatus() != MembershipStatus.DISABLED)
                 .orElseThrow(() -> new ForbiddenException("You are not a member of that organization"));
 
         session.setOrganizationId(membership.getOrganizationId());
