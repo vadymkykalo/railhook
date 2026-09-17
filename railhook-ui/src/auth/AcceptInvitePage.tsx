@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import AuthLayout from './AuthLayout';
 import { membersApi } from '../api/members.api';
+import { queryKeys } from '../api/queries';
 import { Button, buttonVariants } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { useAuth } from './auth.store';
@@ -19,6 +21,7 @@ export default function AcceptInvitePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const token = searchParams.get('token');
   const orgId = searchParams.get('orgId');
 
@@ -38,12 +41,17 @@ export default function AcceptInvitePage() {
     }
 
     membersApi.acceptInvite(orgId, token)
-      .then(() => setStatus('success'))
+      .then(() => {
+        // The organization switcher only appears with a second organization to switch to, and its
+        // cached list does not know about the one just joined.
+        queryClient.invalidateQueries({ queryKey: queryKeys.organizations.mine });
+        setStatus('success');
+      })
       .catch((err: any) => {
         setStatus('error');
         setErrorMessage(err.response?.data?.message || t('invite.failed'));
       });
-  }, [token, orgId, isAuthenticated, t]);
+  }, [token, orgId, isAuthenticated, t, queryClient]);
 
   const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
 
