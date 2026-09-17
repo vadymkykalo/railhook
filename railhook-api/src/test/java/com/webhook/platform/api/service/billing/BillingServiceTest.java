@@ -367,6 +367,58 @@ class BillingServiceTest {
     }
 
     @Test
+    void processWebhook_replayedPaymentSucceeded_doesNotRenewTwice() {
+        BillingSubscription sub = BillingSubscription.builder()
+                .id(SUB_ID).organizationId(ORG_ID).providerCode("stripe")
+                .status(SubscriptionStatus.ACTIVE)
+                .externalSubscriptionId("sub_ext_1").build();
+        when(subscriptionRepository.findByExternalSubscriptionId("sub_ext_1"))
+                .thenReturn(Optional.of(sub));
+        List<BillingPayment> recorded = new ArrayList<>();
+        when(paymentRepository.save(any(BillingPayment.class))).thenAnswer(inv -> {
+            recorded.add(inv.getArgument(0));
+            return inv.getArgument(0);
+        });
+        when(paymentRepository.existsByProviderCodeAndExternalPaymentIdAndStatusIn(any(), any(), any()))
+                .thenAnswer(inv -> recorded.stream().anyMatch(p ->
+                        p.getProviderCode().equals(inv.getArgument(0))
+                                && p.getExternalPaymentId().equals(inv.getArgument(1))
+                                && ((Collection<?>) inv.getArgument(2)).contains(p.getStatus())));
+
+        stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
+                "payment.succeeded", ORG_ID.toString(), "sub_ext_1", "railhook_order_1", null,
+                2900L, "UAH", null, null, null, null, null, null, null, Map.of()));
+
+        service.processWebhook("stripe", "{}", Map.of());
+        service.processWebhook("stripe", "{}", Map.of());
+
+        verify(lifecycleService, times(1)).renew(eq(SUB_ID), any(), any());
+        assertThat(recorded).hasSize(1);
+    }
+
+    @Test
+    void processWebhook_replayedPaymentFailedAfterSuccess_doesNotMarkPastDue() {
+        BillingSubscription sub = BillingSubscription.builder()
+                .id(SUB_ID).organizationId(ORG_ID).providerCode("stripe")
+                .status(SubscriptionStatus.ACTIVE)
+                .externalSubscriptionId("sub_ext_1").build();
+        when(subscriptionRepository.findByExternalSubscriptionId("sub_ext_1"))
+                .thenReturn(Optional.of(sub));
+        when(paymentRepository.existsByProviderCodeAndExternalPaymentIdAndStatusIn(
+                eq("stripe"), eq("railhook_order_1"), argThat(s -> s.contains(PaymentStatus.SUCCEEDED))))
+                .thenReturn(true);
+
+        stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
+                "payment.failed", ORG_ID.toString(), "sub_ext_1", "railhook_order_1", null,
+                2900L, "UAH", null, null, "1101", "Declined", null, null, null, Map.of()));
+
+        service.processWebhook("stripe", "{}", Map.of());
+
+        verify(lifecycleService, never()).markPastDue(any(), any());
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
     void processWebhook_invoicePaid_activatesPastDueSubscription() {
         BillingSubscription sub = BillingSubscription.builder()
                 .id(SUB_ID).organizationId(ORG_ID).providerCode("stripe")
