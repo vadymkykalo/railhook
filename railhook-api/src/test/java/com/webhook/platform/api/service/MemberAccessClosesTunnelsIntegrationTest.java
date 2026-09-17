@@ -32,6 +32,8 @@ import static org.mockito.Mockito.when;
 class MemberAccessClosesTunnelsIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private MembershipService membershipService;
+    @Autowired private OrganizationService organizationService;
+    @Autowired private AccountErasureService accountErasureService;
     @Autowired private TunnelService tunnelService;
     @Autowired private TunnelIngressService tunnelIngressService;
     @Autowired private TunnelSessionRepository tunnelSessionRepository;
@@ -86,12 +88,51 @@ class MemberAccessClosesTunnelsIntegrationTest extends AbstractIntegrationTest {
         assertStillOpen(membersTunnelElsewhere);
     }
 
+    @Test
+    void deletingAnOrganization_closesEveryTunnelInIt_andNoneElsewhere() {
+        TunnelSession membersTunnel = openTunnel(memberId, organizationId);
+        TunnelSession colleaguesTunnel = openTunnel(colleagueId, organizationId);
+        TunnelSession membersTunnelElsewhere = openTunnel(memberId, otherOrganizationId);
+
+        TenantContext.runAs(organizationId, () -> organizationService.deleteOrganization());
+
+        assertClosedAndRefused(membersTunnel);
+        assertClosedAndRefused(colleaguesTunnel);
+        assertStillOpen(membersTunnelElsewhere);
+    }
+
+    @Test
+    void erasingAnAccount_closesTheirTunnelsInEveryOrganization_andNobodyElses() {
+        TunnelSession membersTunnel = openTunnel(memberId, organizationId);
+        TunnelSession membersTunnelElsewhere = openTunnel(memberId, otherOrganizationId);
+        TunnelSession colleaguesTunnel = openTunnel(colleagueId, organizationId);
+
+        accountErasureService.eraseAccount(memberId);
+
+        assertClosedAndRefused(membersTunnel);
+        assertClosedAndRefused(membersTunnelElsewhere);
+        assertStillOpen(colleaguesTunnel);
+    }
+
+    @Test
+    void erasingTheOnlyMember_closesTheTunnelsLeftInTheOrganizationItDeletes() {
+        UUID soleOwnerId = user();
+        UUID soloOrganizationId = organization("member-tunnels-solo");
+        membership(soleOwnerId, soloOrganizationId, MembershipRole.OWNER);
+        // Opened by someone who has since left: the erasure deletes the organization, not them.
+        TunnelSession formerMembersTunnel = openTunnel(colleagueId, soloOrganizationId);
+
+        accountErasureService.eraseAccount(soleOwnerId);
+
+        assertClosedAndRefused(formerMembersTunnel);
+    }
+
     private void assertClosedAndRefused(TunnelSession tunnel) {
+        assertThat(tunnelIngressService.forward(tunnel.getPublicSlug(), request(), null))
+                .isInstanceOf(TunnelIngressService.Outcome.Refused.class);
         assertThat(tunnelSessionRepository.findById(tunnel.getId()).orElseThrow().getStatus())
                 .isEqualTo(TunnelStatus.CLOSED);
         verify(redisTunnelCoordinator).disconnect(tunnel.getPublicSlug());
-        assertThat(tunnelIngressService.forward(tunnel.getPublicSlug(), request(), null))
-                .isInstanceOf(TunnelIngressService.Outcome.Refused.class);
     }
 
     private void assertStillOpen(TunnelSession tunnel) {
