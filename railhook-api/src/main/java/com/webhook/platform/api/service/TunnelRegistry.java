@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -139,14 +140,40 @@ public class TunnelRegistry {
     }
 
     /**
-     * Called when the CLI sends back a response through WebSocket.
+     * Called when a CLI sends back a response through its WebSocket. Only the socket the request
+     * was sent down may answer it: the request id is all a response names, and any other tunnel
+     * that learned one could otherwise answer a request meant for someone else's machine.
      */
-    public void completeRequest(String requestId, TunnelResponseMessage response) {
-        Pending pending = pendingRequests.remove(requestId);
-        if (pending != null) {
-            pending.answer().complete(response);
-        } else {
+    public void completeRequest(String socketId, String requestId, TunnelResponseMessage response) {
+        Pending pending = pendingRequests.get(requestId);
+        if (pending == null) {
             log.warn("No pending request found for requestId={}", requestId);
+            return;
+        }
+        if (!pending.sessionId().equals(socketId)) {
+            log.warn("Ignoring response for requestId={} from socket {}: it was sent down {}",
+                    requestId, socketId, pending.sessionId());
+            return;
+        }
+        if (pendingRequests.remove(requestId, pending)) {
+            pending.answer().complete(response);
+        }
+    }
+
+    /**
+     * Ends the tunnel on this instance, if its socket is here: the slug stops resolving at once,
+     * rather than when the close callback gets round to it, and the socket is closed.
+     */
+    public void disconnect(String slug) {
+        WebSocketSession session = activeTunnels.get(slug);
+        if (session == null) {
+            return;
+        }
+        unregister(slug, session);
+        try {
+            session.close(CloseStatus.NORMAL.withReason("Tunnel session closed"));
+        } catch (IOException e) {
+            log.warn("Failed to close tunnel socket: slug={}, error={}", slug, e.getMessage());
         }
     }
 

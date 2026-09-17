@@ -69,7 +69,8 @@ class SubscriptionServiceTest {
     void setUp() {
         service = new SubscriptionService(
                 subscriptionRepository, projectRepository, endpointRepository,
-                transformationRepository, subscriptionMatchingCache, objectMapper);
+                transformationRepository, subscriptionMatchingCache, objectMapper,
+                new RetryLadderEscalationCap(96, 24));
 
         project = Project.builder().id(projectId).organizationId(orgId).name("Test").build();
         endpoint = Endpoint.builder().id(endpointId).projectId(projectId).url("https://ok.com").build();
@@ -281,5 +282,57 @@ class SubscriptionServiceTest {
                 .hasMessageContaining("retryDelays");
 
         assertThat(existing.getRetryDelays()).isEqualTo(RetryLadderDefaults.OUTGOING_DELAYS);
+    }
+
+    // A custom ladder longer than the delivery escalation cap was accepted, and the Delivery was
+    // then moved to the DLQ by age before its later tiers ever ran.
+
+    @Test
+    void createSubscription_ladderOutlivingTheEscalationCap_throws() {
+        when(subscriptionRepository.existsByEndpointIdAndEventType(any(), any())).thenReturn(false);
+        when(subscriptionRepository.saveAndFlush(any(Subscription.class))).thenAnswer(inv -> inv.getArgument(0));
+        // 10 attempts at a day each: up to 360h with jitter, against a 96h cap.
+        SubscriptionRequest request = baseRequest().retryDelays("86400").maxAttempts(10).build();
+
+        assertThatThrownBy(() -> service.createSubscription(projectId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("96h");
+
+        verify(subscriptionRepository, never()).saveAndFlush(any(Subscription.class));
+    }
+
+    @Test
+    void updateSubscription_raisingMaxAttemptsPastTheEscalationCap_throws() {
+        UUID subId = UUID.randomUUID();
+        Subscription existing = Subscription.builder()
+                .id(subId).projectId(projectId).endpointId(endpointId).eventType("order.created")
+                .enabled(true).orderingEnabled(false).maxAttempts(3).timeoutSeconds(30)
+                .retryDelays("86400").createdAt(Instant.now()).updatedAt(Instant.now()).build();
+        when(subscriptionRepository.findById(subId)).thenReturn(Optional.of(existing));
+        when(subscriptionRepository.saveAndFlush(any(Subscription.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThatThrownBy(() -> service.updateSubscription(subId,
+                SubscriptionRequest.builder().maxAttempts(10).build()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maxAttempts");
+
+        verify(subscriptionRepository, never()).saveAndFlush(any(Subscription.class));
+    }
+
+    @Test
+    void createSubscription_ladderWithinTheEscalationCap_isAccepted() {
+        when(subscriptionRepository.existsByEndpointIdAndEventType(any(), any())).thenReturn(false);
+        when(subscriptionRepository.saveAndFlush(any(Subscription.class))).thenAnswer(inv -> {
+            Subscription sub = inv.getArgument(0);
+            sub.setId(UUID.randomUUID());
+            sub.setCreatedAt(Instant.now());
+            sub.setUpdatedAt(Instant.now());
+            return sub;
+        });
+
+        // 2 attempts at a day each: up to 72h with jitter, inside the 96h cap.
+        service.createSubscription(projectId, baseRequest().retryDelays("86400").maxAttempts(2).build());
+
+        verify(subscriptionRepository).saveAndFlush(any(Subscription.class));
     }
 }

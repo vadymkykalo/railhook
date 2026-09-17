@@ -73,7 +73,7 @@ public class TunnelIngressService {
     }
 
     public Outcome forward(String slug, TunnelRequestMessage request, String body) {
-        if (!redisTunnelCoordinator.isActiveInCluster(slug)) {
+        if (!redisTunnelCoordinator.isActiveInCluster(slug) || !tunnelService.isForwardable(slug)) {
             return refuse("offline", "tunnel_offline", "Tunnel is not connected");
         }
         if (!rateLimiterService.tryAcquireForSlug(slug, RATE_LIMIT_PER_SECOND)) {

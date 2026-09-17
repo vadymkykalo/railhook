@@ -134,6 +134,7 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
             case TunnelMessage.TYPE_TUNNEL_RESPONSE:
                 if (tunnelMessage.getResponse() != null && tunnelMessage.getResponse().getRequestId() != null) {
                     tunnelRegistry.completeRequest(
+                            session.getId(),
                             tunnelMessage.getResponse().getRequestId(),
                             tunnelMessage.getResponse());
                 }

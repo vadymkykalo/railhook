@@ -38,6 +38,7 @@ public class SubscriptionService {
     private final TransformationRepository transformationRepository;
     private final SubscriptionMatchingCache subscriptionMatchingCache;
     private final ObjectMapper objectMapper;
+    private final RetryLadderEscalationCap retryLadderEscalationCap;
 
     public SubscriptionService(
             SubscriptionRepository subscriptionRepository,
@@ -45,13 +46,15 @@ public class SubscriptionService {
             EndpointRepository endpointRepository,
             TransformationRepository transformationRepository,
             SubscriptionMatchingCache subscriptionMatchingCache,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            RetryLadderEscalationCap retryLadderEscalationCap) {
         this.subscriptionRepository = subscriptionRepository;
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
         this.transformationRepository = transformationRepository;
         this.subscriptionMatchingCache = subscriptionMatchingCache;
         this.objectMapper = objectMapper;
+        this.retryLadderEscalationCap = retryLadderEscalationCap;
     }
 
     /**
@@ -124,6 +127,7 @@ public class SubscriptionService {
                 .customHeaders(request.getCustomHeaders())
                 .transformationId(request.getTransformationId())
                 .build();
+        retryLadderEscalationCap.requireOutgoingFits(subscription.getRetryDelays(), subscription.getMaxAttempts());
         
         subscription = subscriptionRepository.saveAndFlush(subscription);
         subscriptionMatchingCache.evict(projectId);
@@ -193,6 +197,7 @@ public class SubscriptionService {
             validateTransformationBelongsToProject(request.getTransformationId(), subscription.getProjectId());
             subscription.setTransformationId(request.getTransformationId());
         }
+        retryLadderEscalationCap.requireOutgoingFits(subscription.getRetryDelays(), subscription.getMaxAttempts());
         
         subscription = subscriptionRepository.saveAndFlush(subscription);
         subscriptionMatchingCache.evict(subscription.getProjectId());

@@ -1,9 +1,11 @@
 package com.webhook.platform.api.domain.repository;
 
 import com.webhook.platform.api.domain.entity.BillingPayment;
+import com.webhook.platform.api.domain.enums.PaymentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,4 +18,7 @@ public interface BillingPaymentRepository extends JpaRepository<BillingPayment, 
     List<BillingPayment> findByInvoiceIdOrderByCreatedAtDesc(UUID invoiceId);
 
     Optional<BillingPayment> findByExternalPaymentId(String externalPaymentId);
+
+    boolean existsByProviderCodeAndExternalPaymentIdAndStatusIn(
+            String providerCode, String externalPaymentId, Collection<PaymentStatus> statuses);
 }
