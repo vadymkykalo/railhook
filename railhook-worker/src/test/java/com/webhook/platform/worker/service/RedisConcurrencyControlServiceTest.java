@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -74,7 +75,8 @@ class RedisConcurrencyControlServiceTest {
         assertFalse(service.tryAcquireForTarget(UUID.randomUUID()));
 
         ArgumentCaptor<Long> waitTime = ArgumentCaptor.forClass(Long.class);
-        verify(semaphore).tryAcquire(waitTime.capture(), eq((long) leaseSeconds), eq(TimeUnit.SECONDS));
+        // atLeastOnce: a refusal re-asserts the limit and asks again, in case the key was evicted.
+        verify(semaphore, atLeastOnce()).tryAcquire(waitTime.capture(), eq((long) leaseSeconds), eq(TimeUnit.SECONDS));
 
         // Redisson's signature is tryAcquire(waitTime, leaseTime, unit) — ONE TimeUnit for
         // both. The call used to pass 100 there, meaning 100 *seconds* of waiting, not the
@@ -85,7 +87,7 @@ class RedisConcurrencyControlServiceTest {
         // every Kafka container, and the worker stops delivering for every tenant. The wait
         // also exceeded the 90s lease, so a permit expired while still in use and the cap it
         // exists to enforce did not hold.
-        assertEquals(0L, waitTime.getValue(),
+        assertTrue(waitTime.getAllValues().stream().allMatch(wait -> wait == 0L),
                 "acquiring a permit must not block: admit() defers on refusal");
     }
 
