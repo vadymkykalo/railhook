@@ -64,7 +64,8 @@ class IncomingDestinationServiceTest {
                 destinationRepository, sourceRepository,
                 transformationRepository,
                 registry,
-                true, List.of()
+                true, List.of(),
+                new RetryLadderEscalationCap(96, 24)
         );
         source = IncomingSource.builder()
                 .id(sourceId).projectId(projectId).name("src")
@@ -197,7 +198,7 @@ class IncomingDestinationServiceTest {
         IncomingDestination dest = buildDest();
         when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
         stubOwnership();
-        when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         IncomingDestinationRequest request = IncomingDestinationRequest.builder()
                 .url("https://updated.com/hook")
@@ -290,7 +291,7 @@ class IncomingDestinationServiceTest {
         IncomingDestination dest = buildDest();
         dest.setTransformationId(UUID.randomUUID());
         when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
-        when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
         stubOwnership();
 
         // Same signal that clears payloadTransform. There used to be none for this field, so a
@@ -310,7 +311,7 @@ class IncomingDestinationServiceTest {
         UUID attached = UUID.randomUUID();
         dest.setTransformationId(attached);
         when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
-        when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
         stubOwnership();
 
         service.updateDestination(destId, IncomingDestinationRequest.builder()
@@ -429,5 +430,46 @@ class IncomingDestinationServiceTest {
         // read why.
         assertThat(RetryLadderDefaults.INCOMING_DELAYS).isNotEqualTo(RetryLadderDefaults.OUTGOING_DELAYS);
         assertThat(RetryLadderDefaults.INCOMING_MAX_ATTEMPTS).isLessThan(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS);
+    }
+
+    // A custom ladder longer than the forward escalation cap was accepted, and the Forward was
+    // then moved to the DLQ by age before its later tiers ever ran.
+
+    @Test
+    void createDestination_ladderOutlivingTheEscalationCap_throws() {
+        stubOwnership();
+
+        lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        // 5 attempts at 6h each: up to 45h with jitter, against a 24h cap.
+        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .retryDelays("21600")
+                .maxAttempts(5)
+                .build();
+
+        assertThatThrownBy(() -> service.createDestination(sourceId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("24h");
+
+        verify(destinationRepository, never()).saveAndFlush(any(IncomingDestination.class));
+    }
+
+    @Test
+    void updateDestination_lengtheningTheLadderPastTheEscalationCap_throws() {
+        IncomingDestination existing = buildDest();
+        when(destinationRepository.findById(destId)).thenReturn(Optional.of(existing));
+        lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        stubOwnership();
+
+        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .retryDelays("86400")
+                .build();
+
+        assertThatThrownBy(() -> service.updateDestination(destId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("retryDelays");
+
+        verify(destinationRepository, never()).saveAndFlush(any(IncomingDestination.class));
     }
 }

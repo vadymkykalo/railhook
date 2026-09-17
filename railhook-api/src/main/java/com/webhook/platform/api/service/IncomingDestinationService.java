@@ -42,6 +42,7 @@ public class IncomingDestinationService {
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
+    private final RetryLadderEscalationCap retryLadderEscalationCap;
 
     public IncomingDestinationService(
             IncomingDestinationRepository destinationRepository,
@@ -49,13 +50,15 @@ public class IncomingDestinationService {
             TransformationRepository transformationRepository,
             EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
+            RetryLadderEscalationCap retryLadderEscalationCap) {
         this.destinationRepository = destinationRepository;
         this.sourceRepository = sourceRepository;
         this.transformationRepository = transformationRepository;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
+        this.retryLadderEscalationCap = retryLadderEscalationCap;
     }
 
     /**
@@ -142,6 +145,7 @@ public class IncomingDestinationService {
             destination.setEncryptionKeyVersion(encrypted.getKeyVersion());
         }
 
+        retryLadderEscalationCap.requireIncomingFits(destination.getRetryDelays(), destination.getMaxAttempts());
         destination = destinationRepository.saveAndFlush(destination);
         log.info("Created incoming destination: id={}, sourceId={}, url={}", destination.getId(), sourceId, request.getUrl());
         return mapToResponse(destination);
@@ -224,6 +228,7 @@ public class IncomingDestinationService {
             destination.setTransformationId(requested);
         }
 
+        retryLadderEscalationCap.requireIncomingFits(destination.getRetryDelays(), destination.getMaxAttempts());
         destination = destinationRepository.saveAndFlush(destination);
         log.info("Updated incoming destination: id={}", id);
         return mapToResponse(destination);
