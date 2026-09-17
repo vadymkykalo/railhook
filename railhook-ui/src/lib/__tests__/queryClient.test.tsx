@@ -19,7 +19,9 @@ function failure() {
 function wrapperFor() {
   const client = createQueryClient();
   client.setDefaultOptions({ ...client.getDefaultOptions(), mutations: { ...client.getDefaultOptions().mutations, retry: false } });
-  return ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
 }
 
 /** Lets the mutation settle and any deferred fallback run. */
