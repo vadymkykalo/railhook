@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TestEndpointRepository;
 import com.webhook.platform.api.dto.TestEndpointRequest;
 import com.webhook.platform.api.exception.ConflictException;
+import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,8 @@ class TestEndpointServiceTest {
 
         TestEndpointService service = new TestEndpointService(
                 endpoints, mock(CapturedRequestRepository.class), projects,
-                mock(TrustedProxyResolver.class), mock(PlatformTransactionManager.class));
+                mock(TrustedProxyResolver.class), mock(PlatformTransactionManager.class),
+                mock(SuspensionCheck.class));
         ReflectionTestUtils.setField(service, "maxPerProject", 10);
 
         assertThatThrownBy(() -> service.create(projectId, new TestEndpointRequest()))

@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
@@ -172,7 +173,7 @@ public class MembershipService {
                 .orElseThrow(() -> new NotFoundException("Membership not found"));
 
         if (membership.getStatus() != MembershipStatus.INVITED) {
-            throw new IllegalStateException("Membership has no pending invite to re-issue");
+            throw new ConflictException("Membership has no pending invite to re-issue");
         }
 
         String inviteToken = generateInviteToken();
@@ -232,7 +233,7 @@ public class MembershipService {
         }
 
         if (membership.getStatus() != MembershipStatus.INVITED) {
-            throw new IllegalStateException("Invite already accepted or membership is not in INVITED status");
+            throw new ConflictException("Invite already accepted or membership is not in INVITED status");
         }
 
         if (membership.getInviteExpiresAt() != null && Instant.now().isAfter(membership.getInviteExpiresAt())) {
