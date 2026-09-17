@@ -11,8 +11,6 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RRateLimiter;
-import org.redisson.api.RateIntervalUnit;
-import org.redisson.api.RateType;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -30,7 +28,11 @@ public class RedisRateLimiterService {
     private static final String ORGANIZATION_KEY_PREFIX = "rate_limiter:org:";
     private static final Duration KEY_TTL = Duration.ofHours(24);
 
+    private static final Duration SLUG_KEY_TTL = Duration.ofMinutes(10);
+
     private final RedissonClient redissonClient;
+    private final ConvergingRateLimiter limiters;
+    private final ConvergingRateLimiter slugLimiters;
     private final int defaultRateLimit;
     private final Counter rateLimitHits;
     private final Counter rateLimitExceeded;
@@ -50,6 +52,8 @@ public class RedisRateLimiterService {
             MeterRegistry meterRegistry,
             @Value("${event.ingestion.rate-limit-per-second:100}") int defaultRateLimit) {
         this.redissonClient = redissonClient;
+        this.limiters = new ConvergingRateLimiter(redissonClient, KEY_TTL);
+        this.slugLimiters = new ConvergingRateLimiter(redissonClient, SLUG_KEY_TTL);
         this.defaultRateLimit = defaultRateLimit;
 
         this.localFallbackBuckets = Caffeine.newBuilder()
@@ -89,12 +93,8 @@ public class RedisRateLimiterService {
     public RateLimitResult tryAcquireWithInfo(UUID projectId, int ratePerSecond) {
         try {
             String key = KEY_PREFIX + projectId;
-            RRateLimiter limiter = redissonClient.getRateLimiter(key);
-            limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
-            limiter.expire(KEY_TTL);
-
-            boolean acquired = limiter.tryAcquire(1);
-            long available = limiter.availablePermits();
+            boolean acquired = limiters.tryAcquire(key, ratePerSecond);
+            long available = redissonClient.getRateLimiter(key).availablePermits();
             int remaining = (int) Math.max(0, Math.min(available, ratePerSecond));
             long resetTimestamp = Instant.now().plusSeconds(1).getEpochSecond();
 
@@ -162,12 +162,7 @@ public class RedisRateLimiterService {
      */
     public boolean tryAcquireForSourceFailClosed(UUID sourceId, int ratePerSecond) {
         try {
-            String key = SOURCE_KEY_PREFIX + sourceId;
-            RRateLimiter limiter = redissonClient.getRateLimiter(key);
-            limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
-            limiter.expire(KEY_TTL);
-
-            boolean acquired = limiter.tryAcquire(1);
+            boolean acquired = limiters.tryAcquire(SOURCE_KEY_PREFIX + sourceId, ratePerSecond);
             if (acquired) {
                 rateLimitHits.increment();
             } else {
@@ -191,12 +186,7 @@ public class RedisRateLimiterService {
      */
     public boolean tryAcquireForSlug(String slug, int ratePerSecond) {
         try {
-            String key = SLUG_KEY_PREFIX + slug;
-            RRateLimiter limiter = redissonClient.getRateLimiter(key);
-            limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
-            limiter.expire(Duration.ofMinutes(10));
-
-            boolean acquired = limiter.tryAcquire(1);
+            boolean acquired = slugLimiters.tryAcquire(SLUG_KEY_PREFIX + slug, ratePerSecond);
             if (acquired) {
                 rateLimitHits.increment();
             } else {
@@ -229,12 +219,7 @@ public class RedisRateLimiterService {
 
     private boolean doTryAcquire(String key, UUID id, int ratePerSecond) {
         try {
-            RRateLimiter limiter = redissonClient.getRateLimiter(key);
-
-            limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
-            limiter.expire(KEY_TTL);
-
-            boolean acquired = limiter.tryAcquire(1);
+            boolean acquired = limiters.tryAcquire(key, ratePerSecond);
             if (acquired) {
                 rateLimitHits.increment();
             } else {
