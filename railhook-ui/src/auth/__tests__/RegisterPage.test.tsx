@@ -24,7 +24,7 @@ const USER = {
 describe('RegisterPage', () => {
   let login: Mock<AuthState['login']>;
 
-  function renderRegister() {
+  function renderRegister(entry = '/register') {
     login = vi.fn<AuthState['login']>();
     const authState: AuthState = {
       user: null,
@@ -36,9 +36,10 @@ describe('RegisterPage', () => {
     };
     return render(
       <AuthContext.Provider value={authState}>
-        <MemoryRouter initialEntries={['/register']}>
+        <MemoryRouter initialEntries={[entry]}>
           <Routes>
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/accept-invite" element={<p>the invite screen</p>} />
             <Route path="/admin/dashboard" element={<p>the dashboard</p>} />
           </Routes>
         </MemoryRouter>
@@ -182,5 +183,36 @@ describe('RegisterPage', () => {
 
     await screen.findByRole('alert');
     expect(screen.getByRole('button', { name: /create|register|sign up/i })).toBeEnabled();
+  });
+
+  const INVITE = `/register?redirect=${encodeURIComponent('/accept-invite?token=t&orgId=o2')}`;
+
+  it('continues to the invite that sent the new person here (?redirect=)', async () => {
+    vi.spyOn(authApi, 'register').mockResolvedValue({ accessToken: 'the-token' } as never);
+    vi.spyOn(authApi, 'getCurrentUser').mockResolvedValue(USER);
+
+    renderRegister(INVITE);
+    await fillAndSubmit();
+
+    expect(await screen.findByText('the invite screen')).toBeInTheDocument();
+  });
+
+  it('keeps ?redirect= on the way to signing in instead', () => {
+    renderRegister(INVITE);
+
+    expect(screen.getByRole('link', { name: /sign in/i }))
+      .toHaveAttribute('href', `/login?redirect=${encodeURIComponent('/accept-invite?token=t&orgId=o2')}`);
+  });
+
+  it('does not follow ?redirect= off this site', async () => {
+    vi.spyOn(authApi, 'register').mockResolvedValue({ accessToken: 'the-token' } as never);
+    vi.spyOn(authApi, 'getCurrentUser').mockResolvedValue(USER);
+
+    renderRegister(`/register?redirect=${encodeURIComponent('//evil.example')}`);
+    await fillAndSubmit();
+
+    await waitFor(() => expect(login).toHaveBeenCalled());
+    expect(screen.queryByText('the invite screen')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /continue/i })).toBeInTheDocument();
   });
 });
