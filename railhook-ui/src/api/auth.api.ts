@@ -43,10 +43,6 @@ export const authApi = {
     return http.get<CurrentUserResponse>('/api/v1/auth/me');
   },
 
-  refresh: (): Promise<AuthResponse> => {
-    return http.post<AuthResponse>('/api/v1/auth/refresh', {});
-  },
-
   verifyEmail: (token: string): Promise<void> => {
     return http.post<void>(`/api/v1/auth/verify-email?token=${encodeURIComponent(token)}`);
   },
@@ -89,8 +85,9 @@ export const authApi = {
     return http.post<void>('/api/v1/auth/change-password', { currentPassword, newPassword });
   },
 
-  logout: (): Promise<void> => {
-    return http.post<void>('/api/v1/auth/logout', {});
+  /** Takes the token to end explicitly: the caller clears the client's own before this is sent. */
+  logout: (accessToken: string | null): Promise<void> => {
+    return http.post<void>('/api/v1/auth/logout', {}, accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined);
   },
 
   forgotPassword: (email: string): Promise<void> => {

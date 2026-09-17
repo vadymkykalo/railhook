@@ -8,7 +8,6 @@ export const DEFAULT_TIMEOUT_MS = 30_000;
 /** Exports stream a whole dataset; they are the one call that may legitimately outlast the rest. */
 export const EXPORT_TIMEOUT_MS = 120_000;
 
-type OnRefreshedCallback = (token: string) => void;
 type OnLogoutCallback = () => void;
 
 /** Waits before retrying a refresh that failed for a reason that is not the session itself. */
@@ -24,17 +23,33 @@ function isSessionRejected(err: unknown): boolean {
   return status === 401 || status === 403;
 }
 
-/** A rate limit, a restarting API or a dropped connection: worth another try. */
-function isTransientRefreshFailure(err: unknown): boolean {
+/**
+ * Worth sending the same refresh cookie again: the API cannot have rotated it. A rate limit is
+ * refused before the token is looked at; a gateway that could not reach the API (502, 503) or a
+ * connection that failed outright never delivered the request.
+ *
+ * Not a 500, a 504 or a timeout. The API may have rotated the token and then failed to answer,
+ * and a retry would present the rotated-away cookie, which reuse detection answers by revoking
+ * every session the person has. Such a failure is left to surface as an error without signing
+ * anyone out. The residual risk is a 502 or a dropped connection that did reach the API, which
+ * the browser cannot tell apart from one that did not.
+ */
+function isRetryableRefreshFailure(err: unknown): boolean {
   const status = statusOf(err);
-  return status === undefined || status === 429 || status >= 500;
+  if (status === undefined) {
+    return (err as AxiosError | undefined)?.code !== 'ECONNABORTED'
+      && (err as AxiosError | undefined)?.code !== 'ETIMEDOUT';
+  }
+  return status === 429 || status === 502 || status === 503;
 }
+
+/** Held by whichever tab is refreshing, so no two tabs present the same cookie at once. */
+export const REFRESH_LOCK_NAME = 'railhook-auth-refresh';
 
 class HttpClient {
   private client: AxiosInstance;
   private token: string | null = null;
-  private isRefreshing = false;
-  private refreshSubscribers: OnRefreshedCallback[] = [];
+  private refreshInFlight: Promise<string> | null = null;
   private onLogout: OnLogoutCallback | null = null;
 
   constructor() {
@@ -67,48 +82,14 @@ class HttpClient {
           error.response?.status === 401 &&
           !originalRequest._retry &&
           !originalRequest.url?.includes('/api/v1/auth/refresh') &&
-          !originalRequest.url?.includes('/api/v1/auth/login')
+          !originalRequest.url?.includes('/api/v1/auth/login') &&
+          // A sign-out refused is a session already over; refreshing would bring it back.
+          !originalRequest.url?.includes('/api/v1/auth/logout')
         ) {
-          if (this.isRefreshing) {
-            return new Promise((resolve) => {
-              this.refreshSubscribers.push((newToken: string) => {
-                originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                resolve(this.client(originalRequest));
-              });
-            });
-          }
-
           originalRequest._retry = true;
-          this.isRefreshing = true;
-
-          try {
-            const response = await this.refreshWithRetry();
-
-            const { accessToken } = response.data;
-
-            this.token = accessToken;
-
-            this.refreshSubscribers.forEach((cb) => cb(accessToken));
-            this.refreshSubscribers = [];
-
-            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-            return this.client(originalRequest);
-          } catch (refreshError) {
-            this.refreshSubscribers = [];
-            // Log out only when the session itself was refused. A rate limit, an API restart or a
-            // dropped connection is not the end of a session, and treating it as one threw people
-            // to the sign-in screen for browsing quickly or for a deploy.
-            if (isSessionRejected(refreshError)) {
-              this.token = null;
-              localStorage.removeItem('auth_user');
-              if (this.onLogout) {
-                this.onLogout();
-              }
-            }
-            return Promise.reject(refreshError);
-          } finally {
-            this.isRefreshing = false;
-          }
+          const accessToken = await this.refreshSession();
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return this.client(originalRequest);
         }
 
         return Promise.reject(error);
@@ -116,12 +97,63 @@ class HttpClient {
     );
   }
 
+  /**
+   * One refresh at a time, shared by every request that met a 401 while it runs. Each of them
+   * settles with it: a queue that was only ever resolved left the requests behind a failed
+   * refresh pending forever, with their buttons disabled and their spinners turning.
+   */
+  refreshSession(): Promise<string> {
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.underRefreshLock(() => this.runRefresh()).finally(() => {
+        this.refreshInFlight = null;
+      });
+    }
+    return this.refreshInFlight;
+  }
+
+  /**
+   * Tabs share the refresh cookie, and each refresh rotates it. Two tabs refreshing together (a
+   * browser restoring its tabs, a laptop waking) sent the same cookie twice, and the API took the
+   * second for a stolen token and signed the person out everywhere. Under the lock the second tab
+   * goes after the first has finished, with the cookie the first one left in the shared jar, and
+   * the access token the first tab holds stays valid: rotation does not revoke access tokens.
+   * Without Web Locks the refresh runs as it did before.
+   */
+  private underRefreshLock<T>(work: () => Promise<T>): Promise<T> {
+    const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+    if (!locks?.request) {
+      return work();
+    }
+    return locks.request(REFRESH_LOCK_NAME, work) as Promise<T>;
+  }
+
+  private async runRefresh(): Promise<string> {
+    try {
+      const response = await this.refreshWithRetry();
+      const { accessToken } = response.data;
+      this.token = accessToken;
+      return accessToken;
+    } catch (refreshError) {
+      // Log out only when the session itself was refused. A rate limit, an API restart or a
+      // dropped connection is not the end of a session, and treating it as one threw people
+      // to the sign-in screen for browsing quickly or for a deploy.
+      if (isSessionRejected(refreshError)) {
+        this.token = null;
+        localStorage.removeItem('auth_user');
+        if (this.onLogout) {
+          this.onLogout();
+        }
+      }
+      throw refreshError;
+    }
+  }
+
   private async refreshWithRetry() {
     for (let attempt = 0; ; attempt++) {
       try {
         return await this.client.post('/api/v1/auth/refresh', {});
       } catch (err) {
-        if (!isTransientRefreshFailure(err) || attempt >= REFRESH_RETRY_DELAYS_MS.length) {
+        if (!isRetryableRefreshFailure(err) || attempt >= REFRESH_RETRY_DELAYS_MS.length) {
           throw err;
         }
         await new Promise((resolve) => setTimeout(resolve, REFRESH_RETRY_DELAYS_MS[attempt]));

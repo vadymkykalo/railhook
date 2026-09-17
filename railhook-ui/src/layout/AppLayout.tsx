@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Menu, Search, Mail, Loader2, Moon, Sun } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/auth.store';
 import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
@@ -29,6 +30,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
+  const queryClient = useQueryClient();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === '1');
@@ -61,10 +63,23 @@ export default function AppLayout() {
 
   useEffect(() => {
     authApi.getCurrentUser().then((freshUser) => {
+      if (!freshUser) return;
       // platformAdmin too: an address added to PLATFORM_ADMIN_EMAILS should bring the panel's
-      // entry up on the next navigation, not only after signing out and in again.
-      if (freshUser.user?.status !== user?.user?.status || freshUser.platformAdmin !== user?.platformAdmin) {
+      // entry up on the next navigation, not only after signing out and in again. The role and
+      // the organization as well: a demotion, or a session now in another organization, left
+      // every role check reading a stored copy the server no longer agreed with.
+      const organizationChanged = freshUser.organization?.id !== user?.organization?.id;
+      if (
+        freshUser.user?.status !== user?.user?.status
+        || freshUser.platformAdmin !== user?.platformAdmin
+        || freshUser.role !== user?.role
+        || organizationChanged
+      ) {
         updateUser(freshUser);
+      }
+      if (organizationChanged) {
+        // Everything cached belongs to the organization we were in; see OrganizationSwitcher.
+        queryClient.clear();
       }
     }).catch(() => { });
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
