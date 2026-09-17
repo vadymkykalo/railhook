@@ -44,6 +44,9 @@ class TunnelServiceTest {
     @Mock
     private com.webhook.platform.api.service.billing.EntitlementService entitlementService;
 
+    @Mock
+    private RedisTunnelCoordinator redisTunnelCoordinator;
+
     @InjectMocks
     private TunnelService tunnelService;
 
@@ -138,6 +141,47 @@ class TunnelServiceTest {
         tunnelService.closeSession(sessionId);
 
         verify(tunnelSessionRepository).save(argThat(s -> s.getStatus() == TunnelStatus.CLOSED));
+    }
+
+    // Deleting a tunnel only marked its row CLOSED. The CLI's socket stayed up and the slug stayed
+    // registered, so the tunnel kept forwarding — outside the plan's active-tunnel count, which
+    // only counts ACTIVE rows, and outside bandwidth metering, which only meters ACTIVE ones.
+    @Test
+    void closingASessionByIdDisconnectsItsTunnelEverywhere() {
+        UUID sessionId = UUID.randomUUID();
+        TunnelSession session = TunnelSession.builder()
+                .id(sessionId).tunnelToken("t").publicSlug("tun-closeme").status(TunnelStatus.ACTIVE).build();
+        when(tunnelSessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+        when(tunnelSessionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        tunnelService.closeSession(sessionId);
+
+        verify(redisTunnelCoordinator).disconnect("tun-closeme");
+    }
+
+    @Test
+    void closingASessionByTokenDisconnectsItsTunnelEverywhere() {
+        TunnelSession session = TunnelSession.builder()
+                .id(UUID.randomUUID()).tunnelToken("tok").publicSlug("tun-bytoken").status(TunnelStatus.ACTIVE).build();
+        when(tunnelSessionRepository.findByTunnelToken("tok")).thenReturn(Optional.of(session));
+        when(tunnelSessionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        tunnelService.closeSession("tok");
+
+        verify(redisTunnelCoordinator).disconnect("tun-bytoken");
+    }
+
+    @Test
+    void onlyAnActiveSessionIsForwardable() {
+        when(tunnelSessionRepository.findByPublicSlug("tun-open")).thenReturn(Optional.of(
+                TunnelSession.builder().publicSlug("tun-open").status(TunnelStatus.ACTIVE).build()));
+        when(tunnelSessionRepository.findByPublicSlug("tun-shut")).thenReturn(Optional.of(
+                TunnelSession.builder().publicSlug("tun-shut").status(TunnelStatus.CLOSED).build()));
+        when(tunnelSessionRepository.findByPublicSlug("tun-gone")).thenReturn(Optional.empty());
+
+        assertTrue(tunnelService.isForwardable("tun-open"));
+        assertFalse(tunnelService.isForwardable("tun-shut"));
+        assertFalse(tunnelService.isForwardable("tun-gone"));
     }
 
     @Test

@@ -75,7 +75,7 @@ class TunnelRegistryTest {
         String requestId = "req-complete-1";
 
         // Simulate: register a pending request and complete it
-        tunnelRegistry.completeRequest(requestId, TunnelResponseMessage.builder()
+        tunnelRegistry.completeRequest("ws-none", requestId, TunnelResponseMessage.builder()
                 .requestId(requestId)
                 .statusCode(200)
                 .body("OK")
@@ -142,9 +142,49 @@ class TunnelRegistryTest {
 
         assertTrue(tunnelRegistry.isActive("slug-reconnect"), "the replacement session is still the tunnel");
         assertFalse(answer.isDone(), "a request on the replacement session must not be failed");
-        tunnelRegistry.completeRequest("req-on-new", TunnelResponseMessage.builder()
+        tunnelRegistry.completeRequest("ws-new", "req-on-new", TunnelResponseMessage.builder()
                 .requestId("req-on-new").statusCode(200).body("ok").build());
         assertEquals(200, answer.get(2, java.util.concurrent.TimeUnit.SECONDS).getStatusCode());
+    }
+
+    @Test
+    void disconnectClosesTheSocketHoldingTheSlug() throws Exception {
+        WebSocketSession session = mock(WebSocketSession.class);
+        when(session.getId()).thenReturn("ws-closed-by-api");
+        when(session.isOpen()).thenReturn(true);
+        tunnelRegistry.register("slug-deleted", session);
+
+        tunnelRegistry.disconnect("slug-deleted");
+
+        verify(session).close(any(org.springframework.web.socket.CloseStatus.class));
+    }
+
+    // Request ids travel to the CLI in the clear, so any socket that learned one could answer a
+    // request that was sent down another tunnel.
+    @Test
+    void aResponseFromAnotherSocketDoesNotAnswerTheRequest() throws Exception {
+        WebSocketSession session = mock(WebSocketSession.class);
+        when(session.getId()).thenReturn("ws-owner");
+        when(session.isOpen()).thenReturn(true);
+        tunnelRegistry.register("slug-owned", session);
+
+        TunnelRequestMessage request = TunnelRequestMessage.builder()
+                .requestId("req-owned").method("POST").path("/hook").build();
+        CompletableFuture<TunnelResponseMessage> answer = CompletableFuture.supplyAsync(
+                () -> tunnelRegistry.forwardRequest("slug-owned", request));
+        long deadline = System.currentTimeMillis() + 5_000;
+        while (tunnelRegistry.pendingRequestCount() == 0 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+
+        tunnelRegistry.completeRequest("ws-intruder", "req-owned", TunnelResponseMessage.builder()
+                .requestId("req-owned").statusCode(200).body("forged").build());
+        Thread.sleep(100);
+        assertFalse(answer.isDone(), "a response from a different socket must be ignored");
+
+        tunnelRegistry.completeRequest("ws-owner", "req-owned", TunnelResponseMessage.builder()
+                .requestId("req-owned").statusCode(200).body("real").build());
+        assertEquals("real", answer.get(2, java.util.concurrent.TimeUnit.SECONDS).getBody());
     }
 
     @Test
