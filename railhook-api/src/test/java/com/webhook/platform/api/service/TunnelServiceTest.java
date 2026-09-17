@@ -172,19 +172,6 @@ class TunnelServiceTest {
     }
 
     @Test
-    void onlyAnActiveSessionIsForwardable() {
-        when(tunnelSessionRepository.findByPublicSlug("tun-open")).thenReturn(Optional.of(
-                TunnelSession.builder().publicSlug("tun-open").status(TunnelStatus.ACTIVE).build()));
-        when(tunnelSessionRepository.findByPublicSlug("tun-shut")).thenReturn(Optional.of(
-                TunnelSession.builder().publicSlug("tun-shut").status(TunnelStatus.CLOSED).build()));
-        when(tunnelSessionRepository.findByPublicSlug("tun-gone")).thenReturn(Optional.empty());
-
-        assertTrue(tunnelService.isForwardable("tun-open"));
-        assertFalse(tunnelService.isForwardable("tun-shut"));
-        assertFalse(tunnelService.isForwardable("tun-gone"));
-    }
-
-    @Test
     void shouldUpdateHeartbeat() {
         TunnelSession session = TunnelSession.builder()
                 .id(UUID.randomUUID())

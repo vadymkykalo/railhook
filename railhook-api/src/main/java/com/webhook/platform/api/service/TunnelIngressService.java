@@ -73,7 +73,7 @@ public class TunnelIngressService {
     }
 
     public Outcome forward(String slug, TunnelRequestMessage request, String body) {
-        if (!redisTunnelCoordinator.isActiveInCluster(slug) || !tunnelService.isForwardable(slug)) {
+        if (!redisTunnelCoordinator.isActiveInCluster(slug)) {
             return refuse("offline", "tunnel_offline", "Tunnel is not connected");
         }
         if (!rateLimiterService.tryAcquireForSlug(slug, RATE_LIMIT_PER_SECOND)) {
@@ -87,7 +87,8 @@ public class TunnelIngressService {
         // A tunnel request authenticates nothing — the slug in the URL is the only thing naming an
         // organization — so the session lookup runs unscoped. It used to happen only afterwards,
         // for metering; it now happens first, because a suspended organization's tunnel is
-        // refused here, where the interceptor that refuses its writes never runs.
+        // refused here, where the interceptor that refuses its writes never runs. It is also what
+        // refuses a closed tunnel whose socket has not gone yet: only an ACTIVE session is returned.
         TunnelSession session;
         try {
             session = TenantContext.callAsSystem(() -> tunnelService.getActiveBySlug(slug));

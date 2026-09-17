@@ -308,10 +308,10 @@ class SubscriptionServiceTest {
                 .id(subId).projectId(projectId).endpointId(endpointId).eventType("order.created")
                 .enabled(true).orderingEnabled(false).maxAttempts(3).timeoutSeconds(30)
                 .retryDelays("86400").createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        when(subscriptionRepository.findById(subId)).thenReturn(Optional.of(existing));
+        when(subscriptionRepository.findByIdAndProjectId(subId, projectId)).thenReturn(Optional.of(existing));
         when(subscriptionRepository.saveAndFlush(any(Subscription.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThatThrownBy(() -> service.updateSubscription(subId,
+        assertThatThrownBy(() -> service.updateSubscription(projectId, subId,
                 SubscriptionRequest.builder().maxAttempts(10).build()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("maxAttempts");

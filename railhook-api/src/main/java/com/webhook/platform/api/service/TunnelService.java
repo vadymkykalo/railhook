@@ -154,14 +154,6 @@ public class TunnelService {
         return session;
     }
 
-    /** Whether a public request may still be carried to this slug's CLI. */
-    @SystemTenant("a public tunnel request authenticates nothing; the slug is what names the organization")
-    public boolean isForwardable(String slug) {
-        return tunnelSessionRepository.findByPublicSlug(slug)
-                .map(session -> session.getStatus() == TunnelStatus.ACTIVE)
-                .orElse(false);
-    }
-
     public TunnelSession getBySessionAndOrg(UUID sessionId) {
         return tunnelSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel session not found"));

@@ -448,7 +448,7 @@ class IncomingDestinationServiceTest {
                 .maxAttempts(5)
                 .build();
 
-        assertThatThrownBy(() -> service.createDestination(sourceId, request))
+        assertThatThrownBy(() -> service.createDestination(projectId, sourceId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("24h");
 
@@ -458,7 +458,7 @@ class IncomingDestinationServiceTest {
     @Test
     void updateDestination_lengtheningTheLadderPastTheEscalationCap_throws() {
         IncomingDestination existing = buildDest();
-        when(destinationRepository.findById(destId)).thenReturn(Optional.of(existing));
+        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(existing));
         lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
         stubOwnership();
 
@@ -467,7 +467,7 @@ class IncomingDestinationServiceTest {
                 .retryDelays("86400")
                 .build();
 
-        assertThatThrownBy(() -> service.updateDestination(destId, request))
+        assertThatThrownBy(() -> service.updateDestination(projectId, sourceId, destId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("retryDelays");
 
