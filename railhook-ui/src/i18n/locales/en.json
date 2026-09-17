@@ -715,6 +715,10 @@
     "importResult": "Created {{endpoints}} endpoints, {{subscriptions}} subscriptions",
     "importing": "Importing...",
     "moreErrors": "...and {{count}} more errors",
+    "newSecrets": {
+      "hint": "An export never contains secrets, so each imported endpoint was given a new one. Copy them now: they are not shown again.",
+      "title": "Signing secrets for the imported endpoints"
+    },
     "selectProject": "Select project",
     "title": "Config Export / Import",
     "toast": {
