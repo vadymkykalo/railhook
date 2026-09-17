@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -339,6 +340,40 @@ class AttemptRunnerTest {
             assertEquals(1, store.succeededCalls);
             assertEquals(1, metrics.successes);
             assertEquals(0, store.abandonedCalls);
+        }
+
+        @Test
+        @DisplayName("a failure whose finalisation throws is recorded once and left to the stuck sweep")
+        void unfinalisableFailureIsRecordedOnce() {
+            // The failure path's finalisation sat inside the same try that catches "the request
+            // failed", so a database blip while writing down a 503 re-entered fail(): the Attempt
+            // was recorded twice, the breaker counted two failures, and the second finalisation
+            // threw straight out of the Runner.
+            respond(503, "unavailable");
+            FakeStore store = new FakeStore(baseUrl);
+            store.finaliseFailure = new IllegalStateException("connection pool exhausted");
+
+            assertDoesNotThrow(() -> runner.run(store, metrics));
+
+            assertEquals(1, store.records.size(), "one Attempt was made, so one is recorded");
+            assertEquals(503, store.records.get(0).statusCode());
+            assertEquals(1, store.finalizations.size(), "the row is the stuck sweep's now, not a second write's");
+            assertEquals(1, metrics.failures);
+            assertEquals(0, metrics.errors);
+        }
+
+        @Test
+        @DisplayName("a failed transformation whose finalisation throws does not escape the Runner")
+        void unfinalisableTransformFailureDoesNotEscape() {
+            respond(200, "ok");
+            FakeStore store = new FakeStore(baseUrl);
+            store.bodyFailure = new PayloadTransformException("template missing");
+            store.finaliseFailure = new IllegalStateException("connection pool exhausted");
+
+            assertDoesNotThrow(() -> runner.run(store, metrics));
+
+            assertEquals(1, store.records.size());
+            assertEquals(1, store.finalizations.size());
         }
 
         // A 4xx or a 3xx is an answer another attempt will not change, so it does not burn the
@@ -720,6 +755,7 @@ class AttemptRunnerTest {
         PayloadTransformException bodyFailure;
         int timeoutSeconds = 5;
         RuntimeException recordAttemptFailure;
+        RuntimeException finaliseFailure;
         String contentType;
         byte[] wireBytes;
 
@@ -784,6 +820,9 @@ class AttemptRunnerTest {
         @Override
         public boolean finalise(String claim, Finalization outcome) {
             finalizations.add(outcome);
+            if (finaliseFailure != null) {
+                throw finaliseFailure;
+            }
             return finaliseApplies;
         }
 

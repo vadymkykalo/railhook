@@ -240,11 +240,30 @@ public class AttemptRunner {
      * successor is: the side effect runs only if this Attempt's own finalisation applied.
      */
     private <C> void abandon(AttemptStore<C> store, C claim, AttemptContext ctx, String reason) {
-        if (store.finalise(claim, new Finalization.Abandoned(reason))) {
+        if (finaliseOrLeaveToSweep(store, claim, ctx, new Finalization.Abandoned(reason))) {
             store.onAbandoned(claim);
         } else {
             log.warn("{}: abandon did not apply — the obligation is owned by another attempt now: {}",
                     ctx.description(), reason);
+        }
+    }
+
+    /**
+     * Finalises a failure, and treats not managing to as the stuck sweep's business.
+     *
+     * <p>These run inside the catch-all that turns an exception into a failed Attempt, so a
+     * finalisation that threw re-entered {@code fail()}: the Attempt was recorded and counted
+     * against the breaker twice, and the second throw escaped the Runner. The row stays claimed
+     * either way; the sweep hands it back, and the Attempt is recorded once.
+     */
+    private <C> boolean finaliseOrLeaveToSweep(AttemptStore<C> store, C claim, AttemptContext ctx,
+            Finalization outcome) {
+        try {
+            return store.finalise(claim, outcome);
+        } catch (Exception e) {
+            log.error("{}: the outcome would not finalise: {} — the obligation stays claimed and the "
+                    + "stuck sweep owns it", ctx.description(), e.getMessage(), e);
+            return false;
         }
     }
 
@@ -373,7 +392,7 @@ public class AttemptRunner {
 
         Instant next = ctx.ladder().nextRetryAt(ctx.attemptNumber());
         // Invariant 2: only the Attempt that actually finalised may queue a successor.
-        if (store.finalise(claim, new Finalization.Retry(next, reason))) {
+        if (finaliseOrLeaveToSweep(store, claim, ctx, new Finalization.Retry(next, reason))) {
             log.info("{}: attempt {} failed ({}), next at {}",
                     ctx.description(), ctx.attemptNumber(), reason, next);
         } else {
