@@ -165,6 +165,22 @@
             <artifactId>spring-boot-jpa-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+          Bare flyway-core, never the starter: Boot 4 auto-configures Flyway only through the
+          starter, so this runs the api's migrations where a test asks it to and nowhere else.
+          For the worker's reads of tables it has no entity for, which a schema Hibernate
+          derived from the worker's own entities does not contain.
+        -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>

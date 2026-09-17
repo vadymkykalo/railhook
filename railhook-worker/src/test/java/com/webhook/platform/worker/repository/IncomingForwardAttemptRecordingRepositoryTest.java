@@ -9,6 +9,7 @@ import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.worker.attempt.AttemptMetrics;
 import com.webhook.platform.worker.attempt.AttemptRunner;
 import com.webhook.platform.worker.attempt.IncomingAttemptStore;
+import com.webhook.platform.worker.attempt.ProjectStatusLookup;
 import com.webhook.platform.worker.domain.entity.IncomingDestination;
 import com.webhook.platform.worker.domain.entity.IncomingEvent;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
@@ -185,7 +186,7 @@ class IncomingForwardAttemptRecordingRepositoryTest {
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId).attemptCount(0).build();
 
-        IncomingAttemptStore store = new IncomingAttemptStore(attemptRepository,
+        IncomingAttemptStore store = new IncomingAttemptStore(attemptRepository, activeProjects(),
                 new TransactionTemplate(transactionManager), null, null, null, new ObjectMapper(),
                 WebClient.builder().build(), null, message, event, destination);
 
@@ -210,5 +211,20 @@ class IncomingForwardAttemptRecordingRepositoryTest {
         @Override
         public void transformFailed() {
         }
+    }
+
+    /** Every Project active: whether a Project may still be sent for is not what this test is about. */
+    private static ProjectStatusLookup activeProjects() {
+        return new ProjectStatusLookup(null) {
+            @Override
+            public ProjectStatus forProject(UUID projectId) {
+                return ProjectStatus.ACTIVE;
+            }
+
+            @Override
+            public ProjectStatus forSource(UUID sourceId) {
+                return ProjectStatus.ACTIVE;
+            }
+        };
     }
 }

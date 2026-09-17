@@ -113,6 +113,60 @@ public class TunnelService {
     }
 
     /**
+     * Closes every tunnel a user holds in the current organization, for a member whose access to
+     * it has just been withdrawn. Revoking their sessions does not reach a tunnel: the CLI
+     * authenticated once with the tunnel token and presents nothing else, so the slug would go on
+     * forwarding to their machine. {@code @TenantId} confines the lookup to this organization — a
+     * tunnel the same person opened elsewhere is not this organization's to close.
+     */
+    @Transactional
+    public void closeSessionsOfUser(UUID userId) {
+        TenantContext.require();
+        if (TenantContext.isSystem()) {
+            // Unscoped, the same lookup would close the user's tunnels in every organization.
+            throw new IllegalStateException("Closing a member's tunnels needs the organization's scope");
+        }
+        tunnelSessionRepository.findByUserIdAndStatus(userId, TunnelStatus.ACTIVE).forEach(this::close);
+    }
+
+    /**
+     * Closes every tunnel in the current organization, for an organization about to be deleted.
+     * {@code tunnel_sessions} has no foreign key to organizations, so the delete leaves the rows
+     * ACTIVE and the sockets connected, and the ingress — which finds no suspension on a missing
+     * organization — goes on forwarding.
+     */
+    @Transactional
+    public void closeAllSessions() {
+        TenantContext.require();
+        if (TenantContext.isSystem()) {
+            throw new IllegalStateException("Closing an organization's tunnels needs the organization's scope");
+        }
+        tunnelSessionRepository.findByStatus(TunnelStatus.ACTIVE).forEach(this::close);
+    }
+
+    /**
+     * {@link #closeAllSessions()} for an organization that is not the caller's scope: one an
+     * erasure deletes because the person being erased was its only member.
+     */
+    @SystemTenant("an erasure deletes organizations other than the request's own, read off membership rows")
+    @Transactional
+    public void closeSessionsOfOrganization(UUID organizationId) {
+        tunnelSessionRepository.findByOrganizationIdAndStatus(organizationId, TunnelStatus.ACTIVE)
+                .forEach(this::close);
+    }
+
+    /**
+     * Closes a person's tunnels in every organization, for an erased account. Unlike
+     * {@link #closeSessionsOfUser}, which withdraws access to one organization, nothing of the
+     * person is left anywhere to keep a tunnel open for.
+     */
+    @SystemTenant("an erased person's tunnels are in every organization they belonged to")
+    @Transactional
+    public void closeAllSessionsOfUserEverywhere(UUID userId) {
+        tunnelSessionRepository.findByUserIdAndStatus(userId, TunnelStatus.ACTIVE).forEach(this::close);
+    }
+
+    /**
      * Marks the session CLOSED and, once that is committed, ends its tunnel on whichever instance
      * holds the socket. Marking the row alone left the CLI connected and the slug forwarding — a
      * tunnel outside the plan's active-tunnel count and outside bandwidth metering. The disconnect

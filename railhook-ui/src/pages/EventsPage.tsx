@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Radio, Plus, Share2, Loader2 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
-import { useEvents, useProject, useDeliveries } from '../api/queries';
+import { useEvents, useProject } from '../api/queries';
 import PageSkeleton from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
@@ -21,7 +21,7 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { debugLinksApi } from '../api/debugLinks.api';
 import { CopyId, FilterBar, FilterField, SearchField, SORTABLE_HEAD_CLASS, TimeCell } from './tableParts';
-import type { DeliveryResponse } from '../types/api.types';
+import type { DeliveryStatusCounts } from '../types/api.types';
 import { useDebounced } from '../hooks/useDebounced';
 
 
@@ -30,25 +30,24 @@ import { useDebounced } from '../hooks/useDebounced';
  *
  * An Event has no status of its own — it exists whether or not anyone was
  * listening — so the only question this page can answer, and the reason it
- * exists, is what became of the Deliveries it created. That rollup is derived
- * here rather than served: no endpoint returns it, so the page fetches the
- * Deliveries created in the same window as the Events on screen and joins them
- * by event id.
+ * exists, is what became of the Deliveries it created. The event list carries
+ * each Event's Delivery counts by status, so every row is exact on any page and
+ * for any fan-out.
  */
-interface Rollup {
-  total: number;
-  delivered: number;
-  owed: number;
-  abandoned: number;
+type EventStatus = 'delivered' | 'owed' | 'abandoned' | 'unsubscribed';
+
+function deliveredOf(counts: DeliveryStatusCounts | undefined) {
+  if (!counts) return { delivered: 0, total: 0 };
+  return {
+    delivered: counts.success,
+    total: counts.pending + counts.processing + counts.success + counts.failed + counts.dlq,
+  };
 }
 
-type EventStatus = 'delivered' | 'owed' | 'abandoned' | 'unsubscribed' | 'unknown';
-
-function statusOf(rollup: Rollup | undefined, deliveriesCreated: number | undefined): EventStatus {
-  if (deliveriesCreated === 0) return 'unsubscribed';
-  if (!rollup || rollup.total === 0) return 'unknown';
-  if (rollup.abandoned > 0) return 'abandoned';
-  if (rollup.owed > 0) return 'owed';
+function statusOf(counts: DeliveryStatusCounts | undefined): EventStatus {
+  if (!counts || deliveredOf(counts).total === 0) return 'unsubscribed';
+  if (counts.dlq > 0 || counts.failed > 0) return 'abandoned';
+  if (counts.pending > 0 || counts.processing > 0) return 'owed';
   return 'delivered';
 }
 
@@ -62,21 +61,7 @@ export const STATUS_KIND: Record<EventStatus, StatusKind> = {
   owed: 'retry',
   abandoned: 'halt',
   unsubscribed: 'idle',
-  unknown: 'idle',
 };
-
-function rollupOf(deliveries: DeliveryResponse[]): Map<string, Rollup> {
-  const byEvent = new Map<string, Rollup>();
-  for (const d of deliveries) {
-    const r = byEvent.get(d.eventId) ?? { total: 0, delivered: 0, owed: 0, abandoned: 0 };
-    r.total += 1;
-    if (d.status === 'SUCCESS') r.delivered += 1;
-    else if (d.status === 'DLQ' || d.status === 'FAILED') r.abandoned += 1;
-    else r.owed += 1;
-    byEvent.set(d.eventId, r);
-  }
-  return byEvent;
-}
 
 const STATUS_FILTERS: EventStatus[] = ['delivered', 'owed', 'abandoned', 'unsubscribed'];
 
@@ -107,26 +92,11 @@ export default function EventsPage() {
   const totalElements = eventsData?.totalElements ?? 0;
   const totalPages = eventsData?.totalPages ?? 0;
 
-  // One request, not one per row: the window that covers the events on screen.
-  const fromDate = useMemo(() => {
-    if (events.length === 0) return undefined;
-    const oldest = Math.min(...events.map((e) => new Date(e.createdAt).getTime()));
-    return new Date(oldest - 60_000).toISOString();
-  }, [events]);
-
-  const { data: deliveriesData } = useDeliveries(fromDate ? projectId : undefined, {
-    page: 0,
-    size: 200,
-    sort: 'createdAt,desc',
-    fromDate,
-  });
-  const rollups = useMemo(() => rollupOf(deliveriesData?.content ?? []), [deliveriesData]);
-
   const rows = useMemo(() => events.map((event) => ({
     event,
-    rollup: rollups.get(event.id),
-    status: statusOf(rollups.get(event.id), event.deliveriesCreated),
-  })), [events, rollups]);
+    delivered: deliveredOf(event.deliveryCounts),
+    status: statusOf(event.deliveryCounts),
+  })), [events]);
 
   const visibleRows = statusFilter ? rows.filter((r) => r.status === statusFilter) : rows;
 
@@ -223,7 +193,7 @@ export default function EventsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visibleRows.map(({ event, rollup, status }) => (
+                {visibleRows.map(({ event, delivered, status }) => (
                   <TableRow
                     key={event.id}
                     className="group/row cursor-pointer"
@@ -247,9 +217,7 @@ export default function EventsPage() {
                         onClick={(e) => e.stopPropagation()}
                         className="rounded font-mono text-[13px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        {rollup
-                          ? t('events.deliveredOf', { delivered: rollup.delivered, total: rollup.total })
-                          : t('events.deliveredOf', { delivered: 0, total: event.deliveriesCreated ?? 0 })}
+                        {t('events.deliveredOf', delivered)}
                       </Link>
                     </TableCell>
                     <TableCell>

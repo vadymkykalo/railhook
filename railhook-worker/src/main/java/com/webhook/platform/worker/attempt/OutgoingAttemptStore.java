@@ -55,6 +55,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     private final DeliveryAttemptRepository deliveryAttemptRepository;
     private final EndpointRepository endpointRepository;
     private final EventRepository eventRepository;
+    private final ProjectStatusLookup projectStatusLookup;
     private final TransactionTemplate transactionTemplate;
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final OrderingGate orderingGate;
@@ -78,6 +79,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             DeliveryAttemptRepository deliveryAttemptRepository,
             EndpointRepository endpointRepository,
             EventRepository eventRepository,
+            ProjectStatusLookup projectStatusLookup,
             TransactionTemplate transactionTemplate,
             OrderingBufferService orderingBufferService,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
@@ -96,6 +98,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         this.deliveryAttemptRepository = deliveryAttemptRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
+        this.projectStatusLookup = projectStatusLookup;
         this.transactionTemplate = transactionTemplate;
         this.kafkaTemplate = kafkaTemplate;
         this.orderingGate = new OrderingGate(orderingBufferService, deliveryRepository, kafkaTemplate,
@@ -180,6 +183,16 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         if (endpoint.getDeletedAt() != null) {
             return terminal(claim, "Endpoint has been deleted");
         }
+        // Deleting a Project or suspending an Organization stamps that row and nothing under it,
+        // so the Endpoint reads as live here. A deleted Project ends as a deleted Endpoint does;
+        // a suspension is handed back, because an operator can lift it.
+        ProjectStatusLookup.ProjectStatus projectStatus = projectStatusLookup.forProject(endpoint.getProjectId());
+        if (projectStatus == ProjectStatusLookup.ProjectStatus.DELETED) {
+            return terminal(claim, "Project has been deleted");
+        }
+        if (projectStatus == ProjectStatusLookup.ProjectStatus.ORGANIZATION_SUSPENDED) {
+            return deferred(claim, "Organization is suspended");
+        }
         if (!endpoint.getEnabled()) {
             return terminal(claim, "Endpoint is disabled");
         }
@@ -215,6 +228,17 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                 endpoint.getUrl(),
                 AttemptSupport.clampTimeout(delivery.getTimeoutSeconds()));
         return new ClaimResult.Claimed<>(claim, context);
+    }
+
+    /**
+     * Hands the Delivery back under its fencing token, unattempted, until {@link
+     * ProjectStatusLookup#SUSPENSION_RECHECK} from now.
+     */
+    private ClaimResult<Claim> deferred(Claim claim, String reason) {
+        Instant until = Instant.now().plus(ProjectStatusLookup.SUSPENSION_RECHECK);
+        log.info("Delivery {} will not be attempted before {}: {}", claim.deliveryId(), until, reason);
+        finalise(claim, new Finalization.Deferred(until, reason));
+        return new ClaimResult.Deferred<>(until, reason);
     }
 
     /** Fails the Delivery under its fencing token and reports that there is nothing to attempt. */

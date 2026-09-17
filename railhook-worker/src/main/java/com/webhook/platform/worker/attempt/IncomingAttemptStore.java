@@ -59,6 +59,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     }
 
     private final IncomingForwardAttemptRepository attemptRepository;
+    private final ProjectStatusLookup projectStatusLookup;
     private final TransactionTemplate transactionTemplate;
     private final TransformationCacheService transformationCacheService;
     private final PayloadTransformService payloadTransformService;
@@ -73,6 +74,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
 
     public IncomingAttemptStore(
             IncomingForwardAttemptRepository attemptRepository,
+            ProjectStatusLookup projectStatusLookup,
             TransactionTemplate transactionTemplate,
             TransformationCacheService transformationCacheService,
             PayloadTransformService payloadTransformService,
@@ -84,6 +86,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             IncomingEvent event,
             IncomingDestination destination) {
         this.attemptRepository = attemptRepository;
+        this.projectStatusLookup = projectStatusLookup;
         this.transactionTemplate = transactionTemplate;
         this.transformationCacheService = transformationCacheService;
         this.payloadTransformService = payloadTransformService;
@@ -157,6 +160,16 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         if (!Boolean.TRUE.equals(destination.getEnabled())) {
             return terminal(claim, "Destination is disabled");
         }
+        // Deleting a Project or suspending an Organization touches no Source or Destination under
+        // it, so both read as live here. The same two outcomes the Outgoing store gives them.
+        ProjectStatusLookup.ProjectStatus projectStatus =
+                projectStatusLookup.forSource(destination.getIncomingSourceId());
+        if (projectStatus == ProjectStatusLookup.ProjectStatus.DELETED) {
+            return terminal(claim, "Project has been deleted");
+        }
+        if (projectStatus == ProjectStatusLookup.ProjectStatus.ORGANIZATION_SUSPENDED) {
+            return deferred(claim, "Organization is suspended");
+        }
 
         RetryLadder ladder;
         try {
@@ -179,6 +192,18 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 destination.getUrl(),
                 AttemptSupport.clampTimeout(destination.getTimeoutSeconds()));
         return new ClaimResult.Claimed<>(claim, context);
+    }
+
+    /**
+     * Hands the Forward back under its fencing token, unattempted, until {@link
+     * ProjectStatusLookup#SUSPENSION_RECHECK} from now.
+     */
+    private ClaimResult<Claim> deferred(Claim claim, String reason) {
+        Instant until = Instant.now().plus(ProjectStatusLookup.SUSPENSION_RECHECK);
+        log.info("Forward eventId={}, destId={} will not be attempted before {}: {}",
+                claim.eventId(), claim.destinationId(), until, reason);
+        finalise(claim, new Finalization.Deferred(until, reason));
+        return new ClaimResult.Deferred<>(until, reason);
     }
 
     /** Fails the Forward under its fencing token and reports that there is nothing to attempt. */

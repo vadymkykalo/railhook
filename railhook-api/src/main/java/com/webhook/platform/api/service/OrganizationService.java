@@ -29,14 +29,17 @@ public class OrganizationService {
     private final OrganizationRepository organizationRepository;
     private final MembershipRepository membershipRepository;
     private final EntityManager entityManager;
+    private final TunnelService tunnelService;
 
     public OrganizationService(
             OrganizationRepository organizationRepository,
             MembershipRepository membershipRepository,
-            EntityManager entityManager) {
+            EntityManager entityManager,
+            TunnelService tunnelService) {
         this.organizationRepository = organizationRepository;
         this.membershipRepository = membershipRepository;
         this.entityManager = entityManager;
+        this.tunnelService = tunnelService;
     }
 
     /**
@@ -100,6 +103,7 @@ public class OrganizationService {
                 .orElseThrow(() -> new NotFoundException("Organization not found"));
 
         log.warn("GDPR DELETE: permanently deleting organization {} ('{}')", organizationId, organization.getName());
+        tunnelService.closeAllSessions();
         organizationRepository.delete(organization);
         entityManager.flush();
         log.info("GDPR DELETE: organization {} deleted successfully", organizationId);
@@ -124,6 +128,7 @@ public class OrganizationService {
                 .orElseThrow(() -> new NotFoundException("Organization not found"));
 
         log.warn("GDPR DELETE: permanently deleting organization {} ('{}')", organizationId, organization.getName());
+        tunnelService.closeSessionsOfOrganization(organizationId);
         organizationRepository.delete(organization);
         entityManager.flush();
     }

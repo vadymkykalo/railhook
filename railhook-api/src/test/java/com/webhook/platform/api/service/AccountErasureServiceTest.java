@@ -56,6 +56,7 @@ class AccountErasureServiceTest {
     @Mock private UserIdentityRepository userIdentityRepository;
     @Mock private EmailChangeRequestRepository emailChangeRequestRepository;
     @Mock private VerificationEmailSendRepository verificationEmailSendRepository;
+    @Mock private TunnelService tunnelService;
 
     private AccountErasureService service;
 
@@ -66,7 +67,7 @@ class AccountErasureServiceTest {
     void setUp() {
         service = new AccountErasureService(userRepository, membershipRepository,
                 organizationService, userSessionService, tokenBlacklistService, userIdentityRepository,
-                emailChangeRequestRepository, verificationEmailSendRepository);
+                emailChangeRequestRepository, verificationEmailSendRepository, tunnelService);
         userId = UUID.randomUUID();
         user = User.builder()
                 .id(userId)

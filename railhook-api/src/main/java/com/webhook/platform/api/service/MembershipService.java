@@ -46,18 +46,21 @@ public class MembershipService {
     private final EmailService emailService;
     private final TokenBlacklistService tokenBlacklistService;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final TunnelService tunnelService;
 
     public MembershipService(
             UserRepository userRepository,
             MembershipRepository membershipRepository,
             EmailService emailService,
             TokenBlacklistService tokenBlacklistService,
-            BCryptPasswordEncoder passwordEncoder) {
+            BCryptPasswordEncoder passwordEncoder,
+            TunnelService tunnelService) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.emailService = emailService;
         this.tokenBlacklistService = tokenBlacklistService;
         this.passwordEncoder = passwordEncoder;
+        this.tunnelService = tunnelService;
     }
 
     public List<MemberResponse> getOrganizationMembers() {
@@ -340,6 +343,9 @@ public class MembershipService {
         // Refreshing is already blocked — that path 404s on the missing membership — which is
         // precisely why the live access token is the gap left to close.
         tokenBlacklistService.revokeAllUserTokens(userId);
+        // A tunnel is the other access that outlives the membership: its CLI never presents an
+        // access token, so revoking those leaves the slug forwarding to the removed member.
+        tunnelService.closeSessionsOfUser(userId);
     }
 
     /**
@@ -388,6 +394,7 @@ public class MembershipService {
         membership.setStatus(MembershipStatus.DISABLED);
         membershipRepository.save(membership);
         tokenBlacklistService.revokeAllUserTokens(userId);
+        tunnelService.closeSessionsOfUser(userId);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));

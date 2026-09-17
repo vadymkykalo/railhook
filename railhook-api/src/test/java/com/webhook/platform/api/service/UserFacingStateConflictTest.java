@@ -28,6 +28,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -58,7 +59,7 @@ class UserFacingStateConflictTest {
         TenantContext.set(organizationId);
         membershipService = new MembershipService(
                 userRepository, membershipRepository, emailService, tokenBlacklistService,
-                new BCryptPasswordEncoder(4));
+                new BCryptPasswordEncoder(4), mock(TunnelService.class));
         transformationService = new TransformationService(
                 transformationRepository, projectRepository, subscriptionRepository,
                 incomingDestinationRepository, new ObjectMapper());

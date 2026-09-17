@@ -5,6 +5,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import com.webhook.platform.worker.attempt.AttemptRunner;
 import com.webhook.platform.worker.attempt.ForwardAttemptMetrics;
 import com.webhook.platform.worker.attempt.IncomingAttemptStoreFactory;
+import com.webhook.platform.worker.attempt.ProjectStatusLookup;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
@@ -150,7 +151,7 @@ class IncomingForwardServiceTest {
 
     private IncomingForwardService newService(WebClient webClient, MeterRegistry registry, AttemptRunner runner) {
         IncomingAttemptStoreFactory storeFactory = new IncomingAttemptStoreFactory(
-                attemptRepository, transactionTemplate, transformationCacheService,
+                attemptRepository, activeProjects(), transactionTemplate, transformationCacheService,
                 payloadTransformService, encryptionKeyRegistry, new ObjectMapper(),
                 webClient, kafkaTemplate);
         return new IncomingForwardService(eventRepository, destinationRepository, attemptRepository,
@@ -750,5 +751,20 @@ class IncomingForwardServiceTest {
                 .build();
 
         assertThatNoException().isThrownBy(() -> service.processForward(message));
+    }
+
+    /** Every Project active: whether a Project may still be sent for is not what this test is about. */
+    private static ProjectStatusLookup activeProjects() {
+        return new ProjectStatusLookup(null) {
+            @Override
+            public ProjectStatus forProject(UUID projectId) {
+                return ProjectStatus.ACTIVE;
+            }
+
+            @Override
+            public ProjectStatus forSource(UUID sourceId) {
+                return ProjectStatus.ACTIVE;
+            }
+        };
     }
 }

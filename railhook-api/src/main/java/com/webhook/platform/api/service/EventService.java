@@ -7,6 +7,7 @@ import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
+import com.webhook.platform.api.dto.DeliveryStatusCounts;
 import com.webhook.platform.api.dto.EventResponse;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
@@ -19,10 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -75,21 +76,9 @@ public class EventService {
                 ? eventRepository.findByProjectIdAndEventTypeContainingIgnoreCase(projectId, eventType.trim(), pageable)
                 : eventRepository.findByProjectId(projectId, pageable);
 
-        List<UUID> eventIds = events.getContent().stream().map(Event::getId).toList();
-        Map<UUID, Long> deliveryCounts = Map.of();
-        if (!eventIds.isEmpty()) {
-            deliveryCounts = deliveryRepository.countByEventIds(eventIds).stream()
-                    .collect(Collectors.toMap(
-                            row -> (UUID) row[0],
-                            row -> (Long) row[1]
-                    ));
-        }
-        Map<UUID, Long> counts = deliveryCounts;
-        return events.map(event -> {
-            EventResponse resp = mapToResponse(event);
-            resp.setDeliveriesCreated(counts.getOrDefault(event.getId(), 0L).intValue());
-            return resp;
-        });
+        Map<UUID, DeliveryStatusCounts> counts =
+                deliveryCountsOf(events.getContent().stream().map(Event::getId).toList());
+        return events.map(event -> withDeliveryCounts(mapToResponse(event), counts));
     }
 
     public EventResponse getEvent(UUID projectId, UUID eventId) {
@@ -103,10 +92,38 @@ public class EventService {
             throw new ForbiddenException("Event does not belong to this project");
         }
         
-        EventResponse resp = mapToResponse(event);
-        List<Object[]> counts = deliveryRepository.countByEventIds(List.of(eventId));
-        resp.setDeliveriesCreated(counts.isEmpty() ? 0 : ((Long) counts.get(0)[1]).intValue());
-        return resp;
+        return withDeliveryCounts(mapToResponse(event), deliveryCountsOf(List.of(eventId)));
+    }
+
+    /**
+     * One grouped query for however many Events, keyed by event id. The ids come from a
+     * project-scoped read, so the Deliveries counted are that project's.
+     */
+    private Map<UUID, DeliveryStatusCounts> deliveryCountsOf(List<UUID> eventIds) {
+        Map<UUID, DeliveryStatusCounts> byEvent = new HashMap<>();
+        if (eventIds.isEmpty()) {
+            return byEvent;
+        }
+        for (Object[] row : deliveryRepository.countByEventIdsAndStatus(eventIds)) {
+            DeliveryStatusCounts counts = byEvent.computeIfAbsent((UUID) row[0], id -> new DeliveryStatusCounts());
+            int n = ((Long) row[2]).intValue();
+            switch ((DeliveryStatus) row[1]) {
+                case PENDING -> counts.setPending(n);
+                case PROCESSING -> counts.setProcessing(n);
+                case SUCCESS -> counts.setSuccess(n);
+                case FAILED -> counts.setFailed(n);
+                case DLQ -> counts.setDlq(n);
+            }
+        }
+        return byEvent;
+    }
+
+    private static EventResponse withDeliveryCounts(EventResponse response, Map<UUID, DeliveryStatusCounts> byEvent) {
+        DeliveryStatusCounts counts = byEvent.getOrDefault(response.getId(), new DeliveryStatusCounts());
+        response.setDeliveryCounts(counts);
+        response.setDeliveriesCreated(counts.getPending() + counts.getProcessing() + counts.getSuccess()
+                + counts.getFailed() + counts.getDlq());
+        return response;
     }
 
     @Transactional
