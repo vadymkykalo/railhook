@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { projectsApi } from './projects.api';
 import { endpointsApi } from './endpoints.api';
 import { deliveriesApi, type DeliveryFilters, type BulkReplayRequest } from './deliveries.api';
@@ -432,6 +432,7 @@ export function useDlq(projectId: string | undefined, page: number, size = 20, f
         queryKey: queryKeys.dlq.list(projectId!, page, size, filters),
         queryFn: () => dlqApi.list(projectId!, page, size, filters),
         enabled: !!projectId,
+        placeholderData: keepPreviousData,
     });
 }
 
