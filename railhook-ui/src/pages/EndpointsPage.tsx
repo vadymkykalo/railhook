@@ -106,7 +106,8 @@ export default function EndpointsPage() {
   const [localEndpointOverrides, setLocalEndpointOverrides] = useState<Record<string, EndpointResponse>>({});
   const displayEndpoints = endpoints.map((e) => localEndpointOverrides[e.id] ?? e);
 
-  const loading = projectLoading || endpointsLoading;
+  // First load only; a page change keeps the previous rows (keepPreviousData).
+  const loading = (projectLoading && !project) || (endpointsLoading && !pageInfo);
   const isError = projectIsError || endpointsIsError;
   const retry = () => { refetchProject(); refetchEndpoints(); };
 

@@ -104,7 +104,8 @@ export default function IncomingEventsPage() {
     });
   }, [attempts]);
 
-  const loading = projectLoading || eventsLoading;
+  // First load only; a page or source change keeps the previous rows (keepPreviousData).
+  const loading = (projectLoading && !project) || (eventsLoading && !eventsPage);
   const isError = projectIsError || eventsIsError || sourcesIsError;
   const retry = () => { refetchProject(); refetchEvents(); refetchSources(); };
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import '../../i18n';
@@ -167,5 +167,18 @@ describe('EndpointsPage', () => {
       TEST_PROJECT_ID,
       expect.objectContaining({ signatureScheme: 'STANDARD' }),
     ));
+  });
+  it('keeps the rows on screen while the next page loads', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(endpointsApi.listPaged)
+      .mockResolvedValueOnce({ ...populatedPage([ENDPOINT]), totalElements: 40, totalPages: 2 })
+      .mockReturnValue(new Promise(() => {}));
+    renderEndpoints();
+    await screen.findByText('https://example.com/webhook');
+
+    fireEvent.click(screen.getByRole('button', { name: /^next$/i }));
+
+    await waitFor(() => expect(endpointsApi.listPaged).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('https://example.com/webhook')).toBeInTheDocument();
   });
 });

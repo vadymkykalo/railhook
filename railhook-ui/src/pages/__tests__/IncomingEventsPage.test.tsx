@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import '../../i18n';
@@ -157,5 +157,18 @@ describe('IncomingEventsPage', () => {
     expect(await screen.findByText('Forwarded request headers')).toBeInTheDocument();
     expect(screen.getByText('Forwarded request body')).toBeInTheDocument();
     expect(screen.getByText(/ord_42/)).toBeInTheDocument();
+  });
+  it('keeps the rows on screen while the next page loads', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(incomingEventsApi.list)
+      .mockResolvedValueOnce({ ...populatedEventsPage([INCOMING_EVENT]), totalElements: 40, totalPages: 2 })
+      .mockReturnValue(new Promise(() => {}));
+    renderIncomingEvents();
+    await screen.findByText(/req-12345678/);
+
+    fireEvent.click(screen.getByRole('button', { name: /^next$/i }));
+
+    await waitFor(() => expect(incomingEventsApi.list).toHaveBeenCalledTimes(2));
+    expect(screen.getByText(/req-12345678/)).toBeInTheDocument();
   });
 });
