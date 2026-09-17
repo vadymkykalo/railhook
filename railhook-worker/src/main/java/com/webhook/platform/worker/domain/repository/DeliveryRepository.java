@@ -122,11 +122,17 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
             "WHERE id = :id AND status = 'PENDING' AND claim_token IS NULL", nativeQuery = true)
     int scheduleIfUnclaimed(@Param("id") UUID id, @Param("retryAt") Instant retryAt);
 
+    /**
+     * Spends a rung, but only for the Attempt that holds the row. Matched by id alone, an Attempt
+     * the stuck sweep had already taken the row from spent a rung of its successor's Ladder. The
+     * fence is null only for a retry published before tokens travelled with the message, which
+     * then matches a row carrying none.
+     */
     @Modifying
     @Query(value = "UPDATE deliveries SET attempt_count = attempt_count + 1, " +
             "updated_at = now(), version = version + 1 " +
-            "WHERE id = :id", nativeQuery = true)
-    int incrementAttemptCount(@Param("id") UUID id);
+            "WHERE id = :id AND claim_token IS NOT DISTINCT FROM CAST(:fence AS uuid)", nativeQuery = true)
+    int incrementAttemptCount(@Param("id") UUID id, @Param("fence") UUID fence);
 
     /**
      * Decides only whether anything is still outstanding in the gap; the timeout itself is
