@@ -300,6 +300,13 @@ export function useEvents(projectId: string | undefined, page: number, size = 20
         queryFn: () => eventsApi.listByProject(projectId!, { page, size, sort, eventType }),
         enabled: !!projectId,
         placeholderData: keepPreviousData,
+        // Each row's delivery counts move while its deliveries are still in flight.
+        refetchInterval: (query) => {
+            const inFlight = query.state.data?.content?.some(
+                (e) => (e.deliveryCounts?.pending ?? 0) + (e.deliveryCounts?.processing ?? 0) > 0
+            );
+            return inFlight ? 5000 : false;
+        },
     });
 }
 

@@ -8916,6 +8916,24 @@ components:
       required:
       - data
       - type
+    DeliveryStatusCounts:
+      type: object
+      properties:
+        pending:
+          type: integer
+          format: int32
+        processing:
+          type: integer
+          format: int32
+        success:
+          type: integer
+          format: int32
+        failed:
+          type: integer
+          format: int32
+        dlq:
+          type: integer
+          format: int32
     EventResponse:
       type: object
       properties:
@@ -8935,6 +8953,8 @@ components:
         deliveriesCreated:
           type: integer
           format: int32
+        deliveryCounts:
+          $ref: "#/components/schemas/DeliveryStatusCounts"
         schemaWarnings:
           type: array
           items:
@@ -9606,14 +9626,14 @@ components:
           $ref: "#/components/schemas/SortObject"
         paged:
           type: boolean
-        unpaged:
-          type: boolean
-        pageSize:
-          type: integer
-          format: int32
         pageNumber:
           type: integer
           format: int32
+        pageSize:
+          type: integer
+          format: int32
+        unpaged:
+          type: boolean
     SortObject:
       type: object
       properties:

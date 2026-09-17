@@ -74,6 +74,7 @@ export type EndpointResponseConforms = Assert<Conforms<'EndpointResponse', Mirro
 export type DeliveryResponseConforms = Assert<Conforms<'DeliveryResponse', Mirror.DeliveryResponse>>;
 export type DeliveryAttemptResponseConforms = Assert<Conforms<'DeliveryAttemptResponse', Mirror.DeliveryAttemptResponse>>;
 export type EventResponseConforms = Assert<Conforms<'EventResponse', Mirror.EventResponse>>;
+export type DeliveryStatusCountsConforms = Assert<Conforms<'DeliveryStatusCounts', Mirror.DeliveryStatusCounts>>;
 export type SubscriptionResponseConforms = Assert<Conforms<'SubscriptionResponse', Mirror.SubscriptionResponse>>;
 export type IncomingSourceRequestConforms = Assert<Conforms<'IncomingSourceRequest', Mirror.IncomingSourceRequest>>;
 export type IncomingSourceResponseConforms = Assert<Conforms<'IncomingSourceResponse', Mirror.IncomingSourceResponse>>;

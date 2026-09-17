@@ -183,8 +183,18 @@ export interface EventResponse {
   payload: string;
   createdAt: string;
   deliveriesCreated?: number;
+  /** The same Deliveries as `deliveriesCreated`, by status. Absent on a test-event response. */
+  deliveryCounts?: DeliveryStatusCounts;
   /** Set only on a test-event response, and only under a project whose policy is WARN. */
   schemaWarnings?: string[];
+}
+
+export interface DeliveryStatusCounts {
+  pending: number;
+  processing: number;
+  success: number;
+  failed: number;
+  dlq: number;
 }
 
 export interface SubscriptionResponse {

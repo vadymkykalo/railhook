@@ -4525,6 +4525,18 @@ export interface components {
             type: string;
             data: components["schemas"]["JsonNode"];
         };
+        DeliveryStatusCounts: {
+            /** Format: int32 */
+            pending?: number;
+            /** Format: int32 */
+            processing?: number;
+            /** Format: int32 */
+            success?: number;
+            /** Format: int32 */
+            failed?: number;
+            /** Format: int32 */
+            dlq?: number;
+        };
         EventResponse: {
             /** Format: uuid */
             id?: string;
@@ -4536,6 +4548,7 @@ export interface components {
             createdAt?: string;
             /** Format: int32 */
             deliveriesCreated?: number;
+            deliveryCounts?: components["schemas"]["DeliveryStatusCounts"];
             schemaWarnings?: string[];
         };
         VerificationResponse: {
@@ -4859,11 +4872,11 @@ export interface components {
             offset?: number;
             sort?: components["schemas"]["SortObject"];
             paged?: boolean;
-            unpaged?: boolean;
-            /** Format: int32 */
-            pageSize?: number;
             /** Format: int32 */
             pageNumber?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            unpaged?: boolean;
         };
         SortObject: {
             empty?: boolean;
