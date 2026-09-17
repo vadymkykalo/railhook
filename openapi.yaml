@@ -841,6 +841,12 @@ paths:
       description: Returns subscription details
       operationId: getSubscription
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -864,6 +870,12 @@ paths:
       description: Updates subscription configuration
       operationId: updateSubscription
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -893,6 +905,12 @@ paths:
       description: Removes a subscription
       operationId: deleteSubscription
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -912,6 +930,12 @@ paths:
       description: "Partially updates subscription (e.g., toggle ordering)"
       operationId: patchSubscription
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -1183,6 +1207,18 @@ paths:
       description: Returns destination details by ID
       operationId: getDestination
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -1212,6 +1248,18 @@ paths:
       description: Updates destination configuration
       operationId: updateDestination
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -1247,6 +1295,18 @@ paths:
       description: Permanently deletes the forwarding destination
       operationId: deleteDestination
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -1267,6 +1327,12 @@ paths:
       description: Returns incoming source details by ID
       operationId: getSource
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -1296,6 +1362,12 @@ paths:
       description: Updates incoming source configuration
       operationId: updateSource
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -1331,6 +1403,12 @@ paths:
       description: Disables the incoming source (soft delete)
       operationId: deleteSource
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -1418,6 +1496,12 @@ paths:
       description: Returns endpoint details by ID
       operationId: getEndpoint
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -1441,6 +1525,12 @@ paths:
       description: Updates endpoint configuration
       operationId: updateEndpoint
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -1470,6 +1560,12 @@ paths:
       description: Deletes an endpoint
       operationId: deleteEndpoint
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -2758,6 +2854,12 @@ paths:
       description: Returns paginated destinations for the incoming source
       operationId: listDestinations
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: sourceId
         in: path
         required: true
@@ -2806,6 +2908,12 @@ paths:
       description: Creates a new forwarding destination for the incoming source
       operationId: createDestination
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: sourceId
         in: path
         required: true
@@ -3344,6 +3452,12 @@ paths:
       description: Generates a new webhook signing secret
       operationId: rotateSecret
       parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
@@ -7763,8 +7877,11 @@ components:
         rateLimitPerSecond:
           type: integer
           format: int32
-          description: Rate limit per second for ingress endpoint (null = unlimited)
+          description: "Rate limit per second for the ingress URL, at most the plan's\
+            \ own (null = the default limit)"
           example: 100
+          maximum: 10000
+          minimum: 1
       required:
       - name
     IncomingSourceResponse:
@@ -9489,14 +9606,14 @@ components:
           $ref: "#/components/schemas/SortObject"
         paged:
           type: boolean
-        pageNumber:
-          type: integer
-          format: int32
+        unpaged:
+          type: boolean
         pageSize:
           type: integer
           format: int32
-        unpaged:
-          type: boolean
+        pageNumber:
+          type: integer
+          format: int32
     SortObject:
       type: object
       properties:

@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.repository;
 
+import com.webhook.platform.worker.attempt.OutgoingAttemptStore;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.entity.Endpoint;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
@@ -11,6 +12,8 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -66,6 +69,9 @@ class DeliveryRepositoryTest {
 
     @Autowired
     private TestEntityManager entityManager;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private UUID sharedEndpointId;
     private UUID sharedProjectId;
@@ -234,6 +240,28 @@ class DeliveryRepositoryTest {
         Delivery reloaded = deliveryRepository.findById(delivery.getId()).orElseThrow();
         assertEquals(Delivery.DeliveryStatus.PROCESSING, reloaded.getStatus());
         assertEquals(consumerToken, reloaded.getClaimToken());
+    }
+
+    @Test
+    void attemptStarting_aSweptAttemptDoesNotSpendItsSuccessorsRung() {
+        // The stuck sweep took this row from an Attempt still running, and a successor has claimed
+        // it since under a token of its own. The first Attempt only now reaches attemptStarting;
+        // matched by id alone, its increment spent a rung of the successor's Ladder.
+        createSharedEndpoint();
+        Delivery delivery = createAndPersistDelivery(Delivery.DeliveryStatus.PROCESSING, null);
+        UUID sweptFence = UUID.randomUUID();
+        delivery.setClaimToken(UUID.randomUUID());
+        entityManager.flush();
+        entityManager.clear();
+
+        OutgoingAttemptStore store = new OutgoingAttemptStore(deliveryRepository, null, null, null,
+                new TransactionTemplate(transactionManager), null, null, null, null, null, null, null, null,
+                null, null, 0, null, true);
+        store.attemptStarting(new OutgoingAttemptStore.Claim(delivery.getId(), sweptFence, delivery));
+        entityManager.clear();
+
+        assertEquals(1, deliveryRepository.findById(delivery.getId()).orElseThrow().getAttemptCount(),
+                "the rung belongs to the Attempt that holds the row now");
     }
 
     @Test

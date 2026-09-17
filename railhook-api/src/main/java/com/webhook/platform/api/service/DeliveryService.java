@@ -140,12 +140,13 @@ public class DeliveryService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        Specification<Delivery> spec;
+        // The project applies with or without an event filter: an event id alone named another
+        // project's event just as readily, and listed its deliveries under this project's URL.
+        Specification<Delivery> spec = Specification.where(DeliverySpecification.hasProjectId(projectId));
         if (eventId != null) {
-            spec = Specification.where(DeliverySpecification.hasEventIds(List.of(eventId)));
+            spec = spec.and(DeliverySpecification.hasEventIds(List.of(eventId)));
         } else {
-            spec = Specification.where(DeliverySpecification.hasProjectId(projectId))
-                    .and(DeliverySpecification.hasEventTypeContaining(eventType));
+            spec = spec.and(DeliverySpecification.hasEventTypeContaining(eventType));
         }
         spec = spec.and(DeliverySpecification.hasStatus(status))
                 .and(DeliverySpecification.hasEndpointId(endpointId))

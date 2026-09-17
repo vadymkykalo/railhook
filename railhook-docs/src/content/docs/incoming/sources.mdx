@@ -124,7 +124,8 @@ The ingress answers a provider, not a person. Each code is what the provider's o
 |---|---|
 | `202` | Accepted and stored. The body carries `requestId`. |
 | `401` | Verification is configured and the signature did not check out, or a signature already seen arrived on a webhook that is not a resend of a stored one. Nothing is stored. |
-| `404` | No source has that token. |
+| `403` | The organization is suspended. Answered `403`, not `410`, so a provider that deletes its subscription on `410` still has it when the suspension is lifted. |
+| `404` | No source has that token, or its project has been deleted. |
 | `410` | The source exists but is disabled. |
 | `413` | The body is larger than the limit, 512 KB by default. |
 | `429` | The source's rate limit is spent, with `Retry-After: 1`. Also returned, with `Retry-After: 3600`, when the organization cannot accept more webhooks right now; a resend of a webhook already stored is still answered `202`. |

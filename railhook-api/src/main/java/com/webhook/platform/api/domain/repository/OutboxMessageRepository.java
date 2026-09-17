@@ -70,12 +70,23 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
     int recoverStuckSendingMessages(@Param("cutoff") Instant cutoff);
 
     /**
+     * The other half of recovery: a stuck row whose recovery would reach {@code maxRetries}
+     * goes to DEAD instead. The count alone did not stop anything — the PENDING claim does not
+     * read retry_count and {@code promoteExhaustedToDead} only reads FAILED — so without this a row
+     * that never gets an outcome went round for ever. Run before {@link #recoverStuckSendingMessages}
+     * in the same transaction, which then no longer sees these rows.
+     */
+    @Modifying
+    @Query(value = "UPDATE outbox_messages SET status = 'DEAD', retry_count = retry_count + 1, error_message = 'No Kafka send outcome before recovery, retries exhausted', updated_at = NOW() WHERE status = 'SENDING' AND updated_at < :cutoff AND retry_count + 1 >= :maxRetries", nativeQuery = true)
+    int deadLetterStuckSendingMessages(@Param("cutoff") Instant cutoff, @Param("maxRetries") int maxRetries);
+
+    /**
      * Settles the rows this batch is still holding.
      *
      * <p>{@code AND status = 'SENDING'} is load-bearing. A Kafka callback that arrives after the
-     * batch wait is not thrown away — it lands in a later cycle's update — and by then its row
-     * may have been recovered to PENDING and re-claimed by somebody else. Without the guard the
-     * straggler stamps its stale outcome over whatever that cycle was doing.
+     * batch wait is settled on its own by {@code OutboxPublisherService.settleLateOutcomes}, and
+     * by then its row may have been recovered to PENDING. Without the guard the straggler stamps
+     * its stale outcome over a row that is queued again.
      */
     @Modifying
     @Query(value = "UPDATE outbox_messages SET status = 'PUBLISHED', published_at = :now, updated_at = :now WHERE id IN :ids AND status = 'SENDING'", nativeQuery = true)

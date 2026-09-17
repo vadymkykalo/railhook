@@ -5,10 +5,12 @@ import BootSplash from './components/BootSplash';
 import './i18n';
 import { initCSP } from './lib/csp';
 import { initTheme } from './lib/theme';
+import { installStaleChunkReload } from './lib/staleChunkReload';
 import './index.css';
 
 initCSP();
 initTheme();
+installStaleChunkReload();
 
 // Locale bundles now load via a dynamic import() per language (see src/i18n),
 // so any component that calls useTranslation() before its language's bundle

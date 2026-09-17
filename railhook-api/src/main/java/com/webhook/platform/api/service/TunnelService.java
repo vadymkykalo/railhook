@@ -16,6 +16,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
@@ -34,6 +36,7 @@ public class TunnelService {
     private final ProjectRepository projectRepository;
     private final OrganizationRepository organizationRepository;
     private final EntitlementService entitlementService;
+    private final RedisTunnelCoordinator redisTunnelCoordinator;
 
     @Value("${webhook.ingress-base-url:http://localhost:8080}")
     private String ingressBaseUrl;
@@ -97,12 +100,7 @@ public class TunnelService {
 
     @Transactional
     public void closeSession(String tunnelToken) {
-        tunnelSessionRepository.findByTunnelToken(tunnelToken).ifPresent(session -> {
-            session.setStatus(TunnelStatus.CLOSED);
-            session.setClosedAt(Instant.now());
-            tunnelSessionRepository.save(session);
-            log.info("Tunnel session closed: id={}, slug={}", session.getId(), session.getPublicSlug());
-        });
+        tunnelSessionRepository.findByTunnelToken(tunnelToken).ifPresent(this::close);
     }
 
     @Transactional
@@ -111,10 +109,32 @@ public class TunnelService {
         // previous findByIdAndOrganizationId asked the same question twice.
         TunnelSession session = tunnelSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel session not found"));
+        close(session);
+    }
+
+    /**
+     * Marks the session CLOSED and, once that is committed, ends its tunnel on whichever instance
+     * holds the socket. Marking the row alone left the CLI connected and the slug forwarding — a
+     * tunnel outside the plan's active-tunnel count and outside bandwidth metering. The disconnect
+     * waits for the commit because a CLI reconnecting in between would still read ACTIVE.
+     */
+    private void close(TunnelSession session) {
         session.setStatus(TunnelStatus.CLOSED);
         session.setClosedAt(Instant.now());
         tunnelSessionRepository.save(session);
         log.info("Tunnel session closed: id={}, slug={}", session.getId(), session.getPublicSlug());
+
+        String slug = session.getPublicSlug();
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            redisTunnelCoordinator.disconnect(slug);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                redisTunnelCoordinator.disconnect(slug);
+            }
+        });
     }
 
     @Transactional

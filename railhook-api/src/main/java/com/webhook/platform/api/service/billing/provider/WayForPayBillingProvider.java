@@ -12,11 +12,14 @@ import org.springframework.web.reactive.function.client.WebClient;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * WayForPay billing provider.
@@ -43,6 +46,8 @@ public class WayForPayBillingProvider implements BillingProvider {
 
     private static final String API_URL = "https://api.wayforpay.com/api";
     private static final String PAYMENT_URL = "https://secure.wayforpay.com/pay";
+    private static final Pattern ORGANIZATION_ORDER_REFERENCE = Pattern.compile(
+            "railhook_(?:rec_)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_\\d+");
     private static final Set<BillingCapability> CAPABILITIES = Set.of(
             BillingCapability.MERCHANT_RECURRING
     );
@@ -221,21 +226,30 @@ public class WayForPayBillingProvider implements BillingProvider {
                     authCode, cardPan, status, reasonCode);
             String expectedSig = hmacMd5(signString);
 
-            if (!expectedSig.equals(merchantSig)) {
+            if (!MessageDigest.isEqual(expectedSig.getBytes(StandardCharsets.UTF_8),
+                    merchantSig.getBytes(StandardCharsets.UTF_8))) {
                 log.warn("WayForPay: invalid webhook signature for orderRef={}", orderRef);
+                return null;
+            }
+
+            // clientAccountId is not covered by the signature, so it cannot be what decides whose
+            // subscription a payment lands on. The organization comes from the signed reference,
+            // and a clientAccountId naming any other organization is a forged callback.
+            String organizationId = organizationFromOrderReference(orderRef);
+            String clientAccountId = body.path("clientAccountId").asText(null);
+            if (clientAccountId != null && !clientAccountId.equals(organizationId)) {
+                log.warn("WayForPay: clientAccountId does not match the signed orderRef={}", orderRef);
                 return null;
             }
 
             String eventType = mapTransactionStatus(status);
             long amountCents = (long) (amountRaw * 100);
 
-            String clientAccountId = body.path("clientAccountId").asText(null);
-
             log.info("WayForPay: webhook orderRef={} status={} eventType={}", orderRef, status, eventType);
 
             return new BillingWebhookEvent(
                     eventType,
-                    clientAccountId,
+                    organizationId,
                     null,
                     orderRef,
                     null,
@@ -256,6 +270,16 @@ public class WayForPayBillingProvider implements BillingProvider {
     }
 
     // ── Internal helpers ────────────────────────────────────────────
+
+    /**
+     * The organization a checkout or fallback recurring reference was issued for, or null when the
+     * reference names none (a scheduler renewal names its subscription, which the scheduler has
+     * already settled synchronously).
+     */
+    private static String organizationFromOrderReference(String orderRef) {
+        Matcher m = ORGANIZATION_ORDER_REFERENCE.matcher(orderRef);
+        return m.matches() ? m.group(1) : null;
+    }
 
     private String mapTransactionStatus(String status) {
         return switch (status) {

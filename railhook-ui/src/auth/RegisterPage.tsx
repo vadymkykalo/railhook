@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import CaptchaWidget, { isCaptchaConfigured } from '../components/CaptchaWidget';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Loader2, Mail } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import AuthLayout from './AuthLayout';
@@ -17,6 +17,7 @@ import { writeIntent } from '../lib/onboarding';
 import PasswordStrengthIndicator, { missingPasswordRules, passwordMeetsPolicy } from '../components/PasswordStrengthIndicator';
 import EmailSuggestion from '../components/EmailSuggestion';
 import { hasImpossibleTld } from '../lib/emailTypos';
+import { safeDestination } from '../lib/signInDestination';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -32,6 +33,11 @@ export default function RegisterPage() {
   const [resending, setResending] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [searchParams] = useSearchParams();
+  // An invite or a CLI approval sent the visitor here to make an account first; they carry on
+  // there once it exists. Only a path on this site counts.
+  const requested = searchParams.get('redirect');
+  const redirect = requested && safeDestination(requested, '') ? requested : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +58,10 @@ export default function RegisterPage() {
       const user = await authApi.getCurrentUser();
       login(authResponse.accessToken, user);
       showSuccess(t('auth.register.success'));
+      if (redirect) {
+        navigate(redirect);
+        return;
+      }
       setRegistered(true);
     } catch (err: any) {
       // The API answers a rejected field with fieldErrors {field: reason} and a
@@ -125,13 +135,13 @@ export default function RegisterPage() {
       footer={
         <>
           {t('auth.register.hasAccount')}{' '}
-          <Link to="/login" className="font-medium text-primary hover:underline">
+          <Link to={redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login'} className="font-medium text-primary hover:underline">
             {t('auth.register.signIn')}
           </Link>
         </>
       }
     >
-      <GoogleSignInButton intent="register" />
+      <GoogleSignInButton intent="register" returnTo={redirect ?? undefined} />
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">

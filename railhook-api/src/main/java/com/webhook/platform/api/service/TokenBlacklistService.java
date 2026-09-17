@@ -92,12 +92,21 @@ public class TokenBlacklistService {
         return bucket.isExists();
     }
 
+    /**
+     * Compared in whole seconds, because that is all a JWT's {@code iat} carries. Against the
+     * millisecond epoch, the login a user makes right after changing or resetting a password —
+     * signed in the same second — read as older than the revocation and was refused.
+     *
+     * <p>The cost is the other half of that second: a token signed up to a second <em>before</em>
+     * the revocation also survives, for one access-token lifetime at most: a refresh re-reads the
+     * session row and the membership, which the revoking operation has already changed.
+     */
     public boolean isTokenRevokedByEpoch(UUID userId, Date issuedAt) {
         if (userId == null || issuedAt == null) {
             return false;
         }
         RBucket<Long> bucket = redissonClient.getBucket(EPOCH_PREFIX + userId);
         Long epoch = bucket.get();
-        return epoch != null && issuedAt.getTime() < epoch;
+        return epoch != null && issuedAt.getTime() / 1000 < epoch / 1000;
     }
 }

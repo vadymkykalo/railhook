@@ -1,4 +1,5 @@
 import { http } from './http';
+import { withJsonErrorBody } from './blobErrorBody';
 
 export interface OrganizationResponse {
   id: string;
@@ -29,6 +30,6 @@ export const organizationsApi = {
   },
 
   exportData: (orgId: string): Promise<Blob> => {
-    return http.getBlob(`/api/v1/orgs/${orgId}/export`);
+    return withJsonErrorBody(http.getBlob(`/api/v1/orgs/${orgId}/export`));
   },
 };

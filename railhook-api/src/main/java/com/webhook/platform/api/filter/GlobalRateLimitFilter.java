@@ -1,5 +1,6 @@
 package com.webhook.platform.api.filter;
 
+import com.webhook.platform.api.service.ConvergingRateLimiter;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.micrometer.core.instrument.Counter;
@@ -8,9 +9,6 @@ import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RRateLimiter;
-import org.redisson.api.RateIntervalUnit;
-import org.redisson.api.RateType;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
@@ -26,22 +24,23 @@ import java.time.Duration;
 public class GlobalRateLimitFilter implements Filter {
 
     private static final String REDIS_KEY = "rate_limiter:global";
+    // A keep-alive, refreshed by every acquire: a TTL set once at startup lapsed a day later and
+    // left each replica on its own local bucket for as long as the process lived.
     private static final Duration KEY_TTL = Duration.ofHours(24);
 
-    private final RedissonClient redissonClient;
+    private final ConvergingRateLimiter redisLimiter;
     private final Bucket localFallbackBucket;
     private final int requestsPerSecond;
     private final boolean enabled;
     private final Counter globalRateLimitExceeded;
     private final Counter globalRateLimitFallback;
-    private volatile boolean redisRateLimiterInitialized = false;
 
     public GlobalRateLimitFilter(
             RedissonClient redissonClient,
             MeterRegistry meterRegistry,
             @Value("${rate-limit.global.requests-per-second:5000}") int requestsPerSecond,
             @Value("${rate-limit.global.enabled:true}") boolean enabled) {
-        this.redissonClient = redissonClient;
+        this.redisLimiter = new ConvergingRateLimiter(redissonClient, KEY_TTL);
         this.requestsPerSecond = requestsPerSecond;
         this.enabled = enabled;
         this.localFallbackBucket = Bucket.builder()
@@ -56,20 +55,8 @@ public class GlobalRateLimitFilter implements Filter {
         this.globalRateLimitFallback = Counter.builder("global_rate_limit_fallback_total")
                 .description("Number of global rate limit checks using local fallback (Redis unavailable)")
                 .register(meterRegistry);
-        initRedisRateLimiter();
         log.info("Global rate limit filter initialized: {}/sec, enabled={}, backend=redis+local-fallback",
                 requestsPerSecond, enabled);
-    }
-
-    private void initRedisRateLimiter() {
-        try {
-            RRateLimiter limiter = redissonClient.getRateLimiter(REDIS_KEY);
-            limiter.trySetRate(RateType.OVERALL, requestsPerSecond, 1, RateIntervalUnit.SECONDS);
-            limiter.expire(KEY_TTL);
-            redisRateLimiterInitialized = true;
-        } catch (Exception e) {
-            log.warn("Failed to initialize Redis rate limiter at startup, will use local fallback: {}", e.getMessage());
-        }
     }
 
     @Override
@@ -105,11 +92,7 @@ public class GlobalRateLimitFilter implements Filter {
 
     private boolean tryAcquire() {
         try {
-            if (!redisRateLimiterInitialized) {
-                initRedisRateLimiter();
-            }
-            RRateLimiter limiter = redissonClient.getRateLimiter(REDIS_KEY);
-            return limiter.tryAcquire(1);
+            return redisLimiter.tryAcquire(REDIS_KEY, requestsPerSecond);
         } catch (Exception e) {
             log.warn("Redis unavailable for global rate limit, using local fallback: {}", e.getMessage());
             globalRateLimitFallback.increment();

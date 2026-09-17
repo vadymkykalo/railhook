@@ -3,9 +3,6 @@ package com.webhook.platform.worker.service;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RRateLimiter;
-import org.redisson.api.RateIntervalUnit;
-import org.redisson.api.RateType;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 
@@ -24,7 +21,7 @@ public class RedisRateLimiterService {
     private static final String KEY_PREFIX = "rate_limiter:endpoint:";
     private static final Duration KEY_TTL = Duration.ofHours(24);
 
-    private final RedissonClient redissonClient;
+    private final ConvergingRateLimiter limiters;
     private final Counter rateLimitHits;
     private final Counter rateLimitMisses;
     private final Counter rateLimitFallback;
@@ -34,13 +31,8 @@ public class RedisRateLimiterService {
             .expireAfterAccess(Duration.ofMinutes(5))
             .build();
 
-    private final Cache<String, Boolean> initializedLimiters = Caffeine.newBuilder()
-            .maximumSize(10_000)
-            .expireAfterWrite(Duration.ofMinutes(20))
-            .build();
-
     public RedisRateLimiterService(RedissonClient redissonClient, MeterRegistry meterRegistry) {
-        this.redissonClient = redissonClient;
+        this.limiters = new ConvergingRateLimiter(redissonClient, KEY_TTL);
         this.rateLimitHits = Counter.builder("webhook_rate_limit_hits_total")
                 .description("Number of requests that passed rate limiting")
                 .register(meterRegistry);
@@ -59,16 +51,7 @@ public class RedisRateLimiterService {
         }
 
         try {
-            String key = KEY_PREFIX + endpointId;
-            RRateLimiter limiter = redissonClient.getRateLimiter(key);
-
-            if (initializedLimiters.getIfPresent(key) == null) {
-                limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
-                limiter.expire(KEY_TTL);
-                initializedLimiters.put(key, Boolean.TRUE);
-            }
-
-            boolean acquired = limiter.tryAcquire(1);
+            boolean acquired = limiters.tryAcquire(KEY_PREFIX + endpointId, ratePerSecond);
             if (acquired) {
                 rateLimitHits.increment();
             } else {

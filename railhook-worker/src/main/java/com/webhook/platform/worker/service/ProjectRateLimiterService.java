@@ -5,9 +5,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RRateLimiter;
-import org.redisson.api.RateIntervalUnit;
-import org.redisson.api.RateType;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -43,7 +40,7 @@ public class ProjectRateLimiterService {
     private static final String KEY_PREFIX = "rate_limiter:delivery:project:";
     private static final Duration KEY_TTL = Duration.ofHours(24);
 
-    private final RedissonClient redissonClient;
+    private final ConvergingRateLimiter limiters;
     private final int defaultRatePerSecond;
     private final Counter projectRateLimitHits;
     private final Counter projectRateLimitExceeded;
@@ -58,7 +55,7 @@ public class ProjectRateLimiterService {
             RedissonClient redissonClient,
             MeterRegistry meterRegistry,
             @Value("${webhook.project-rate-limit-per-second:50}") int defaultRatePerSecond) {
-        this.redissonClient = redissonClient;
+        this.limiters = new ConvergingRateLimiter(redissonClient, KEY_TTL);
         this.defaultRatePerSecond = defaultRatePerSecond;
         this.projectRateLimitHits = Counter.builder("webhook_project_rate_limit_hits_total")
                 .description("Deliveries that passed project-level rate limiting")
@@ -82,12 +79,7 @@ public class ProjectRateLimiterService {
         }
 
         try {
-            String key = KEY_PREFIX + projectId;
-            RRateLimiter limiter = redissonClient.getRateLimiter(key);
-            limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
-            limiter.expire(KEY_TTL);
-
-            boolean acquired = limiter.tryAcquire(1);
+            boolean acquired = limiters.tryAcquire(KEY_PREFIX + projectId, ratePerSecond);
             if (acquired) {
                 projectRateLimitHits.increment();
             } else {

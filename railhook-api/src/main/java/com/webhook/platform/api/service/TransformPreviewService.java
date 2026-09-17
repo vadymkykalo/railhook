@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -23,7 +24,7 @@ public class TransformPreviewService {
     private final TransformationRepository transformationRepository;
     private final TemplateTransformer templateTransformer;
 
-    public TransformPreviewResponse preview(TransformPreviewRequest request) {
+    public TransformPreviewResponse preview(UUID projectId, TransformPreviewRequest request) {
         List<String> errors = new ArrayList<>();
         String outputPayload = null;
         String outputHeaders = null;
@@ -44,7 +45,8 @@ public class TransformPreviewService {
         String resolvedTemplate = null;
 
         if (request.getTransformationId() != null) {
-            Transformation transformation = transformationRepository.findById(request.getTransformationId())
+            Transformation transformation = transformationRepository
+                    .findByIdAndProjectId(request.getTransformationId(), projectId)
                     .orElse(null);
             if (transformation == null) {
                 errors.add("Transformation not found: " + request.getTransformationId());

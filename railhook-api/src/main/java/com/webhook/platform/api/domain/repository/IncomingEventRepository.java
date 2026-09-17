@@ -22,8 +22,30 @@ public interface IncomingEventRepository extends JpaRepository<IncomingEvent, UU
 
     Optional<IncomingEvent> findByIncomingSourceIdAndProviderEventId(UUID incomingSourceId, String providerEventId);
 
+    /**
+     * Removes up to {@code limit} Incoming Events received before the cutoff, and through the
+     * cascade their Forwards' attempt rows.
+     *
+     * <p>An Incoming Event with a Forward attempt still PENDING or PROCESSING is left alone however
+     * old it is, as events retention leaves an in-flight Delivery. A Replay or a Failed Messages
+     * retry starts a fresh Forward for a webhook that may have arrived just inside the window, and
+     * the cascade wiped it mid-ladder, with a claim possibly live on it.
+     */
     @Modifying
-    @Query(value = "DELETE FROM incoming_events WHERE id IN (SELECT id FROM incoming_events WHERE received_at < :cutoff ORDER BY received_at ASC LIMIT :limit)", nativeQuery = true)
+    @Query(value = """
+        DELETE FROM incoming_events
+         WHERE id IN (
+               SELECT e.id FROM incoming_events e
+                WHERE e.received_at < :cutoff
+                  AND NOT EXISTS (
+                      SELECT 1 FROM incoming_forward_attempts a
+                       WHERE a.incoming_event_id = e.id
+                         AND a.status IN ('PENDING', 'PROCESSING')
+                  )
+                ORDER BY e.received_at ASC
+                LIMIT :limit
+         )
+        """, nativeQuery = true)
     int deleteOldIncomingEvents(@Param("cutoff") Instant cutoff, @Param("limit") int limit);
 
     @Query("SELECT e FROM IncomingEvent e WHERE e.incomingSourceId IN " +

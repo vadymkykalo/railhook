@@ -59,8 +59,14 @@ function WorkflowBuilderInner() {
     enabled: !!projectId && !!workflowId,
   });
 
+  // A refetch (after a toggle, say) must not throw away edits nobody has saved yet. The flag and
+  // the rest of the toolbar read `workflow` directly, so only the canvas waits for a save.
+  const hasUnsavedRef = useRef(hasUnsaved);
+  hasUnsavedRef.current = hasUnsaved;
+
   // Load definition into canvas
   useEffect(() => {
+    if (hasUnsavedRef.current) return;
     if (workflow?.definition) {
       const def = workflow.definition;
       // The API documents a node as id, type and data, and an edge as source and target. Position

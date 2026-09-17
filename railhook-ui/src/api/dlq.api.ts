@@ -28,20 +28,15 @@ export interface PageResponse<T> {
   number: number;
 }
 
+/** Only what `GET /dlq` accepts: anything else would be dropped server-side while the UI claimed it filtered. */
 export interface DlqFilters {
   endpointId?: string;
-  search?: string;
-  dateFrom?: string;
-  dateTo?: string;
 }
 
 export const dlqApi = {
   list: (projectId: string, page = 0, size = 20, filters?: DlqFilters): Promise<PageResponse<DlqItemResponse>> => {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
     if (filters?.endpointId) params.append('endpointId', filters.endpointId);
-    if (filters?.search) params.append('search', filters.search);
-    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
-    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
     return http.get<PageResponse<DlqItemResponse>>(`/api/v1/projects/${projectId}/dlq?${params}`);
   },
 

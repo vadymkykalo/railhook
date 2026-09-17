@@ -7,6 +7,7 @@ import LoginPage from '../LoginPage';
 import { AuthContext, type AuthState } from '../auth.store';
 import { authApi } from '../../api/auth.api';
 import { http } from '../../api/http';
+import { rememberSignedOutUser } from '../../lib/signInDestination';
 import type { CurrentUserResponse } from '../../types/api.types';
 
 const USER = {
@@ -56,7 +57,30 @@ describe('LoginPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     http.setToken(null);
+    sessionStorage.clear();
   });
+
+  function renderAtEntry(entry: string | { pathname: string; search?: string; state?: unknown }) {
+    login = vi.fn<AuthState['login']>();
+    return render(
+      <AuthContext.Provider
+        value={{
+          user: null, token: null, login, logout: () => {}, updateUser: () => {},
+          isAuthenticated: false,
+        }}
+      >
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<p>the register screen</p>} />
+            <Route path="/admin/projects" element={<p>the projects screen</p>} />
+            <Route path="/admin/projects/:projectId/endpoints" element={<p>their project's endpoints</p>} />
+            <Route path="/accept-invite" element={<p>the invite screen</p>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+  }
 
   it('signs the user in and takes them to the dashboard', async () => {
     vi.spyOn(authApi, 'login').mockResolvedValue({ accessToken: 'the-token' } as never);
@@ -163,5 +187,54 @@ describe('LoginPage', () => {
     await signIn();
 
     expect(await screen.findByText('the endpoints screen')).toBeInTheDocument();
+  });
+
+  it('continues to the invite a signed-out visitor was sent here from (?redirect=)', async () => {
+    vi.spyOn(authApi, 'login').mockResolvedValue({ accessToken: 'the-token' } as never);
+    vi.spyOn(authApi, 'getCurrentUser').mockResolvedValue(USER);
+
+    renderAtEntry(`/login?redirect=${encodeURIComponent('/accept-invite?token=t&orgId=o2')}`);
+    await signIn();
+
+    expect(await screen.findByText('the invite screen')).toBeInTheDocument();
+  });
+
+  it('keeps ?redirect= on the way to creating an account instead', () => {
+    renderAtEntry(`/login?redirect=${encodeURIComponent('/accept-invite?token=t&orgId=o2')}`);
+
+    expect(screen.getByRole('link', { name: /create/i }))
+      .toHaveAttribute('href', `/register?redirect=${encodeURIComponent('/accept-invite?token=t&orgId=o2')}`);
+  });
+
+  it('does not follow ?redirect= off this site', async () => {
+    vi.spyOn(authApi, 'login').mockResolvedValue({ accessToken: 'the-token' } as never);
+    vi.spyOn(authApi, 'getCurrentUser').mockResolvedValue(USER);
+
+    renderAtEntry(`/login?redirect=${encodeURIComponent('//evil.example/phish')}`);
+    await signIn();
+
+    expect(await screen.findByText('the projects screen')).toBeInTheDocument();
+  });
+
+  it('does not send a different person to the page the previous one was signed out of', async () => {
+    vi.spyOn(authApi, 'login').mockResolvedValue({ accessToken: 'the-token' } as never);
+    vi.spyOn(authApi, 'getCurrentUser').mockResolvedValue(USER);
+    rememberSignedOutUser('someone-else');
+
+    renderAtEntry({ pathname: '/login', state: { from: '/admin/projects/their-project/endpoints' } });
+    await signIn();
+
+    expect(await screen.findByText('the projects screen')).toBeInTheDocument();
+  });
+
+  it('does return the same person to where their session ended', async () => {
+    vi.spyOn(authApi, 'login').mockResolvedValue({ accessToken: 'the-token' } as never);
+    vi.spyOn(authApi, 'getCurrentUser').mockResolvedValue(USER);
+    rememberSignedOutUser('u1');
+
+    renderAtEntry({ pathname: '/login', state: { from: '/admin/projects/their-project/endpoints' } });
+    await signIn();
+
+    expect(await screen.findByText("their project's endpoints")).toBeInTheDocument();
   });
 });

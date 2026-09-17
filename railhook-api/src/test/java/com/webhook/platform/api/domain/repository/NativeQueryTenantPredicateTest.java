@@ -103,6 +103,7 @@ class NativeQueryTenantPredicateTest {
             "OutboxMessageRepository.batchMarkFailed",
             "OutboxMessageRepository.promoteExhaustedToDead",
             "OutboxMessageRepository.recoverStuckSendingMessages",
+            "OutboxMessageRepository.deadLetterStuckSendingMessages",
             "WorkflowTriggerOutboxRepository.claimBatch",
 
             // Sequence reconciliation: SequenceReconciliationService (@SystemTenant) rebuilds the

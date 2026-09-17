@@ -85,9 +85,14 @@ public class DlqService {
     @Transactional(readOnly = true)
     public DlqItemResponse getDlqItem(UUID projectId, UUID deliveryId) {
         validateProjectOwnership(projectId);
+        // In this project, not merely this organization: another project's delivery is as
+        // unknown here as a missing one, and is refused before its status can say otherwise.
         Delivery delivery = deliveryRepository.findById(deliveryId)
+                .filter(d -> eventRepository.findById(d.getEventId())
+                        .map(event -> projectId.equals(event.getProjectId()))
+                        .orElse(false))
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
-        
+
         if (delivery.getStatus() != DeliveryStatus.DLQ) {
             throw new IllegalArgumentException("Delivery is not in DLQ");
         }

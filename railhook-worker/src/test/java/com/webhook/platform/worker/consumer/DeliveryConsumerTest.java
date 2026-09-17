@@ -96,7 +96,7 @@ class DeliveryConsumerTest {
 
         consumer.consumeDispatch(message, "key", "deliveries.dispatch", null, ack);
 
-        verify(webhookDeliveryService).rescheduleForBackpressure(message.getDeliveryId(), false);
+        verify(webhookDeliveryService).rescheduleForBackpressure(message, false);
         verify(ack).acknowledge();
         verify(webhookDeliveryService, never()).processDelivery(any(), anyBoolean());
     }
@@ -110,7 +110,7 @@ class DeliveryConsumerTest {
 
         consumer.consumeRetry(message, "key", "deliveries.retry.1m", null, ack);
 
-        verify(webhookDeliveryService).rescheduleForBackpressure(message.getDeliveryId(), true);
+        verify(webhookDeliveryService).rescheduleForBackpressure(message, true);
         verify(ack).acknowledge();
         verify(webhookDeliveryService, never()).processDelivery(any(), anyBoolean());
     }

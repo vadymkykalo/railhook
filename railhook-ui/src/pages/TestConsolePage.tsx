@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Send, Play, Loader2, ChevronDown, ChevronRight, Zap, Timer,
@@ -140,6 +140,18 @@ export default function TestConsolePage() {
   const [polling, setPolling] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // One polling run at a time. Each send starts a new run and bumps the counter; a timer or an
+  // in-flight response from an older run sees a stale number and stops, so an earlier event's
+  // deliveries can never overwrite a later one's, and nothing polls after the page is gone.
+  const pollRun = useRef(0);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelPolling = useCallback(() => {
+    pollRun.current++;
+    if (pollTimer.current) clearTimeout(pollTimer.current);
+    pollTimer.current = null;
+  }, []);
+  useEffect(() => cancelPolling, [cancelPolling]);
+
   const matchingSubscriptions = subscriptions.filter((sub) => {
     if (!eventType.trim()) return false;
     if (sub.eventType === '**') return true;
@@ -175,9 +187,12 @@ export default function TestConsolePage() {
 
   const pollDeliveries = useCallback(async (eventId: string, maxPolls = 10) => {
     if (!projectId) return;
+    cancelPolling();
+    const run = pollRun.current;
     setPolling(true);
     let polls = 0;
     const poll = async () => {
+      if (run !== pollRun.current) return;
       try {
         const res = await deliveriesApi.listByProject(projectId, { eventId, size: 50 });
         const enriched: DeliveryWithAttempts[] = await Promise.all(
@@ -192,22 +207,23 @@ export default function TestConsolePage() {
             return { ...d, endpointUrl: ep?.url, attempts };
           }),
         );
+        if (run !== pollRun.current) return;
         setDeliveries(enriched);
 
         const allDone = enriched.length > 0
           && enriched.every((d) => d.status === 'SUCCESS' || d.status === 'FAILED' || d.status === 'DLQ');
         polls++;
         if (!allDone && polls < maxPolls) {
-          setTimeout(() => poll(), 2000);
+          pollTimer.current = setTimeout(() => poll(), 2000);
         } else {
           setPolling(false);
         }
       } catch {
-        setPolling(false);
+        if (run === pollRun.current) setPolling(false);
       }
     };
     poll();
-  }, [projectId, endpoints]);
+  }, [projectId, endpoints, cancelPolling]);
 
   const handleSendEvent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -217,6 +233,8 @@ export default function TestConsolePage() {
       return;
     }
 
+    cancelPolling();
+    setPolling(false);
     setSending(true);
     setDeliveries([]);
     setPingResult(null);
@@ -231,7 +249,9 @@ export default function TestConsolePage() {
 
       if (response.id) {
         setLoadingResults(true);
-        setTimeout(() => {
+        const run = pollRun.current;
+        pollTimer.current = setTimeout(() => {
+          if (run !== pollRun.current) return;
           pollDeliveries(response.id);
           setLoadingResults(false);
         }, 1000);
@@ -245,6 +265,8 @@ export default function TestConsolePage() {
 
   const handlePingEndpoint = async () => {
     if (!projectId || !selectedEndpointId) return;
+    cancelPolling();
+    setPolling(false);
     setPinging(true);
     setPingResult(null);
     setDeliveries([]);

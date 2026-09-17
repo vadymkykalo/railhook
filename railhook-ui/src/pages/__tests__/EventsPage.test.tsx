@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'jest-axe';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
@@ -93,5 +93,21 @@ describe('EventsPage', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     expect(screen.queryByText(/no events yet/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+  });
+  it('keeps the search box and the rows mounted while a debounced search loads', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(eventsApi.listByProject)
+      .mockResolvedValueOnce(populatedPage([EVENT]))
+      .mockReturnValue(new Promise(() => {}));
+    const { container } = renderEvents();
+    await screen.findByText('order.created');
+
+    const search = container.querySelector('#event-search') as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'order' } });
+
+    await waitFor(() => expect(eventsApi.listByProject).toHaveBeenCalledTimes(2));
+    expect(search).toBeInTheDocument();
+    expect(search).toHaveValue('order');
+    expect(screen.getByText('order.created')).toBeInTheDocument();
   });
 });

@@ -153,12 +153,16 @@ class IncomingForwardRetrySchedulerTest {
         Instant before = Instant.now();
         scheduler.pollPendingRetries(0);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<IncomingForwardAttempt>> captor = ArgumentCaptor.forClass(List.class);
-        verify(attemptRepository, times(2)).saveAll(captor.capture());
-        List<IncomingForwardAttempt> resultSave = captor.getAllValues().get(1);
-        assertEquals(ForwardAttemptStatus.PENDING, resultSave.get(0).getStatus());
-        assertTrue(resultSave.get(0).getNextRetryAt().isAfter(before),
+        // Only the Phase 1 claim is saved as an entity. The hand-back is fenced on the started_at
+        // that claim stamped, so a send that landed after all leaves the consumer's row alone.
+        verify(attemptRepository, times(1)).saveAll(anyList());
+        ArgumentCaptor<Instant> retryAt = ArgumentCaptor.forClass(Instant.class);
+        verify(attemptRepository).handBackSchedulerClaim(
+                org.mockito.ArgumentMatchers.eq(attemptId),
+                org.mockito.ArgumentMatchers.eq(attempt.getStartedAt()),
+                retryAt.capture());
+        assertNotNull(attempt.getStartedAt());
+        assertTrue(retryAt.getValue().isAfter(before),
                 "a failed send must be rescheduled into the future, not left null");
     }
 

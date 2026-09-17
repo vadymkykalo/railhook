@@ -21,6 +21,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -347,7 +348,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                         && attempt.getStatus() != ForwardAttemptStatus.PROCESSING) {
                     return false;
                 }
-                if (!stillHoldsClaim(claim, attempt)) {
+                if (!stillHoldsClaim(claim, attempt,
+                        ForwardAttemptStatus.PENDING, ForwardAttemptStatus.PROCESSING)) {
                     return false;
                 }
                 attempt.handBackTo(deferred.until());
@@ -362,7 +364,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 return false;
             }
 
-            if (!stillHoldsClaim(claim, attempt)) {
+            if (!stillHoldsClaim(claim, attempt, ForwardAttemptStatus.PROCESSING)) {
                 log.warn("Attempt {} for eventId={}, destId={} was reclaimed while this attempt was in "
                                 + "flight — refusing to finalise a row another attempt now owns",
                         claim.attemptNumber(), claim.eventId(), claim.destinationId());
@@ -393,8 +395,18 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return Boolean.TRUE.equals(applied);
     }
 
-    private boolean stillHoldsClaim(Claim claim, IncomingForwardAttempt attempt) {
-        return AttemptSupport.fenceMatches(attempt.getClaimToken(), claim.fence());
+    /**
+     * Whether the Claim owns the row, re-checked under the row lock. The read that found the row
+     * is a snapshot, and the write that follows is an UPDATE by id: a stuck sweep committed in
+     * between used to be overwritten, and a Retry queued a successor beside the one the sweep had
+     * already handed back.
+     */
+    private boolean stillHoldsClaim(Claim claim, IncomingForwardAttempt attempt, ForwardAttemptStatus... statuses) {
+        if (!AttemptSupport.fenceMatches(attempt.getClaimToken(), claim.fence())) {
+            return false;
+        }
+        List<String> names = Arrays.stream(statuses).map(Enum::name).toList();
+        return attemptRepository.holdIfStillClaimed(attempt.getId(), names, claim.fence()) == 1;
     }
 
     /**

@@ -48,6 +48,12 @@ public class RuleService {
                 .orElseThrow(() -> new NotFoundException("Project not found"));
     }
 
+    /** Another project's rule is "not found", like a missing one - the URL names the project. */
+    private Rule requireRule(UUID projectId, UUID id) {
+        return ruleRepository.findByIdAndProjectId(id, projectId)
+                .orElseThrow(() -> new NotFoundException("Rule not found"));
+    }
+
     @Auditable(action = AuditAction.CREATE, resourceType = "Rule")
     @Transactional
     public RuleResponse create(UUID projectId, RuleRequest request) {
@@ -86,10 +92,8 @@ public class RuleService {
         return mapToResponse(rule);
     }
 
-    public RuleResponse get(UUID id) {
-        Rule rule = ruleRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Rule not found"));
-        validateProjectOwnership(rule.getProjectId());
+    public RuleResponse get(UUID projectId, UUID id) {
+        Rule rule = requireRule(projectId, id);
         return mapToResponse(rule);
     }
 
@@ -125,10 +129,8 @@ public class RuleService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Rule")
     @Transactional
-    public RuleResponse update(UUID id, RuleRequest request) {
-        Rule rule = ruleRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Rule not found"));
-        validateProjectOwnership(rule.getProjectId());
+    public RuleResponse update(UUID projectId, UUID id, RuleRequest request) {
+        Rule rule = requireRule(projectId, id);
 
         if (request.getName() != null) {
             if (!rule.getName().equals(request.getName()) &&
@@ -172,22 +174,17 @@ public class RuleService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "Rule")
     @Transactional
-    public void delete(UUID id) {
-        Rule rule = ruleRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Rule not found"));
-        validateProjectOwnership(rule.getProjectId());
+    public void delete(UUID projectId, UUID id) {
+        Rule rule = requireRule(projectId, id);
 
-        UUID projectId = rule.getProjectId();
         ruleRepository.deleteById(id);
         ruleEngineService.invalidate(projectId);
         log.info("Deleted rule '{}' ({})", rule.getName(), id);
     }
 
     @Transactional
-    public RuleResponse toggleEnabled(UUID id, boolean enabled) {
-        Rule rule = ruleRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Rule not found"));
-        validateProjectOwnership(rule.getProjectId());
+    public RuleResponse toggleEnabled(UUID projectId, UUID id, boolean enabled) {
+        Rule rule = requireRule(projectId, id);
 
         rule.setEnabled(enabled);
         rule = ruleRepository.saveAndFlush(rule);

@@ -52,6 +52,8 @@ class IncomingAttemptStoreTest {
     void setUp() {
         lenient().when(transactionTemplate.execute(any())).thenAnswer(inv ->
                 inv.getArgument(0, TransactionCallback.class).doInTransaction(null));
+        // Nobody else is writing: the row lock finds the row as the read left it.
+        lenient().when(attemptRepository.holdIfStillClaimed(any(), any(), any())).thenReturn(1);
 
         store = new IncomingAttemptStore(
                 attemptRepository, transactionTemplate,

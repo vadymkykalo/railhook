@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -87,6 +88,14 @@ public class OutboxPublisherService {
      * StaleDeliveryEscalationService.</p>
      */
     private final AtomicLong oldestPendingAgeSeconds = new AtomicLong(0);
+
+    /**
+     * Kafka outcomes that arrived after their batch stopped waiting, held for
+     * {@link #settleLateOutcomes}. Settling them on the callback itself would put a database round
+     * trip on the producer's network thread, which every other send in this JVM is queued behind.
+     */
+    private final Queue<UUID> latePublished = new ConcurrentLinkedQueue<>();
+    private final Map<UUID, String> lateFailed = new ConcurrentHashMap<>();
     private final Timer publishLatency;
     private final TransactionTemplate txTemplate;
 
@@ -206,6 +215,8 @@ public class OutboxPublisherService {
         // wait up to ~59 extra minutes for the hourly job to reclaim it — worst case ~1h of an
         // undelivered webhook with nothing visibly wrong (no SENDING gauge existed either; see
         // the outbox_queue_depth{status="sending"} gauge registered below).
+        // Before recovery, so a row whose send did land is marked rather than handed back.
+        settleLateOutcomes();
         recoverStuckSendingMessages();
 
         // Phase 1: claim inside short transaction — SELECT FOR UPDATE + mark SENDING, commit immediately
@@ -292,6 +303,39 @@ public class OutboxPublisherService {
     }
 
     /**
+     * Settles the rows whose Kafka outcome outlived their batch's wait.
+     *
+     * <p>Without this such an outcome was added to a collection nobody read again: the row stayed
+     * SENDING, recovery handed it back to PENDING, and a message Kafka had already accepted was
+     * published a second time. The update carries the same {@code status = 'SENDING'} guard as a
+     * batch's own, so an outcome that arrives after recovery changes nothing.
+     *
+     * <p>No {@code @SchedulerLock}: the outcomes live in this instance's memory, and a replica
+     * that did not win the publisher lock is still the only one that can settle them.
+     */
+    @SystemTenant("settles outbox rows, which belong to no organization")
+    @Scheduled(fixedDelayString = "${outbox.publisher.poll-interval-ms:1000}")
+    public void settleLateOutcomes() {
+        List<UUID> published = new ArrayList<>();
+        for (UUID id; (id = latePublished.poll()) != null; ) {
+            published.add(id);
+        }
+        Map<UUID, String> failed = new HashMap<>();
+        for (UUID id : lateFailed.keySet()) {
+            String error = lateFailed.remove(id);
+            if (error != null) {
+                failed.put(id, error);
+            }
+        }
+        if (published.isEmpty() && failed.isEmpty()) {
+            return;
+        }
+        log.info("Settling {} published and {} failed outbox messages whose Kafka outcome arrived "
+                + "after the {}s batch wait", published.size(), failed.size(), batchSendTimeoutSeconds);
+        batchUpdateResults(published, failed, false);
+    }
+
+    /**
      * Recovers outbox messages stuck in SENDING (claimed but the app crashed, or the Kafka
      * send never got a callback, before {@link #publishBatchAsync} could mark them
      * PUBLISHED/FAILED) back to PENDING so the next {@link #publishPendingMessages} poll can
@@ -302,8 +346,17 @@ public class OutboxPublisherService {
      */
     private void recoverStuckSendingMessages() {
         Instant sendingCutoff = Instant.now().minusSeconds(sendingRecoverySeconds);
-        Integer recovered = txTemplate.execute(status ->
-                outboxMessageRepository.recoverStuckSendingMessages(sendingCutoff));
+        int[] dead = new int[1];
+        Integer recovered = txTemplate.execute(status -> {
+            // The PENDING claim does not look at retry_count, so this is the only place a row that
+            // never gets an outcome can stop.
+            dead[0] = outboxMessageRepository.deadLetterStuckSendingMessages(sendingCutoff, maxRetries);
+            return outboxMessageRepository.recoverStuckSendingMessages(sendingCutoff);
+        });
+        if (dead[0] > 0) {
+            log.warn("Moved {} outbox messages to DEAD: stuck SENDING with no Kafka outcome {} times",
+                    dead[0], maxRetries);
+        }
         if (recovered != null && recovered > 0) {
             log.warn("Recovered {} stuck SENDING outbox messages back to PENDING", recovered);
         }
@@ -323,6 +376,8 @@ public class OutboxPublisherService {
         // Thread-safe collections to track per-message results
         List<UUID> publishedIds = Collections.synchronizedList(new ArrayList<>());
         Map<UUID, String> failedMap = new ConcurrentHashMap<>();
+        // Guarded by publishedIds' monitor: once set, an outcome goes to the late queues instead.
+        boolean[] batchSettled = new boolean[1];
 
         for (OutboxMessage message : messages) {
             try {
@@ -350,9 +405,22 @@ public class OutboxPublisherService {
                             if (ex != null) {
                                 log.error("Failed to publish outbox message {}: {}",
                                         message.getId(), ex.getMessage());
-                                failedMap.put(message.getId(), describe(ex));
+                                String error = describe(ex);
+                                synchronized (publishedIds) {
+                                    if (!batchSettled[0]) {
+                                        failedMap.put(message.getId(), error);
+                                        return null;
+                                    }
+                                }
+                                lateFailed.put(message.getId(), error);
                             } else {
-                                publishedIds.add(message.getId());
+                                synchronized (publishedIds) {
+                                    if (!batchSettled[0]) {
+                                        publishedIds.add(message.getId());
+                                    } else {
+                                        latePublished.add(message.getId());
+                                    }
+                                }
                                 if (isRetry) {
                                     log.info("Successfully retried outbox message: {}",
                                             message.getId());
@@ -367,9 +435,9 @@ public class OutboxPublisherService {
             }
         }
 
-        // Wait for all send callbacks to complete (bounded).
-        // Messages still in-flight after timeout stay SENDING —
-        // cleanupOldMessages() recovers them back to PENDING after sendingRecoverySeconds.
+        // Wait for all send callbacks to complete (bounded). An outcome still in flight after the
+        // timeout is settled by settleLateOutcomes() when it arrives; one that never arrives is
+        // recovered back to PENDING after sendingRecoverySeconds.
         if (!completionFutures.isEmpty()) {
             try {
                 CompletableFuture.allOf(completionFutures.toArray(new CompletableFuture[0]))
@@ -386,10 +454,13 @@ public class OutboxPublisherService {
         // repository means Spring Data iterates it to bind the IN clause without holding that
         // monitor, while a callback that arrived after the wait above may still be adding to it.
         List<UUID> settled;
+        Map<UUID, String> failed;
         synchronized (publishedIds) {
             settled = new ArrayList<>(publishedIds);
+            failed = new HashMap<>(failedMap);
+            batchSettled[0] = true;
         }
-        batchUpdateResults(settled, failedMap, isRetry);
+        batchUpdateResults(settled, failed, isRetry);
 
         sample.stop(publishLatency);
     }

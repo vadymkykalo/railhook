@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.time.Clock;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,7 +57,7 @@ class EventRetentionTest {
     private DataRetentionService service(int eventsRetentionDays) {
         return new DataRetentionService(
                 deliveryAttemptRepository, incomingEventRepository, tunnelRequestLogRepository,
-                eventRepository, meterRegistry, TransactionOperations.withoutTransaction(),
+                eventRepository, meterRegistry, TransactionOperations.withoutTransaction(), Clock.systemUTC(),
                 // attempts, successfulAttempts, incoming, tunnelLog, maxPerDelivery, events, batch
                 90, 14, 30, 7, 10, eventsRetentionDays, 1000);
     }

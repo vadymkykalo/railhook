@@ -182,7 +182,7 @@ class ApiKeyScopeEnforcementTest {
     }
 
     private static HandlerMethod rotateSecretHandlerMethod() throws NoSuchMethodException {
-        Method method = EndpointController.class.getMethod("rotateSecret", UUID.class, AuthContext.class);
+        Method method = EndpointController.class.getMethod("rotateSecret", UUID.class, UUID.class, AuthContext.class);
         return new HandlerMethod(mock(EndpointController.class), method);
     }
 

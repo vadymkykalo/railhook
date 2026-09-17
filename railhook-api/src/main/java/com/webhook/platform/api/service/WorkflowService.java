@@ -38,6 +38,7 @@ public class WorkflowService {
     private final WorkflowExecutionRepository executionRepository;
     private final WorkflowStepExecutionRepository stepExecutionRepository;
     private final ProjectRepository projectRepository;
+    private final EndpointRepository endpointRepository;
     private final ObjectMapper objectMapper;
     private final WorkflowEngine workflowEngine;
 
@@ -51,36 +52,58 @@ public class WorkflowService {
                 .orElseThrow(() -> new NotFoundException("Project not found"));
     }
 
+    /** Another project's workflow is "not found", like a missing one - the URL names the project. */
+    private Workflow requireWorkflow(UUID projectId, UUID id) {
+        return workflowRepository.findByIdAndProjectId(id, projectId)
+                .orElseThrow(() -> new NotFoundException("Workflow not found"));
+    }
+
     /**
-     * Every project a createEvent node names has to be one the caller can see. Nothing checked it,
-     * so a workflow could be saved emitting Events into another organization's project. The same
-     * tenant-scoped lookup as the workflow's own project, so a foreign id is simply not found.
+     * What a node reaches outside the workflow has to be inside the workflow's own project.
+     *
+     * <p>The executors run with only the organization in scope, so a createEvent node would emit
+     * into, and a delivery node deliver to, any project of the organization. Checked here, where
+     * the project is known: a key confined to one project could otherwise save a workflow that
+     * writes Events into another, or sends its data to another project's endpoint. A reference
+     * outside the project reads as not found, like the id of another organization's project.
      */
-    private void validateNodeProjects(Object definition) {
+    private void validateNodeProjects(Object definition, UUID projectId) {
         if (definition == null) {
             return;
         }
         JsonNode nodes = objectMapper.valueToTree(definition).path("nodes");
         for (JsonNode node : nodes) {
-            if (!"createEvent".equals(node.path("type").asText())) {
-                continue;
+            String type = node.path("type").asText();
+            if ("createEvent".equals(type)) {
+                String target = node.path("data").path("projectId").asText("");
+                if (!target.isBlank() && !projectId.equals(parseOrNull(target))) {
+                    throw new NotFoundException("Project not found");
+                }
+            } else if ("delivery".equals(type)) {
+                String target = node.path("data").path("endpointId").asText("");
+                if (target.isBlank()) {
+                    continue;
+                }
+                UUID endpointId = parseOrNull(target);
+                if (endpointId == null || endpointRepository.findByIdAndProjectId(endpointId, projectId).isEmpty()) {
+                    throw new NotFoundException("Endpoint not found");
+                }
             }
-            String target = node.path("data").path("projectId").asText("");
-            if (target.isBlank()) {
-                continue;
-            }
-            try {
-                validateProjectOwnership(UUID.fromString(target));
-            } catch (IllegalArgumentException e) {
-                throw new NotFoundException("Project not found");
-            }
+        }
+    }
+
+    private static UUID parseOrNull(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 
     @Transactional
     public WorkflowResponse create(UUID projectId, WorkflowRequest request) {
         validateProjectOwnership(projectId);
-        validateNodeProjects(request.getDefinition());
+        validateNodeProjects(request.getDefinition(), projectId);
 
         if (workflowRepository.existsByProjectIdAndName(projectId, request.getName())) {
             throw new ConflictException("Workflow with this name already exists");
@@ -101,10 +124,8 @@ public class WorkflowService {
         return mapToResponse(workflow);
     }
 
-    public WorkflowResponse get(UUID id) {
-        Workflow workflow = workflowRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId());
+    public WorkflowResponse get(UUID projectId, UUID id) {
+        Workflow workflow = requireWorkflow(projectId, id);
         return mapToResponse(workflow);
     }
 
@@ -147,11 +168,9 @@ public class WorkflowService {
     }
 
     @Transactional
-    public WorkflowResponse update(UUID id, WorkflowRequest request) {
-        Workflow workflow = workflowRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId());
-        validateNodeProjects(request.getDefinition());
+    public WorkflowResponse update(UUID projectId, UUID id, WorkflowRequest request) {
+        Workflow workflow = requireWorkflow(projectId, id);
+        validateNodeProjects(request.getDefinition(), projectId);
 
         // Check name uniqueness if changed
         if (!workflow.getName().equals(request.getName()) &&
@@ -181,19 +200,15 @@ public class WorkflowService {
     }
 
     @Transactional
-    public void delete(UUID id) {
-        Workflow workflow = workflowRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId());
+    public void delete(UUID projectId, UUID id) {
+        Workflow workflow = requireWorkflow(projectId, id);
         workflowRepository.delete(workflow);
         log.info("Deleted workflow '{}'", workflow.getName());
     }
 
     @Transactional
-    public WorkflowResponse toggleEnabled(UUID id, boolean enabled) {
-        Workflow workflow = workflowRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId());
+    public WorkflowResponse toggleEnabled(UUID projectId, UUID id, boolean enabled) {
+        Workflow workflow = requireWorkflow(projectId, id);
         workflow.setEnabled(enabled);
         workflow = workflowRepository.save(workflow);
         log.info("Workflow '{}' {}", workflow.getName(), enabled ? "enabled" : "disabled");
@@ -202,10 +217,8 @@ public class WorkflowService {
 
     // ── Manual trigger ───────────────────────────────────────────────────
 
-    public WorkflowExecutionResponse manualTrigger(UUID workflowId, Object testPayload) {
-        Workflow workflow = workflowRepository.findById(workflowId)
-                .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId());
+    public WorkflowExecutionResponse manualTrigger(UUID projectId, UUID workflowId, Object testPayload) {
+        Workflow workflow = requireWorkflow(projectId, workflowId);
 
         String payloadStr;
         JsonNode payloadJson;
@@ -232,15 +245,13 @@ public class WorkflowService {
 
         // Re-fetch to get updated status
         execution = executionRepository.findById(execution.getId()).orElse(execution);
-        return getExecution(execution.getId());
+        return getExecution(projectId, workflowId, execution.getId());
     }
 
     // ── Executions ──────────────────────────────────────────────────────
 
-    public Page<WorkflowExecutionResponse> listExecutions(UUID workflowId, int page, int size) {
-        Workflow workflow = workflowRepository.findById(workflowId)
-                .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId());
+    public Page<WorkflowExecutionResponse> listExecutions(UUID projectId, UUID workflowId, int page, int size) {
+        Workflow workflow = requireWorkflow(projectId, workflowId);
 
         return executionRepository.findByWorkflowIdOrderByStartedAtDesc(workflowId, PageRequest.of(page, size))
                 .map(exec -> {
@@ -251,13 +262,10 @@ public class WorkflowService {
                 });
     }
 
-    public WorkflowExecutionResponse getExecution(UUID executionId) {
-        WorkflowExecution execution = executionRepository.findById(executionId)
+    public WorkflowExecutionResponse getExecution(UUID projectId, UUID workflowId, UUID executionId) {
+        requireWorkflow(projectId, workflowId);
+        WorkflowExecution execution = executionRepository.findByIdAndWorkflowId(executionId, workflowId)
                 .orElseThrow(() -> new NotFoundException("Execution not found"));
-
-        Workflow workflow = workflowRepository.findById(execution.getWorkflowId())
-                .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId());
 
         WorkflowExecutionResponse response = mapExecutionToResponse(execution);
         List<WorkflowStepExecution> steps = stepExecutionRepository.findByExecutionIdOrderByCreatedAtAsc(executionId);

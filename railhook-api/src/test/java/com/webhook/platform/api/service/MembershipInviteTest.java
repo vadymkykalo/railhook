@@ -183,7 +183,7 @@ class MembershipInviteTest {
         accepted.setInviteExpiresAt(null);
 
         assertThatThrownBy(() -> membershipService.reissueInvite(accepted.getUserId(), MembershipRole.OWNER))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(com.webhook.platform.api.exception.ConflictException.class);
     }
 
     @Test

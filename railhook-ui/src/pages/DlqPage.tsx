@@ -11,7 +11,6 @@ import {
   useProject, useDlq, useDlqStats, useEndpoints, useDlqRetry, useDlqBulkRetry, useDlqPurge,
 } from '../api/queries';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Select } from '../components/ui/select';
 import { TablePagination } from '../components/ui/table-pagination';
@@ -20,7 +19,7 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { railFromCounts } from './attemptRailData';
-import { AttemptCell, CopyId, FilterBar, FilterField, SearchField, SelectBox, SelectionBar, TimeCell } from './tableParts';
+import { AttemptCell, CopyId, FilterBar, FilterField, SelectBox, SelectionBar, TimeCell } from './tableParts';
 import DeliveryDetailsSheet from './DeliveryDetailsSheet';
 
 
@@ -47,19 +46,11 @@ export default function DlqPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const [endpointFilter, setEndpointFilter] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showPurgeDialog, setShowPurgeDialog] = useState(false);
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
 
-  const dlqFilters = {
-    endpointId: endpointFilter || undefined,
-    search: searchQuery || undefined,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-  };
+  const dlqFilters = { endpointId: endpointFilter || undefined };
 
   const {
     data: project, isLoading: projectLoading, isError: projectIsError, error: projectError, refetch: refetchProject,
@@ -73,7 +64,9 @@ export default function DlqPage() {
   const totalElements = dlqData?.totalElements ?? 0;
   const totalPages = dlqData?.totalPages ?? 0;
 
-  const loading = projectLoading || dlqLoading;
+  // Only the first load swaps the page for a skeleton; a filter or page change keeps the
+  // previous rows on screen (keepPreviousData) instead of unmounting the filters mid-edit.
+  const loading = (projectLoading && !project) || (dlqLoading && !dlqData);
   const isError = projectIsError || dlqIsError;
   const retry = () => { refetchProject(); refetchDlq(); refetchStats(); };
 
@@ -175,24 +168,20 @@ export default function DlqPage() {
 
       <FilterBar>
         <FilterField id="dlq-endpoint" label={t('dlq.filterEndpoint')} className="min-w-[14rem]">
-          <Select id="dlq-endpoint" value={endpointFilter} onChange={(e) => { setEndpointFilter(e.target.value); setPage(0); }}>
+          <Select
+            id="dlq-endpoint"
+            value={endpointFilter}
+            onChange={(e) => {
+              setEndpointFilter(e.target.value);
+              setPage(0);
+              // A selection made under one filter must not ride along into another.
+              setSelectedIds(new Set());
+            }}
+          >
             <option value="">{t('dlq.allEndpoints')}</option>
             {endpoints.map(endpoint => (<option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>))}
           </Select>
         </FilterField>
-        <FilterField id="dlq-from" label={t('dlq.filterFrom')}>
-          <Input id="dlq-from" type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(0); }} />
-        </FilterField>
-        <FilterField id="dlq-to" label={t('dlq.filterTo')}>
-          <Input id="dlq-to" type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(0); }} />
-        </FilterField>
-        <SearchField
-          id="dlq-search"
-          label={t('common.search')}
-          placeholder={t('dlq.searchPlaceholder')}
-          value={searchQuery}
-          onChange={(value) => { setSearchQuery(value); setPage(0); }}
-        />
       </FilterBar>
 
       {items.length === 0 ? (

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Endpoint.VerificationStatus;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
+import com.webhook.platform.api.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -90,8 +91,8 @@ public class EndpointVerificationService {
      * <p>Three steps instead: a short transaction to claim the attempt, the call with nothing
      * held, and a short transaction to write the verdict.
      */
-    public VerificationResult verify(UUID endpointId) {
-        Endpoint endpoint = beginVerificationAttempt(endpointId);
+    public VerificationResult verify(UUID projectId, UUID endpointId) {
+        Endpoint endpoint = beginVerificationAttempt(projectId, endpointId);
 
         if (endpoint.getVerificationStatus() == VerificationStatus.VERIFIED) {
             return new VerificationResult(true, "Already verified", endpoint);
@@ -133,10 +134,9 @@ public class EndpointVerificationService {
      * Claims the attempt: stamps when it started and mints a token if there is not one already.
      * Short, and over before anything is sent.
      */
-    public Endpoint beginVerificationAttempt(UUID endpointId) {
+    public Endpoint beginVerificationAttempt(UUID projectId, UUID endpointId) {
         return txTemplate.execute(tx -> {
-            Endpoint endpoint = endpointRepository.findById(endpointId)
-                    .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+            Endpoint endpoint = requireEndpoint(projectId, endpointId);
 
             if (endpoint.getVerificationStatus() == VerificationStatus.VERIFIED) {
                 return endpoint;
@@ -169,9 +169,8 @@ public class EndpointVerificationService {
     }
 
     @Transactional
-    public Endpoint skipVerification(UUID endpointId, String reason) {
-        Endpoint endpoint = endpointRepository.findById(endpointId)
-                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+    public Endpoint skipVerification(UUID projectId, UUID endpointId, String reason) {
+        Endpoint endpoint = requireEndpoint(projectId, endpointId);
 
         endpoint.setVerificationStatus(VerificationStatus.SKIPPED);
         endpoint.setVerificationSkipReason(reason != null ? reason : "Skipped by administrator");
@@ -180,6 +179,12 @@ public class EndpointVerificationService {
         endpoint = endpointRepository.save(endpoint);
         log.info("Endpoint {} verification skipped: {}", endpointId, reason);
         return endpoint;
+    }
+
+    /** Another project's endpoint is "not found", like a missing one - the URL names the project. */
+    private Endpoint requireEndpoint(UUID projectId, UUID endpointId) {
+        return endpointRepository.findByIdAndProjectId(endpointId, projectId)
+                .orElseThrow(() -> new NotFoundException("Endpoint not found"));
     }
 
     /**

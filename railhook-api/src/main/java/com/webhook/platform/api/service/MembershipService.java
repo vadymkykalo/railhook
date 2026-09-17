@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
@@ -89,6 +90,7 @@ public class MembershipService {
         if (requestingRole != MembershipRole.OWNER) {
             throw new ForbiddenException("Only owners can add members");
         }
+        requireGrantableRole(request.getRole());
 
         String email = EmailAddresses.normalize(request.getEmail());
         boolean isNewUser = !userRepository.existsByEmail(email);
@@ -171,7 +173,7 @@ public class MembershipService {
                 .orElseThrow(() -> new NotFoundException("Membership not found"));
 
         if (membership.getStatus() != MembershipStatus.INVITED) {
-            throw new IllegalStateException("Membership has no pending invite to re-issue");
+            throw new ConflictException("Membership has no pending invite to re-issue");
         }
 
         String inviteToken = generateInviteToken();
@@ -231,7 +233,7 @@ public class MembershipService {
         }
 
         if (membership.getStatus() != MembershipStatus.INVITED) {
-            throw new IllegalStateException("Invite already accepted or membership is not in INVITED status");
+            throw new ConflictException("Invite already accepted or membership is not in INVITED status");
         }
 
         if (membership.getInviteExpiresAt() != null && Instant.now().isAfter(membership.getInviteExpiresAt())) {
@@ -267,6 +269,19 @@ public class MembershipService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
+    /**
+     * The roles an owner may hand out, whether by adding a member or by changing one. OWNER is
+     * never granted here, and API_KEY is not a human role at all.
+     */
+    private static void requireGrantableRole(MembershipRole role) {
+        if (role == MembershipRole.OWNER) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot assign OWNER role through this endpoint");
+        }
+        if (role == MembershipRole.API_KEY) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "API_KEY is not a role a member can hold");
+        }
+    }
+
     @Auditable(action = AuditAction.MEMBER_ROLE_CHANGED, resourceType = "Member")
     @Transactional
     public MemberResponse changeMemberRole(UUID userId, MembershipRole newRole,
@@ -276,9 +291,7 @@ public class MembershipService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can change member roles");
         }
 
-        if (newRole == MembershipRole.OWNER) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot assign OWNER role through this endpoint");
-        }
+        requireGrantableRole(newRole);
 
         Membership membership = membershipRepository.findByUserIdAndOrganizationId(userId, organizationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
