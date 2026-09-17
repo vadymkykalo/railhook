@@ -113,6 +113,23 @@ public class TunnelService {
     }
 
     /**
+     * Closes every tunnel a user holds in the current organization, for a member whose access to
+     * it has just been withdrawn. Revoking their sessions does not reach a tunnel: the CLI
+     * authenticated once with the tunnel token and presents nothing else, so the slug would go on
+     * forwarding to their machine. {@code @TenantId} confines the lookup to this organization — a
+     * tunnel the same person opened elsewhere is not this organization's to close.
+     */
+    @Transactional
+    public void closeSessionsOfUser(UUID userId) {
+        TenantContext.require();
+        if (TenantContext.isSystem()) {
+            // Unscoped, the same lookup would close the user's tunnels in every organization.
+            throw new IllegalStateException("Closing a member's tunnels needs the organization's scope");
+        }
+        tunnelSessionRepository.findByUserIdAndStatus(userId, TunnelStatus.ACTIVE).forEach(this::close);
+    }
+
+    /**
      * Marks the session CLOSED and, once that is committed, ends its tunnel on whichever instance
      * holds the socket. Marking the row alone left the CLI connected and the slug forwarding — a
      * tunnel outside the plan's active-tunnel count and outside bandwidth metering. The disconnect

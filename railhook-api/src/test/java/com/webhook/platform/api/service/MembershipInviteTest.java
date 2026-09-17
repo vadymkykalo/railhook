@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -72,7 +73,7 @@ class MembershipInviteTest {
         // for no assertion's benefit.
         membershipService = new MembershipService(
                 userRepository, membershipRepository, emailService, tokenBlacklistService,
-                new BCryptPasswordEncoder(4));
+                new BCryptPasswordEncoder(4), mock(TunnelService.class));
 
         when(membershipRepository.save(any(Membership.class))).thenAnswer(i -> i.getArgument(0));
         when(userRepository.save(any(User.class))).thenAnswer(i -> {
