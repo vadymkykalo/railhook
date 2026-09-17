@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, Eye, SkipForward, Lightbulb, AlertTriangle, Info, ExternalLink, Timer, TrendingUp, TrendingDown, GitCompare, Flame, Plus } from 'lucide-react';
 import { showApiError, showSuccess } from '../lib/toast';
@@ -79,38 +79,47 @@ export default function DeliveryDetailsSheet({
   useEffect(() => {
     if (!delivery || !open) return;
     if (delivery.status !== 'PENDING' && delivery.status !== 'PROCESSING') return;
-    const interval = setInterval(() => { loadDelivery(); loadAttempts(); }, 3000);
+    const interval = setInterval(() => { loadDelivery(true); loadAttempts(true); }, 3000);
     return () => clearInterval(interval);
   }, [delivery?.status, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadDelivery = async () => {
+  // The 3-second refresh of an in-flight delivery is a background load: it neither swaps the
+  // panel for a skeleton nor toasts again while the same outage is already reported.
+  const refreshFailureReported = useRef(false);
+
+  const loadDelivery = async (background = false) => {
     if (!deliveryId) return;
 
     try {
-      setLoading(true);
+      if (!background) setLoading(true);
       const data = await deliveriesApi.get(deliveryId);
       setDelivery(data);
       setLoadError(null);
+      refreshFailureReported.current = false;
     } catch (err: any) {
       setLoadError(err);
-      showApiError(err, 'deliveryDetails.toast.loadFailed', { retry: loadDelivery });
+      if (!background || !refreshFailureReported.current) {
+        refreshFailureReported.current = true;
+        showApiError(err, 'deliveryDetails.toast.loadFailed', { retry: () => loadDelivery() });
+      }
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   };
 
-  const loadAttempts = async () => {
+  const loadAttempts = async (background = false) => {
     if (!deliveryId) return;
 
     try {
-      setAttemptsLoading(true);
+      if (!background) setAttemptsLoading(true);
       const data = await deliveriesApi.getAttempts(deliveryId);
       setAttempts(data);
     } catch (err: any) {
       console.error('Failed to load delivery attempts:', err);
-      setAttempts([]);
+      // A failed background refresh keeps the attempts already on screen.
+      if (!background) setAttempts([]);
     } finally {
-      setAttemptsLoading(false);
+      if (!background) setAttemptsLoading(false);
     }
   };
 
@@ -784,7 +793,7 @@ export default function DeliveryDetailsSheet({
             <ErrorState
               error={loadError}
               fallbackKey="deliveryDetails.toast.loadFailed"
-              onRetry={loadDelivery}
+              onRetry={() => loadDelivery()}
               retrying={loading}
               className="flex flex-col items-center justify-center py-16"
             />
