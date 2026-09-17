@@ -2,6 +2,8 @@ package com.webhook.platform.api.exception;
 
 import com.webhook.platform.common.security.UrlValidator;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -138,16 +140,34 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
-    @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalStateException(
-            IllegalStateException ex, WebRequest request) {
-        log.warn("Illegal state: {}", ex.getMessage());
+    /**
+     * A unique or foreign-key constraint the service's own pre-check did not catch, almost always
+     * two requests racing to create the same name. The message names the constraint and carries
+     * the SQL, so it stays in the log.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex, WebRequest request) {
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
         ErrorResponse error = new ErrorResponse(
-                "unprocessable_entity",
-                ex.getMessage(),
-                HttpStatus.UNPROCESSABLE_ENTITY.value()
+                "conflict",
+                "The request conflicts with the current state of the resource",
+                HttpStatus.CONFLICT.value()
         );
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(error);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    /** {@code ?sort=} naming a property the entity does not have. */
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<ErrorResponse> handlePropertyReference(
+            PropertyReferenceException ex, WebRequest request) {
+        log.debug("Unknown property reference: {}", ex.getPropertyName());
+        ErrorResponse error = new ErrorResponse(
+                "invalid_parameter",
+                "Cannot sort by '" + ex.getPropertyName() + "'",
+                HttpStatus.BAD_REQUEST.value()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
     /**
