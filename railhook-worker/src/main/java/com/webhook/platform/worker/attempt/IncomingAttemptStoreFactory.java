@@ -19,6 +19,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class IncomingAttemptStoreFactory {
 
     private final IncomingForwardAttemptRepository attemptRepository;
+    private final ProjectStatusLookup projectStatusLookup;
     private final TransactionTemplate transactionTemplate;
     private final TransformationCacheService transformationCacheService;
     private final PayloadTransformService payloadTransformService;
@@ -29,6 +30,7 @@ public class IncomingAttemptStoreFactory {
 
     public IncomingAttemptStoreFactory(
             IncomingForwardAttemptRepository attemptRepository,
+            ProjectStatusLookup projectStatusLookup,
             TransactionTemplate transactionTemplate,
             TransformationCacheService transformationCacheService,
             PayloadTransformService payloadTransformService,
@@ -38,6 +40,7 @@ public class IncomingAttemptStoreFactory {
             @Qualifier("incomingForwardKafkaTemplate")
             KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate) {
         this.attemptRepository = attemptRepository;
+        this.projectStatusLookup = projectStatusLookup;
         this.transactionTemplate = transactionTemplate;
         this.transformationCacheService = transformationCacheService;
         this.payloadTransformService = payloadTransformService;
@@ -50,7 +53,7 @@ public class IncomingAttemptStoreFactory {
     public IncomingAttemptStore create(IncomingForwardMessage message, IncomingEvent event,
             IncomingDestination destination) {
         return new IncomingAttemptStore(
-                attemptRepository, transactionTemplate, transformationCacheService,
+                attemptRepository, projectStatusLookup, transactionTemplate, transformationCacheService,
                 payloadTransformService, encryptionKeyRegistry, objectMapper,
                 incomingForwardWebClient, kafkaTemplate, message, event, destination);
     }

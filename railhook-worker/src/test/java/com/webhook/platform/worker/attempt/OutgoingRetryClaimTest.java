@@ -83,6 +83,7 @@ class OutgoingRetryClaimTest {
     private OutgoingAttemptStore retryStoreFor(DeliveryMessage message) {
         return new OutgoingAttemptStore(
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
+                activeProjects(),
                 transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
                 mtlsWebClientFactory, transformationCacheService, payloadTransformService,
                 new ObjectMapper(), WebClient.builder().build(),
@@ -173,5 +174,20 @@ class OutgoingRetryClaimTest {
         verify(deliveryRepository, atLeastOnce()).findById(deliveryId);
         verify(deliveryRepository, never()).claimRetryForProcessing(any(), any(), any());
         assertInstanceOf(ClaimResult.NotClaimed.class, result);
+    }
+
+    /** Every Project active: whether a Project may still be sent for is not what this test is about. */
+    private static ProjectStatusLookup activeProjects() {
+        return new ProjectStatusLookup(null) {
+            @Override
+            public ProjectStatus forProject(UUID projectId) {
+                return ProjectStatus.ACTIVE;
+            }
+
+            @Override
+            public ProjectStatus forSource(UUID sourceId) {
+                return ProjectStatus.ACTIVE;
+            }
+        };
     }
 }

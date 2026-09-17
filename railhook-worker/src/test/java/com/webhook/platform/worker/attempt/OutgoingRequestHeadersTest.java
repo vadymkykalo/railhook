@@ -162,6 +162,7 @@ class OutgoingRequestHeadersTest {
                 .thenReturn(delivery);
         OutgoingAttemptStore store = new OutgoingAttemptStore(
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
+                activeProjects(),
                 transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
                 mtlsWebClientFactory, transformationCacheService, payloadTransformService,
                 objectMapper, WebClient.builder().build(),
@@ -206,5 +207,20 @@ class OutgoingRequestHeadersTest {
                 .idempotencyKey(idempotencyKey)
                 .customHeaders(customHeaders)
                 .build();
+    }
+
+    /** Every Project active: whether a Project may still be sent for is not what this test is about. */
+    private static ProjectStatusLookup activeProjects() {
+        return new ProjectStatusLookup(null) {
+            @Override
+            public ProjectStatus forProject(UUID projectId) {
+                return ProjectStatus.ACTIVE;
+            }
+
+            @Override
+            public ProjectStatus forSource(UUID sourceId) {
+                return ProjectStatus.ACTIVE;
+            }
+        };
     }
 }

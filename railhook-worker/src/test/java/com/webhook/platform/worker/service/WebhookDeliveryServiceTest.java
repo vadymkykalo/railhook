@@ -4,6 +4,7 @@ import com.webhook.platform.worker.attempt.AttemptRunner;
 import java.time.Clock;
 import com.webhook.platform.worker.attempt.DeliveryAttemptMetrics;
 import com.webhook.platform.worker.attempt.OutgoingAttemptStoreFactory;
+import com.webhook.platform.worker.attempt.ProjectStatusLookup;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -126,6 +127,7 @@ class WebhookDeliveryServiceTest {
     private WebhookDeliveryService newService(WebClient webClient, MeterRegistry registry, AttemptRunner runner) {
         OutgoingAttemptStoreFactory storeFactory = new OutgoingAttemptStoreFactory(
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
+                activeProjects(),
                 transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
                 mtlsWebClientFactory, transformationCacheService, payloadTransformService,
                 new ObjectMapper(), webClient, registry, Clock.systemUTC(),
@@ -1210,5 +1212,20 @@ class WebhookDeliveryServiceTest {
         service.processDelivery(message, true);
 
         verify(projectRateLimiterService).tryAcquire(endpoint.getProjectId());
+    }
+
+    /** Every Project active: whether a Project may still be sent for is not what this test is about. */
+    private static ProjectStatusLookup activeProjects() {
+        return new ProjectStatusLookup(null) {
+            @Override
+            public ProjectStatus forProject(UUID projectId) {
+                return ProjectStatus.ACTIVE;
+            }
+
+            @Override
+            public ProjectStatus forSource(UUID sourceId) {
+                return ProjectStatus.ACTIVE;
+            }
+        };
     }
 }
