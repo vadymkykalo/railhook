@@ -20,10 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   organization and switching back issued a fresh token for the suspended membership.
 - **Deleting a project stops it.** Its API keys are revoked and refused, and its events, incoming
   webhooks and test captures are refused, instead of continuing to run while no longer counting
-  towards the plan.
+  towards the plan. Deliveries and forwards already queued for it are no longer sent: they end as
+  failed.
 - **A suspended organization stops receiving.** `/ingress` answers `403` (not `410`, so providers
   keep their subscriptions for when the suspension is lifted), and test captures and tunnels are
-  refused.
+  refused. Its queued deliveries and forwards are held, and sent once the suspension is lifted.
 - **API keys can no longer create, rotate or revoke API keys.** Managing keys needs a signed-in
   user, so a leaked key cannot mint replacements that outlive its revocation.
 - **Reusing a rotated refresh token ends every session**, not just the access tokens.
@@ -33,7 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **WayForPay callbacks are bound to their signed order reference and deduplicated**, so a
   replayed or altered callback cannot renew or mark past due a subscription it does not belong to.
 - **A closed tunnel is disconnected** across every instance, and a tunnel response is accepted
-  only from the tunnel's own connection.
+  only from the tunnel's own connection. A member's tunnels close when they are removed or
+  suspended, an organization's when it is deleted, and a person's everywhere when their account is
+  erased.
 
 ### Changed
 
@@ -67,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Several tabs refreshing a session at once no longer sign the person out everywhere.
   - Requests waiting on a failed session refresh fail instead of spinning forever.
   - Signing out clears everything cached for that person.
+  - Every event shows its exact delivery status, on any page and however many endpoints it fans
+    out to.
   - Invite and CLI sign-in links survive signing in or registering first.
   - A changed role or organization is picked up without signing out.
   - Lists keep their rows while the next page loads, and the delivery panel no longer closes
