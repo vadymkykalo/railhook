@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.entity.IncomingEvent;
 import com.webhook.platform.api.dto.IngressResponse;
 import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.service.IngressService;
+import com.webhook.platform.api.service.ingress.OrganizationSuspendedException;
 import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
 import com.webhook.platform.api.service.ingress.RateLimitExceededException;
 import com.webhook.platform.api.service.ingress.SignatureVerificationFailedException;
@@ -91,6 +92,16 @@ public class IngressController {
     @ExceptionHandler(SourceDisabledException.class)
     ResponseEntity<IngressResponse> sourceDisabled(SourceDisabledException e) {
         return problem(HttpStatus.GONE, "disabled", "This ingress endpoint is disabled");
+    }
+
+    /**
+     * 403, not the 410 a disabled Source answers: providers such as Zapier delete a subscription for
+     * good on 410, and a suspension can be lifted. The reason stays out of the body, since the
+     * sender is a third-party provider, not the customer it was written for.
+     */
+    @ExceptionHandler(OrganizationSuspendedException.class)
+    ResponseEntity<IngressResponse> organizationSuspended(OrganizationSuspendedException e) {
+        return problem(HttpStatus.FORBIDDEN, "suspended", "This ingress endpoint is not accepting webhooks");
     }
 
     @ExceptionHandler(PayloadTooLargeException.class)

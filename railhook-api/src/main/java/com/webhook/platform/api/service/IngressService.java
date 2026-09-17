@@ -18,6 +18,7 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
+import com.webhook.platform.api.service.ingress.OrganizationSuspendedException;
 import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
 import com.webhook.platform.api.service.ingress.ProviderEventIdExtractor;
 import com.webhook.platform.api.service.ingress.RateLimitExceededException;
@@ -229,12 +230,11 @@ public class IngressService {
             throw new SourceDisabledException("Source is disabled");
         }
         // Ingest is what a suspension most needs to stop, and this path authenticates nobody, so
-        // the interceptor that refuses a suspended organization's writes never sees it. Answered
-        // as a disabled Source is: the sender is a provider, not the customer the reason is for.
+        // the interceptor that refuses a suspended organization's writes never sees it.
         if (suspensionCheck.suspensionReason(source.getOrganizationId()).isPresent()) {
             log.warn("Rejecting incoming webhook: organization {} is suspended (sourceId={})",
                     source.getOrganizationId(), source.getId());
-            throw new SourceDisabledException("Organization is suspended");
+            throw new OrganizationSuspendedException("Organization is suspended");
         }
         return source;
     }

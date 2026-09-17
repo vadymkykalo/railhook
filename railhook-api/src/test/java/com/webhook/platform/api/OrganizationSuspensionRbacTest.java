@@ -254,11 +254,12 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
 
         suspend(tenant);
 
-        // Answered as a disabled Source is, and without the reason: the sender is a third-party
-        // provider, not the customer the reason was written for.
+        // 403, not the 410 a disabled Source gets: providers such as Zapier delete a subscription
+        // for good on 410, and a suspension that is lifted must find its subscriptions still there.
+        // No reason either: the sender is a third-party provider, not the customer it was written for.
         mockMvc.perform(post("/ingress/" + token).contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isGone())
-                .andExpect(jsonPath("$.error").value("disabled"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("suspended"))
                 .andExpect(jsonPath("$.message").value(
                         org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("chargeback"))));
     }
