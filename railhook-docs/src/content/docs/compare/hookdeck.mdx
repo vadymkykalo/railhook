@@ -18,7 +18,7 @@ Hookdeck details come from [hookdeck.com/pricing](https://hookdeck.com/pricing) 
 | Licence | MIT | Closed source, SaaS only | Apache-2.0 |
 | Self-hostable | Yes, every feature | No | Yes |
 | Delivers to queues and event buses | No, HTTP only | — | Yes: SQS, Kafka, EventBridge, Pub/Sub, RabbitMQ and more |
-| Customer-facing portal | No | — | Yes |
+| Customer-facing portal | Yes, embeddable | — | Yes |
 | OpenTelemetry | No | — | Yes |
 | Free CLI for local development | Yes | Yes, with the Console | — |
 
@@ -27,7 +27,7 @@ A dash means the pages we checked did not settle the point, or it does not apply
 ## When Hookdeck is the better choice
 
 - **Your customers' receivers are queues, not HTTP services.** Outpost delivers to SQS, Kafka, EventBridge, Pub/Sub and RabbitMQ. Railhook delivers over HTTP only.
-- **You want a portal your customers use themselves.** Outpost has a user portal. Railhook has no customer-facing portal yet; you manage endpoints on your customers' behalf.
+- **You want a portal your customers use themselves, styled with your own CSS.** Outpost has a user portal. Railhook has an embeddable [customer portal](/docs/outgoing/customer-portal/) too, but its theming is a brand colour, a logo, light or dark and the language.
 - **You want traces.** Outpost exports OpenTelemetry. Railhook exposes Prometheus metrics and no traces.
 - **You receive webhooks and never want to run anything.** Event Gateway is a managed service with paid plans. Railhook Cloud is free-plan only for now, so a volume above its limits means self-hosting.
 

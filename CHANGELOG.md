@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Customer portal.** Group endpoints by Consumer — one of your own users, keyed by your own
+  id — and open a short-lived portal session for them from your backend. The portal embeds in
+  your product in an iframe: your users register endpoints, choose event types, see every
+  delivery with its attempts, and retry failed ones, with your brand colour, logo, theme and
+  language. A session can be pinned to the one origin allowed to embed it. SDK methods in
+  Node.js, Python and PHP.
+
 ## [2.20.13] - 2026-09-18
 
 ### Fixed

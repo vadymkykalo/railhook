@@ -48,6 +48,7 @@ export const SIDEBAR_GROUPS = [
       'outgoing/schema-registry',
       'outgoing/workflows',
       'outgoing/endpoint-security',
+      'outgoing/customer-portal',
     ],
   },
   {

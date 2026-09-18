@@ -1,0 +1,220 @@
+---
+title: Customer portal
+description: Embed a page in your product where your own users register endpoints, choose event types, see their deliveries and retry the failed ones.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The customer portal is a page you embed in your own product. On it, each of your users registers their own endpoints, chooses which event types they receive, sees every delivery to those endpoints with each attempt's request and response, and retries the ones that failed. It takes webhook support out of your inbox: "why didn't we get the webhook?" is answered on the page, by the person asking.
+
+Railhook calls each of your users a **Consumer**. A Consumer groups the endpoints registered for that user, and a **portal session** is a short-lived credential that lets the portal act for exactly one Consumer.
+
+## How it fits together
+
+<Steps>
+
+1. Your backend creates a Consumer for each of your users who receives webhooks, keyed by your own user id.
+2. When that user opens the webhooks page in your product, your backend opens a portal session for their Consumer with your API key.
+3. Your page puts the session's `url` in an `<iframe>`. The portal runs inside it and talks to Railhook with the session's token, and nothing else.
+
+</Steps>
+
+## Create a Consumer
+
+`POST /api/v1/projects/{projectId}/consumers` takes an `externalId` and an optional `name`. `externalId` is your own id for the user, unique within the project, so your backend can find the Consumer again without storing Railhook's id: `GET /api/v1/projects/{projectId}/consumers?externalId=user_123` returns it. `name` is shown at the top of the portal and defaults to the `externalId`. A second Consumer with the same `externalId` is refused with `409`.
+
+<Tabs syncKey="lang">
+  <TabItem label="Node.js">
+    ```ts
+    import { Railhook } from '@railhook/node';
+
+    const railhook = new Railhook({
+      apiKey: process.env.RAILHOOK_API_KEY,
+      baseUrl: 'https://railhook.io', // or your instance
+    });
+
+    const consumer = await railhook.consumers.create(projectId, { externalId: 'user_123', name: 'Acme Ltd' });
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    import os
+
+    from railhook import ConsumerCreateParams, Railhook
+
+    client = Railhook(
+        api_key=os.environ["RAILHOOK_API_KEY"],
+        base_url="https://railhook.io",  # or your instance
+    )
+
+    consumer = client.consumers.create(
+        project_id,
+        ConsumerCreateParams(external_id="user_123", name="Acme Ltd"),
+    )
+    ```
+  </TabItem>
+  <TabItem label="PHP">
+    ```php
+    <?php
+    use Railhook\Railhook;
+
+    $client = new Railhook(
+        apiKey: getenv('RAILHOOK_API_KEY'),
+        baseUrl: 'https://railhook.io', // or your instance
+    );
+
+    $consumer = $client->consumers->create($projectId, ['externalId' => 'user_123', 'name' => 'Acme Ltd']);
+    ```
+  </TabItem>
+  <TabItem label="cURL">
+    ```bash
+    curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/consumers" \
+      -H "X-API-Key: $API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"externalId":"user_123","name":"Acme Ltd"}'
+    ```
+  </TabItem>
+</Tabs>
+
+## Give a Consumer its endpoints
+
+A Consumer can register endpoints itself, in the portal. Endpoints you already manage on a user's behalf move into their portal when you set `consumerId` on them, on create or update:
+
+```bash
+curl -X PUT "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/endpoints/$ENDPOINT_ID" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://hooks.acme.example/railhook","consumerId":"'"$CONSUMER_ID"'"}'
+```
+
+The Consumer must belong to the same project as the endpoint; any other is `404`. Leaving `consumerId` out of an update keeps the endpoint where it is. `GET /api/v1/projects/{projectId}/consumers/{consumerId}/endpoints` lists a Consumer's endpoints.
+
+An endpoint with no Consumer is yours alone: it never appears in any portal.
+
+## Open a portal session
+
+Open a session from your backend each time the user loads the page, with `POST /api/v1/projects/{projectId}/consumers/{consumerId}/portal-sessions`. The body is optional:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `ttlMinutes` | `60` | How long the session lasts, from 1 to 1440 (24 hours). |
+| `allowedOrigin` | none | The origin of the page that embeds the portal, such as `https://app.example.com`. When set, the portal renders inside that page and nowhere else. |
+
+The response carries `id`, `consumerId`, `url`, `token`, `allowedOrigin` and `expiresAt`. The token is in this response and nowhere else: Railhook stores only its SHA-256 hash.
+
+<Tabs syncKey="lang">
+  <TabItem label="Node.js">
+    ```ts
+    const session = await railhook.portalSessions.create(projectId, consumer.id, {
+      ttlMinutes: 60,
+      allowedOrigin: 'https://app.example.com',
+    });
+    // session.url → hand it to your page
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from railhook import PortalSessionCreateParams
+
+    session = client.portal_sessions.create(
+        project_id,
+        consumer.id,
+        PortalSessionCreateParams(ttl_minutes=60, allowed_origin="https://app.example.com"),
+    )
+    # session.url → hand it to your page
+    ```
+  </TabItem>
+  <TabItem label="PHP">
+    ```php
+    $session = $client->portalSessions->create($projectId, $consumer['id'], [
+        'ttlMinutes' => 60,
+        'allowedOrigin' => 'https://app.example.com',
+    ]);
+    // $session['url'] → hand it to your page
+    ```
+  </TabItem>
+  <TabItem label="cURL">
+    ```bash
+    curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/consumers/$CONSUMER_ID/portal-sessions" \
+      -H "X-API-Key: $API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"ttlMinutes":60,"allowedOrigin":"https://app.example.com"}'
+    ```
+  </TabItem>
+</Tabs>
+
+Opening a session is a write, so it needs a `READ_WRITE` API key.
+
+## Embed it
+
+Put the `url` in an iframe on your page:
+
+```html title="webhooks.html"
+<iframe
+  src="https://railhook.example.com/portal?origin=https://app.example.com#rhp_…"
+  style="width: 100%; height: 720px; border: 0"
+  title="Webhooks"
+></iframe>
+```
+
+The URL is `<APP_BASE_URL>/portal#<token>`, or `<APP_BASE_URL>/portal?origin=<allowedOrigin>#<token>` when the session has an allowed origin. The token travels in the fragment after `#`, which a browser never sends to a server, so it reaches no access log and no `Referer` header. The portal removes it from the address bar as soon as it loads and keeps it in memory only.
+
+<Aside type="caution">
+The token is a credential for your user's endpoints. Open the session on your server when the page is requested, pass the URL straight to the page, and keep it out of your own logs.
+</Aside>
+
+To show the portal outside your product, for example from a support tool, open the `url` in a new tab: a session without `allowedOrigin` works at the top level as well as in a frame.
+
+## Match your product's look
+
+Add these query parameters to the URL before the `#`:
+
+| Parameter | Value |
+|---|---|
+| `primary` | Your brand colour as a hex code, 3 or 6 digits: `primary=1D4BFF`, or with the `#` encoded as `%23`. |
+| `logo` | An `https://` URL of an image, shown in the portal's header. |
+| `theme` | `light` or `dark`. Without it the portal follows the viewer's system preference. |
+| `lang` | `en` or `uk`. Without it the portal follows the viewer's browser language, and falls back to English. |
+
+A value the portal cannot use is ignored, and the default applies.
+
+```text
+https://railhook.example.com/portal?origin=https://app.example.com&primary=1D4BFF&theme=dark&lang=uk#rhp_…
+```
+
+## What a Consumer can do
+
+A Consumer can:
+
+- see its own endpoints, and create, edit and delete them: URL, description, enabled, and the event types each one receives;
+- see an endpoint's signing secret once, when the endpoint is created or its secret rotated;
+- list the deliveries to its endpoints, filtered by status;
+- see every attempt at a delivery, with its request and response, masked by the project's [PII rules](/docs/platform/pii-masking/);
+- retry a failed delivery, which puts it back on its [retry ladder](/docs/outgoing/retries/).
+
+A Consumer cannot:
+
+- see or touch another Consumer's endpoints or deliveries, or the project's own endpoints;
+- set a rate limit, an IP allow-list, mTLS or the signature scheme — those stay your decisions;
+- reach anything outside `/api/v1/portal/`. The session's token authenticates nothing else, and a dashboard login or an API key is refused on the portal's routes.
+
+When your project declares its event types in the [schema registry](/docs/outgoing/schema-registry/), the portal offers those and accepts no others; a pattern such as `order.*` is accepted when it matches a declared type. Without any declared, it offers the types the project sent in the last 7 days and the ones its endpoints already subscribe to.
+
+Endpoints a Consumer creates count against your plan's endpoint limit for the project, like any other.
+
+## Security model
+
+- **The token.** 32 random bytes behind an `rhp_` prefix, returned once and stored only as its SHA-256 hash, as an API key is.
+- **Lifetime.** 1 minute to 24 hours. An expired session gets `401`, and the portal shows that the session has ended. Open a new one.
+- **Revoking.** `DELETE /api/v1/projects/{projectId}/consumers/{consumerId}/portal-sessions` ends every open session of a Consumer at once — the thing to do when a token may have leaked. Deleting the Consumer ends its sessions too, and deletes its endpoints so nothing goes on delivering to a user who is gone.
+- **Where it can be embedded.** `allowedOrigin` is an `https://` origin, or `http://localhost` or `http://127.0.0.1` with any port while you develop. With it, the portal page is served with `Content-Security-Policy: frame-ancestors <that origin>`, so the browser refuses to render it inside any other page, and the portal refuses to render when the origin in its URL does not match the session's. Without it, any `https://` page, and `http://localhost`, can embed the portal. Every other page Railhook serves refuses to be framed by any other site.
+- **Rate limit.** Portal requests are limited per session, so a script looping over one token spends its own budget and not your dashboard's.
+
+The portal's endpoints are listed under **Portal**, and the ones your backend calls under **Consumers**, in the [API reference](/docs/api-reference/).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Endpoints and subscriptions" href="/docs/outgoing/endpoints-subscriptions/" description="What a Consumer registers, and how event types match." />
+  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="The ladder a retried delivery walks again." />
+  <LinkCard title="API reference" href="/docs/api-reference/" description="Every Consumers and Portal request and response." />
+</CardGrid>
