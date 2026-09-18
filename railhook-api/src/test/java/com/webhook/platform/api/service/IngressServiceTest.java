@@ -24,6 +24,8 @@ import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
+import com.webhook.platform.api.service.ingress.IngressOutcome;
+import com.webhook.platform.api.service.ingress.OrganizationSuspendedException;
 import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
 import com.webhook.platform.api.service.ingress.SignatureVerificationFailedException;
 import com.webhook.platform.api.service.ingress.SourceDisabledException;
@@ -161,6 +163,11 @@ class IngressServiceTest {
                 .build();
     }
 
+    private static IncomingEvent accepted(IngressOutcome outcome) {
+        assertThat(outcome).isInstanceOf(IngressOutcome.Accepted.class);
+        return ((IngressOutcome.Accepted) outcome).event();
+    }
+
     private void stubHttpRequest() {
         when(httpRequest.getMethod()).thenReturn("POST");
         when(httpRequest.getRequestURI()).thenReturn("/ingress/validtoken");
@@ -187,7 +194,7 @@ class IngressServiceTest {
                 .as("registered before the first webhook, so a quiet deployment reads 0 rather than no data")
                 .isZero();
 
-        IncomingEvent event = service.receiveWebhook("validtoken", "{\"test\":true}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent event = accepted(service.receiveWebhook("validtoken", "{\"test\":true}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(meterRegistry.get("events_ingested_total").tag("direction", "incoming").counter().count())
                 .isEqualTo(1.0);
@@ -210,7 +217,7 @@ class IngressServiceTest {
         stubAcceptingSourceWithoutDestinations();
         byte[] arrived = {(byte) 0x7B, (byte) 0xC0, (byte) 0xFF, (byte) 0x7D};
 
-        IncomingEvent event = service.receiveWebhook("validtoken", arrived, httpRequest);
+        IncomingEvent event = accepted(service.receiveWebhook("validtoken", arrived, httpRequest));
 
         assertThat(event.getBodyBytes()).isEqualTo(arrived);
         assertThat(event.getBodyRaw()).as("still shown, with replacement characters").isNotNull();
@@ -223,7 +230,7 @@ class IngressServiceTest {
         stubAcceptingSourceWithoutDestinations();
         byte[] arrived = "a\u0000b".getBytes(StandardCharsets.UTF_8);
 
-        IncomingEvent event = service.receiveWebhook("validtoken", arrived, httpRequest);
+        IncomingEvent event = accepted(service.receiveWebhook("validtoken", arrived, httpRequest));
 
         assertThat(event.getBodyBytes()).isEqualTo(arrived);
         assertThat(event.getBodyRaw()).doesNotContain("\u0000");
@@ -233,8 +240,8 @@ class IngressServiceTest {
     void aUtf8BodyIsStoredOnceAsText() {
         stubAcceptingSourceWithoutDestinations();
 
-        IncomingEvent event = service.receiveWebhook("validtoken",
-                "{\"name\":\"Zoë\"}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent event = accepted(service.receiveWebhook("validtoken",
+                "{\"name\":\"Zoë\"}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(event.getBodyRaw()).isEqualTo("{\"name\":\"Zoë\"}");
         assertThat(event.getBodyBytes()).as("the text already encodes back to the same bytes").isNull();
@@ -272,7 +279,7 @@ class IngressServiceTest {
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of(dest));
         stubHttpRequest();
 
-        IncomingEvent event = service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent event = accepted(service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(event.getId()).isEqualTo(eventId);
 
@@ -348,7 +355,7 @@ class IngressServiceTest {
         stubHttpRequest();
         when(httpRequest.getHeader("X-Signature")).thenReturn(expectedHmac);
 
-        IncomingEvent event = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent event = accepted(service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(event.getVerified()).isTrue();
         assertThat(event.getVerificationError()).isNull();
@@ -466,7 +473,7 @@ class IngressServiceTest {
         });
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
 
-        IncomingEvent result = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest));
 
         // Legitimate webhook is accepted and persisted
         assertThat(result.getId()).isEqualTo(eventId);
@@ -533,7 +540,7 @@ class IngressServiceTest {
         // First time — not a replay
         when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(false);
 
-        IncomingEvent event = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent event = accepted(service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(event.getVerified()).isTrue();
         verify(eventRepository).save(any(IncomingEvent.class));
@@ -551,7 +558,7 @@ class IngressServiceTest {
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
         stubHttpRequest();
 
-        IncomingEvent event = service.receiveWebhook("validtoken", (byte[]) null, httpRequest);
+        IncomingEvent event = accepted(service.receiveWebhook("validtoken", (byte[]) null, httpRequest));
 
         assertThat(event.getBodyRaw()).isNull();
         assertThat(event.getBodySha256()).isNull();
@@ -573,7 +580,7 @@ class IngressServiceTest {
         // trusted proxy actually saw as its peer, and therefore the real client.
         when(httpRequest.getHeader("X-Forwarded-For")).thenReturn("203.0.113.50, 70.41.3.18");
 
-        IncomingEvent event = service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent event = accepted(service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(event.getClientIp()).isEqualTo("70.41.3.18");
     }
@@ -594,7 +601,7 @@ class IngressServiceTest {
         when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_123"))
                 .thenReturn(Optional.of(existing));
 
-        IncomingEvent result = service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getId()).isEqualTo(eventId);
         // No new event saved, no forwarding
@@ -617,8 +624,8 @@ class IngressServiceTest {
         stubHttpRequest();
         when(httpRequest.getHeader("Stripe-Signature")).thenReturn("t=1700000000,v1=abc");
 
-        IncomingEvent result = service.receiveWebhook("validtoken",
-                "{\"id\":\"evt_stripe_456\",\"object\":\"event\"}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken",
+                "{\"id\":\"evt_stripe_456\",\"object\":\"event\"}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getProviderEventId()).isEqualTo("evt_stripe_456");
     }
@@ -644,7 +651,7 @@ class IngressServiceTest {
         when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "f5e5f430-f57b-4e6e-9fac-d9128cd7232f"))
                 .thenReturn(Optional.of(existing));
 
-        IncomingEvent result = service.receiveWebhook("validtoken", "{\"object_kind\":\"push\"}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken", "{\"object_kind\":\"push\"}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getId()).isEqualTo(eventId);
         verify(eventRepository, never()).save(any(IncomingEvent.class));
@@ -667,7 +674,7 @@ class IngressServiceTest {
         when(httpRequest.getHeader("X-Gitlab-Event")).thenReturn("Push Hook");
         when(httpRequest.getHeader("webhook-id")).thenReturn("msg_2b3c");
 
-        IncomingEvent result = service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getProviderEventId()).isEqualTo("msg_2b3c");
     }
@@ -688,7 +695,7 @@ class IngressServiceTest {
         when(httpRequest.getHeader("X-Gitlab-Event")).thenReturn("Pipeline Hook");
         when(httpRequest.getHeader("X-Gitlab-Event-UUID")).thenReturn("13792a34-cac6-4fda-95a8-c58e00a3954e");
 
-        IncomingEvent result = service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getProviderEventId()).isNull();
         verify(eventRepository, never()).findByIncomingSourceIdAndProviderEventId(any(), any());
@@ -715,7 +722,7 @@ class IngressServiceTest {
         when(eventRepository.save(any(IncomingEvent.class)))
                 .thenThrow(new DataIntegrityViolationException("Unique index violation"));
 
-        IncomingEvent result = service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken", "{\"data\":1}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getId()).isEqualTo(eventId);
         assertThat(result.getProviderEventId()).isEqualTo("evt_race");
@@ -749,8 +756,8 @@ class IngressServiceTest {
         stubHttpRequest();
 
         // Two events with identical body but no provider event ID header — both must be saved
-        IncomingEvent first = service.receiveWebhook("validtoken", "{\"status\":\"active\"}".getBytes(StandardCharsets.UTF_8), httpRequest);
-        IncomingEvent second = service.receiveWebhook("validtoken", "{\"status\":\"active\"}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent first = accepted(service.receiveWebhook("validtoken", "{\"status\":\"active\"}".getBytes(StandardCharsets.UTF_8), httpRequest));
+        IncomingEvent second = accepted(service.receiveWebhook("validtoken", "{\"status\":\"active\"}".getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(first.getId()).isNotEqualTo(second.getId());
         assertThat(first.getProviderEventId()).isNull();
@@ -776,7 +783,7 @@ class IngressServiceTest {
         when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "Ev0PV52K25"))
                 .thenReturn(Optional.of(existing));
 
-        IncomingEvent result = service.receiveWebhook("validtoken", slackBody.getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken", slackBody.getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getId()).isEqualTo(eventId);
         assertThat(result.getProviderEventId()).isEqualTo("Ev0PV52K25");
@@ -799,10 +806,126 @@ class IngressServiceTest {
         when(httpRequest.getHeader("X-Slack-Request-Timestamp")).thenReturn("1531420618");
 
         String challengeBody = "{\"type\":\"url_verification\",\"challenge\":\"abc\"}";
-        IncomingEvent result = service.receiveWebhook("validtoken", challengeBody.getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken", challengeBody.getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getProviderEventId()).isNull();
         verify(eventRepository).save(any(IncomingEvent.class));
+    }
+
+    // ── Slack's url_verification handshake ─────────────────────────────────────────────
+    //
+    // Slack will not send a single event to a Request URL until that URL has echoed the challenge
+    // of a signed url_verification POST. It was answered 202 with a requestId and stored as an
+    // event, so a SLACK Source could never be connected to the Events API at all.
+
+    private static final String SLACK_SECRET = "slack-signing-secret";
+    private static final String URL_VERIFICATION =
+            "{\"token\":\"Jhj5dZrVaK7ZwHHjRyZWjbDl\",\"challenge\":\"3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P\","
+                    + "\"type\":\"url_verification\"}";
+
+    private IncomingSource slackSource() {
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(SLACK_SECRET, ENCRYPTION_KEY, ENCRYPTION_SALT);
+        IncomingSource source = buildActiveSource();
+        source.setProviderType(ProviderType.SLACK);
+        source.setVerificationMode(VerificationMode.PROVIDER);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        return source;
+    }
+
+    private void signLikeSlack(String secret, String body) {
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+        when(httpRequest.getHeader("X-Slack-Request-Timestamp")).thenReturn(timestamp);
+        when(httpRequest.getHeader("X-Slack-Signature"))
+                .thenReturn("v0=" + computeHmac(secret, "v0:" + timestamp + ":" + body));
+    }
+
+    @Test
+    void aVerifiedSlackUrlVerificationIsAnsweredWithItsChallengeAndNothingIsStored() {
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(slackSource()));
+        stubHttpRequest();
+        signLikeSlack(SLACK_SECRET, URL_VERIFICATION);
+
+        IngressOutcome outcome = service.receiveWebhook("validtoken",
+                URL_VERIFICATION.getBytes(StandardCharsets.UTF_8), httpRequest);
+
+        assertThat(outcome).isEqualTo(new IngressOutcome.SlackUrlVerification(
+                "3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P"));
+        verify(eventRepository, never()).save(any());
+        verify(outboxMessageRepository, never()).saveAll(any());
+        verify(entitlementService, never()).checkEventQuota();
+        verify(quotaCounterService, never()).increment();
+        verify(replayDetectionService, never()).isReplay(any(), any());
+        verify(transactionManager, never()).getTransaction(any());
+    }
+
+    @Test
+    void anOverQuotaOrganizationCanStillConnectASlackApp() {
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(slackSource()));
+        stubHttpRequest();
+        signLikeSlack(SLACK_SECRET, URL_VERIFICATION);
+        doThrow(new QuotaExceededException("events_per_month", 1000, 1000, "Free"))
+                .when(entitlementService).checkEventQuota();
+
+        IngressOutcome outcome = service.receiveWebhook("validtoken",
+                URL_VERIFICATION.getBytes(StandardCharsets.UTF_8), httpRequest);
+
+        assertThat(outcome).isInstanceOf(IngressOutcome.SlackUrlVerification.class);
+    }
+
+    @Test
+    void aSlackUrlVerificationWithABadSignatureIsRefusedAndNotEchoed() {
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(slackSource()));
+        stubHttpRequest();
+        signLikeSlack("not-the-signing-secret", URL_VERIFICATION);
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken",
+                URL_VERIFICATION.getBytes(StandardCharsets.UTF_8), httpRequest))
+                .isInstanceOf(SignatureVerificationFailedException.class);
+        verify(eventRepository, never()).save(any());
+    }
+
+    @Test
+    void aSlackUrlVerificationToASuspendedOrganizationIsRefused() {
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(slackSource()));
+        when(suspensionCheck.suspensionReason(orgId)).thenReturn(Optional.of("abuse"));
+        stubHttpRequest();
+        signLikeSlack(SLACK_SECRET, URL_VERIFICATION);
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken",
+                URL_VERIFICATION.getBytes(StandardCharsets.UTF_8), httpRequest))
+                .isInstanceOf(OrganizationSuspendedException.class);
+    }
+
+    @Test
+    void aSlackSourceWithoutVerificationDoesNotEchoAChallengeItCannotAuthenticate() {
+        IncomingSource source = slackSource();
+        source.setVerificationMode(VerificationMode.NONE);
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubHttpRequest();
+
+        IngressOutcome outcome = service.receiveWebhook("validtoken",
+                URL_VERIFICATION.getBytes(StandardCharsets.UTF_8), httpRequest);
+
+        assertThat(outcome).isInstanceOf(IngressOutcome.Accepted.class);
+    }
+
+    @Test
+    void aVerifiedSlackEventCallbackIsStillStoredAsAnEvent() {
+        String eventCallback = "{\"type\":\"event_callback\",\"event_id\":\"Ev0PV52K25\",\"challenge\":\"x\"}";
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(slackSource()));
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubHttpRequest();
+        signLikeSlack(SLACK_SECRET, eventCallback);
+
+        IncomingEvent event = accepted(service.receiveWebhook("validtoken",
+                eventCallback.getBytes(StandardCharsets.UTF_8), httpRequest));
+
+        assertThat(event.getProviderEventId()).isEqualTo("Ev0PV52K25");
+        assertThat(event.getVerified()).isTrue();
     }
 
     @Test
@@ -965,7 +1088,7 @@ class IngressServiceTest {
         when(eventRepository.save(any(IncomingEvent.class)))
                 .thenThrow(new DataIntegrityViolationException("Unique index violation"));
 
-        IncomingEvent result = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getId()).isEqualTo(eventId);
         verify(replayDetectionService, never()).unmark(any(), any());
@@ -997,7 +1120,7 @@ class IngressServiceTest {
         when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
         when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(false);
 
-        IncomingEvent event = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent event = accepted(service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(event.getId()).isEqualTo(eventId);
         verify(replayDetectionService, never()).unmark(any(), any());
@@ -1045,7 +1168,7 @@ class IngressServiceTest {
         when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_resent"))
                 .thenReturn(Optional.of(acceptedEvent("evt_resent")));
 
-        IncomingEvent result = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getId()).isEqualTo(eventId);
         verify(eventRepository, never()).save(any(IncomingEvent.class));
@@ -1085,7 +1208,7 @@ class IngressServiceTest {
         doThrow(new QuotaExceededException("events_per_month", 1000, 1000, "Free"))
                 .when(entitlementService).checkEventQuota();
 
-        IncomingEvent result = service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = accepted(service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest));
 
         assertThat(result.getId()).isEqualTo(eventId);
         verify(eventRepository, never()).save(any(IncomingEvent.class));

@@ -122,6 +122,7 @@ The ingress answers a provider, not a person. Each code is what the provider's o
 
 | Status | Meaning |
 |---|---|
+| `200` | Slack's `url_verification` handshake to a `SLACK` source, answered `{"challenge":"…"}` once its signature is verified. This is how Slack enables the Request URL, so the source needs `PROVIDER` verification with the app's signing secret. The handshake is not an event: nothing is stored, forwarded or counted. |
 | `202` | Accepted and stored. The body carries `requestId`. |
 | `401` | Verification is configured and the signature did not check out, or a signature already seen arrived on a webhook that is not a resend of a stored one. Nothing is stored. |
 | `403` | The organization is suspended. Answered `403`, not `410`, so a provider that deletes its subscription on `410` still has it when the suspension is lifted. |
