@@ -11,9 +11,9 @@ import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 /**
  * Seven sections, read by people who decide on outcomes as much as by the engineers who install:
- * the promise and both ways in (hero), what it does in either direction (directions), what
- * happens when the other side is down (reliability), what it is built on and why that keeps
- * events safe (architecture), what the team will look at (product), how
+ * the promise and both ways in (hero), the real product in screenshots straight after it
+ * (product), what it does in either direction (directions), what happens when the other side is
+ * down (reliability), what it is built on and why that keeps events safe (architecture), how
  * to run it — free in the cloud or on your own servers (run), and where an engineer starts, with
  * the ask again (developer).
  *
@@ -41,10 +41,10 @@ export default function LandingPage() {
   return (
     <>
       <HeroSection />
+      <ProductSection />
       <DirectionsSection />
       <ReliabilitySection />
       <ArchitectureSection />
-      <ProductSection />
       <RunSection />
       <DeveloperSection />
     </>

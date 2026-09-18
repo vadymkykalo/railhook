@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { fireEvent, screen, within } from '@testing-library/react';
 import LandingPage from '../LandingPage';
@@ -81,13 +82,16 @@ describe('LandingPage', () => {
     }
   });
 
-  it('explains what keeps events safe right after the reliability section, before the product', () => {
+  it('shows the product straight after the hero, and what keeps events safe right after the reliability section', () => {
     renderLanding();
+    const hero = screen.getByRole('heading', { level: 1 }).closest('section') as HTMLElement;
+    const product = sectionTitled(en.landing.product.title);
+    const directions = sectionTitled(en.landing.directions.title);
     const reliability = sectionTitled(en.landing.reliability.title);
     const architecture = sectionTitled(en.landing.architecture.title);
-    const product = sectionTitled(en.landing.product.title);
+    expect(hero.nextElementSibling).toBe(product);
+    expect(product.nextElementSibling).toBe(directions);
     expect(reliability.nextElementSibling).toBe(architecture);
-    expect(architecture.nextElementSibling).toBe(product);
   });
 
   it('draws the architecture as one picture with a text alternative naming what it runs on', () => {
@@ -262,16 +266,34 @@ describe('DeveloperSection', () => {
 });
 
 describe('LandingNav', () => {
-  it('keeps the header to eight things to press', () => {
+  it('keeps the header to nine things to press', () => {
     renderPage(<LandingNav />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
     const nav = screen.getByRole('navigation', { name: en.landing.nav.label });
     const interactive = [...within(nav).queryAllByRole('link'), ...within(nav).queryAllByRole('button')];
-    expect(interactive.length).toBeLessThanOrEqual(8);
+    expect(interactive.length).toBeLessThanOrEqual(9);
 
     const hrefs = within(nav).getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(expect.arrayContaining(['/#product', '/pricing', '/#run', '/docs/', '/register', '/login']));
+    expect(hrefs).toEqual(expect.arrayContaining(['/#product', '/pricing', '/#run', '/about', '/register', '/login']));
     // Pricing covers both the cloud plan and self-hosting, so the header has no separate "Cloud".
     expect(within(nav).queryByRole('link', { name: 'Cloud' })).toBeNull();
+  });
+
+  it('keeps docs, the CLI and the MCP server behind a Developers menu, each with a line on what it is', async () => {
+    renderPage(<LandingNav />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
+    const nav = screen.getByRole('navigation', { name: en.landing.nav.label });
+    const toggle = within(nav).getByRole('button', { name: en.landing.nav.developers });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(within(nav).getByRole('link', { name: new RegExp(en.landing.nav.devCli) })).toHaveAttribute('href', '/docs/tools/cli/');
+    expect(within(nav).getByRole('link', { name: new RegExp(en.landing.nav.devMcp) })).toHaveAttribute('href', '/docs/tools/mcp/');
+    expect(within(nav).getByRole('link', { name: new RegExp(en.landing.nav.devDocs) })).toHaveAttribute('href', '/docs/');
+    expect(within(nav).getByText(en.landing.nav.devMcpBody)).toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
   });
 });
 

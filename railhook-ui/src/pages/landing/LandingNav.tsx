@@ -1,17 +1,33 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Github, Menu, X } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import {
+  Activity,
+  BookOpen,
+  Bot,
+  ChevronDown,
+  Github,
+  Menu,
+  Radio,
+  ShieldCheck,
+  Terminal,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { RailhookIcon } from '../../components/icons/RailhookIcon';
 import { Button } from '../../components/ui/button';
 import { useAuth } from '../../auth/auth.store';
+import { publicTesterEnabled, statusPageUrl } from '../../lib/runtimeConfig';
+import { cn } from '../../lib/utils';
 import { REPO_URL } from './plans';
 import { WRAP } from './primitives';
 
 /**
- * Eight things to press, at most: the logo, four places to go, the repository, and the two ways
+ * Nine things to press, at most: the logo, five places to go, the repository, and the two ways
  * in. The header this replaced had eleven, including the language and theme switches — those
- * are set once and now live in the footer.
+ * are set once and now live in the footer. What a developer reaches for — docs, the CLI, the MCP
+ * server, the free tools, status — sits behind one "Developers" menu with a line on each, the way
+ * the products people compare this with do it, rather than as five more words in a row.
  *
  * Pricing is the page people look for first, and it covers both the free cloud plan and
  * self-hosting, so it took the place of a "Cloud" link that pointed at the same section as
@@ -53,6 +69,8 @@ export default function LandingNav() {
     { to: '/pricing', label: t('landing.nav.pricing') },
     { to: '/#run', label: t('landing.nav.selfHost') },
   ];
+  const developers = useDeveloperLinks();
+  const about = { to: '/about', label: t('landing.nav.about') };
   const linkClass = 'transition-colors hover:text-foreground';
   const close = () => setOpen(false);
 
@@ -76,9 +94,12 @@ export default function LandingNav() {
               </li>
             ))}
             <li>
-              <a href="/docs/" className={linkClass}>
-                {t('landing.nav.docs')}
-              </a>
+              <DevelopersMenu links={developers} />
+            </li>
+            <li>
+              <Link to={about.to} className={linkClass}>
+                {about.label}
+              </Link>
             </li>
           </ul>
 
@@ -129,10 +150,20 @@ export default function LandingNav() {
                 </Link>
               </li>
             ))}
+            <li className="border-b border-rail py-3">
+              <p className="mono-label mb-2">{t('landing.nav.developers')}</p>
+              <ul className="grid gap-1">
+                {developers.map((d) => (
+                  <li key={d.href}>
+                    <DeveloperLink link={d} onNavigate={close} />
+                  </li>
+                ))}
+              </ul>
+            </li>
             <li>
-              <a href="/docs/" className="block border-b border-rail py-3">
-                {t('landing.nav.docs')}
-              </a>
+              <Link to={about.to} onClick={close} className="block border-b border-rail py-3">
+                {about.label}
+              </Link>
             </li>
             <li>
               <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 border-b border-rail py-3">
@@ -151,5 +182,135 @@ export default function LandingNav() {
         </div>
       )}
     </header>
+  );
+}
+
+interface DeveloperLinkData {
+  href: string;
+  /** A route in this app rather than a page of the docs site or another host. */
+  route?: boolean;
+  external?: boolean;
+  icon: LucideIcon;
+  title: string;
+  body: string;
+}
+
+function useDeveloperLinks(): DeveloperLinkData[] {
+  const { t } = useTranslation();
+  const status = statusPageUrl();
+  return [
+    { href: '/docs/', icon: BookOpen, title: t('landing.nav.devDocs'), body: t('landing.nav.devDocsBody') },
+    { href: '/docs/tools/cli/', icon: Terminal, title: t('landing.nav.devCli'), body: t('landing.nav.devCliBody') },
+    { href: '/docs/tools/mcp/', icon: Bot, title: t('landing.nav.devMcp'), body: t('landing.nav.devMcpBody') },
+    ...(publicTesterEnabled()
+      ? [{ href: '/tester', route: true, icon: Radio, title: t('landing.nav.devTester'), body: t('landing.nav.devTesterBody') }]
+      : []),
+    {
+      href: '/tools/webhook-signature',
+      route: true,
+      icon: ShieldCheck,
+      title: t('landing.nav.devVerifier'),
+      body: t('landing.nav.devVerifierBody'),
+    },
+    ...(status
+      ? [{ href: status, external: true, icon: Activity, title: t('landing.nav.devStatus'), body: t('landing.nav.devStatusBody') }]
+      : []),
+  ];
+}
+
+function DeveloperLink({ link, onNavigate }: { link: DeveloperLinkData; onNavigate?: () => void }) {
+  const Icon = link.icon;
+  const className = 'group flex items-start gap-3 rounded-lg p-2.5 transition-colors hover:bg-muted focus-visible:bg-muted';
+  const content = (
+    <>
+      <span
+        aria-hidden="true"
+        className="grid h-8 w-8 flex-none place-items-center rounded-md bg-accent text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground"
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[14px] font-semibold text-foreground">{link.title}</span>
+        <span className="block text-[13px] leading-snug text-muted-foreground">{link.body}</span>
+      </span>
+    </>
+  );
+  if (link.route) {
+    return (
+      <Link to={link.href} onClick={onNavigate} className={className}>
+        {content}
+      </Link>
+    );
+  }
+  return (
+    <a
+      href={link.href}
+      onClick={onNavigate}
+      className={className}
+      {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+    >
+      {content}
+    </a>
+  );
+}
+
+/** The "Developers" disclosure on a wide screen: opens on click, closes on Escape, outside or on arrival elsewhere. */
+function DevelopersMenu({ links }: { links: DeveloperLinkData[] }) {
+  const { t } = useTranslation();
+  const { pathname } = useLocation();
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const root = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => setOpen(false), [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        button.current?.focus();
+      }
+    };
+    const onPointer = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer);
+    };
+  }, [open]);
+
+  return (
+    <div ref={root} className="relative">
+      <button
+        ref={button}
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+        className={cn('inline-flex items-center gap-1 transition-colors hover:text-foreground', open && 'text-foreground')}
+      >
+        {t('landing.nav.developers')}
+        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} aria-hidden="true" />
+      </button>
+      {open && (
+        <div
+          id={panelId}
+          className="absolute left-1/2 top-[calc(100%+14px)] z-50 -ml-[17rem] w-[34rem] rounded-2xl border border-rail bg-card p-2 shadow-elevated-lg animate-scale-in motion-reduce:animate-none"
+        >
+          <ul className="grid grid-cols-2 gap-1">
+            {links.map((link) => (
+              <li key={link.href}>
+                <DeveloperLink link={link} onNavigate={() => setOpen(false)} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }

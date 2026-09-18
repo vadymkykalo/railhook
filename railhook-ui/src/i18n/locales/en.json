@@ -1664,7 +1664,8 @@
     "company": "Company",
     "releases": "Releases",
     "signatureVerifier": "Signature verifier",
-    "status": "Status"
+    "status": "Status",
+    "cli": "CLI"
   },
   "incidents": {
     "addNote": "Add Note",
@@ -2128,23 +2129,56 @@
       "selfHost": "Self-host",
       "signIn": "Sign in",
       "startFree": "Start free",
-      "pricing": "Pricing"
+      "pricing": "Pricing",
+      "about": "About",
+      "developers": "Developers",
+      "devDocs": "Documentation",
+      "devDocsBody": "Guides, quickstart and the API reference.",
+      "devCli": "CLI",
+      "devCliBody": "railhook listen forwards webhooks to your localhost.",
+      "devMcp": "MCP server",
+      "devMcpBody": "Let Claude, Cursor and other agents send and replay events.",
+      "devTester": "Webhook tester",
+      "devTesterBody": "A free URL that shows exactly what arrives.",
+      "devVerifier": "Signature verifier",
+      "devVerifierBody": "Check a Stripe, GitHub or Standard Webhooks signature.",
+      "devStatus": "Status",
+      "devStatusBody": "Live uptime of the site, the API and deliveries."
     },
     "product": {
-      "connectionsAlt": "Railhook connections screen listing incoming sources and destinations",
-      "connectionsBody": "The services you receive from, and where their webhooks go next.",
-      "connectionsTab": "Connections",
-      "dashboardAlt": "Railhook dashboard: delivery volume and outcomes over time",
-      "dashboardBody": "How much went out, how much arrived, and what is waiting to retry.",
-      "dashboardTab": "Dashboard",
-      "deliveriesAlt": "Railhook deliveries list with the status and response of each attempt",
-      "deliveriesBody": "Each delivery, every attempt, and what the other server answered.",
-      "deliveriesTab": "Deliveries",
-      "lead": "The screen your team opens when a customer asks what happened.",
-      "openFull": "Tap to open the full-size screenshot",
-      "tabsLabel": "Screens",
-      "title": "See where every webhook went",
-      "unavailable": "Screenshot not captured yet"
+      "analytics": {
+        "alt": "Railhook analytics: delivery volume, success rate and latency charts",
+        "caption": "Volume, success rate and latency, per endpoint and over time.",
+        "tab": "Analytics"
+      },
+      "attempts": {
+        "alt": "A delivery opened in Railhook, listing its attempts: server errors first, then a retry that succeeded",
+        "caption": "Each attempt of one delivery, with the status code and response body it got.",
+        "tab": "Retries"
+      },
+      "deliveries": {
+        "alt": "Railhook deliveries list: webhooks to several customer endpoints, most delivered, some retrying or failed, with response codes",
+        "caption": "Every webhook you sent, to whom, and what their server answered.",
+        "tab": "Deliveries"
+      },
+      "failed": {
+        "alt": "Railhook failed messages: deliveries that exhausted their retries, with a replay button",
+        "caption": "What ran out of retries waits here until you replay it, one or all at once.",
+        "tab": "Failed messages"
+      },
+      "incoming": {
+        "alt": "Railhook incoming events from Stripe and GitHub, each marked with its signature verification result",
+        "caption": "Webhooks from Stripe and GitHub, their signatures checked before anything is forwarded.",
+        "tab": "Incoming"
+      },
+      "lead": "The real product, with demo data: the screens your team opens when a customer asks what happened.",
+      "portal": {
+        "alt": "The Railhook customer portal embedded in a customer-facing app, showing endpoints and recent deliveries",
+        "caption": "Your customers manage their own endpoints and see their own deliveries, inside your app.",
+        "tab": "Customer portal"
+      },
+      "tabsLabel": "Product screens",
+      "title": "See it in action"
     },
     "reliability": {
       "failedBody": "See what didn't arrive and send it again with one click.",
@@ -4584,7 +4618,7 @@
       "title": "What it is built on",
       "lead": "Well-understood parts you can run yourself.",
       "java": {
-        "title": "Java 17 and Spring Boot",
+        "title": "Java and Spring Boot",
         "body": "The API, and the worker that makes the deliveries."
       },
       "postgres": {
