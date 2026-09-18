@@ -2220,7 +2220,7 @@
         },
         "cookies": {
           "title": "Cookies, analytics and messages",
-          "body": "- One cookie keeps you signed in. It is needed for the service to work and is not used for anything else.\n- Visits to the site are counted with Cloudflare Web Analytics. It sets no cookies and does not follow you across sites. Decline it in the notice on the site and it is not loaded again in that browser.\n- A message you send through the site's form is emailed to our support inbox with your address, so we can reply. It is kept only as long as that conversation needs."
+          "body": "- One cookie keeps you signed in. It is needed for the service to work and is not used for anything else.\n- Visits to the site are counted with Cloudflare Web Analytics. It sets no cookies and does not follow you across sites.\n- A message you send through the site's form is emailed to our support inbox with your address, so we can reply. It is kept only as long as that conversation needs."
         }
       },
       "title": "Privacy Policy"
@@ -4385,11 +4385,10 @@
   },
   "site": {
     "cookie": {
-      "title": "Cookies and analytics",
-      "body": "We set only the cookie that keeps you signed in. Visits are counted with Cloudflare Web Analytics, which uses no cookies and does not track you across sites. You can turn it off.",
+      "title": "Cookies",
+      "body": "We use one cookie, to keep you signed in. Visits are counted by Cloudflare Web Analytics without cookies and without tracking you across sites.",
       "policy": "Privacy policy",
-      "accept": "Accept",
-      "decline": "Decline"
+      "ok": "Got it"
     },
     "contact": {
       "launcher": "Message us",

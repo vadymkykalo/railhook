@@ -6,7 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import '../../../i18n';
 import en from '../../../i18n/locales/en.json';
 import { createTestQueryClient } from '../../../test/renderPage';
-import { CONSENT_KEY } from '../../../lib/consent';
+import { NOTICE_KEY } from '../../../lib/consent';
 import SiteOverlays from '../SiteOverlays';
 
 /**
@@ -34,17 +34,18 @@ afterEach(() => {
 });
 
 describe('cookie notice', () => {
-  it('asks once, and remembers a decline for analytics.js to read', async () => {
+  it('says once what the site stores, and goes away when acknowledged', async () => {
     renderAt();
-    const decline = await screen.findByRole('button', { name: en.site.cookie.decline }, { timeout: 2000 });
-    await userEvent.click(decline);
+    const ok = await screen.findByRole('button', { name: en.site.cookie.ok }, { timeout: 2000 });
+    expect(screen.getByRole('link', { name: en.site.cookie.policy })).toHaveAttribute('href', '/privacy');
+    await userEvent.click(ok);
 
-    expect(localStorage.getItem(CONSENT_KEY)).toBe('declined');
+    expect(localStorage.getItem(NOTICE_KEY)).toBe('seen');
     expect(screen.queryByText(en.site.cookie.title)).not.toBeInTheDocument();
   });
 
   it('is not shown again once answered', async () => {
-    localStorage.setItem(CONSENT_KEY, 'accepted');
+    localStorage.setItem(NOTICE_KEY, 'seen');
     renderAt();
     await new Promise((resolve) => setTimeout(resolve, 1100));
     expect(screen.queryByText(en.site.cookie.title)).not.toBeInTheDocument();

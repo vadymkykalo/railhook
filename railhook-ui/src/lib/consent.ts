@@ -1,27 +1,23 @@
 /**
- * The visitor's answer to the cookie notice, kept in this browser only.
+ * Whether this browser has already seen the cookie notice, kept in this browser only.
  *
- * `public/analytics.js` reads the same key before loading the Cloudflare beacon, which is why it
- * is a plain string under a fixed name rather than anything richer: that script runs before the
- * app and cannot import this module.
+ * The notice asks nothing: the site sets only the sign-in cookie, and its analytics are
+ * cookieless, so there is nothing to consent to. It says so once, and this is how it knows.
  */
-export type Consent = 'accepted' | 'declined';
+export const NOTICE_KEY = 'railhook.cookie-notice';
 
-export const CONSENT_KEY = 'railhook.consent';
-
-export function readConsent(): Consent | null {
+export function noticeSeen(): boolean {
   try {
-    const value = localStorage.getItem(CONSENT_KEY);
-    return value === 'accepted' || value === 'declined' ? value : null;
+    return localStorage.getItem(NOTICE_KEY) === 'seen';
   } catch {
-    return null;
+    return false;
   }
 }
 
-export function saveConsent(value: Consent): void {
+export function markNoticeSeen(): void {
   try {
-    localStorage.setItem(CONSENT_KEY, value);
+    localStorage.setItem(NOTICE_KEY, 'seen');
   } catch {
-    // Storage blocked: the notice comes back next visit, which is the honest outcome.
+    // Storage blocked: the notice comes back next visit, which is harmless.
   }
 }

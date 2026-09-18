@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Cookie, MessageCircle, X } from 'lucide-react';
 import { contactDomain, webAnalyticsToken } from '../../lib/runtimeConfig';
-import { readConsent, saveConsent } from '../../lib/consent';
+import { markNoticeSeen, noticeSeen } from '../../lib/consent';
 import { RailhookIcon } from '../icons/RailhookIcon';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
@@ -13,20 +13,20 @@ import ContactForm from './ContactForm';
  * What floats over the public pages: the cookie notice and the "write to us" widget.
  *
  * <p>Both only where they mean something. The notice appears where the deployment runs analytics
- * (a web analytics token is set) — a self-hosted install sets no cookie beyond sign-in and has
- * nothing to ask about. The widget appears where there is a support address to write to (the
+ * (a web analytics token is set) and says, once, what the site stores: the sign-in cookie and
+ * cookieless visit counts. It asks nothing, because there is nothing optional to refuse. The widget appears where there is a support address to write to (the
  * contact domain is set), and not on the contact page, which carries the same form in full.
  * Owned together because on a phone they share the bottom edge: the launcher rises above the
  * notice while the notice is up.
  */
 export default function SiteOverlays() {
   const { pathname } = useLocation();
-  const [consentOpen, setConsentOpen] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(false);
 
   useEffect(() => {
-    if (!webAnalyticsToken() || readConsent()) return;
+    if (!webAnalyticsToken() || noticeSeen()) return;
     // Not on first paint: the page is what the visitor came for.
-    const timer = window.setTimeout(() => setConsentOpen(true), 900);
+    const timer = window.setTimeout(() => setNoticeOpen(true), 900);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -34,16 +34,16 @@ export default function SiteOverlays() {
 
   return (
     <>
-      {consentOpen && <CookieNotice onAnswer={() => setConsentOpen(false)} />}
-      {showWidget && <ContactWidget raised={consentOpen} />}
+      {noticeOpen && <CookieNotice onAnswer={() => setNoticeOpen(false)} />}
+      {showWidget && <ContactWidget raised={noticeOpen} />}
     </>
   );
 }
 
 function CookieNotice({ onAnswer }: { onAnswer: () => void }) {
   const { t } = useTranslation();
-  const answer = (value: 'accepted' | 'declined') => {
-    saveConsent(value);
+  const dismiss = () => {
+    markNoticeSeen();
     onAnswer();
   };
   return (
@@ -63,14 +63,15 @@ function CookieNotice({ onAnswer }: { onAnswer: () => void }) {
         <div>
           <h2 id="cookie-notice-title" className="text-[15px] font-semibold text-foreground">{t('site.cookie.title')}</h2>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            {t('site.cookie.body')}{' '}
-            <Link to="/privacy" className="font-medium text-primary hover:underline">{t('site.cookie.policy')}</Link>
+            {t('site.cookie.body')}
           </p>
         </div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <Button variant="outline" size="sm" onClick={() => answer('declined')}>{t('site.cookie.decline')}</Button>
-        <Button size="sm" onClick={() => answer('accepted')}>{t('site.cookie.accept')}</Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/privacy">{t('site.cookie.policy')}</Link>
+        </Button>
+        <Button size="sm" onClick={dismiss}>{t('site.cookie.ok')}</Button>
       </div>
     </section>
   );
