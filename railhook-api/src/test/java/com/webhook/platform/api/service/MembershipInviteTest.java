@@ -124,6 +124,39 @@ class MembershipInviteTest {
         assertThat(response.getInviteExpiresAt()).isNull();
     }
 
+    /**
+     * An account can be registered for any address and used without ever proving it owns that
+     * address. Inviting the address then made that account an ACTIVE member on the spot — and read
+     * access needs no verified email — so whoever registered alice@customer.com first read the
+     * customer's events the day the owner invited Alice. With email delivery on, an unverified
+     * account is not taken to be the person at that address.
+     */
+    @Test
+    void anAccountThatNeverProvedItsAddressIsNotAddedWhenThatAddressIsInvited() {
+        when(emailService.isEnabled()).thenReturn(true);
+        User squatter = User.builder().id(UUID.randomUUID()).email("alice@customer.com").emailVerified(false).build();
+        when(userRepository.existsByEmail("alice@customer.com")).thenReturn(true);
+        when(userRepository.findByEmail("alice@customer.com")).thenReturn(Optional.of(squatter));
+
+        assertThatThrownBy(() -> membershipService.addMember(AddMemberRequest.builder().email("alice@customer.com").role(MembershipRole.VIEWER).build(), MembershipRole.OWNER))
+                .isInstanceOf(com.webhook.platform.api.exception.ConflictException.class)
+                .hasMessageContaining("verif");
+        verify(membershipRepository, never()).save(any(Membership.class));
+    }
+
+    @Test
+    void anAccountThatProvedItsAddressIsAddedAsBefore() {
+        when(emailService.isEnabled()).thenReturn(true);
+        User alice = User.builder().id(UUID.randomUUID()).email("alice@customer.com").emailVerified(true).build();
+        when(userRepository.existsByEmail("alice@customer.com")).thenReturn(true);
+        when(userRepository.findByEmail("alice@customer.com")).thenReturn(Optional.of(alice));
+
+        MemberResponse response = membershipService.addMember(AddMemberRequest.builder().email("alice@customer.com").role(MembershipRole.VIEWER).build(), MembershipRole.OWNER);
+
+        assertThat(response.getUserId()).isEqualTo(alice.getId());
+        assertThat(response.getStatus()).isEqualTo(MembershipStatus.ACTIVE);
+    }
+
     @Test
     void invitingACaseVariantOfAnExistingAddressAddsThatAccount_notANewOne() {
         User existing = new User();
