@@ -40,6 +40,42 @@ export interface paths {
         patch: operations["captureRequestPatch"];
         trace?: never;
     };
+    "/hook/p/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Send a request to a tester URL
+         * @description Any method, any body. Recorded and answered with 200.
+         */
+        get: operations["capturePublicBinRequestGet"];
+        /**
+         * Send a request to a tester URL
+         * @description Any method, any body. Recorded and answered with 200.
+         */
+        put: operations["capturePublicBinRequestPut"];
+        /**
+         * Send a request to a tester URL
+         * @description Any method, any body. Recorded and answered with 200.
+         */
+        post: operations["capturePublicBinRequestPost"];
+        /**
+         * Send a request to a tester URL
+         * @description Any method, any body. Recorded and answered with 200.
+         */
+        delete: operations["capturePublicBinRequestDelete"];
+        options?: never;
+        head?: never;
+        /**
+         * Send a request to a tester URL
+         * @description Any method, any body. Recorded and answered with 200.
+         */
+        patch: operations["capturePublicBinRequestPatch"];
+        trace?: never;
+    };
     "/tunnel/{slug}": {
         parameters: {
             query?: never;
@@ -586,6 +622,26 @@ export interface paths {
          * @description Creates a new tunnel session for CLI use. The tunnelToken is returned only once.
          */
         post: operations["createTunnel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/bins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a tester URL
+         * @description A URL that records every request sent to it for a day: the latest 100, with the first 64 KB of each body and credentials masked. Anyone who has the URL can read what it received.
+         */
+        post: operations["createPublicBin"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2346,6 +2402,26 @@ export interface paths {
          * @description Public endpoint — returns sanitized event payload. No authentication required.
          */
         get: operations["viewPublicLink"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/bins/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a tester URL
+         * @description The URL and the requests it received, newest first.
+         */
+        get: operations["getPublicBin"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4197,6 +4273,30 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
+        PublicBinResponse: {
+            slug?: string;
+            url?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            /** Format: int64 */
+            requestCount?: number;
+            requests?: components["schemas"]["Request"][];
+        };
+        Request: {
+            /** Format: int64 */
+            id?: number;
+            method?: string;
+            query?: string;
+            headers?: components["schemas"]["JsonNode"];
+            body?: string;
+            bodyTruncated?: boolean;
+            /** Format: int64 */
+            sizeBytes?: number;
+            contentType?: string;
+            sourceIp?: string;
+            /** Format: date-time */
+            receivedAt?: string;
+        };
         StepExecutionResponse: {
             /** Format: uuid */
             id?: string;
@@ -4881,12 +4981,12 @@ export interface components {
             /** Format: int64 */
             offset?: number;
             sort?: components["schemas"]["SortObject"];
-            unpaged?: boolean;
             paged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
+            unpaged?: boolean;
         };
         SortObject: {
             empty?: boolean;
@@ -6217,6 +6317,256 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["WebhookCaptureResponse"];
+                };
+            };
+        };
+    };
+    capturePublicBinRequestGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such URL, or it has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Too many requests to this URL */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    capturePublicBinRequestPut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such URL, or it has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Too many requests to this URL */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    capturePublicBinRequestPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such URL, or it has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Too many requests to this URL */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    capturePublicBinRequestDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such URL, or it has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Too many requests to this URL */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    capturePublicBinRequestPatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such URL, or it has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Too many requests to this URL */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -7725,6 +8075,35 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["TunnelCreateResponse"];
+                };
+            };
+        };
+    };
+    createPublicBin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The URL */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicBinResponse"];
+                };
+            };
+            /** @description Too many URLs made from this address */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicBinResponse"];
                 };
             };
         };
@@ -10633,6 +11012,37 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["SharedDebugLinkPublicResponse"];
+                };
+            };
+        };
+    };
+    getPublicBin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The URL and its requests */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicBinResponse"];
+                };
+            };
+            /** @description No such URL, or it has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicBinResponse"];
                 };
             };
         };

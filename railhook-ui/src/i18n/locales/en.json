@@ -1658,7 +1658,8 @@
     "tagline": "Open-source webhook gateway. Send and receive webhooks, in our cloud or on your own servers.",
     "talkToUs": "Talk to us",
     "terms": "Terms of Service",
-    "pricing": "Pricing"
+    "pricing": "Pricing",
+    "tester": "Webhook tester"
   },
   "incidents": {
     "addNote": "Add Note",
@@ -2395,6 +2396,10 @@
     "pricing": {
       "title": "Pricing — Railhook: free webhook gateway, in the cloud or self-hosted",
       "description": "Railhook is free: a cloud plan with 10,000 events a month, or every feature on your own servers under the MIT licence, with no licence key."
+    },
+    "tester": {
+      "title": "Webhook tester — inspect webhook requests online, free | Railhook",
+      "description": "Get a free URL, send it a webhook from Stripe, GitHub or curl, and see the method, headers and body that arrived. No account needed, kept for 24 hours."
     }
   },
   "mtls": {
@@ -4107,6 +4112,40 @@
         "q": "What do I need to run it myself?",
         "a": "A server with Docker and 4 GB of RAM. One command installs Railhook with PostgreSQL, Kafka and Redis, and sets up HTTPS on your domain."
       }
+    }
+  },
+  "tester": {
+    "eyebrow": "Free tool · no account",
+    "title": "Webhook tester",
+    "lead": "Get a URL, send it a webhook from Stripe, GitHub or curl, and see exactly what arrived: method, headers and body. Nothing to install, and it keeps what it receives for 24 hours.",
+    "createHint": "Your URL records every request sent to it — the latest 100, with the first 64 KB of each body — and shows them here as they arrive.",
+    "create": "Create a test URL",
+    "creating": "Creating…",
+    "loading": "Loading your URL…",
+    "yourUrl": "Your URL",
+    "tryIt": "Try it",
+    "copy": "Copy",
+    "copied": "Copied",
+    "expires": "Expires {{time}}",
+    "newUrl": "New URL",
+    "requests": "Requests",
+    "received": "{{count}} received",
+    "waiting": "Waiting for the first request…",
+    "select": "Pick a request to see its headers and body.",
+    "query": "Query",
+    "headers": "Headers",
+    "body": "Body",
+    "truncated": "Only the first 64 KB of this body was kept.",
+    "masked": "Anyone with this URL can read what it received, so Authorization, cookies and signature headers are masked.",
+    "from": "from {{ip}}",
+    "size": "{{size}} bytes",
+    "tooMany": "Too many URLs from your address. Try again in a minute.",
+    "error": "Could not create a URL. Try again.",
+    "cta": {
+      "title": "Receive webhooks for real",
+      "body": "A free Railhook account keeps every request, verifies Stripe, GitHub and Shopify signatures, retries delivery to your service when it is down, and forwards to localhost while you develop.",
+      "button": "Start free",
+      "docs": "Receive your first webhook"
     }
   }
 }

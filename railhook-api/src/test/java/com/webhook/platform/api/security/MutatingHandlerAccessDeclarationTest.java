@@ -76,6 +76,9 @@ class MutatingHandlerAccessDeclarationTest {
             "DeviceAuthController.pollDeviceToken",
             "BillingController.handleWebhook",
             "IngressController.receiveWebhook",
+            // The public site's webhook tester: anonymous by design (/api/v1/public/** in
+            // SecurityConfig), rate-limited per address, and it touches no tenant data at all.
+            "PublicBinController.create",
 
             // Act on the caller's own account rather than on tenant data, so a membership role
             // is not the right question: a Viewer may change their own password.

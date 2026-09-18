@@ -15,6 +15,8 @@ const MARKETING = [
   { path: '/', priority: '1.0', changefreq: 'weekly' },
   // The free plan, the self-hosted promise and what the alternatives cost.
   { path: '/pricing', priority: '0.8', changefreq: 'monthly' },
+  // The free webhook tester: a tool people search for, and a first use before signing up.
+  { path: '/tester', priority: '0.8', changefreq: 'monthly' },
   { path: '/contact', priority: '0.5', changefreq: 'monthly' },
   // Linked from the registration form and from Google's consent screen, which requires both.
   { path: '/privacy', priority: '0.3', changefreq: 'yearly' },

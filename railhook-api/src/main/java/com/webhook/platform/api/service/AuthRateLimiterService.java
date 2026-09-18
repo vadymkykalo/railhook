@@ -35,6 +35,9 @@ public class AuthRateLimiterService {
     /** The CLI polls every five seconds, twelve a minute; the rest is room for a clock that drifts. */
     static final int DEVICE_POLL_PER_CODE_PER_MINUTE = 20;
     static final int DEVICE_POLL_PER_IP_PER_MINUTE = 120;
+    private static final String PUBLIC_BIN_KEY_PREFIX = "rate_limiter:public_bin:ip:";
+    /** Public tester URLs a single address may make in a minute; a person needs one or two. */
+    static final int PUBLIC_BIN_PER_IP_PER_MINUTE = 5;
     private static final Duration KEY_TTL = Duration.ofMinutes(5);
 
     private final RedissonClient redissonClient;
@@ -87,6 +90,11 @@ public class AuthRateLimiterService {
             return tryAcquire(LOGIN_EMAIL_KEY_PREFIX + email.toLowerCase().trim(), loginRateLimit);
         }
         return true;
+    }
+
+    /** Making a webhook tester URL on the public site, which needs no account. */
+    public boolean allowPublicBin(String ip) {
+        return tryAcquire(PUBLIC_BIN_KEY_PREFIX + ip, PUBLIC_BIN_PER_IP_PER_MINUTE);
     }
 
     public boolean allowRegister(String ip) {

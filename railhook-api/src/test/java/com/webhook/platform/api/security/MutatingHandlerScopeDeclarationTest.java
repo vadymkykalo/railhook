@@ -133,6 +133,9 @@ class MutatingHandlerScopeDeclarationTest {
             // Unauthenticated by design — whitelisted public paths in SecurityConfig.
             "BillingController.handleWebhook",
             "IngressController.receiveWebhook",
+            // The public site's webhook tester: anonymous by design (/api/v1/public/** in
+            // SecurityConfig), rate-limited per address, and it touches no tenant data at all.
+            "PublicBinController.create",
 
             // Platform-admin only, gated on the PLATFORM_ADMIN authority for /api/v1/admin/**
             // in SecurityConfig rather than on a tenant scope.

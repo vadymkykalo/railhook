@@ -27,6 +27,7 @@ import type { EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest
 // ─── Query Keys ────────────────────────────────────────────────────
 
 export const queryKeys = {
+    publicBin: (slug: string) => ['publicBin', slug] as const,
     platformAdmin: {
         all: ['platformAdmin'] as const,
         overview: () => ['platformAdmin', 'overview'] as const,

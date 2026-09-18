@@ -102,6 +102,8 @@ public abstract class AbstractIntegrationTest {
         when(authRateLimiterService.allowRefresh(anyString(), any())).thenReturn(true);
         // Device-code polling too (allowDevicePoll): unstubbed, every CLI poll answers 429.
         when(authRateLimiterService.allowDevicePoll(anyString(), any())).thenReturn(true);
+        // Creating a public tester URL without an account (allowPublicBin).
+        when(authRateLimiterService.allowPublicBin(anyString())).thenReturn(true);
         when(tokenBlacklistService.isBlacklisted(any())).thenReturn(false);
         when(tokenBlacklistService.isTokenRevokedByEpoch(any(), any())).thenReturn(false);
     }

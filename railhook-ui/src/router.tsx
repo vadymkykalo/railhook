@@ -20,6 +20,7 @@ const DeviceApprovePage = lazy(() => import('./auth/DeviceApprovePage'));
 const AuthCallbackPage = lazy(() => import('./auth/AuthCallbackPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
+const TesterPage = lazy(() => import('./pages/TesterPage'));
 const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.PrivacyPage })));
 const TermsPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.TermsPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -94,6 +95,10 @@ export const router = createBrowserRouter([
           {
             path: '/pricing',
             element: <S><PricingPage /></S>,
+          },
+          {
+            path: '/tester',
+            element: <S><TesterPage /></S>,
           },
           {
             path: '/contact',
