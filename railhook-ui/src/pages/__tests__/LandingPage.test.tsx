@@ -269,8 +269,9 @@ describe('LandingNav', () => {
     expect(interactive.length).toBeLessThanOrEqual(8);
 
     const hrefs = within(nav).getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(expect.arrayContaining(['/#product', '/#run', '/docs/', '/register', '/login']));
-    expect(hrefs).not.toContain('/pricing');
+    expect(hrefs).toEqual(expect.arrayContaining(['/#product', '/pricing', '/#run', '/docs/', '/register', '/login']));
+    // Pricing covers both the cloud plan and self-hosting, so the header has no separate "Cloud".
+    expect(within(nav).queryByRole('link', { name: 'Cloud' })).toBeNull();
   });
 });
 

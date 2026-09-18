@@ -2114,7 +2114,6 @@
     },
     "nav": {
       "closeMenu": "Close menu",
-      "cloud": "Cloud",
       "docs": "Docs",
       "github": "Railhook on GitHub",
       "goToDashboard": "Go to dashboard",
@@ -2123,7 +2122,8 @@
       "product": "Product",
       "selfHost": "Self-host",
       "signIn": "Sign in",
-      "startFree": "Start free"
+      "startFree": "Start free",
+      "pricing": "Pricing"
     },
     "product": {
       "connectionsAlt": "Railhook connections screen listing incoming sources and destinations",

@@ -2114,7 +2114,6 @@
     },
     "nav": {
       "closeMenu": "Закрити меню",
-      "cloud": "Хмара",
       "docs": "Документація",
       "github": "Railhook на GitHub",
       "goToDashboard": "До панелі",
@@ -2123,7 +2122,8 @@
       "product": "Продукт",
       "selfHost": "Свій сервер",
       "signIn": "Увійти",
-      "startFree": "Почати безкоштовно"
+      "startFree": "Почати безкоштовно",
+      "pricing": "Ціни"
     },
     "product": {
       "connectionsAlt": "Екран з'єднань Railhook зі списком вхідних джерел і призначень",
