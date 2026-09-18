@@ -122,6 +122,7 @@ The ingress answers a provider, not a person. Each code is what the provider's o
 
 | Status | Meaning |
 |---|---|
+| `200` | Slack's `url_verification` handshake to a `SLACK` source, answered `{"challenge":"…"}` once its signature is verified. This is how Slack enables the Request URL, so the source needs `PROVIDER` verification with the app's signing secret. The handshake is not an event: nothing is stored, forwarded or counted. |
 | `202` | Accepted and stored. The body carries `requestId`. |
 | `401` | Verification is configured and the signature did not check out, or a signature already seen arrived on a webhook that is not a resend of a stored one. Nothing is stored. |
 | `403` | The organization is suspended. Answered `403`, not `410`, so a provider that deletes its subscription on `410` still has it when the suspension is lifted. |
@@ -142,11 +143,11 @@ Providers send the same webhook again. When a request carries an id Railhook rec
 | Provider | Id |
 |---|---|
 | Generic | `X-Webhook-Id` header |
-| Stripe | `Stripe-Webhook-Id` header |
+| Stripe | `id` in the JSON body (`evt_…`), on a request signed with `Stripe-Signature` |
 | GitHub | `X-GitHub-Delivery` header |
 | GitLab | `webhook-id` header, or `Idempotency-Key` (GitLab 17.4 and later) |
 | Shopify | `X-Shopify-Webhook-Id` header |
-| Twilio | `X-Twilio-Webhook-Id` header |
+| Twilio | `I-Twilio-Idempotency-Token` header |
 | Slack | `event_id` in the JSON body |
 
 A provider that sends none of these is not deduplicated.

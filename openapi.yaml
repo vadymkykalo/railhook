@@ -1823,6 +1823,14 @@ paths:
             schema:
               type: string
       responses:
+        "200":
+          description: "Slack url_verification handshake on a SLACK source, answered\
+            \ once its signature is verified. The challenge is echoed and nothing\
+            \ is stored or forwarded."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlackUrlVerificationResponse"
         "202":
           description: Webhook accepted for processing
           content:
@@ -8339,6 +8347,17 @@ components:
           - ACTIVE
           - PENDING_VERIFICATION
           - DISABLED
+    SlackUrlVerificationResponse:
+      type: object
+      description: "Answer to Slack's url_verification handshake: the challenge Slack\
+        \ sent, echoed back"
+      properties:
+        challenge:
+          type: string
+          description: The challenge from the verified url_verification request
+          example: 3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P
+      required:
+      - challenge
     IngressResponse:
       type: object
       description: Response from incoming webhook ingress endpoint
