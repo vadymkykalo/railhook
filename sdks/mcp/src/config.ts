@@ -22,6 +22,13 @@ export class ConfigError extends Error {
  * `https://railhook.io` for Railhook Cloud, your own origin when self-hosted — and the remote
  * server is always at `/mcp` under it.
  */
+/** A loop rather than /\/+$/, which backtracks polynomially on a long run of slashes. */
+function withoutTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end--;
+  return value.slice(0, end);
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
   const apiKey = env.RAILHOOK_API_KEY?.trim();
   if (!apiKey) {
@@ -32,7 +39,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
     );
   }
 
-  const base = (env.RAILHOOK_BASE_URL?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, '');
+  const base = withoutTrailingSlashes(env.RAILHOOK_BASE_URL?.trim() || DEFAULT_BASE_URL);
   let url: URL;
   try {
     url = new URL(`${base}/mcp`);
