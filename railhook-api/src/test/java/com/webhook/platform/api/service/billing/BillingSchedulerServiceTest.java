@@ -14,6 +14,7 @@ import org.mockito.quality.Strictness;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
@@ -225,7 +226,7 @@ class BillingSchedulerServiceTest {
         sub.setCurrency("UAH");
         sub.setPriceCents(119900L);
         sub.setCurrentPeriodEnd(Instant.now().minus(1, ChronoUnit.HOURS));
-        List<BillingProvider.RecurringChargeRequest> charged = new java.util.ArrayList<>();
+        List<BillingProvider.RecurringChargeRequest> charged = new ArrayList<>();
         BillingProvider recording = new BillingProvider() {
             @Override public String getProviderCode() { return "wayforpay"; }
             @Override public String getDisplayName() { return "WayForPay"; }

@@ -27,6 +27,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -81,7 +83,7 @@ class SignInWithoutMembershipTest {
                 .build();
         when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
         // What the repository holds: nothing, until the sign-in saves a membership.
-        List<Membership> stored = new java.util.ArrayList<>();
+        List<Membership> stored = new ArrayList<>();
         when(membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()))
                 .thenAnswer(inv -> List.copyOf(stored));
         when(planRepository.findByName("free")).thenReturn(Optional.of(Plan.builder().name("free").build()));
@@ -97,7 +99,7 @@ class SignInWithoutMembershipTest {
         when(jwtUtil.generateRefreshToken(any(), any())).thenReturn("refresh");
         when(jwtUtil.getJtiFromToken("refresh")).thenReturn(UUID.randomUUID().toString());
         when(jwtUtil.getExpirationFromToken("refresh"))
-                .thenReturn(new java.util.Date(System.currentTimeMillis() + 86_400_000L));
+                .thenReturn(new Date(System.currentTimeMillis() + 86_400_000L));
     }
 
     @Test

@@ -299,7 +299,7 @@ class DeliveryRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        Delivery claimed = deliveryRepository.claimForProcessingAndReturn(waiting.getId(), UUID.randomUUID());
+        Delivery claimed = deliveryRepository.claimForProcessingAndReturn(waiting.getId(), UUID.randomUUID(), Instant.now());
 
         assertNull(claimed, "a Delivery whose next rung is in five minutes is not due for an Attempt");
     }
@@ -312,8 +312,8 @@ class DeliveryRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        assertNotNull(deliveryRepository.claimForProcessingAndReturn(fresh.getId(), UUID.randomUUID()));
-        assertNotNull(deliveryRepository.claimForProcessingAndReturn(due.getId(), UUID.randomUUID()));
+        assertNotNull(deliveryRepository.claimForProcessingAndReturn(fresh.getId(), UUID.randomUUID(), Instant.now()));
+        assertNotNull(deliveryRepository.claimForProcessingAndReturn(due.getId(), UUID.randomUUID(), Instant.now()));
     }
 
     @Test

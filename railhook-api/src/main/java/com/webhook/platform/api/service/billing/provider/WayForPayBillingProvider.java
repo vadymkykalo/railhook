@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.io.IOException;
 
 /**
  * WayForPay billing provider.
@@ -332,7 +333,7 @@ public class WayForPayBillingProvider implements BillingProvider {
     }
 
     /** The top-level {@code amount} exactly as it appears in the payload, or "" when absent. */
-    private String topLevelAmountText(String rawPayload) throws java.io.IOException {
+    private String topLevelAmountText(String rawPayload) throws IOException {
         try (JsonParser parser = objectMapper.getFactory().createParser(rawPayload)) {
             if (parser.nextToken() != JsonToken.START_OBJECT) {
                 return "";

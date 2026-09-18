@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
@@ -661,7 +662,7 @@ class BillingServiceTest {
         verify(lifecycleService).activate(eq(SUB_ID), start.capture(), end.capture());
         assertThat(start.getValue()).isAfterOrEqualTo(before);
         // A month from now, by the subscription's interval — not a fixed thirty days.
-        assertThat(end.getValue()).isEqualTo(start.getValue().atZone(java.time.ZoneOffset.UTC)
+        assertThat(end.getValue()).isEqualTo(start.getValue().atZone(ZoneOffset.UTC)
                 .plus(BillingInterval.MONTHLY.getPeriod()).toInstant());
         verify(lifecycleService, never()).renew(any(), any(), any());
         verify(lifecycleService).setRecurringToken(SUB_ID, "rec_token", "8217", "visa");

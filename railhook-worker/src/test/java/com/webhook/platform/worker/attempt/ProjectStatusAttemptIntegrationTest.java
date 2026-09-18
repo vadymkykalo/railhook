@@ -211,6 +211,16 @@ class ProjectStatusAttemptIntegrationTest {
         assertThat(deferred.getNextRetryAt()).isAfter(Instant.now().plusSeconds(60));
 
         jdbc.update("UPDATE organizations SET suspended_at = NULL, suspension_reason = NULL WHERE id = ?", org);
+        // The recheck comes due. Before it, a copy of the dispatch message claims nothing: the
+        // Delivery is waiting on its next_retry_at, which the RetryGovernor hands out.
+        assertThat(runDelivery(delivery).getAttemptCount()).isZero();
+        // Through the entity, the way the application writes it: the column has no time zone,
+        // so the database's own now() is not the clock the claim compares against.
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+            Delivery row = deliveryRepository.findById(delivery).orElseThrow();
+            row.setNextRetryAt(Instant.now().minusSeconds(1));
+            deliveryRepository.save(row);
+        });
         Delivery resumed = runDelivery(delivery);
 
         assertThat(received.get()).isEqualTo(1);

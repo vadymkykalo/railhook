@@ -162,13 +162,15 @@ class PaidCheckoutIntegrationTest extends AbstractIntegrationTest {
         // A month later the scheduler charges the card token for what the checkout charged, in
         // UAH — not the catalog's USD cents — and extends the period from where it ended.
         BillingSubscription due = subscriptionRepository.findById(second.getId()).orElseThrow();
-        Instant lapsedAt = Instant.now().minus(Duration.ofHours(1));
+        // Microsecond precision up front: Postgres rounds a nanosecond timestamp rather than
+        // truncating it, so a CI clock with nanoseconds made the comparison below miss by one.
+        Instant lapsedAt = Instant.now().minus(Duration.ofHours(1)).truncatedTo(ChronoUnit.MICROS);
         due.setCurrentPeriodEnd(lapsedAt);
         subscriptionRepository.save(due);
         billingSchedulerService.processRenewals();
         BillingSubscription renewed = subscriptionRepository.findById(second.getId()).orElseThrow();
         assertThat(renewed.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
-        assertThat(renewed.getCurrentPeriodStart()).isEqualTo(lapsedAt.truncatedTo(ChronoUnit.MICROS));
+        assertThat(renewed.getCurrentPeriodStart()).isEqualTo(lapsedAt);
         assertThat(paymentRepository.findByOrganizationIdOrderByCreatedAtDesc(orgId))
                 .filteredOn(p -> p.getStatus() == PaymentStatus.SUCCEEDED)
                 .singleElement()

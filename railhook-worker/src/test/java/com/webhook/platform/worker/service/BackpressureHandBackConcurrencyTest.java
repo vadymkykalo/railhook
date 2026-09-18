@@ -143,7 +143,7 @@ class BackpressureHandBackConcurrencyTest {
     void aDispatchCopyRefusedByBackpressureLeavesTheClaimAnotherCopyTook() {
         Delivery delivery = persistDelivery(Delivery.DeliveryStatus.PENDING, null);
         UUID firstCopy = UUID.randomUUID();
-        tx.execute(s -> deliveryRepository.claimForProcessing(delivery.getId(), firstCopy));
+        tx.execute(s -> deliveryRepository.claimForProcessing(delivery.getId(), firstCopy, Instant.now()));
 
         deliveries.rescheduleForBackpressure(DeliveryMessage.builder().deliveryId(delivery.getId()).build(), false);
 
