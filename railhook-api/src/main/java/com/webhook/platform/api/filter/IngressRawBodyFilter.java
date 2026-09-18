@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * Keeps the bytes an ingress request arrived with, before anything can turn them into parameters.
@@ -31,8 +32,11 @@ import java.nio.charset.StandardCharsets;
  * correct. And once anything has asked for a parameter, the container has consumed the stream and
  * the original bytes are gone, so this has to run before every filter that might.
  *
+ * <p>The same holds for a tunnel, where the developer's own app does the verifying, and for a test
+ * capture, which is only useful if it shows what was sent — see {@code RAW_BODY_PREFIXES}.
+ *
  * <p>Ordered right after {@code RequestSizeLimitFilter}, so reading the whole body here is still
- * bounded by the ingress size limit: an oversized body fails mid-read and that filter answers 413.
+ * bounded by that path's size limit: an oversized body fails mid-read and that filter answers 413.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
@@ -53,10 +57,17 @@ public class IngressRawBodyFilter extends OncePerRequestFilter {
         return raw.length == 0 ? null : raw;
     }
 
+    /**
+     * The public endpoints that pass a body on as it was sent: ingress to Destinations, a tunnel
+     * to the developer's local app — which checks the provider's signature itself — and a test
+     * capture to the person reading what their provider sends.
+     */
+    private static final List<String> RAW_BODY_PREFIXES = List.of("/ingress/", "/tunnel/", "/hook/");
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        return uri == null || !uri.startsWith("/ingress/");
+        return uri == null || RAW_BODY_PREFIXES.stream().noneMatch(uri::startsWith);
     }
 
     @Override

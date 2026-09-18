@@ -72,7 +72,7 @@ public class TunnelIngressService {
         this.suspensionCheck = suspensionCheck;
     }
 
-    public Outcome forward(String slug, TunnelRequestMessage request, String body) {
+    public Outcome forward(String slug, TunnelRequestMessage request, byte[] body) {
         if (!redisTunnelCoordinator.isActiveInCluster(slug)) {
             return refuse("offline", "tunnel_offline", "Tunnel is not connected");
         }
@@ -80,7 +80,7 @@ public class TunnelIngressService {
             log.warn("Rate limit exceeded for tunnel slug: {}", slug);
             return refuse("rate_limited", "rate_limit_exceeded", "Too many requests to this tunnel");
         }
-        if (body != null && body.length() > MAX_BODY_SIZE) {
+        if (body != null && body.length > MAX_BODY_SIZE) {
             return refuse("payload_too_large", "payload_too_large", "Request body exceeds maximum size");
         }
 
@@ -105,8 +105,10 @@ public class TunnelIngressService {
         TunnelResponseMessage response = redisTunnelCoordinator.forwardRequest(slug, request);
         int durationMs = (int) (System.currentTimeMillis() - startMs);
 
-        int requestSize = body != null ? body.length() : 0;
-        int responseSize = response != null && response.getBody() != null ? response.getBody().length() : 0;
+        // Bytes, which is what bandwidth is billed in; a String's length counts characters.
+        int requestSize = body != null ? body.length : 0;
+        byte[] responseBody = response != null ? response.bodyBytes() : null;
+        int responseSize = responseBody != null ? responseBody.length : 0;
         recordAsync(session, slug, request, requestSize, responseSize, response, durationMs);
 
         if (response == null) {
