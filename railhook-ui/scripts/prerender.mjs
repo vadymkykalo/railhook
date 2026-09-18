@@ -87,6 +87,7 @@ const PRERENDER_CONFIG_JS = `window.__RAILHOOK__ = ${JSON.stringify({
   siteUrl: SITE_URL_PLACEHOLDER,
   captchaSiteKey: '',
   captchaScriptUrl: '',
+  webAnalyticsToken: '',
 })};\n`;
 
 /** The same SPA fallback nginx serves, so the browser sees production routing. */

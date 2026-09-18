@@ -631,6 +631,8 @@ services:
       # CAPTCHA_SECRET_KEY on the API, never one without the other.
       RAILHOOK_CAPTCHA_SITE_KEY: ${CAPTCHA_SITE_KEY:-}
       RAILHOOK_CAPTCHA_SCRIPT_URL: ${CAPTCHA_SCRIPT_URL:-}
+      # Cloudflare Web Analytics token. Empty: no analytics script.
+      RAILHOOK_WEB_ANALYTICS_TOKEN: ${WEB_ANALYTICS_TOKEN:-}
     depends_on:
       - api
     logging:

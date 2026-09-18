@@ -42,15 +42,29 @@
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "Railhook",
-        "applicationCategory": "DeveloperApplication",
-        "operatingSystem": "Any",
-        "url": "https://site-url.railhook.invalid/",
-        "description": "Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start.",
-        "license": "https://opensource.org/licenses/MIT",
-        "offers": [
-          { "@type": "Offer", "name": "Railhook Cloud Free", "price": "0", "priceCurrency": "USD", "url": "https://site-url.railhook.invalid/register" }
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "name": "Railhook",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Any",
+            "url": "https://site-url.railhook.invalid/",
+            "description": "Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start.",
+            "license": "https://opensource.org/licenses/MIT",
+            "codeRepository": "https://github.com/vadymkykalo/railhook",
+            "publisher": { "@id": "https://site-url.railhook.invalid/#organization" },
+            "offers": [
+              { "@type": "Offer", "name": "Railhook Cloud Free", "price": "0", "priceCurrency": "USD", "url": "https://site-url.railhook.invalid/pricing" }
+            ]
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://site-url.railhook.invalid/#organization",
+            "name": "Railhook",
+            "url": "https://site-url.railhook.invalid/",
+            "logo": "https://site-url.railhook.invalid/favicon.svg",
+            "sameAs": ["https://github.com/vadymkykalo/railhook"]
+          }
         ]
       }
     </script>
@@ -61,6 +75,12 @@
       in public/ is an empty placeholder for the dev server and the prerender.
     -->
     <script src="/config.js"></script>
+    <!--
+      Cloudflare Web Analytics, only when the container was given a token
+      (RAILHOOK_WEB_ANALYTICS_TOKEN); otherwise it adds nothing. Shared with the
+      docs site, which loads the same two files.
+    -->
+    <script src="/analytics.js" defer></script>
   </head>
   <body>
     <div id="root"></div>

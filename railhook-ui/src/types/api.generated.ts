@@ -4881,12 +4881,12 @@ export interface components {
             /** Format: int64 */
             offset?: number;
             sort?: components["schemas"]["SortObject"];
+            unpaged?: boolean;
             paged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
-            unpaged?: boolean;
         };
         SortObject: {
             empty?: boolean;
@@ -5900,6 +5900,18 @@ export interface components {
             last?: boolean;
             empty?: boolean;
         };
+        Activation: {
+            /** Format: int64 */
+            signups?: number;
+            /** Format: int64 */
+            verified?: number;
+            /** Format: int64 */
+            organizations?: number;
+            /** Format: int64 */
+            withProject?: number;
+            /** Format: int64 */
+            withEvent?: number;
+        };
         AdminSignupResponse: {
             /** Format: uuid */
             userId?: string;
@@ -5914,6 +5926,14 @@ export interface components {
             organizationName?: string;
             /** Format: date-time */
             createdAt?: string;
+        };
+        Day: {
+            /** Format: date */
+            date?: string;
+            /** Format: int64 */
+            signups?: number;
+            /** Format: int64 */
+            events?: number;
         };
         PlatformOverviewResponse: {
             /** Format: int64 */
@@ -5940,6 +5960,8 @@ export interface components {
             activeTunnels?: number;
             /** Format: int64 */
             organizationsNearQuota?: number;
+            daily30d?: components["schemas"]["Day"][];
+            activation30d?: components["schemas"]["Activation"];
             recentSignups?: components["schemas"]["AdminSignupResponse"][];
             /** Format: date-time */
             generatedAt?: string;

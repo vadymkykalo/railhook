@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,6 +23,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByPasswordResetToken(String passwordResetToken);
 
     long countByCreatedAtGreaterThanEqual(Instant since);
+
+    long countByCreatedAtGreaterThanEqualAndEmailVerifiedTrue(Instant since);
+
+    /** {@code [day, count]} of accounts created since then, one row per calendar day that has any. */
+    @Query("SELECT CAST(u.createdAt AS LocalDate), COUNT(u) FROM User u WHERE u.createdAt >= :since "
+            + "GROUP BY CAST(u.createdAt AS LocalDate)")
+    List<Object[]> countPerDaySince(@Param("since") Instant since);
 
     /** The platform admin's account search: by address or name, a null term matching everyone. */
     @Query("SELECT u FROM User u WHERE :search IS NULL "

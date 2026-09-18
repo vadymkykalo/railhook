@@ -1657,7 +1657,8 @@
     "signIn": "Sign in",
     "tagline": "Open-source webhook gateway. Send and receive webhooks, in our cloud or on your own servers.",
     "talkToUs": "Talk to us",
-    "terms": "Terms of Service"
+    "terms": "Terms of Service",
+    "pricing": "Pricing"
   },
   "incidents": {
     "addNote": "Add Note",
@@ -2165,7 +2166,8 @@
         "pill": "Open source · MIT",
         "title": "On your servers"
       },
-      "title": "Run it your way"
+      "title": "Run it your way",
+      "compare": "Pricing and questions"
     }
   },
   "legal": {
@@ -2389,6 +2391,10 @@
     "terms": {
       "title": "Terms of Service — Railhook",
       "description": "The terms for using Railhook Cloud: the Free plan limits, acceptable use and liability."
+    },
+    "pricing": {
+      "title": "Pricing — Railhook: free webhook gateway, in the cloud or self-hosted",
+      "description": "Railhook is free: a cloud plan with 10,000 events a month, or every feature on your own servers under the MIT licence, with no licence key."
     }
   },
   "mtls": {
@@ -2753,7 +2759,23 @@
         "users": "Accounts"
       },
       "noSignups": "No accounts yet",
-      "recentSignups": "Recent sign-ups"
+      "recentSignups": "Recent sign-ups",
+      "activation": {
+        "title": "Activation, last 30 days",
+        "description": "Each step against the one before it.",
+        "signups": "Signed up",
+        "verified": "Verified their address",
+        "organizations": "New organizations",
+        "withProject": "Created a project",
+        "withEvent": "Sent an event"
+      },
+      "daily": {
+        "period": "Last 30 days",
+        "signups": "Sign-ups per day",
+        "signupsSeries": "Sign-ups",
+        "events": "Events per day",
+        "eventsSeries": "Events"
+      }
     },
     "reauth": {
       "action": "Sign in again",
@@ -4043,6 +4065,48 @@
       "workflows": "Automations that run a sequence of steps when an event arrives.",
       "analytics": "How deliveries are going over time: success rate, latency, alerts and usage.",
       "develop": "Tools for trying things out: send test events, shape payloads, and inspect what arrives."
+    }
+  },
+  "pricing": {
+    "title": "Free, in our cloud or on your servers",
+    "lead": "Start on the cloud's free plan, or run everything yourself under the MIT licence. Neither needs a card.",
+    "cloud": {
+      "pill": "Railhook Cloud",
+      "title": "Cloud Free",
+      "price": "Free",
+      "body": "{{events}} events a month, {{projects}} projects, {{endpoints}} endpoints per project and {{retention}} days of history. Every feature is included.",
+      "later": "Later we'll add paid plans with support and higher limits.",
+      "cta": "Start free"
+    },
+    "selfHosted": {
+      "pill": "Open source · MIT",
+      "title": "Self-hosted",
+      "price": "Free",
+      "body": "The same software with every feature, no plan limits and no licence key. One command installs it with PostgreSQL, Kafka and Redis on a server with Docker and 4 GB of RAM.",
+      "cta": "Read the install guide"
+    },
+    "faq": {
+      "title": "Questions",
+      "free": {
+        "q": "Is Railhook really free?",
+        "a": "Yes. The cloud's Free plan includes every feature within its limits, and the self-hosted edition is the same software under the MIT licence, with no limits and no licence key."
+      },
+      "limit": {
+        "q": "What happens when I reach the monthly event limit?",
+        "a": "The API refuses new events with a quota_exceeded error until the next month starts. Events it accepted before that are still delivered and retried."
+      },
+      "card": {
+        "q": "Do I need a credit card?",
+        "a": "No. Sign up with an email address or a Google account and send your first event."
+      },
+      "paid": {
+        "q": "Will there be paid plans?",
+        "a": "Later we'll add paid plans with support and higher limits. The self-hosted edition stays complete and free."
+      },
+      "selfHost": {
+        "q": "What do I need to run it myself?",
+        "a": "A server with Docker and 4 GB of RAM. One command installs Railhook with PostgreSQL, Kafka and Redis, and sets up HTTPS on your domain."
+      }
     }
   }
 }

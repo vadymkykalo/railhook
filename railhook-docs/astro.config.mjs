@@ -71,6 +71,10 @@ export default defineConfig({
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' } },
         { tag: 'link', attrs: { rel: 'stylesheet', href: FONTS } },
         ...socialImageHead,
+        // Cloudflare Web Analytics, shared with the app: /config.js carries the container's
+        // token, /analytics.js adds the beacon only when there is one (railhook-ui/public/).
+        { tag: 'script', attrs: { src: '/config.js' } },
+        { tag: 'script', attrs: { src: '/analytics.js', defer: true } },
       ],
       // The code surface is dark in both site themes, as it is on the landing page and in
       // the dashboard: one theme, no light/dark switch for code.

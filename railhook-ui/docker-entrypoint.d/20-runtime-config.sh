@@ -3,10 +3,12 @@
 #
 # The published image is built once for every deployment of it: the hosted cloud and each
 # self-hosted install run the same bytes. Whatever must differ between them — the public
-# origin, the registration challenge, the domain behind the sales@ and support@ addresses —
+# origin, the registration challenge, the domain behind the sales@ and support@ addresses, the
+# web analytics token —
 # therefore cannot live in the bundle. It is written here, when the container starts:
 #
 #   /tmp/railhook-config.js  window.__RAILHOOK__, which nginx serves as /config.js ahead of the app
+#                            and of the docs
 #   /tmp/railhook-site.conf  $railhook_site_url, which nginx substitutes for the placeholder
 #                            origin the build leaves in the HTML, sitemap and robots.txt
 #
@@ -65,8 +67,17 @@ if [ -n "$captcha_key" ]; then
     fi
 fi
 
+# Cloudflare Web Analytics: cookieless, so no consent banner. Off unless set, which is every
+# self-hosted install — they report to nobody. The token is public (it ends up in the page), but
+# it is still kept out of the log, like the site key.
+analytics_token=$(trim "${RAILHOOK_WEB_ANALYTICS_TOKEN:-}")
+if [ -n "$analytics_token" ] && ! matches "$analytics_token" '^[A-Za-z0-9]+$'; then
+    echo "20-runtime-config: RAILHOOK_WEB_ANALYTICS_TOKEN has characters no token uses; web analytics is off" >&2
+    analytics_token=""
+fi
+
 cat > "$OUT" <<CONF
-window.__RAILHOOK__ = {"contactDomain": "${domain}", "siteUrl": "${site}", "captchaSiteKey": "${captcha_key}", "captchaScriptUrl": "${captcha_script}"};
+window.__RAILHOOK__ = {"contactDomain": "${domain}", "siteUrl": "${site}", "captchaSiteKey": "${captcha_key}", "captchaScriptUrl": "${captcha_script}", "webAnalyticsToken": "${analytics_token}"};
 CONF
 
 cat > "$SITE_CONF_OUT" <<CONF
@@ -87,4 +98,9 @@ if [ -n "$captcha_key" ]; then
     echo "20-runtime-config: captcha on"
 else
     echo "20-runtime-config: captcha off"
+fi
+if [ -n "$analytics_token" ]; then
+    echo "20-runtime-config: web analytics on"
+else
+    echo "20-runtime-config: web analytics off"
 fi

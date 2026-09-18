@@ -51,10 +51,9 @@ function spaSegments(): string[] {
 }
 
 /**
- * Every URL used to answer 200 with the prerendered landing page: `/this-does-not-exist`,
- * `/pricing` (a page that no longer exists) and each dashboard route alike, all carrying the
- * landing's title and a canonical pointing at `/`. To a crawler that is one page duplicated at
- * every address anyone links to — a soft 404 — and `/pricing` was listed in the sitemap on top.
+ * Every URL used to answer 200 with the prerendered landing page: `/this-does-not-exist` and
+ * each dashboard route alike, all carrying the landing's title and a canonical pointing at `/`.
+ * To a crawler that is one page duplicated at every address anyone links to — a soft 404.
  */
 describe('nginx answers with the status the URL deserves', () => {
   it('finds the router routes it is meant to be checking', () => {
@@ -63,7 +62,7 @@ describe('nginx answers with the status the URL deserves', () => {
 
   it('serves the app shell for every top-level route the router owns', () => {
     const prerendered = publicRoutes().map((r: { path: string }) => r.path.slice(1)).filter(Boolean);
-    const owned = routerTopLevelSegments().filter((s) => !prerendered.includes(s) && s !== 'pricing');
+    const owned = routerTopLevelSegments().filter((s) => !prerendered.includes(s));
     expect(spaLocation(), 'a regex location for the app routes').toBeDefined();
     expect(spaSegments()).toEqual(owned);
   });
@@ -89,15 +88,15 @@ describe('nginx answers with the status the URL deserves', () => {
     expect(spaLocation()!.body).toMatch(/sub_filter\s+'https:\/\/site-url\.railhook\.invalid'\s+\$railhook_site_url;/);
   });
 
-  it('sends the retired /pricing page where the router sends it, permanently', () => {
-    expect(location('= /pricing')?.body).toMatch(/return\s+301\s+\/#run;/);
+  it('serves /pricing as its own page rather than redirecting it to the landing page', () => {
+    expect(location('= /pricing')).toBeUndefined();
   });
 });
 
 describe('the public route list', () => {
-  it('no longer offers /pricing to crawlers or to the prerender', () => {
-    expect(publicRoutes().map((r: { path: string }) => r.path)).not.toContain('/pricing');
-    expect(read('railhook-ui/public/sitemap.xml')).not.toMatch(/\/pricing</);
+  it('offers /pricing to crawlers and to the prerender', () => {
+    expect(publicRoutes().map((r: { path: string }) => r.path)).toContain('/pricing');
+    expect(read('railhook-ui/public/sitemap.xml')).toMatch(/\/pricing</);
   });
 
   it('serves the privacy policy and the terms as prerendered pages, not as 404s or noindex shells', () => {

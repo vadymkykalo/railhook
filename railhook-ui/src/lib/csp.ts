@@ -1,4 +1,4 @@
-import { captchaScriptUrl, captchaSiteKey } from './runtimeConfig';
+import { captchaScriptUrl, captchaSiteKey, webAnalyticsToken } from './runtimeConfig';
 
 /**
  * Injects the Content-Security-Policy meta tag.
@@ -9,6 +9,8 @@ import { captchaScriptUrl, captchaSiteKey } from './runtimeConfig';
  * Runtime (window.__RAILHOOK__, written by the UI container):
  *   captchaSiteKey         — presence of this turns the registration challenge on, which is
  *                            what widens script-src and frame-src below.
+ *   webAnalyticsToken      — presence of this loads Cloudflare's beacon (public/analytics.js),
+ *                            which widens script-src and connect-src to Cloudflare's two hosts.
  *
  * In development (localhost), connect-src automatically includes http://localhost:* and ws://localhost:*.
  * In production, only 'self' + VITE_API_URL origin are allowed.
@@ -68,6 +70,11 @@ export function initCSP() {
   if (captchaOrigin) {
     scriptSources.push(captchaOrigin);
     frameSources.push(captchaOrigin);
+  }
+
+  if (webAnalyticsToken()) {
+    scriptSources.push('https://static.cloudflareinsights.com');
+    connectSources.add('https://cloudflareinsights.com');
   }
 
   const policy = [

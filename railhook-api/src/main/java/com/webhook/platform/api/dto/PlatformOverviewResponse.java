@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -41,7 +42,42 @@ public class PlatformOverviewResponse {
     /** Organizations whose events this billing period are at 80% or more of their plan's limit. */
     private long organizationsNearQuota;
 
+    /** Sign-ups and events per day over the last 30 days, oldest first, every day present. */
+    private List<Day> daily30d;
+
+    /** How far the last 30 days' sign-ups got. */
+    private Activation activation30d;
+
     private List<AdminSignupResponse> recentSignups;
 
     private Instant generatedAt;
+
+    /**
+     * The first steps of the people who signed up in the window, each a subset of the one before:
+     * accounts and how many verified their address; organizations and how many created a project
+     * and then sent an event. Organizations rather than accounts from there on, because a project
+     * and its events belong to the organization, whichever member did the work.
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Activation {
+        private long signups;
+        private long verified;
+        private long organizations;
+        private long withProject;
+        private long withEvent;
+    }
+
+    /** One calendar day of {@link #daily30d}, the database's day. */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Day {
+        private LocalDate date;
+        private long signups;
+        private long events;
+    }
 }

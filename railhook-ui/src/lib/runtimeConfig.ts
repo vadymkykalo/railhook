@@ -17,6 +17,8 @@ export interface RuntimeConfig {
   captchaSiteKey?: string;
   /** The challenge provider's script. Only set alongside a site key. */
   captchaScriptUrl?: string;
+  /** Cloudflare Web Analytics token. Empty means no analytics, which is the default. */
+  webAnalyticsToken?: string;
 }
 
 declare global {
@@ -48,4 +50,9 @@ export function captchaSiteKey(): string | undefined {
 /** The challenge script; Turnstile's when a site key is set without one. */
 export function captchaScriptUrl(): string {
   return read('captchaScriptUrl') ?? 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+}
+
+/** The Cloudflare Web Analytics token; undefined when analytics is off. */
+export function webAnalyticsToken(): string | undefined {
+  return read('webAnalyticsToken');
 }

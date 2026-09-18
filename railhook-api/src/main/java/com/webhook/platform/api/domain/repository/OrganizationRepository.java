@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -41,6 +42,18 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
     Optional<Organization> lockById(@Param("id") UUID id);
 
     long countBySuspendedAtIsNotNull();
+
+    long countByCreatedAtGreaterThanEqual(Instant since);
+
+    /** Organizations created since then that have created at least one project, deleted or not. */
+    @Query("SELECT COUNT(o) FROM Organization o WHERE o.createdAt >= :since "
+            + "AND EXISTS (SELECT 1 FROM Project p WHERE p.organizationId = o.id)")
+    long countCreatedSinceWithProject(@Param("since") Instant since);
+
+    /** Organizations created since then that have sent at least one event. */
+    @Query("SELECT COUNT(o) FROM Organization o WHERE o.createdAt >= :since "
+            + "AND EXISTS (SELECT 1 FROM Event e WHERE e.organizationId = o.id)")
+    long countCreatedSinceWithEvent(@Param("since") Instant since);
 
     /** {@code [organizationId, maxEventsPerMonth]} of each given organization's plan. */
     @Query("SELECT o.id, p.maxEventsPerMonth FROM Organization o JOIN o.plan p WHERE o.id IN :organizationIds")

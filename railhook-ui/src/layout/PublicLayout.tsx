@@ -144,6 +144,7 @@ export function Footer() {
             <RouteLink to="/#product">{t('footer.overview')}</RouteLink>
             <RouteLink to="/#cloud">{t('footer.cloud')}</RouteLink>
             <RouteLink to="/#self-host">{t('footer.selfHost')}</RouteLink>
+            <RouteLink to="/pricing">{t('footer.pricing')}</RouteLink>
             <RouteLink to="/login">{t('footer.signIn')}</RouteLink>
           </Column>
           <Column title={t('footer.docs')}>

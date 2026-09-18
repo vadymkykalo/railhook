@@ -286,8 +286,8 @@ describe('Footer', () => {
       'https://github.com/vadymkykalo/railhook/releases',
       'https://github.com/vadymkykalo/railhook/blob/main/SECURITY.md',
       '/contact',
+      '/pricing',
     ]));
-    expect(hrefs).not.toContain('/pricing');
   });
 
   describe('connect with us', () => {

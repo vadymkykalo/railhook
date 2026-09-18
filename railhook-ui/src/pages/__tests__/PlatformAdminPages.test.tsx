@@ -79,14 +79,42 @@ describe('PlatformAdminGate', () => {
   });
 });
 
+const DAYS = Array.from({ length: 30 }, (_, i) => ({
+  date: `2026-08-${String(i + 1).padStart(2, '0')}`, signups: i % 3, events: i * 10,
+}));
+const ACTIVATION = { signups: 40, verified: 30, organizations: 20, withProject: 10, withEvent: 5 };
+
 describe('PlatformOverviewPage', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('shows how far the last month\u2019s sign-ups got, each step against the one before it', async () => {
+    vi.mocked(platformAdminApi.overview).mockResolvedValue({
+      organizations: 1, suspendedOrganizations: 0, users: 1, signupsToday: 0, signups7d: 0, signups30d: 40,
+      eventsToday: 0, events30d: 0, deliveriesSucceeded24h: 0, deliveriesFailed24h: 0,
+      activeTunnels: 0, organizationsNearQuota: 0, generatedAt: '2026-09-13T12:00:00Z', recentSignups: [],
+      daily30d: DAYS, activation30d: ACTIVATION,
+    });
+    renderPage(<PlatformOverviewPage />, { path: '/admin/platform', initialEntry: '/admin/platform' });
+
+    const funnel = await screen.findByRole('list', { name: 'Activation, last 30 days' });
+    const steps = within(funnel).getAllByRole('listitem').map((li) => li.textContent);
+    expect(steps).toEqual([
+      expect.stringMatching(/Signed up.*40/),
+      expect.stringMatching(/Verified their address.*30.*75%/),
+      expect.stringMatching(/New organizations.*20/),
+      expect.stringMatching(/Created a project.*10.*50%/),
+      expect.stringMatching(/Sent an event.*5.*50%/),
+    ]);
+    expect(screen.getByText('Sign-ups per day')).toBeInTheDocument();
+    expect(screen.getByText('Events per day')).toBeInTheDocument();
+  });
 
   it('shows the deployment totals and the latest sign-ups', async () => {
     const overview: PlatformOverview = {
       organizations: 128, suspendedOrganizations: 3, users: 342, signupsToday: 4, signups7d: 31, signups30d: 97,
       eventsToday: 1000, events30d: 50000, deliveriesSucceeded24h: 900, deliveriesFailed24h: 12,
       activeTunnels: 2, organizationsNearQuota: 5, generatedAt: '2026-09-13T12:00:00Z',
+      daily30d: DAYS, activation30d: ACTIVATION,
       recentSignups: [{
         userId: 'u-1', email: 'new@customer.example', fullName: null, emailVerified: false, status: 'PENDING_VERIFICATION',
         signInMethods: ['GOOGLE'], organizationId: 'org-9', organizationName: 'Acme Corp', createdAt: '2026-09-13T11:00:00Z',
@@ -107,6 +135,7 @@ describe('PlatformOverviewPage', () => {
       organizations: 1, suspendedOrganizations: 0, users: 1, signupsToday: 0, signups7d: 0, signups30d: 0,
       eventsToday: 0, events30d: 0, deliveriesSucceeded24h: 0, deliveriesFailed24h: 0,
       activeTunnels: 0, organizationsNearQuota: 0, generatedAt: '2026-09-13T12:00:00Z', recentSignups: [],
+      daily30d: DAYS, activation30d: { signups: 0, verified: 0, organizations: 0, withProject: 0, withEvent: 0 },
     });
     renderPage(<PlatformOverviewPage />, { path: '/admin/platform', initialEntry: '/admin/platform' });
     expect(await screen.findByText(/Only accounts listed in PLATFORM_ADMIN_EMAILS/)).toBeInTheDocument();

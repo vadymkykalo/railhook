@@ -197,6 +197,9 @@ ui:
   captcha:
     siteKey: ""
     scriptUrl: ""
+  # Cloudflare Web Analytics token, read by the container at startup. Empty — the
+  # default — loads no analytics script at all.
+  webAnalyticsToken: ""
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
     # (multi-arch: linux/amd64, linux/arm64).
