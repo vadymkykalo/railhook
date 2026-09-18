@@ -10,7 +10,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -22,6 +26,8 @@ import java.util.UUID;
 @Slf4j
 public class SubscriptionLifecycleService {
 
+    private static final ObjectMapper METADATA_JSON = new ObjectMapper();
+
     private final BillingSubscriptionRepository subscriptionRepository;
     private final BillingSubscriptionEventRepository eventRepository;
     private final OrganizationRepository organizationRepository;
@@ -30,31 +36,85 @@ public class SubscriptionLifecycleService {
 
     // ── Create ──────────────────────────────────────────────────────
 
+    /**
+     * Opens a checkout: a {@code PENDING} subscription for the caller's organization, bound to the
+     * reference the provider will echo back in its payment callback. The organization's plan is
+     * left alone — nothing has been paid — and {@link #activate} moves it on the first payment.
+     *
+     * <p>A checkout the customer walked away from is still {@code PENDING}; starting another one
+     * expires it, so an organization never holds two open checkouts. The expiry is flushed before
+     * the insert because Hibernate orders inserts ahead of updates, and the database allows one
+     * open subscription per organization.
+     *
+     * @param externalSubscriptionId the reference callbacks carry, when the provider's checkout
+     *                               has one (WayForPay's orderReference); null when the provider
+     *                               creates the subscription later (Stripe)
+     * @param checkoutSessionId      the provider's checkout session, kept for support lookups
+     */
     @Transactional
-    public BillingSubscription createSubscription(Plan plan,
-                                                   String providerCode, String currency,
-                                                   BillingInterval interval,
-                                                   Instant periodStart, Instant periodEnd) {
+    public BillingSubscription createPending(Plan plan, String providerCode, String currency,
+                                             BillingInterval interval, long priceCents,
+                                             String externalCustomerId, String externalSubscriptionId,
+                                             String checkoutSessionId) {
         UUID organizationId = TenantContext.require();
+        for (BillingSubscription earlier : subscriptionRepository.findByOrganizationIdAndStatus(
+                organizationId, SubscriptionStatus.PENDING)) {
+            expire(earlier, "Superseded by a newer checkout");
+        }
+
         BillingSubscription sub = BillingSubscription.builder()
                 .organizationId(organizationId)
                 .plan(plan)
                 .providerCode(providerCode)
-                .status(SubscriptionStatus.ACTIVE)
+                .status(SubscriptionStatus.PENDING)
                 .billingInterval(interval != null ? interval : BillingInterval.MONTHLY)
                 .currency(currency != null ? currency : "USD")
-                .currentPeriodStart(periodStart)
-                .currentPeriodEnd(periodEnd)
+                .priceCents(priceCents)
+                .externalCustomerId(externalCustomerId)
+                .externalSubscriptionId(externalSubscriptionId)
+                .metadata(checkoutSessionId != null ? checkoutMetadata(checkoutSessionId) : "{}")
                 .build();
-        sub = subscriptionRepository.save(sub);
+        // Flushed too: the event row below references it by a plain id column, which Hibernate's
+        // insert ordering does not see, and batched with the expiry event above it went first.
+        sub = subscriptionRepository.saveAndFlush(sub);
 
-        logEvent(sub, SubscriptionEventType.CREATED, null, SubscriptionStatus.ACTIVE,
-                null, plan.getId(), "Subscription created");
-
-        syncOrgPlan(organizationId, plan, BillingStatus.ACTIVE);
-        log.info("Subscription created: sub={} org={} plan={} provider={}",
+        logEvent(sub, SubscriptionEventType.CREATED, null, SubscriptionStatus.PENDING,
+                null, plan.getId(), "Checkout started");
+        log.info("Checkout opened: sub={} org={} plan={} provider={}",
                 sub.getId(), organizationId, plan.getName(), providerCode);
         return sub;
+    }
+
+    // ── Abandon (a checkout that will not be paid) ──────────────────
+
+    /**
+     * Expires a checkout that was never paid. Unlike {@link #cancel} the organization's plan is not
+     * touched: it never moved. A subscription that has been paid for is left alone.
+     */
+    @Transactional
+    public void abandon(UUID subscriptionId, String reason) {
+        BillingSubscription sub = findOrThrow(subscriptionId);
+        if (sub.getStatus() != SubscriptionStatus.PENDING) {
+            log.info("Not abandoning subscription {}: it is {}", subscriptionId, sub.getStatus());
+            return;
+        }
+        expire(sub, reason);
+    }
+
+    private void expire(BillingSubscription sub, String reason) {
+        SubscriptionStatus prev = sub.getStatus();
+        sub.setStatus(SubscriptionStatus.EXPIRED);
+        subscriptionRepository.saveAndFlush(sub);
+        logEvent(sub, SubscriptionEventType.EXPIRED, prev, SubscriptionStatus.EXPIRED, null, null, reason);
+        log.info("Checkout expired: sub={} reason={}", sub.getId(), reason);
+    }
+
+    private static String checkoutMetadata(String checkoutSessionId) {
+        try {
+            return METADATA_JSON.writeValueAsString(Map.of("checkoutSessionId", checkoutSessionId));
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     // ── Activate (from trial or past_due) ───────────────────────────

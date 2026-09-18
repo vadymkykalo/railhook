@@ -26,18 +26,34 @@ public interface BillingSubscriptionRepository extends JpaRepository<BillingSubs
 
     Optional<BillingSubscription> findByExternalSubscriptionId(String externalSubscriptionId);
 
-    Optional<BillingSubscription> findByExternalCustomerId(String externalCustomerId);
+    /**
+     * The newest subscription for a provider customer. A customer outlives its subscriptions — a
+     * checkout after a cancellation reuses it — so a customer id names several rows over time,
+     * and the newest is the one a callback without a subscription id is about.
+     */
+    Optional<BillingSubscription> findFirstByExternalCustomerIdOrderByCreatedAtDesc(String externalCustomerId);
+
+    List<BillingSubscription> findByOrganizationIdAndStatus(UUID organizationId, SubscriptionStatus status);
+
+    /** The provider customer an organization already has, to reuse on its next checkout. */
+    Optional<BillingSubscription> findFirstByOrganizationIdAndProviderCodeAndExternalCustomerIdIsNotNullOrderByCreatedAtDesc(
+            UUID organizationId, String providerCode);
 
     @Query("SELECT s FROM BillingSubscription s WHERE s.status = :status AND s.currentPeriodEnd < :now")
     List<BillingSubscription> findExpiredByStatus(@Param("status") SubscriptionStatus status, @Param("now") Instant now);
 
-    @Query("SELECT s FROM BillingSubscription s WHERE s.status = 'ACTIVE' AND s.currentPeriodEnd < :now AND s.providerCode = :providerCode")
+    /**
+     * The plan is fetched with the row: the renewal scheduler runs outside a transaction and reads
+     * the plan's name and price after this returns, which on a lazy proxy failed every renewal.
+     */
+    @Query("SELECT s FROM BillingSubscription s JOIN FETCH s.plan WHERE s.status = 'ACTIVE' AND s.currentPeriodEnd < :now AND s.providerCode = :providerCode")
     List<BillingSubscription> findDueForRenewal(@Param("now") Instant now, @Param("providerCode") String providerCode);
 
     @Query("SELECT s FROM BillingSubscription s WHERE s.status = 'GRACE_PERIOD' AND s.currentPeriodEnd < :graceCutoff")
     List<BillingSubscription> findGracePeriodExpired(@Param("graceCutoff") Instant graceCutoff);
 
-    @Query("SELECT s FROM BillingSubscription s WHERE s.providerCode = :providerCode " +
+    /** Plan fetched with the row, for the same reason as {@link #findDueForRenewal}: reconciliation compares plan names. */
+    @Query("SELECT s FROM BillingSubscription s JOIN FETCH s.plan WHERE s.providerCode = :providerCode " +
            "AND s.externalSubscriptionId IS NOT NULL " +
            "AND s.status IN ('ACTIVE', 'PAST_DUE', 'GRACE_PERIOD')")
     List<BillingSubscription> findReconcilable(@Param("providerCode") String providerCode);

@@ -2,6 +2,8 @@ package com.webhook.platform.api.domain.entity;
 
 import com.webhook.platform.api.domain.enums.SubscriptionStatus;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.TenantId;
@@ -82,6 +84,11 @@ public class BillingSubscription {
     @Builder.Default
     private String currency = "USD";
 
+    /** What the checkout charged, in minor units of {@link #currency}; renewals charge it again. */
+    @Column(name = "price_cents")
+    private Long priceCents;
+
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     @Builder.Default
     private String metadata = "{}";

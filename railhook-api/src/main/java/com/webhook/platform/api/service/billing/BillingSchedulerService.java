@@ -77,9 +77,14 @@ public class BillingSchedulerService {
             return;
         }
 
-        long amountCents = sub.getBillingInterval() == BillingInterval.YEARLY
-                ? sub.getPlan().getPriceYearlyCents()
-                : sub.getPlan().getPriceMonthlyCents();
+        // What the checkout charged, in the subscription's currency. The catalog price is USD
+        // cents; charged in a WayForPay subscription's UAH it renewed the plan at a fraction of
+        // its price. A row from before checkout recorded the amount still renews at the catalog.
+        long amountCents = sub.getPriceCents() != null
+                ? sub.getPriceCents()
+                : sub.getBillingInterval() == BillingInterval.YEARLY
+                        ? sub.getPlan().getPriceYearlyCents()
+                        : sub.getPlan().getPriceMonthlyCents();
         String orderRef = "railhook_renew_" + sub.getId() + "_" + System.currentTimeMillis();
 
         // Create invoice
