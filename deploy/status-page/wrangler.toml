@@ -1,0 +1,14 @@
+name = "railhook-status"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+workers_dev = false
+
+routes = [{ pattern = "status.railhook.io", custom_domain = true }]
+
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "railhook-status"
+database_id = "b0bdbca0-365c-47b2-a77d-658547b4aac4"

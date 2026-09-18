@@ -19,6 +19,8 @@ export interface RuntimeConfig {
   captchaScriptUrl?: string;
   /** Cloudflare Web Analytics token. Empty means no analytics, which is the default. */
   webAnalyticsToken?: string;
+  /** The public status page the footer links to. Empty means no link, which is the default. */
+  statusPageUrl?: string;
   /** Whether the public webhook tester (/tester) is on. Off unless the deployment says so. */
   publicTester?: boolean;
 }
@@ -57,6 +59,11 @@ export function captchaScriptUrl(): string {
 /** The Cloudflare Web Analytics token; undefined when analytics is off. */
 export function webAnalyticsToken(): string | undefined {
   return read('webAnalyticsToken');
+}
+
+/** The public status page's address; undefined when the deployment has none. */
+export function statusPageUrl(): string | undefined {
+  return read('statusPageUrl');
 }
 
 /** Whether the public webhook tester is on for this deployment. */

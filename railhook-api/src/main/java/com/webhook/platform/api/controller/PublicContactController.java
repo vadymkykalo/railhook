@@ -4,6 +4,7 @@ import com.webhook.platform.api.dto.PublicContactRequest;
 import com.webhook.platform.api.security.ProjectScopeExempt;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
+import com.webhook.platform.api.service.ContactMessageBudget;
 import com.webhook.platform.api.service.EmailService;
 import com.webhook.platform.api.service.captcha.CaptchaVerifier;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,13 +37,14 @@ public class PublicContactController {
     private final AuthRateLimiterService authRateLimiterService;
     private final TrustedProxyResolver trustedProxyResolver;
     private final CaptchaVerifier captchaVerifier;
+    private final ContactMessageBudget contactMessageBudget;
 
     @Operation(operationId = "sendContactMessage", summary = "Write to support",
             description = "Sends the message to this deployment's support address, with the given email as the "
-                    + "Reply-To. Two messages a minute per address.")
+                    + "Reply-To. Two messages a minute per address, and a daily ceiling across all senders.")
     @ApiResponse(responseCode = "202", description = "The message is on its way")
     @ApiResponse(responseCode = "400", description = "A field is invalid, or the challenge was not passed")
-    @ApiResponse(responseCode = "429", description = "Too many messages from this address")
+    @ApiResponse(responseCode = "429", description = "Too many messages from this address, or the form's daily ceiling is reached")
     @ApiResponse(responseCode = "503", description = "This deployment has no support address")
     @PostMapping
     public ResponseEntity<Map<String, String>> send(@Valid @RequestBody PublicContactRequest body,
@@ -56,6 +58,11 @@ public class PublicContactController {
         }
         if (!captchaVerifier.verify(body.getCaptchaToken(), ip)) {
             return error(HttpStatus.BAD_REQUEST, "captcha_failed", "Challenge verification failed. Please try again.");
+        }
+        // Last, so neither a refused challenge nor an over-eager address spends it: this ceiling
+        // exists to keep the mail quota for verification and password-reset mails.
+        if (!contactMessageBudget.tryAcquire()) {
+            return error(HttpStatus.TOO_MANY_REQUESTS, "contact_busy", "The form has taken all the messages it can today. Please write to support by email.");
         }
         String topic = body.getTopic() == null || body.getTopic().isEmpty() ? "other" : body.getTopic();
         emailService.sendContactMessage(body.getEmail().strip(), body.getName(), topic, body.getMessage().strip(), body.getPage());

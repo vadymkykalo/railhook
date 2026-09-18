@@ -17,6 +17,13 @@ const MARKETING = [
   { path: '/pricing', priority: '0.8', changefreq: 'monthly' },
   // The free webhook tester: a tool people search for, and a first use before signing up.
   { path: '/tester', priority: '0.8', changefreq: 'monthly' },
+  // The signature verifier: the other free tool, for "validate a Stripe webhook signature".
+  { path: '/tools/webhook-signature', priority: '0.8', changefreq: 'monthly' },
+  // Read before trusting a vendor with webhooks: what protects the data, who builds it, and
+  // how actively (the release history, rebuilt from CHANGELOG.md on every build).
+  { path: '/security', priority: '0.6', changefreq: 'monthly' },
+  { path: '/about', priority: '0.5', changefreq: 'monthly' },
+  { path: '/changelog', priority: '0.6', changefreq: 'weekly' },
   { path: '/contact', priority: '0.5', changefreq: 'monthly' },
   // Linked from the registration form and from Google's consent screen, which requires both.
   { path: '/privacy', priority: '0.3', changefreq: 'yearly' },

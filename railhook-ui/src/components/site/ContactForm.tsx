@@ -23,6 +23,7 @@ function errorOf(error: unknown): { status?: number; code?: string } {
 function errorKey(error: unknown): string {
   const { status, code } = errorOf(error);
   if (code === 'captcha_failed') return 'site.contact.errors.captcha';
+  if (code === 'contact_busy') return 'site.contact.errors.busy';
   if (status === 429) return 'site.contact.errors.tooMany';
   if (status === 400) return 'site.contact.errors.invalid';
   return 'site.contact.errors.generic';

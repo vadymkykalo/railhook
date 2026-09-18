@@ -33,6 +33,12 @@ Almost every variable is a timeout or a batch size whose default is fine. These 
 Variables that start with `VITE_` are baked into the dashboard when its image is built. On the published images they cannot be changed. To change one, you have to build your own `ui` image.
 </Aside>
 
+## Onboarding email
+
+`ONBOARDING_EMAILS_ENABLED` sends two mails to new accounts: a welcome once the address is verified, and one nudge two days later if the account's organization has still sent and received no events. Each goes at most once per account, replies go to `EMAIL_SUPPORT_ADDRESS`, and nothing is sent unless `EMAIL_ENABLED` is on as well. Accounts that existed before the upgrade that added the setting never receive either.
+
+Leave it off on your own instance. Both mails are written in the first person by Railhook's author for Railhook Cloud, and your users did not sign up with him.
+
 ## All variables
 
 <EnvReference />

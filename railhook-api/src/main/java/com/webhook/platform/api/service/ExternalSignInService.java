@@ -52,19 +52,22 @@ public class ExternalSignInService {
     private final UserSessionService userSessionService;
     private final AuthService authService;
     private final ProjectService projectService;
+    private final OnboardingMailService onboardingMailService;
 
     public ExternalSignInService(UserRepository userRepository,
                                  UserIdentityRepository userIdentityRepository,
                                  SignInHandoffRepository signInHandoffRepository,
                                  UserSessionService userSessionService,
                                  AuthService authService,
-                                 ProjectService projectService) {
+                                 ProjectService projectService,
+                                 OnboardingMailService onboardingMailService) {
         this.userRepository = userRepository;
         this.userIdentityRepository = userIdentityRepository;
         this.signInHandoffRepository = signInHandoffRepository;
         this.userSessionService = userSessionService;
         this.authService = authService;
         this.projectService = projectService;
+        this.onboardingMailService = onboardingMailService;
     }
 
     /**
@@ -109,6 +112,7 @@ public class ExternalSignInService {
             user.setVerificationToken(null);
             user.setVerificationTokenExpiresAt(null);
             userRepository.save(user);
+            onboardingMailService.welcome(user);
             userSessionService.revokeAllSessions(user.getId());
             log.info("Address of user {} verified by {}; the unverified password was removed", user.getId(),
                     identity.provider());
@@ -140,6 +144,7 @@ public class ExternalSignInService {
         // work in. A password registration names its own; the setup state leads it there.
         projectService.createFirstProject(authService.createOrganizationOwnedBy(user, organizationName));
         link(user.getId(), identity);
+        onboardingMailService.welcome(user);
         log.info("Created account {} through {}", user.getId(), identity.provider());
         return user.getId();
     }

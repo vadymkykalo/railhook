@@ -200,6 +200,8 @@ ui:
   # Cloudflare Web Analytics token, read by the container at startup. Empty — the
   # default — loads no analytics script at all.
   webAnalyticsToken: ""
+  # A public status page (https://…) the footer links to. Empty — the default — shows no link.
+  statusPageUrl: ""
   # The public webhook tester page (/tester). Turn it on together with
   # api.env.PUBLIC_TESTER_ENABLED: "true"; off, the page says so.
   publicTester: false
@@ -386,6 +388,9 @@ backup:
 email:
   enabled: false
   from: noreply@example.com
+  # ONBOARDING_EMAILS_ENABLED: a welcome and one day-2 nudge to new accounts, written as
+  # Railhook's author. Meant for Railhook Cloud; leave off on your own install.
+  onboarding: false
   smtp:
     host: ""
     port: 587

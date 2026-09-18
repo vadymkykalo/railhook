@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 /**
  * Where the lockout meets the login.
@@ -75,7 +76,7 @@ class LoginLockoutTest {
         authService = new AuthService(userRepository, organizationRepository, membershipRepository,
                 planRepository, jwtUtil, encoder, tokenBlacklistService, userSessionService,
                 lockout, emailService,
-                org.mockito.Mockito.mock(VerificationMailBudget.class), false);
+                org.mockito.Mockito.mock(VerificationMailBudget.class), mock(OnboardingMailService.class), false);
 
         user = User.builder()
                 .id(UUID.randomUUID())

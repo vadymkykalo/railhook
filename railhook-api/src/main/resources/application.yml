@@ -369,6 +369,14 @@ app:
     enabled: ${EMAIL_ENABLED:false}
     from: ${EMAIL_FROM:noreply@example.com}
     support-address: ${EMAIL_SUPPORT_ADDRESS:}
+  # The welcome and day-2 nudge mails to new accounts, written as Railhook's author. Off unless a
+  # deployment asks: a self-hosted install should not mail its users in someone else's name.
+  onboarding-emails:
+    enabled: ${ONBOARDING_EMAILS_ENABLED:false}
+  # The public contact form's ceiling across all senders per UTC day. Its messages spend the same
+  # mail quota as verification and password-reset mails, so this keeps a flood from starving them.
+  contact:
+    daily-limit: ${CONTACT_DAILY_LIMIT:30}
 
 spring.mail:
   host: ${SMTP_HOST:localhost}

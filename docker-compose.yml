@@ -391,6 +391,8 @@ services:
       EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@example.com}
       EMAIL_SUPPORT_ADDRESS: ${EMAIL_SUPPORT_ADDRESS:-}
+      ONBOARDING_EMAILS_ENABLED: ${ONBOARDING_EMAILS_ENABLED:-false}
+      CONTACT_DAILY_LIMIT: ${CONTACT_DAILY_LIMIT:-30}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost}
       SMTP_HOST: ${SMTP_HOST:-localhost}
       SMTP_PORT: ${SMTP_PORT:-1025}
@@ -636,6 +638,8 @@ services:
       RAILHOOK_CAPTCHA_SCRIPT_URL: ${CAPTCHA_SCRIPT_URL:-}
       # Cloudflare Web Analytics token. Empty: no analytics script.
       RAILHOOK_WEB_ANALYTICS_TOKEN: ${WEB_ANALYTICS_TOKEN:-}
+      # A public status page the footer links to. Empty: no link.
+      RAILHOOK_STATUS_PAGE_URL: ${STATUS_PAGE_URL:-}
       # The public webhook tester (/tester), the same switch the API reads.
       RAILHOOK_PUBLIC_TESTER: ${PUBLIC_TESTER_ENABLED:-false}
     depends_on:

@@ -39,11 +39,12 @@ type Config = {
   captchaSiteKey?: string;
   captchaScriptUrl?: string;
   webAnalyticsToken?: string;
+  statusPageUrl?: string;
   publicTester?: boolean;
 };
 
 const EMPTY: Config = {
-  contactDomain: '', siteUrl: '', captchaSiteKey: '', captchaScriptUrl: '', webAnalyticsToken: '', publicTester: false,
+  contactDomain: '', siteUrl: '', captchaSiteKey: '', captchaScriptUrl: '', webAnalyticsToken: '', statusPageUrl: '', publicTester: false,
 };
 
 /** Runs the entrypoint script as the container would, and evaluates what it wrote. */
@@ -328,6 +329,29 @@ describe('the page loads the runtime config before the app', () => {
 });
 
 /** Cross-file contract: the deployment files must hand the container these names. */
+describe('status page link', () => {
+  it('carries an https status page address into the config', () => {
+    const { config } = runEntrypoint({ RAILHOOK_STATUS_PAGE_URL: ' https://status.railhook.io ' });
+    expect(config).toEqual({ ...EMPTY, statusPageUrl: 'https://status.railhook.io' });
+  });
+
+  it('is off by default, and stays off on anything that is not a plain https URL', () => {
+    expect(runEntrypoint({}).config?.statusPageUrl).toBe('');
+    const { status, js, config, stderr } = runEntrypoint({ RAILHOOK_STATUS_PAGE_URL: 'javascript:alert(1)"};//' });
+    expect(status).toBe(0);
+    expect(config).toEqual(EMPTY);
+    expect(js).not.toContain('alert');
+    expect(stderr).toMatch(/RAILHOOK_STATUS_PAGE_URL/);
+  });
+
+  it('reaches the container from .env.dist, Compose and the Helm chart', () => {
+    expect(read('.env.dist')).toMatch(/^#\s*STATUS_PAGE_URL=$/m);
+    expect(read('docker-compose.yml')).toMatch(/^\s+RAILHOOK_STATUS_PAGE_URL: \$\{STATUS_PAGE_URL:-\}$/m);
+    expect(read('deploy/helm/railhook/templates/ui-deployment.yaml'))
+      .toMatch(/name: RAILHOOK_STATUS_PAGE_URL\s+value: \{\{ \.Values\.ui\.statusPageUrl \| default "" \| quote \}\}/);
+  });
+});
+
 describe('the settings reach the container', () => {
   const compose = read('docker-compose.yml');
   const ui = compose.slice(compose.indexOf('\n  ui:'), compose.indexOf('\n  caddy:'));

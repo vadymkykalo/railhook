@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -327,6 +328,83 @@ public class EmailService {
         });
     }
 
+    /**
+     * The welcome a new account gets once its address is proven, from the person who built the
+     * product, with the three things worth doing first.
+     *
+     * <p>Written to be answered: replies go to the support address, not to the no-reply sender.
+     * Nothing in it is a credential, so with email off the log says which mail and to whom and is
+     * done — in production as on a workstation.
+     */
+    public void sendWelcomeEmail(String to) {
+        String quickstartUrl = baseUrl + "/docs/start/quickstart/";
+        String stripeUrl = baseUrl + "/docs/guides/stripe-webhooks/";
+        String githubUrl = baseUrl + "/docs/guides/github-webhooks/";
+        if (!emailEnabled) {
+            logNotSent("onboarding-welcome", to);
+            return;
+        }
+        deliver("onboarding-welcome", to, () -> sendBoth(to, "Welcome to Railhook", replyAddress(),
+                """
+                Hi,
+
+                I'm Vadym, and I built Railhook. Thanks for signing up.
+
+                Three things worth doing first:
+
+                1. Create a project and send your first event. The quickstart takes a few minutes:
+                %s
+
+                2. Receive webhooks from a provider you already use, such as Stripe:
+                %s
+                or GitHub:
+                %s
+
+                3. If anything is unclear or does not work, reply to this email. It reaches me.
+
+                Vadym
+                """.formatted(quickstartUrl, stripeUrl, githubUrl),
+                buildWelcomeHtml(quickstartUrl, stripeUrl, githubUrl)));
+    }
+
+    /**
+     * The one follow-up for an account that has sent and received nothing two days after the
+     * welcome: the shortest path to a first event, and an offer to help.
+     */
+    public void sendOnboardingNudgeEmail(String to) {
+        String quickstartUrl = baseUrl + "/docs/start/quickstart/";
+        if (!emailEnabled) {
+            logNotSent("onboarding-nudge", to);
+            return;
+        }
+        deliver("onboarding-nudge", to, () -> sendBoth(to, "Stuck? The 2-minute path to a first event", replyAddress(),
+                """
+                Hi,
+
+                Vadym from Railhook again. Your account has not sent or received an event yet,
+                which usually means something got in the way.
+
+                The shortest path: create a project, add an endpoint, send one event. It takes
+                about two minutes:
+                %s
+
+                If you got stuck somewhere, reply and tell me where. I read every reply.
+
+                Vadym
+                """.formatted(quickstartUrl),
+                buildOnboardingNudgeHtml(quickstartUrl)));
+    }
+
+    /** Where a reply to a mail written as a person goes: support, when this deployment has one. */
+    private String replyAddress() {
+        return supportAddress == null || supportAddress.isBlank() ? null : supportAddress;
+    }
+
+    /** The stand-in for a mail with no secret in it: which one, and a masked recipient. */
+    private void logNotSent(String template, String to) {
+        log.info("Mail {} to {} not sent: EMAIL_ENABLED=false", template, maskRecipient(to));
+    }
+
     /** Whether the site's contact form has somewhere to deliver to: the deployment's support address. */
     public boolean isContactAvailable() {
         return supportAddress != null && !supportAddress.isBlank();
@@ -339,7 +417,11 @@ public class EmailService {
      * form that mails whatever address it is given is a relay. Plain text only, so nothing the
      * visitor typed is ever rendered as markup in the inbox that reads it. Without SMTP the log
      * gets who wrote and about what, not the message.
+     *
+     * <p>Asynchronous: an SMTP round trip takes seconds, and the visitor is waiting on a form. It
+     * reads no tenant data, so it needs no scope on the pool's thread.
      */
+    @Async
     public void sendContactMessage(String replyTo, String name, String topic, String message, String page) {
         String who = name == null || name.isBlank() ? replyTo : oneLine(name);
         String subject = "[Railhook " + topic + "] Message from " + who;
@@ -432,10 +514,18 @@ public class EmailService {
      * same thing, so both are built from the same link.
      */
     private void sendBoth(String to, String subject, String plain, String html) throws Exception {
+        sendBoth(to, subject, null, plain, html);
+    }
+
+    /** {@link #sendBoth(String, String, String, String)} with a Reply-To, when {@code replyTo} is not null. */
+    private void sendBoth(String to, String subject, String replyTo, String plain, String html) throws Exception {
         var message = mailSender.createMimeMessage();
         var helper = new MimeMessageHelper(message, true, "UTF-8");
         helper.setFrom(fromAddress);
         helper.setTo(to);
+        if (replyTo != null) {
+            helper.setReplyTo(replyTo);
+        }
         helper.setSubject(subject);
         helper.setText(plain, html);
         mailSender.send(message);
@@ -456,6 +546,45 @@ public class EmailService {
                 <span style="color: #555; word-break: break-all;">%s</span>
             </p>
             """.formatted(url);
+    }
+
+    private String buildWelcomeHtml(String quickstartUrl, String stripeUrl, String githubUrl) {
+        return """
+            <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; color: #333; line-height: 1.6;">
+                <p>Hi,</p>
+                <p>I'm Vadym, and I built Railhook. Thanks for signing up.</p>
+                <p>Three things worth doing first:</p>
+                <ol style="padding-left: 20px;">
+                    <li style="margin-bottom: 8px;">
+                        Create a project and send your first event. The
+                        <a href="%1$s" style="color: #1D4BFF;">quickstart</a> takes a few minutes.
+                    </li>
+                    <li style="margin-bottom: 8px;">
+                        Receive webhooks from a provider you already use, such as
+                        <a href="%2$s" style="color: #1D4BFF;">Stripe</a> or
+                        <a href="%3$s" style="color: #1D4BFF;">GitHub</a>.
+                    </li>
+                    <li style="margin-bottom: 8px;">
+                        If anything is unclear or does not work, reply to this email. It reaches me.
+                    </li>
+                </ol>
+                <p>Vadym</p>
+%4$s            </div>
+            """.formatted(quickstartUrl, stripeUrl, githubUrl, linkFallback(quickstartUrl));
+    }
+
+    private String buildOnboardingNudgeHtml(String quickstartUrl) {
+        return """
+            <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; color: #333; line-height: 1.6;">
+                <p>Hi,</p>
+                <p>Vadym from Railhook again. Your account has not sent or received an event yet,
+                   which usually means something got in the way.</p>
+                <p>The shortest path: create a project, add an endpoint, send one event. It takes
+                   about two minutes with the <a href="%1$s" style="color: #1D4BFF;">quickstart</a>.</p>
+                <p>If you got stuck somewhere, reply and tell me where. I read every reply.</p>
+                <p>Vadym</p>
+%2$s            </div>
+            """.formatted(quickstartUrl, linkFallback(quickstartUrl));
     }
 
     private String buildPasswordResetHtml(String resetUrl) {

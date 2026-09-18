@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../lib/utils';
 
@@ -126,6 +126,54 @@ export function SectionHeading({
         {title}
       </h2>
       {lead && <p className="text-[1.05rem] text-muted-foreground">{lead}</p>}
+    </div>
+  );
+}
+
+/**
+ * The top of a standalone public page: an optional eyebrow, the page's one h1 and its lead, with
+ * room below for a call to action. The same measure and type as /pricing and /tester.
+ */
+export function PageIntro({
+  eyebrow,
+  title,
+  lead,
+  children,
+}: {
+  eyebrow?: string;
+  title: string;
+  lead: string;
+  children?: ReactNode;
+}) {
+  return (
+    <section className="pb-4 pt-14 sm:pt-20">
+      <div className={WRAP}>
+        {eyebrow && <p className="mono-label mb-3 text-primary">{eyebrow}</p>}
+        <h1 className="max-w-3xl font-display text-[2.2rem] font-bold leading-[1.05] tracking-[-0.035em] text-foreground [text-wrap:balance] sm:text-[3.2rem]">
+          {title}
+        </h1>
+        <p className="mt-4 max-w-2xl text-[1.1rem] text-muted-foreground">{lead}</p>
+        {children && <div className="mt-6">{children}</div>}
+      </div>
+    </section>
+  );
+}
+
+/** One stated fact in a grid of them: an icon, a short title and a sentence or two. */
+export function FactCard({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn('flex h-full flex-col p-6', panel())}>
+      <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
+      <h3 className="mt-3 text-[15px] font-semibold text-foreground">{title}</h3>
+      <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{children}</p>
     </div>
   );
 }

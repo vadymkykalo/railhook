@@ -54,6 +54,7 @@ public class AuthService {
     private final AccountLockoutService accountLockoutService;
     private final EmailService emailService;
     private final VerificationMailBudget verificationMailBudget;
+    private final OnboardingMailService onboardingMailService;
     private final boolean billingEnabled;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -71,6 +72,7 @@ public class AuthService {
             AccountLockoutService accountLockoutService,
             EmailService emailService,
             VerificationMailBudget verificationMailBudget,
+            OnboardingMailService onboardingMailService,
             @Value("${billing.enabled:false}") boolean billingEnabled) {
         this.userRepository = userRepository;
         this.organizationRepository = organizationRepository;
@@ -86,6 +88,7 @@ public class AuthService {
         this.accountLockoutService = accountLockoutService;
         this.emailService = emailService;
         this.verificationMailBudget = verificationMailBudget;
+        this.onboardingMailService = onboardingMailService;
         this.billingEnabled = billingEnabled;
     }
 
@@ -127,6 +130,9 @@ public class AuthService {
         if (verificationIsDeliverable) {
             verificationMailBudget.recordSend(user.getId(), VerificationEmailSend.REGISTER);
             emailService.sendVerificationEmail(user.getEmail(), verificationToken);
+        } else {
+            // Created already verified, so this is the moment the welcome would otherwise wait for.
+            onboardingMailService.welcome(user);
         }
 
         return issueSession(user, organization.getId(), MembershipRole.OWNER, origin,
@@ -523,6 +529,7 @@ public class AuthService {
         user.setVerificationToken(null);
         user.setVerificationTokenExpiresAt(null);
         userRepository.save(user);
+        onboardingMailService.welcome(user);
         log.info("Email verified for user {}", user.getEmail());
     }
 

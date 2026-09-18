@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.0] - 2026-09-18
+
+### Added
+
+- **Onboarding email for new accounts.** With `ONBOARDING_EMAILS_ENABLED=true`, an account gets a
+  short welcome once its address is verified (or at sign-up, when it is created already verified)
+  with three next steps — the quickstart, receiving from Stripe or GitHub, and replying with
+  questions — and, two days later, one nudge if its organization has still sent and received no
+  events. Each is sent at most once per account, replies go to `EMAIL_SUPPORT_ADDRESS`, and
+  suspended accounts and organizations are skipped. Off by default: both mails are written as
+  Railhook's author, for Railhook Cloud. Accounts that exist before the upgrade are marked as
+  already onboarded and never receive either. Migration `V082` adds two nullable columns to
+  `users`.
+- **Webhook signature verifier** at `/tools/webhook-signature`: paste a body, a secret and the
+  signature header to see whether they match, and what the signature should have been — for
+  Standard Webhooks, Stripe, GitHub, Shopify, Slack and Railhook's own `X-Signature`, with a
+  warning when a timestamp is outside the 5-minute window. It runs in the browser with Web
+  Crypto; nothing pasted into it is sent anywhere.
+- **Security, About and Changelog pages** on the public site. `/security` states how data is
+  hosted, how secrets, API keys and passwords are stored, how organizations are isolated and
+  how to report a vulnerability. `/about` says who builds Railhook and on what. `/changelog` is
+  built from this file on every build, newest release first, each at its own anchor.
+- The footer gains a Company column (About, Security, Changelog, Contact, Privacy, Terms) and a
+  link to the signature verifier.
+
+- **Status page.** `deploy/status-page/` holds the Cloudflare Worker behind status.railhook.io:
+  it probes the site, the API, the dashboard, the docs and the MCP server once a minute, keeps
+  90 days of uptime in D1, and opens and resolves incidents on its own. `STATUS_PAGE_URL` puts a
+  Status link in the site's footer; empty, the default, shows none.
+
+### Changed
+
+- The contact form answers at once: the mail to support is sent in the background.
+- **The contact form has a daily ceiling across all senders**, `CONTACT_DAILY_LIMIT` (30 by
+  default), so a flood from many addresses cannot spend the mail quota that verification and
+  password-reset mails need. Onboarding nudges go at most ten an hour for the same reason.
+
 ## [2.22.0] - 2026-09-18
 
 ### Added

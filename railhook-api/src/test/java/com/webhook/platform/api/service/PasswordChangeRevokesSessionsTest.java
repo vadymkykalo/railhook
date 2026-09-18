@@ -22,6 +22,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 /**
  * A password change has to end the sessions that the old password could have opened.
@@ -62,7 +63,7 @@ class PasswordChangeRevokesSessionsTest {
         authService = new AuthService(userRepository, organizationRepository, membershipRepository,
                 planRepository, jwtUtil, new BCryptPasswordEncoder(4), tokenBlacklistService,
                 userSessionService, accountLockoutService, emailService,
-                org.mockito.Mockito.mock(VerificationMailBudget.class), false);
+                org.mockito.Mockito.mock(VerificationMailBudget.class), mock(OnboardingMailService.class), false);
 
         user = new User();
         user.setId(UUID.randomUUID());

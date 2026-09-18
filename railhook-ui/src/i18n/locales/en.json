@@ -1641,7 +1641,6 @@
     "connect": "Connect with us",
     "connectEmail": "Email support",
     "connectGithub": "Railhook on GitHub",
-    "contact": "Contact",
     "copyright": "© {{year}} Railhook · MIT",
     "docs": "Docs",
     "documentation": "Documentation",
@@ -1660,7 +1659,12 @@
     "terms": "Terms of Service",
     "pricing": "Pricing",
     "tester": "Webhook tester",
-    "mcp": "MCP server"
+    "mcp": "MCP server",
+    "about": "About",
+    "company": "Company",
+    "releases": "Releases",
+    "signatureVerifier": "Signature verifier",
+    "status": "Status"
   },
   "incidents": {
     "addNote": "Add Note",
@@ -2455,6 +2459,22 @@
     "tester": {
       "title": "Webhook tester — inspect webhook requests online, free | Railhook",
       "description": "Get a free URL, send it a webhook from Stripe, GitHub or curl, and see the method, headers and body that arrived. No account needed, kept for 24 hours."
+    },
+    "security": {
+      "title": "Security — Railhook",
+      "description": "How Railhook protects your data: EU hosting, encrypted signing secrets, hashed API keys, isolation between organizations, and signed, verified webhooks."
+    },
+    "about": {
+      "title": "About — Railhook",
+      "description": "Railhook is an open-source, MIT-licensed webhook gateway built by Vadym Kykalo: send and receive webhooks, with every delivery on record."
+    },
+    "changelog": {
+      "title": "Changelog — Railhook",
+      "description": "Every Railhook release, newest first: what was added, changed and fixed."
+    },
+    "signatureVerifier": {
+      "title": "Webhook signature verifier — validate Stripe, GitHub, Shopify and Slack signatures | Railhook",
+      "description": "Free online webhook signature validator. Check an HMAC-SHA256 signature from Stripe, GitHub, Shopify, Slack or Standard Webhooks against its payload and secret. Runs in your browser; nothing is sent."
     }
   },
   "mtls": {
@@ -4419,8 +4439,260 @@
         "captcha": "The check did not pass. Try again.",
         "tooMany": "Too many messages in a minute. Wait a moment and send again.",
         "invalid": "Check the email address and the message.",
-        "generic": "The message was not sent. Try again, or write to support by email."
+        "generic": "The message was not sent. Try again, or write to support by email.",
+        "busy": "We have had a lot of messages today. Please write to us by email instead."
       }
+    }
+  },
+  "security": {
+    "eyebrow": "Security",
+    "title": "How Railhook protects your data",
+    "lead": "What the code does today, stated plainly. Railhook is open source, so you can check every claim on this page against the repository.",
+    "sourceCta": "Read the source",
+    "hosting": {
+      "title": "Where Railhook Cloud runs",
+      "lead": "Railhook Cloud is the hosted service at railhook.io. A copy you run yourself sends us nothing.",
+      "hetzner": {
+        "title": "Hosted in the EU",
+        "body": "The servers run at Hetzner in Helsinki, Finland."
+      },
+      "cloudflare": {
+        "title": "Cloudflare in front",
+        "body": "Traffic reaches the servers through Cloudflare, which provides the CDN, DNS and the Turnstile check at sign-up."
+      },
+      "resend": {
+        "title": "Mail through Resend",
+        "body": "Transactional email, such as address verification and password resets, is sent through Resend."
+      },
+      "selfHosted": {
+        "title": "Or on your own servers",
+        "body": "Self-hosted Railhook runs entirely on your infrastructure. Your events, secrets and accounts never reach us."
+      }
+    },
+    "secrets": {
+      "title": "How credentials are stored",
+      "lead": "Nothing that grants access is kept in a form someone could use after reading the database.",
+      "signing": {
+        "title": "Signing secrets are encrypted",
+        "body": "Endpoint and source signing secrets and mTLS client keys are encrypted with AES-256-GCM. Encryption keys are versioned, and an operator can re-encrypt every secret under a new one."
+      },
+      "apiKeys": {
+        "title": "API keys are hashed",
+        "body": "A project API key is shown once, when it is created. Railhook keeps only its SHA-256 hash. A key can be rotated with a grace period, or revoked."
+      },
+      "passwords": {
+        "title": "Passwords are hashed with bcrypt",
+        "body": "Passwords are stored as bcrypt hashes. An account that signs in with Google has no password at all."
+      },
+      "sessions": {
+        "title": "Sessions you control",
+        "body": "Access tokens last 15 minutes. The refresh token sits in an HttpOnly cookie and is replaced on every use; if a used one is presented again, every session of that user ends. You can see your sessions and end any of them."
+      }
+    },
+    "access": {
+      "title": "Isolation and access",
+      "tenancy": {
+        "title": "Organizations are isolated",
+        "body": "Every database query is scoped to the caller's organization by the data layer itself, lookups by id included, so no feature depends on remembering the check. Another organization's resource answers 404."
+      },
+      "roles": {
+        "title": "Roles and scoped keys",
+        "body": "People are Owners, Developers or Viewers. An API key belongs to one project and can be read-only."
+      },
+      "audit": {
+        "title": "Audit log",
+        "body": "Sign-ins, member and role changes, rotated secrets, replays and purges are recorded in the organization's audit log."
+      },
+      "abuse": {
+        "title": "Limits on abuse",
+        "body": "Sign-in and registration are rate-limited, repeated failed sign-ins lock the account for a growing interval, and registration on Railhook Cloud passes a Cloudflare Turnstile check."
+      }
+    },
+    "webhooks": {
+      "title": "Webhooks, in both directions",
+      "signed": {
+        "title": "Every delivery is signed",
+        "body": "HMAC-SHA256 over the payload, in Railhook's own header and in the Standard Webhooks format. After a secret is rotated, deliveries are signed with both secrets for 24 hours, so receivers switch without downtime."
+      },
+      "incoming": {
+        "title": "Incoming webhooks are verified",
+        "body": "Stripe, GitHub, GitLab, Shopify, Slack and Twilio requests are checked with each provider's own scheme before anything is stored. A request that fails is answered 401 and not stored, and a replayed signature is refused."
+      },
+      "network": {
+        "title": "No requests into private networks",
+        "body": "Endpoint URLs are checked when they are saved and again before every attempt. Loopback, link-local and private addresses are refused, so a webhook cannot be aimed at internal services."
+      },
+      "mtls": {
+        "title": "Client certificates and ownership checks",
+        "body": "An endpoint can require Railhook to present a client certificate (mTLS), and a deployment can require every endpoint to prove it owns its URL before it receives anything."
+      },
+      "pii": {
+        "title": "Personal data masked on screen",
+        "body": "Masking rules hide emails, phone numbers, card numbers and fields you name, in the dashboard and in shared debug links."
+      }
+    },
+    "data": {
+      "title": "Your data",
+      "retention": {
+        "title": "Kept only as long as the plan says",
+        "body": "On the Railhook Cloud free plan, webhook events are kept for {{days}} days and then deleted."
+      },
+      "export": {
+        "title": "Export and delete",
+        "body": "An owner can export an organization's data and delete the organization. Anyone can delete their own account in the product."
+      },
+      "noSale": {
+        "title": "Not sold, not tracked",
+        "body": "We do not sell data and do not use advertising trackers."
+      },
+      "privacyCta": "Read the privacy policy"
+    },
+    "report": {
+      "title": "Report a vulnerability",
+      "body": "Please do not open a public issue. Report it privately through GitHub, as the security policy describes, and it will be fixed on the latest release line.",
+      "advisory": "Report privately on GitHub",
+      "policy": "Read the security policy",
+      "email": "Or write to"
+    }
+  },
+  "about": {
+    "eyebrow": "About",
+    "title": "An open-source webhook gateway, built in the open",
+    "lead": "Railhook sends webhooks to your customers and receives them from other services, with every delivery on record. It is released under the MIT licence, and all of its code is on GitHub.",
+    "why": {
+      "title": "Why it exists",
+      "both": {
+        "title": "Both directions in one tool",
+        "body": "Sending webhooks and receiving them usually means two systems. Railhook does both: signed, retried deliveries to your customers, and verified webhooks from Stripe, GitHub and other services, in one place."
+      },
+      "open": {
+        "title": "Everything in the open-source version",
+        "body": "There is no enterprise edition and no licence key. Every feature is in the code you can run on your own servers, free, under the MIT licence."
+      },
+      "record": {
+        "title": "Every delivery on record",
+        "body": "Each attempt is kept with the response it got, so when a customer asks what happened, the answer is on screen rather than in a log search."
+      }
+    },
+    "who": {
+      "title": "Who builds it",
+      "body": "Railhook is built by Vadym Kykalo, the project's maintainer, who also runs Railhook Cloud at railhook.io. The work happens in the public repository: issues, changes and releases are all there.",
+      "github": "Vadym Kykalo on GitHub",
+      "repo": "The Railhook repository"
+    },
+    "stack": {
+      "title": "What it is built on",
+      "lead": "Well-understood parts you can run yourself.",
+      "java": {
+        "title": "Java 17 and Spring Boot",
+        "body": "The API, and the worker that makes the deliveries."
+      },
+      "postgres": {
+        "title": "PostgreSQL",
+        "body": "An event and its outbox record are written in one transaction before the API replies, so an accepted event is not lost."
+      },
+      "kafka": {
+        "title": "Kafka",
+        "body": "Carries events from the API to the worker."
+      },
+      "redis": {
+        "title": "Redis",
+        "body": "Rate limits and delivery ordering."
+      },
+      "react": {
+        "title": "React and TypeScript",
+        "body": "The dashboard, the customer portal and this site."
+      }
+    },
+    "links": {
+      "title": "Find out more",
+      "github": {
+        "title": "Source code",
+        "body": "The repository, its issues and its releases."
+      },
+      "docs": {
+        "title": "Documentation",
+        "body": "Guides for sending, receiving and self-hosting, and the API reference."
+      },
+      "changelog": {
+        "title": "Changelog",
+        "body": "Every release, and what changed in it."
+      },
+      "contact": {
+        "title": "Contact",
+        "body": "Questions about Railhook Cloud or running it yourself."
+      }
+    }
+  },
+  "changelog": {
+    "eyebrow": "Changelog",
+    "title": "What's new in Railhook",
+    "lead": "Every release, newest first. This is the same history as CHANGELOG.md in the repository.",
+    "languageNote": "Release notes are written in English.",
+    "releases": "Releases on GitHub",
+    "anchor": "Link to version {{version}}"
+  },
+  "webhookSignature": {
+    "eyebrow": "Free tool",
+    "title": "Webhook signature verifier",
+    "lead": "Paste a webhook's body, its signing secret and its signature header to see whether they match. Works for Standard Webhooks, Stripe, GitHub, Shopify, Slack and Railhook.",
+    "private": "Runs entirely in your browser. Your secret and payload never leave this page.",
+    "provider": "Provider",
+    "providers": {
+      "standard": "Standard Webhooks",
+      "stripe": "Stripe",
+      "github": "GitHub",
+      "shopify": "Shopify",
+      "slack": "Slack",
+      "railhook": "Railhook"
+    },
+    "payload": "Raw request body",
+    "payloadHint": "Paste the body exactly as it arrived. Reformatting JSON, even its whitespace, changes the signature.",
+    "secret": "Signing secret",
+    "secretHint": {
+      "standard": "whsec_ followed by base64. The part after whsec_ is decoded and used as the key.",
+      "stripe": "The whsec_ secret from the Stripe dashboard, used exactly as written.",
+      "github": "The secret set on the webhook in GitHub.",
+      "shopify": "Your app's client secret, or the key from your store's webhook settings.",
+      "slack": "The signing secret from your Slack app's Basic Information page.",
+      "railhook": "The endpoint's secret, returned when the endpoint was created or its secret rotated."
+    },
+    "headers": "Headers",
+    "headersHint": "Paste the value, or the whole line with the header name.",
+    "example": "Fill in an example",
+    "clear": "Clear",
+    "result": {
+      "label": "Result",
+      "incomplete": "Fill in the body, the secret and every header to check the signature.",
+      "valid": "Signature is valid",
+      "validBody": "This body was signed with this secret.",
+      "invalid": "Signature does not match",
+      "invalidBody": "Either the body changed on the way, or it was signed with a different secret. Compare the expected signature with the one you received.",
+      "malformed": "Can't check this signature",
+      "expected": "Expected signature",
+      "reasons": {
+        "secret": "The part of the secret after whsec_ is not valid base64.",
+        "header": "{{header}} is not in the format this provider sends.",
+        "timestamp": "{{header}} does not carry a numeric timestamp."
+      },
+      "timestampOk": "Signed {{when}}, within the {{minutes}}-minute window receivers allow.",
+      "timestampOutside": "Signed {{when}}, outside the {{minutes}}-minute window receivers allow. A live request like this is refused even when the signature matches."
+    },
+    "how": {
+      "title": "How each provider signs",
+      "lead": "What is signed, with which key, and where the signature goes. Every scheme here is HMAC-SHA256.",
+      "standard": "Signs webhook-id.webhook-timestamp.body with the base64-decoded whsec_ secret. The webhook-signature header carries v1,<base64>, one entry per active secret. The timestamp is in seconds, with a 5-minute window.",
+      "stripe": "Signs t.body with the whsec_ secret as written. Stripe-Signature carries t=<seconds>,v1=<hex>, one v1 per active secret, with a 5-minute window.",
+      "github": "Signs the raw body. X-Hub-Signature-256 carries sha256=<hex>. There is no timestamp.",
+      "shopify": "Signs the raw body. X-Shopify-Hmac-Sha256 carries the digest in base64. There is no timestamp.",
+      "slack": "Signs v0:timestamp:body. X-Slack-Signature carries v0=<hex>, and X-Slack-Request-Timestamp the time in seconds, with a 5-minute window.",
+      "railhook": "Signs t.body with the endpoint secret. X-Signature carries t=<milliseconds>,v1=<hex>, with a 5-minute window. Railhook sends the Standard Webhooks headers as well."
+    },
+    "cta": {
+      "title": "Railhook checks these for you on every incoming webhook",
+      "body": "Point Stripe, GitHub, Shopify, Slack, GitLab or Twilio at a Railhook source. Every request is verified with the provider's own scheme before it is stored, and a forged one is refused.",
+      "button": "Start free",
+      "docs": "How verification works"
     }
   }
 }

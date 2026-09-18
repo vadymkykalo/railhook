@@ -2298,7 +2298,8 @@ paths:
       - Contact
       summary: Write to support
       description: "Sends the message to this deployment's support address, with the\
-        \ given email as the Reply-To. Two messages a minute per address."
+        \ given email as the Reply-To. Two messages a minute per address, and a daily\
+        \ ceiling across all senders."
       operationId: sendContactMessage
       requestBody:
         content:
@@ -2324,7 +2325,8 @@ paths:
                 additionalProperties:
                   type: string
         "429":
-          description: Too many messages from this address
+          description: "Too many messages from this address, or the form's daily ceiling\
+            \ is reached"
           content:
             '*/*':
               schema:
