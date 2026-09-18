@@ -159,7 +159,7 @@ groups:
         annotations:
           summary: "Delivery failure rate above 10% for >10 min"
           description: |
-            {{ $value | printf "%.1f" }}% failure rate. SLO target: <5% DLQ rate.
+            {{ $value | humanizePercentage }} failure rate. SLO target: <5% DLQ rate.
 
       # The incoming counterpart of DlqRateHigh. Same expression shape, same threshold and
       # the same 10m window -- a Forward failing repeatedly ends up in DLQ exactly as a
@@ -176,7 +176,7 @@ groups:
         annotations:
           summary: "Incoming forward failure rate above 10% for >10 min"
           description: |
-            {{ $value | printf "%.1f" }}% failure rate. SLO target: <5% DLQ rate.
+            {{ $value | humanizePercentage }} failure rate. SLO target: <5% DLQ rate.
 
       # Actionable DLQ backlog (deliveries still in DeliveryStatus.DLQ -- this is
       # DB-backed and genuinely returns to 0 once retried/purged via DlqService, unlike the
@@ -292,10 +292,12 @@ groups:
   # ── API Availability (from SLOs) ─────────────────────────────
   - name: railhook.api
     rules:
+      # Tunnel traffic is left out: a tunnel relays what the customer's own machine answers, and
+      # answers 503 while nobody is connected. Their dev server failing is not the API failing.
       - alert: ApiErrorRateHigh
         expr: |
-          (sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) or vector(0)) /
-          sum(rate(http_server_requests_seconds_count[5m]))
+          (sum(rate(http_server_requests_seconds_count{status=~"5..", uri!~"/tunnel/.*"}[5m])) or vector(0)) /
+          sum(rate(http_server_requests_seconds_count{uri!~"/tunnel/.*"}[5m]))
           > 0.005
         for: 5m
         labels:
@@ -304,7 +306,7 @@ groups:
         annotations:
           summary: "API 5xx error rate above 0.5%"
           description: |
-            {{ $value | printf "%.2f" }}% of requests returning 5xx.
+            {{ $value | humanizePercentage }} of requests returning 5xx.
             SLO target: <0.1% over 30d. Investigate API logs immediately.
 
   # ── Oldest Pending Age ───────────────────────────────────────
