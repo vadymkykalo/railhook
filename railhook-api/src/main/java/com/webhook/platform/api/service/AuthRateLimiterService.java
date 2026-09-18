@@ -38,6 +38,8 @@ public class AuthRateLimiterService {
     private static final String PUBLIC_BIN_KEY_PREFIX = "rate_limiter:public_bin:ip:";
     /** Public tester URLs a single address may make in a minute; a person needs one or two. */
     static final int PUBLIC_BIN_PER_IP_PER_MINUTE = 5;
+    private static final String CONTACT_KEY_PREFIX = "rate_limiter:contact:ip:";
+    static final int CONTACT_PER_IP_PER_MINUTE = 2;
     private static final String OAUTH_REGISTER_KEY_PREFIX = "rate_limiter:oauth:register:ip:";
     /**
      * Not the sign-up bucket's 5: a hosted app registers from its own servers, so every person who
@@ -106,6 +108,11 @@ public class AuthRateLimiterService {
     /** Making a webhook tester URL on the public site, which needs no account. */
     public boolean allowPublicBin(String ip) {
         return tryAcquire(PUBLIC_BIN_KEY_PREFIX + ip, PUBLIC_BIN_PER_IP_PER_MINUTE);
+    }
+
+    /** A message from the public site's contact form, which needs no account and sends mail. */
+    public boolean allowContactMessage(String ip) {
+        return tryAcquire(CONTACT_KEY_PREFIX + ip, CONTACT_PER_IP_PER_MINUTE);
     }
 
     public boolean allowRegister(String ip) {

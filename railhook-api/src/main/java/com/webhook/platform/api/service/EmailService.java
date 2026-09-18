@@ -327,6 +327,51 @@ public class EmailService {
         });
     }
 
+    /** Whether the site's contact form has somewhere to deliver to: the deployment's support address. */
+    public boolean isContactAvailable() {
+        return supportAddress != null && !supportAddress.isBlank();
+    }
+
+    /**
+     * A visitor's message from the public site's contact form, to this deployment's support address.
+     *
+     * <p>The visitor's address is the Reply-To and never a recipient: the form is anonymous, and a
+     * form that mails whatever address it is given is a relay. Plain text only, so nothing the
+     * visitor typed is ever rendered as markup in the inbox that reads it. Without SMTP the log
+     * gets who wrote and about what, not the message.
+     */
+    public void sendContactMessage(String replyTo, String name, String topic, String message, String page) {
+        String who = name == null || name.isBlank() ? replyTo : oneLine(name);
+        String subject = "[Railhook " + topic + "] Message from " + who;
+        if (!emailEnabled) {
+            log.info("========== CONTACT MESSAGE ==========");
+            log.info("From: {}", maskRecipient(replyTo));
+            log.info("Topic: {}", topic);
+            log.info("=====================================");
+            return;
+        }
+        String body = message
+                + "\n\n--\n"
+                + "From: " + who + " <" + replyTo + ">\n"
+                + "Topic: " + topic + "\n"
+                + "Sent from: " + baseUrl + (page == null ? "" : oneLine(page)) + "\n";
+        deliver("contact", supportAddress, () -> {
+            var mail = mailSender.createMimeMessage();
+            var helper = new MimeMessageHelper(mail, false, "UTF-8");
+            helper.setFrom(fromAddress);
+            helper.setTo(supportAddress);
+            helper.setReplyTo(replyTo);
+            helper.setSubject(subject);
+            helper.setText(body, false);
+            mailSender.send(mail);
+        });
+    }
+
+    /** A header value from what a visitor typed: no line breaks, so it cannot add a header of its own. */
+    private static String oneLine(String value) {
+        return value.replaceAll("[\\r\\n\\t]+", " ").strip();
+    }
+
     private String buildInviteHtml(String inviteUrl) {
         return """
             <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">

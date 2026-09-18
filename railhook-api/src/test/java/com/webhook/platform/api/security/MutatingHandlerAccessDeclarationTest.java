@@ -79,6 +79,9 @@ class MutatingHandlerAccessDeclarationTest {
             // The public site's webhook tester: anonymous by design (/api/v1/public/** in
             // SecurityConfig), rate-limited per address, and it touches no tenant data at all.
             "PublicBinController.create",
+            // The public site's contact form: anonymous by design, rate-limited per address and
+            // behind the challenge; it only ever mails the deployment's own support address.
+            "PublicContactController.send",
             // The MCP server's OAuth protocol endpoints: called by an app with its client
             // credentials, a code + PKCE verifier or a refresh token, never by a member, so there
             // is no role to require. Public paths in McpSecurityConfig, outside /api.

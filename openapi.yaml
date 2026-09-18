@@ -95,6 +95,8 @@ tags:
   description: PII masking rules for payload sanitization
 - name: Incidents
   description: Incident management with timeline and RCA
+- name: Contact
+  description: Messages from the public site to the deployment's support address
 - name: Tunnels
   description: CLI tunnel session management
 - name: Workflows
@@ -2290,6 +2292,53 @@ paths:
                 $ref: "#/components/schemas/TunnelCreateResponse"
       security:
       - bearerAuth: []
+  /api/v1/public/contact:
+    post:
+      tags:
+      - Contact
+      summary: Write to support
+      description: "Sends the message to this deployment's support address, with the\
+        \ given email as the Reply-To. Two messages a minute per address."
+      operationId: sendContactMessage
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicContactRequest"
+        required: true
+      responses:
+        "202":
+          description: The message is on its way
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+        "400":
+          description: "A field is invalid, or the challenge was not passed"
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+        "429":
+          description: Too many messages from this address
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+        "503":
+          description: This deployment has no support address
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
   /api/v1/public/bins:
     post:
       tags:
@@ -9470,6 +9519,34 @@ components:
         createdAt:
           type: string
           format: date-time
+    PublicContactRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          minLength: 0
+        name:
+          type: string
+          maxLength: 100
+          minLength: 0
+        topic:
+          type: string
+          pattern: ^(sales|support|other)?$
+        message:
+          type: string
+          maxLength: 5000
+          minLength: 0
+        page:
+          type: string
+          maxLength: 300
+          minLength: 0
+        captchaToken:
+          type: string
+      required:
+      - email
+      - message
     PublicBinCreateRequest:
       type: object
       properties:

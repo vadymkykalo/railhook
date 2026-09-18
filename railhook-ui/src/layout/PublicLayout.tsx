@@ -7,6 +7,7 @@ import { RailhookIcon } from '../components/icons/RailhookIcon';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import ThemeToggle from '../components/ThemeToggle';
 import LandingNav from '../pages/landing/LandingNav';
+import SiteOverlays from '../components/site/SiteOverlays';
 import { REPO_URL } from '../pages/landing/plans';
 import { WRAP } from '../pages/landing/primitives';
 
@@ -43,6 +44,7 @@ export default function PublicLayout({ nav = true }: { nav?: boolean }) {
         <Outlet />
       </div>
       <Footer />
+      <SiteOverlays />
     </div>
   );
 }

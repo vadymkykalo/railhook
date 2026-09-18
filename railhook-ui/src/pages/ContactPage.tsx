@@ -6,6 +6,7 @@ import { REPO_URL } from './landing/plans';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { docsUrl } from '../lib/docsUrl';
 import { contactDomain } from '../lib/runtimeConfig';
+import ContactForm from '../components/site/ContactForm';
 
 /**
  * The route that replaces a mailto to a personal Gmail address.
@@ -78,7 +79,20 @@ export default function ContactPage() {
         </div>
       </Reveal>
 
-      <div className="mt-10 grid gap-4 sm:grid-cols-2">
+      {/* The form writes to the same support address, so it is here only where that exists. */}
+      {domain && (
+        <Reveal>
+          <div className={cn('mt-10 p-6 sm:p-8', panel())}>
+            <h2 className="font-display text-[1.35rem] font-bold tracking-[-0.02em] text-foreground">{t('site.contact.formTitle')}</h2>
+            <p className="mt-1.5 text-muted-foreground">{t('site.contact.formLead')}</p>
+            <div className="mt-6">
+              <ContactForm />
+            </div>
+          </div>
+        </Reveal>
+      )}
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {domain && (
           <>
             <Reveal className="h-full">
