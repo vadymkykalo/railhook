@@ -36,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -158,7 +159,7 @@ class OutgoingRequestHeadersTest {
     }
 
     private Sent send(Delivery delivery) {
-        when(deliveryRepository.claimForProcessingAndReturn(eq(delivery.getId()), any(UUID.class)))
+        when(deliveryRepository.claimForProcessingAndReturn(eq(delivery.getId()), any(UUID.class), any(Instant.class)))
                 .thenReturn(delivery);
         OutgoingAttemptStore store = new OutgoingAttemptStore(
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,

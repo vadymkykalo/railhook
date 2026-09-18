@@ -286,6 +286,36 @@ class DeliveryRepositoryTest {
         assertTrue(stale.contains(retriedLongAgo.getId()), "a retry is not a permanent exemption from the cap");
     }
 
+    /**
+     * A failed Attempt hands the Delivery back PENDING with its next rung in next_retry_at. The
+     * dispatch claim matched on status alone, so a second copy of the dispatch message — Kafka
+     * redelivery after a rebalance, an outbox re-publish — took the row at once: an Attempt the
+     * ladder had not reached yet, spending a rung and bringing the DLQ closer.
+     */
+    @Test
+    void claimForProcessingAndReturn_leavesADeliveryWaitingOnItsLadderAlone() {
+        createSharedEndpoint();
+        Delivery waiting = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, Instant.now().plusSeconds(300));
+        entityManager.flush();
+        entityManager.clear();
+
+        Delivery claimed = deliveryRepository.claimForProcessingAndReturn(waiting.getId(), UUID.randomUUID(), Instant.now());
+
+        assertNull(claimed, "a Delivery whose next rung is in five minutes is not due for an Attempt");
+    }
+
+    @Test
+    void claimForProcessingAndReturn_takesAFreshOrDueDelivery() {
+        createSharedEndpoint();
+        Delivery fresh = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, null);
+        Delivery due = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, Instant.now().minusSeconds(5));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertNotNull(deliveryRepository.claimForProcessingAndReturn(fresh.getId(), UUID.randomUUID(), Instant.now()));
+        assertNotNull(deliveryRepository.claimForProcessingAndReturn(due.getId(), UUID.randomUUID(), Instant.now()));
+    }
+
     @Test
     void findPendingRetryIds_shouldRespectPageSize() {
         // Arrange

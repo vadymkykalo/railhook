@@ -2,21 +2,30 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.service.HopByHopHeaders;
 import com.webhook.platform.api.service.TunnelIngressService;
+import com.webhook.platform.common.dto.tunnel.TunnelBody;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+
+import static com.webhook.platform.api.filter.IngressRawBodyFilter.rawBody;
 
 /**
  * Public endpoint for requests destined for a CLI tunnel. The request goes out over the WebSocket
@@ -34,10 +43,19 @@ public class TunnelIngressController {
     @RequestMapping(value = {"/{slug}", "/{slug}/**"}, method = {RequestMethod.GET, RequestMethod.POST,
             RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE, RequestMethod.HEAD, RequestMethod.OPTIONS})
     @Operation(summary = "Tunnel ingress", description = "Forward request through CLI tunnel to local application")
-    public ResponseEntity<String> handleTunnelRequest(
+    // Documented as the String it used to be bound as: the wire format is unchanged.
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(mediaType = "application/json", schema = @Schema(type = "string")))
+    @ApiResponse(responseCode = "200", description = "OK",
+            content = @Content(mediaType = "*/*", schema = @Schema(type = "string")))
+    public ResponseEntity<byte[]> handleTunnelRequest(
             @PathVariable("slug") String slug,
-            @RequestBody(required = false) String body,
-            HttpServletRequest request) {
+            HttpServletRequest request) throws IOException {
+        // Bytes, not @RequestBody String: for a form POST Spring rebuilds that String from parsed
+        // parameters, and any String is a decoding — either way the developer's app, checking a
+        // provider's signature, was handed bytes the provider never sent. IngressRawBodyFilter
+        // kept the original.
+        byte[] body = rawBody(request);
 
         TunnelIngressService.Outcome outcome =
                 tunnelIngressService.forward(slug, asTunnelRequest(slug, body, request), body);
@@ -70,15 +88,16 @@ public class TunnelIngressController {
         };
     }
 
-    private TunnelRequestMessage asTunnelRequest(String slug, String body, HttpServletRequest request) {
+    private TunnelRequestMessage asTunnelRequest(String slug, byte[] body, HttpServletRequest request) {
+        Map<String, String> headers = relayableHeaders(request);
         return TunnelRequestMessage.builder()
                 .type("TUNNEL_REQUEST")
                 .requestId(UUID.randomUUID().toString())
                 .method(request.getMethod())
                 .path(pathAfterSlug(request.getRequestURI(), slug))
                 .queryString(request.getQueryString())
-                .headers(relayableHeaders(request))
-                .body(body)
+                .headers(headers)
+                .rawBody(body, TunnelBody.charsetOf(headers))
                 .timestampMs(System.currentTimeMillis())
                 .build();
     }
@@ -111,7 +130,7 @@ public class TunnelIngressController {
         return headers;
     }
 
-    private ResponseEntity<String> relay(TunnelResponseMessage response) {
+    private ResponseEntity<byte[]> relay(TunnelResponseMessage response) {
         HttpHeaders headers = new HttpHeaders();
         if (response.getHeaders() != null) {
             response.getHeaders().forEach((name, value) -> {
@@ -120,11 +139,15 @@ public class TunnelIngressController {
                 }
             });
         }
-        return ResponseEntity.status(response.getStatusCode()).headers(headers).body(response.getBody());
+        // The local app's bytes, not a string re-encoded here: a gzip, an image, or text in a
+        // charset other than the one this side would have picked reaches the caller unchanged.
+        return ResponseEntity.status(response.getStatusCode()).headers(headers).body(response.bodyBytes());
     }
 
-    private ResponseEntity<String> problem(HttpStatus status, String error, String message) {
+    private ResponseEntity<byte[]> problem(HttpStatus status, String error, String message) {
         return ResponseEntity.status(status)
-                .body("{\"error\":\"" + error + "\",\"message\":\"" + message + "\"}");
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(("{\"error\":\"" + error + "\",\"message\":\"" + message + "\"}")
+                        .getBytes(StandardCharsets.UTF_8));
     }
 }

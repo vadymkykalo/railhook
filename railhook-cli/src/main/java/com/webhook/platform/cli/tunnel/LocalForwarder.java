@@ -1,5 +1,6 @@
 package com.webhook.platform.cli.tunnel;
 
+import com.webhook.platform.common.dto.tunnel.TunnelBody;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
 import org.slf4j.Logger;
@@ -68,20 +69,22 @@ public class LocalForwarder {
                 });
             }
 
-            // Set method and body
+            // Set method and body. The body is the bytes the provider sent, not a string encoded
+            // here: the local app checks the provider's signature over them.
+            byte[] body = request.bodyBytes();
             String method = request.getMethod() != null ? request.getMethod().toUpperCase() : "GET";
             switch (method) {
                 case "GET" -> builder.GET();
                 case "DELETE" -> builder.DELETE();
-                case "POST" -> builder.POST(bodyPublisher(request.getBody()));
-                case "PUT" -> builder.PUT(bodyPublisher(request.getBody()));
-                case "PATCH" -> builder.method("PATCH", bodyPublisher(request.getBody()));
+                case "POST" -> builder.POST(bodyPublisher(body));
+                case "PUT" -> builder.PUT(bodyPublisher(body));
+                case "PATCH" -> builder.method("PATCH", bodyPublisher(body));
                 case "HEAD" -> builder.method("HEAD", HttpRequest.BodyPublishers.noBody());
                 case "OPTIONS" -> builder.method("OPTIONS", HttpRequest.BodyPublishers.noBody());
-                default -> builder.method(method, bodyPublisher(request.getBody()));
+                default -> builder.method(method, bodyPublisher(body));
             }
 
-            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<byte[]> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
             long durationMs = System.currentTimeMillis() - startMs;
 
             // Extract response headers
@@ -99,7 +102,7 @@ public class LocalForwarder {
                     .requestId(request.getRequestId())
                     .statusCode(response.statusCode())
                     .headers(responseHeaders)
-                    .body(response.body())
+                    .rawBody(response.body(), TunnelBody.charsetOf(responseHeaders))
                     .durationMs(durationMs)
                     .timestampMs(System.currentTimeMillis())
                     .build();
@@ -130,9 +133,9 @@ public class LocalForwarder {
         }
     }
 
-    private HttpRequest.BodyPublisher bodyPublisher(String body) {
+    private HttpRequest.BodyPublisher bodyPublisher(byte[] body) {
         return body != null
-                ? HttpRequest.BodyPublishers.ofString(body)
+                ? HttpRequest.BodyPublishers.ofByteArray(body)
                 : HttpRequest.BodyPublishers.noBody();
     }
 }

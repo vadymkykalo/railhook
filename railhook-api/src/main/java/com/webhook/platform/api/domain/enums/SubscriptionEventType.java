@@ -13,5 +13,7 @@ public enum SubscriptionEventType {
     PLAN_CHANGED,
     TRIAL_STARTED,
     TRIAL_ENDED,
-    RESUMED
+    RESUMED,
+    /** A checkout that was never paid: superseded by a newer one, or dropped by the provider. */
+    EXPIRED
 }

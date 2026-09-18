@@ -26,6 +26,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import com.webhook.platform.api.exception.ConflictException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -139,7 +140,7 @@ class MembershipInviteTest {
         when(userRepository.findByEmail("alice@customer.com")).thenReturn(Optional.of(squatter));
 
         assertThatThrownBy(() -> membershipService.addMember(AddMemberRequest.builder().email("alice@customer.com").role(MembershipRole.VIEWER).build(), MembershipRole.OWNER))
-                .isInstanceOf(com.webhook.platform.api.exception.ConflictException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("verif");
         verify(membershipRepository, never()).save(any(Membership.class));
     }
@@ -217,7 +218,7 @@ class MembershipInviteTest {
         accepted.setInviteExpiresAt(null);
 
         assertThatThrownBy(() -> membershipService.reissueInvite(accepted.getUserId(), MembershipRole.OWNER))
-                .isInstanceOf(com.webhook.platform.api.exception.ConflictException.class);
+                .isInstanceOf(ConflictException.class);
     }
 
     @Test

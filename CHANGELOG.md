@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.13] - 2026-09-18
+
+### Fixed
+
+- **Tunnels relay bodies byte for byte.** A form body (Slack slash commands, Twilio callbacks)
+  was rebuilt from its parsed fields and binary bodies were re-encoded, so the app behind
+  `railhook tunnel` rejected the provider's signature. Requests and responses now arrive exactly
+  as sent; binary bodies need the updated CLI, text and form bodies are fixed for every CLI.
+  Test captures (`/hook`) store a form body as it was sent.
+- **Two deliveries with the same body are no longer refused as a replay** when the provider
+  gives each its own delivery id.
+- **A repeated dispatch message no longer runs a delivery's next attempt early**, ahead of its
+  retry backoff.
+- **Paid checkout** (not yet enabled on railhook.io): starting a checkout creates the
+  subscription, the first successful payment moves the organization to the plan, renewals charge
+  the amount the checkout charged, and WayForPay callbacks for prices with kopecks verify.
+
 ## [2.20.12] - 2026-09-18
 
 ### Security

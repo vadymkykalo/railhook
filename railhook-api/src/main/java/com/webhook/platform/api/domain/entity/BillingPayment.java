@@ -2,6 +2,8 @@ package com.webhook.platform.api.domain.entity;
 
 import com.webhook.platform.api.domain.enums.PaymentStatus;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.TenantId;
@@ -70,10 +72,12 @@ public class BillingPayment {
     @Column(name = "failure_message")
     private String failureMessage;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "provider_response", columnDefinition = "jsonb")
     @Builder.Default
     private String providerResponse = "{}";
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     @Builder.Default
     private String metadata = "{}";

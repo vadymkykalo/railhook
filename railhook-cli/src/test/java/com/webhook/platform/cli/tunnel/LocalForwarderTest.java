@@ -1,6 +1,7 @@
 package com.webhook.platform.cli.tunnel;
 
 import com.sun.net.httpserver.HttpServer;
+import com.webhook.platform.common.dto.tunnel.TunnelBody;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
 import org.junit.jupiter.api.AfterEach;
@@ -290,6 +291,116 @@ class LocalForwarderTest {
                 .timestampMs(System.currentTimeMillis()).build());
         assertEquals("DELETE", receivedMethod.get());
         assertEquals(204, deleteResponse.getStatusCode());
+    }
+
+    // ─── Bodies are bytes: what the provider sent is what the local app gets ────
+    // The app checks the provider's signature over those bytes, so a body re-encoded on the
+    // way (a form's %20 turned into +, a gzip body through a UTF-8 String) fails it.
+
+    private static final byte[] NOT_UTF8 = {(byte) 0x1f, (byte) 0x8b, 0x08, 0x00, (byte) 0xff, (byte) 0xfe,
+            0x00, (byte) 0x80, (byte) 0xc3};
+
+    @Test
+    void forward_formBody_reachesTheLocalAppByteForByte() throws Exception {
+        byte[] form = "text=a%20b&token=X%2fY".getBytes(StandardCharsets.US_ASCII);
+        AtomicReference<byte[]> received = new AtomicReference<>();
+        AtomicReference<String> receivedType = new AtomicReference<>();
+        server.createContext("/slack", exchange -> {
+            received.set(exchange.getRequestBody().readAllBytes());
+            receivedType.set(exchange.getRequestHeaders().getFirst("Content-Type"));
+            exchange.sendResponseHeaders(200, -1);
+        });
+        server.start();
+
+        Map<String, String> headers = Map.of("Content-Type", "application/x-www-form-urlencoded");
+        new LocalForwarder(port).forward(TunnelRequestMessage.builder()
+                .requestId("bytes-1").method("POST").path("/slack").headers(headers)
+                .rawBody(form, TunnelBody.charsetOf(headers))
+                .build());
+
+        assertArrayEquals(form, received.get());
+        assertEquals("application/x-www-form-urlencoded", receivedType.get());
+    }
+
+    @Test
+    void forward_binaryBody_reachesTheLocalAppByteForByte() throws Exception {
+        AtomicReference<byte[]> received = new AtomicReference<>();
+        AtomicReference<String> receivedEncoding = new AtomicReference<>();
+        server.createContext("/upload", exchange -> {
+            received.set(exchange.getRequestBody().readAllBytes());
+            receivedEncoding.set(exchange.getRequestHeaders().getFirst("Content-Encoding"));
+            exchange.sendResponseHeaders(204, -1);
+        });
+        server.start();
+
+        Map<String, String> headers = Map.of("Content-Type", "application/json", "Content-Encoding", "gzip");
+        new LocalForwarder(port).forward(TunnelRequestMessage.builder()
+                .requestId("bytes-2").method("POST").path("/upload").headers(headers)
+                .rawBody(NOT_UTF8, TunnelBody.charsetOf(headers))
+                .build());
+
+        assertArrayEquals(NOT_UTF8, received.get());
+        assertEquals("gzip", receivedEncoding.get());
+    }
+
+    // An older server sends the string alone; it was decoded with the charset Content-Type
+    // names, and goes out encoded with the same one.
+    @Test
+    void forward_stringBodyFromAnOlderServer_isEncodedWithItsDeclaredCharset() throws Exception {
+        AtomicReference<byte[]> received = new AtomicReference<>();
+        server.createContext("/legacy", exchange -> {
+            received.set(exchange.getRequestBody().readAllBytes());
+            exchange.sendResponseHeaders(200, -1);
+        });
+        server.start();
+
+        new LocalForwarder(port).forward(TunnelRequestMessage.builder()
+                .requestId("bytes-3").method("PUT").path("/legacy")
+                .headers(Map.of("Content-Type", "text/plain; charset=ISO-8859-1"))
+                .body("café")
+                .build());
+
+        assertArrayEquals("café".getBytes(StandardCharsets.ISO_8859_1), received.get());
+    }
+
+    @Test
+    void forward_binaryResponse_comesBackByteForByte() throws Exception {
+        server.createContext("/logo.png", exchange -> {
+            exchange.getResponseHeaders().add("Content-Type", "image/png");
+            exchange.sendResponseHeaders(200, NOT_UTF8.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(NOT_UTF8);
+            }
+        });
+        server.start();
+
+        TunnelResponseMessage response = new LocalForwarder(port).forward(TunnelRequestMessage.builder()
+                .requestId("bytes-4").method("GET").path("/logo.png").build());
+
+        assertEquals(200, response.getStatusCode());
+        assertArrayEquals(NOT_UTF8, response.bodyBytes());
+        // An older server reads only the string, which is what it always got.
+        assertEquals(new String(NOT_UTF8, StandardCharsets.UTF_8), response.getBody());
+    }
+
+    @Test
+    void forward_textResponse_travelsAsTheStringAlone() throws Exception {
+        byte[] text = "{\"ok\":\"café\"}".getBytes(StandardCharsets.UTF_8);
+        server.createContext("/json", exchange -> {
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, text.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(text);
+            }
+        });
+        server.start();
+
+        TunnelResponseMessage response = new LocalForwarder(port).forward(TunnelRequestMessage.builder()
+                .requestId("bytes-5").method("GET").path("/json").build());
+
+        assertEquals("{\"ok\":\"café\"}", response.getBody());
+        assertNull(response.getBodyBase64());
+        assertArrayEquals(text, response.bodyBytes());
     }
 
     private static String findHeaderIgnoreCase(TunnelResponseMessage response, String name) {

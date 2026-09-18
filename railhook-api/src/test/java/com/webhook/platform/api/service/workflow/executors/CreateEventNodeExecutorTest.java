@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.UUID;
+import com.webhook.platform.api.exception.QuotaExceededException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,7 +45,7 @@ class CreateEventNodeExecutorTest {
     void overQuota_failsTheStep() throws Exception {
         UUID projectId = UUID.randomUUID();
         when(eventIngestService.ingestEvent(eq(projectId), any(EventIngestRequest.class), isNull()))
-                .thenThrow(new com.webhook.platform.api.exception.QuotaExceededException(
+                .thenThrow(new QuotaExceededException(
                         "events", 10000, 10000, "free"));
 
         StepResult result = executor.execute(

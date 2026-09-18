@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
@@ -204,14 +205,15 @@ class BillingServiceTest {
     }
 
     @Test
-    void createCheckoutSession_reusesExistingCustomer() {
-        BillingSubscription existingSub = BillingSubscription.builder()
-                .id(SUB_ID).externalCustomerId("cus_existing").build();
+    void createCheckoutSession_reusesTheCustomerOfAnEarlierSubscription() {
+        BillingSubscription cancelled = BillingSubscription.builder()
+                .id(SUB_ID).status(SubscriptionStatus.CANCELLED).externalCustomerId("cus_existing").build();
 
         when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
         when(planRepository.findByName("starter")).thenReturn(Optional.of(starterPlan));
-        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID))
-                .thenReturn(Optional.of(existingSub));
+        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
+        when(subscriptionRepository.findFirstByOrganizationIdAndProviderCodeAndExternalCustomerIdIsNotNullOrderByCreatedAtDesc(
+                ORG_ID, "stripe")).thenReturn(Optional.of(cancelled));
 
         stripeProvider.setCreatePaymentResult(
                 new BillingProvider.CreatePaymentResult("https://checkout.stripe.com/s2", "cs_2"));
@@ -220,6 +222,75 @@ class BillingServiceTest {
 
         // Should not create new customer
         assertThat(stripeProvider.createCustomerCalled).isFalse();
+        assertThat(stripeProvider.lastPaymentRequest.externalCustomerId()).isEqualTo("cus_existing");
+    }
+
+    // A paid checkout used to create nothing: no production code wrote a billing_subscriptions
+    // row, so the payment callback found no subscription, logged a warning, and the organization
+    // stayed on Free while the provider kept the money.
+
+    @Test
+    void createCheckoutSession_opensAPendingSubscriptionBoundToTheReferenceTheProviderEchoes() {
+        TestBillingProvider wayforpay = merchantRecurringProvider();
+        BillingService withWayForPay = serviceWith(wayforpay);
+        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
+        when(planRepository.findByName("starter")).thenReturn(Optional.of(starterPlan));
+        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
+        wayforpay.setCreatePaymentResult(new BillingProvider.CreatePaymentResult(
+                "https://secure.wayforpay.com/page?vkh=1", "railhook_" + ORG_ID + "_1"));
+
+        String url = withWayForPay.createCheckoutSession("starter", "wayforpay", "MONTHLY", "ok", "cancel");
+
+        assertThat(url).isEqualTo("https://secure.wayforpay.com/page?vkh=1");
+        // The provider's own price, in its own currency — not the catalog's USD cents.
+        assertThat(wayforpay.lastPaymentRequest.amountCents()).isEqualTo(29900L);
+        assertThat(wayforpay.lastPaymentRequest.currency()).isEqualTo("UAH");
+        verify(organizationRepository).lockById(ORG_ID);
+        verify(lifecycleService).createPending(starterPlan, "wayforpay", "UAH", BillingInterval.MONTHLY,
+                29900L, null, "railhook_" + ORG_ID + "_1", null);
+    }
+
+    @Test
+    void createCheckoutSession_bindsAManagedProviderByCustomerAndKeepsTheSession() {
+        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
+        when(planRepository.findByName("pro")).thenReturn(Optional.of(proPlan));
+        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
+        stripeProvider.setCreateCustomerResult("cus_new");
+        stripeProvider.setCreatePaymentResult(
+                new BillingProvider.CreatePaymentResult("https://checkout.stripe.com/c", "cs_1"));
+
+        service.createCheckoutSession("pro", "stripe", "YEARLY", "ok", "cancel");
+
+        // Stripe creates the subscription when the session completes; its first invoice names
+        // the customer, which is what finds this row.
+        verify(lifecycleService).createPending(proPlan, "stripe", "USD", BillingInterval.YEARLY,
+                99000L, "cus_new", null, "cs_1");
+    }
+
+    @Test
+    void createCheckoutSession_refusesWhileASubscriptionIsLive() {
+        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
+        when(planRepository.findByName("pro")).thenReturn(Optional.of(proPlan));
+        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.of(
+                BillingSubscription.builder().id(SUB_ID).plan(starterPlan).status(SubscriptionStatus.ACTIVE).build()));
+
+        // A second checkout would start a second paid subscription beside the first, and both
+        // would be charged.
+        assertThatThrownBy(() -> service.createCheckoutSession("pro", "stripe", "MONTHLY", "ok", "cancel"))
+                .isInstanceOf(ConflictException.class);
+        assertThat(stripeProvider.lastPaymentRequest).isNull();
+        verify(lifecycleService, never()).createPending(any(), any(), any(), any(), anyLong(), any(), any(), any());
+    }
+
+    @Test
+    void createCheckoutSession_refusesAPlanThatCostsNothing() {
+        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
+        when(planRepository.findByName("free")).thenReturn(Optional.of(freePlan));
+        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createCheckoutSession("free", "stripe", "MONTHLY", "ok", "cancel"))
+                .isInstanceOf(ConflictException.class);
+        assertThat(stripeProvider.lastPaymentRequest).isNull();
     }
 
     @Test
@@ -506,8 +577,8 @@ class BillingServiceTest {
                 .status(PaymentStatus.SUCCEEDED)
                 .externalPaymentId("pi_ref").build();
         when(subscriptionRepository.findByExternalSubscriptionId(any())).thenReturn(Optional.empty());
-        when(subscriptionRepository.findByExternalCustomerId(any())).thenReturn(Optional.empty());
-        when(paymentRepository.findByExternalPaymentId("pi_ref"))
+        when(subscriptionRepository.findFirstByExternalCustomerIdOrderByCreatedAtDesc(any())).thenReturn(Optional.empty());
+        when(paymentRepository.findFirstByProviderCodeAndExternalPaymentIdAndStatusInOrderByCreatedAtDesc(eq("stripe"), eq("pi_ref"), any()))
                 .thenReturn(Optional.of(payment));
 
         stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
@@ -528,8 +599,8 @@ class BillingServiceTest {
                 .status(PaymentStatus.SUCCEEDED)
                 .externalPaymentId("pi_part").build();
         when(subscriptionRepository.findByExternalSubscriptionId(any())).thenReturn(Optional.empty());
-        when(subscriptionRepository.findByExternalCustomerId(any())).thenReturn(Optional.empty());
-        when(paymentRepository.findByExternalPaymentId("pi_part"))
+        when(subscriptionRepository.findFirstByExternalCustomerIdOrderByCreatedAtDesc(any())).thenReturn(Optional.empty());
+        when(paymentRepository.findFirstByProviderCodeAndExternalPaymentIdAndStatusInOrderByCreatedAtDesc(eq("stripe"), eq("pi_part"), any()))
                 .thenReturn(Optional.of(payment));
 
         stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
@@ -568,6 +639,194 @@ class BillingServiceTest {
         verify(lifecycleService).setRecurringToken(SUB_ID, "rec_token_enc", "1234", "mastercard");
     }
 
+    // ── Checkout → first payment ────────────────────────────────────
+
+    @Test
+    void processWebhook_firstPaymentActivatesThePendingCheckoutAndMovesThePlan() {
+        String orderRef = "railhook_" + ORG_ID + "_1";
+        BillingSubscription pending = pendingSubscription("wayforpay", orderRef, null);
+        TestBillingProvider wayforpay = merchantRecurringProvider();
+        BillingService withWayForPay = serviceWith(wayforpay);
+        when(subscriptionRepository.findByExternalSubscriptionId(orderRef)).thenReturn(Optional.of(pending));
+        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
+        wayforpay.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
+                "payment.succeeded", ORG_ID.toString(), orderRef, orderRef, null,
+                29900L, "UAH", "8217", "visa", null, null, "rec_token",
+                null, null, Map.of()));
+
+        Instant before = Instant.now();
+        withWayForPay.processWebhook("wayforpay", "{}", Map.of());
+
+        ArgumentCaptor<Instant> start = ArgumentCaptor.forClass(Instant.class);
+        ArgumentCaptor<Instant> end = ArgumentCaptor.forClass(Instant.class);
+        verify(lifecycleService).activate(eq(SUB_ID), start.capture(), end.capture());
+        assertThat(start.getValue()).isAfterOrEqualTo(before);
+        // A month from now, by the subscription's interval — not a fixed thirty days.
+        assertThat(end.getValue()).isEqualTo(start.getValue().atZone(ZoneOffset.UTC)
+                .plus(BillingInterval.MONTHLY.getPeriod()).toInstant());
+        verify(lifecycleService, never()).renew(any(), any(), any());
+        verify(lifecycleService).setRecurringToken(SUB_ID, "rec_token", "8217", "visa");
+        ArgumentCaptor<BillingPayment> payment = ArgumentCaptor.forClass(BillingPayment.class);
+        verify(paymentRepository).save(payment.capture());
+        assertThat(payment.getValue().getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(payment.getValue().getOrganizationId()).isEqualTo(ORG_ID);
+    }
+
+    @Test
+    void processWebhook_stripesFirstInvoiceFindsThePendingCheckoutByCustomerAndBindsTheSubscription() {
+        BillingSubscription pending = pendingSubscription("stripe", null, "cus_1");
+        when(subscriptionRepository.findByExternalSubscriptionId("sub_new")).thenReturn(Optional.empty());
+        when(subscriptionRepository.findFirstByExternalCustomerIdOrderByCreatedAtDesc("cus_1"))
+                .thenReturn(Optional.of(pending));
+        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
+        Instant start = Instant.now();
+        Instant end = start.plusSeconds(86400 * 30);
+        stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
+                "invoice.paid", "cus_1", "sub_new", "pi_1", null,
+                2900L, "usd", null, null, null, null, null, start, end, Map.of()));
+
+        service.processWebhook("stripe", "{}", Map.of());
+
+        verify(lifecycleService).setExternalIds(SUB_ID, "cus_1", "sub_new");
+        verify(lifecycleService).activate(SUB_ID, start, end);
+    }
+
+    @Test
+    void processWebhook_declinedFirstPaymentKeepsTheCheckoutPendingAndTheOrganizationAlone() {
+        String orderRef = "railhook_" + ORG_ID + "_1";
+        BillingSubscription pending = pendingSubscription("stripe", orderRef, null);
+        when(subscriptionRepository.findByExternalSubscriptionId(orderRef)).thenReturn(Optional.of(pending));
+        stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
+                "payment.failed", ORG_ID.toString(), orderRef, orderRef, null,
+                29900L, "UAH", null, null, "1101", "Declined", null, null, null, Map.of()));
+
+        service.processWebhook("stripe", "{}", Map.of());
+
+        // Nothing was ever paid, so there is nothing past due: marking it would put an
+        // organization on Free into dunning over a card it tried once.
+        verify(lifecycleService, never()).markPastDue(any(), any());
+        verify(lifecycleService, never()).activate(any(), any(), any());
+        ArgumentCaptor<BillingPayment> payment = ArgumentCaptor.forClass(BillingPayment.class);
+        verify(paymentRepository).save(payment.capture());
+        assertThat(payment.getValue().getStatus()).isEqualTo(PaymentStatus.FAILED);
+    }
+
+    @Test
+    void processWebhook_aDroppedCheckoutIsExpiredNotCancelled() {
+        BillingSubscription pending = pendingSubscription("stripe", "sub_ext_1", "cus_1");
+        when(subscriptionRepository.findByExternalSubscriptionId("sub_ext_1")).thenReturn(Optional.of(pending));
+        stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
+                "customer.subscription.deleted", "cus_1", "sub_ext_1", null, null,
+                null, null, null, null, null, null, null, null, null, Map.of()));
+
+        service.processWebhook("stripe", "{}", Map.of());
+
+        // cancel() would move the organization to Free and stamp it CANCELLED; it never left Free.
+        verify(lifecycleService).abandon(eq(SUB_ID), any());
+        verify(lifecycleService, never()).cancel(any(), any());
+    }
+
+    @Test
+    void processWebhook_aSubscriptionUpdateDoesNotActivateAnUnpaidCheckout() {
+        BillingSubscription pending = pendingSubscription("stripe", "sub_ext_1", "cus_1");
+        when(subscriptionRepository.findByExternalSubscriptionId("sub_ext_1")).thenReturn(Optional.of(pending));
+        when(planRepository.findByName("pro")).thenReturn(Optional.of(proPlan));
+        stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
+                "customer.subscription.updated", "cus_1", "sub_ext_1", null, "pro",
+                null, null, null, null, null, null, null, Instant.now(), Instant.now().plusSeconds(60), Map.of()));
+
+        service.processWebhook("stripe", "{}", Map.of());
+
+        verify(lifecycleService, never()).activate(any(), any(), any());
+        verify(lifecycleService, never()).changePlan(any(), any());
+    }
+
+    @Test
+    void processWebhook_paymentOnASupersededCheckoutActivatesItAndExpiresTheNewerOne() {
+        String orderRef = "railhook_" + ORG_ID + "_1";
+        BillingSubscription superseded = pendingSubscription("stripe", orderRef, null);
+        superseded.setStatus(SubscriptionStatus.EXPIRED);
+        BillingSubscription newer = pendingSubscription("stripe", "railhook_" + ORG_ID + "_2", null);
+        newer.setId(UUID.randomUUID());
+        when(subscriptionRepository.findByExternalSubscriptionId(orderRef)).thenReturn(Optional.of(superseded));
+        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
+        when(subscriptionRepository.findByOrganizationIdAndStatus(ORG_ID, SubscriptionStatus.PENDING))
+                .thenReturn(List.of(newer));
+        stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
+                "payment.succeeded", ORG_ID.toString(), orderRef, orderRef, null,
+                29900L, "UAH", null, null, null, null, null, null, null, Map.of()));
+
+        service.processWebhook("stripe", "{}", Map.of());
+
+        // The customer paid on the first tab after opening a second: the money is real, so the
+        // checkout it paid for is the one that counts.
+        verify(lifecycleService).abandon(eq(newer.getId()), any());
+        verify(lifecycleService).activate(eq(SUB_ID), any(), any());
+    }
+
+    @Test
+    void processWebhook_paymentOnASupersededCheckoutDoesNotOpenASecondLiveSubscription() {
+        String orderRef = "railhook_" + ORG_ID + "_1";
+        BillingSubscription superseded = pendingSubscription("stripe", orderRef, null);
+        superseded.setStatus(SubscriptionStatus.EXPIRED);
+        when(subscriptionRepository.findByExternalSubscriptionId(orderRef)).thenReturn(Optional.of(superseded));
+        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.of(
+                BillingSubscription.builder().id(UUID.randomUUID()).organizationId(ORG_ID)
+                        .status(SubscriptionStatus.ACTIVE).plan(proPlan).build()));
+        stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
+                "payment.succeeded", ORG_ID.toString(), orderRef, orderRef, null,
+                29900L, "UAH", null, null, null, null, null, null, null, Map.of()));
+
+        service.processWebhook("stripe", "{}", Map.of());
+
+        // Paid twice: the payment is recorded so it can be refunded, but only one subscription
+        // stays live.
+        verify(paymentRepository).save(any(BillingPayment.class));
+        verify(lifecycleService, never()).activate(any(), any(), any());
+        verify(lifecycleService, never()).renew(any(), any(), any());
+    }
+
+    @Test
+    void processWebhook_aRenewalWithoutPeriodsExtendsFromTheCurrentPeriodEnd() {
+        Instant periodEnd = Instant.parse("2026-10-01T00:00:00Z");
+        BillingSubscription sub = BillingSubscription.builder()
+                .id(SUB_ID).organizationId(ORG_ID).providerCode("stripe").plan(starterPlan)
+                .status(SubscriptionStatus.ACTIVE).billingInterval(BillingInterval.MONTHLY)
+                .currentPeriodStart(Instant.parse("2026-09-01T00:00:00Z")).currentPeriodEnd(periodEnd)
+                .externalSubscriptionId("ref_1").build();
+        when(subscriptionRepository.findByExternalSubscriptionId("ref_1")).thenReturn(Optional.of(sub));
+        stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
+                "payment.succeeded", null, "ref_1", "pay_2", null,
+                2900L, "USD", null, null, null, null, null, null, null, Map.of()));
+
+        service.processWebhook("stripe", "{}", Map.of());
+
+        verify(lifecycleService).renew(SUB_ID, periodEnd, Instant.parse("2026-11-01T00:00:00Z"));
+    }
+
+    private BillingSubscription pendingSubscription(String providerCode, String reference, String customerId) {
+        return BillingSubscription.builder()
+                .id(SUB_ID).organizationId(ORG_ID).providerCode(providerCode).plan(starterPlan)
+                .status(SubscriptionStatus.PENDING).billingInterval(BillingInterval.MONTHLY)
+                .currency("UAH").priceCents(29900L)
+                .externalSubscriptionId(reference).externalCustomerId(customerId).build();
+    }
+
+    private TestBillingProvider merchantRecurringProvider() {
+        TestBillingProvider wayforpay = new TestBillingProvider("wayforpay", "WayForPay",
+                EnumSet.of(BillingCapability.MERCHANT_RECURRING));
+        wayforpay.currency = "UAH";
+        wayforpay.ownPriceCents = 29900L;
+        return wayforpay;
+    }
+
+    private BillingService serviceWith(TestBillingProvider provider) {
+        return new BillingService(
+                true, new BillingProviderRegistry(List.of(provider, new NoOpBillingProvider()), provider.getProviderCode()),
+                planRepository, organizationRepository, subscriptionRepository, invoiceRepository,
+                paymentRepository, entitlementService, lifecycleService);
+    }
+
     // ── parseBillingInterval ────────────────────────────────────────
 
     @Test
@@ -600,6 +859,8 @@ class BillingServiceTest {
         String portalUrl;
         List<ExternalInvoice> externalInvoices = List.of();
         BillingWebhookEvent webhookEvent;
+        String currency = "USD";
+        Long ownPriceCents;
 
         TestBillingProvider(String code, String displayName, Set<BillingCapability> caps) {
             this.code = code;
@@ -616,6 +877,12 @@ class BillingServiceTest {
         @Override public String getProviderCode() { return code; }
         @Override public String getDisplayName() { return displayName; }
         @Override public Set<BillingCapability> capabilities() { return caps; }
+        @Override public String getDefaultCurrency() { return currency; }
+
+        @Override
+        public long checkoutPriceCents(String planName, BillingInterval interval, long catalogPriceCents) {
+            return ownPriceCents != null ? ownPriceCents : catalogPriceCents;
+        }
 
         @Override
         public String createCustomer(UUID orgId, String name, String email) {

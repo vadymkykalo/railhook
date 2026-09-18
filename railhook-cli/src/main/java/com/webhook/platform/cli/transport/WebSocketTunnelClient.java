@@ -30,7 +30,10 @@ public class WebSocketTunnelClient {
 
     private static final Logger log = LoggerFactory.getLogger(WebSocketTunnelClient.class);
     private static final int HEARTBEAT_INTERVAL_SECONDS = 30;
-    private static final int MAX_MESSAGE_SIZE = 1024 * 1024; // 1MB
+    // What this CLI accepts. A binary request body arrives both as a string and as base64.
+    private static final int MAX_MESSAGE_SIZE = 4 * 1024 * 1024;
+    // What the server accepts: TunnelWebSocketHandler's limit, the same in every version so far.
+    static final int SERVER_MAX_MESSAGE_CHARS = 1024 * 1024;
 
     // Exponential backoff config
     private static final long BASE_DELAY_MS = 1_000;      // 1s initial
@@ -106,12 +109,35 @@ public class WebSocketTunnelClient {
             return;
         }
         try {
-            TunnelMessage message = TunnelMessage.tunnelResponse(response);
-            String json = objectMapper.writeValueAsString(message);
+            String json = responseJson(objectMapper, response);
             wsSession.getBasicRemote().sendText(json);
         } catch (IOException e) {
             log.error("Failed to send tunnel response: {}", e.getMessage());
         }
+    }
+
+    /**
+     * The response as it goes on the socket — or, when it would not fit in one server message,
+     * a 502 saying so. Every server version closes the socket over a message larger than
+     * {@link #SERVER_MAX_MESSAGE_CHARS}, which ended the tunnel instead of failing one request.
+     * A binary body now travels twice — as the string an older server reads and as base64 — so
+     * that ceiling is nearer than it was.
+     */
+    static String responseJson(ObjectMapper objectMapper, TunnelResponseMessage response) throws IOException {
+        String json = objectMapper.writeValueAsString(TunnelMessage.tunnelResponse(response));
+        if (json.length() <= SERVER_MAX_MESSAGE_CHARS) {
+            return json;
+        }
+        log.warn("Local response to {} is too large to relay through the tunnel ({} characters encoded)",
+                response.getRequestId(), json.length());
+        return objectMapper.writeValueAsString(TunnelMessage.tunnelResponse(TunnelResponseMessage.builder()
+                .type(response.getType())
+                .requestId(response.getRequestId())
+                .statusCode(502)
+                .error("Local response is too large to relay through the tunnel")
+                .durationMs(response.getDurationMs())
+                .timestampMs(response.getTimestampMs())
+                .build()));
     }
 
     private void doConnect() {

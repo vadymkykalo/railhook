@@ -212,7 +212,7 @@ public class IngressService {
         // Before the replay check, because that one marks the signature as seen: refused here, the
         // provider's retry once there is room again must not be taken for a replay.
         entitlementService.checkEventQuota();
-        rejectReplay(source, verification);
+        rejectReplay(source, verification, providerEventId);
 
         try {
             IncomingEvent stored = transactionTemplate.execute(status ->
@@ -229,10 +229,10 @@ public class IngressService {
             // to. The replay marker (if any) must not stay burned for a webhook that never made
             // it to disk, or the provider's legitimate resend gets rejected as a replay for the
             // rest of the TTL window instead of just being retried.
-            releaseReplayMarkerAfterFailedPersist(source, verification);
+            releaseReplayMarkerAfterFailedPersist(source, verification, providerEventId);
             throw e;
         } catch (RuntimeException e) {
-            releaseReplayMarkerAfterFailedPersist(source, verification);
+            releaseReplayMarkerAfterFailedPersist(source, verification, providerEventId);
             throw e;
         }
     }
@@ -421,9 +421,20 @@ public class IngressService {
      * if the write that's supposed to follow never commits, the caller must release this mark via
      * {@link #releaseReplayMarkerAfterFailedPersist}.
      */
-    private void rejectReplay(IncomingSource source, VerificationOutcome verification) {
+    /**
+     * The signature, and the provider's delivery id when it sent one. A signature over the body
+     * alone is the same for two genuine deliveries with byte-identical bodies — Shopify firing an
+     * order under two topics in one second, a sender posting a static payload — and keyed on the
+     * signature alone the second was refused as a replay. A replay repeats the id too, and dedup
+     * answers it before this check; the window this key guards is only five minutes either way.
+     */
+    private static String replayKey(VerificationOutcome verification, String providerEventId) {
+        return providerEventId == null ? verification.replayKey() : verification.replayKey() + ":" + providerEventId;
+    }
+
+    private void rejectReplay(IncomingSource source, VerificationOutcome verification, String providerEventId) {
         if (Boolean.TRUE.equals(verification.verified()) && verification.replayKey() != null
-                && replayDetectionService.isReplay(source.getId().toString(), verification.replayKey())) {
+                && replayDetectionService.isReplay(source.getId().toString(), replayKey(verification, providerEventId))) {
             meterRegistry.counter("incoming_events_rejected_total",
                     "reason", "replay_detected").increment();
             log.warn("Replay attack detected for source {}", source.getId());
@@ -431,9 +442,10 @@ public class IngressService {
         }
     }
 
-    private void releaseReplayMarkerAfterFailedPersist(IncomingSource source, VerificationOutcome verification) {
+    private void releaseReplayMarkerAfterFailedPersist(IncomingSource source, VerificationOutcome verification,
+                                                        String providerEventId) {
         if (Boolean.TRUE.equals(verification.verified()) && verification.replayKey() != null) {
-            replayDetectionService.unmark(source.getId().toString(), verification.replayKey());
+            replayDetectionService.unmark(source.getId().toString(), replayKey(verification, providerEventId));
             log.warn("Released replay marker after failed persist so a legitimate resend is not "
                     + "permanently rejected: sourceId={}", source.getId());
         }

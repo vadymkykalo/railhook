@@ -154,7 +154,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         } else {
             UUID token = UUID.randomUUID();
             delivery = transactionTemplate.execute(tx ->
-                    deliveryRepository.claimForProcessingAndReturn(message.getDeliveryId(), token));
+                    deliveryRepository.claimForProcessingAndReturn(message.getDeliveryId(), token, clock.instant()));
             if (delivery == null) {
                 return new ClaimResult.NotClaimed<>("delivery already claimed or not PENDING");
             }

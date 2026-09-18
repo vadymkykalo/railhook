@@ -7,6 +7,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,7 +35,7 @@ class TunnelIngressServiceTest {
                 .thenThrow(new ResponseStatusException(HttpStatus.GONE, "Tunnel is no longer active"));
 
         TunnelIngressService.Outcome outcome = ingress.forward("tun-deleted",
-                TunnelRequestMessage.builder().requestId("r1").method("POST").path("/").build(), "{}");
+                TunnelRequestMessage.builder().requestId("r1").method("POST").path("/").build(), "{}".getBytes(StandardCharsets.UTF_8));
 
         assertThat(outcome).isInstanceOf(TunnelIngressService.Outcome.Refused.class);
         assertThat(((TunnelIngressService.Outcome.Refused) outcome).error()).isEqualTo("tunnel_offline");
