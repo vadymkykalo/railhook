@@ -200,6 +200,8 @@ ui:
   # Cloudflare Web Analytics token, read by the container at startup. Empty — the
   # default — loads no analytics script at all.
   webAnalyticsToken: ""
+  # A public status page (https://…) the footer links to. Empty — the default — shows no link.
+  statusPageUrl: ""
   # The public webhook tester page (/tester). Turn it on together with
   # api.env.PUBLIC_TESTER_ENABLED: "true"; off, the page says so.
   publicTester: false

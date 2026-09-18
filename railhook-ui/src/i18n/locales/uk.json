@@ -1663,7 +1663,8 @@
     "about": "Про проєкт",
     "company": "Компанія",
     "releases": "Випуски",
-    "signatureVerifier": "Перевірка підпису"
+    "signatureVerifier": "Перевірка підпису",
+    "status": "Статус"
   },
   "incidents": {
     "addNote": "Додати нотатку",

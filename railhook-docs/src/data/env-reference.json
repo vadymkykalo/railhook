@@ -1485,6 +1485,12 @@
           "default": null,
           "example": null,
           "description": "Cloudflare Web Analytics on the public pages, the dashboard and the docs. Cookieless, so it\nneeds no consent banner. Empty is the default and means no analytics script at all — a\nself-hosted install reports nothing to anyone.\n\nThe token is the one Cloudflare shows under Analytics & Logs → Web Analytics → Manage site\n(the JS snippet's \"token\"). Read by the UI container when it starts: set it and run\n`docker compose up -d ui`, no rebuild."
+        },
+        {
+          "name": "STATUS_PAGE_URL",
+          "default": null,
+          "example": null,
+          "description": "A public status page (https://…) for the site's footer to link to. Empty is the default and\nmeans no link. Read by the UI container when it starts."
         }
       ]
     },

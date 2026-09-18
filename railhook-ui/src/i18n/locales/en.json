@@ -1663,7 +1663,8 @@
     "about": "About",
     "company": "Company",
     "releases": "Releases",
-    "signatureVerifier": "Signature verifier"
+    "signatureVerifier": "Signature verifier",
+    "status": "Status"
   },
   "incidents": {
     "addNote": "Add Note",

@@ -43,6 +43,8 @@ spec:
               value: {{ .Values.ui.captcha.scriptUrl | default "" | quote }}
             - name: RAILHOOK_WEB_ANALYTICS_TOKEN
               value: {{ .Values.ui.webAnalyticsToken | default "" | quote }}
+            - name: RAILHOOK_STATUS_PAGE_URL
+              value: {{ .Values.ui.statusPageUrl | default "" | quote }}
             - name: RAILHOOK_PUBLIC_TESTER
               value: {{ .Values.ui.publicTester | default false | quote }}
           ports:

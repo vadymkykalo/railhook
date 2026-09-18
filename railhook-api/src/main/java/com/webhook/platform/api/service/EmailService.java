@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -416,7 +417,11 @@ public class EmailService {
      * form that mails whatever address it is given is a relay. Plain text only, so nothing the
      * visitor typed is ever rendered as markup in the inbox that reads it. Without SMTP the log
      * gets who wrote and about what, not the message.
+     *
+     * <p>Asynchronous: an SMTP round trip takes seconds, and the visitor is waiting on a form. It
+     * reads no tenant data, so it needs no scope on the pool's thread.
      */
+    @Async
     public void sendContactMessage(String replyTo, String name, String topic, String message, String page) {
         String who = name == null || name.isBlank() ? replyTo : oneLine(name);
         String subject = "[Railhook " + topic + "] Message from " + who;

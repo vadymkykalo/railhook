@@ -30,6 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The footer gains a Company column (About, Security, Changelog, Contact, Privacy, Terms) and a
   link to the signature verifier.
 
+- **Status page.** `deploy/status-page/` holds the Cloudflare Worker behind status.railhook.io:
+  it probes the site, the API, the dashboard, the docs and the MCP server once a minute, keeps
+  90 days of uptime in D1, and opens and resolves incidents on its own. `STATUS_PAGE_URL` puts a
+  Status link in the site's footer; empty, the default, shows none.
+
+### Changed
+
+- The contact form answers at once: the mail to support is sent in the background.
+
 ## [2.22.0] - 2026-09-18
 
 ### Added

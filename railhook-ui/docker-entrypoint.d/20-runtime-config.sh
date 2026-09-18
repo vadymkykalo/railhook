@@ -76,6 +76,14 @@ if [ -n "$analytics_token" ] && ! matches "$analytics_token" '^[A-Za-z0-9]+$'; t
     analytics_token=""
 fi
 
+# A public status page to link from the footer. Off unless set: a self-hosted install has its own
+# idea of where its status lives, if anywhere.
+status_url=$(trim "${RAILHOOK_STATUS_PAGE_URL:-}")
+if [ -n "$status_url" ] && ! matches "$status_url" '^https://[A-Za-z0-9._~:/?#@!$&()*+,=%-]+$'; then
+    echo "20-runtime-config: RAILHOOK_STATUS_PAGE_URL is not a plain https URL; the status link is off" >&2
+    status_url=""
+fi
+
 # The public webhook tester, on only for an exact "true" — the page's half of PUBLIC_TESTER_ENABLED.
 public_tester=false
 if [ "$(trim "${RAILHOOK_PUBLIC_TESTER:-}")" = "true" ]; then
@@ -83,7 +91,7 @@ if [ "$(trim "${RAILHOOK_PUBLIC_TESTER:-}")" = "true" ]; then
 fi
 
 cat > "$OUT" <<CONF
-window.__RAILHOOK__ = {"contactDomain": "${domain}", "siteUrl": "${site}", "captchaSiteKey": "${captcha_key}", "captchaScriptUrl": "${captcha_script}", "webAnalyticsToken": "${analytics_token}", "publicTester": ${public_tester}};
+window.__RAILHOOK__ = {"contactDomain": "${domain}", "siteUrl": "${site}", "captchaSiteKey": "${captcha_key}", "captchaScriptUrl": "${captcha_script}", "webAnalyticsToken": "${analytics_token}", "statusPageUrl": "${status_url}", "publicTester": ${public_tester}};
 CONF
 
 cat > "$SITE_CONF_OUT" <<CONF

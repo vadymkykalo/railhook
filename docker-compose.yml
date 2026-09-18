@@ -637,6 +637,8 @@ services:
       RAILHOOK_CAPTCHA_SCRIPT_URL: ${CAPTCHA_SCRIPT_URL:-}
       # Cloudflare Web Analytics token. Empty: no analytics script.
       RAILHOOK_WEB_ANALYTICS_TOKEN: ${WEB_ANALYTICS_TOKEN:-}
+      # A public status page the footer links to. Empty: no link.
+      RAILHOOK_STATUS_PAGE_URL: ${STATUS_PAGE_URL:-}
       # The public webhook tester (/tester), the same switch the API reads.
       RAILHOOK_PUBLIC_TESTER: ${PUBLIC_TESTER_ENABLED:-false}
     depends_on:
