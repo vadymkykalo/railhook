@@ -7,6 +7,8 @@ import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.TestEndpointService;
 import com.webhook.platform.api.tenancy.TenantContext;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,7 +18,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+
+import static com.webhook.platform.api.filter.IngressRawBodyFilter.rawBody;
 
 @Slf4j
 @RestController
@@ -44,10 +51,17 @@ public class WebhookCaptureController {
     @RequestMapping(value = "/{slug}", method = { RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
             RequestMethod.PATCH, RequestMethod.DELETE })
     @Operation(summary = "Capture webhook request", description = "Captures any HTTP request sent to this test endpoint")
+    // Documented as the String it used to be bound as: the wire format is unchanged.
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(mediaType = "application/json", schema = @Schema(type = "string")))
     public ResponseEntity<WebhookCaptureResponse> captureRequest(
             @PathVariable("slug") String slug,
-            @RequestBody(required = false) String body,
-            HttpServletRequest request) {
+            HttpServletRequest request) throws IOException {
+        // Not @RequestBody String: for a form POST that is a body Spring rebuilt from parsed
+        // parameters, and a capture has to show what was sent. IngressRawBodyFilter kept it; it
+        // is stored as text, decoded with the charset the request declares.
+        byte[] raw = rawBody(request);
+        String body = raw == null ? null : new String(raw, charsetOf(request));
 
         // Early check: reject unknown slugs before allocating a rate-limit bucket.
         // Unscoped on purpose: /hook/** is public, so nothing has established a tenant yet and
@@ -102,5 +116,17 @@ public class WebhookCaptureController {
                 .requestId(captured.getId())
                 .receivedAt(captured.getReceivedAt() != null ? captured.getReceivedAt().toString() : Instant.now().toString())
                 .build());
+    }
+
+    private static Charset charsetOf(HttpServletRequest request) {
+        String encoding = request.getCharacterEncoding();
+        if (encoding == null) {
+            return StandardCharsets.UTF_8;
+        }
+        try {
+            return Charset.forName(encoding);
+        } catch (IllegalArgumentException e) {
+            return StandardCharsets.UTF_8;
+        }
     }
 }

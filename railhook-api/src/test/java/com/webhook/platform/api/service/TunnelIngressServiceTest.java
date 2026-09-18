@@ -34,7 +34,7 @@ class TunnelIngressServiceTest {
                 .thenThrow(new ResponseStatusException(HttpStatus.GONE, "Tunnel is no longer active"));
 
         TunnelIngressService.Outcome outcome = ingress.forward("tun-deleted",
-                TunnelRequestMessage.builder().requestId("r1").method("POST").path("/").build(), "{}");
+                TunnelRequestMessage.builder().requestId("r1").method("POST").path("/").build(), "{}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
         assertThat(outcome).isInstanceOf(TunnelIngressService.Outcome.Refused.class);
         assertThat(((TunnelIngressService.Outcome.Refused) outcome).error()).isEqualTo("tunnel_offline");

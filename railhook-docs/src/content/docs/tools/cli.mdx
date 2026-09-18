@@ -30,7 +30,7 @@ The `railhook` CLI opens a tunnel from a public URL to a port on your machine, s
    railhook listen 3000
    ```
 
-   The CLI prints a public URL and forwards every request that reaches it to `http://localhost:3000`, then returns your response. The URL is a base: a path after it is kept, so `https://<host>/tunnel/<slug>/webhooks/stripe` reaches `http://localhost:3000/webhooks/stripe`. Use it as an endpoint while you develop. If the connection drops, the CLI reconnects to the same URL; a request already sent to your machine when it dropped is answered `502` straight away rather than after the 30-second timeout. Press Ctrl+C to close it.
+   The CLI prints a public URL and forwards every request that reaches it to `http://localhost:3000`, then returns your response. The URL is a base: a path after it is kept, so `https://<host>/tunnel/<slug>/webhooks/stripe` reaches `http://localhost:3000/webhooks/stripe`. Use it as an endpoint while you develop. The body reaches your app byte for byte, as the provider sent it, so your own signature check passes for form posts and binary bodies too, and your response goes back the same way. If the connection drops, the CLI reconnects to the same URL; a request already sent to your machine when it dropped is answered `502` straight away rather than after the 30-second timeout. Press Ctrl+C to close it.
 
 </Steps>
 
@@ -88,6 +88,7 @@ The CLI stores the server URL, tokens and active project in `~/.config/railhook/
 |---|---|
 | Java not found | Install Java 17+, or re-run the installer with `--with-java` |
 | Connection refused while tunnelling | Nothing is listening on the local port you gave `listen` |
+| A signature check fails only for gzip or other binary bodies through the tunnel | Your CLI predates byte-exact bodies. Re-run the install command to update it |
 | Repeated `401` | Tokens refresh on their own. If it keeps happening, run `railhook login` again |
 
 ## Next steps
