@@ -11,6 +11,7 @@ import StatusBadge from '../components/StatusBadge';
 import PermissionGate from '../components/PermissionGate';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ConnectedMcpApps from '../components/ConnectedMcpApps';
 import { apiKeysApi, ApiKeyResponse, ApiKeyScope } from '../api/apiKeys.api';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse, PageResponse } from '../types/api.types';
@@ -293,6 +294,8 @@ export default function ApiKeysPage() {
           )}
         </div>
       )}
+
+      {projectId && <ConnectedMcpApps projectId={projectId} />}
 
       {/* Create */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>

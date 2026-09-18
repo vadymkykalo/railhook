@@ -17,6 +17,7 @@ const ForgotPasswordPage = lazy(() => import('./auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./auth/ResetPasswordPage'));
 const AcceptInvitePage = lazy(() => import('./auth/AcceptInvitePage'));
 const DeviceApprovePage = lazy(() => import('./auth/DeviceApprovePage'));
+const OAuthConsentPage = lazy(() => import('./auth/OAuthConsentPage'));
 const AuthCallbackPage = lazy(() => import('./auth/AuthCallbackPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
@@ -151,6 +152,13 @@ export const router = createBrowserRouter([
       {
         path: '/device',
         element: <S><DeviceApprovePage /></S>,
+      },
+      /* Where an MCP app (claude.ai, ChatGPT) sends a person to connect Railhook. The API's
+         /oauth/authorize parks the request and redirects here; signed out, the page goes through
+         /login and back. */
+      {
+        path: '/oauth/consent',
+        element: <S><OAuthConsentPage /></S>,
       },
       /* Where the API sends the browser after "Continue with Google", with a one-time code to trade
          for a session. */

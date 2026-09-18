@@ -12,6 +12,7 @@ Disallow: /forgot-password
 Disallow: /reset-password
 Disallow: /accept-invite
 Disallow: /device
+Disallow: /oauth/
 Disallow: /shared/
 
 # nginx replaces the placeholder origin below with the container's RAILHOOK_SITE_URL.

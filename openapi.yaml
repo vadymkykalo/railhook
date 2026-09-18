@@ -78,6 +78,8 @@ tags:
   description: Incoming webhook events monitoring
 - name: Ingress
   description: Public incoming webhook ingress endpoint
+- name: MCP apps
+  description: "Connecting AI apps to a project over OAuth, for the MCP server"
 - name: Events
   description: Event ingestion API
 - name: Subscriptions
@@ -4233,6 +4235,81 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/oauth/requests/{requestId}/deny:
+    post:
+      tags:
+      - MCP apps
+      summary: Decline an MCP app's sign-in request
+      description: Ends the request and returns the URL that tells the app access
+        was denied.
+      operationId: denyMcpConsentRequest
+      parameters:
+      - name: requestId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Declined; follow redirectUrl
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentDecisionResponse"
+        "404":
+          description: "Expired, already answered, or never existed"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentDecisionResponse"
+      security:
+      - bearerAuth: []
+  /api/v1/oauth/requests/{requestId}/approve:
+    post:
+      tags:
+      - MCP apps
+      summary: Approve an MCP app's sign-in request
+      description: "Connects the app to one project of the caller's organization with\
+        \ READ_ONLY or READ_WRITE access — the same scope an API key carries. Any\
+        \ member may grant READ_ONLY; READ_WRITE takes a role that may create an API\
+        \ key. Returns the URL to send the browser to, carrying the authorization\
+        \ code."
+      operationId: approveMcpConsentRequest
+      parameters:
+      - name: requestId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/McpConsentApproveRequest"
+        required: true
+      responses:
+        "200":
+          description: Approved; follow redirectUrl
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentDecisionResponse"
+        "403":
+          description: The caller's role may not grant READ_WRITE
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentDecisionResponse"
+        "404":
+          description: "Request expired or answered, or project not found"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentDecisionResponse"
+      security:
+      - bearerAuth: []
   /api/v1/events:
     post:
       tags:
@@ -5731,6 +5808,31 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/projects/{projectId}/mcp-grants:
+    get:
+      tags:
+      - MCP apps
+      summary: List connected MCP apps
+      description: "Apps connected to this project through OAuth sign-in, newest first."
+      operationId: listMcpGrants
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/McpGrantResponse"
+      security:
+      - bearerAuth: []
   /api/v1/projects/{projectId}/incoming-events:
     get:
       tags:
@@ -6419,6 +6521,37 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/oauth/requests/{requestId}:
+    get:
+      tags:
+      - MCP apps
+      summary: Describe an MCP app's sign-in request
+      description: "What the consent screen shows: the app's name, the host its code\
+        \ will be sent to, the access it asked for, and whether the caller's role\
+        \ may grant write access."
+      operationId: describeMcpConsentRequest
+      parameters:
+      - name: requestId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: "The request, still waiting for an answer"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentRequestResponse"
+        "404":
+          description: "Expired, already answered, or never existed"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentRequestResponse"
+      security:
+      - bearerAuth: []
   /api/v1/deliveries:
     get:
       tags:
@@ -7346,6 +7479,32 @@ paths:
       responses:
         "200":
           description: OK
+      security:
+      - bearerAuth: []
+  /api/v1/projects/{projectId}/mcp-grants/{grantId}:
+    delete:
+      tags:
+      - MCP apps
+      summary: Disconnect an MCP app
+      description: "Revokes the app's access to this project at once: its access and\
+        \ refresh tokens stop working, and it has to be connected again from the app."
+      operationId: revokeMcpGrant
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: grantId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Disconnected
       security:
       - bearerAuth: []
   /api/v1/projects/{projectId}/debug-links/{linkId}:
@@ -9436,6 +9595,25 @@ components:
           format: date-time
         inviteUrl:
           type: string
+    McpConsentDecisionResponse:
+      type: object
+      properties:
+        redirectUrl:
+          type: string
+    McpConsentApproveRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        scope:
+          type: string
+          enum:
+          - READ_WRITE
+          - READ_ONLY
+      required:
+      - projectId
+      - scope
     EventIngestResponse:
       type: object
       properties:
@@ -10246,6 +10424,34 @@ components:
           type: boolean
         empty:
           type: boolean
+    McpGrantResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        clientName:
+          type: string
+        clientUri:
+          type: string
+        redirectHost:
+          type: string
+        scope:
+          type: string
+          enum:
+          - READ_WRITE
+          - READ_ONLY
+        approvedByEmail:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
     PageIncomingSourceResponse:
       type: object
       properties:
@@ -11071,6 +11277,28 @@ components:
           type: integer
           format: int32
         createdAt:
+          type: string
+          format: date-time
+    McpConsentRequestResponse:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        clientName:
+          type: string
+        clientUri:
+          type: string
+        redirectHost:
+          type: string
+        requestedScope:
+          type: string
+          enum:
+          - READ_WRITE
+          - READ_ONLY
+        canGrantWrite:
+          type: boolean
+        expiresAt:
           type: string
           format: date-time
     DeliveryResponse:

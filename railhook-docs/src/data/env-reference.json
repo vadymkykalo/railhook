@@ -1590,6 +1590,12 @@
           "default": "true",
           "example": null,
           "description": "The remote MCP server at <your origin>/mcp, which lets an AI agent (Claude Code,\nCursor, Claude Desktop) send events and inspect endpoints, subscriptions and\ndeliveries. It authenticates with a project API key and can do nothing that key\ncannot; a READ_ONLY key gets the read tools only. Set to false to turn /mcp off."
+        },
+        {
+          "name": "MCP_OAUTH_ENABLED",
+          "default": "true",
+          "example": null,
+          "description": "Sign-in for the MCP server, so claude.ai and ChatGPT can connect it as a custom\nconnector: the app registers itself (OAuth dynamic client registration), the\nperson approves it for one project with read-only or read & write access on a\nconsent screen, and the app gets short-lived tokens for that project. The\nconnections are listed, and revocable, next to the project's API keys. It is\nserved from APP_BASE_URL, which must therefore be the public origin. Set to false\nto accept API keys only."
         }
       ]
     },

@@ -104,6 +104,9 @@ public abstract class AbstractIntegrationTest {
         when(authRateLimiterService.allowDevicePoll(anyString(), any())).thenReturn(true);
         // Creating a public tester URL without an account (allowPublicBin).
         when(authRateLimiterService.allowPublicBin(anyString())).thenReturn(true);
+        // The MCP server's OAuth registration and token endpoints.
+        when(authRateLimiterService.allowOAuthRegister(anyString())).thenReturn(true);
+        when(authRateLimiterService.allowOAuthToken(anyString(), any())).thenReturn(true);
         when(tokenBlacklistService.isBlacklisted(any())).thenReturn(false);
         when(tokenBlacklistService.isTokenRevokedByEpoch(any(), any())).thenReturn(false);
     }

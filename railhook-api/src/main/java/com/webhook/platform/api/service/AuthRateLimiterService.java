@@ -38,6 +38,17 @@ public class AuthRateLimiterService {
     private static final String PUBLIC_BIN_KEY_PREFIX = "rate_limiter:public_bin:ip:";
     /** Public tester URLs a single address may make in a minute; a person needs one or two. */
     static final int PUBLIC_BIN_PER_IP_PER_MINUTE = 5;
+    private static final String OAUTH_REGISTER_KEY_PREFIX = "rate_limiter:oauth:register:ip:";
+    /**
+     * Not the sign-up bucket's 5: a hosted app registers from its own servers, so every person who
+     * adds the connector there in the same minute arrives from the same few addresses.
+     */
+    static final int OAUTH_REGISTER_PER_IP_PER_MINUTE = 60;
+    private static final String OAUTH_TOKEN_IP_KEY_PREFIX = "rate_limiter:oauth:token:ip:";
+    private static final String OAUTH_TOKEN_CLIENT_KEY_PREFIX = "rate_limiter:oauth:token:client:";
+    /** High, because one hosted app (claude.ai, ChatGPT) refreshes every user's connection from few addresses. */
+    static final int OAUTH_TOKEN_PER_IP_PER_MINUTE = 600;
+    static final int OAUTH_TOKEN_PER_CLIENT_PER_MINUTE = 300;
     private static final Duration KEY_TTL = Duration.ofMinutes(5);
 
     private final RedissonClient redissonClient;
@@ -170,6 +181,31 @@ public class AuthRateLimiterService {
         if (deviceCode != null && !deviceCode.isBlank()) {
             return tryAcquire(DEVICE_POLL_CODE_KEY_PREFIX + CryptoUtils.hashApiKey(deviceCode),
                     DEVICE_POLL_PER_CODE_PER_MINUTE);
+        }
+        return true;
+    }
+
+    /**
+     * An MCP app registering itself (OAuth dynamic client registration). Open by necessity — the
+     * app has no account to register under — so bounded per address. A script minting clients in a
+     * loop is what this stops.
+     */
+    public boolean allowOAuthRegister(String ip) {
+        return tryAcquire(OAUTH_REGISTER_KEY_PREFIX + ip, OAUTH_REGISTER_PER_IP_PER_MINUTE);
+    }
+
+    /**
+     * The OAuth token and revocation endpoints. Per address, and per client so that one app
+     * guessing at codes or refresh tokens is bounded however many addresses it comes from. An app
+     * in normal use calls this once an hour per connection.
+     */
+    public boolean allowOAuthToken(String ip, String clientId) {
+        if (!tryAcquire(OAUTH_TOKEN_IP_KEY_PREFIX + ip, OAUTH_TOKEN_PER_IP_PER_MINUTE)) {
+            return false;
+        }
+        if (clientId != null && !clientId.isBlank()) {
+            return tryAcquire(OAUTH_TOKEN_CLIENT_KEY_PREFIX + CryptoUtils.hashApiKey(clientId),
+                    OAUTH_TOKEN_PER_CLIENT_PER_MINUTE);
         }
         return true;
     }

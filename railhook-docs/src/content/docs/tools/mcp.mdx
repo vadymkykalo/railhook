@@ -1,23 +1,66 @@
 ---
 title: MCP server
-description: Let an AI agent — Claude Code, Cursor, Claude Desktop — send events and inspect endpoints, subscriptions and deliveries with a project API key.
+description: Let an AI agent — claude.ai, ChatGPT, Claude Code, Cursor, Claude Desktop — send events and inspect endpoints, subscriptions and deliveries in one project, by signing in or with a project API key.
 ---
-import { Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Railhook serves a [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp`, so an AI agent can work with your project directly: find out why a delivery failed, replay it, register an endpoint, send a test event. The server authenticates with a project API key and can do nothing that key cannot.
+Railhook serves a [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp`, so an AI agent can work with your project directly: find out why a delivery failed, replay it, register an endpoint, send a test event. It acts on one project, with read-only or read & write access, and can do nothing more.
 
 | Where | MCP server URL |
 |---|---|
 | Railhook Cloud | `https://railhook.io/mcp` |
 | Self-hosted | `<your origin>/mcp`, e.g. `https://hooks.example.com/mcp` |
 
-It speaks Streamable HTTP. Clients that only start local processes use the `@railhook/mcp` package, a stdio bridge to the same server.
+There are two ways in:
+
+- **Sign in.** Apps that connect to remote servers themselves — claude.ai, Claude Desktop's connectors, ChatGPT — send you to Railhook to approve them for a project. Nothing to copy or paste.
+- **A project API key.** Clients configured from a file or a command line — Claude Code, Cursor, the `@railhook/mcp` stdio bridge — send the key as a header.
+
+Both reach the same tools with the same limits. The server speaks Streamable HTTP.
+
+## Connect by signing in
+
+<Tabs syncKey="mcp-signin">
+  <TabItem label="claude.ai / Claude Desktop">
+    <Steps>
+    1. Open **Settings → Connectors** (in newer versions, **Customize → Connectors**) and add a **custom connector**.
+    2. Name it `Railhook` and enter the URL `https://railhook.io/mcp`. Leave the OAuth client ID and secret empty: Claude registers itself.
+    3. Click **Connect**. Railhook opens; sign in if you are not already.
+    4. Pick the organization and project, choose **Read Only** or **Read & Write**, and click **Connect**. You are sent back to Claude.
+    </Steps>
+
+    A connector added on claude.ai is also available in Claude Desktop and the mobile apps signed in to the same account.
+  </TabItem>
+  <TabItem label="ChatGPT">
+    <Steps>
+    1. Turn on developer mode: **Settings → Apps → Advanced settings → Developer mode**. On a Business or Enterprise workspace an admin may have to allow custom connectors first.
+    2. Create a connector with the URL `https://railhook.io/mcp` and **OAuth** as its authentication.
+    3. ChatGPT opens Railhook. Sign in, pick the organization and project, choose the access, and click **Connect**.
+    </Steps>
+  </TabItem>
+</Tabs>
+
+What you approve is exactly what an API key carries — one project and one scope — so an app you connect read-only cannot send an event or replay a delivery. The menus above change between versions of each app; what stays the same is the URL, and that the app handles the sign-in.
+
+<Aside type="caution">
+An app's name on the consent screen is whatever the app registered, so check the host shown under it — the address Railhook hands access to — before you click **Connect**.
+</Aside>
+
+### Who can connect what
+
+Any member of the organization can connect an app **read-only**. **Read & write** takes the Owner or Developer role, the same roles that may create an API key. A connected app keeps working only while the person who approved it could approve it today: removing or suspending them, or taking a Developer down to Viewer, stops the apps they connected.
+
+The app gets an access token for an hour at a time and renews it on its own, so it keeps working until someone disconnects it.
+
+### See and disconnect apps
+
+A project's connected apps are listed under **API Keys**, below the keys, with the access each has, the host it signed in from, who approved it and when it was last used. **Disconnect** stops it at once; to use it again, connect it again from the app. Connecting and disconnecting are recorded in the organization's audit log, under the person who did it.
+
+## Connect with an API key
 
 <Aside type="tip">
 Start with a `READ_ONLY` key. The read tools work with it, and every tool that changes something is refused, so an agent can explore a project without being able to send an event or replay a delivery. Create a `READ_WRITE` key when you want it to act. [Authentication](/docs/platform/authentication/) covers creating keys and their scopes.
 </Aside>
-
-## Connect a client
 
 <Tabs syncKey="mcp-client">
   <TabItem label="Claude Code">
@@ -44,8 +87,8 @@ Start with a `READ_ONLY` key. The read tools work with it, and every tool that c
 
     `~/.cursor/mcp.json` makes it available in every project. `${env:RAILHOOK_API_KEY}` is read from Cursor's environment, so the key stays out of the file.
   </TabItem>
-  <TabItem label="Claude Desktop">
-    Claude Desktop starts local servers, so it uses the bridge. It needs Node.js 18 or later.
+  <TabItem label="Claude Desktop (config file)">
+    Servers in Claude Desktop's config file are local processes, so they use the bridge. It needs Node.js 18 or later. To connect by signing in instead, add a connector as above.
 
     ```json title="claude_desktop_config.json"
     {
@@ -79,7 +122,7 @@ Start with a `READ_ONLY` key. The read tools work with it, and every tool that c
   </TabItem>
 </Tabs>
 
-### Self-hosted
+## Self-hosted
 
 Replace `https://railhook.io` with your own origin in the URL. For the bridge, set `RAILHOOK_BASE_URL` next to the key:
 
@@ -90,13 +133,15 @@ Replace `https://railhook.io` with your own origin in the URL. For the bridge, s
 }
 ```
 
-The server is on by default. `MCP_ENABLED=false` in `.env` turns `/mcp` off; see [Configuration](/docs/self-hosting/configuration/).
+Signing in needs two things from the instance. `APP_BASE_URL` must be its public HTTPS origin: it is the address the app is sent to and back from, and the issuer the app checks. And claude.ai and ChatGPT connect from their own servers, so the instance has to be reachable from the internet; one on a private network takes API keys only.
+
+Both switches are on by default. `MCP_ENABLED=false` in `.env` turns `/mcp` off; `MCP_OAUTH_ENABLED=false` keeps it on for API keys and turns signing in off. See [Configuration](/docs/self-hosting/configuration/).
 
 ## Tools
 
-Every tool acts on the project the API key belongs to. None takes a project id, so an agent cannot reach another project, even in the same organization.
+Every tool acts on the project the API key or the connected app belongs to. None takes a project id, so an agent cannot reach another project, even in the same organization.
 
-| Tool | What it does | Key |
+| Tool | What it does | Access |
 |---|---|---|
 | `list_endpoints` | The project's endpoints, with whether each is enabled and verified | Any |
 | `list_subscriptions` | Which endpoint receives which event type, optionally for one endpoint | Any |
@@ -115,9 +160,12 @@ The same limits apply as over the API: `send_event` counts against the project's
 
 | Symptom | Fix |
 |---|---|
-| `401` when the client connects | The key is wrong, revoked or expired, or it belongs to another instance than the URL. Create a new key |
-| A tool answers that the key is `READ_ONLY` | Expected for write tools. Use a `READ_WRITE` key for them |
-| `404` at `/mcp` on a self-hosted instance | `MCP_ENABLED` is `false`, or the instance predates the MCP server. Upgrade it |
+| `401` when the client connects with a key | The key is wrong, revoked or expired, or it belongs to another instance than the URL. Create a new key |
+| The app asks you to sign in again | The app was disconnected, or the person who approved it was removed, suspended or lost the role it needs. Connect it again |
+| "This request has expired" on the consent screen | The screen was open for more than ten minutes, or already answered. Start connecting again from the app |
+| "This app can't be connected" | The app asked to return somewhere it did not register. Remove the connector in the app and add it again |
+| A tool answers that the key or app is read-only | Expected for write tools. Use a `READ_WRITE` key, or reconnect the app with **Read & Write** |
+| `404` at `/mcp` or `/.well-known/oauth-authorization-server` on a self-hosted instance | `MCP_ENABLED` or `MCP_OAUTH_ENABLED` is `false`, or the instance predates it. Upgrade it |
 | The bridge exits with `RAILHOOK_API_KEY is not set` | Put the key in the `env` block of the client's config, not in `args` |
 
 ## Next steps
