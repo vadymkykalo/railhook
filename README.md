@@ -65,6 +65,7 @@ a month, 3 projects, 7 days of history). Paid plans with support and higher limi
 | | |
 |---|---|
 | **Delivery** | Retry ladder · per-endpoint ordering · rate limits · shared circuit breaker |
+| **Customer portal** | Embed a portal where your own customers register endpoints, pick event types, and see and retry their deliveries — in your brand colours |
 | **Recovery** | Failed Messages with bulk retry · Time Machine replay |
 | **Signing** | HMAC-SHA256 in [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks) and legacy headers · secret rotation |
 | **Shaping** | Rules · JSONPath transformations · schema registry · workflows · wildcard subscriptions |

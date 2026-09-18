@@ -2067,7 +2067,7 @@
       "inBody": "One address per service. Railhook checks that Stripe or GitHub really sent it, then passes it on to your app.",
       "inTag": "Receive",
       "inTitle": "Webhooks from other services",
-      "outBody": "Your customer adds a URL. Railhook delivers each event there, signed, and tries again if their server is down.",
+      "outBody": "Your customers add their URLs themselves, in a portal you embed in your product. Railhook delivers each event there, signed, and tries again if their server is down.",
       "outTag": "Send",
       "outTitle": "Webhooks for your customers",
       "scene": {
