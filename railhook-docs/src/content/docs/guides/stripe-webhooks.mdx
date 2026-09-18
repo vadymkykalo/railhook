@@ -1,0 +1,115 @@
+---
+title: Receive Stripe webhooks reliably
+description: Put Railhook between Stripe and your app — verify the Stripe-Signature header, forward each event to your service with retries, deduplicate by event id, and replay after an outage.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This guide puts Railhook between Stripe and your application. Stripe sends its webhooks to a Railhook source, which verifies the signature, stores each event as it arrived and forwards it to your service. When your service is down, nothing is lost: forwards are retried, and anything that still fails can be replayed later.
+
+## Why Stripe's retries are not enough on their own
+
+Stripe does retry. In live mode it keeps trying a failed event for up to three days with exponential backoff; in a sandbox it retries three times over a few hours. After that, the Dashboard can resend an event for up to 15 days and the Stripe CLI for up to 30. Stripe also states that events can arrive out of order and that an endpoint can receive the same event more than once. ([Stripe: Receive Stripe events in your webhook endpoint](https://docs.stripe.com/webhooks))
+
+What that leaves to you:
+
+- **Your handler has to answer fast.** Stripe asks for a `2xx` before any complex logic, or the delivery times out and counts as failed. Railhook answers Stripe as soon as the event is stored, and your service can take as long as the destination's timeout allows.
+- **Recovery is one event at a time.** After a longer outage, resending from the Dashboard means clicking through events. Railhook replays every stored event from a time range in one call.
+- **Duplicates reach your code.** Railhook recognises the `evt_…` id: a second delivery of the same event is answered `202` with the stored copy and is not forwarded again.
+
+## Connect Stripe
+
+You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Create the source.** Stripe shows the signing secret only after you register a URL, so create the source first, without the secret. With `verificationMode` set to `PROVIDER` and no secret, it refuses every request with `401` until you add one, so nothing unverified is stored in the meantime.
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Stripe","providerType":"STRIPE","verificationMode":"PROVIDER"}'
+   ```
+
+   Keep the `id` and the `ingressUrl` from the response.
+
+2. **Register the URL in Stripe.** In Workbench, open **Webhooks** and click **Create an event destination**. Choose **Your account**, pick the event types you handle, choose **Webhook endpoint**, and paste the `ingressUrl` as the **Endpoint URL**.
+
+3. **Give Railhook the signing secret.** On the endpoint's page in Stripe, click **Reveal secret** and copy the value that starts with `whsec_`. Set it on the source:
+
+   ```bash
+   curl -X PUT "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Stripe","hmacSecret":"whsec_..."}'
+   ```
+
+   Only the fields you send change; the secret is write-only and never returned.
+
+4. **Add a destination.** This is the URL of your own service that should receive the events:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/stripe","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+5. **Send a test event** from Stripe, or run `stripe trigger payment_intent.succeeded`. It appears under **Incoming → Received**, with one forward per destination.
+
+</Steps>
+
+## How the signature is checked
+
+Railhook reads `Stripe-Signature`, computes the hex HMAC-SHA256 of `<t>.<raw body>` with the `whsec_` secret and compares it with each `v1` value. `t` must be within 300 seconds of Railhook's clock. While you roll the secret in Stripe, it sends one `v1` per active secret; the request verifies if any of them matches, so put the new secret on the source as soon as you roll it. A request that fails is answered `401` and not stored, and Stripe retries it.
+
+## What your service receives
+
+The body exactly as Stripe sent it, byte for byte, with its `Content-Type`. `Stripe-Signature` is not forwarded: your service authenticates Railhook through the destination's credentials instead, so it does not need the Stripe secret at all. Each request carries `Idempotency-Key`, stable across attempts, and `X-Forward-Attempt`. See [Destinations](/docs/incoming/destinations/#what-the-destination-receives).
+
+A forward is retried on `408`, `429`, any `5xx`, a timeout or a connection error, up to 5 attempts. Any other `4xx` moves it to **Failed Forwards** at once, where you can retry it after fixing your service.
+
+## Develop locally with the CLI
+
+Point a destination at your machine through a tunnel, and Stripe's test events reach the code in your editor after Railhook has verified them.
+
+<Steps>
+
+1. Install the CLI and log in, as in [CLI](/docs/tools/cli/), then open a tunnel to the port your app listens on:
+
+   ```bash
+   railhook listen 3000
+   ```
+
+2. Add a second destination to the source with the printed public URL and your route appended, such as `https://<host>/tunnel/<slug>/webhooks/stripe`. A path after the tunnel URL is kept, so this reaches `http://localhost:3000/webhooks/stripe`.
+
+3. Trigger an event in your Stripe sandbox. When you stop the tunnel, disable or delete that destination so its forwards do not pile up in Failed Forwards.
+
+</Steps>
+
+## Replay after an outage
+
+If your service was down longer than the retries lasted, replay what arrived in the meantime. This creates new forwards to every destination of the source, starting again from attempt 1:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
+```
+
+Your handler should still be idempotent on the Stripe event id, because a replay sends events your service may already have processed. Replay reaches back as far as events are kept: 7 days on Railhook Cloud, and whatever you configure when self-hosting. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
+  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Credentials, retries and transformations per destination." />
+  <LinkCard title="CLI" href="/docs/tools/cli/" description="Tunnels, events and replays from the terminal." />
+</CardGrid>

@@ -1,0 +1,106 @@
+---
+title: Надійне приймання подій Slack
+description: Щоразу відповідайте Events API Slack протягом трьох секунд — Railhook перевіряє X-Slack-Signature, проходить перевірку url_verification і пересилає події на ваш сервіс із повторами та повтором подій.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Цей гайд ставить Railhook між Events API Slack і вашим застосунком. Slack надсилає події на джерело Railhook, яке перевіряє підпис, зберігає кожну подію в тому вигляді, в якому вона надійшла, і пересилає на ваш сервіс із повторами. Slack спілкується лише з Railhook, який відповідає одразу, тож повільний обробник більше не призводить до вимкнення ваших підписок на події.
+
+## Чому подіям Slack потрібен буфер
+
+Slack просить застосунок відповідати на кожну подію `2xx` протягом трьох секунд. Невдалу подію він повторює тричі — майже одразу, через 1 хвилину й через 5 хвилин, — позначаючи кожен повтор заголовком `x-slack-retry-num`. Якщо застосунок не відповідає успішно щонайменше на 5% подій протягом 60 хвилин, Slack тимчасово вимикає його підписки на події й надсилає листа власнику застосунку. ([Slack: The Events API](https://docs.slack.dev/apis/events-api/))
+
+Три секунди — це мало для будь-якого обробника, що звертається до бази даних чи іншого API, а вікно повторів близько п'яти хвилин не покриває невдалий деплой. З Railhook попереду:
+
+- Slack отримує відповідь, щойно подію збережено, з великим запасом до трьох секунд.
+- Ваш сервіс отримує до 5 спроб на кожне пересилання, з очікуваннями від 1 хвилини до 1 години, а те, що все одно не вдалося, потрапляє в **«Невдалі пересилання»**.
+- Повтор від Slack має той самий `event_id`. Railhook його розпізнає, відповідає збереженою копією й не пересилає вдруге.
+
+<Aside type="caution" title="Лише Events API">
+Ingress відповідає `202` із власним невеликим JSON-тілом. Використовуйте джерело для Events API, де Slack потрібен лише `2xx`. Slash-команди й інтерактивні компоненти, чию відповідь Slack показує користувачу, мають надходити у ваш застосунок напряму.
+</Aside>
+
+## Підключення Slack
+
+Знадобляться проєкт Railhook і API-ключ. Усе нижче також можна зробити в розділі **Вхідні** панелі керування.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Скопіюйте signing secret.** У налаштуваннях застосунку на api.slack.com відкрийте **Basic Information** і скопіюйте **Signing Secret** у розділі **App Credentials**.
+
+2. **Створіть джерело** з цим секретом:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Slack","providerType":"SLACK","verificationMode":"PROVIDER","hmacSecret":"'"$SLACK_SIGNING_SECRET"'"}'
+   ```
+
+   Збережіть `id` і `ingressUrl` із відповіді.
+
+3. **Додайте призначення** — адресу вашого сервісу:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/slack","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+4. **Увімкніть події в Slack.** Відкрийте **Event Subscriptions**, увімкніть їх і вставте `ingressUrl` як **Request URL**. Slack надсилає перевірку `url_verification`; Railhook перевіряє її підпис і відповідає challenge, тож адресу приймають. Ця перевірка — не подія: нічого не зберігається й не пересилається.
+
+5. **Підпишіться на bot events**, збережіть і згенеруйте подію, наприклад повідомлення в каналі, де є застосунок. Вона з'явиться в розділі **Вхідні → Отримані**, з одним пересиланням на кожне призначення.
+
+</Steps>
+
+## Як перевіряється підпис
+
+Railhook читає `X-Slack-Signature` і `X-Slack-Request-Timestamp`, обчислює `v0=`, за яким іде шістнадцятковий HMAC-SHA256 від `v0:<timestamp>:<raw body>` із signing secret, і порівнює їх. Мітка часу має бути в межах 300 секунд від годинника Railhook. Запит, що не збігається, отримує `401` і не зберігається. Це схема, яку Slack описує в [Verifying requests from Slack](https://docs.slack.dev/authentication/verifying-requests-from-slack/).
+
+## Що отримує ваш сервіс
+
+Тіло точно таке, яким його надіслав Slack, байт у байт, з його `Content-Type`. `X-Slack-Signature` не пересилається: ваш сервіс автентифікує Railhook за обліковими даними призначення, і signing secret йому не потрібен. Кожен запит містить `Idempotency-Key`, незмінний між спробами. Див. [Призначення](/docs/uk/incoming/destinations/#що-отримує-призначення).
+
+## Локальна розробка з CLI
+
+<Steps>
+
+1. Встановіть CLI й увійдіть, як описано в [CLI](/docs/uk/tools/cli/), а потім відкрийте тунель до порту вашого застосунку:
+
+   ```bash
+   railhook listen 3000
+   ```
+
+2. Додайте джерелу друге призначення з виведеною публічною адресою й вашим маршрутом у кінці, наприклад `https://<host>/tunnel/<slug>/webhooks/slack`. Запит потрапить на `http://localhost:3000/webhooks/slack`.
+
+3. Напишіть повідомлення в тестовому робочому просторі, і перевірена подія надійде у ваш локальний застосунок. Request URL у Slack лишається ingress-адресою, тож вам не доведеться перевіряти її знову після перезапуску тунелю. Вимкніть це призначення, коли закриєте тунель.
+
+</Steps>
+
+## Повтор подій після збою
+
+Відтворіть те, що надійшло, поки ваш сервіс лежав. Кожна відтворена подія йде на кожне призначення джерела як нове пересилання:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
+```
+
+Повтор сягає так далеко, як довго зберігаються події: 7 днів у Railhook Cloud і скільки налаштуєте на власному сервері. Тримайте обробник ідемпотентним за `event_id`, бо повтор може надіслати події, які ваш сервіс уже обробив. Див. [Повтор](/docs/uk/outgoing/replay/#повтор-вхідних-вебхуків).
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Джерела" href="/docs/uk/incoming/sources/" description="Що відповідає ingress, зокрема на перевірку Slack." />
+  <LinkCard title="Перевірка вхідних вебхуків" href="/docs/uk/incoming/verification/" description="Схема підпису кожного провайдера й захист від повторного використання." />
+  <LinkCard title="CLI" href="/docs/uk/tools/cli/" description="Тунелі, події й повтори з термінала." />
+</CardGrid>

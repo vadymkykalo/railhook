@@ -1,0 +1,107 @@
+---
+title: Receive GitHub webhooks reliably
+description: GitHub never retries a failed webhook delivery. Put Railhook in front of your app to verify X-Hub-Signature-256, retry forwards to your service, and replay after an outage.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This guide puts Railhook between GitHub and your application. GitHub sends its webhooks to a Railhook source, which verifies the signature, stores each delivery as it arrived and forwards it to your service with retries. When your service is down, the webhooks wait in Railhook instead of being lost.
+
+## Why GitHub webhooks need a buffer
+
+GitHub states that it does not automatically redeliver failed webhook deliveries. You can redeliver them by hand or through the API, but only deliveries from the past 3 days. ([GitHub: Handling failed webhook deliveries](https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries), [Redelivering webhooks](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/redelivering-webhooks)) GitHub also asks your server to answer with a `2xx` within 10 seconds. ([Best practices for using webhooks](https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks))
+
+So one deploy, one crash or one slow handler at the wrong moment, and that push, pull request or issue event is gone unless someone notices. With Railhook in front:
+
+- Railhook answers GitHub as soon as the delivery is stored, well inside the 10 seconds.
+- Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour.
+- What still fails lands in **Failed Forwards**, and any stored delivery can be replayed for as long as events are kept.
+- A GitHub redelivery carries the same `X-GitHub-Delivery` id. Railhook recognises it, answers `202` with the stored copy and does not forward it twice.
+
+## Connect GitHub
+
+You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Choose a secret.** With GitHub you pick the webhook secret yourself:
+
+   ```bash
+   export GITHUB_WEBHOOK_SECRET=$(openssl rand -hex 32)
+   ```
+
+2. **Create the source** with that secret:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"GitHub","providerType":"GITHUB","verificationMode":"PROVIDER","hmacSecret":"'"$GITHUB_WEBHOOK_SECRET"'"}'
+   ```
+
+   Keep the `id` and the `ingressUrl` from the response.
+
+3. **Register the webhook in GitHub.** In the repository or organization, open **Settings → Webhooks → Add webhook**. Paste the `ingressUrl` as the **Payload URL**, set **Content type** to `application/json`, paste the same secret into **Secret**, and choose the events you want.
+
+4. **Add a destination**, the URL of your own service:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/github","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+5. **Check the ping.** GitHub sends a `ping` event when the webhook is created. It appears under **Incoming → Received** in Railhook.
+
+</Steps>
+
+## How the signature is checked
+
+Railhook reads `X-Hub-Signature-256`, which is `sha256=` followed by the hex HMAC-SHA256 of the raw body, and compares it with its own computation using the source's secret. A request that does not match is answered `401` and not stored. A signature already seen within the replay window, 5 minutes by default, is refused too, unless the request is a redelivery of a delivery Railhook already stored.
+
+## What your service receives
+
+The body exactly as GitHub sent it, byte for byte. Because a push and an issue cannot be told apart by their bodies, Railhook passes GitHub's event headers through: `X-GitHub-Event`, `X-GitHub-Delivery`, `X-GitHub-Hook-ID`, `X-GitHub-Hook-Installation-Target-Type` and `X-GitHub-Hook-Installation-Target-ID`. `X-Hub-Signature-256` is not forwarded: your service authenticates Railhook through the destination's credentials, and does not need the GitHub secret. See [Destinations](/docs/incoming/destinations/#what-the-destination-receives).
+
+## Develop locally with the CLI
+
+<Steps>
+
+1. Install the CLI and log in, as in [CLI](/docs/tools/cli/), then open a tunnel to your app's port:
+
+   ```bash
+   railhook listen 3000
+   ```
+
+2. Add a second destination to the source with the printed public URL and your route appended, such as `https://<host>/tunnel/<slug>/webhooks/github`. It reaches `http://localhost:3000/webhooks/github`.
+
+3. Push a commit, or replay the stored `ping` from Railhook (a redelivery from GitHub carries the same `X-GitHub-Delivery`, so Railhook answers it with the stored copy and does not forward it again). The verified webhook arrives in your local app with its `X-GitHub-Event` header. Disable that destination when you stop the tunnel.
+
+</Steps>
+
+## Replay after an outage
+
+Replay what arrived while your service was down. Each replayed delivery goes to every destination of the source as a new forward:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
+```
+
+Unlike GitHub's own redelivery, this is not limited to 3 days: it reaches back as far as events are kept, 7 days on Railhook Cloud and whatever you configure when self-hosting. Make your handler idempotent on `X-GitHub-Delivery`, since a replay can send deliveries your service already processed. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
+  <LinkCard title="Sources" href="/docs/incoming/sources/" description="What the ingress answers, and how resends are deduplicated." />
+  <LinkCard title="GitLab webhooks" href="/docs/guides/gitlab-webhooks/" description="The same setup for GitLab." />
+</CardGrid>

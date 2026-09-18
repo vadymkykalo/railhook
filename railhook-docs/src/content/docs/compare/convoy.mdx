@@ -1,0 +1,52 @@
+---
+title: Railhook vs Convoy — MIT-licensed Convoy alternative
+description: Looking for a Convoy alternative? Railhook sends and receives webhooks under the MIT licence, with every feature self-hosted and no licence key.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Use this page to decide between Convoy and Railhook. Both send webhooks to your customers and receive webhooks from providers; the largest differences are the licence and what the self-hosted build includes.
+
+<Aside title="Verified 2026-09-18">
+Convoy details come from [getconvoy.io/pricing](https://www.getconvoy.io/pricing) and [github.com/frain-dev/convoy](https://github.com/frain-dev/convoy) as they read on 18 September 2026. Products change: check them before you decide, and send a correction as a pull request if something here is out of date.
+</Aside>
+
+## Side by side
+
+| | Railhook | Convoy |
+|---|---|---|
+| Licence | MIT, approved by the OSI | Elastic License 2.0, source-available |
+| Sending webhooks to your customers | Yes | Yes |
+| Receiving webhooks from providers | Yes | Yes |
+| Every feature self-hosted without a licence key | Yes | No |
+| Self-hosted paid edition | None | Yes |
+| Customer-facing portal | No | Portal links, in paid editions |
+| Transformations | Yes, in every build | JavaScript transformations, in paid editions |
+| OpenTelemetry | No | In paid editions |
+| Role-based access control | Three fixed roles, in every build | In paid editions |
+
+A dash means Convoy's pages we checked did not settle the point. It is not a claim that the feature is missing.
+
+## When Convoy is the better choice
+
+- **Your customers need to see their own deliveries.** Convoy's portal links give a customer a view of an endpoint's deliveries. Railhook has no customer-facing portal yet.
+- **You want traces, and a paid edition is fine.** Convoy offers OpenTelemetry. Railhook exposes Prometheus metrics and no traces.
+- **You need finer-grained access control.** Railhook has three fixed roles and two API key scopes, with no custom roles.
+
+## When Railhook is the better choice
+
+- **The licence matters to you.** The Elastic License 2.0 is source-available, not an open-source licence approved by the OSI, and it restricts offering the software as a managed service. Railhook is MIT: you can run it, change it and ship it inside your own product.
+- **You want the whole product without paying for a key.** Convoy puts portal links, JavaScript transformations, OpenTelemetry and RBAC in paid editions. Railhook has no licence key and no paid self-hosted edition: transformations, workflows, per-endpoint ordering, replay, PII masking and roles are all in the free build.
+- **You receive webhooks from well-known providers.** Railhook verifies Stripe, GitHub, GitLab, Shopify, Slack and Twilio signatures itself. See [Verification](/docs/incoming/verification/).
+- **You want to develop locally against real webhooks.** `railhook listen 3000` tunnels a public URL to your machine. See [CLI](/docs/tools/cli/).
+
+## Moving from Convoy
+
+Convoy's concepts carry over almost one to one: a project is a project, an endpoint an endpoint, a subscription a subscription, an event an event and a source a source. Railhook signs with the Standard Webhooks headers, so check what your receivers verify before you switch them. [Migrate to Railhook](/docs/resources/migrating/) has the mapping and a migration with both platforms live.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Migrate to Railhook" href="/docs/resources/migrating/" description="Concept mapping and a migration with both platforms live." />
+  <LinkCard title="Organizations and roles" href="/docs/platform/organizations-rbac/" description="What Railhook's three roles can do." />
+  <LinkCard title="How Railhook compares" href="/docs/resources/comparison/" description="Railhook next to every alternative, gaps included." />
+</CardGrid>

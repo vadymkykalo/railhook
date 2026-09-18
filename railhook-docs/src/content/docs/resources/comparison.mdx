@@ -1,10 +1,10 @@
 ---
 title: How Railhook compares
-description: Railhook next to Svix, Hookdeck and Convoy as of 2026-09, including what Railhook does not have.
+description: Railhook next to Svix, Hookdeck, Convoy and Hook0 as of 2026-09, including what Railhook does not have.
 ---
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Use this page to shortlist a webhook platform. It compares Railhook with Svix, Hookdeck and Convoy on points each vendor states in its own public documentation, and it lists Railhook's gaps as plainly as its strengths.
+Use this page to shortlist a webhook platform. It compares Railhook with Svix, Hookdeck, Convoy and Hook0 on points each vendor states in its own public documentation, and it lists Railhook's gaps as plainly as its strengths.
 
 <Aside title="As of 2026-09">
 Competitor details come from the linked public pages as they read in September 2026. Products change: read their documentation before you decide, and send a correction as a pull request if something here is out of date.
@@ -23,6 +23,16 @@ Competitor details come from the linked public pages as they read in September 2
 | Every feature self-hosted without a licence key | Yes | — | — | No |
 
 A dash means the vendor's pages we checked did not settle the point either way. It is not a claim that the feature is missing.
+
+## Compare in depth
+
+<CardGrid>
+  <LinkCard title="Railhook vs Svix" href="/docs/compare/svix/" description="An MIT Svix alternative with both directions in one product." />
+  <LinkCard title="Railhook vs Hookdeck" href="/docs/compare/hookdeck/" description="Self-host the receiving side that Hookdeck runs only as SaaS." />
+  <LinkCard title="Railhook vs Convoy" href="/docs/compare/convoy/" description="Both directions, MIT instead of the Elastic License." />
+  <LinkCard title="Railhook vs Hook0" href="/docs/compare/hook0/" description="MIT instead of the SSPL, and incoming webhooks too." />
+  <LinkCard title="Open-source webhook tools compared" href="/docs/compare/open-source-webhook-tools/" description="All five self-hostable projects, licence first." />
+</CardGrid>
 
 ## Railhook
 
@@ -69,6 +79,12 @@ A dash means the vendor's pages we checked did not settle the point either way. 
 - Portal Links generate a customer-facing dashboard of an endpoint's deliveries, as a one-time link or one you embed. ([Portal Links](https://getconvoy.io/docs/product-manual/portal-links))
 
 **Choose Convoy** if you want both directions and an embeddable delivery view, and its licence terms fit.
+
+## Hook0
+
+- Hook0 is a service for sending webhooks to your customers. It is licensed under the Server Side Public License, and its hosted service runs in the EU, in France by default. ([Hook0](https://www.hook0.com/pricing))
+
+**Choose Hook0** if a hosted sending service must keep its data in the EU and its licence terms fit.
 
 ## Next steps
 

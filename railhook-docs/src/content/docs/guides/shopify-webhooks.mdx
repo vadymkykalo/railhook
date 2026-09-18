@@ -1,0 +1,118 @@
+---
+title: Receive Shopify webhooks reliably
+description: Keep Shopify from removing your webhook subscription when your app is slow or down — Railhook verifies X-Shopify-Hmac-SHA256, answers within Shopify's five seconds, and forwards with retries and replay.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This guide puts Railhook between Shopify and your app. Shopify sends its webhooks to a Railhook source, which verifies the HMAC, stores each webhook as it arrived and forwards it to your service with retries. Shopify only ever talks to Railhook, which answers straight away, so a slow or failing app no longer puts the subscription at risk.
+
+## Why Shopify webhooks need a buffer
+
+Shopify expects your app to respond within five seconds. It retries a failed webhook up to eight times over four hours, and if failures continue, the subscription is removed. ([Shopify: Troubleshooting webhooks](https://shopify.dev/docs/apps/build/webhooks/troubleshooting-webhooks)) Shopify also tells you to deduplicate deliveries by `X-Shopify-Webhook-Id`. ([Shopify: Deliver webhooks through HTTPS](https://shopify.dev/docs/apps/build/webhooks/subscribe/https))
+
+Four hours is a short window for a bad deploy, and five seconds is a tight budget for an order handler. With Railhook in front:
+
+- Shopify is answered as soon as the webhook is stored, well inside the five seconds.
+- Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed Forwards**.
+- A second delivery with the same `X-Shopify-Webhook-Id` is answered with the stored copy and not forwarded again.
+- Any stored webhook can be replayed for as long as events are kept, long after Shopify's four hours.
+
+## Connect Shopify
+
+You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Create the source** with your app's client secret. Shopify computes `X-Shopify-Hmac-SHA256` with it, so it is the secret Railhook verifies against:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Shopify","providerType":"SHOPIFY","verificationMode":"PROVIDER","hmacSecret":"'"$SHOPIFY_CLIENT_SECRET"'"}'
+   ```
+
+   Keep the `id` and the `ingressUrl` from the response.
+
+2. **Add a destination**, the URL of your own service:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/shopify","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+3. **Subscribe in `shopify.app.toml`**, with the `ingressUrl` as the `uri`:
+
+   ```toml title="shopify.app.toml"
+   [webhooks]
+   api_version = "2026-07"
+
+   [[webhooks.subscriptions]]
+   topics = ["orders/create"]
+   uri = "https://railhook.io/ingress/<token>"
+   ```
+
+   Deploy it with `shopify app deploy`. While `shopify app dev` runs, a saved change applies to your development store straight away.
+
+4. **Send a test:**
+
+   ```bash
+   shopify app webhook trigger --api-version=2026-07 --topic=orders/create --address="$INGRESS_URL"
+   ```
+
+   It appears under **Incoming → Received**, with one forward per destination.
+
+</Steps>
+
+## How the signature is checked
+
+Railhook computes the HMAC-SHA256 of the raw body with the client secret, base64-encodes it and compares it with `X-Shopify-Hmac-SHA256`. A request that does not match is answered `401` and not stored. A signature already seen within the replay window, 5 minutes by default, is refused too, unless the request is a resend of a webhook Railhook already stored.
+
+## What your service receives
+
+The body exactly as Shopify sent it, byte for byte. Railhook passes Shopify's event headers through: `X-Shopify-Topic`, `X-Shopify-Webhook-Id`, `X-Shopify-Shop-Domain`, `X-Shopify-API-Version`, `X-Shopify-Event-Id` and `X-Shopify-Triggered-At`. `X-Shopify-Hmac-SHA256` is not forwarded: your service authenticates Railhook through the destination's credentials, and does not need the client secret. See [Destinations](/docs/incoming/destinations/#what-the-destination-receives).
+
+## Develop locally with the CLI
+
+<Steps>
+
+1. Install the CLI and log in, as in [CLI](/docs/tools/cli/), then open a tunnel to your app's port:
+
+   ```bash
+   railhook listen 3000
+   ```
+
+2. Add a second destination to the source with the printed public URL and your route appended, such as `https://<host>/tunnel/<slug>/webhooks/shopify`. It reaches `http://localhost:3000/webhooks/shopify`.
+
+3. Trigger a test webhook, or create an order in your development store, and it arrives in your local app with its `X-Shopify-Topic` header. Disable that destination when you stop the tunnel.
+
+</Steps>
+
+## Replay after an outage
+
+Replay what arrived while your service was down. Each replayed webhook goes to every destination of the source as a new forward:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
+```
+
+Replay reaches back as far as events are kept: 7 days on Railhook Cloud, and whatever you configure when self-hosting. Keep your handler idempotent on `X-Shopify-Webhook-Id`, since a replay can send webhooks your service already processed. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
+  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Credentials, retries and transformations per destination." />
+  <LinkCard title="Transformations" href="/docs/outgoing/transformations/" description="Reshape a forwarded body before your service sees it." />
+</CardGrid>

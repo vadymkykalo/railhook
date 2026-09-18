@@ -1,0 +1,118 @@
+---
+title: Надійне приймання вебхуків Shopify
+description: Не дайте Shopify видалити підписку на вебхук, коли застосунок повільний чи недоступний — Railhook перевіряє X-Shopify-Hmac-SHA256, відповідає в межах п'яти секунд Shopify і пересилає з повторами та повтором подій.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Цей гайд ставить Railhook між Shopify і вашим застосунком. Shopify надсилає вебхуки на джерело Railhook, яке перевіряє HMAC, зберігає кожен вебхук у тому вигляді, в якому він надійшов, і пересилає на ваш сервіс із повторами. Shopify спілкується лише з Railhook, який відповідає одразу, тож повільний чи збійний застосунок більше не ставить підписку під загрозу.
+
+## Чому вебхукам Shopify потрібен буфер
+
+Shopify очікує відповіді застосунку протягом п'яти секунд. Невдалий вебхук він повторює до восьми разів за чотири години, а якщо невдачі тривають, підписку видаляють. ([Shopify: Troubleshooting webhooks](https://shopify.dev/docs/apps/build/webhooks/troubleshooting-webhooks)) Також Shopify радить дедуплікувати доставки за `X-Shopify-Webhook-Id`. ([Shopify: Deliver webhooks through HTTPS](https://shopify.dev/docs/apps/build/webhooks/subscribe/https))
+
+Чотири години — коротке вікно для невдалого деплою, а п'ять секунд — тісний бюджет для обробника замовлень. З Railhook попереду:
+
+- Shopify отримує відповідь, щойно вебхук збережено, з великим запасом до п'яти секунд.
+- Ваш сервіс отримує до 5 спроб на кожне пересилання, з очікуваннями від 1 хвилини до 1 години, а те, що все одно не вдалося, потрапляє в **«Невдалі пересилання»**.
+- На другу доставку з тим самим `X-Shopify-Webhook-Id` відповідають збереженою копією, і її не пересилають удруге.
+- Будь-який збережений вебхук можна відтворити, доки зберігаються події, — значно пізніше за чотири години Shopify.
+
+## Підключення Shopify
+
+Знадобляться проєкт Railhook і API-ключ. Усе нижче також можна зробити в розділі **Вхідні** панелі керування.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Створіть джерело** з client secret вашого застосунку. Shopify обчислює `X-Shopify-Hmac-SHA256` саме з ним, тож із ним Railhook і звіряє підпис:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Shopify","providerType":"SHOPIFY","verificationMode":"PROVIDER","hmacSecret":"'"$SHOPIFY_CLIENT_SECRET"'"}'
+   ```
+
+   Збережіть `id` і `ingressUrl` із відповіді.
+
+2. **Додайте призначення** — адресу вашого сервісу:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/shopify","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+3. **Підпишіться в `shopify.app.toml`**, вказавши `ingressUrl` як `uri`:
+
+   ```toml title="shopify.app.toml"
+   [webhooks]
+   api_version = "2026-07"
+
+   [[webhooks.subscriptions]]
+   topics = ["orders/create"]
+   uri = "https://railhook.io/ingress/<token>"
+   ```
+
+   Розгорніть це командою `shopify app deploy`. Поки працює `shopify app dev`, збережена зміна одразу застосовується до вашого магазину для розробки.
+
+4. **Надішліть тест:**
+
+   ```bash
+   shopify app webhook trigger --api-version=2026-07 --topic=orders/create --address="$INGRESS_URL"
+   ```
+
+   Він з'явиться в розділі **Вхідні → Отримані**, з одним пересиланням на кожне призначення.
+
+</Steps>
+
+## Як перевіряється підпис
+
+Railhook обчислює HMAC-SHA256 від сирого тіла з client secret, кодує його в base64 і порівнює з `X-Shopify-Hmac-SHA256`. Запит, що не збігається, отримує `401` і не зберігається. Підпис, уже побачений у межах вікна повторів (типово 5 хвилин), теж відхиляється, якщо тільки запит не є повторним надсиланням уже збереженого в Railhook вебхука.
+
+## Що отримує ваш сервіс
+
+Тіло точно таке, яким його надіслав Shopify, байт у байт. Railhook передає далі заголовки подій Shopify: `X-Shopify-Topic`, `X-Shopify-Webhook-Id`, `X-Shopify-Shop-Domain`, `X-Shopify-API-Version`, `X-Shopify-Event-Id` і `X-Shopify-Triggered-At`. `X-Shopify-Hmac-SHA256` не пересилається: ваш сервіс автентифікує Railhook за обліковими даними призначення, і client secret йому не потрібен. Див. [Призначення](/docs/uk/incoming/destinations/#що-отримує-призначення).
+
+## Локальна розробка з CLI
+
+<Steps>
+
+1. Встановіть CLI й увійдіть, як описано в [CLI](/docs/uk/tools/cli/), а потім відкрийте тунель до порту вашого застосунку:
+
+   ```bash
+   railhook listen 3000
+   ```
+
+2. Додайте джерелу друге призначення з виведеною публічною адресою й вашим маршрутом у кінці, наприклад `https://<host>/tunnel/<slug>/webhooks/shopify`. Запит потрапить на `http://localhost:3000/webhooks/shopify`.
+
+3. Надішліть тестовий вебхук або створіть замовлення в магазині для розробки, і він надійде у ваш локальний застосунок із заголовком `X-Shopify-Topic`. Вимкніть це призначення, коли закриєте тунель.
+
+</Steps>
+
+## Повтор подій після збою
+
+Відтворіть те, що надійшло, поки ваш сервіс лежав. Кожен відтворений вебхук іде на кожне призначення джерела як нове пересилання:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
+```
+
+Повтор сягає так далеко, як довго зберігаються події: 7 днів у Railhook Cloud і скільки налаштуєте на власному сервері. Тримайте обробник ідемпотентним за `X-Shopify-Webhook-Id`, бо повтор може надіслати вебхуки, які ваш сервіс уже обробив. Див. [Повтор](/docs/uk/outgoing/replay/#повтор-вхідних-вебхуків).
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Перевірка вхідних вебхуків" href="/docs/uk/incoming/verification/" description="Схема підпису кожного провайдера й захист від повторного використання." />
+  <LinkCard title="Призначення" href="/docs/uk/incoming/destinations/" description="Облікові дані, повтори й трансформації для кожного призначення." />
+  <LinkCard title="Трансформації" href="/docs/uk/outgoing/transformations/" description="Змініть форму тіла, перш ніж його побачить ваш сервіс." />
+</CardGrid>
