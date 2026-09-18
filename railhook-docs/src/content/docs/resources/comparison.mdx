@@ -18,7 +18,7 @@ Competitor details come from the linked public pages as they read in September 2
 | Sends webhooks to your customers | Yes | Yes | Yes (Outpost) | Yes |
 | Receives webhooks from providers | Yes | Yes (Svix Ingest) | Yes (Event Gateway) | Yes |
 | Delivers to queues and cloud services, not only HTTP | No | — | Yes (Outpost) | — |
-| Customer-facing portal | No | App Portal, in the hosted version only | User portal (Outpost) | Portal Links |
+| Customer-facing portal | Yes, embeddable and self-hosted | App Portal, in the hosted version only | User portal (Outpost) | Portal Links |
 | OpenTelemetry | No | Yes (server) | Yes (Outpost) | — |
 | Every feature self-hosted without a licence key | Yes | — | — | No |
 
@@ -44,10 +44,11 @@ A dash means the vendor's pages we checked did not settle the point either way. 
 - **Replay creates new deliveries** from stored events (Time Machine in the dashboard) instead of re-sending the original.
 - **A built-in request bin and a localhost tunnel** in the CLI.
 - **A workflow builder** that goes beyond single-step transformations.
+- **An embeddable customer portal**, self-hosted like everything else: your own users register endpoints, choose event types, see their deliveries and retry failed ones. Sessions are short-lived and can be pinned to the origin that embeds them. See [Customer portal](/docs/outgoing/customer-portal/).
 
 ### What Railhook does not have
 
-- **No customer-facing portal.** You manage your customers' endpoints on their behalf. A shareable debug link covers one event; there is nothing embeddable. This is the largest gap, and it is first on the roadmap.
+- **A young customer portal.** Theming is a brand colour, a logo, light or dark and the language; there is no custom CSS, no custom domain for the portal, and no view of the event catalog's schemas.
 - **HTTP delivery only.** No SQS, S3, EventBridge, Pub/Sub, RabbitMQ or Kafka destinations.
 - **No SSO (SAML or OIDC) and no SCIM.**
 - **No OpenTelemetry.** Prometheus metrics are thorough; there are no traces.

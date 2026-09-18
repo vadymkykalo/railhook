@@ -39,6 +39,11 @@ from .types import (
     IncomingEventListParams,
     IncomingForwardAttempt,
     ReplayEventResponse,
+    Consumer,
+    ConsumerCreateParams,
+    ConsumerUpdateParams,
+    PortalSession,
+    PortalSessionCreateParams,
 )
 
 __version__ = "2.20.13"
@@ -84,4 +89,9 @@ __all__ = [
     "IncomingEventListParams",
     "IncomingForwardAttempt",
     "ReplayEventResponse",
+    "Consumer",
+    "ConsumerCreateParams",
+    "ConsumerUpdateParams",
+    "PortalSession",
+    "PortalSessionCreateParams",
 ]

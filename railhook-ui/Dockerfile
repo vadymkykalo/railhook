@@ -84,6 +84,7 @@ COPY railhook-cli/install.sh /usr/share/nginx/html/install-cli.sh
 # Copy nginx config
 COPY railhook-ui/nginx.conf /etc/nginx/conf.d/default.conf
 COPY railhook-ui/nginx-security-headers.conf /etc/nginx/snippets/security-headers.conf
+COPY railhook-ui/nginx-security-headers-common.conf /etc/nginx/snippets/security-headers-common.conf
 
 # Runs before nginx starts — the base image's entrypoint executes
 # /docker-entrypoint.d/*.sh in order. Fills in the resolver address from

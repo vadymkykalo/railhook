@@ -9,8 +9,9 @@ tree to audit. `npm ls --prod` on this package prints nothing.
 ## Scope
 
 This SDK covers the **send + verify** surface of the API: Events, Endpoints,
-Subscriptions, Deliveries, Incoming Sources, Incoming Events, and webhook
-signature verification — 7 of the platform's 35 API controllers. It
+Subscriptions, Deliveries, Consumers and their portal sessions, Incoming
+Sources, Incoming Events, and webhook signature verification — 8 of the
+platform's API controllers. It
 does **not** wrap Transformations, Rules, Workflows, Schemas, DLQ, Analytics,
 Usage, Alerts, Incidents, PII rules, Audit Log, Tunnels, API keys, Members,
 or Projects. Those are dashboard/API-only today; use the [Generic
@@ -136,6 +137,44 @@ for (const attempt of attempts) {
 
 // Replay failed delivery
 await client.deliveries.replay(deliveryId);
+```
+
+### Consumers and the customer portal
+
+A Consumer is one of your own users. Register their endpoints under it, then
+open a portal session so they can manage those endpoints and see their
+deliveries themselves, in a page you embed in your product.
+
+```typescript
+// Register one of your users, by your own id for them
+const consumer = await client.consumers.create(projectId, {
+  externalId: 'user_42',
+  name: 'Acme Ltd',
+});
+
+// Find them again later by that id
+const page = await client.consumers.list(projectId, { externalId: 'user_42' });
+
+// Give them an endpoint (it then shows up in their portal)
+await client.endpoints.create(projectId, {
+  url: 'https://acme.example.com/webhooks',
+  consumerId: consumer.id,
+});
+const endpoints = await client.consumers.listEndpoints(projectId, consumer.id);
+
+// Open the portal for them: put session.url in an iframe's src.
+// The token inside it is shown once; only its hash is stored.
+const session = await client.portalSessions.create(projectId, consumer.id, {
+  ttlMinutes: 60,
+  allowedOrigin: 'https://app.example.com',
+});
+
+// End every open session (for example after a suspected leak)
+await client.portalSessions.revoke(projectId, consumer.id);
+
+// Update, or delete — which also deletes their endpoints and ends their sessions
+await client.consumers.update(projectId, consumer.id, { externalId: 'user_42', name: 'Acme Inc' });
+await client.consumers.delete(projectId, consumer.id);
 ```
 
 ## Incoming Webhooks

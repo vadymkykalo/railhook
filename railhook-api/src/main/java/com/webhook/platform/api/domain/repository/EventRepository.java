@@ -23,6 +23,11 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
 
     long countByCreatedAtGreaterThanEqual(Instant since);
 
+    /** The distinct event types a project has sent since {@code since}: the portal's picker. */
+    @Query("SELECT DISTINCT e.eventType FROM Event e WHERE e.projectId = :projectId AND e.createdAt >= :since")
+    List<String> findRecentEventTypes(@Param("projectId") UUID projectId, @Param("since") Instant since,
+                                      Pageable pageable);
+
     /** {@code [organizationId, count]} over a half-open window, for every organization in scope. */
     @Query("SELECT e.organizationId, COUNT(e) FROM Event e "
             + "WHERE e.createdAt >= :from AND e.createdAt < :to GROUP BY e.organizationId")

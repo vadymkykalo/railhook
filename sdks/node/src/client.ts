@@ -27,6 +27,12 @@ import {
   IncomingEventListParams,
   IncomingForwardAttempt,
   ReplayEventResponse,
+  Consumer,
+  ConsumerCreateParams,
+  ConsumerUpdateParams,
+  ConsumerListParams,
+  PortalSession,
+  PortalSessionCreateParams,
 } from './types';
 import {
   RailhookError,
@@ -51,6 +57,8 @@ export class Railhook {
   public readonly deliveries: Deliveries;
   public readonly incomingSources: IncomingSources;
   public readonly incomingEvents: IncomingEvents;
+  public readonly consumers: Consumers;
+  public readonly portalSessions: PortalSessions;
 
   constructor(config: RailhookConfig) {
     if (!config.apiKey) {
@@ -67,6 +75,8 @@ export class Railhook {
     this.deliveries = new Deliveries(this);
     this.incomingSources = new IncomingSources(this);
     this.incomingEvents = new IncomingEvents(this);
+    this.consumers = new Consumers(this);
+    this.portalSessions = new PortalSessions(this);
   }
 
   async request<T>(
@@ -533,6 +543,93 @@ class IncomingEvents {
     return this.client.request<ReplayEventResponse>(
       'POST',
       `/api/v1/projects/${projectId}/incoming-events/${eventId}/replay`
+    );
+  }
+}
+
+class Consumers {
+  constructor(private client: Railhook) {}
+
+  async create(projectId: string, params: ConsumerCreateParams): Promise<Consumer> {
+    return this.client.request<Consumer>(
+      'POST',
+      `/api/v1/projects/${projectId}/consumers`,
+      params
+    );
+  }
+
+  async get(projectId: string, consumerId: string): Promise<Consumer> {
+    return this.client.request<Consumer>(
+      'GET',
+      `/api/v1/projects/${projectId}/consumers/${consumerId}`
+    );
+  }
+
+  /** Lists a project's Consumers; `externalId` finds the one you know by your own id. */
+  async list(
+    projectId: string,
+    params: ConsumerListParams = {}
+  ): Promise<PaginatedResponse<Consumer>> {
+    const query = new URLSearchParams();
+    if (params.externalId) query.set('externalId', params.externalId);
+    if (params.page !== undefined) query.set('page', params.page.toString());
+    if (params.size !== undefined) query.set('size', params.size.toString());
+
+    const queryString = query.toString();
+    const path = `/api/v1/projects/${projectId}/consumers${queryString ? `?${queryString}` : ''}`;
+
+    return this.client.request<PaginatedResponse<Consumer>>('GET', path);
+  }
+
+  async update(
+    projectId: string,
+    consumerId: string,
+    params: ConsumerUpdateParams
+  ): Promise<Consumer> {
+    return this.client.request<Consumer>(
+      'PUT',
+      `/api/v1/projects/${projectId}/consumers/${consumerId}`,
+      params
+    );
+  }
+
+  /** Deletes the Consumer, deletes its endpoints and ends its portal sessions. */
+  async delete(projectId: string, consumerId: string): Promise<void> {
+    return this.client.request<void>(
+      'DELETE',
+      `/api/v1/projects/${projectId}/consumers/${consumerId}`
+    );
+  }
+
+  async listEndpoints(projectId: string, consumerId: string): Promise<Endpoint[]> {
+    return this.client.request<Endpoint[]>(
+      'GET',
+      `/api/v1/projects/${projectId}/consumers/${consumerId}/endpoints`
+    );
+  }
+}
+
+class PortalSessions {
+  constructor(private client: Railhook) {}
+
+  /** Opens the customer portal for one Consumer. Hand `url` to their browser. */
+  async create(
+    projectId: string,
+    consumerId: string,
+    params: PortalSessionCreateParams = {}
+  ): Promise<PortalSession> {
+    return this.client.request<PortalSession>(
+      'POST',
+      `/api/v1/projects/${projectId}/consumers/${consumerId}/portal-sessions`,
+      params
+    );
+  }
+
+  /** Ends every open portal session of the Consumer. */
+  async revoke(projectId: string, consumerId: string): Promise<void> {
+    return this.client.request<void>(
+      'DELETE',
+      `/api/v1/projects/${projectId}/consumers/${consumerId}/portal-sessions`
     );
   }
 }

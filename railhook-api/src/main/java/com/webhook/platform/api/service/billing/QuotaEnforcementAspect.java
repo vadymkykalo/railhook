@@ -7,6 +7,7 @@ import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
+import com.webhook.platform.api.security.PortalSessionAuthenticationToken;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
@@ -149,6 +150,9 @@ public class QuotaEnforcementAspect {
         if (authentication instanceof JwtAuthenticationToken jwt) {
             return jwt.getOrganizationId();
         }
+        if (authentication instanceof PortalSessionAuthenticationToken portal) {
+            return portal.getOrganizationId();
+        }
         if (authentication instanceof ApiKeyAuthenticationToken apiKey && apiKey.getProjectId() != null) {
             return projectRepository.findById(apiKey.getProjectId())
                     .map(Project::getOrganizationId)
@@ -196,6 +200,11 @@ public class QuotaEnforcementAspect {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication instanceof ApiKeyAuthenticationToken apiKey) {
             return apiKey.getProjectId();
+        }
+        // An endpoint a Consumer registers from the portal is one of the session's project's,
+        // and counts against that project's limit like any other.
+        if (authentication instanceof PortalSessionAuthenticationToken portal) {
+            return portal.getProjectId();
         }
 
         return null;

@@ -26,7 +26,11 @@ export default function App() {
   useEffect(() => {
     const storedUser = localStorage.getItem('auth_user');
     
-    if (storedUser) {
+    // The customer portal is not a dashboard page and runs for someone who is not a Railhook
+    // user, often inside another site. Restoring a dashboard session there would present this
+    // browser's refresh cookie for nothing — and, where the cookie is not sent to a framed page,
+    // fail and sign the dashboard out in the tab next to it.
+    if (storedUser && !window.location.pathname.startsWith('/portal')) {
       // Silent refresh from the httpOnly cookie, through the same serialized path a 401 takes, so
       // tabs restored together do not present one cookie twice.
       http.refreshSession()

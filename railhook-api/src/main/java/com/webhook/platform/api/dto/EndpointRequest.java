@@ -12,6 +12,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.validator.constraints.URL;
 
+import java.util.UUID;
+
 /**
  * What an endpoint is, on create and on update.
  *
@@ -62,4 +64,13 @@ public class EndpointRequest {
      * BOTH for a new endpoint, unchanged for an existing one.
      */
     private SignatureScheme signatureScheme;
+
+    /**
+     * The Consumer this endpoint is registered for — one of the same project's. Null leaves it
+     * alone: an endpoint moves between Consumers by naming another, and there is no empty value
+     * for an id.
+     */
+    @Schema(description = "The Consumer this endpoint belongs to, which puts it in that Consumer's portal. "
+            + "Absent leaves the current assignment alone.")
+    private UUID consumerId;
 }

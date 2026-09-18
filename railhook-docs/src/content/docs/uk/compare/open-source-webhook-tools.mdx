@@ -30,14 +30,14 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 | Приймає вебхуки від провайдерів | Так | Окремим продуктом (Ingest) | Ні | Так | — |
 | Чого немає у версії для власного сервера | Нічого | App Portal, трансформацій | — | Portal links, трансформацій на JavaScript, OpenTelemetry, RBAC | — |
 | Доставляє в черги й шини подій | Ні | — | Так | — | — |
-| Портал для клієнтів | Ні | Лише в хмарі | Так | Платні редакції | — |
+| Портал для клієнтів | Так | Лише в хмарі | Так | Платні редакції | — |
 | OpenTelemetry | Ні | Так | Так | Платні редакції | — |
 
 Прочерк означає, що перевірені сторінки не дають однозначної відповіді. Це не твердження, що функції немає.
 
 ## Кожен одним рядком
 
-- **Railhook** — обидва напрямки в одному продукті під MIT, усі функції на власному сервері без ліцензійного ключа, тунель до localhost у CLI. Немає порталу для клієнтів, доставка лише через HTTP, немає OpenTelemetry. [Railhook поряд з іншими](/docs/uk/resources/comparison/).
+- **Railhook** — обидва напрямки в одному продукті під MIT, усі функції на власному сервері без ліцензійного ключа, тунель до localhost у CLI, вбудовуваний портал для клієнтів. Доставка лише через HTTP, немає OpenTelemetry. [Railhook поряд з іншими](/docs/uk/resources/comparison/).
 - **Svix** — зріла платформа надсилання з SDK для 9 мов, Terraform-провайдером і SOC 2 та HIPAA для хмарного сервісу; відкритий сервер не містить App Portal і трансформацій. [Railhook проти Svix](/docs/uk/compare/svix/).
 - **Hookdeck Outpost** — лише надсилання, і саме його варто обрати, коли приймачі ваших клієнтів — SQS, Kafka, EventBridge, Pub/Sub чи RabbitMQ. Шлюз приймання Hookdeck — окремий SaaS із закритим кодом. [Railhook проти Hookdeck](/docs/uk/compare/hookdeck/).
 - **Convoy** — обидва напрямки під source-available ліцензією, з portal links, трансформаціями на JavaScript, OpenTelemetry і RBAC у платних редакціях. [Railhook проти Convoy](/docs/uk/compare/convoy/).

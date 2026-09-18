@@ -26,6 +26,11 @@ from .types import (
     IncomingEventListParams,
     IncomingForwardAttempt,
     ReplayEventResponse,
+    Consumer,
+    ConsumerCreateParams,
+    ConsumerUpdateParams,
+    PortalSession,
+    PortalSessionCreateParams,
 )
 from .errors import (
     RailhookError,
@@ -62,6 +67,8 @@ class Railhook:
         self.deliveries = Deliveries(self)
         self.incoming_sources = IncomingSources(self)
         self.incoming_events = IncomingEventsApi(self)
+        self.consumers = Consumers(self)
+        self.portal_sessions = PortalSessions(self)
 
     def get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Any:
         """Generic GET request. Use for endpoints not yet covered by the SDK."""
@@ -546,3 +553,99 @@ class IncomingEventsApi:
             f"/api/v1/projects/{project_id}/incoming-events/{event_id}/replay",
         )
         return ReplayEventResponse.from_dict(data)
+
+
+class Consumers:
+    """Consumers API: your own users, and the endpoints registered for them."""
+
+    def __init__(self, client: Railhook) -> None:
+        self._client = client
+
+    def create(self, project_id: str, params: ConsumerCreateParams) -> Consumer:
+        """Register one of your users, by your own id for them."""
+        data = self._client._request(
+            "POST",
+            f"/api/v1/projects/{project_id}/consumers",
+            body=params.to_dict(),
+        )
+        return Consumer.from_dict(data)
+
+    def get(self, project_id: str, consumer_id: str) -> Consumer:
+        """Get consumer by ID."""
+        data = self._client._request(
+            "GET",
+            f"/api/v1/projects/{project_id}/consumers/{consumer_id}",
+        )
+        return Consumer.from_dict(data)
+
+    def list(
+        self,
+        project_id: str,
+        external_id: Optional[str] = None,
+        page: int = 0,
+        size: int = 20,
+    ) -> PaginatedResponse:
+        """List a project's consumers; ``external_id`` finds the one you know by your own id."""
+        params: Dict[str, Any] = {"page": page, "size": size}
+        if external_id is not None:
+            params["externalId"] = external_id
+        data = self._client._request(
+            "GET",
+            f"/api/v1/projects/{project_id}/consumers",
+            params=params,
+        )
+        return PaginatedResponse.from_dict(data, Consumer)
+
+    def update(
+        self, project_id: str, consumer_id: str, params: ConsumerUpdateParams
+    ) -> Consumer:
+        """Update consumer."""
+        data = self._client._request(
+            "PUT",
+            f"/api/v1/projects/{project_id}/consumers/{consumer_id}",
+            body=params.to_dict(),
+        )
+        return Consumer.from_dict(data)
+
+    def delete(self, project_id: str, consumer_id: str) -> None:
+        """Delete the consumer, delete its endpoints and end its portal sessions."""
+        self._client._request(
+            "DELETE",
+            f"/api/v1/projects/{project_id}/consumers/{consumer_id}",
+        )
+
+    def list_endpoints(self, project_id: str, consumer_id: str) -> List[Endpoint]:
+        """The endpoints registered for this consumer."""
+        data = self._client._request(
+            "GET",
+            f"/api/v1/projects/{project_id}/consumers/{consumer_id}/endpoints",
+        )
+        return [Endpoint.from_dict(e) for e in data]
+
+
+class PortalSessions:
+    """Portal sessions API: open the customer portal for one of your consumers."""
+
+    def __init__(self, client: Railhook) -> None:
+        self._client = client
+
+    def create(
+        self,
+        project_id: str,
+        consumer_id: str,
+        params: Optional[PortalSessionCreateParams] = None,
+    ) -> PortalSession:
+        """Open a portal session. Hand ``url`` to the consumer's browser."""
+        data = self._client._request(
+            "POST",
+            f"/api/v1/projects/{project_id}/consumers/{consumer_id}/portal-sessions",
+            body=(params or PortalSessionCreateParams()).to_dict(),
+        )
+        return PortalSession.from_dict(data)
+
+    def revoke(self, project_id: str, consumer_id: str) -> None:
+        """End every open portal session of the consumer."""
+        self._client._request(
+            "DELETE",
+            f"/api/v1/projects/{project_id}/consumers/{consumer_id}/portal-sessions",
+        )

@@ -26,6 +26,7 @@ public class RedisRateLimiterService {
     private static final String KEY_PREFIX = "rate_limiter:project:";
     private static final String SOURCE_KEY_PREFIX = "rate_limiter:source:";
     private static final String ORGANIZATION_KEY_PREFIX = "rate_limiter:org:";
+    private static final String PORTAL_SESSION_KEY_PREFIX = "rate_limiter:portal_session:";
     private static final Duration KEY_TTL = Duration.ofHours(24);
 
     private static final Duration SLUG_KEY_TTL = Duration.ofMinutes(10);
@@ -153,6 +154,15 @@ public class RedisRateLimiterService {
      */
     public boolean tryAcquireForOrganization(UUID organizationId, int ratePerSecond) {
         return doTryAcquire(ORGANIZATION_KEY_PREFIX + organizationId, organizationId, ratePerSecond);
+    }
+
+    /**
+     * One portal session's share of the portal API. A session is a credential held by a browser
+     * that belongs to the customer's user, not to the customer, so it gets a budget of its own
+     * rather than drawing on the organization's. Fail-open, like the organization limiter.
+     */
+    public boolean tryAcquireForPortalSession(UUID sessionId, int ratePerSecond) {
+        return doTryAcquire(PORTAL_SESSION_KEY_PREFIX + sessionId, sessionId, ratePerSecond);
     }
 
     /**

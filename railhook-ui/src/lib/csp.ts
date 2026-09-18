@@ -82,7 +82,9 @@ export function initCSP() {
     `script-src ${scriptSources.join(' ')}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob:",
+    // The portal shows a logo from wherever the customer hosts it (portalParams.ts accepts
+    // https only). Nothing else loads a foreign image, so only that page is widened.
+    window.location.pathname === '/portal' ? "img-src 'self' data: blob: https:" : "img-src 'self' data: blob:",
     `connect-src ${[...connectSources].join(' ')}`,
     frameSources.length ? `frame-src ${frameSources.join(' ')}` : "frame-src 'none'",
     "object-src 'none'",

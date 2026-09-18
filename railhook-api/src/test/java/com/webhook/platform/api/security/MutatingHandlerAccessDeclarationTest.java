@@ -112,6 +112,16 @@ class MutatingHandlerAccessDeclarationTest {
             "PlatformAdminOrganizationController.suspend",
             "PlatformAdminOrganizationController.reinstate",
 
+            // The customer portal: authenticated by a portal session, which holds no membership
+            // role at all — SecurityConfig admits only PORTAL_SESSION on /api/v1/portal/**, and
+            // PortalService confines every row to the session's Consumer. The session is the whole
+            // of the caller's authority, so there is no level to require.
+            "PortalController.portalCreateEndpoint",
+            "PortalController.portalUpdateEndpoint",
+            "PortalController.portalDeleteEndpoint",
+            "PortalController.portalRotateEndpointSecret",
+            "PortalController.portalRetryDelivery",
+
             // The API key IS the intended caller, and what it may do is decided by its scope:
             // these carry @RequireScope instead. See MutatingHandlerScopeDeclarationTest.
             "EventController.ingestEvent",

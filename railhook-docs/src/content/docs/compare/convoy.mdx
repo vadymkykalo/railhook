@@ -19,7 +19,7 @@ Convoy details come from [getconvoy.io/pricing](https://www.getconvoy.io/pricing
 | Receiving webhooks from providers | Yes | Yes |
 | Every feature self-hosted without a licence key | Yes | No |
 | Self-hosted paid edition | None | Yes |
-| Customer-facing portal | No | Portal links, in paid editions |
+| Customer-facing portal | Yes, embeddable, in the free build | Portal links, in paid editions |
 | Transformations | Yes, in every build | JavaScript transformations, in paid editions |
 | OpenTelemetry | No | In paid editions |
 | Role-based access control | Three fixed roles, in every build | In paid editions |
@@ -28,14 +28,13 @@ A dash means Convoy's pages we checked did not settle the point. It is not a cla
 
 ## When Convoy is the better choice
 
-- **Your customers need to see their own deliveries.** Convoy's portal links give a customer a view of an endpoint's deliveries. Railhook has no customer-facing portal yet.
 - **You want traces, and a paid edition is fine.** Convoy offers OpenTelemetry. Railhook exposes Prometheus metrics and no traces.
 - **You need finer-grained access control.** Railhook has three fixed roles and two API key scopes, with no custom roles.
 
 ## When Railhook is the better choice
 
 - **The licence matters to you.** The Elastic License 2.0 is source-available, not an open-source licence approved by the OSI, and it restricts offering the software as a managed service. Railhook is MIT: you can run it, change it and ship it inside your own product.
-- **You want the whole product without paying for a key.** Convoy puts portal links, JavaScript transformations, OpenTelemetry and RBAC in paid editions. Railhook has no licence key and no paid self-hosted edition: transformations, workflows, per-endpoint ordering, replay, PII masking and roles are all in the free build.
+- **You want the whole product without paying for a key.** Convoy puts portal links, JavaScript transformations, OpenTelemetry and RBAC in paid editions. Railhook has no licence key and no paid self-hosted edition: the embeddable [customer portal](/docs/outgoing/customer-portal/), transformations, workflows, per-endpoint ordering, replay, PII masking and roles are all in the free build.
 - **You receive webhooks from well-known providers.** Railhook verifies Stripe, GitHub, GitLab, Shopify, Slack and Twilio signatures itself. See [Verification](/docs/incoming/verification/).
 - **You want to develop locally against real webhooks.** `railhook listen 3000` tunnels a public URL to your machine. See [CLI](/docs/tools/cli/).
 

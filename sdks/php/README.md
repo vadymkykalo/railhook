@@ -8,8 +8,9 @@ Official PHP SDK for [Railhook](https://github.com/vadymkykalo/railhook).
 > this one.
 
 **Scope.** This SDK covers Events, Endpoints, Subscriptions, Deliveries,
-Incoming Sources, Incoming Events, and webhook signature verification —
-7 of the platform's 35 API controllers. It does not wrap
+Consumers and their portal sessions, Incoming Sources, Incoming Events, and
+webhook signature verification — 8 of the platform's API controllers. It
+does not wrap
 Transformations, Rules, Workflows, Schemas, DLQ, Analytics, Usage, Alerts,
 Incidents, PII rules, Audit Log, Tunnels, API keys, Members, or Projects —
 use the [Generic Requests](#generic-requests) helpers for those until the
@@ -144,6 +145,44 @@ foreach ($attempts as $attempt) {
 
 // Replay failed delivery
 $client->deliveries->replay($deliveryId);
+```
+
+### Consumers and the customer portal
+
+A Consumer is one of your own users. Register their endpoints under it, then
+open a portal session so they can manage those endpoints and see their
+deliveries themselves, in a page you embed in your product.
+
+```php
+// Register one of your users, by your own id for them
+$consumer = $client->consumers->create($projectId, [
+    'externalId' => 'user_42',
+    'name' => 'Acme Ltd',
+]);
+
+// Find them again later by that id
+$page = $client->consumers->list($projectId, ['externalId' => 'user_42']);
+
+// Give them an endpoint (it then shows up in their portal)
+$client->endpoints->create($projectId, [
+    'url' => 'https://acme.example.com/webhooks',
+    'consumerId' => $consumer['id'],
+]);
+$endpoints = $client->consumers->listEndpoints($projectId, $consumer['id']);
+
+// Open the portal for them: put $session['url'] in an iframe's src.
+// The token inside it is shown once; only its hash is stored.
+$session = $client->portalSessions->create($projectId, $consumer['id'], [
+    'ttlMinutes' => 60,
+    'allowedOrigin' => 'https://app.example.com',
+]);
+
+// End every open session (for example after a suspected leak)
+$client->portalSessions->revoke($projectId, $consumer['id']);
+
+// Update, or delete — which also deletes their endpoints and ends their sessions
+$client->consumers->update($projectId, $consumer['id'], ['externalId' => 'user_42', 'name' => 'Acme Inc']);
+$client->consumers->delete($projectId, $consumer['id']);
 ```
 
 ## Incoming Webhooks

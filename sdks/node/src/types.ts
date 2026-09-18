@@ -24,6 +24,8 @@ export interface EventResponse {
 export interface Endpoint {
   id: string;
   projectId: string;
+  /** The Consumer this endpoint belongs to, or absent when it is your own. */
+  consumerId?: string;
   url: string;
   description?: string;
   secret?: string;
@@ -48,6 +50,8 @@ export interface EndpointCreateParams {
   rateLimitPerSecond?: number;
   /** Comma-separated CIDRs the endpoint is allowed to be reached from. */
   allowedSourceIps?: string;
+  /** Registers the endpoint for one of your Consumers, which puts it in their portal. */
+  consumerId?: string;
 }
 
 export interface EndpointUpdateParams {
@@ -57,6 +61,8 @@ export interface EndpointUpdateParams {
   enabled?: boolean;
   rateLimitPerSecond?: number;
   allowedSourceIps?: string;
+  /** Moves the endpoint to another Consumer of the same project. Omit to leave it alone. */
+  consumerId?: string;
 }
 
 export interface Subscription {
@@ -324,4 +330,54 @@ export interface ReplayEventResponse {
   status: string;
   eventId: string;
   destinationsCount: number;
+}
+
+/** One of your own users, grouping the endpoints registered for them. */
+export interface Consumer {
+  id: string;
+  projectId: string;
+  /** Your own identifier for the user, unique within the project. */
+  externalId: string;
+  name: string;
+  /** Live endpoints registered for this Consumer. */
+  endpointCount: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ConsumerCreateParams {
+  externalId: string;
+  /** Shown at the top of the portal. Defaults to externalId. */
+  name?: string;
+}
+
+export interface ConsumerUpdateParams {
+  externalId: string;
+  /** Omit to leave the name unchanged. */
+  name?: string;
+}
+
+export interface ConsumerListParams {
+  /** Narrows the list to the Consumer with this external id. */
+  externalId?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface PortalSessionCreateParams {
+  /** Minutes the session lasts, 1–1440. Defaults to 60. */
+  ttlMinutes?: number;
+  /** The https origin of the page that embeds the portal, e.g. https://app.example.com. */
+  allowedOrigin?: string;
+}
+
+/** A new portal session. `token` is returned here and never again. */
+export interface PortalSession {
+  id: string;
+  consumerId: string;
+  /** The portal, ready to open or to use as an iframe's src. */
+  url: string;
+  token: string;
+  allowedOrigin?: string | null;
+  expiresAt: string;
 }

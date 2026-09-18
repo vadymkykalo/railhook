@@ -468,6 +468,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/consumers/{consumerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get consumer */
+        get: operations["getConsumer"];
+        /** Update consumer */
+        put: operations["updateConsumer"];
+        post?: never;
+        /**
+         * Delete consumer
+         * @description Deletes the consumer, deletes its endpoints and ends its portal sessions
+         */
+        delete: operations["deleteConsumer"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/alerts/rules/{ruleId}": {
         parameters: {
             query?: never;
@@ -487,6 +509,28 @@ export interface paths {
          * @description Removes the rule. The alerts it has already fired stay in the history.
          */
         delete: operations["deleteAlertRule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/endpoints/{endpointId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get portal endpoint */
+        get: operations["portalGetEndpoint"];
+        /**
+         * Update portal endpoint
+         * @description Absent fields are left alone; eventTypes replaces the set
+         */
+        put: operations["portalUpdateEndpoint"];
+        post?: never;
+        /** Delete portal endpoint */
+        delete: operations["portalDeleteEndpoint"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1452,6 +1496,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/consumers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List consumers
+         * @description Returns the project's consumers; externalId narrows it to one
+         */
+        get: operations["listConsumers"];
+        put?: never;
+        /**
+         * Create consumer
+         * @description Registers one of your users, identified by your own id
+         */
+        post: operations["createConsumer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/consumers/{consumerId}/portal-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create portal session
+         * @description Opens the customer portal for this consumer. The response carries the token once; only its hash is stored.
+         */
+        post: operations["createPortalSession"];
+        /**
+         * Revoke portal sessions
+         * @description Ends every open portal session of this consumer
+         */
+        delete: operations["revokePortalSessions"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/api-keys": {
         parameters: {
             query?: never;
@@ -1554,6 +1646,70 @@ export interface paths {
          * @description Clears the whole backlog at once, for when a known outage fired many.
          */
         post: operations["resolveAll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/endpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List portal endpoints
+         * @description The consumer's own endpoints
+         */
+        get: operations["portalListEndpoints"];
+        put?: never;
+        /**
+         * Create portal endpoint
+         * @description Registers an endpoint for the consumer. The signing secret is in this response only.
+         */
+        post: operations["portalCreateEndpoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/endpoints/{endpointId}/rotate-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate portal endpoint secret
+         * @description A new signing secret, shown in this response only. The old one keeps verifying for 24 hours.
+         */
+        post: operations["portalRotateEndpointSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/deliveries/{deliveryId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry portal delivery
+         * @description Puts a failed delivery back on its retry ladder for another attempt
+         */
+        post: operations["portalRetryDelivery"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2906,6 +3062,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/consumers/{consumerId}/endpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List consumer endpoints
+         * @description The endpoints registered for this consumer
+         */
+        get: operations["listConsumerEndpoints"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/alerts/events": {
         parameters: {
             query?: never;
@@ -2938,6 +3114,66 @@ export interface paths {
          * @description How many fired alerts nobody has resolved — for a badge, not a report.
          */
         get: operations["countUnresolved"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get portal session
+         * @description The consumer and project this session is for, and the event types it can subscribe to
+         */
+        get: operations["portalGetSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List portal deliveries
+         * @description Deliveries to the consumer's endpoints, newest first
+         */
+        get: operations["portalListDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/deliveries/{deliveryId}/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List portal delivery attempts
+         * @description Every attempt at one delivery, with request and response
+         */
+        get: operations["portalListDeliveryAttempts"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4076,12 +4312,19 @@ export interface components {
             allowedSourceIps?: string;
             /** @enum {string} */
             signatureScheme?: "LEGACY" | "STANDARD" | "BOTH";
+            /**
+             * Format: uuid
+             * @description The Consumer this endpoint belongs to, which puts it in that Consumer's portal. Absent leaves the current assignment alone.
+             */
+            consumerId?: string;
         };
         EndpointResponse: {
             /** Format: uuid */
             id?: string;
             /** Format: uuid */
             projectId?: string;
+            /** Format: uuid */
+            consumerId?: string;
             url?: string;
             description?: string;
             enabled?: boolean;
@@ -4103,6 +4346,26 @@ export interface components {
             /** @enum {string} */
             signatureScheme?: "LEGACY" | "STANDARD" | "BOTH";
             standardWebhooksSecret?: string;
+        };
+        ConsumerRequest: {
+            /** @description Your own identifier for this user, unique within the project — typically the user or tenant id in your database. */
+            externalId: string;
+            /** @description Shown at the top of the portal. Absent: the externalId on create, unchanged on update. */
+            name?: string;
+        };
+        ConsumerResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            projectId?: string;
+            externalId?: string;
+            name?: string;
+            /** Format: int64 */
+            endpointCount?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         AlertRuleRequest: {
             name: string;
@@ -4155,6 +4418,29 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        PortalEndpointRequest: {
+            url: string;
+            description?: string;
+            enabled?: boolean;
+            /** @description The event types this Endpoint receives. Replaces the current set; absent leaves it alone. Wildcards: order.* (one segment), order.** and ** (everything). */
+            eventTypes?: string[];
+        };
+        PortalEndpointResponse: {
+            /** Format: uuid */
+            id?: string;
+            url?: string;
+            description?: string;
+            enabled?: boolean;
+            eventTypes?: string[];
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            /** @description The signing secret: present only in the response that created or rotated it. */
+            secret?: string;
+            /** @description The same secret as a Standard Webhooks library expects it (whsec_…); present only with secret. */
+            standardWebhooksSecret?: string;
         };
         UpdateOrganizationRequest: {
             name: string;
@@ -4665,6 +4951,31 @@ export interface components {
         };
         DlqRetryRequest: {
             deliveryIds: string[];
+        };
+        PortalSessionRequest: {
+            /**
+             * Format: int32
+             * @description How long the session lasts, in minutes. Defaults to 60.
+             */
+            ttlMinutes?: number;
+            /**
+             * @description The origin of the page that embeds the portal, e.g. https://app.example.com. When set, the portal refuses to render inside any other page.
+             * @example https://app.example.com
+             */
+            allowedOrigin?: string;
+        };
+        PortalSessionResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            consumerId?: string;
+            /** @description The portal, ready to open or to put in an iframe's src. The token travels in the fragment, which a browser never sends to a server. */
+            url?: string;
+            /** @description The bearer token for /api/v1/portal/**. Shown once; only its hash is stored. */
+            token?: string;
+            allowedOrigin?: string;
+            /** Format: date-time */
+            expiresAt?: string;
         };
         ApiKeyRequest: {
             name: string;
@@ -5473,6 +5784,24 @@ export interface components {
             last?: boolean;
             empty?: boolean;
         };
+        PageConsumerResponse: {
+            /** Format: int32 */
+            totalPages?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["ConsumerResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"];
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            numberOfElements?: number;
+            first?: boolean;
+            last?: boolean;
+            empty?: boolean;
+        };
         PageApiKeyResponse: {
             /** Format: int32 */
             totalPages?: number;
@@ -5529,6 +5858,78 @@ export interface components {
             first?: boolean;
             last?: boolean;
             empty?: boolean;
+        };
+        PortalSessionInfoResponse: {
+            consumerName?: string;
+            projectName?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            /** @description The origin the portal may be embedded in, or null for any. */
+            allowedOrigin?: string;
+            /** @description Event types an Endpoint can subscribe to: the project's event catalog when it has one, otherwise the types it has sent recently. */
+            eventTypes?: string[];
+        };
+        PagePortalDeliveryResponse: {
+            /** Format: int32 */
+            totalPages?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["PortalDeliveryResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"];
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            numberOfElements?: number;
+            first?: boolean;
+            last?: boolean;
+            empty?: boolean;
+        };
+        PortalDeliveryResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            eventId?: string;
+            eventType?: string;
+            /** Format: uuid */
+            endpointId?: string;
+            /** @enum {string} */
+            status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
+            /** Format: int32 */
+            attemptCount?: number;
+            /** Format: int32 */
+            maxAttempts?: number;
+            /** Format: date-time */
+            nextRetryAt?: string;
+            /** Format: date-time */
+            lastAttemptAt?: string;
+            /** Format: date-time */
+            succeededAt?: string;
+            /** Format: date-time */
+            failedAt?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        DeliveryAttemptResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            deliveryId?: string;
+            /** Format: int32 */
+            attemptNumber?: number;
+            requestHeaders?: string;
+            requestBody?: string;
+            /** Format: int32 */
+            httpStatusCode?: number;
+            responseHeaders?: string;
+            responseBody?: string;
+            errorMessage?: string;
+            /** Format: int32 */
+            durationMs?: number;
+            /** Format: date-time */
+            createdAt?: string;
         };
         ApiKeyData: {
             /** Format: uuid */
@@ -5692,25 +6093,6 @@ export interface components {
             first?: boolean;
             last?: boolean;
             empty?: boolean;
-        };
-        DeliveryAttemptResponse: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            deliveryId?: string;
-            /** Format: int32 */
-            attemptNumber?: number;
-            requestHeaders?: string;
-            requestBody?: string;
-            /** Format: int32 */
-            httpStatusCode?: number;
-            responseHeaders?: string;
-            responseBody?: string;
-            errorMessage?: string;
-            /** Format: int32 */
-            durationMs?: number;
-            /** Format: date-time */
-            createdAt?: string;
         };
         DashboardStatsResponse: {
             deliveryStats?: components["schemas"]["DeliveryStats"];
@@ -7738,6 +8120,77 @@ export interface operations {
             };
         };
     };
+    getConsumer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                consumerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ConsumerResponse"];
+                };
+            };
+        };
+    };
+    updateConsumer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                consumerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsumerRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ConsumerResponse"];
+                };
+            };
+        };
+    };
+    deleteConsumer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                consumerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Consumer deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     updateAlertRule: {
         parameters: {
             query?: never;
@@ -7778,6 +8231,74 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Rule deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    portalGetEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpointId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalEndpointResponse"];
+                };
+            };
+        };
+    };
+    portalUpdateEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpointId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalEndpointRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalEndpointResponse"];
+                };
+            };
+        };
+    };
+    portalDeleteEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpointId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Endpoint deleted */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -9472,6 +9993,120 @@ export interface operations {
             };
         };
     };
+    listConsumers: {
+        parameters: {
+            query?: {
+                /** @description Your own id for the user */
+                externalId?: string;
+                /** @description Zero-based page index (0..N) */
+                page?: number;
+                /** @description The size of the page to be returned */
+                size?: number;
+                /** @description Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+                sort?: string[];
+            };
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageConsumerResponse"];
+                };
+            };
+        };
+    };
+    createConsumer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsumerRequest"];
+            };
+        };
+        responses: {
+            /** @description Consumer created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ConsumerResponse"];
+                };
+            };
+            /** @description A consumer with this externalId already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ConsumerResponse"];
+                };
+            };
+        };
+    };
+    createPortalSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                consumerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PortalSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Session created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalSessionResponse"];
+                };
+            };
+        };
+    };
+    revokePortalSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                consumerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sessions revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listApiKeys: {
         parameters: {
             query?: {
@@ -9644,6 +10279,108 @@ export interface operations {
                         [key: string]: number;
                     };
                 };
+            };
+        };
+    };
+    portalListEndpoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalEndpointResponse"][];
+                };
+            };
+        };
+    };
+    portalCreateEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalEndpointRequest"];
+            };
+        };
+        responses: {
+            /** @description Endpoint created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalEndpointResponse"];
+                };
+            };
+            /** @description The project has reached its plan's endpoint limit */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalEndpointResponse"];
+                };
+            };
+        };
+    };
+    portalRotateEndpointSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpointId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalEndpointResponse"];
+                };
+            };
+        };
+    };
+    portalRetryDelivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Retry scheduled */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description An attempt at this delivery is under way */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -11743,6 +12480,29 @@ export interface operations {
             };
         };
     };
+    listConsumerEndpoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                consumerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EndpointResponse"][];
+                };
+            };
+        };
+    };
     listAlertEvents: {
         parameters: {
             query?: {
@@ -11788,6 +12548,77 @@ export interface operations {
                     "*/*": {
                         [key: string]: number;
                     };
+                };
+            };
+        };
+    };
+    portalGetSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalSessionInfoResponse"];
+                };
+            };
+        };
+    };
+    portalListDeliveries: {
+        parameters: {
+            query?: {
+                endpointId?: string;
+                status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
+                /** @description Zero-based page index (0..N) */
+                page?: number;
+                /** @description The size of the page to be returned */
+                size?: number;
+                /** @description Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+                sort?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagePortalDeliveryResponse"];
+                };
+            };
+        };
+    };
+    portalListDeliveryAttempts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DeliveryAttemptResponse"][];
                 };
             };
         };

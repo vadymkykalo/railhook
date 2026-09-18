@@ -10,8 +10,9 @@ pip install railhook
 > package is not updated any further; install `railhook` and change the import.
 
 **Scope.** This SDK covers Events, Endpoints, Subscriptions, Deliveries,
-Incoming Sources, Incoming Events, and webhook signature verification —
-7 of the platform's 35 API controllers. It does not wrap
+Consumers and their portal sessions, Incoming Sources, Incoming Events, and
+webhook signature verification — 8 of the platform's API controllers. It
+does not wrap
 Transformations, Rules, Workflows, Schemas, DLQ, Analytics, Usage, Alerts,
 Incidents, PII rules, Audit Log, Tunnels, API keys, Members, or Projects —
 use the [Generic Requests](#generic-requests) helpers for those until the
@@ -155,6 +156,52 @@ for attempt in attempts:
 
 # Replay failed delivery
 client.deliveries.replay(delivery_id)
+```
+
+### Consumers and the customer portal
+
+A Consumer is one of your own users. Register their endpoints under it, then
+open a portal session so they can manage those endpoints and see their
+deliveries themselves, in a page you embed in your product.
+
+```python
+from railhook import (
+    ConsumerCreateParams,
+    ConsumerUpdateParams,
+    EndpointCreateParams,
+    PortalSessionCreateParams,
+)
+
+# Register one of your users, by your own id for them
+consumer = client.consumers.create(
+    project_id,
+    ConsumerCreateParams(external_id="user_42", name="Acme Ltd"),
+)
+
+# Find them again later by that id
+page = client.consumers.list(project_id, external_id="user_42")
+
+# Give them an endpoint (it then shows up in their portal)
+client.endpoints.create(
+    project_id,
+    EndpointCreateParams(url="https://acme.example.com/webhooks", consumer_id=consumer.id),
+)
+endpoints = client.consumers.list_endpoints(project_id, consumer.id)
+
+# Open the portal for them: put session.url in an iframe's src.
+# The token inside it is shown once; only its hash is stored.
+session = client.portal_sessions.create(
+    project_id,
+    consumer.id,
+    PortalSessionCreateParams(ttl_minutes=60, allowed_origin="https://app.example.com"),
+)
+
+# End every open session (for example after a suspected leak)
+client.portal_sessions.revoke(project_id, consumer.id)
+
+# Update, or delete — which also deletes their endpoints and ends their sessions
+client.consumers.update(project_id, consumer.id, ConsumerUpdateParams(external_id="user_42", name="Acme Inc"))
+client.consumers.delete(project_id, consumer.id)
 ```
 
 ## Incoming Webhooks

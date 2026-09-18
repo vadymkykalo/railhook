@@ -7,6 +7,8 @@ import com.webhook.platform.api.security.PlatformAdminAuthenticationToken;
 import com.webhook.platform.api.audit.AuditLogAspect;
 import com.webhook.platform.api.security.JwtUtil;
 import com.webhook.platform.api.security.PlatformAdminAccessFilter;
+import com.webhook.platform.api.security.PortalSessionAuthenticationFilter;
+import com.webhook.platform.api.security.PortalSessionAuthenticationToken;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.PlatformAdminAccessService;
@@ -33,6 +35,7 @@ public class SecurityConfig {
         private final JwtAuthenticationFilter jwtAuthenticationFilter;
         private final PlatformAdminAuthenticationFilter platformAdminAuthenticationFilter;
         private final PlatformAdminAccessFilter platformAdminAccessFilter;
+        private final PortalSessionAuthenticationFilter portalSessionAuthenticationFilter;
         private final TenantContextFilter tenantContextFilter = new TenantContextFilter();
         private final CorsConfigurationSource corsConfigurationSource;
         private final boolean swaggerEnabled;
@@ -42,6 +45,7 @@ public class SecurityConfig {
                         ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
                         JwtAuthenticationFilter jwtAuthenticationFilter,
                         PlatformAdminAuthenticationFilter platformAdminAuthenticationFilter,
+                        PortalSessionAuthenticationFilter portalSessionAuthenticationFilter,
                         PlatformAdminAccessService platformAdminAccessService,
                         JwtUtil jwtUtil,
                         AuthRateLimiterService authRateLimiterService,
@@ -53,6 +57,7 @@ public class SecurityConfig {
                 this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
                 this.jwtAuthenticationFilter = jwtAuthenticationFilter;
                 this.platformAdminAuthenticationFilter = platformAdminAuthenticationFilter;
+                this.portalSessionAuthenticationFilter = portalSessionAuthenticationFilter;
                 this.platformAdminAccessFilter = new PlatformAdminAccessFilter(platformAdminAccessService, jwtUtil,
                                 authRateLimiterService, auditLogAspect, trustedProxyResolver);
                 this.corsConfigurationSource = corsConfigurationSource;
@@ -120,6 +125,12 @@ public class SecurityConfig {
                                                         .requestMatchers("/tunnel/**").permitAll()
                                                         .requestMatchers("/ws/tunnel").permitAll()
                                                         .requestMatchers("/api/v1/public/**").permitAll()
+                                                        // The customer portal: a portal session and
+                                                        // nothing else. A JWT or an API key here is
+                                                        // a 403, and a portal token anywhere else is
+                                                        // anonymous — its filter never looks at it.
+                                                        .requestMatchers("/api/v1/portal/**")
+                                                                        .hasAuthority(PortalSessionAuthenticationToken.AUTHORITY)
                                                         .requestMatchers("/api/v1/billing/plans").permitAll()
                                                         .requestMatchers("/api/v1/billing/webhook/**").permitAll()
                                                         // Re-encrypting every tenant's secrets: the operator
@@ -182,6 +193,8 @@ public class SecurityConfig {
                                 .addFilterBefore(apiKeyAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class)
                                 .addFilterBefore(platformAdminAuthenticationFilter,
+                                                UsernamePasswordAuthenticationFilter.class)
+                                .addFilterBefore(portalSessionAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class)
                                 // After both identities are known: it may turn a JWT into the
                                 // platform-admin authority, and it must see the operator token too

@@ -90,6 +90,14 @@ export type IncomingBulkReplayRequestConforms = Assert<Conforms<'IncomingBulkRep
 export type IncomingBulkReplayResponseConforms = Assert<Conforms<'IncomingBulkReplayResponse', Mirror.IncomingBulkReplayResponse>>;
 export type TransformationRequestConforms = Assert<Conforms<'TransformationRequest', Mirror.TransformationRequest>>;
 export type TransformationResponseConforms = Assert<Conforms<'TransformationResponse', Mirror.TransformationResponse>>;
+export type ConsumerRequestConforms = Assert<Conforms<'ConsumerRequest', Mirror.ConsumerRequest>>;
+export type ConsumerResponseConforms = Assert<Conforms<'ConsumerResponse', Mirror.ConsumerResponse>>;
+export type PortalSessionRequestConforms = Assert<Conforms<'PortalSessionRequest', Mirror.PortalSessionRequest>>;
+export type PortalSessionResponseConforms = Assert<Conforms<'PortalSessionResponse', Mirror.PortalSessionResponse>>;
+export type PortalSessionInfoResponseConforms = Assert<Conforms<'PortalSessionInfoResponse', Mirror.PortalSessionInfoResponse>>;
+export type PortalEndpointRequestConforms = Assert<Conforms<'PortalEndpointRequest', Mirror.PortalEndpointRequest>>;
+export type PortalEndpointResponseConforms = Assert<Conforms<'PortalEndpointResponse', Mirror.PortalEndpointResponse>>;
+export type PortalDeliveryResponseConforms = Assert<Conforms<'PortalDeliveryResponse', Mirror.PortalDeliveryResponse>>;
 
 /**
  * `PageResponse<T>` is generic; springdoc emits one concrete `PageXxx` schema per payload type.

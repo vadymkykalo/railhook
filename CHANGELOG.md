@@ -15,6 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   delivery's attempts, create endpoints and subscriptions, and replay a delivery. A `READ_ONLY`
   key gets the read tools only. `@railhook/mcp` on npm bridges it to stdio-only clients such as
   Claude Desktop. `MCP_ENABLED=false` turns it off on a self-hosted instance.
+- **Customer portal.** Group endpoints by Consumer — one of your own users, keyed by your own
+  id — and open a short-lived portal session for them from your backend. The portal embeds in
+  your product in an iframe: your users register endpoints, choose event types, see every
+  delivery with its attempts, and retry failed ones, with your brand colour, logo, theme and
+  language. A session can be pinned to the one origin allowed to embed it. SDK methods in
+  Node.js, Python and PHP.
+- **Free webhook tester** at `/tester` on the public site: a URL that records the requests sent
+  to it for a day, no account needed. Off unless `PUBLIC_TESTER_ENABLED=true`; bounded per
+  address, per URL and overall, and it asks for the registration CAPTCHA where one is set.
+- **`/pricing`** — the free cloud plan and the self-hosted promise, with an FAQ.
+- **Web analytics** — Cloudflare Web Analytics on the public pages, the dashboard and the docs
+  when `WEB_ANALYTICS_TOKEN` is set; nothing is loaded otherwise.
+- **Platform admin** — activation over the last 30 days and sign-ups and events per day.
+- **Docs** — comparisons with Svix, Hookdeck, Convoy and Hook0, and guides for receiving
+  Stripe, GitHub, GitLab, Shopify, Slack and Twilio webhooks.
 
 ## [2.20.13] - 2026-09-18
 
