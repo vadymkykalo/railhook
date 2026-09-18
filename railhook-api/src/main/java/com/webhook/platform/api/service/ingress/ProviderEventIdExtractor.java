@@ -14,15 +14,16 @@ public final class ProviderEventIdExtractor {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    // Immutable provider-native event ID headers only.
+    // Immutable provider-native event ID headers only — each one a header its provider really
+    // sends and keeps across its own retries.
     // NOT included: X-Request-Id (proxy/LB header, not provider event ID),
     // X-Slack-Request-Timestamp (1s granularity — collisions cause false dedup).
+    // Stripe has no such header: its event id is in the body (see extractStripeEventId).
     private static final List<String> PROVIDER_EVENT_ID_HEADERS = List.of(
             "X-Webhook-Id",              // Generic
-            "Stripe-Webhook-Id",         // Stripe
             "X-GitHub-Delivery",         // GitHub
             "X-Shopify-Webhook-Id",      // Shopify
-            "X-Twilio-Webhook-Id"        // Twilio
+            "I-Twilio-Idempotency-Token" // Twilio
     );
 
     // GitLab's per-delivery id, newest name first. Both carry the same value when both are sent.
@@ -37,11 +38,13 @@ public final class ProviderEventIdExtractor {
     /**
      * Extract a provider-native immutable event ID from the request.
      * <p>
-     * 1. Well-known HTTP headers (Stripe, GitHub, Shopify, Twilio, generic X-Webhook-Id).
+     * 1. Well-known HTTP headers (GitHub, Shopify, Twilio, generic X-Webhook-Id).
      * 2. GitLab: {@code webhook-id}, then {@code Idempotency-Key}, on a request carrying
      *    {@code X-Gitlab-Event}.
      * 3. Slack: extract {@code event_id} from JSON body (Slack does not send event ID in headers).
-     * 4. Returns {@code null} if no reliable event ID found — no dedup will be performed.
+     * 4. Stripe: extract the top-level {@code id} ({@code evt_...}) from the JSON body, on a
+     *    request carrying {@code Stripe-Signature}.
+     * 5. Returns {@code null} if no reliable event ID found — no dedup will be performed.
      */
     public static String extract(HttpServletRequest request, String body) {
         // 1. Check well-known provider event ID headers
@@ -72,6 +75,13 @@ public final class ProviderEventIdExtractor {
             return extractSlackEventId(body);
         }
 
+        // 4. Stripe: sends no event-id header. The event's own id is the body's top-level "id",
+        // the same on an automatic retry and a manual resend — while each of those is re-signed
+        // with a fresh timestamp, so the replay check cannot recognise it either.
+        if (request.getHeader("Stripe-Signature") != null) {
+            return extractStripeEventId(body);
+        }
+
         // No provider event ID found — return null to avoid false dedup
         return null;
     }
@@ -95,6 +105,28 @@ public final class ProviderEventIdExtractor {
             }
         } catch (Exception e) {
             log.debug("Failed to extract Slack event_id from body: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Stripe's top-level {@code id}, only when it is an event id ({@code evt_...}). Anything else
+     * in that place is not something Stripe keeps across resends, so it is no dedup key.
+     */
+    static String extractStripeEventId(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode idNode = MAPPER.readTree(body).get("id");
+            if (idNode != null && idNode.isTextual()) {
+                String id = idNode.asText().trim();
+                if (id.startsWith("evt_")) {
+                    return truncate(id, 255);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to extract Stripe event id from body: {}", e.getMessage());
         }
         return null;
     }

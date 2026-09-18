@@ -142,11 +142,11 @@ Ingress відповідає провайдерові, а не людині. К�
 | Провайдер | Ідентифікатор |
 |---|---|
 | Загальний | заголовок `X-Webhook-Id` |
-| Stripe | заголовок `Stripe-Webhook-Id` |
+| Stripe | `id` у JSON-тілі (`evt_…`), у запиті, підписаному `Stripe-Signature` |
 | GitHub | заголовок `X-GitHub-Delivery` |
 | GitLab | заголовок `webhook-id` або `Idempotency-Key` (GitLab 17.4 і новіші) |
 | Shopify | заголовок `X-Shopify-Webhook-Id` |
-| Twilio | заголовок `X-Twilio-Webhook-Id` |
+| Twilio | заголовок `I-Twilio-Idempotency-Token` |
 | Slack | `event_id` у JSON-тілі |
 
 Провайдер, який не надсилає жодного з них, не дедуплікується.

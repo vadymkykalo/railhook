@@ -615,9 +615,10 @@ class IngressServiceTest {
         });
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
         stubHttpRequest();
-        when(httpRequest.getHeader("Stripe-Webhook-Id")).thenReturn("evt_stripe_456");
+        when(httpRequest.getHeader("Stripe-Signature")).thenReturn("t=1700000000,v1=abc");
 
-        IncomingEvent result = service.receiveWebhook("validtoken", "{}".getBytes(StandardCharsets.UTF_8), httpRequest);
+        IncomingEvent result = service.receiveWebhook("validtoken",
+                "{\"id\":\"evt_stripe_456\",\"object\":\"event\"}".getBytes(StandardCharsets.UTF_8), httpRequest);
 
         assertThat(result.getProviderEventId()).isEqualTo("evt_stripe_456");
     }
