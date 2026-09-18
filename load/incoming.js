@@ -57,7 +57,8 @@ export const options = {
 
 export function setup() {
   const ctx = bootstrapProject('incoming');
-  const secret = `load-${uniqueSuffix()}`;
+  // A signing key, so it comes from a CSPRNG rather than the Math.random() uniqueSuffix() uses.
+  const secret = `load-${crypto.hexEncode(crypto.randomBytes(32))}`;
 
   const sourceRes = http.post(
     `${BASE_URL}/api/v1/projects/${ctx.projectId}/incoming-sources`,
