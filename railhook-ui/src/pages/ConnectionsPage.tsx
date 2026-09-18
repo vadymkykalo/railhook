@@ -199,6 +199,7 @@ export default function ConnectionsPage() {
     try {
       const result = await verifyEndpoint.mutateAsync(endpoint.id);
       if (result.success) showSuccess(t('endpoints.toast.verified'));
+      else if (result.reason === 'TUNNEL_OFFLINE') showError(t('endpoints.toast.verifyTunnelOffline'));
       else showError(t('endpoints.toast.verifyFailed', { message: result.message }));
     } catch (err) {
       showApiError(err, 'endpoints.toast.verifyError');

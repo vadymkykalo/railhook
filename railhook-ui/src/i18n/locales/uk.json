@@ -1409,7 +1409,8 @@
       "toggleFailed": "Не вдалося перемкнути ендпоінт",
       "verified": "Ендпоінт успішно верифіковано!",
       "verifyError": "Не вдалося верифікувати ендпоінт",
-      "verifyFailed": "Верифікація невдала: {{message}}"
+      "verifyFailed": "Верифікація невдала: {{message}}",
+      "verifyTunnelOffline": "Тунель не під'єднано. Запустіть railhook tunnel і повторіть верифікацію."
     },
     "toggle": "Перемкнути",
     "toggleDialog": {

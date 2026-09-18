@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.beans.factory.annotation.Value;
 import reactor.netty.http.client.HttpClient;
@@ -48,6 +49,14 @@ public class EndpointVerificationService {
     private final WebClient webClient;
 
     private static final int VERIFICATION_TIMEOUT_SECONDS = 10;
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    /** Why a verification failed, where the UI has something better to say than the raw error. */
+    public enum FailureReason {
+        /** The URL is a Railhook tunnel with no {@code railhook tunnel} client connected. */
+        TUNNEL_OFFLINE
+    }
 
     public EndpointVerificationService(
             EndpointRepository endpointRepository,
@@ -95,7 +104,7 @@ public class EndpointVerificationService {
         Endpoint endpoint = beginVerificationAttempt(projectId, endpointId);
 
         if (endpoint.getVerificationStatus() == VerificationStatus.VERIFIED) {
-            return new VerificationResult(true, "Already verified", endpoint);
+            return new VerificationResult(true, "Already verified", endpoint, null);
         }
 
         String token = endpoint.getVerificationToken();
@@ -117,16 +126,29 @@ public class EndpointVerificationService {
             if (verifyChallengeResponse(response, token)) {
                 log.info("Endpoint {} verified successfully", endpointId);
                 return new VerificationResult(true, "Verification successful",
-                        recordVerificationOutcome(endpointId, VerificationStatus.VERIFIED));
+                        recordVerificationOutcome(endpointId, VerificationStatus.VERIFIED), null);
             }
             log.warn("Endpoint {} verification failed - challenge not returned", endpointId);
             return new VerificationResult(false, "Challenge token not found in response",
-                    recordVerificationOutcome(endpointId, VerificationStatus.FAILED));
+                    recordVerificationOutcome(endpointId, VerificationStatus.FAILED), null);
 
+        } catch (WebClientResponseException e) {
+            // A tunnel nobody is connected to answers 503 with this body. Reported raw, it read as
+            // the server being down, when the fix is on the caller's own machine.
+            if (isOfflineTunnel(e)) {
+                log.info("Endpoint {} verification failed - tunnel not connected", endpointId);
+                return new VerificationResult(false,
+                        "The tunnel is not connected. Start it with `railhook tunnel`, then verify again.",
+                        recordVerificationOutcome(endpointId, VerificationStatus.FAILED),
+                        FailureReason.TUNNEL_OFFLINE);
+            }
+            log.error("Endpoint {} verification failed: {}", endpointId, e.getMessage());
+            return new VerificationResult(false, "Verification request failed: " + e.getMessage(),
+                    recordVerificationOutcome(endpointId, VerificationStatus.FAILED), null);
         } catch (Exception e) {
             log.error("Endpoint {} verification failed: {}", endpointId, e.getMessage());
             return new VerificationResult(false, "Verification request failed: " + e.getMessage(),
-                    recordVerificationOutcome(endpointId, VerificationStatus.FAILED));
+                    recordVerificationOutcome(endpointId, VerificationStatus.FAILED), null);
         }
     }
 
@@ -199,8 +221,7 @@ public class EndpointVerificationService {
 
         // Try JSON parse first
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode json = mapper.readTree(response);
+            JsonNode json = MAPPER.readTree(response);
             if (json.has("challenge")) {
                 return expectedToken.equals(json.get("challenge").asText());
             }
@@ -212,6 +233,18 @@ public class EndpointVerificationService {
         return expectedToken.equals(response.trim());
     }
 
-    public record VerificationResult(boolean success, String message, Endpoint endpoint) {
+    private static boolean isOfflineTunnel(WebClientResponseException e) {
+        if (e.getStatusCode().value() != 503) {
+            return false;
+        }
+        try {
+            return "tunnel_offline".equals(MAPPER.readTree(e.getResponseBodyAsString()).path("error").asText());
+        } catch (Exception notJson) {
+            return false;
+        }
+    }
+
+    /** @param reason set when the failure has a known cause the UI explains itself; null otherwise */
+    public record VerificationResult(boolean success, String message, Endpoint endpoint, FailureReason reason) {
     }
 }

@@ -1409,7 +1409,8 @@
       "toggleFailed": "Failed to toggle endpoint",
       "verified": "Endpoint verified successfully!",
       "verifyError": "Failed to verify endpoint",
-      "verifyFailed": "Verification failed: {{message}}"
+      "verifyFailed": "Verification failed: {{message}}",
+      "verifyTunnelOffline": "The tunnel isn't connected. Start it with railhook tunnel, then verify again."
     },
     "toggle": "Toggle",
     "toggleDialog": {
