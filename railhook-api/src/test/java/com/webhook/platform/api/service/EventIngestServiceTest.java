@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Event;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Subscription;
 import com.webhook.platform.api.domain.repository.*;
@@ -90,7 +91,7 @@ class EventIngestServiceTest {
                 outboxMessageRepository, workflowTriggerOutboxRepository,
                 objectMapper, new DeliveryDispatch(outboxMessageRepository, objectMapper), meterRegistry,
                 sequenceGeneratorService, new SchemaValidationGate(payloadSchemaValidator, objectMapper), projectRepository,
-                quotaCounterService,
+                quotaCounterService, entitlementService,
                 transactionManager, 262144L, 1024
         );
     }
@@ -166,6 +167,38 @@ class EventIngestServiceTest {
         assertThat(response.getEventId()).isEqualTo(eventId);
         assertThat(response.getDeliveriesCreated()).isEqualTo(0);
         verify(eventRepository, never()).saveAndFlush(any());
+    }
+
+    /**
+     * The retry of the Event that used up the month's quota is not a new Event: the client lost the
+     * first answer and is asking for it again. It was checked against the quota before the key was
+     * looked up, so it got a quota error for an Event that had been accepted.
+     */
+    @Test
+    void ingestEvent_quotaExhausted_retryWithAnAcceptedKey_returnsTheExistingEvent() {
+        when(eventRepository.findByProjectIdAndIdempotencyKey(projectId, "idem-last"))
+                .thenReturn(Optional.of(buildEvent("order.created", "idem-last")));
+        doThrow(new QuotaExceededException("events_per_month", 1000, 1000, "Free"))
+                .when(entitlementService).checkEventQuota();
+        stubTransactionTemplate();
+
+        EventIngestResponse response = service.ingestEvent(projectId, buildRequest("order.created"), "idem-last");
+
+        assertThat(response.getEventId()).isEqualTo(eventId);
+        verify(eventRepository, never()).saveAndFlush(any());
+        verify(quotaCounterService, never()).increment();
+    }
+
+    @Test
+    void ingestEvent_quotaExhausted_newEvent_isRefusedBeforeAnythingIsStored() {
+        doThrow(new QuotaExceededException("events_per_month", 1000, 1000, "Free"))
+                .when(entitlementService).checkEventQuota();
+        stubTransactionTemplate();
+
+        assertThatThrownBy(() -> service.ingestEvent(projectId, buildRequest("order.created"), "idem-new"))
+                .isInstanceOf(QuotaExceededException.class);
+        verify(eventRepository, never()).saveAndFlush(any());
+        verify(quotaCounterService, never()).increment();
     }
 
     @Test

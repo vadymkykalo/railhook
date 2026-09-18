@@ -79,7 +79,7 @@ function currentPhase(elapsedSeconds) {
 }
 
 export function sendTraffic(ctx) {
-  const seq = seqCounter++;
+  const phaseSeq = seqCounter++; const seq = __VU * 1000000 + __ITER;
   // Approximate elapsed-seconds-into-the-run from the arrival rate rather
   // than wall-clock (k6 has no clean "seconds since this scenario started"
   // accessor from inside an iteration) — good enough for a human-readable
@@ -89,7 +89,7 @@ export function sendTraffic(ctx) {
     `${BASE_URL}/api/v1/events`,
     JSON.stringify({
       type: EVENT_TYPE,
-      data: { seq, sentAtMs: Date.now(), phaseHint: currentPhase(seq / Math.max(TRAFFIC_RPS, 1)) },
+      data: { seq, sentAtMs: Date.now(), phaseHint: currentPhase(phaseSeq / Math.max(TRAFFIC_RPS, 1)) },
     }),
     {
       headers: {

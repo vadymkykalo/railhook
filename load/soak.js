@@ -52,7 +52,7 @@ export function setup() {
 }
 
 export default function (ctx) {
-  const seq = seqCounter++;
+  const seq = __VU * 1000000 + __ITER; seqCounter++;
   const res = http.post(
     `${BASE_URL}/api/v1/events`,
     JSON.stringify({ type: EVENT_TYPE, data: { seq, sentAtMs: Date.now() } }),

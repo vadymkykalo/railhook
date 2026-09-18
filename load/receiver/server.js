@@ -84,25 +84,31 @@ function handleWebhook(req, res, body) {
   // so the receiver can compute an end-to-end latency proxy and check
   // ordering without needing to know anything about the platform's internal
   // sequence numbers (see load/lib/setup.js and load/ordering.js).
-  const seq = parsed && parsed.data ? parsed.data.seq : undefined;
-  const sentAtMs = parsed && parsed.data ? parsed.data.sentAtMs : undefined;
+  const seq = parsed && parsed.data && parsed.data.seq !== undefined ? parsed.data.seq : (parsed ? parsed.seq : undefined);
+  const sentAtMs = parsed && parsed.data && parsed.data.sentAtMs !== undefined ? parsed.data.sentAtMs : (parsed ? parsed.sentAtMs : undefined);
 
-  state.received.push({
+  const entry = {
     seq,
     receivedAtMs,
     sentAtMs,
     latencyMs: typeof sentAtMs === 'number' ? receivedAtMs - sentAtMs : undefined,
     type: parsed ? parsed.type : undefined,
     deliveryAttempt: req.headers['x-webhook-attempt'] || req.headers['x-delivery-attempt'] || undefined,
-  });
+    // The status this request was answered with: a seq answered 2xx twice is a duplicate
+    // delivery, while a 503 followed by a 200 is a retry doing its job.
+    status: 200,
+  };
+  state.received.push(entry);
 
   if (state.failRemaining > 0) {
     state.failRemaining -= 1;
+    entry.status = 500;
     sendJson(res, 500, { error: 'load-receiver: forced failure (fail-next)' });
     return;
   }
 
   if (state.mode === 'down') {
+    entry.status = 503;
     sendJson(res, 503, { error: 'load-receiver: mode=down' });
     return;
   }
@@ -124,9 +130,21 @@ function summarize() {
   const latencies = state.received.map((r) => r.latencyMs).filter((l) => typeof l === 'number').sort((a, b) => a - b);
   const p99 = latencies.length ? latencies[Math.min(latencies.length - 1, Math.floor(latencies.length * 0.99))] : null;
   const p50 = latencies.length ? latencies[Math.floor(latencies.length * 0.5)] : null;
+  const okCountBySeq = new Map();
+  for (const r of state.received) {
+    if (typeof r.seq === 'number' && r.status >= 200 && r.status < 300) {
+      okCountBySeq.set(r.seq, (okCountBySeq.get(r.seq) || 0) + 1);
+    }
+  }
+  let duplicateDeliveries = 0;
+  for (const count of okCountBySeq.values()) {
+    if (count > 1) duplicateDeliveries += count - 1;
+  }
   return {
     totalReceived: state.received.length,
-    distinctSeqs: seqs.length,
+    distinctSeqs: new Set(seqs).size,
+    seqsAnsweredOk: okCountBySeq.size,
+    duplicateDeliveries,
     outOfOrderTransitions: outOfOrder,
     inOrder: outOfOrder === 0,
     latencyMsP50: p50,

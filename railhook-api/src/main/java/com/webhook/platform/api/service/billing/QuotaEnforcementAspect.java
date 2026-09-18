@@ -66,7 +66,6 @@ public class QuotaEnforcementAspect {
         QuotaType quota = requireQuota.value();
 
         switch (quota) {
-            case EVENTS_PER_MONTH -> entitlementService.checkEventQuota();
             case ENDPOINTS_PER_PROJECT -> {
                 UUID projectId = extractProjectId(joinPoint);
                 if (projectId == null) {

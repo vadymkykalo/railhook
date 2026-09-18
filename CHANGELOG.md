@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.10] - 2026-09-18
+
+### Fixed
+
+- **Test events reach pattern subscriptions.** Sending a test event from the Test Console matched
+  subscriptions by exact event type and skipped the rules, so an `order.*` subscription got no
+  delivery from a test `order.completed` while the same event sent through the API was delivered.
+  A test event now goes to the deliveries a real one would: pattern subscriptions, rules and the
+  fan-out limit included.
+- **Retrying an accepted event with its `Idempotency-Key` returns that event once the monthly
+  quota is used up.** The quota was checked before the key was looked up, so a client that lost the
+  response to the event which used the month's last slot, and retried it, got `402` for an event
+  already accepted. A new event over the quota is still refused.
+
 ## [2.20.9] - 2026-09-17
 
 ### Security

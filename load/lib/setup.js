@@ -22,10 +22,34 @@ function assertOk(res, label, expectedStatus) {
  * more realistic than trying to share state across runs), creates a project
  * and a READ_WRITE API key scoped to it.
  *
- * Returns { accessToken, orgId, projectId, apiKey }.
+ * With ACCESS_TOKEN and PROJECT_ID set, uses that existing account and project
+ * instead: a deployment with a registration captcha (any production one) cannot
+ * be registered against from a script.
+ *
+ * Returns { accessToken, authHeaders, projectId, apiKey }.
  */
 export function bootstrapProject(namePrefix) {
   const suffix = uniqueSuffix();
+
+  if (__ENV.ACCESS_TOKEN && __ENV.PROJECT_ID) {
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${__ENV.ACCESS_TOKEN}`,
+    };
+    const keyRes = http.post(
+      `${BASE_URL}/api/v1/projects/${__ENV.PROJECT_ID}/api-keys`,
+      JSON.stringify({ name: `load-${namePrefix}-${suffix}`.slice(0, 100), scope: 'READ_WRITE' }),
+      { headers: authHeaders }
+    );
+    const apiKey = assertOk(keyRes, 'create api key', 201);
+    return {
+      accessToken: __ENV.ACCESS_TOKEN,
+      authHeaders,
+      projectId: __ENV.PROJECT_ID,
+      apiKey: apiKey.key,
+    };
+  }
+
   const email = `${namePrefix}-${suffix}@load-test.invalid`;
 
   const registerRes = http.post(

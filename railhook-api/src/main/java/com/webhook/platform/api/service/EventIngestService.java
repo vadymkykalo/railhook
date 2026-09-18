@@ -7,6 +7,7 @@ import com.webhook.platform.api.domain.enums.IdempotencyPolicy;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
+import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.billing.QuotaCounterService;
 import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
 import com.webhook.platform.common.util.PayloadCompressionUtil;
@@ -48,6 +49,7 @@ public class EventIngestService {
     private final SchemaValidationGate schemaValidationGate;
     private final ProjectRepository projectRepository;
     private final QuotaCounterService quotaCounterService;
+    private final EntitlementService entitlementService;
     private final TransactionTemplate transactionTemplate;
     private final long maxPayloadSizeBytes;
     private final int compressionThresholdBytes;
@@ -65,6 +67,7 @@ public class EventIngestService {
             SchemaValidationGate schemaValidationGate,
             ProjectRepository projectRepository,
             QuotaCounterService quotaCounterService,
+            EntitlementService entitlementService,
             PlatformTransactionManager transactionManager,
             @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes,
             @Value("${webhook.payload-compression-threshold-bytes:1024}") int compressionThresholdBytes) {
@@ -92,6 +95,7 @@ public class EventIngestService {
         this.schemaValidationGate = schemaValidationGate;
         this.projectRepository = projectRepository;
         this.quotaCounterService = quotaCounterService;
+        this.entitlementService = entitlementService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
         this.compressionThresholdBytes = compressionThresholdBytes;
@@ -206,6 +210,12 @@ public class EventIngestService {
                 return buildResponse(event, 0);
             }
         }
+
+        // After the key lookup, as IngressService orders it: the retry of an Event already accepted
+        // stores and charges nothing, so the quota has nothing to refuse. Checked before it, the
+        // client that lost the answer to the Event which took the month's last slot was told it
+        // was over quota for an Event it had.
+        entitlementService.checkEventQuota();
 
         List<String> schemaWarnings = schemaValidationGate.check(project, projectId, request.getType(), request.getData());
 

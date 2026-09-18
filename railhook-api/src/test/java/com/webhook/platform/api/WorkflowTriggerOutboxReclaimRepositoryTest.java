@@ -16,6 +16,7 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -40,7 +41,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>The method's own javadoc says the threshold has to exceed the longest legitimate run.
  * {@code created_at} does not measure the run.
+ *
+ * <p>The application's own poller runs {@code claimBatch} every two seconds against the same table,
+ * and when it landed between a test's insert and the test's own claim it took the row first — the
+ * test's claim came back empty. Stretched to an hour, it runs once, as the context starts, on an
+ * empty table.
  */
+@TestPropertySource(properties = "workflow.trigger-outbox.poll-interval-ms=3600000")
 class WorkflowTriggerOutboxReclaimRepositoryTest extends AbstractIntegrationTest {
 
     @Autowired
