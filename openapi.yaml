@@ -8968,6 +8968,10 @@ components:
           type: string
         status:
           type: string
+        reason:
+          type: string
+          enum:
+          - TUNNEL_OFFLINE
     EndpointTestResponse:
       type: object
       properties:

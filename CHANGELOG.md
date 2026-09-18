@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.11] - 2026-09-18
+
+### Fixed
+
+- **Verifying an endpoint behind a tunnel that isn't running says so.** The error read
+  `503 Service Unavailable from POST https://…/tunnel/…`; it now says the tunnel isn't connected
+  and to start `railhook tunnel`. The verify response carries `reason: TUNNEL_OFFLINE` for API
+  clients.
+
 ## [2.20.10] - 2026-09-18
 
 ### Fixed

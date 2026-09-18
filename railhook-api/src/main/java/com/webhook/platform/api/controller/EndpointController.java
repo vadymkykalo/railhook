@@ -201,7 +201,8 @@ public class EndpointController {
         return ResponseEntity.ok(new VerificationResponse(
                 result.success(),
                 result.message(),
-                result.endpoint().getVerificationStatus().name()
+                result.endpoint().getVerificationStatus().name(),
+                result.reason()
         ));
     }
 
@@ -224,6 +225,8 @@ public class EndpointController {
         return ResponseEntity.ok(endpointService.getEndpoint(projectId, id));
     }
 
-    public record VerificationResponse(boolean success, String message, String status) {}
+    /** @param reason a failure the UI explains in its own words; absent for any other outcome */
+    public record VerificationResponse(boolean success, String message, String status,
+            EndpointVerificationService.FailureReason reason) {}
     public record SkipVerificationRequest(String reason) {}
 }

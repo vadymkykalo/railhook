@@ -71,4 +71,6 @@ export interface VerificationResponse {
   success: boolean;
   message: string;
   status: 'PENDING' | 'VERIFIED' | 'FAILED' | 'SKIPPED';
+  /** Set when the failure has a known cause the UI explains itself. */
+  reason?: 'TUNNEL_OFFLINE';
 }

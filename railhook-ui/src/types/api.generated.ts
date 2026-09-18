@@ -4555,6 +4555,8 @@ export interface components {
             success?: boolean;
             message?: string;
             status?: string;
+            /** @enum {string} */
+            reason?: "TUNNEL_OFFLINE";
         };
         EndpointTestResponse: {
             success?: boolean;
