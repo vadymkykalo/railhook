@@ -67,8 +67,11 @@ public class WorkflowTriggerOutboxService {
         this.projectConcurrency = new ProjectConcurrencyLimiter(maxConcurrentPerProject);
     }
 
+    // The first poll waits one interval too: with no initial delay it fired as the context came
+    // up, on whatever the scheduler thread got to first — including a row a test had just written.
     @SystemTenant
-    @Scheduled(fixedDelayString = "${workflow.trigger-outbox.poll-interval-ms:2000}")
+    @Scheduled(fixedDelayString = "${workflow.trigger-outbox.poll-interval-ms:2000}",
+            initialDelayString = "${workflow.trigger-outbox.poll-interval-ms:2000}")
     @SchedulerLock(name = "workflowTriggerOutboxPoll", lockAtMostFor = "PT30S", lockAtLeastFor = "PT1S")
     public void poll() {
         List<WorkflowTriggerOutbox> batch = outboxRepository.claimBatch(batchSize, maxPerProject);
@@ -173,7 +176,8 @@ public class WorkflowTriggerOutboxService {
      * well past that and still short enough that a lost trigger recovers the same hour.</p>
      */
     @SystemTenant
-    @Scheduled(fixedDelayString = "${workflow.trigger-outbox.stalled-sweep-ms:300000}")
+    @Scheduled(fixedDelayString = "${workflow.trigger-outbox.stalled-sweep-ms:300000}",
+            initialDelayString = "${workflow.trigger-outbox.stalled-sweep-ms:300000}")
     @SchedulerLock(name = "workflowTriggerOutboxStalledSweep", lockAtMostFor = "PT2M")
     @Transactional
     public void reclaimStalledRows() {

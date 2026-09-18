@@ -44,10 +44,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>The application's own poller runs {@code claimBatch} every two seconds against the same table,
  * and when it landed between a test's insert and the test's own claim it took the row first — the
- * test's claim came back empty. Stretched to an hour, it runs once, as the context starts, on an
- * empty table.
+ * test's claim came back empty. Both schedules wait one interval before their first run, so
+ * stretched to an hour neither runs while these tests do. (With no initial delay the first poll
+ * fired as the context came up and could still land inside the first test.)
  */
-@TestPropertySource(properties = "workflow.trigger-outbox.poll-interval-ms=3600000")
+@TestPropertySource(properties = {
+        "workflow.trigger-outbox.poll-interval-ms=3600000",
+        "workflow.trigger-outbox.stalled-sweep-ms=3600000"
+})
 class WorkflowTriggerOutboxReclaimRepositoryTest extends AbstractIntegrationTest {
 
     @Autowired
