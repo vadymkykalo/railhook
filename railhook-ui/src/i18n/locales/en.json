@@ -4439,7 +4439,8 @@
         "captcha": "The check did not pass. Try again.",
         "tooMany": "Too many messages in a minute. Wait a moment and send again.",
         "invalid": "Check the email address and the message.",
-        "generic": "The message was not sent. Try again, or write to support by email."
+        "generic": "The message was not sent. Try again, or write to support by email.",
+        "busy": "We have had a lot of messages today. Please write to us by email instead."
       }
     }
   },

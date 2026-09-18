@@ -1,5 +1,6 @@
 package com.webhook.platform.api;
 
+import com.webhook.platform.api.service.ContactMessageBudget;
 import com.webhook.platform.api.service.EmailService;
 import com.webhook.platform.api.service.captcha.CaptchaVerifier;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,9 @@ public class PublicContactIntegrationTest extends AbstractIntegrationTest {
     @MockitoBean
     private EmailService emailService;
 
+    @MockitoBean
+    private ContactMessageBudget contactMessageBudget;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -49,6 +53,7 @@ public class PublicContactIntegrationTest extends AbstractIntegrationTest {
         when(captchaVerifier.verify(any(), anyString())).thenReturn(true);
         when(authRateLimiterService.allowContactMessage(anyString())).thenReturn(true);
         when(emailService.isContactAvailable()).thenReturn(true);
+        when(contactMessageBudget.tryAcquire()).thenReturn(true);
     }
 
     private static MockHttpServletRequestBuilder send(String body) {
@@ -118,6 +123,26 @@ public class PublicContactIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("rate_limit_exceeded"));
 
         verify(emailService, never()).sendContactMessage(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    public void pastTheDailyCeilingNothingIsSent() throws Exception {
+        when(contactMessageBudget.tryAcquire()).thenReturn(false);
+
+        mockMvc.perform(send(VALID))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.error").value("contact_busy"));
+
+        verify(emailService, never()).sendContactMessage(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    public void aFailedChallengeSpendsNoneOfTheDailyCeiling() throws Exception {
+        when(captchaVerifier.verify(any(), anyString())).thenReturn(false);
+
+        mockMvc.perform(send(VALID)).andExpect(status().isBadRequest());
+
+        verify(contactMessageBudget, never()).tryAcquire();
     }
 
     @Test

@@ -683,7 +683,7 @@ export interface paths {
         put?: never;
         /**
          * Write to support
-         * @description Sends the message to this deployment's support address, with the given email as the Reply-To. Two messages a minute per address.
+         * @description Sends the message to this deployment's support address, with the given email as the Reply-To. Two messages a minute per address, and a daily ceiling across all senders.
          */
         post: operations["sendContactMessage"];
         delete?: never;
@@ -8804,7 +8804,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Too many messages from this address */
+            /** @description Too many messages from this address, or the form's daily ceiling is reached */
             429: {
                 headers: {
                     [name: string]: unknown;

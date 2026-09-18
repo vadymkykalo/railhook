@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The contact form answers at once: the mail to support is sent in the background.
+- **The contact form has a daily ceiling across all senders**, `CONTACT_DAILY_LIMIT` (30 by
+  default), so a flood from many addresses cannot spend the mail quota that verification and
+  password-reset mails need. Onboarding nudges go at most ten an hour for the same reason.
 
 ## [2.22.0] - 2026-09-18
 

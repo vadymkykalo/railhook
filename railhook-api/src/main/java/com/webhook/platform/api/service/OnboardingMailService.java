@@ -35,11 +35,15 @@ public class OnboardingMailService {
     /** How long after the welcome an account that has done nothing is asked whether it is stuck. */
     static final Duration NUDGE_AFTER = Duration.ofHours(48);
 
-    /** Accounts taken per query, so one run never holds an unbounded list. */
-    static final int BATCH_SIZE = 100;
+    /**
+     * Accounts taken per query, so one run never holds an unbounded list. Small on purpose: the
+     * nudges share the mail provider's daily quota with verification and password-reset mails, and
+     * a nudge that waits an hour loses nothing.
+     */
+    static final int BATCH_SIZE = 10;
 
-    /** Batches per run; whatever is left waits for the next run. */
-    static final int MAX_BATCHES = 20;
+    /** Batches per run; whatever is left waits for the next run. At most ten nudges an hour. */
+    static final int MAX_BATCHES = 1;
 
     private final UserRepository userRepository;
     private final EmailService emailService;
