@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.21.0] - 2026-09-18
 
 ### Added
 
@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   delivery's attempts, create endpoints and subscriptions, and replay a delivery. A `READ_ONLY`
   key gets the read tools only. `@railhook/mcp` on npm bridges it to stdio-only clients such as
   Claude Desktop. `MCP_ENABLED=false` turns it off on a self-hosted instance.
+- **claude.ai and ChatGPT connect to the MCP server by signing in.** OAuth 2.1 with PKCE, dynamic
+  client registration and protected-resource metadata: add `https://<your host>/mcp` as a custom
+  connector, sign in, pick a project and read-only or read-write. Connected apps are listed next
+  to API keys and can be disconnected there. `MCP_OAUTH_ENABLED=false` turns it off.
 - **Customer portal.** Group endpoints by Consumer — one of your own users, keyed by your own
   id — and open a short-lived portal session for them from your backend. The portal embeds in
   your product in an iframe: your users register endpoints, choose event types, see every
