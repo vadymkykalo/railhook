@@ -153,6 +153,7 @@ export function Footer() {
             <PageLink href="/docs/start/quickstart/">{t('footer.quickstart')}</PageLink>
             <PageLink href="/docs/self-hosting/overview/">{t('footer.selfHosting')}</PageLink>
             <PageLink href="/docs/api-reference/">{t('footer.apiReference')}</PageLink>
+            <PageLink href="/docs/tools/mcp/">{t('footer.mcp')}</PageLink>
           </Column>
           <Column title={t('footer.community')}>
             <PageLink href={REPO_URL} external>{t('footer.github')}</PageLink>

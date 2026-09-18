@@ -289,6 +289,7 @@ describe('Footer', () => {
       'https://github.com/vadymkykalo/railhook/blob/main/SECURITY.md',
       '/contact',
       '/pricing',
+      '/docs/tools/mcp/',
     ]));
   });
 
