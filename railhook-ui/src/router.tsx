@@ -22,6 +22,10 @@ const AuthCallbackPage = lazy(() => import('./auth/AuthCallbackPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
 const TesterPage = lazy(() => import('./pages/TesterPage'));
+const SignatureVerifierPage = lazy(() => import('./pages/SignatureVerifierPage'));
+const SecurityPage = lazy(() => import('./pages/SecurityPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
 const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.PrivacyPage })));
 const TermsPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.TermsPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -102,6 +106,22 @@ export const router = createBrowserRouter([
           {
             path: '/tester',
             element: <S><TesterPage /></S>,
+          },
+          {
+            path: '/tools/webhook-signature',
+            element: <S><SignatureVerifierPage /></S>,
+          },
+          {
+            path: '/security',
+            element: <S><SecurityPage /></S>,
+          },
+          {
+            path: '/about',
+            element: <S><AboutPage /></S>,
+          },
+          {
+            path: '/changelog',
+            element: <S><ChangelogPage /></S>,
           },
           {
             path: '/contact',

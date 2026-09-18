@@ -16,6 +16,26 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://site-url.railhook.invalid/tools/webhook-signature</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://site-url.railhook.invalid/security</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://site-url.railhook.invalid/about</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://site-url.railhook.invalid/changelog</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://site-url.railhook.invalid/contact</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>

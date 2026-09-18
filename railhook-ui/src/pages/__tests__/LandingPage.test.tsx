@@ -286,11 +286,21 @@ describe('Footer', () => {
     expect(hrefs).toEqual(expect.arrayContaining([
       'https://github.com/vadymkykalo/railhook/issues',
       'https://github.com/vadymkykalo/railhook/releases',
-      'https://github.com/vadymkykalo/railhook/blob/main/SECURITY.md',
       '/contact',
       '/pricing',
       '/docs/tools/mcp/',
+      '/tools/webhook-signature',
+      '/about',
+      '/security',
+      '/changelog',
     ]));
+  });
+
+  it('lists the company pages under their own heading', () => {
+    renderPage(<Footer />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
+    const company = screen.getByRole('heading', { name: en.footer.company }).parentElement as HTMLElement;
+    expect(within(company).getAllByRole('link').map((a) => a.getAttribute('href')))
+      .toEqual(['/about', '/security', '/changelog', '/contact', '/privacy', '/terms']);
   });
 
   describe('connect with us', () => {

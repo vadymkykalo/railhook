@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Railhook's author, for Railhook Cloud. Accounts that exist before the upgrade are marked as
   already onboarded and never receive either. Migration `V082` adds two nullable columns to
   `users`.
+- **Webhook signature verifier** at `/tools/webhook-signature`: paste a body, a secret and the
+  signature header to see whether they match, and what the signature should have been — for
+  Standard Webhooks, Stripe, GitHub, Shopify, Slack and Railhook's own `X-Signature`, with a
+  warning when a timestamp is outside the 5-minute window. It runs in the browser with Web
+  Crypto; nothing pasted into it is sent anywhere.
+- **Security, About and Changelog pages** on the public site. `/security` states how data is
+  hosted, how secrets, API keys and passwords are stored, how organizations are isolated and
+  how to report a vulnerability. `/about` says who builds Railhook and on what. `/changelog` is
+  built from this file on every build, newest release first, each at its own anchor.
+- The footer gains a Company column (About, Security, Changelog, Contact, Privacy, Terms) and a
+  link to the signature verifier.
 
 ## [2.22.0] - 2026-09-18
 

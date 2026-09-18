@@ -148,6 +148,7 @@ export function Footer() {
             <RouteLink to="/#self-host">{t('footer.selfHost')}</RouteLink>
             <RouteLink to="/pricing">{t('footer.pricing')}</RouteLink>
             {publicTesterEnabled() && <RouteLink to="/tester">{t('footer.tester')}</RouteLink>}
+            <RouteLink to="/tools/webhook-signature">{t('footer.signatureVerifier')}</RouteLink>
             <RouteLink to="/login">{t('footer.signIn')}</RouteLink>
           </Column>
           <Column title={t('footer.docs')}>
@@ -160,10 +161,12 @@ export function Footer() {
           <Column title={t('footer.community')}>
             <PageLink href={REPO_URL} external>{t('footer.github')}</PageLink>
             <PageLink href={`${REPO_URL}/issues`} external>{t('footer.issues')}</PageLink>
-            <PageLink href={`${REPO_URL}/releases`} external>{t('footer.changelog')}</PageLink>
-            <PageLink href={`${REPO_URL}/blob/main/SECURITY.md`} external>{t('footer.security')}</PageLink>
+            <PageLink href={`${REPO_URL}/releases`} external>{t('footer.releases')}</PageLink>
           </Column>
-          <Column title={t('footer.contact')}>
+          <Column title={t('footer.company')}>
+            <RouteLink to="/about">{t('footer.about')}</RouteLink>
+            <RouteLink to="/security">{t('footer.security')}</RouteLink>
+            <RouteLink to="/changelog">{t('footer.changelog')}</RouteLink>
             <RouteLink to="/contact">{t('footer.talkToUs')}</RouteLink>
             <RouteLink to="/privacy">{t('footer.privacy')}</RouteLink>
             <RouteLink to="/terms">{t('footer.terms')}</RouteLink>

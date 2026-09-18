@@ -13,6 +13,14 @@ function publicRoutes(): { path: string }[] {
   return [...source.matchAll(/\{\s*path:\s*'([^']+)'/g)].map((m) => ({ path: m[1] }));
 }
 
+/**
+ * The first path segment of every prerendered page: `/tools/webhook-signature` is served from
+ * `dist/tools/webhook-signature/index.html` by `location /`, so `tools` is not an app route.
+ */
+function prerenderedSegments(): string[] {
+  return publicRoutes().map((r) => r.path.slice(1).split('/')[0]).filter(Boolean);
+}
+
 function locations(): { head: string; body: string }[] {
   const out: { head: string; body: string }[] = [];
   const re = /^\s*location\s+([^{]+)\{/gm;
@@ -61,7 +69,7 @@ describe('nginx answers with the status the URL deserves', () => {
   });
 
   it('serves the app shell for every top-level route the router owns', () => {
-    const prerendered = publicRoutes().map((r: { path: string }) => r.path.slice(1)).filter(Boolean);
+    const prerendered = prerenderedSegments();
     // The portal has a location of its own, below, because its headers differ.
     const owned = routerTopLevelSegments().filter((s) => !prerendered.includes(s) && s !== 'portal');
     expect(spaLocation(), 'a regex location for the app routes').toBeDefined();
@@ -75,7 +83,7 @@ describe('nginx answers with the status the URL deserves', () => {
   });
 
   it('never marks the public pages noindex', () => {
-    const prerendered = publicRoutes().map((r: { path: string }) => r.path.slice(1)).filter(Boolean);
+    const prerendered = prerenderedSegments();
     for (const page of prerendered) expect(spaSegments(), page).not.toContain(page);
     expect(location('/')!.body).not.toMatch(/X-Robots-Tag/);
   });
