@@ -72,15 +72,15 @@
           `mvn dependency:tree -Dincludes=org.apache.tomcat.embed` - a version
           that still reads 11.0.24 there means the override is not taking.
         -->
-        <tomcat.version>11.0.25</tomcat.version>
+        <tomcat.version>11.0.26</tomcat.version>
         <!--
           The 2.0 line is the one built against Boot 4 (2.0.1's own poms name
           spring-boot 4.1.1); 1.x targets Boot 3 and does not start on 4.
           Imported only for the MCP server starter in railhook-api.
         -->
         <spring-ai.version>2.0.1</spring-ai.version>
-        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
-        <jacoco.version>0.8.12</jacoco.version>
+        <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
+        <jacoco.version>0.8.15</jacoco.version>
         <!--
           Single knob controlling where the JaCoCo agent writes exec
           data AND where the per-module `report` goal reads it back from, so
