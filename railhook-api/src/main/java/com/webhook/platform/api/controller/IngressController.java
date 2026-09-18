@@ -2,8 +2,10 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.domain.entity.IncomingEvent;
 import com.webhook.platform.api.dto.IngressResponse;
+import com.webhook.platform.api.dto.SlackUrlVerificationResponse;
 import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.service.IngressService;
+import com.webhook.platform.api.service.ingress.IngressOutcome;
 import com.webhook.platform.api.service.ingress.OrganizationSuspendedException;
 import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
 import com.webhook.platform.api.service.ingress.RateLimitExceededException;
@@ -19,6 +21,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,6 +48,11 @@ public class IngressController {
             description = "Public endpoint for third-party providers to send webhooks. " +
                     "The token in the path identifies the incoming source configuration.")
     @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Slack url_verification handshake on a SLACK "
+                    + "source, answered once its signature is verified. The challenge is echoed and "
+                    + "nothing is stored or forwarded.",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = SlackUrlVerificationResponse.class))),
             @ApiResponse(responseCode = "202", description = "Webhook accepted for processing",
                     content = @Content(schema = @Schema(implementation = IngressResponse.class))),
             @ApiResponse(responseCode = "404", description = "Invalid ingress token",
@@ -68,7 +76,7 @@ public class IngressController {
                     + "verified over these bytes, so nothing re-encodes them in transit.",
             content = @Content(mediaType = "application/json", schema = @Schema(type = "string")))
     @PostMapping("/{token}")
-    public ResponseEntity<IngressResponse> receiveWebhook(
+    public ResponseEntity<?> receiveWebhook(
             @PathVariable("token") String token,
             HttpServletRequest request) throws IOException {
         // Bytes, not a String: Spring decodes a String parameter with whatever charset the
@@ -76,7 +84,15 @@ public class IngressController {
         // that used anything else had its genuine signature rejected. And not @RequestBody byte[]
         // either: for a form POST that is a body Spring rebuilt from parsed parameters rather than
         // the one that was signed. IngressRawBodyFilter kept the original.
-        IncomingEvent event = ingressService.receiveWebhook(token, rawBody(request), request);
+        IngressOutcome outcome = ingressService.receiveWebhook(token, rawBody(request), request);
+        // Slack enables a Request URL only once it has echoed the challenge; a 202 without it
+        // left a SLACK Source impossible to connect to the Events API.
+        if (outcome instanceof IngressOutcome.SlackUrlVerification handshake) {
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(new SlackUrlVerificationResponse(handshake.challenge()));
+        }
+        IncomingEvent event = ((IngressOutcome.Accepted) outcome).event();
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(IngressResponse.builder()
                         .status("accepted")

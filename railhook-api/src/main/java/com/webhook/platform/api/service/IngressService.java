@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingEvent;
@@ -9,6 +10,7 @@ import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
+import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
@@ -18,6 +20,7 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.security.SuspensionCheck;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
+import com.webhook.platform.api.service.ingress.IngressOutcome;
 import com.webhook.platform.api.service.ingress.OrganizationSuspendedException;
 import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
 import com.webhook.platform.api.service.ingress.ProviderEventIdExtractor;
@@ -132,7 +135,7 @@ public class IngressService {
      * or rate-limited request held a Hikari connection for the duration of two Redis calls that
      * never wrote anything (a cheap DoS on the connection pool).
      */
-    public IncomingEvent receiveWebhook(String token, byte[] body, HttpServletRequest request) {
+    public IngressOutcome receiveWebhook(String token, byte[] body, HttpServletRequest request) {
         // Ingress has a tenant but no caller. Nothing has authenticated, so TenantContextFilter
         // left the scope unset and the path token in the URL is the only thing that names an
         // organization -- which means the lookup that finds it has to run without one. Everything
@@ -142,7 +145,7 @@ public class IngressService {
         return TenantContext.callAs(source.getOrganizationId(), () -> receiveVerifiedWebhook(source, body, request));
     }
 
-    private IncomingEvent receiveVerifiedWebhook(IncomingSource source, byte[] body, HttpServletRequest request) {
+    private IngressOutcome receiveVerifiedWebhook(IncomingSource source, byte[] body, HttpServletRequest request) {
         enforceRateLimit(source);
         enforcePayloadSize(body);
 
@@ -158,6 +161,22 @@ public class IngressService {
             log.warn("Rejecting incoming webhook due to failed signature verification: sourceId={}, error={}",
                     source.getId(), reason);
             throw new SignatureVerificationFailedException("Signature verification failed: " + reason);
+        }
+
+        // Slack's url_verification is answered here and goes no further. It is a handshake, not
+        // an event: storing it would forward a message no Destination can do anything with, and
+        // charge the Organization for it. So it runs ahead of dedup (it carries no event_id), the
+        // quota (a customer over quota can still connect their Slack app, since nothing is
+        // stored) and the replay check (that one marks a signature for a write that will not
+        // happen). Behind verification, and only when verification actually passed: an unverified
+        // request — including one to a Source with verification off — is never echoed back, so
+        // nobody can register someone else's ingress URL in their own Slack app.
+        if (source.getProviderType() == ProviderType.SLACK && Boolean.TRUE.equals(verification.verified())) {
+            String challenge = slackUrlVerificationChallenge(meta.body());
+            if (challenge != null) {
+                log.info("Answered Slack url_verification: sourceId={}", source.getId());
+                return new IngressOutcome.SlackUrlVerification(challenge);
+            }
         }
 
         // Extract provider event ID for dedup (well-known headers only, no body hash fallback).
@@ -182,7 +201,7 @@ public class IngressService {
                 log.info("Duplicate incoming webhook detected: sourceId={}, providerEventId={}, existingEventId={}",
                         source.getId(), providerEventId, existing.get().getId());
                 meterRegistry.counter("incoming_events_deduplicated_total").increment();
-                return existing.get();
+                return new IngressOutcome.Accepted(existing.get());
             }
         }
 
@@ -200,11 +219,11 @@ public class IngressService {
                     persistEventAndForwardAttempts(source, meta, providerEventId, verification));
             chargeQuotaPostCommit();
             incomingEventsIngestedCounter.increment();
-            return stored;
+            return new IngressOutcome.Accepted(stored);
         } catch (DataIntegrityViolationException e) {
             IncomingEvent recovered = handleDuplicateRace(source, providerEventId, e);
             if (recovered != null) {
-                return recovered;
+                return new IngressOutcome.Accepted(recovered);
             }
             // Genuinely lost -- nothing was persisted and there's no existing row to fall back
             // to. The replay marker (if any) must not stay burned for a webhook that never made
@@ -216,6 +235,25 @@ public class IngressService {
             releaseReplayMarkerAfterFailedPersist(source, verification);
             throw e;
         }
+    }
+
+    /** The challenge of a {@code {"type":"url_verification","challenge":...}} body, or null for anything else. */
+    private String slackUrlVerificationChallenge(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode type = root.get("type");
+            JsonNode challenge = root.get("challenge");
+            if (type != null && "url_verification".equals(type.asText())
+                    && challenge != null && challenge.isTextual() && !challenge.asText().isEmpty()) {
+                return challenge.asText();
+            }
+        } catch (Exception e) {
+            log.debug("Slack body is not JSON, so not a url_verification: {}", e.getMessage());
+        }
+        return null;
     }
 
     private IncomingSource resolveActiveSource(String token) {

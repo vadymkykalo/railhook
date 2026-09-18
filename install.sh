@@ -992,7 +992,15 @@ monitoring() {
         update)
             [ -d monitoring ] || return 0
             monitoring_fetch "${2:-$(monitoring_ref)}" || return 1
-            [ -z "$(monitoring_compose ps -q 2>/dev/null)" ] || monitoring_compose up -d --remove-orphans ;;
+            [ -n "$(monitoring_compose ps -q 2>/dev/null)" ] || return 0
+            # The running containers mount files of the directory the fetch just replaced, so
+            # neither `up -d` (the Compose file is unchanged) nor a reload (the same old inode)
+            # reaches the new rules. Recreated only when something changed.
+            if diff -rq monitoring.previous monitoring >/dev/null 2>&1; then
+                monitoring_compose up -d --remove-orphans
+            else
+                monitoring_compose up -d --force-recreate --remove-orphans
+            fi ;;
         *)
             echo "railhook monitoring up|down|status|logs [service]|update [version]" >&2
             echo "  up needs GRAFANA_ADMIN_PASSWORD in .env; MONITORING_DOMAIN serves Grafana through Caddy" >&2

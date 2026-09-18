@@ -170,6 +170,10 @@ public class Delivery {
         this.nextRetryAt = null;
         this.failedAt = null;
         this.ladderResumedAt = Instant.now();
+        // The worker leaves its token on a Delivery it finished with. Kept, it made the retry
+        // look claimed, and a dispatch rescheduled for backpressure (claim_token IS NULL) matched
+        // nothing — the Delivery sat until the stranded sweep, an hour later.
+        this.claimToken = null;
     }
 
     @ManyToOne(fetch = FetchType.LAZY)

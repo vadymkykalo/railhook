@@ -268,6 +268,87 @@ class IncomingAttemptStoreTest {
         assertThat(recorded).doesNotContain("Content-Encoding");
     }
 
+    // ── A Forward carries the provider's event metadata, never its credentials ──────
+
+    // GitHub names the event only in a header: a push and an issue cannot be told apart by body.
+    @Test
+    void anUntransformedForwardCarriesTheProvidersEventHeadersUnderTheirCanonicalNames() {
+        IncomingEvent event = event("application/json", "{}", null,
+                "{\"x-github-event\":\"push\",\"x-github-delivery\":\"d-1\",\"x-github-hook-id\":\"42\"}");
+        IncomingAttemptStore store = storeFor(destination(true), firstDispatch(), event);
+
+        String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
+
+        assertThat(recorded).contains("\"X-GitHub-Event\":\"push\"")
+                .contains("\"X-GitHub-Delivery\":\"d-1\"")
+                .contains("\"X-GitHub-Hook-ID\":\"42\"");
+    }
+
+    @Test
+    void aTransformedForwardStillCarriesTheProvidersEventHeaders() {
+        IncomingDestination destination = destination(true);
+        destination.setPayloadTransform("$.data");
+        IncomingEvent event = event("application/json", "{\"data\":1}", null,
+                "{\"X-Shopify-Topic\":\"orders/create\",\"X-Gitlab-Event\":\"Push Hook\"}");
+        IncomingAttemptStore store = storeFor(destination, firstDispatch(), event);
+
+        String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
+
+        assertThat(recorded).contains("\"X-Shopify-Topic\":\"orders/create\"")
+                .contains("\"X-Gitlab-Event\":\"Push Hook\"");
+    }
+
+    // Railhook authenticates to the Destination itself; the provider's proof is for Railhook.
+    @Test
+    void theProvidersSignaturesAndCredentialsAreNotForwarded() {
+        IncomingEvent event = event("application/json", "{}", null,
+                "{\"x-hub-signature-256\":\"sha256=abc\",\"x-shopify-hmac-sha256\":\"h\","
+                        + "\"x-gitlab-token\":\"t\",\"stripe-signature\":\"s\",\"x-slack-signature\":\"v0=x\","
+                        + "\"authorization\":\"Bearer p\",\"cookie\":\"c=1\",\"x-custom-provider\":\"v\"}");
+        IncomingAttemptStore store = storeFor(destination(true), firstDispatch(), event);
+
+        String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
+
+        assertThat(recorded.toLowerCase())
+                .doesNotContain("x-hub-signature")
+                .doesNotContain("x-shopify-hmac")
+                .doesNotContain("x-gitlab-token")
+                .doesNotContain("stripe-signature")
+                .doesNotContain("x-slack-signature")
+                .doesNotContain("authorization")
+                .doesNotContain("cookie")
+                .doesNotContain("x-custom-provider");
+    }
+
+    @Test
+    void theDestinationsOwnHeaderWinsOverAForwardedOneOfTheSameNameInAnyCase() {
+        IncomingDestination destination = destination(true);
+        destination.setCustomHeadersJson("{\"x-github-event\":\"overridden\"}");
+        IncomingEvent event = event("application/json", "{}", null, "{\"X-GitHub-Event\":\"push\"}");
+        IncomingAttemptStore store = storeFor(destination, firstDispatch(), event);
+
+        String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
+
+        assertThat(recorded).contains("\"x-github-event\":\"overridden\"")
+                .doesNotContain("push");
+    }
+
+    // A value from a third party must not be able to smuggle a header of its own.
+    @Test
+    void aForwardedHeaderValueCarryingALineBreakIsDropped() {
+        IncomingEvent event = event("application/json", "{}", null,
+                "{\"X-GitHub-Event\":\"push\\r\\nX-Injected: 1\",\"X-Shopify-Topic\":\"a\\nb\","
+                        + "\"X-GitHub-Delivery\":\"d-1\"}");
+        IncomingAttemptStore store = storeFor(destination(true), firstDispatch(), event);
+
+        String recorded = store.buildRequest(claim(FENCE), store.buildBody(claim(FENCE))).recordedHeaders();
+
+        assertThat(recorded).doesNotContain("X-GitHub-Event")
+                .doesNotContain("X-Injected")
+                .doesNotContain("X-Shopify-Topic")
+                .contains("\"X-GitHub-Delivery\":\"d-1\"");
+    }
+
     private IncomingEvent event(String contentType, String bodyRaw, byte[] bodyBytes, String headersJson) {
         return IncomingEvent.builder()
                 .id(EVENT_ID)

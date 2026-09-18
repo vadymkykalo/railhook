@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.12] - 2026-09-18
+
+### Security
+
+- **Inviting an address no longer hands the organization to an account that never proved it
+  owns that address.** An account could be registered for someone else's address and left
+  unverified; when an owner later invited that address, the account became a member and could
+  read the organization's events. With email delivery on, inviting an address whose account has
+  not verified it is now refused, with a message saying to ask them to verify first.
+
+### Fixed
+
+- **Ordered events sent to `POST /events` are delivered in order.** Their sequence number was
+  never written, so ordering was silently not enforced for them; the sweep meant to repair that
+  failed the same way.
+- **Slack apps can be connected to a Slack source.** The ingress now answers Slack's
+  `url_verification` handshake with the challenge (after checking the signature), instead of
+  `202`, which Slack refused.
+- **Forwards carry the provider's event headers** — `X-GitHub-Event`, `X-Gitlab-Event`,
+  `X-Shopify-Topic` and related ones — so a destination can tell one event type from another.
+  Signatures and tokens are still never forwarded.
+- **Stripe and Twilio resends are deduplicated.** Railhook looked for id headers these providers
+  don't send; it now uses Stripe's event `id` from the body and Twilio's
+  `I-Twilio-Idempotency-Token`.
+- **Someone removed from their only organization can sign in again**, into an organization of
+  their own, instead of getting `404` on every sign-in.
+- **A manually retried delivery no longer waits up to an hour** when the worker is busy.
+- **Monitoring:** the API error-rate alert no longer counts tunnel traffic (a customer's own
+  server answering through a tunnel) and reports the rate correctly; an upgrade now restarts the
+  monitoring stack onto the new rules instead of leaving it on the ones it started with.
+
 ## [2.20.11] - 2026-09-18
 
 ### Fixed

@@ -165,7 +165,7 @@ public class AuthService {
         // attack in progress. An account in daily use therefore never accumulates a lockout.
         accountLockoutService.clearFailures(user);
 
-        Membership membership = membershipToIssueTokenFor(user.getId());
+        Membership membership = membershipToSignInWith(user);
 
         return issueSession(user, membership.getOrganizationId(), membership.getRole(), origin,
                 Boolean.TRUE.equals(user.getEmailVerified()));
@@ -205,7 +205,7 @@ public class AuthService {
         if (user.getStatus() == UserStatus.DISABLED) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
         }
-        Membership membership = membershipToIssueTokenFor(user.getId());
+        Membership membership = membershipToSignInWith(user);
         return issueSession(user, membership.getOrganizationId(), membership.getRole(), origin,
                 Boolean.TRUE.equals(user.getEmailVerified()));
     }
@@ -441,6 +441,32 @@ public class AuthService {
      * <p>INVITED is deliberately not skipped: that is the membership an invitee signs in with in
      * order to accept the invite.
      */
+    /**
+     * {@link #membershipToIssueTokenFor}, for a sign-in: an account left in no organization at all
+     * gets one of its own, as a new account does.
+     *
+     * <p>Being removed from the only organization you were invited to, or having it deleted,
+     * used to end in a 404 here on every sign-in, password and Google alike — and registering
+     * again is refused because the address is taken, while erasing the account needs a session.
+     * Nothing short of the database let that person back in.
+     */
+    private Membership membershipToSignInWith(User user) {
+        if (membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).isEmpty()) {
+            Organization organization = createOrganizationOwnedBy(user, workspaceNameFor(user));
+            log.info("User {} signed in with no organization left; created {} for them",
+                    user.getId(), organization.getId());
+        }
+        return membershipToIssueTokenFor(user.getId());
+    }
+
+    private static String workspaceNameFor(User user) {
+        String person = user.getFullName() != null && !user.getFullName().isBlank()
+                ? user.getFullName().trim()
+                : user.getEmail().substring(0, Math.max(1, user.getEmail().indexOf('@')));
+        String name = person + "'s workspace";
+        return name.length() <= 100 ? name : name.substring(0, 100);
+    }
+
     private Membership membershipToIssueTokenFor(UUID userId) {
         List<Membership> memberships = membershipRepository.findByUserIdOrderByCreatedAtAsc(userId);
         return memberships.stream()

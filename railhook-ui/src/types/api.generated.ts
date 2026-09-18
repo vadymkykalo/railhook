@@ -4153,6 +4153,14 @@ export interface components {
             /** @enum {string} */
             status?: "ACTIVE" | "PENDING_VERIFICATION" | "DISABLED";
         };
+        /** @description Answer to Slack's url_verification handshake: the challenge Slack sent, echoed back */
+        SlackUrlVerificationResponse: {
+            /**
+             * @description The challenge from the verified url_verification request
+             * @example 3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P
+             */
+            challenge: string;
+        };
         /** @description Response from incoming webhook ingress endpoint */
         IngressResponse: {
             /**
@@ -7588,6 +7596,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Slack url_verification handshake on a SLACK source, answered once its signature is verified. The challenge is echoed and nothing is stored or forwarded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlackUrlVerificationResponse"];
+                };
+            };
             /** @description Webhook accepted for processing */
             202: {
                 headers: {

@@ -105,7 +105,15 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE
 | `X-Forward-Attempt` | Номер спроби, починаючи з 1. |
 | `Idempotency-Key` | `<incoming event id>-<destination id>`, не змінюється між спробами. |
 
-Первісні заголовки провайдера, зокрема його підпис, не пересилаються. Перевірка відбулася на ingress; ваш сервіс має покладатися на облікові дані призначення.
+З власних заголовків провайдера передаються лише ті, що описують подію, — з трансформацією чи без, бо деякі провайдери більше ніде не називають подію: push і issue від GitHub за тілом не розрізнити.
+
+| Провайдер | Заголовки, що передаються |
+|---|---|
+| GitHub | `X-GitHub-Event`, `X-GitHub-Delivery`, `X-GitHub-Hook-ID`, `X-GitHub-Hook-Installation-Target-Type`, `X-GitHub-Hook-Installation-Target-ID` |
+| GitLab | `X-Gitlab-Event`, `X-Gitlab-Event-UUID`, `X-Gitlab-Instance` |
+| Shopify | `X-Shopify-Topic`, `X-Shopify-Webhook-Id`, `X-Shopify-Shop-Domain`, `X-Shopify-API-Version`, `X-Shopify-Event-Id`, `X-Shopify-Triggered-At` |
+
+Заголовок із такою самою назвою, заданий Railhook, обліковими даними призначення чи його власними заголовками, має перевагу. Решта первісних заголовків не пересилається, а підписи й токени — ніколи (`X-Hub-Signature-256`, `X-Shopify-Hmac-Sha256`, `X-Gitlab-Token`, `Stripe-Signature` тощо). Перевірка відбулася на ingress; ваш сервіс має покладатися на облікові дані призначення.
 
 ## Трансформація перед пересиланням
 

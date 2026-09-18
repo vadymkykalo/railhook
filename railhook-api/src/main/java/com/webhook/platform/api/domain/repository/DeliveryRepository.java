@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -214,7 +215,12 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
      * (see {@code EventIngestService#assignSequenceNumbersPostCommit}). A separate, tiny,
      * auto-committing statement — not part of the ingest transaction — so a later rollback in
      * that transaction can never be the reason a generated sequence number goes unused.
+     *
+     * <p>Transactional on its own account: both callers run it with no transaction open, and a
+     * JPQL update refuses to run without one — which is how every ordered Delivery ingested
+     * through the API went out unordered, and the sweep meant to repair them failed the same way.
      */
+    @Transactional
     @Modifying
     @Query("UPDATE Delivery d SET d.sequenceNumber = :sequenceNumber WHERE d.id = :id")
     int updateSequenceNumber(@Param("id") UUID id, @Param("sequenceNumber") long sequenceNumber);

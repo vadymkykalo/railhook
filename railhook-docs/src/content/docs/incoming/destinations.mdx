@@ -105,7 +105,15 @@ The body is the webhook exactly as the provider sent it, byte for byte, with its
 | `X-Forward-Attempt` | The attempt number, starting at 1. |
 | `Idempotency-Key` | `<incoming event id>-<destination id>`, stable across attempts. |
 
-The provider's original headers, including its signature, are not forwarded. Verification happened at the ingress; your service should rely on the destination credentials instead.
+Of the provider's own headers, only those that describe the event are passed through, transformed or not, because some providers name the event nowhere else: a GitHub push and a GitHub issue cannot be told apart by their bodies.
+
+| Provider | Headers passed through |
+|---|---|
+| GitHub | `X-GitHub-Event`, `X-GitHub-Delivery`, `X-GitHub-Hook-ID`, `X-GitHub-Hook-Installation-Target-Type`, `X-GitHub-Hook-Installation-Target-ID` |
+| GitLab | `X-Gitlab-Event`, `X-Gitlab-Event-UUID`, `X-Gitlab-Instance` |
+| Shopify | `X-Shopify-Topic`, `X-Shopify-Webhook-Id`, `X-Shopify-Shop-Domain`, `X-Shopify-API-Version`, `X-Shopify-Event-Id`, `X-Shopify-Triggered-At` |
+
+A header of the same name set by Railhook, the destination's credentials or its custom headers takes precedence. Every other original header is not forwarded, and signatures and tokens never are (`X-Hub-Signature-256`, `X-Shopify-Hmac-Sha256`, `X-Gitlab-Token`, `Stripe-Signature` and the like). Verification happened at the ingress; your service should rely on the destination credentials instead.
 
 ## Transforming before forwarding
 
