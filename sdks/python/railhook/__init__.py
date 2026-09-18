@@ -41,7 +41,7 @@ from .types import (
     ReplayEventResponse,
 )
 
-__version__ = "2.20.11"
+__version__ = "2.20.12"
 
 # Backward-compatible aliases
 WebhookPlatform = Railhook
