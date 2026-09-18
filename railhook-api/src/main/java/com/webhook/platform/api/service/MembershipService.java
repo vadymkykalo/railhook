@@ -118,6 +118,15 @@ public class MembershipService {
             throw new IllegalArgumentException("User is already a member");
         }
 
+        // The owner invited an address. An existing account becomes a member on the spot, and
+        // reading needs no verified email — so an account registered for someone else's address,
+        // and never proven, would read this organization's data the day that person is invited.
+        // Where verification can be delivered at all, such an account is not taken to be them.
+        if (!isNewUser && emailService.isEnabled() && !Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new ConflictException("An account with this address exists but has not verified it. "
+                    + "Ask them to verify their email address, then invite them again.");
+        }
+
         String inviteToken = generateInviteToken();
         String inviteTokenHash = CryptoUtils.hashApiKey(inviteToken);
         Instant expiresAt = Instant.now().plus(INVITE_EXPIRATION_HOURS, ChronoUnit.HOURS);
