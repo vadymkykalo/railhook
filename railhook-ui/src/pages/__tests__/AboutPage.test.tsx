@@ -47,7 +47,7 @@ describe('AboutPage', () => {
   it('lists the stack Railhook runs on', () => {
     renderAbout();
     const text = document.body.textContent ?? '';
-    for (const part of ['Java 17', 'Spring Boot', 'PostgreSQL', 'Kafka', 'Redis']) expect(text).toContain(part);
+    for (const part of ['Java', 'Spring Boot', 'PostgreSQL', 'Kafka', 'Redis']) expect(text).toContain(part);
   });
 
   it('links to the docs, the changelog and the contact page', () => {

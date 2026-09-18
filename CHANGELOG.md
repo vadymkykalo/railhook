@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **"See it in action" on the landing page**, straight after the hero: six screenshots of the
+  real product — deliveries, one delivery's attempts, failed messages with replay, incoming
+  Stripe and GitHub webhooks, the embedded customer portal and analytics — behind tabs that the
+  arrow keys move between, each with a one-line caption. Every screen is captured in both
+  themes and follows the site's; on a phone the tabs scroll sideways and the page does not. It
+  replaces the three-screenshot section further down, and the README shows three of the new
+  captures.
+
+### Changed
+
+- **The header gains a Developers menu and an About link.** Docs, the CLI, the MCP server, the
+  webhook tester, the signature verifier and the status page sit behind one menu, each with a
+  line on what it is. The footer links to the CLI next to the MCP server.
+
 ## [2.23.0] - 2026-09-18
 
 ### Added
