@@ -10,6 +10,7 @@ import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import { brandVariables, embeddingAllowed, readPortalParams, type PortalParams } from './portal/portalParams';
 import PortalEndpoints from './portal/PortalEndpoints';
 import PortalDeliveries from './portal/PortalDeliveries';
+import { WRAP, panel } from './landing/primitives';
 
 /**
  * The customer portal: what a Railhook customer embeds in their own product so that their user —
@@ -22,6 +23,9 @@ import PortalDeliveries from './portal/PortalDeliveries';
  */
 
 type Tab = 'endpoints' | 'deliveries';
+
+/** Where src/i18n caches the chosen language (its `lookupLocalStorage`). */
+const LANGUAGE_STORAGE_KEY = 'i18n_lng';
 
 /** Read once per page load: the fragment is gone after the first render. */
 function useInitialParams(): PortalParams {
@@ -53,7 +57,24 @@ function useBranding(params: PortalParams) {
     if (params.theme) applyTheme(params.theme);
   }, [params.theme]);
   useEffect(() => {
-    if (params.lang && i18n.language !== params.lang) i18n.changeLanguage(params.lang);
+    if (!params.lang || i18n.language === params.lang) return;
+    // i18next caches whatever it switches to as this origin's language, which is the dashboard's
+    // preference too: a customer's `lang` must not change the language a Railhook user signs
+    // in to next. The previous choice is put back once the switch has been cached.
+    let previous: string | null = null;
+    try {
+      previous = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    } catch {
+      previous = null;
+    }
+    i18n.changeLanguage(params.lang).finally(() => {
+      try {
+        if (previous === null) window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+        else window.localStorage.setItem(LANGUAGE_STORAGE_KEY, previous);
+      } catch {
+        // Storage refused, as in a sandboxed frame: then nothing was cached either.
+      }
+    });
   }, [params.lang, i18n]);
   // On the document rather than the page's wrapper: dialogs and sheets render in a portal at the
   // end of <body>, outside anything the wrapper's variables would reach.
@@ -69,9 +90,9 @@ function useBranding(params: PortalParams) {
 function Notice({ icon: Icon, title, description }: { icon: React.ElementType; title: string; description: string }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
-      <div className="w-full max-w-md rounded-lg border border-rail bg-card p-6 text-center" role="alert">
+      <div className={cn(panel(), 'w-full max-w-md p-7 text-center')} role="alert">
         <Icon className="mx-auto mb-3 h-6 w-6 text-muted-foreground" aria-hidden />
-        <h1 className="text-base font-semibold">{title}</h1>
+        <h1 className="font-display text-lg font-bold tracking-[-0.02em]">{title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{description}</p>
       </div>
     </div>
@@ -84,6 +105,12 @@ export default function PortalPage() {
   useBranding(params);
   const [expired, setExpired] = useState(false);
   const [tab, setTab] = useState<Tab>('endpoints');
+
+  // The shell's static title is the landing page's; inside someone else's product that reads as
+  // an advert in the browser's tab strip.
+  useEffect(() => {
+    document.title = t('portal.title');
+  }, [t]);
 
   useEffect(() => {
     onPortalUnauthorized(() => setExpired(true));
@@ -137,8 +164,8 @@ export default function PortalPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-5xl p-4 lg:p-6">
-        <header className="flex items-center gap-3 pb-4">
+      <div className={cn(WRAP, 'py-6 sm:py-8')}>
+        <header className="flex items-center gap-3 pb-5">
           {params.logo ? (
             <img src={params.logo} alt="" className="h-8 max-w-[160px] object-contain" referrerPolicy="no-referrer" />
           ) : (
@@ -147,7 +174,9 @@ export default function PortalPage() {
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="text-title truncate">{t('portal.title')}</h1>
+            <h1 className="truncate font-display text-[1.45rem] font-bold leading-tight tracking-[-0.025em]">
+              {t('portal.title')}
+            </h1>
             <p className="truncate text-sm text-muted-foreground">
               {t('portal.subtitle', { consumer: session.data.consumerName, project: session.data.projectName })}
             </p>

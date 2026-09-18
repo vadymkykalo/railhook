@@ -108,7 +108,7 @@ export default function PortalEndpoints({ eventTypes }: { eventTypes: string[] }
         />
       ) : (
         <>
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">{t('portal.endpoints.description')}</p>
             {addButton}
           </div>

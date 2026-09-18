@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import '../../i18n';
+import i18n from '../../i18n';
 import { renderPage } from '../../test/renderPage';
 import type {
   PageResponse, PortalDeliveryResponse, PortalEndpointResponse, PortalSessionInfoResponse,
@@ -64,7 +64,8 @@ function openAt(url: string) {
 }
 
 describe('PortalPage', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await i18n.changeLanguage('en');
     vi.clearAllMocks();
     vi.mocked(portalApi.session).mockResolvedValue(SESSION);
     vi.mocked(portalApi.listEndpoints).mockResolvedValue([ENDPOINT]);
@@ -90,6 +91,13 @@ describe('PortalPage', () => {
     expect(window.location.href).not.toContain('rhp_');
     expect(window.localStorage.getItem('rhp_secret-token')).toBeNull();
     expect(JSON.stringify({ ...window.localStorage })).not.toContain('rhp_');
+  });
+
+  it('speaks the language the customer asked for without making it the dashboard’s', async () => {
+    window.localStorage.setItem('i18n_lng', 'en');
+    openAt('/portal?lang=uk#rhp_token');
+    expect(await screen.findByRole('heading', { name: 'Вебхуки' })).toBeInTheDocument();
+    await waitFor(() => expect(window.localStorage.getItem('i18n_lng')).toBe('en'));
   });
 
   it('shows the ended-session screen when the session is no longer valid', async () => {
