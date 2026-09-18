@@ -860,9 +860,9 @@
     "docsCta": "Go to the docs",
     "docsTitle": "Read first",
     "responseNote": "We answer on working days, usually within one.",
-    "salesBody": "Paid plans with support are coming to Railhook Cloud. Tell us what you would need.",
+    "salesBody": "Need higher limits, a hand with setup or help with self-hosting? Tell us what you need.",
     "salesTitle": "Plans and support",
-    "subtitle": "Railhook Cloud, self-hosting, future paid support, or a question the docs did not answer.",
+    "subtitle": "Railhook Cloud, self-hosting, limits and support, or a question the docs did not answer.",
     "supportBody": "Something is wrong with a delivery, an account or a bill.",
     "supportTitle": "Support",
     "title": "Talk to us"
@@ -2217,6 +2217,10 @@
         "who": {
           "body": "Railhook is an open-source webhook gateway released under the MIT license. Railhook Cloud at railhook.io is operated by the project maintainer. You can reach us at support@railhook.io.",
           "title": "Who we are"
+        },
+        "cookies": {
+          "title": "Cookies, analytics and messages",
+          "body": "- One cookie keeps you signed in. It is needed for the service to work and is not used for anything else.\n- Visits to the site are counted with Cloudflare Web Analytics. It sets no cookies and does not follow you across sites. Decline it in the notice on the site and it is not loaded again in that browser.\n- A message you send through the site's form is emailed to our support inbox with your address, so we can reply. It is kept only as long as that conversation needs."
         }
       },
       "title": "Privacy Policy"
@@ -4376,6 +4380,47 @@
       "toast": {
         "retried": "Retry scheduled",
         "retryFailed": "Couldn't retry the delivery"
+      }
+    }
+  },
+  "site": {
+    "cookie": {
+      "title": "Cookies and analytics",
+      "body": "We set only the cookie that keeps you signed in. Visits are counted with Cloudflare Web Analytics, which uses no cookies and does not track you across sites. You can turn it off.",
+      "policy": "Privacy policy",
+      "accept": "Accept",
+      "decline": "Decline"
+    },
+    "contact": {
+      "launcher": "Message us",
+      "widgetTitle": "Hi, how can we help?",
+      "widgetLead": "Ask about Railhook, the cloud or self-hosting. The reply comes to your email.",
+      "team": "Railhook team",
+      "close": "Close",
+      "formTitle": "Send us a message",
+      "formLead": "It goes straight to the team, and the reply comes to your email.",
+      "topicLabel": "What is it about?",
+      "topics": {
+        "other": "Question",
+        "sales": "Plans and limits",
+        "support": "Something is broken"
+      },
+      "emailLabel": "Your email",
+      "emailPlaceholder": "you@company.com",
+      "nameLabel": "Name",
+      "optional": "(optional)",
+      "messageLabel": "Message",
+      "messagePlaceholder": "What are you building, and what do you need from Railhook?",
+      "send": "Send",
+      "responseNote": "We answer on working days, usually within one.",
+      "sentTitle": "Message sent",
+      "sentBody": "Thanks! We will reply to {{email}}.",
+      "another": "Write another",
+      "errors": {
+        "captcha": "The check did not pass. Try again.",
+        "tooMany": "Too many messages in a minute. Wait a moment and send again.",
+        "invalid": "Check the email address and the message.",
+        "generic": "The message was not sent. Try again, or write to support by email."
       }
     }
   }

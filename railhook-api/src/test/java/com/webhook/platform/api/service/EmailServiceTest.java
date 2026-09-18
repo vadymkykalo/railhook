@@ -357,4 +357,48 @@ class EmailServiceTest {
             assertThat(wire(message).split("TempPw!12345", -1).length - 1).isEqualTo(1);
         }
     }
+
+    /**
+     * The message form on the public site. Anonymous, so the one rule that keeps it from being a
+     * relay lives here: it only ever writes to the deployment's own support address. The visitor's
+     * address is the Reply-To, never a recipient, and what they typed goes out as plain text.
+     */
+    @Nested
+    @DisplayName("a message from the site's contact form")
+    class ContactMessage {
+
+        private MimeMessage captured() {
+            MimeMessage message = new MimeMessage((jakarta.mail.Session) null);
+            when(mailSender.createMimeMessage()).thenReturn(message);
+            return message;
+        }
+
+        @Test
+        @DisplayName("goes to support, with the visitor as Reply-To")
+        void goesToSupport() throws Exception {
+            emailEnabled(true);
+            ReflectionTestUtils.setField(service, "supportAddress", "support@railhook.test");
+            MimeMessage message = captured();
+
+            service.sendContactMessage("ada@example.com", "Ada", "sales", "<b>Two million</b> a month", "/pricing");
+
+            assertThat(message.getAllRecipients()).extracting(Object::toString).containsExactly("support@railhook.test");
+            assertThat(message.getReplyTo()).extracting(Object::toString).containsExactly("ada@example.com");
+            assertThat(message.getSubject()).contains("sales").contains("Ada");
+            assertThat(message.getContent().toString())
+                    .contains("<b>Two million</b> a month")
+                    .contains("/pricing");
+            assertThat(message.getContentType()).startsWith("text/plain");
+        }
+
+        @Test
+        @DisplayName("is not available without a support address")
+        void unavailableWithoutSupportAddress() {
+            ReflectionTestUtils.setField(service, "supportAddress", "");
+            assertThat(service.isContactAvailable()).isFalse();
+
+            ReflectionTestUtils.setField(service, "supportAddress", "support@railhook.test");
+            assertThat(service.isContactAvailable()).isTrue();
+        }
+    }
 }

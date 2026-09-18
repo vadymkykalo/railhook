@@ -672,6 +672,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/contact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Write to support
+         * @description Sends the message to this deployment's support address, with the given email as the Reply-To. Two messages a minute per address.
+         */
+        post: operations["sendContactMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/bins": {
         parameters: {
             query?: never;
@@ -4658,6 +4678,15 @@ export interface components {
             status?: "ACTIVE" | "CLOSED" | "EXPIRED";
             /** Format: date-time */
             createdAt?: string;
+        };
+        PublicContactRequest: {
+            /** Format: email */
+            email: string;
+            name?: string;
+            topic?: string;
+            message: string;
+            page?: string;
+            captchaToken?: string;
         };
         PublicBinCreateRequest: {
             captchaToken?: string;
@@ -8736,6 +8765,65 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["TunnelCreateResponse"];
+                };
+            };
+        };
+    };
+    sendContactMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicContactRequest"];
+            };
+        };
+        responses: {
+            /** @description The message is on its way */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description A field is invalid, or the challenge was not passed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Too many messages from this address */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description This deployment has no support address */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: string;
+                    };
                 };
             };
         };

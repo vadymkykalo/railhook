@@ -20,7 +20,7 @@ type Doc = 'privacy' | 'terms';
 
 /** Section order is part of the document, so it is written down rather than read off the JSON. */
 const SECTIONS: Record<Doc, string[]> = {
-  privacy: ['who', 'data', 'purpose', 'google', 'retention', 'processors', 'sharing', 'rights', 'changes', 'contact'],
+  privacy: ['who', 'data', 'purpose', 'google', 'retention', 'processors', 'cookies', 'sharing', 'rights', 'changes', 'contact'],
   terms: ['service', 'free', 'use', 'suspension', 'warranty', 'liability', 'selfHosted', 'law', 'changes', 'contact'],
 };
 

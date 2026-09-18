@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.22.0] - 2026-09-18
+
+### Added
+
+- **Write to support from any public page.** A "Message us" widget in the corner of the public
+  site, and the same form on the contact page, send the message to the deployment's support
+  address (`EMAIL_SUPPORT_ADDRESS`) with the visitor's email as Reply-To. It never mails the
+  address the visitor typed, sits behind the CAPTCHA where one is configured, and allows two
+  messages a minute per address. It is shown only where `RAILHOOK_CONTACT_DOMAIN` is set.
+- **Cookie notice.** Where web analytics is configured, the public site asks once whether to
+  count visits; "Decline" stops the Cloudflare Web Analytics beacon from loading in that browser,
+  on the site and in the docs. The privacy policy gains a section on cookies, analytics and
+  messages.
+
+### Changed
+
+- The contact page no longer calls paid support "future".
+
 ## [2.21.2] - 2026-09-18
 
 ### Changed
