@@ -45,6 +45,26 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     private static final int REQUEST_BODY_SNIPPET_LIMIT = 10240;
 
     /**
+     * What a provider sends about the event rather than about its own authenticity, in the
+     * canonical case each goes out under. No signature or token belongs here.
+     */
+    private static final List<String> FORWARDED_PROVIDER_HEADERS = List.of(
+            "X-GitHub-Event",
+            "X-GitHub-Delivery",
+            "X-GitHub-Hook-ID",
+            "X-GitHub-Hook-Installation-Target-Type",
+            "X-GitHub-Hook-Installation-Target-ID",
+            "X-Gitlab-Event",
+            "X-Gitlab-Event-UUID",
+            "X-Gitlab-Instance",
+            "X-Shopify-Topic",
+            "X-Shopify-Webhook-Id",
+            "X-Shopify-Shop-Domain",
+            "X-Shopify-API-Version",
+            "X-Shopify-Event-Id",
+            "X-Shopify-Triggered-At");
+
+    /**
      * Ownership of one forward attempt row.
      *
      * @param fence           the claim_token this attempt was claimed under, null only for a
@@ -244,6 +264,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         headers.put("Idempotency-Key", idempotencyKey);
         new DestinationAuthenticator(destination, encryptionKeyRegistry, objectMapper).authenticate(headers);
         AttemptSupport.collectCustomHeaders(headers, destination.getCustomHeadersJson(), objectMapper);
+        // Last, so that everything Railhook set above — its own headers, the Destination's
+        // credentials and custom headers — keeps the name, in whatever case it was written.
+        forwardProviderEventHeaders(headers);
 
         return new RequestSpec(webClient, request -> headers.forEach(request::header), recorded(headers));
     }
@@ -267,24 +290,68 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 || (destination.getPayloadTransform() != null && !destination.getPayloadTransform().isBlank());
     }
 
+    /**
+     * Adds the provider's event metadata that arrived with the Event, under its canonical name,
+     * unless a header of that name is already set. Some providers name the event only here —
+     * GitHub's push and issue bodies cannot be told apart — so without them the Destination
+     * cannot route what it receives.
+     *
+     * <p>An allowlist, never a pass-through: the provider's signatures and tokens prove the
+     * request to Railhook, not to the Destination, which Railhook authenticates to itself. A
+     * value holding a control character is dropped, so a third party cannot inject a header.
+     */
+    private void forwardProviderEventHeaders(Map<String, String> headers) {
+        Map<String, String> arrived = arrivedHeaders();
+        if (arrived.isEmpty()) {
+            return;
+        }
+        for (String name : FORWARDED_PROVIDER_HEADERS) {
+            String value = headerIgnoringCase(arrived, name);
+            if (value == null || containsControlCharacter(value) || headerIgnoringCase(headers, name) != null) {
+                continue;
+            }
+            headers.put(name, value);
+        }
+    }
+
+    private static boolean containsControlCharacter(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if ((c < 0x20 && c != '\t') || c == 0x7F) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String headerIgnoringCase(Map<String, String> headers, String name) {
+        for (Map.Entry<String, String> header : headers.entrySet()) {
+            if (header.getKey() != null && header.getKey().equalsIgnoreCase(name)) {
+                return header.getValue();
+            }
+        }
+        return null;
+    }
+
     /** A header as the provider sent it, read back off the stored request, by name in any case. */
-    @SuppressWarnings("unchecked")
     private String arrivedHeader(String name) {
+        return headerIgnoringCase(arrivedHeaders(), name);
+    }
+
+    /** The headers the provider sent, as the stored request kept them; empty when unreadable. */
+    @SuppressWarnings("unchecked")
+    private Map<String, String> arrivedHeaders() {
         if (event.getHeadersJson() == null) {
-            return null;
+            return Map.of();
         }
         try {
             Map<String, String> arrived = objectMapper.readValue(event.getHeadersJson(), Map.class);
-            for (Map.Entry<String, String> header : arrived.entrySet()) {
-                if (header.getKey().equalsIgnoreCase(name)) {
-                    return header.getValue();
-                }
-            }
+            return arrived != null ? arrived : Map.of();
         } catch (Exception e) {
             log.warn("Could not read the stored request headers of incoming event {}: {}",
                     event.getId(), e.getMessage());
+            return Map.of();
         }
-        return null;
     }
 
     /**
