@@ -2489,7 +2489,8 @@
     "transformations": "Transformations",
     "tunnels": "Tunnels",
     "usage": "Usage",
-    "workflows": "Workflows"
+    "workflows": "Workflows",
+    "consumers": "Consumers"
   },
   "notFound": {
     "backToDashboard": "Back to Dashboard",
@@ -4106,6 +4107,171 @@
       "selfHost": {
         "q": "What do I need to run it myself?",
         "a": "A server with Docker and 4 GB of RAM. One command installs Railhook with PostgreSQL, Kafka and Redis, and sets up HTTPS on your domain."
+      }
+    }
+  },
+  "consumers": {
+    "title": "Consumers",
+    "description": "Your own users who receive your webhooks. Each one gets a portal to register their endpoints and see what was delivered to them.",
+    "new": "New consumer",
+    "name": "Name",
+    "externalId": "External ID",
+    "endpoints": "Endpoints",
+    "created": "Created",
+    "endpointCount": "{{count}} endpoints",
+    "endpointCount_one": "{{count}} endpoint",
+    "endpointCount_few": "{{count}} endpoints",
+    "endpointCount_many": "{{count}} endpoints",
+    "endpointCount_other": "{{count}} endpoints",
+    "openPortal": "Open portal",
+    "empty": {
+      "title": "No consumers yet",
+      "description": "Create one for each of your users who receives webhooks, then embed their portal in your product so they can manage their own endpoints."
+    },
+    "toast": {
+      "created": "Consumer created",
+      "createFailed": "Couldn't create the consumer",
+      "deleted": "Consumer deleted",
+      "deleteFailed": "Couldn't delete the consumer",
+      "sessionFailed": "Couldn't open a portal session",
+      "loadFailed": "Couldn't load consumers"
+    },
+    "createDialog": {
+      "title": "New consumer",
+      "description": "A consumer is one of your users. Railhook groups the endpoints registered for them and shows them only their own.",
+      "externalIdHint": "Your own ID for this user, such as the user or account ID in your database. Unique within the project.",
+      "namePlaceholder": "Acme Ltd"
+    },
+    "deleteDialog": {
+      "title": "Delete {{name}}?",
+      "description": "Its {{count}} endpoints will be deleted and stop receiving events, and every open portal session ends. Past deliveries stay in the project.",
+      "description_one": "Its {{count}} endpoint will be deleted and stop receiving events, and every open portal session ends. Past deliveries stay in the project.",
+      "description_few": "Its {{count}} endpoints will be deleted and stop receiving events, and every open portal session ends. Past deliveries stay in the project.",
+      "description_many": "Its {{count}} endpoints will be deleted and stop receiving events, and every open portal session ends. Past deliveries stay in the project.",
+      "description_other": "Its {{count}} endpoints will be deleted and stop receiving events, and every open portal session ends. Past deliveries stay in the project."
+    },
+    "endpointsSheet": {
+      "title": "Endpoints of {{name}}",
+      "description": "Registered by this consumer in their portal, or assigned to them through the API.",
+      "empty": "This consumer has no endpoints yet"
+    },
+    "embed": {
+      "button": "Embed snippet",
+      "title": "Embed the portal for {{name}}",
+      "description": "Creates a portal session and gives you an iframe to try it. In production your backend creates a new session each time the user opens the page.",
+      "allowedOrigin": "Allowed origin",
+      "allowedOriginHint": "The origin of the page that will embed the portal, such as https://app.example.com. Leave it empty to allow any page.",
+      "allowedOriginInvalid": "Enter an https origin with no path, such as https://app.example.com.",
+      "generate": "Create session",
+      "snippet": "iframe",
+      "expires": "This link expires {{date}}.",
+      "docs": "How to open sessions from your backend"
+    }
+  },
+  "portal": {
+    "title": "Webhooks",
+    "subtitle": "{{consumer}} · {{project}}",
+    "loadFailed": "Couldn't load this portal",
+    "missing": {
+      "title": "This link is incomplete",
+      "description": "The portal link has no session in it. Open it again from the page that gave it to you."
+    },
+    "expired": {
+      "title": "This session has ended",
+      "description": "Portal sessions last a limited time. Reload the page you opened it from to start a new one."
+    },
+    "wrongOrigin": {
+      "title": "This portal can't be shown here",
+      "description": "It was opened for a different website. Open it from the page that embeds it."
+    },
+    "tabs": {
+      "endpoints": "Endpoints",
+      "deliveries": "Deliveries"
+    },
+    "eventTypes": {
+      "all": "All event types"
+    },
+    "endpoints": {
+      "add": "Add endpoint",
+      "description": "The URLs events are sent to, and which events each one receives.",
+      "url": "URL",
+      "eventTypes": "Event types",
+      "status": "Status",
+      "created": "Created",
+      "noEventTypes": "None — receives nothing",
+      "moreTypes": "+{{count}} more",
+      "rotateSecret": "Rotate signing secret",
+      "loadFailed": "Couldn't load your endpoints",
+      "empty": {
+        "title": "No endpoints yet",
+        "description": "Add the URL that should receive events, and choose which events it gets."
+      },
+      "toast": {
+        "created": "Endpoint added",
+        "createFailed": "Couldn't add the endpoint",
+        "updated": "Endpoint saved",
+        "updateFailed": "Couldn't save the endpoint",
+        "deleted": "Endpoint deleted",
+        "deleteFailed": "Couldn't delete the endpoint",
+        "rotateFailed": "Couldn't rotate the secret"
+      },
+      "deleteDialog": {
+        "title": "Delete this endpoint?",
+        "description": "It stops receiving events straight away. Its past deliveries stay listed."
+      },
+      "rotateDialog": {
+        "title": "Rotate the signing secret?",
+        "description": "A new secret is created and shown once. The old one keeps working for 24 hours, so you can update your server without missing a delivery.",
+        "confirm": "Rotate"
+      }
+    },
+    "secret": {
+      "title": "Your signing secret",
+      "description": "Use it to verify that deliveries come from us. It is shown only now — copy it somewhere safe.",
+      "label": "Signing secret",
+      "standardLabel": "Standard Webhooks secret (whsec_…)",
+      "done": "I've saved it"
+    },
+    "endpointDialog": {
+      "createTitle": "Add endpoint",
+      "editTitle": "Edit endpoint",
+      "description": "Events are sent to this URL as signed HTTPS POST requests.",
+      "url": "URL",
+      "urlHint": "Must be reachable from the internet.",
+      "descriptionLabel": "Description",
+      "enabled": "Receiving events",
+      "eventTypes": "Event types",
+      "noKnownTypes": "No event types have been sent yet. Add one below.",
+      "customType": "Event type",
+      "customTypePlaceholder": "order.created or order.*",
+      "addType": "Add",
+      "invalidType": "Use lowercase words separated by dots, such as order.created. * and ** are wildcards.",
+      "removeType": "Remove {{type}}",
+      "noneSelected": "With no event types selected, this endpoint receives nothing.",
+      "create": "Add endpoint"
+    },
+    "deliveries": {
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "endpoint": "Endpoint",
+      "allEndpoints": "All endpoints",
+      "eventType": "Event type",
+      "attempts": "Attempts",
+      "created": "Created",
+      "open": "Open delivery {{type}}",
+      "loadFailed": "Couldn't load deliveries",
+      "empty": {
+        "title": "No deliveries yet",
+        "description": "Events sent to your endpoints appear here, with every attempt and the response your server gave."
+      },
+      "retry": "Retry",
+      "retryHint": "Retrying sends this event to the endpoint again, with a fresh set of attempts.",
+      "attemptsTitle": "Attempts",
+      "attemptsFailed": "Couldn't load the attempts",
+      "noAttempts": "No attempt has been made yet.",
+      "toast": {
+        "retried": "Retry scheduled",
+        "retryFailed": "Couldn't retry the delivery"
       }
     }
   }

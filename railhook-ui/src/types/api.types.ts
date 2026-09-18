@@ -121,11 +121,15 @@ export interface EndpointRequest {
   rateLimitPerSecond?: number;
   allowedSourceIps?: string;
   signatureScheme?: SignatureScheme;
+  /** The Consumer this endpoint belongs to. Absent leaves the assignment alone. */
+  consumerId?: string;
 }
 
 export interface EndpointResponse {
   id: string;
   projectId: string;
+  /** The Consumer this endpoint belongs to, or absent when it is the project's own. */
+  consumerId?: string;
   url: string;
   description?: string;
   enabled: boolean;
@@ -173,6 +177,81 @@ export interface DeliveryAttemptResponse {
   responseBody?: string;
   errorMessage?: string;
   durationMs?: number;
+  createdAt: string;
+}
+
+/** One of the customer's own users, grouping the endpoints registered for them. */
+export interface ConsumerResponse {
+  id: string;
+  projectId: string;
+  externalId: string;
+  name: string;
+  endpointCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConsumerRequest {
+  externalId: string;
+  name?: string;
+}
+
+export interface PortalSessionRequest {
+  ttlMinutes?: number;
+  allowedOrigin?: string;
+}
+
+/** A new portal session; the token is in this response and nowhere else. */
+export interface PortalSessionResponse {
+  id: string;
+  consumerId: string;
+  url: string;
+  token: string;
+  allowedOrigin?: string;
+  expiresAt: string;
+}
+
+/** What the portal learns about the session it runs in. */
+export interface PortalSessionInfoResponse {
+  consumerName: string;
+  projectName: string;
+  expiresAt: string;
+  allowedOrigin?: string;
+  eventTypes: string[];
+}
+
+export interface PortalEndpointRequest {
+  url: string;
+  description?: string;
+  enabled?: boolean;
+  eventTypes?: string[];
+}
+
+export interface PortalEndpointResponse {
+  id: string;
+  url: string;
+  description?: string;
+  enabled: boolean;
+  eventTypes: string[];
+  createdAt: string;
+  updatedAt: string;
+  /** Present only in the response that created or rotated it. */
+  secret?: string;
+  standardWebhooksSecret?: string;
+}
+
+export interface PortalDeliveryResponse {
+  id: string;
+  eventId: string;
+  eventType?: string;
+  endpointId: string;
+  status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'DLQ';
+  attemptCount: number;
+  maxAttempts: number;
+  nextRetryAt?: string;
+  lastAttemptAt?: string;
+  succeededAt?: string;
+  failedAt?: string;
   createdAt: string;
 }
 

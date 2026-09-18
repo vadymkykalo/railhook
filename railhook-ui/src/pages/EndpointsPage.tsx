@@ -36,7 +36,7 @@ import {
 } from '../components/ui/alert-dialog';
 import MtlsConfigModal from '../components/MtlsConfigModal';
 import SignatureSchemePicker from '../components/SignatureSchemePicker';
-import { SecretField } from './ConnectionSetupPage';
+import SecretField from '../components/SecretField';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';

@@ -22,7 +22,9 @@ import { incidentsApi, type IncidentRequest, type TimelineEntryRequest } from '.
 import { transformApi, type TransformPreviewRequest, type DeliveryDryRunRequest } from './transform.api';
 import { transformationsApi } from './transformations.api';
 import { rulesApi, type RuleRequest } from './rules.api';
-import type { EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest, TransformationRequest } from '../types/api.types';
+import { consumersApi } from './consumers.api';
+import { portalApi, type PortalDeliveryFilters } from './portal.api';
+import type { ConsumerRequest, PortalEndpointRequest, PortalSessionRequest, EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest, TransformationRequest } from '../types/api.types';
 
 // ─── Query Keys ────────────────────────────────────────────────────
 
@@ -132,6 +134,19 @@ export const queryKeys = {
     rules: {
         list: (projectId: string) => ['rules', projectId] as const,
         detail: (projectId: string, id: string) => ['rules', projectId, id] as const,
+    },
+    consumers: {
+        all: (projectId: string) => ['consumers', projectId] as const,
+        paged: (projectId: string, page: number, size: number) => ['consumers', projectId, 'paged', page, size] as const,
+        endpoints: (projectId: string, consumerId: string) => ['consumers', projectId, consumerId, 'endpoints'] as const,
+    },
+    // The portal holds one session per page, so its keys carry no project or consumer: whose
+    // data it is is decided by the token, and a page never sees a second one.
+    portal: {
+        session: ['portal', 'session'] as const,
+        endpoints: ['portal', 'endpoints'] as const,
+        deliveries: (filters: PortalDeliveryFilters) => ['portal', 'deliveries', filters] as const,
+        attempts: (deliveryId: string) => ['portal', 'deliveries', deliveryId, 'attempts'] as const,
     },
 } as const;
 
@@ -1081,5 +1096,131 @@ export function useReinstateOrganization() {
     return useMutation({
         mutationFn: ({ id, reason }: { id: string; reason: string }) => platformAdminApi.reinstate(id, reason),
         onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.platformAdmin.all }); },
+    });
+}
+
+// ─── Consumers ─────────────────────────────────────────────────────
+
+export function useConsumersPaged(projectId: string | undefined, page: number, size = 20) {
+    return useQuery({
+        queryKey: queryKeys.consumers.paged(projectId!, page, size),
+        queryFn: () => consumersApi.listPaged(projectId!, page, size),
+        enabled: !!projectId,
+        placeholderData: keepPreviousData,
+    });
+}
+
+export function useConsumerEndpoints(projectId: string | undefined, consumerId: string | null) {
+    return useQuery({
+        queryKey: queryKeys.consumers.endpoints(projectId!, consumerId!),
+        queryFn: () => consumersApi.listEndpoints(projectId!, consumerId!),
+        enabled: !!projectId && !!consumerId,
+    });
+}
+
+export function useCreateConsumer(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: ConsumerRequest) => consumersApi.create(projectId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.consumers.all(projectId) }); },
+    });
+}
+
+export function useDeleteConsumer(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => consumersApi.delete(projectId, id),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: queryKeys.consumers.all(projectId) });
+            // Deleting a Consumer deletes its endpoints.
+            qc.invalidateQueries({ queryKey: ['endpoints', projectId] });
+        },
+    });
+}
+
+export function useCreatePortalSession(projectId: string) {
+    return useMutation({
+        mutationFn: ({ consumerId, data }: { consumerId: string; data?: PortalSessionRequest }) =>
+            consumersApi.createPortalSession(projectId, consumerId, data),
+    });
+}
+
+export function useRevokePortalSessions(projectId: string) {
+    return useMutation({
+        mutationFn: (consumerId: string) => consumersApi.revokePortalSessions(projectId, consumerId),
+    });
+}
+
+// ─── Customer portal ───────────────────────────────────────────────
+
+export function usePortalSession(enabled: boolean) {
+    return useQuery({
+        queryKey: queryKeys.portal.session,
+        queryFn: () => portalApi.session(),
+        enabled,
+        retry: false,
+    });
+}
+
+export function usePortalEndpoints(enabled: boolean) {
+    return useQuery({
+        queryKey: queryKeys.portal.endpoints,
+        queryFn: () => portalApi.listEndpoints(),
+        enabled,
+    });
+}
+
+export function usePortalDeliveries(filters: PortalDeliveryFilters, enabled: boolean) {
+    return useQuery({
+        queryKey: queryKeys.portal.deliveries(filters),
+        queryFn: () => portalApi.listDeliveries(filters),
+        enabled,
+        placeholderData: keepPreviousData,
+    });
+}
+
+export function usePortalAttempts(deliveryId: string | null) {
+    return useQuery({
+        queryKey: queryKeys.portal.attempts(deliveryId!),
+        queryFn: () => portalApi.listAttempts(deliveryId!),
+        enabled: !!deliveryId,
+    });
+}
+
+export function useCreatePortalEndpoint() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: PortalEndpointRequest) => portalApi.createEndpoint(data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.portal.endpoints }); },
+    });
+}
+
+export function useUpdatePortalEndpoint() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: PortalEndpointRequest }) => portalApi.updateEndpoint(id, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.portal.endpoints }); },
+    });
+}
+
+export function useDeletePortalEndpoint() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => portalApi.deleteEndpoint(id),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.portal.endpoints }); },
+    });
+}
+
+export function useRotatePortalSecret() {
+    return useMutation({
+        mutationFn: (id: string) => portalApi.rotateSecret(id),
+    });
+}
+
+export function useRetryPortalDelivery() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (deliveryId: string) => portalApi.retryDelivery(deliveryId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['portal', 'deliveries'] }); },
     });
 }

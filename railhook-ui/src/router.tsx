@@ -65,6 +65,8 @@ const WorkflowBuilderPage = lazy(() => import('./pages/WorkflowBuilderPage'));
 const TunnelsPage = lazy(() => import('./pages/TunnelsPage'));
 const TestConsolePage = lazy(() => import('./pages/TestConsolePage'));
 const SharedDebugPage = lazy(() => import('./pages/SharedDebugPage'));
+const PortalPage = lazy(() => import('./pages/PortalPage'));
+const ConsumersPage = lazy(() => import('./pages/ConsumersPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 function PageLoader() {
@@ -147,6 +149,13 @@ export const router = createBrowserRouter([
         path: '/device',
         element: <S><DeviceApprovePage /></S>,
       },
+      /* The customer portal: what a customer embeds for their own user. No Railhook session and no
+         layout — its one credential is the portal session token in the URL's fragment. nginx
+         serves it under a location of its own, the one route here another site may frame. */
+      {
+        path: '/portal',
+        element: <S><PortalPage /></S>,
+      },
       /* Where the API sends the browser after "Continue with Google", with a one-time code to trade
          for a session. */
       {
@@ -193,6 +202,10 @@ export const router = createBrowserRouter([
           {
             path: 'projects/:projectId/deliveries',
             element: <S><DeliveriesPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/consumers',
+            element: <S><ConsumersPage /></S>,
           },
           {
             path: 'projects/:projectId/events',

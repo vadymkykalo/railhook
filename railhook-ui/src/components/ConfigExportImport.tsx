@@ -5,7 +5,7 @@ import { showApiError, showSuccess, showWarning } from '../lib/toast';
 import { endpointsApi } from '../api/endpoints.api';
 import { subscriptionsApi, type SubscriptionRequest } from '../api/subscriptions.api';
 import type { EndpointRequest, SignatureScheme } from '../types/api.types';
-import { SecretField } from '../pages/ConnectionSetupPage';
+import SecretField from './SecretField';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 

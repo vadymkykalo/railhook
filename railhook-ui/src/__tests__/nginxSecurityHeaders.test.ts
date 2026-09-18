@@ -7,6 +7,10 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '.
 const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 
 const SNIPPET = '/etc/nginx/snippets/security-headers.conf';
+const COMMON = '/etc/nginx/snippets/security-headers-common.conf';
+
+/** The one page another site may frame; nginxRoutes.test.ts holds its headers to that. */
+const FRAMEABLE = '= /portal';
 
 /**
  * nginx inherits `add_header` from the server block only into a location that sets none of its
@@ -34,12 +38,19 @@ function locationBlocks(conf: string) {
 describe('nginx security headers', () => {
   const conf = read('railhook-ui/nginx.conf');
 
-  it('keeps the headers in a snippet the image ships', () => {
+  it('keeps the headers in snippets the image ships', () => {
+    // X-Frame-Options in the snippet every page includes; the rest in one it shares with the
+    // portal, the single page that is framed on purpose.
     const snippet = read('railhook-ui/nginx-security-headers.conf');
-    for (const header of ['X-Frame-Options', 'X-Content-Type-Options', 'Referrer-Policy', 'Permissions-Policy']) {
-      expect(snippet, header).toMatch(new RegExp(`^\\s*add_header ${header} `, 'm'));
+    const common = read('railhook-ui/nginx-security-headers-common.conf');
+    expect(snippet).toMatch(/^\s*add_header X-Frame-Options "SAMEORIGIN" always;/m);
+    expect(snippet).toMatch(new RegExp(`^\\s*include ${COMMON};`, 'm'));
+    for (const header of ['X-Content-Type-Options', 'Referrer-Policy', 'Permissions-Policy']) {
+      expect(common, header).toMatch(new RegExp(`^\\s*add_header ${header} `, 'm'));
     }
-    expect(read('railhook-ui/Dockerfile')).toMatch(new RegExp(`COPY railhook-ui/nginx-security-headers.conf ${SNIPPET}`));
+    const dockerfile = read('railhook-ui/Dockerfile');
+    expect(dockerfile).toMatch(new RegExp(`COPY railhook-ui/nginx-security-headers.conf ${SNIPPET}`));
+    expect(dockerfile).toMatch(new RegExp(`COPY railhook-ui/nginx-security-headers-common.conf ${COMMON}`));
   });
 
   it('finds the locations it is meant to be checking', () => {
@@ -49,7 +60,7 @@ describe('nginx security headers', () => {
   it('every location that adds a header of its own also includes the security headers', () => {
     const missing = locationBlocks(conf)
       .filter((b) => /^\s*add_header\s/m.test(b.body))
-      .filter((b) => !b.body.includes(`include ${SNIPPET};`))
+      .filter((b) => !b.body.includes(`include ${b.head === FRAMEABLE ? COMMON : SNIPPET};`))
       .map((b) => b.head);
     expect(missing).toEqual([]);
   });
