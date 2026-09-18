@@ -12,6 +12,7 @@ import io.swagger.v3.oas.models.servers.ServerVariable;
 import io.swagger.v3.oas.models.servers.ServerVariables;
 import io.swagger.v3.oas.models.tags.Tag;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.PortalContext;
 import org.springdoc.core.utils.SpringDocUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -32,6 +33,8 @@ public class OpenApiConfig {
         // reads it as a method parameter and publishes it as a required `auth` query object,
         // which describes an API that does not exist.
         SpringDocUtils.getConfig().addRequestWrapperToIgnore(AuthContext.class);
+        // The same for the portal, whose context comes off the portal session's token.
+        SpringDocUtils.getConfig().addRequestWrapperToIgnore(PortalContext.class);
     }
 
     @Bean
@@ -53,6 +56,8 @@ public class OpenApiConfig {
                                 ## Authentication
                                 - **API key** (`X-API-Key` header): project-scoped calls, including sending events. What the SDKs use.
                                 - **Bearer token**: account and organization calls made on behalf of a signed-in user.
+                                - **Portal session** (`Authorization: Bearer rhp_…`): the `/api/v1/portal/**` calls the \
+                                embedded customer portal makes for one Consumer. Opened by your backend with an API key.
 
                                 Guides: [/docs/](/docs/)
                                 """)
@@ -72,7 +77,9 @@ public class OpenApiConfig {
                         new Tag().name("Subscriptions").description("Event type subscriptions for endpoints"),
                         new Tag().name("Events").description("Event ingestion and history"),
                         new Tag().name("Deliveries").description("Delivery status, attempts, and replay operations"),
-                        new Tag().name("API Keys").description("API key management for event ingestion")))
+                        new Tag().name("API Keys").description("API key management for event ingestion"),
+                        new Tag().name("Consumers").description("Your own users, their endpoints, and the portal sessions you open for them"),
+                        new Tag().name("Portal").description("What the embedded customer portal calls, authenticated by a portal session")))
                 .components(new Components()
                         .addSecuritySchemes("bearerAuth", new SecurityScheme()
                                 .type(SecurityScheme.Type.HTTP)
@@ -89,7 +96,13 @@ public class OpenApiConfig {
                                 .in(SecurityScheme.In.HEADER)
                                 .name("X-Platform-Admin-Token")
                                 .description("Cluster-operator credential (PLATFORM_ADMIN_TOKEN env var), independent "
-                                        + "of tenant org membership — required for cross-tenant admin endpoints")))
+                                        + "of tenant org membership — required for cross-tenant admin endpoints"))
+                        .addSecuritySchemes("portalSession", new SecurityScheme()
+                                .type(SecurityScheme.Type.HTTP)
+                                .scheme("bearer")
+                                .bearerFormat("rhp_…")
+                                .description("Portal session token, returned once by "
+                                        + "POST /api/v1/projects/{projectId}/consumers/{consumerId}/portal-sessions")))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
     }
 

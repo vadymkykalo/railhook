@@ -31,6 +31,7 @@ import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -163,13 +164,38 @@ public class DeliveryService {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
         validateDeliveryAccess(delivery, auth);
+        returnToLadder(delivery);
+    }
+
+    /**
+     * The customer portal's retry: the same return to the ladder, for a Delivery to one of the
+     * given Endpoints. A Delivery to any other Endpoint is "not found", exactly like a missing one
+     * — the portal has no project-level access to fall back on, only its Consumer's Endpoints.
+     */
+    @Transactional
+    public void retryDeliveryToEndpoints(UUID deliveryId, Collection<UUID> endpointIds) {
+        returnToLadder(requireDeliveryToEndpoints(deliveryId, endpointIds));
+    }
+
+    /** The attempts of a Delivery to one of the given Endpoints; see {@link #retryDeliveryToEndpoints}. */
+    public List<DeliveryAttemptResponse> getDeliveryAttemptsToEndpoints(UUID deliveryId, Collection<UUID> endpointIds) {
+        return attemptsOf(requireDeliveryToEndpoints(deliveryId, endpointIds));
+    }
+
+    private Delivery requireDeliveryToEndpoints(UUID deliveryId, Collection<UUID> endpointIds) {
+        return deliveryRepository.findById(deliveryId)
+                .filter(delivery -> endpointIds.contains(delivery.getEndpointId()))
+                .orElseThrow(() -> new NotFoundException("Delivery not found"));
+    }
+
+    private void returnToLadder(Delivery delivery) {
         requireReturnable(delivery);
 
         delivery.returnToLadder(Delivery.MANUAL_RETRY_ATTEMPTS);
         deliveryRepository.save(delivery);
 
         deliveryDispatch.announce(delivery, resolveProjectId(delivery), DeliveryDispatch.Reason.REPLAYED);
-        log.info("Replayed delivery: {}", deliveryId);
+        log.info("Replayed delivery: {}", delivery.getId());
     }
 
     /**
@@ -195,9 +221,12 @@ public class DeliveryService {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
         validateDeliveryAccess(delivery, auth);
+        return attemptsOf(delivery);
+    }
 
+    private List<DeliveryAttemptResponse> attemptsOf(Delivery delivery) {
         List<DeliveryAttempt> attempts = deliveryAttemptRepository
-                .findByDeliveryIdOrderByAttemptNumberAsc(deliveryId);
+                .findByDeliveryIdOrderByAttemptNumberAsc(delivery.getId());
 
         UUID projectId = resolveProjectId(delivery);
         return attempts.stream()

@@ -31,6 +31,13 @@ public class Endpoint {
     @Column(name = "project_id", nullable = false)
     private UUID projectId;
 
+    /**
+     * The Consumer this Endpoint was registered for, or null when it is the customer's own. What
+     * a portal session is confined to; the worker never reads it.
+     */
+    @Column(name = "consumer_id")
+    private UUID consumerId;
+
     @Column(nullable = false, length = 2048)
     private String url;
 

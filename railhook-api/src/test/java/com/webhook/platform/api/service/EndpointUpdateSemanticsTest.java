@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Project;
+import com.webhook.platform.api.domain.repository.ConsumerRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.EndpointRequest;
@@ -22,6 +23,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -55,7 +57,7 @@ class EndpointUpdateSemanticsTest {
     @BeforeEach
     void setUp() throws Exception {
         service = new EndpointService(
-                endpointRepository, projectRepository, WebClient.builder(), buildRegistry(),
+                endpointRepository, projectRepository, mock(ConsumerRepository.class), WebClient.builder(), buildRegistry(),
                 true, Collections.emptyList(), false);
 
         when(endpointRepository.saveAndFlush(any(Endpoint.class))).thenAnswer(inv -> inv.getArgument(0));

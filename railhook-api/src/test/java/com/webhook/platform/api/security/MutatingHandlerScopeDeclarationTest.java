@@ -60,6 +60,15 @@ class MutatingHandlerScopeDeclarationTest {
      * <p>Adding an entry here is a security decision — say why, and prefer annotating instead.
      */
     private static final Set<String> DOCUMENTED_EXEMPTIONS = new TreeSet<>(Set.of(
+            // The customer portal: a portal session, never an API key, is the caller —
+            // SecurityConfig refuses an API key on /api/v1/portal/** outright, so there is no
+            // scope to check. PortalService confines every row to the session's Consumer.
+            "PortalController.portalCreateEndpoint",
+            "PortalController.portalUpdateEndpoint",
+            "PortalController.portalDeleteEndpoint",
+            "PortalController.portalRotateEndpointSecret",
+            "PortalController.portalRetryDelivery",
+
             // Authentication: these mint or exchange the credential itself, so an API-key
             // scope cannot apply. Public paths in SecurityConfig.
             "AuthController.register",

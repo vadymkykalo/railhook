@@ -5,6 +5,7 @@ import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Project;
+import com.webhook.platform.api.domain.repository.ConsumerRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.EndpointRequest;
@@ -41,6 +42,7 @@ public class EndpointService {
 
     private final EndpointRepository endpointRepository;
     private final ProjectRepository projectRepository;
+    private final ConsumerRepository consumerRepository;
     private final WebClient webClient;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
@@ -50,6 +52,7 @@ public class EndpointService {
     public EndpointService(
             EndpointRepository endpointRepository,
             ProjectRepository projectRepository,
+            ConsumerRepository consumerRepository,
             WebClient.Builder webClientBuilder,
             EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
@@ -57,6 +60,7 @@ public class EndpointService {
             @Value("${webhook.endpoint-verification-required:false}") boolean endpointVerificationRequired) {
         this.endpointRepository = endpointRepository;
         this.projectRepository = projectRepository;
+        this.consumerRepository = consumerRepository;
         this.webClient = webClientBuilder
                 .clientConnector(new ReactorClientHttpConnector(
                         SsrfProtectionCustomizer.apply(
@@ -90,11 +94,24 @@ public class EndpointService {
                 .orElseThrow(() -> new NotFoundException("Endpoint not found"));
     }
 
+    /**
+     * A Consumer named on an endpoint must be one of that endpoint's project: another project's
+     * is "not found" like a missing one, or an API key could file an endpoint into a portal it
+     * has no business in.
+     */
+    private UUID requireConsumerOfProject(UUID projectId, UUID consumerId) {
+        return consumerRepository.findByIdAndProjectId(consumerId, projectId)
+                .orElseThrow(() -> new NotFoundException("Consumer not found"))
+                .getId();
+    }
+
     @Auditable(action = AuditAction.CREATE, resourceType = "Endpoint")
     @Transactional
     public EndpointResponse createEndpoint(UUID projectId, EndpointRequest request) {
         validateProjectOwnership(projectId);
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
+        UUID consumerId = request.getConsumerId() == null ? null
+                : requireConsumerOfProject(projectId, request.getConsumerId());
         
         // Auto-generate secret if not provided
         String secret = request.getSecret();
@@ -105,6 +122,7 @@ public class EndpointService {
         
         Endpoint endpoint = Endpoint.builder()
                 .projectId(projectId)
+                .consumerId(consumerId)
                 .url(request.getUrl())
                 .description(blankToNull(request.getDescription()))
                 .secretEncrypted(encrypted.getCiphertext())
@@ -145,6 +163,14 @@ public class EndpointService {
                 .collect(Collectors.toList());
     }
 
+    /** The live Endpoints registered for one of the project's Consumers, oldest first. */
+    public List<EndpointResponse> listEndpointsOfConsumer(UUID projectId, UUID consumerId) {
+        requireConsumerOfProject(projectId, consumerId);
+        return endpointRepository.findByConsumerIdAndDeletedAtIsNullOrderByCreatedAtAsc(consumerId).stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
     public Page<EndpointResponse> listEndpoints(UUID projectId, Pageable pageable) {
         validateProjectOwnership(projectId);
         return endpointRepository.findByProjectIdAndDeletedAtIsNull(projectId, pageable)
@@ -157,6 +183,10 @@ public class EndpointService {
         Endpoint endpoint = requireEndpoint(projectId, id);
         
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
+
+        if (request.getConsumerId() != null) {
+            endpoint.setConsumerId(requireConsumerOfProject(projectId, request.getConsumerId()));
+        }
 
         // Verification belongs to the URL that earned it, not to the endpoint row. The worker
         // gate asks only whether the status is VERIFIED or SKIPPED, so leaving the status alone
@@ -405,6 +435,7 @@ public class EndpointService {
         return EndpointResponse.builder()
                 .id(endpoint.getId())
                 .projectId(endpoint.getProjectId())
+                .consumerId(endpoint.getConsumerId())
                 .url(endpoint.getUrl())
                 .description(endpoint.getDescription())
                 .enabled(endpoint.getEnabled())

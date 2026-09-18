@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.repository.AuditLogRepository;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.PlatformAdminUserAuthenticationToken;
+import com.webhook.platform.api.security.PortalSessionAuthenticationToken;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.api.tenancy.TenantPropagatingTaskDecorator;
@@ -94,6 +95,9 @@ public class AuditLogAspect {
             orgId = auth instanceof PlatformAdminUserAuthenticationToken ? null : jwtAuth.getOrganizationId();
         } else if (auth instanceof ApiKeyAuthenticationToken apiKeyAuth) {
             orgId = apiKeyAuth.getOrganizationId();
+        } else if (auth instanceof PortalSessionAuthenticationToken portalAuth) {
+            // No user: the change was made by the customer's own user, from the portal.
+            orgId = portalAuth.getOrganizationId();
         }
 
         // Not dead code, and not a fallback for the two branches above: it exists for the one
