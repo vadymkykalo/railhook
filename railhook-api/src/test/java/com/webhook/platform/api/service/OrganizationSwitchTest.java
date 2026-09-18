@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 /**
  * Reaching a second organization at all, and not reaching a third.
@@ -82,7 +83,7 @@ class OrganizationSwitchTest {
         authService = new AuthService(userRepository, organizationRepository, membershipRepository,
                 planRepository, jwtUtil, new BCryptPasswordEncoder(4), tokenBlacklistService,
                 userSessionService, accountLockoutService, emailService,
-                org.mockito.Mockito.mock(VerificationMailBudget.class), false);
+                org.mockito.Mockito.mock(VerificationMailBudget.class), mock(OnboardingMailService.class), false);
 
         refreshToken = jwtUtil.generateRefreshToken(userId, sessionId);
         session = UserSession.builder()

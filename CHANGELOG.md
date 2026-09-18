@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Onboarding email for new accounts.** With `ONBOARDING_EMAILS_ENABLED=true`, an account gets a
+  short welcome once its address is verified (or at sign-up, when it is created already verified)
+  with three next steps — the quickstart, receiving from Stripe or GitHub, and replying with
+  questions — and, two days later, one nudge if its organization has still sent and received no
+  events. Each is sent at most once per account, replies go to `EMAIL_SUPPORT_ADDRESS`, and
+  suspended accounts and organizations are skipped. Off by default: both mails are written as
+  Railhook's author, for Railhook Cloud. Accounts that exist before the upgrade are marked as
+  already onboarded and never receive either. Migration `V082` adds two nullable columns to
+  `users`.
+
 ## [2.22.0] - 2026-09-18
 
 ### Added

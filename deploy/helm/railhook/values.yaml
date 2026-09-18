@@ -386,6 +386,9 @@ backup:
 email:
   enabled: false
   from: noreply@example.com
+  # ONBOARDING_EMAILS_ENABLED: a welcome and one day-2 nudge to new accounts, written as
+  # Railhook's author. Meant for Railhook Cloud; leave off on your own install.
+  onboarding: false
   smtp:
     host: ""
     port: 587

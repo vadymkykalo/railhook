@@ -71,7 +71,7 @@ class SignInWithoutMembershipTest {
         authService = new AuthService(userRepository, organizationRepository, membershipRepository,
                 planRepository, jwtUtil, encoder, tokenBlacklistService, userSessionService,
                 new AccountLockoutService(userRepository, true, 3, 60, 900, 60), emailService,
-                mock(VerificationMailBudget.class), true);
+                mock(VerificationMailBudget.class), mock(OnboardingMailService.class), true);
 
         user = User.builder()
                 .id(UUID.randomUUID())

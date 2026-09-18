@@ -369,6 +369,10 @@ app:
     enabled: ${EMAIL_ENABLED:false}
     from: ${EMAIL_FROM:noreply@example.com}
     support-address: ${EMAIL_SUPPORT_ADDRESS:}
+  # The welcome and day-2 nudge mails to new accounts, written as Railhook's author. Off unless a
+  # deployment asks: a self-hosted install should not mail its users in someone else's name.
+  onboarding-emails:
+    enabled: ${ONBOARDING_EMAILS_ENABLED:false}
 
 spring.mail:
   host: ${SMTP_HOST:localhost}

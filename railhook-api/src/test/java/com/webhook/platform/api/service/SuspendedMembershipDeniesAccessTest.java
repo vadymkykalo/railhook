@@ -37,6 +37,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 /**
  * Where a suspension is actually refused.
@@ -78,7 +79,7 @@ class SuspendedMembershipDeniesAccessTest {
         authService = new AuthService(userRepository, organizationRepository, membershipRepository,
                 planRepository, jwtUtil, new BCryptPasswordEncoder(4), tokenBlacklistService,
                 userSessionService, accountLockoutService, emailService,
-                org.mockito.Mockito.mock(VerificationMailBudget.class), false);
+                org.mockito.Mockito.mock(VerificationMailBudget.class), mock(OnboardingMailService.class), false);
 
         user = new User();
         user.setId(UUID.randomUUID());

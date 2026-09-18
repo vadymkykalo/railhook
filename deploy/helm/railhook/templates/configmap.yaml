@@ -31,6 +31,7 @@ data:
   # is set on the api Deployment rather than here.
   EMAIL_ENABLED: {{ .Values.email.enabled | quote }}
   EMAIL_FROM: {{ .Values.email.from | quote }}
+  ONBOARDING_EMAILS_ENABLED: {{ .Values.email.onboarding | default false | quote }}
   SMTP_HOST: {{ .Values.email.smtp.host | quote }}
   SMTP_PORT: {{ .Values.email.smtp.port | quote }}
   SMTP_USERNAME: {{ .Values.email.smtp.username | quote }}

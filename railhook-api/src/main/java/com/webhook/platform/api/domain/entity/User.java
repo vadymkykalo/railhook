@@ -67,6 +67,17 @@ public class User {
     @Column(name = "lockout_expires_at")
     private Instant lockoutExpiresAt;
 
+    /**
+     * When the onboarding welcome went out — set once, when the address is proven, and only on a
+     * deployment with onboarding mail on. Also when the day-2 nudge is timed from.
+     */
+    @Column(name = "onboarding_welcome_sent_at")
+    private Instant onboardingWelcomeSentAt;
+
+    /** When the day-2 onboarding nudge went out. Never cleared, so it is sent at most once. */
+    @Column(name = "onboarding_nudge_sent_at")
+    private Instant onboardingNudgeSentAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

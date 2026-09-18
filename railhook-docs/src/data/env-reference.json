@@ -1348,6 +1348,12 @@
           "description": "Where a person is told to write when an email change on their account was not\nthem. It appears in the notice sent to the old address. Leave empty and the\nnotice says to contact the administrator of this installation instead."
         },
         {
+          "name": "ONBOARDING_EMAILS_ENABLED",
+          "default": "false",
+          "example": null,
+          "description": "Onboarding mail to new accounts: a welcome once the address is verified, and one\nnudge two days later if the account's organization has still sent and received no\nevents. Each goes at most once per account, replies go to EMAIL_SUPPORT_ADDRESS, and\nnothing is sent unless EMAIL_ENABLED is on too. Accounts that existed before the\nupgrade that introduced this never receive either.\n\nOff by default, and meant to stay off on a self-hosted install: both mails are written\nin the first person by Railhook's author, for Railhook Cloud."
+        },
+        {
           "name": "SMTP_HOST",
           "default": "localhost",
           "example": null,

@@ -16,12 +16,15 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import jakarta.mail.internet.MimeMessage;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -355,6 +358,104 @@ class EmailServiceTest {
             // Exactly one copy, in the HTML body. A text alternative here would widen the
             // same exposure sendTemporaryPasswordEmail already refuses to widen by logging.
             assertThat(wire(message).split("TempPw!12345", -1).length - 1).isEqualTo(1);
+        }
+    }
+
+    /**
+     * The two onboarding mails: a welcome when an address is proven, and one nudge two days later
+     * for an account that has not sent anything yet. Written as a person, so a reply is the point —
+     * it goes to the support address, never to the no-reply sender.
+     */
+    @Nested
+    @DisplayName("the onboarding mails")
+    class Onboarding {
+
+        private MimeMessage captured() {
+            MimeMessage message = new MimeMessage((jakarta.mail.Session) null);
+            when(mailSender.createMimeMessage()).thenReturn(message);
+            return message;
+        }
+
+        private String wire(MimeMessage message) throws Exception {
+            var out = new ByteArrayOutputStream();
+            message.writeTo(out);
+            return out.toString(StandardCharsets.UTF_8);
+        }
+
+        @Test
+        @DisplayName("the welcome goes to the new account, replies go to support, and the text part carries the quickstart")
+        void welcome() throws Exception {
+            emailEnabled(true);
+            environment("production");
+            ReflectionTestUtils.setField(service, "supportAddress", "support@railhook.test");
+            MimeMessage message = captured();
+
+            service.sendWelcomeEmail("new@acme.io");
+
+            assertThat(message.getAllRecipients()).extracting(Object::toString).containsExactly("new@acme.io");
+            assertThat(message.getReplyTo()).extracting(Object::toString).containsExactly("support@railhook.test");
+            String sent = wire(message);
+            assertThat(sent).contains("multipart/alternative").contains("text/plain").contains("text/html");
+            assertThat(plainPart(sent))
+                    .contains("https://railhook.test/docs/start/quickstart/")
+                    .contains("https://railhook.test/docs/");
+            assertThat(loggedText()).contains("Mail onboarding-welcome to n***w@acme.io sent");
+        }
+
+        @Test
+        @DisplayName("without a support address a reply goes back to the sender, not nowhere")
+        void welcomeWithoutSupportAddress() throws Exception {
+            emailEnabled(true);
+            ReflectionTestUtils.setField(service, "supportAddress", "");
+            MimeMessage message = captured();
+
+            service.sendWelcomeEmail("new@acme.io");
+
+            assertThat(message.getHeader("Reply-To")).isNull();
+            assertThat(message.getFrom()).extracting(Object::toString).containsExactly("noreply@railhook.test");
+        }
+
+        @Test
+        @DisplayName("the nudge is the same shape: to the account, replies to support, the quickstart in plain text")
+        void nudge() throws Exception {
+            emailEnabled(true);
+            ReflectionTestUtils.setField(service, "supportAddress", "support@railhook.test");
+            MimeMessage message = captured();
+
+            service.sendOnboardingNudgeEmail("new@acme.io");
+
+            assertThat(message.getAllRecipients()).extracting(Object::toString).containsExactly("new@acme.io");
+            assertThat(message.getReplyTo()).extracting(Object::toString).containsExactly("support@railhook.test");
+            String sent = wire(message);
+            assertThat(sent).contains("text/plain").contains("text/html");
+            assertThat(plainPart(sent)).contains("https://railhook.test/docs/start/quickstart/");
+            assertThat(loggedText()).contains("Mail onboarding-nudge to n***w@acme.io sent");
+        }
+
+        @Test
+        @DisplayName("with email off nothing is sent, and the log says which mail and to whom")
+        void disabledOnlyLogs() {
+            emailEnabled(false);
+            environment("production");
+
+            service.sendWelcomeEmail("new@acme.io");
+            service.sendOnboardingNudgeEmail("new@acme.io");
+
+            verifyNoInteractions(mailSender);
+            assertThat(loggedText())
+                    .contains("onboarding-welcome")
+                    .contains("onboarding-nudge")
+                    .contains("n***w@acme.io")
+                    .doesNotContain("new@acme.io");
+        }
+
+        /** The text/plain part as sent: what a client that will not render HTML shows. */
+        private String plainPart(String wire) {
+            int start = wire.indexOf("text/plain");
+            int end = wire.indexOf("text/html");
+            assertThat(start).isGreaterThanOrEqualTo(0);
+            assertThat(end).isGreaterThan(start);
+            return wire.substring(start, end);
         }
     }
 
