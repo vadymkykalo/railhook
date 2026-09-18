@@ -138,4 +138,22 @@ class StrandedSequenceRepositoryTest extends AbstractIntegrationTest {
 
         assertThat(stranded()).doesNotContain(done.getId(), abandoned.getId());
     }
+
+    /**
+     * Both callers of the backfill — the ingest after its commit and the stranded sweep — run it
+     * with no transaction open, and a JPQL update refuses to run without one. Every ordered
+     * Delivery ingested through the API therefore went out unordered: on railhook.io the log said
+     * "No active transaction for update or delete query" for each, and the sweep meant to repair
+     * them failed the same way.
+     */
+    @Test
+    @DisplayName("the backfill writes the number when called with no transaction open, as both callers do")
+    void backfillRunsWithoutACallerTransaction() {
+        Delivery ordered = delivery(true, null, DeliveryStatus.PENDING, Instant.now());
+
+        int updated = deliveryRepository.updateSequenceNumber(ordered.getId(), 7L);
+
+        assertThat(updated).isEqualTo(1);
+        assertThat(deliveryRepository.findById(ordered.getId()).orElseThrow().getSequenceNumber()).isEqualTo(7L);
+    }
 }
