@@ -1,7 +1,6 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
@@ -31,7 +30,7 @@ public class EventService {
 
     private final EventRepository eventRepository;
     private final ProjectRepository projectRepository;
-    private final SubscriptionRepository subscriptionRepository;
+    private final EventIntake eventIntake;
     private final DeliveryRepository deliveryRepository;
     private final OutboxMessageRepository outboxMessageRepository;
     private final ObjectMapper objectMapper;
@@ -43,7 +42,7 @@ public class EventService {
     public EventService(
             EventRepository eventRepository,
             ProjectRepository projectRepository,
-            SubscriptionRepository subscriptionRepository,
+            EventIntake eventIntake,
             DeliveryRepository deliveryRepository,
             OutboxMessageRepository outboxMessageRepository,
             ObjectMapper objectMapper,
@@ -53,7 +52,7 @@ public class EventService {
             SchemaValidationGate schemaValidationGate) {
         this.eventRepository = eventRepository;
         this.projectRepository = projectRepository;
-        this.subscriptionRepository = subscriptionRepository;
+        this.eventIntake = eventIntake;
         this.deliveryRepository = deliveryRepository;
         this.outboxMessageRepository = outboxMessageRepository;
         this.objectMapper = objectMapper;
@@ -138,20 +137,20 @@ public class EventService {
         event = eventRepository.saveAndFlush(event);
         log.info("Created test event: {} for project: {}", event.getId(), projectId);
 
-        List<Subscription> subscriptions = subscriptionRepository
-                .findByProjectIdAndEventTypeAndEnabledTrue(projectId, request.getType());
-        log.info("Found {} active subscriptions for event type: {}", subscriptions.size(), request.getType());
+        // The same decision a real ingest of this Event gets — pattern Subscriptions, rules,
+        // fan-out limit — or the test answers a question nobody asked. It used to match the type
+        // exactly and skip the rules, so an order.* Subscription looked broken from here.
+        EventIntake.Decision decision = eventIntake.decide(event);
+        if (decision.dropped()) {
+            log.info("Rule DROP action — no deliveries for test event {}", event.getId());
+            return testEventResponse(event, 0, schemaWarnings);
+        }
 
-        List<Delivery> deliveriesToSave = new ArrayList<>(subscriptions.size());
-        for (Subscription subscription : subscriptions) {
-            Long sequenceNumber = null;
-            boolean orderingEnabled = Boolean.TRUE.equals(subscription.getOrderingEnabled());
-            
-            if (orderingEnabled) {
-                sequenceNumber = sequenceGeneratorService.nextSequence(subscription.getEndpointId());
+        List<Delivery> deliveriesToSave = decision.deliveries();
+        for (Delivery delivery : deliveriesToSave) {
+            if (Boolean.TRUE.equals(delivery.getOrderingEnabled())) {
+                delivery.setSequenceNumber(sequenceGeneratorService.nextSequence(delivery.getEndpointId()));
             }
-            
-            deliveriesToSave.add(createDelivery(event, subscription, sequenceNumber, orderingEnabled));
         }
         List<Delivery> savedDeliveries = deliveryRepository.saveAll(deliveriesToSave);
 
@@ -163,6 +162,10 @@ public class EventService {
 
         int deliveriesCreated = savedDeliveries.size();
         log.info("Created {} deliveries for test event: {}", deliveriesCreated, event.getId());
+        return testEventResponse(event, deliveriesCreated, schemaWarnings);
+    }
+
+    private EventResponse testEventResponse(Event event, int deliveriesCreated, List<String> schemaWarnings) {
         EventResponse response = mapToResponseWithDeliveries(event, deliveriesCreated);
         // A test event is somebody checking their payload, so this is where a WARN policy's
         // findings are worth the most: they arrive with the thing they are about.
@@ -181,25 +184,6 @@ public class EventService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to serialize event payload", e);
         }
-    }
-
-    private Delivery createDelivery(Event event, Subscription subscription, Long sequenceNumber, boolean orderingEnabled) {
-        return Delivery.builder()
-                .eventId(event.getId())
-                .endpointId(subscription.getEndpointId())
-                .subscriptionId(subscription.getId())
-                .status(DeliveryStatus.PENDING)
-                .attemptCount(0)
-                .maxAttempts(subscription.getMaxAttempts() != null ? subscription.getMaxAttempts() : 7)
-                .sequenceNumber(sequenceNumber)
-                .orderingEnabled(orderingEnabled)
-                .timeoutSeconds(subscription.getTimeoutSeconds() != null ? subscription.getTimeoutSeconds() : 30)
-                .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays()
-                        : RetryLadderDefaults.OUTGOING_DELAYS)
-                .payloadTemplate(subscription.getPayloadTemplate())
-                .customHeaders(subscription.getCustomHeaders())
-                .transformationId(subscription.getTransformationId())
-                .build();
     }
 
     private EventResponse mapToResponse(Event event) {

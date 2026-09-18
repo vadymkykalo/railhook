@@ -15,7 +15,6 @@ import java.util.UUID;
 public interface SubscriptionRepository extends JpaRepository<Subscription, UUID> {
 
     Optional<Subscription> findByIdAndProjectId(UUID id, UUID projectId);
-    List<Subscription> findByProjectIdAndEventTypeAndEnabledTrue(UUID projectId, String eventType);
     List<Subscription> findByProjectIdAndEnabledTrue(UUID projectId);
     List<Subscription> findByProjectId(UUID projectId);
     boolean existsByProjectId(UUID projectId);
