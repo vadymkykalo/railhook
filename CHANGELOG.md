@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **MCP server for AI agents.** Railhook serves a remote MCP server at `/mcp` (Streamable HTTP,
+  authenticated with a project API key as a bearer token or `X-API-Key`), so Claude Code, Cursor
+  and other agents can send events, list endpoints, subscriptions and deliveries, read a
+  delivery's attempts, create endpoints and subscriptions, and replay a delivery. A `READ_ONLY`
+  key gets the read tools only. `@railhook/mcp` on npm bridges it to stdio-only clients such as
+  Claude Desktop. `MCP_ENABLED=false` turns it off on a self-hosted instance.
+
 ## [2.20.13] - 2026-09-18
 
 ### Fixed

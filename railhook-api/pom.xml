@@ -223,6 +223,14 @@
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
         <!--
+          The remote MCP server: Streamable HTTP at /mcp, stateless, tools in
+          com.webhook.platform.api.mcp. Version from spring-ai-bom in the reactor pom.
+        -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
+        </dependency>
+        <!--
           Bumped within the 5.x line only (latest is 5.16.0). ShedLock
           6.0.0 (2025) restructured lock-provider internals - e.g. multiple
           LockProvider support - and 7.0.0-RC1 moved DatabaseProduct to a new

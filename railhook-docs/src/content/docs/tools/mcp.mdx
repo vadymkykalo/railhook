@@ -1,0 +1,129 @@
+---
+title: MCP server
+description: Let an AI agent — Claude Code, Cursor, Claude Desktop — send events and inspect endpoints, subscriptions and deliveries with a project API key.
+---
+import { Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Railhook serves a [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp`, so an AI agent can work with your project directly: find out why a delivery failed, replay it, register an endpoint, send a test event. The server authenticates with a project API key and can do nothing that key cannot.
+
+| Where | MCP server URL |
+|---|---|
+| Railhook Cloud | `https://railhook.io/mcp` |
+| Self-hosted | `<your origin>/mcp`, e.g. `https://hooks.example.com/mcp` |
+
+It speaks Streamable HTTP. Clients that only start local processes use the `@railhook/mcp` package, a stdio bridge to the same server.
+
+<Aside type="tip">
+Start with a `READ_ONLY` key. The read tools work with it, and every tool that changes something is refused, so an agent can explore a project without being able to send an event or replay a delivery. Create a `READ_WRITE` key when you want it to act. [Authentication](/docs/platform/authentication/) covers creating keys and their scopes.
+</Aside>
+
+## Connect a client
+
+<Tabs syncKey="mcp-client">
+  <TabItem label="Claude Code">
+    ```bash
+    claude mcp add --transport http railhook https://railhook.io/mcp \
+      --header "Authorization: Bearer $RAILHOOK_API_KEY"
+    ```
+
+    Add `--scope user` to have it in every project. `claude mcp list` shows whether it connected.
+  </TabItem>
+  <TabItem label="Cursor">
+    ```json title=".cursor/mcp.json"
+    {
+      "mcpServers": {
+        "railhook": {
+          "url": "https://railhook.io/mcp",
+          "headers": {
+            "Authorization": "Bearer ${env:RAILHOOK_API_KEY}"
+          }
+        }
+      }
+    }
+    ```
+
+    `~/.cursor/mcp.json` makes it available in every project. `${env:RAILHOOK_API_KEY}` is read from Cursor's environment, so the key stays out of the file.
+  </TabItem>
+  <TabItem label="Claude Desktop">
+    Claude Desktop starts local servers, so it uses the bridge. It needs Node.js 18 or later.
+
+    ```json title="claude_desktop_config.json"
+    {
+      "mcpServers": {
+        "railhook": {
+          "command": "npx",
+          "args": ["-y", "@railhook/mcp"],
+          "env": {
+            "RAILHOOK_API_KEY": "your-project-api-key"
+          }
+        }
+      }
+    }
+    ```
+
+    Open the file from Settings → Developer → Edit Config, then restart Claude Desktop.
+  </TabItem>
+  <TabItem label="Other clients">
+    A client that supports remote servers needs the URL and one header, either of:
+
+    ```http
+    Authorization: Bearer <project API key>
+    X-API-Key: <project API key>
+    ```
+
+    A client that only starts local processes runs the bridge instead:
+
+    ```bash
+    RAILHOOK_API_KEY=<project API key> npx -y @railhook/mcp
+    ```
+  </TabItem>
+</Tabs>
+
+### Self-hosted
+
+Replace `https://railhook.io` with your own origin in the URL. For the bridge, set `RAILHOOK_BASE_URL` next to the key:
+
+```json title="claude_desktop_config.json"
+"env": {
+  "RAILHOOK_API_KEY": "your-project-api-key",
+  "RAILHOOK_BASE_URL": "https://hooks.example.com"
+}
+```
+
+The server is on by default. `MCP_ENABLED=false` in `.env` turns `/mcp` off; see [Configuration](/docs/self-hosting/configuration/).
+
+## Tools
+
+Every tool acts on the project the API key belongs to. None takes a project id, so an agent cannot reach another project, even in the same organization.
+
+| Tool | What it does | Key |
+|---|---|---|
+| `list_endpoints` | The project's endpoints, with whether each is enabled and verified | Any |
+| `list_subscriptions` | Which endpoint receives which event type, optionally for one endpoint | Any |
+| `list_deliveries` | Deliveries, newest first, filtered by status, endpoint, event, event type or time | Any |
+| `get_delivery` | One delivery and every attempt at it: status code, error, duration, request and response bodies | Any |
+| `send_event` | Sends an event; one delivery is created per enabled subscription to its type | `READ_WRITE` |
+| `create_endpoint` | Registers an endpoint and returns its signing secret, once | `READ_WRITE` |
+| `create_subscription` | Subscribes an endpoint to an event type | `READ_WRITE` |
+| `replay_delivery` | Puts a `FAILED` or `DLQ` delivery back on its retry ladder; `dryRun` shows what would be sent | `READ_WRITE` |
+
+The read tools carry the read-only hint, which a client can use to run them without asking you first. Endpoints, subscriptions, deliveries and attempts come back in the shapes the [API reference](/docs/api-reference/) documents, with attempt bodies cut to 2,000 characters; a list comes as `content` plus `page`, `size`, `totalElements` and `totalPages`.
+
+The same limits apply as over the API: `send_event` counts against the project's rate limit and event quota, and `create_endpoint` against the endpoint limit.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `401` when the client connects | The key is wrong, revoked or expired, or it belongs to another instance than the URL. Create a new key |
+| A tool answers that the key is `READ_ONLY` | Expected for write tools. Use a `READ_WRITE` key for them |
+| `404` at `/mcp` on a self-hosted instance | `MCP_ENABLED` is `false`, or the instance predates the MCP server. Upgrade it |
+| The bridge exits with `RAILHOOK_API_KEY is not set` | Put the key in the `env` block of the client's config, not in `args` |
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Authentication" description="API keys, their scopes, and rotating one without downtime." href="/docs/platform/authentication/" />
+  <LinkCard title="Retries and failed messages" description="What an agent is looking at when a delivery fails." href="/docs/outgoing/retries/" />
+  <LinkCard title="SDKs" description="Send events from your code instead." href="/docs/tools/sdks/" />
+</CardGrid>

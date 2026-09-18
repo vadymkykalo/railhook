@@ -70,7 +70,7 @@ export const SIDEBAR_GROUPS = [
   {
     label: 'Tools',
     uk: 'Інструменти',
-    slugs: ['tools/cli', 'tools/sdks'],
+    slugs: ['tools/cli', 'tools/sdks', 'tools/mcp'],
   },
   {
     label: 'Platform',

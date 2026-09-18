@@ -82,6 +82,23 @@ updates:
       - "npm"
       - "sdk"
 
+  # --- npm: MCP bridge ---
+  - package-ecosystem: "npm"
+    directory: "/sdks/mcp"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      mcp-bridge-patch:
+        update-types:
+          - "patch"
+          - "minor"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "sdk"
+
   # --- pip: Python SDK ---
   - package-ecosystem: "pip"
     directory: "/sdks/python"

@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # Fails when the version recorded in the reactor poms disagrees with the
-# Helm chart, the UI package.json, any of the three SDK manifests, or (when
+# Helm chart, the UI package.json, any of the three SDK manifests, the MCP
+# bridge's package.json, or (when
 # HEAD sits exactly on a release tag) the tag itself.
 #
 # This exists because five sources of truth silently drifted apart for
@@ -34,6 +35,7 @@ ui_version=$(grep -m1 '"version"' railhook-ui/package.json | sed -E 's/.*"versio
 node_sdk_version=$(grep -m1 '"version"' sdks/node/package.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
 python_sdk_version=$(grep -m1 -E '^version *=' sdks/python/pyproject.toml | sed -E 's/^version *= *"([^"]+)".*/\1/')
 php_sdk_version=$(grep -m1 '"version"' sdks/php/composer.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
+mcp_version=$(grep -m1 '"version"' sdks/mcp/package.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
 
 echo "pom.xml (reactor):          $pom_version  (compared as $pom_compare)"
 echo "Chart.yaml version:         $chart_version"
@@ -42,6 +44,7 @@ echo "railhook-ui:        $ui_version"
 echo "sdks/node/package.json:     $node_sdk_version"
 echo "sdks/python/pyproject.toml: $python_sdk_version"
 echo "sdks/php/composer.json:     $php_sdk_version"
+echo "sdks/mcp/package.json:      $mcp_version"
 
 fail=0
 check() {
@@ -67,6 +70,7 @@ check "railhook-ui/package.json" "$ui_version"
 check "sdks/node/package.json" "$node_sdk_version"
 check "sdks/python/pyproject.toml" "$python_sdk_version"
 check "sdks/php/composer.json" "$php_sdk_version"
+check "sdks/mcp/package.json" "$mcp_version"
 check "sdks/node/src/client.ts SDK_VERSION" "$node_sdk_const"
 check "sdks/python/railhook/client.py SDK_VERSION" "$python_sdk_const"
 check "sdks/python/railhook/__init__.py __version__" "$python_dunder"

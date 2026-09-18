@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # Bumps every version source in this repo in one step: the reactor poms, the
-# Helm chart, the UI package.json (+ lockfile), and the three SDK manifests.
+# Helm chart, the UI package.json (+ lockfile), the three SDK manifests and the
+# MCP bridge's package.json (+ lockfile).
 #
 # This replaces the old release process step ("2. Update version numbers",
 # CONTRIBUTING.md), which meant hand-editing six files and was the direct
@@ -59,6 +60,18 @@ const f = 'sdks/node/package.json';
 const data = JSON.parse(fs.readFileSync(f, 'utf8'));
 data.version = '$RELEASE_VERSION';
 fs.writeFileSync(f, JSON.stringify(data, null, 2) + '\n');
+"
+
+echo "Setting sdks/mcp version to $RELEASE_VERSION"
+node -e "
+const fs = require('fs');
+const version = '$RELEASE_VERSION';
+for (const f of ['sdks/mcp/package.json', 'sdks/mcp/package-lock.json']) {
+  const data = JSON.parse(fs.readFileSync(f, 'utf8'));
+  data.version = version;
+  if (data.packages && data.packages['']) data.packages[''].version = version;
+  fs.writeFileSync(f, JSON.stringify(data, null, 2) + '\n');
+}
 "
 
 echo "Setting sdks/python version to $RELEASE_VERSION"

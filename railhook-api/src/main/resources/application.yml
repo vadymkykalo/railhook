@@ -28,6 +28,24 @@ spring:
       preferred-json-mapper: jackson2
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  # The remote MCP server: Streamable HTTP at /mcp on the API origin, authenticated with a
+  # project API key. Stateless, so any API replica can answer any call and nothing about a
+  # session has to be shared between them. Tools are in com.webhook.platform.api.mcp.
+  ai:
+    mcp:
+      server:
+        enabled: ${MCP_ENABLED:true}
+        name: railhook
+        protocol: STATELESS
+        type: SYNC
+        instructions: >-
+          Railhook delivers a customer's events to the endpoints subscribed to them. The API key
+          this server was given belongs to one project; every tool acts on that project only.
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: false
   task:
     scheduling:
       pool:

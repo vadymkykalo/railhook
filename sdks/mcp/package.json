@@ -1,0 +1,49 @@
+{
+  "name": "@railhook/mcp",
+  "version": "2.20.13",
+  "description": "Railhook's MCP server for stdio clients — a bridge to the remote server at /mcp",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "railhook-mcp": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "webhook",
+    "webhooks",
+    "ai",
+    "agents"
+  ],
+  "author": "Vadym Kykalo <vadymkykalo@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vadymkykalo/railhook.git",
+    "directory": "sdks/mcp"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^26.3.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.12",
+    "typescript": "^5.3.0"
+  }
+}

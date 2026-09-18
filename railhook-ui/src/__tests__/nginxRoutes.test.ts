@@ -109,3 +109,12 @@ describe('the public route list', () => {
     expect(location('/')!.body).toMatch(/try_files\s+\$uri\s+\$uri\/index\.html\s+=404;/);
   });
 });
+
+describe('the remote MCP server', () => {
+  it('is proxied to the API at /mcp, like /api/', () => {
+    const mcp = location('= /mcp');
+    expect(mcp, 'an exact-match location for /mcp').toBeDefined();
+    expect(mcp!.body).toMatch(/proxy_pass\s+http:\/\/\$api_backend;/);
+    expect(mcp!.body).toMatch(/proxy_set_header\s+X-Forwarded-Proto\s+\$scheme;/);
+  });
+});

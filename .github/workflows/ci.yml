@@ -753,13 +753,24 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: sdks/node/package-lock.json
+          cache-dependency-path: |
+            sdks/node/package-lock.json
+            sdks/mcp/package-lock.json
 
       - name: Node SDK tests
         working-directory: sdks/node
         run: |
           npm ci
           npm test
+
+      # The stdio bridge to the remote MCP server. Built as well as tested: `bin` points into
+      # dist/, so a compile error would otherwise surface only as a broken `npx -y @railhook/mcp`.
+      - name: MCP bridge tests
+        working-directory: sdks/mcp
+        run: |
+          npm ci
+          npm test
+          npm run build
 
       - name: Set up Python
         uses: actions/setup-python@v7

@@ -1583,6 +1583,17 @@
       ]
     },
     {
+      "title": "Mcp server (ai agents)",
+      "variables": [
+        {
+          "name": "MCP_ENABLED",
+          "default": "true",
+          "example": null,
+          "description": "The remote MCP server at <your origin>/mcp, which lets an AI agent (Claude Code,\nCursor, Claude Desktop) send events and inspect endpoints, subscriptions and\ndeliveries. It authenticates with a project API key and can do nothing that key\ncannot; a READ_ONLY key gets the read tools only. Set to false to turn /mcp off."
+        }
+      ]
+    },
+    {
       "title": "CORS configuration",
       "variables": [
         {
