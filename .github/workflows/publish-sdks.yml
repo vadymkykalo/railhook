@@ -198,6 +198,55 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  # The MCP Registry (registry.modelcontextprotocol.io) lists io.github.vadymkykalo/railhook, which
+  # is what VS Code, GitHub and other MCP hosts search. sdks/mcp/server.json declares both the remote
+  # server at https://railhook.io/mcp and the npm bridge; the registry checks the npm package's
+  # mcpName, so this runs after that package is on npm. The io.github namespace is proven with this
+  # workflow's GitHub OIDC token — there is no secret to keep.
+  publish-mcp-registry:
+    name: Publish to the MCP Registry
+    needs: publish-mcp
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    if: >
+      github.event_name == 'push' ||
+      inputs.sdk == 'all' ||
+      inputs.sdk == 'mcp'
+    defaults:
+      run:
+        working-directory: sdks/mcp
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Wait for the npm package this entry points at
+        run: |
+          VERSION=$(node -p "require('./server.json').packages[0].version")
+          for i in $(seq 1 30); do
+            if npm view "@railhook/mcp@$VERSION" version >/dev/null 2>&1; then exit 0; fi
+            sleep 20
+          done
+          echo "::error::@railhook/mcp@$VERSION is not on npm"; exit 1
+
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate with GitHub OIDC
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish
+        # A re-run for a version already listed is not a failure.
+        run: |
+          set +e
+          OUTPUT=$(./mcp-publisher publish 2>&1); STATUS=$?
+          echo "$OUTPUT"
+          if [ $STATUS -ne 0 ] && echo "$OUTPUT" | grep -qi "already exists"; then exit 0; fi
+          exit $STATUS
+
   publish-python:
     name: Publish Python SDK to PyPI (railhook)
     runs-on: ubuntu-latest

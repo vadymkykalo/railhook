@@ -72,6 +72,11 @@ for (const f of ['sdks/mcp/package.json', 'sdks/mcp/package-lock.json']) {
   if (data.packages && data.packages['']) data.packages[''].version = version;
   fs.writeFileSync(f, JSON.stringify(data, null, 2) + '\n');
 }
+// The MCP Registry entry names the server's version and the npm package's, which are the same.
+const server = JSON.parse(fs.readFileSync('sdks/mcp/server.json', 'utf8'));
+server.version = version;
+for (const p of server.packages) p.version = version;
+fs.writeFileSync('sdks/mcp/server.json', JSON.stringify(server, null, 2) + '\n');
 "
 
 echo "Setting sdks/python version to $RELEASE_VERSION"

@@ -36,6 +36,8 @@ node_sdk_version=$(grep -m1 '"version"' sdks/node/package.json | sed -E 's/.*"ve
 python_sdk_version=$(grep -m1 -E '^version *=' sdks/python/pyproject.toml | sed -E 's/^version *= *"([^"]+)".*/\1/')
 php_sdk_version=$(grep -m1 '"version"' sdks/php/composer.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
 mcp_version=$(grep -m1 '"version"' sdks/mcp/package.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
+mcp_registry_version=$(node -p "require('./sdks/mcp/server.json').version")
+mcp_registry_package_version=$(node -p "require('./sdks/mcp/server.json').packages[0].version")
 
 echo "pom.xml (reactor):          $pom_version  (compared as $pom_compare)"
 echo "Chart.yaml version:         $chart_version"
@@ -71,6 +73,8 @@ check "sdks/node/package.json" "$node_sdk_version"
 check "sdks/python/pyproject.toml" "$python_sdk_version"
 check "sdks/php/composer.json" "$php_sdk_version"
 check "sdks/mcp/package.json" "$mcp_version"
+check "sdks/mcp/server.json version" "$mcp_registry_version"
+check "sdks/mcp/server.json packages[0].version" "$mcp_registry_package_version"
 check "sdks/node/src/client.ts SDK_VERSION" "$node_sdk_const"
 check "sdks/python/railhook/client.py SDK_VERSION" "$python_sdk_const"
 check "sdks/python/railhook/__init__.py __version__" "$python_dunder"
