@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowUpRight, BookOpen, Braces, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, BookOpen, Bot, Braces, ShieldCheck } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { highlight, type CodeLanguage } from '../../components/SyntaxHighlight';
 import { useAuth } from '../../auth/auth.store';
@@ -10,7 +10,7 @@ import { WRAP, prefersReducedMotion } from './primitives';
 
 /**
  * The page ends where an engineer starts: the docs, the API reference, the signature standard,
- * and the one call that sends an event — with sign-up once more underneath.
+ * the MCP server for their AI agent, and the one call that sends an event — with sign-up once more underneath.
  *
  * The samples are the quickstart's "Send an event" step, which was checked against `sdks/*`;
  * change them there first. Every line is in the DOM from the start, so a screen reader and a
@@ -362,6 +362,12 @@ export default function DeveloperSection() {
               icon={<ShieldCheck className="h-5 w-5" aria-hidden="true" />}
               title={t('landing.developer.standardTitle')}
               body={t('landing.developer.standardBody')}
+            />
+            <LinkCard
+              href="/docs/tools/mcp/"
+              icon={<Bot className="h-5 w-5" aria-hidden="true" />}
+              title={t('landing.developer.mcpTitle')}
+              body={t('landing.developer.mcpBody')}
             />
           </div>
           <CodeWindow />

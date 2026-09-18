@@ -193,7 +193,7 @@ describe('LandingPage', () => {
 });
 
 describe('DeveloperSection', () => {
-  it('ends the page with the docs, the API reference and Standard Webhooks', () => {
+  it('ends the page with the docs, the API reference, Standard Webhooks and the MCP server', () => {
     const { container } = renderLanding();
     const section = developerSection(container);
     const hrefs = within(section).getAllByRole('link').map((a) => a.getAttribute('href'));
@@ -201,6 +201,7 @@ describe('DeveloperSection', () => {
       '/docs/',
       '/docs/api-reference/',
       'https://www.standardwebhooks.com/',
+      '/docs/tools/mcp/',
     ]));
     const external = within(section).getAllByRole('link')
       .find((a) => a.getAttribute('href') === 'https://www.standardwebhooks.com/') as HTMLElement;

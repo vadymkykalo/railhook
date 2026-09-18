@@ -2059,7 +2059,9 @@
       "codeTitle": "Send an event with one API call",
       "languages": "Language",
       "response": "2 deliveries created",
-      "readDocs": "Read the docs"
+      "readDocs": "Read the docs",
+      "mcpTitle": "AI agents (MCP)",
+      "mcpBody": "Let Claude, Cursor or any MCP client send events and replay deliveries."
     },
     "directions": {
       "inBody": "One address per service. Railhook checks that Stripe or GitHub really sent it, then passes it on to your app.",
