@@ -6,9 +6,6 @@ package com.webhook.platform.api.service.billing;
  */
 public enum QuotaType {
 
-    /** Monthly event ingestion limit (org-scoped). */
-    EVENTS_PER_MONTH,
-
     /** Max endpoints per project (project-scoped, requires projectId). */
     ENDPOINTS_PER_PROJECT,
 

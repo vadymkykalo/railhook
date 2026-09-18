@@ -9,8 +9,6 @@ import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.EventIngestService;
 import com.webhook.platform.api.service.billing.EntitlementService;
-import com.webhook.platform.api.service.billing.QuotaType;
-import com.webhook.platform.api.service.billing.RequireQuota;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -64,7 +62,6 @@ public class EventController {
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @RequireQuota(QuotaType.EVENTS_PER_MONTH)
     @PostMapping
     public ResponseEntity<?> ingestEvent(
             @Valid @RequestBody EventIngestRequest request,
