@@ -13,6 +13,10 @@ import { WRAP } from './primitives';
  * in. The header this replaced had eleven, including the language and theme switches — those
  * are set once and now live in the footer.
  *
+ * Pricing is the page people look for first, and it covers both the free cloud plan and
+ * self-hosting, so it took the place of a "Cloud" link that pointed at the same section as
+ * "Self-host".
+ *
  * Section links are router `Link`s to "/#id" because this header is also mounted on /contact,
  * where a bare "#run" would point nowhere; `LandingPage` scrolls to the hash on arrival. Docs is a
  * plain anchor: it is served as its own static site, not a route in this app.
@@ -46,7 +50,7 @@ export default function LandingNav() {
 
   const sections = [
     { to: '/#product', label: t('landing.nav.product') },
-    { to: '/#run', label: t('landing.nav.cloud') },
+    { to: '/pricing', label: t('landing.nav.pricing') },
     { to: '/#run', label: t('landing.nav.selfHost') },
   ];
   const linkClass = 'transition-colors hover:text-foreground';
