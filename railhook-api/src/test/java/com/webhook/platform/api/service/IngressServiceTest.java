@@ -512,6 +512,48 @@ class IngressServiceTest {
         verify(eventRepository, never()).save(any(IncomingEvent.class));
     }
 
+    /**
+     * Two genuine deliveries can carry byte-identical bodies — Shopify firing one order under two
+     * topics in the same second, a sender posting a static payload — and a signature over the body
+     * alone is then identical too. Keyed on the signature alone, the second was refused as a replay
+     * although its delivery id said it was a different delivery. The id is part of the key now; a
+     * true replay repeats the id as well and is caught by dedup before it gets here.
+     */
+    @Test
+    void receiveWebhook_replayDetection_aDifferentDeliveryWithTheSameBodyIsNotAReplay() {
+        String secret = "my-hmac-secret";
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+
+        IncomingSource source = buildActiveSource();
+        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        source.setHmacHeaderName("X-Signature");
+        source.setHmacSignaturePrefix("");
+
+        String body = "{\"test\":true}";
+        String validHmac = computeHmac(secret, body);
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
+        when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("delivery-2");
+
+        // The same body, and so the same signature, already arrived as delivery-1.
+        when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(true);
+
+        IncomingEvent event = accepted(service.receiveWebhook("validtoken", body.getBytes(StandardCharsets.UTF_8), httpRequest));
+
+        assertThat(event.getVerified()).isTrue();
+        verify(replayDetectionService).isReplay(eq(sourceId.toString()), eq(validHmac + ":delivery-2"));
+    }
+
     @Test
     void receiveWebhook_replayDetection_allowsFirstRequest() {
         String secret = "my-hmac-secret";
