@@ -145,6 +145,13 @@ class MutatingHandlerScopeDeclarationTest {
             // The public site's webhook tester: anonymous by design (/api/v1/public/** in
             // SecurityConfig), rate-limited per address, and it touches no tenant data at all.
             "PublicBinController.create",
+            // The MCP server's OAuth endpoints, called by an app rather than a person: open
+            // registration (RFC 7591), the token endpoint and revocation. Public in
+            // McpSecurityConfig; the app's client credentials, code + PKCE verifier or refresh
+            // token are what authorize each call, and no API key is ever the caller.
+            "McpOAuthController.registerOAuthClient",
+            "McpOAuthController.issueOAuthToken",
+            "McpOAuthController.revokeOAuthToken",
 
             // Platform-admin only, gated on the PLATFORM_ADMIN authority for /api/v1/admin/**
             // in SecurityConfig rather than on a tenant scope.

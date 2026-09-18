@@ -24,6 +24,7 @@ import { transformationsApi } from './transformations.api';
 import { rulesApi, type RuleRequest } from './rules.api';
 import { consumersApi } from './consumers.api';
 import { portalApi, type PortalDeliveryFilters } from './portal.api';
+import { mcpAppsApi } from './mcpApps.api';
 import type { ConsumerRequest, PortalEndpointRequest, PortalSessionRequest, EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest, TransformationRequest } from '../types/api.types';
 
 // ─── Query Keys ────────────────────────────────────────────────────
@@ -72,6 +73,12 @@ export const queryKeys = {
     },
     apiKeys: {
         paged: (projectId: string, page: number, size: number) => ['api-keys', projectId, page, size] as const,
+    },
+    mcpGrants: {
+        list: (projectId: string) => ['mcp-grants', projectId] as const,
+    },
+    mcpConsent: {
+        request: (requestId: string) => ['mcp-consent', requestId] as const,
     },
     // Account-level rather than organization-level: a user's sessions and their organizations
     // are both things they hold across tenants, so neither key carries an organization.
@@ -448,6 +455,38 @@ export function useOrganizations() {
     return useQuery({
         queryKey: queryKeys.organizations.mine,
         queryFn: () => organizationsApi.list(),
+    });
+}
+
+// ─── MCP apps ──────────────────────────────────────────────────────
+
+export function useMcpGrants(projectId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.mcpGrants.list(projectId!),
+        queryFn: () => mcpAppsApi.listGrants(projectId!),
+        enabled: !!projectId,
+    });
+}
+
+export function useRevokeMcpGrant(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (grantId: string) => mcpAppsApi.revokeGrant(projectId, grantId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.mcpGrants.list(projectId) }); },
+    });
+}
+
+/**
+ * A consent request is answered once and expires in minutes: never retried, never refetched on
+ * focus, so a 404 for an answered request is shown rather than papered over.
+ */
+export function useMcpConsentRequest(requestId: string | null, enabled: boolean) {
+    return useQuery({
+        queryKey: queryKeys.mcpConsent.request(requestId ?? ''),
+        queryFn: () => mcpAppsApi.getRequest(requestId!),
+        enabled: enabled && !!requestId,
+        retry: false,
+        refetchOnWindowFocus: false,
     });
 }
 

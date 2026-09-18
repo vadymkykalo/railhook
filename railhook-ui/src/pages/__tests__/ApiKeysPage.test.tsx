@@ -8,6 +8,9 @@ import type { ProjectResponse, PageResponse } from '../../types/api.types';
 vi.mock('../../api/projects.api', () => ({
   projectsApi: { get: vi.fn(), list: vi.fn() },
 }));
+vi.mock('../../api/mcpApps.api', () => ({
+  mcpAppsApi: { getRequest: vi.fn(), approve: vi.fn(), deny: vi.fn(), listGrants: vi.fn().mockResolvedValue([]), revokeGrant: vi.fn() },
+}));
 vi.mock('../../api/apiKeys.api', () => ({
   apiKeysApi: {
     list: vi.fn(),

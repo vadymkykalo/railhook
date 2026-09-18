@@ -165,3 +165,40 @@ describe('framing', () => {
     }
   });
 });
+
+/**
+ * claude.ai and ChatGPT connect to /mcp by signing in: they read the metadata under
+ * /.well-known, register and trade codes at /oauth/*, and send the person to /oauth/consent —
+ * which, unlike its siblings, is the app's own screen.
+ */
+describe('sign-in for the MCP server', () => {
+  const oauthApi = () => locations().find((l) => l.head.startsWith('~ ^/oauth/'));
+
+  it('sends the OAuth protocol endpoints to the API', () => {
+    const api = oauthApi();
+    expect(api, 'a regex location for /oauth/{authorize,token,register,revoke}').toBeDefined();
+    const pattern = new RegExp(api!.head.replace(/^~\s+/, '').trim());
+    for (const path of ['/oauth/authorize', '/oauth/token', '/oauth/register', '/oauth/revoke']) {
+      expect(pattern.test(path), path).toBe(true);
+    }
+    expect(pattern.test('/oauth/consent')).toBe(false);
+    expect(api!.body).toMatch(/proxy_pass\s+http:\/\/\$api_backend;/);
+    expect(api!.body).toMatch(/proxy_set_header\s+X-Forwarded-Proto\s+\$scheme;/);
+  });
+
+  it('checks the API endpoints before the app routes, since nginx takes the first matching regex', () => {
+    const heads = locations().map((l) => l.head);
+    expect(heads.indexOf(oauthApi()!.head)).toBeLessThan(heads.indexOf(spaLocation()!.head));
+  });
+
+  it('serves the consent screen as an app route, kept out of search results', () => {
+    expect(spaSegments()).toContain('oauth');
+    expect(read('railhook-ui/public/robots.txt')).toMatch(/^Disallow: \/oauth\/$/m);
+  });
+
+  it('proxies the discovery metadata ahead of the hidden-file rule', () => {
+    const wellKnown = location('^~ /.well-known/oauth-');
+    expect(wellKnown, 'a ^~ prefix location, so the `~ /\\.` deny never sees it').toBeDefined();
+    expect(wellKnown!.body).toMatch(/proxy_pass\s+http:\/\/\$api_backend;/);
+  });
+});

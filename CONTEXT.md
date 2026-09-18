@@ -169,3 +169,10 @@ _Avoid_: account, tenant, workspace, team
 **Project**:
 A division of an Organization's work that endpoints, sources and API keys belong to.
 _Avoid_: app, environment, namespace
+
+**MCP Grant**:
+One AI app's sign-in to the MCP server, approved by a person for exactly one Project with the
+same READ_ONLY or READ_WRITE scope an API key carries. It is an API key with a person behind
+it: it stops working when that person could no longer approve it. The UI calls it a
+connected app.
+_Avoid_: connection (that is an Endpoint and its Subscriptions), integration, authorization

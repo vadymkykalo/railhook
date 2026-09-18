@@ -1820,6 +1820,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/oauth/requests/{requestId}/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline an MCP app's sign-in request
+         * @description Ends the request and returns the URL that tells the app access was denied.
+         */
+        post: operations["denyMcpConsentRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/oauth/requests/{requestId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve an MCP app's sign-in request
+         * @description Connects the app to one project of the caller's organization with READ_ONLY or READ_WRITE access — the same scope an API key carries. Any member may grant READ_ONLY; READ_WRITE takes a role that may create an API key. Returns the URL to send the browser to, carrying the authorization code.
+         */
+        post: operations["approveMcpConsentRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events": {
         parameters: {
             query?: never;
@@ -2774,6 +2814,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/mcp-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List connected MCP apps
+         * @description Apps connected to this project through OAuth sign-in, newest first.
+         */
+        get: operations["listMcpGrants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/incoming-events": {
         parameters: {
             query?: never;
@@ -3214,6 +3274,26 @@ export interface paths {
          * @description Exports all organization data in machine-readable JSON format. Includes organization info, members, projects, endpoints, subscriptions, incoming sources/destinations, API keys (metadata only), and audit logs. No decrypted secrets are included. Owner only.
          */
         get: operations["exportOrganizationData"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/oauth/requests/{requestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Describe an MCP app's sign-in request
+         * @description What the consent screen shows: the app's name, the host its code will be sent to, the access it asked for, and whether the caller's role may grant write access.
+         */
+        get: operations["describeMcpConsentRequest"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3765,6 +3845,26 @@ export interface paths {
          * @description Closes an active tunnel session belonging to your organization
          */
         delete: operations["close"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/mcp-grants/{grantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Disconnect an MCP app
+         * @description Revokes the app's access to this project at once: its access and refresh tokens stop working, and it has to be connected again from the app.
+         */
+        delete: operations["revokeMcpGrant"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5032,6 +5132,15 @@ export interface components {
             inviteExpiresAt?: string;
             inviteUrl?: string;
         };
+        McpConsentDecisionResponse: {
+            redirectUrl?: string;
+        };
+        McpConsentApproveRequest: {
+            /** Format: uuid */
+            projectId: string;
+            /** @enum {string} */
+            scope: "READ_WRITE" | "READ_ONLY";
+        };
         EventIngestResponse: {
             /** Format: uuid */
             eventId?: string;
@@ -5481,6 +5590,22 @@ export interface components {
             first?: boolean;
             last?: boolean;
             empty?: boolean;
+        };
+        McpGrantResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            projectId?: string;
+            clientName?: string;
+            clientUri?: string;
+            redirectHost?: string;
+            /** @enum {string} */
+            scope?: "READ_WRITE" | "READ_ONLY";
+            approvedByEmail?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            lastUsedAt?: string;
         };
         PageIncomingSourceResponse: {
             /** Format: int32 */
@@ -6049,6 +6174,18 @@ export interface components {
             timeoutSeconds?: number;
             /** Format: date-time */
             createdAt?: string;
+        };
+        McpConsentRequestResponse: {
+            /** Format: uuid */
+            requestId?: string;
+            clientName?: string;
+            clientUri?: string;
+            redirectHost?: string;
+            /** @enum {string} */
+            requestedScope?: "READ_WRITE" | "READ_ONLY";
+            canGrantWrite?: boolean;
+            /** Format: date-time */
+            expiresAt?: string;
         };
         DeliveryResponse: {
             /** Format: uuid */
@@ -10525,6 +10662,81 @@ export interface operations {
             };
         };
     };
+    denyMcpConsentRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Declined; follow redirectUrl */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentDecisionResponse"];
+                };
+            };
+            /** @description Expired, already answered, or never existed */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentDecisionResponse"];
+                };
+            };
+        };
+    };
+    approveMcpConsentRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["McpConsentApproveRequest"];
+            };
+        };
+        responses: {
+            /** @description Approved; follow redirectUrl */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentDecisionResponse"];
+                };
+            };
+            /** @description The caller's role may not grant READ_WRITE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentDecisionResponse"];
+                };
+            };
+            /** @description Request expired or answered, or project not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentDecisionResponse"];
+                };
+            };
+        };
+    };
     ingestEvent: {
         parameters: {
             query?: never;
@@ -12070,6 +12282,28 @@ export interface operations {
             };
         };
     };
+    listMcpGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpGrantResponse"][];
+                };
+            };
+        };
+    };
     listIncomingEvents: {
         parameters: {
             query?: {
@@ -12670,6 +12904,37 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["GdprExportDto"];
+                };
+            };
+        };
+    };
+    describeMcpConsentRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request, still waiting for an answer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentRequestResponse"];
+                };
+            };
+            /** @description Expired, already answered, or never existed */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentRequestResponse"];
                 };
             };
         };
@@ -13507,6 +13772,27 @@ export interface operations {
         responses: {
             /** @description OK */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    revokeMcpGrant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                grantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

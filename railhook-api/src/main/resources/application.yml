@@ -39,8 +39,8 @@ spring:
         protocol: STATELESS
         type: SYNC
         instructions: >-
-          Railhook delivers a customer's events to the endpoints subscribed to them. The API key
-          this server was given belongs to one project; every tool acts on that project only.
+          Railhook delivers a customer's events to the endpoints subscribed to them. The API key or
+          sign-in this server was given belongs to one project; every tool acts on that project only.
         capabilities:
           tool: true
           resource: false
@@ -461,6 +461,13 @@ tunnel:
 
 device-auth:
   cleanup-interval-ms: ${DEVICE_AUTH_CLEANUP_INTERVAL_MS:300000}
+
+# Sign-in for the MCP server: claude.ai / ChatGPT connectors register themselves, send a person
+# through the consent screen and get OAuth tokens for one project. The issuer is app.base-url.
+# Off, /mcp takes API keys only and the /oauth and /.well-known endpoints answer 404.
+mcp:
+  oauth:
+    enabled: ${MCP_OAUTH_ENABLED:true}
 
 logging:
   level:

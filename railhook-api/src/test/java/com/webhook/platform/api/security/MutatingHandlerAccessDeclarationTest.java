@@ -79,6 +79,12 @@ class MutatingHandlerAccessDeclarationTest {
             // The public site's webhook tester: anonymous by design (/api/v1/public/** in
             // SecurityConfig), rate-limited per address, and it touches no tenant data at all.
             "PublicBinController.create",
+            // The MCP server's OAuth protocol endpoints: called by an app with its client
+            // credentials, a code + PKCE verifier or a refresh token, never by a member, so there
+            // is no role to require. Public paths in McpSecurityConfig, outside /api.
+            "McpOAuthController.registerOAuthClient",
+            "McpOAuthController.issueOAuthToken",
+            "McpOAuthController.revokeOAuthToken",
 
             // Act on the caller's own account rather than on tenant data, so a membership role
             // is not the right question: a Viewer may change their own password.

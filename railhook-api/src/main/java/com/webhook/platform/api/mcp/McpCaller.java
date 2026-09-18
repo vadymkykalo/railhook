@@ -9,6 +9,7 @@ import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.exception.UnauthorizedException;
+import com.webhook.platform.api.mcp.oauth.McpOAuthAuthenticationToken;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.SuspensionCheck;
@@ -30,8 +31,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Runs one MCP tool call as the API key that made it, and turns whatever happens into a result
- * the model can read.
+ * Runs one MCP tool call as the API key — or the OAuth grant, which is the same (project, scope)
+ * pair — that made it, and turns whatever happens into a result the model can read.
  *
  * <p>Everything a REST request gets from the web layer has to be done here by hand, because a
  * tool call passes through none of it:
@@ -90,8 +91,8 @@ public class McpCaller {
     private CallToolResult run(McpTransportContext context, String writeTool, Function<AuthContext, Object> body) {
         Object caller = context == null ? null : context.get(McpServerConfig.CALLER);
         if (!(caller instanceof ApiKeyAuthenticationToken apiKey)) {
-            return error("This MCP server accepts project API keys only. Send one as "
-                    + "'Authorization: Bearer <key>' or 'X-API-Key: <key>'.");
+            return error("This MCP server needs a project API key ('Authorization: Bearer <key>' or "
+                    + "'X-API-Key: <key>') or an OAuth access token from signing in to Railhook.");
         }
 
         AuthContext auth = new AuthContext(null, apiKey.getOrganizationId(), MembershipRole.API_KEY,
@@ -99,8 +100,11 @@ public class McpCaller {
 
         if (writeTool != null) {
             if (apiKey.getScope() != ApiKeyScope.READ_WRITE) {
-                return error(writeTool + " changes data, and this API key is READ_ONLY. "
-                        + "Use a READ_WRITE key for it; the read tools work with either.");
+                return error(apiKey instanceof McpOAuthAuthenticationToken
+                        ? writeTool + " changes data, and this app was connected with read-only access. "
+                                + "Reconnect it and choose Read & write to use it; the read tools work either way."
+                        : writeTool + " changes data, and this API key is READ_ONLY. "
+                                + "Use a READ_WRITE key for it; the read tools work with either.");
             }
             String suspended = TenantContext.callAs(apiKey.getOrganizationId(),
                     () -> suspensionCheck.suspensionReason(apiKey.getOrganizationId()).orElse(null));

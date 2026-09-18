@@ -286,6 +286,44 @@ export interface SubscriptionResponse {
   updatedAt: string;
 }
 
+// ─── MCP apps (OAuth connections to the MCP server) ─────────────────
+
+/** Same two values an API key carries: a connected app is a key with a person behind it. */
+export type McpGrantScope = 'READ_ONLY' | 'READ_WRITE';
+
+/** What the consent screen shows about an app asking to connect. */
+export interface McpConsentRequestResponse {
+  requestId: string;
+  /** Self-declared by the app; the redirect host is what identifies it. */
+  clientName: string;
+  clientUri: string | null;
+  redirectHost: string;
+  requestedScope: McpGrantScope;
+  canGrantWrite: boolean;
+  expiresAt: string;
+}
+
+export interface McpConsentApproveRequest {
+  projectId: string;
+  scope: McpGrantScope;
+}
+
+export interface McpConsentDecisionResponse {
+  redirectUrl: string;
+}
+
+export interface McpGrantResponse {
+  id: string;
+  projectId: string;
+  clientName: string;
+  clientUri: string | null;
+  redirectHost: string;
+  scope: McpGrantScope;
+  approvedByEmail: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
 // ─── Incoming Webhooks ──────────────────────────────────────────────
 
 export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO';
