@@ -639,7 +639,7 @@ export interface paths {
         put?: never;
         /**
          * Make a tester URL
-         * @description A URL that records every request sent to it for a day: the latest 100, with the first 64 KB of each body and credentials masked. Anyone who has the URL can read what it received.
+         * @description A URL that records every request sent to it for a day: the latest 100 within 1 MB of bodies, the first 64 KB of each, with credentials masked. Anyone who has the URL can read what it received. At most three live URLs per address.
          */
         post: operations["createPublicBin"];
         delete?: never;
@@ -4273,29 +4273,8 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
-        PublicBinResponse: {
-            slug?: string;
-            url?: string;
-            /** Format: date-time */
-            expiresAt?: string;
-            /** Format: int64 */
-            requestCount?: number;
-            requests?: components["schemas"]["Request"][];
-        };
-        Request: {
-            /** Format: int64 */
-            id?: number;
-            method?: string;
-            query?: string;
-            headers?: components["schemas"]["JsonNode"];
-            body?: string;
-            bodyTruncated?: boolean;
-            /** Format: int64 */
-            sizeBytes?: number;
-            contentType?: string;
-            sourceIp?: string;
-            /** Format: date-time */
-            receivedAt?: string;
+        PublicBinCreateRequest: {
+            captchaToken?: string;
         };
         StepExecutionResponse: {
             /** Format: uuid */
@@ -5031,6 +5010,30 @@ export interface components {
             /** Format: date-time */
             linkExpiresAt?: string;
             projectName?: string;
+        };
+        PublicBinResponse: {
+            slug?: string;
+            url?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            /** Format: int64 */
+            requestCount?: number;
+            requests?: components["schemas"]["Request"][];
+        };
+        Request: {
+            /** Format: int64 */
+            id?: number;
+            method?: string;
+            query?: string;
+            headers?: components["schemas"]["JsonNode"];
+            body?: string;
+            bodyTruncated?: boolean;
+            /** Format: int64 */
+            sizeBytes?: number;
+            contentType?: string;
+            sourceIp?: string;
+            /** Format: date-time */
+            receivedAt?: string;
         };
         PageWorkflowExecutionResponse: {
             /** Format: int32 */
@@ -8086,7 +8089,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PublicBinCreateRequest"];
+            };
+        };
         responses: {
             /** @description The URL */
             201: {
@@ -8094,16 +8101,34 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["PublicBinResponse"];
+                    "*/*": Record<string, never>;
                 };
             };
-            /** @description Too many URLs made from this address */
+            /** @description The challenge was not passed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
+                };
+            };
+            /** @description Too many URLs made from this address, or it already holds three live ones */
             429: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["PublicBinResponse"];
+                    "*/*": Record<string, never>;
+                };
+            };
+            /** @description The tester holds as many live URLs as it allows; try later */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
                 };
             };
         };

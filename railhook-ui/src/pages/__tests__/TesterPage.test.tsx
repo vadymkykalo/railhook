@@ -53,9 +53,13 @@ function renderTester() {
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+  window.__RAILHOOK__ = { publicTester: true };
 });
 
-afterEach(() => localStorage.clear());
+afterEach(() => {
+  localStorage.clear();
+  delete window.__RAILHOOK__;
+});
 
 describe('TesterPage', () => {
   it('names itself for search, and makes no URL just by being loaded', async () => {
@@ -106,6 +110,29 @@ describe('TesterPage', () => {
 
     expect(await screen.findByRole('button', { name: en.tester.create })).toBeInTheDocument();
     await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeNull());
+  });
+
+  it('says what it keeps and for how long before anyone relies on it', () => {
+    renderTester();
+    expect(screen.getByRole('heading', { name: en.tester.limits.title })).toBeInTheDocument();
+    expect(screen.getByText(en.tester.limits.lifetime)).toBeInTheDocument();
+    expect(screen.getByText(en.tester.limits.kept)).toBeInTheDocument();
+  });
+
+  it('explains a refusal in words: three live URLs per address', async () => {
+    vi.mocked(publicBinApi.create).mockRejectedValue({
+      response: { status: 429, data: { error: 'too_many_active_urls' } },
+    });
+    renderTester();
+    await userEvent.click(screen.getByRole('button', { name: en.tester.create }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(en.tester.errors.tooManyActive);
+  });
+
+  it('on a server that has not turned it on, says so and offers nothing', () => {
+    window.__RAILHOOK__ = {};
+    renderTester();
+    expect(screen.getByText(en.tester.disabled)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: en.tester.create })).toBeNull();
   });
 
   it('points at what an account adds: keep, retry and forward', async () => {

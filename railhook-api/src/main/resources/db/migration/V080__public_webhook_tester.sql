@@ -4,17 +4,21 @@
 --
 -- It belongs to no organization, so there is no organization_id and no tenant scope: the slug
 -- is the only identity, as it is for a test endpoint. The bounds that keep it from becoming an
--- open store live in PublicBinService (100 requests, 64 KB of body each, one day).
+-- open store live in PublicBinService: a day's life, three live URLs per address, a ceiling
+-- on live URLs overall, and per URL the latest 100 requests within 1 MB of bodies.
 
 CREATE TABLE public_bins (
     id            UUID PRIMARY KEY,
     slug          VARCHAR(32) NOT NULL UNIQUE,
     created_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at    TIMESTAMP   NOT NULL,
-    request_count BIGINT      NOT NULL DEFAULT 0
+    request_count BIGINT      NOT NULL DEFAULT 0,
+    -- Who made it, for the per-address cap on live URLs. Never shown.
+    creator_ip    VARCHAR(45)
 );
 
 CREATE INDEX idx_public_bins_expires_at ON public_bins (expires_at);
+CREATE INDEX idx_public_bins_creator_ip ON public_bins (creator_ip, expires_at);
 
 COMMENT ON TABLE public_bins IS 'Anonymous webhook tester URLs from the public site; deleted a day after creation.';
 

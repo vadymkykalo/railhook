@@ -4,12 +4,14 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Check, Copy, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import CaptchaWidget, { isCaptchaConfigured } from '../components/CaptchaWidget';
 import JsonBlock from '../components/JsonBlock';
 import { publicBinApi, type PublicBin, type PublicBinRequest } from '../api/publicBin.api';
 import { queryKeys } from '../api/queries';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import { formatRelativeTime } from '../lib/date';
+import { publicTesterEnabled } from '../lib/runtimeConfig';
 import { cn } from '../lib/utils';
 import { Band, WRAP } from './landing/primitives';
 
@@ -45,6 +47,40 @@ function writeSlug(slug: string | null) {
 
 function status(error: unknown): number | undefined {
   return (error as { response?: { status?: number } } | null)?.response?.status;
+}
+
+function errorCode(error: unknown): string | undefined {
+  return (error as { response?: { data?: { error?: string } } } | null)?.response?.data?.error;
+}
+
+/** Why a URL was not made, in the reader's words. */
+function createErrorKey(error: unknown): string {
+  const code = errorCode(error);
+  if (code === 'too_many_active_urls') return 'tester.errors.tooManyActive';
+  if (code === 'tester_busy' || status(error) === 503) return 'tester.errors.busy';
+  if (code === 'captcha_failed') return 'tester.errors.captcha';
+  if (status(error) === 429) return 'tester.errors.tooMany';
+  return 'tester.errors.generic';
+}
+
+const LIMITS = ['lifetime', 'kept', 'rate', 'masked', 'methods'] as const;
+
+/** What the tester does and where it stops, stated before anyone relies on it. */
+function Limits() {
+  const { t } = useTranslation();
+  return (
+    <div>
+      <h2 className="font-display text-[1.35rem] font-bold tracking-[-0.02em] text-foreground">{t('tester.limits.title')}</h2>
+      <ul className="mt-4 grid gap-3 text-muted-foreground sm:grid-cols-2">
+        {LIMITS.map((key) => (
+          <li key={key} className="flex gap-2.5">
+            <Check className="mt-1 h-4 w-4 flex-none text-primary" strokeWidth={2.5} aria-hidden="true" />
+            <span>{t(`tester.limits.${key}`)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function CopyButton({ value }: { value: string }) {
@@ -194,12 +230,14 @@ function BinView({ bin, onNew }: { bin: PublicBin; onNew: () => void }) {
 export default function TesterPage() {
   const { t } = useTranslation();
   useDocumentMeta({ titleKey: 'meta.tester.title', descriptionKey: 'meta.tester.description', path: '/tester' });
+  const enabled = publicTesterEnabled();
   const [slug, setSlug] = useState<string | null>(readSlug);
+  const [captchaToken, setCaptchaToken] = useState('');
 
   const bin = useQuery({
     queryKey: queryKeys.publicBin(slug ?? ''),
     queryFn: () => publicBinApi.get(slug!),
-    enabled: !!slug,
+    enabled: enabled && !!slug,
     refetchInterval: POLL_MS,
     refetchIntervalInBackground: false,
     retry: false,
@@ -214,16 +252,26 @@ export default function TesterPage() {
   }, [bin.isError, bin.error]);
 
   const create = useMutation({
-    mutationFn: publicBinApi.create,
+    mutationFn: () => publicBinApi.create(captchaToken || undefined),
     onSuccess: (created) => {
       writeSlug(created.slug);
       setSlug(created.slug);
     },
+    // A challenge answer is single-use: a failed attempt needs a fresh one.
+    onError: () => setCaptchaToken(''),
   });
 
-  const createError = create.isError
-    ? (status(create.error) === 429 ? t('tester.tooMany') : t('tester.error'))
-    : null;
+  /* "New URL" goes back to the form rather than making one straight away: a new URL needs a
+     fresh challenge answer, and the old one keeps counting against this address until it
+     expires, which the form is the place to say. */
+  const startOver = () => {
+    writeSlug(null);
+    setSlug(null);
+    create.reset();
+  };
+
+  const createError = create.isError ? t(createErrorKey(create.error)) : null;
+  const needsChallenge = isCaptchaConfigured() && !captchaToken;
 
   return (
     <>
@@ -239,17 +287,26 @@ export default function TesterPage() {
 
       <Band labelledBy="tester-tool">
         <h2 id="tester-tool" className="sr-only">{t('tester.title')}</h2>
-        {slug && bin.data ? (
-          <BinView bin={bin.data} onNew={() => create.mutate()} />
+        {!enabled ? (
+          <p className="rounded-2xl border border-dashed border-rail p-6 text-muted-foreground sm:p-8">{t('tester.disabled')}</p>
+        ) : slug && bin.data ? (
+          <BinView bin={bin.data} onNew={startOver} />
         ) : slug && bin.isLoading ? (
           <p className="text-sm text-muted-foreground">{t('tester.loading')}</p>
         ) : (
           <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed border-rail p-6 sm:p-8">
             <p className="max-w-xl text-muted-foreground">{t('tester.createHint')}</p>
-            <Button onClick={() => create.mutate()} disabled={create.isPending}>
+            {/* Keyed on the failures so a failed attempt renders a fresh widget and a fresh answer. */}
+            <CaptchaWidget key={create.failureCount} onToken={setCaptchaToken} />
+            <Button onClick={() => create.mutate()} disabled={create.isPending || needsChallenge}>
               {create.isPending ? t('tester.creating') : t('tester.create')}
             </Button>
             {createError && <p role="alert" className="text-sm text-halt">{createError}</p>}
+          </div>
+        )}
+        {enabled && (
+          <div className="mt-12">
+            <Limits />
           </div>
         )}
       </Band>

@@ -29,6 +29,8 @@ export interface PublicBin {
 }
 
 export const publicBinApi = {
-  create: (): Promise<PublicBin> => http.post<PublicBin>('/api/v1/public/bins', {}),
+  /** The challenge answer, when the deployment asks for one (the same CAPTCHA as registration). */
+  create: (captchaToken?: string): Promise<PublicBin> =>
+    http.post<PublicBin>('/api/v1/public/bins', captchaToken ? { captchaToken } : {}),
   get: (slug: string): Promise<PublicBin> => http.get<PublicBin>(`/api/v1/public/bins/${slug}`),
 };

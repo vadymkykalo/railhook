@@ -42,6 +42,10 @@ public class PublicBin {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    /** Who made it, for the per-address cap on live URLs. Never shown. */
+    @Column(name = "creator_ip", length = 45)
+    private String creatorIp;
+
     @Column(name = "request_count", nullable = false)
     @Builder.Default
     private long requestCount = 0;

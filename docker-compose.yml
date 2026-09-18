@@ -351,6 +351,7 @@ services:
       # The capture URL a person copies and sends requests to, so it has to be the public origin —
       # the default used to be http://api:8080, a name that exists only inside this network.
       TEST_ENDPOINT_BASE_URL: ${TEST_ENDPOINT_BASE_URL:-${APP_BASE_URL:-http://localhost}}
+      PUBLIC_TESTER_ENABLED: ${PUBLIC_TESTER_ENABLED:-false}
       TEST_ENDPOINT_MAX_PER_PROJECT: ${TEST_ENDPOINT_MAX_PER_PROJECT:-10}
       TEST_ENDPOINT_MAX_TTL_HOURS: ${TEST_ENDPOINT_MAX_TTL_HOURS:-72}
       TEST_ENDPOINT_CLEANUP_INTERVAL_MS: ${TEST_ENDPOINT_CLEANUP_INTERVAL_MS:-3600000}
@@ -634,6 +635,8 @@ services:
       RAILHOOK_CAPTCHA_SCRIPT_URL: ${CAPTCHA_SCRIPT_URL:-}
       # Cloudflare Web Analytics token. Empty: no analytics script.
       RAILHOOK_WEB_ANALYTICS_TOKEN: ${WEB_ANALYTICS_TOKEN:-}
+      # The public webhook tester (/tester), the same switch the API reads.
+      RAILHOOK_PUBLIC_TESTER: ${PUBLIC_TESTER_ENABLED:-false}
     depends_on:
       - api
     logging:

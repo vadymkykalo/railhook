@@ -76,8 +76,14 @@ if [ -n "$analytics_token" ] && ! matches "$analytics_token" '^[A-Za-z0-9]+$'; t
     analytics_token=""
 fi
 
+# The public webhook tester, on only for an exact "true" — the page's half of PUBLIC_TESTER_ENABLED.
+public_tester=false
+if [ "$(trim "${RAILHOOK_PUBLIC_TESTER:-}")" = "true" ]; then
+    public_tester=true
+fi
+
 cat > "$OUT" <<CONF
-window.__RAILHOOK__ = {"contactDomain": "${domain}", "siteUrl": "${site}", "captchaSiteKey": "${captcha_key}", "captchaScriptUrl": "${captcha_script}", "webAnalyticsToken": "${analytics_token}"};
+window.__RAILHOOK__ = {"contactDomain": "${domain}", "siteUrl": "${site}", "captchaSiteKey": "${captcha_key}", "captchaScriptUrl": "${captcha_script}", "webAnalyticsToken": "${analytics_token}", "publicTester": ${public_tester}};
 CONF
 
 cat > "$SITE_CONF_OUT" <<CONF

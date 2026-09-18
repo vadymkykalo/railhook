@@ -4138,16 +4138,30 @@
     "headers": "Headers",
     "body": "Body",
     "truncated": "Only the first 64 KB of this body was kept.",
-    "masked": "Anyone with this URL can read what it received, so Authorization, cookies and signature headers are masked.",
     "from": "from {{ip}}",
     "size": "{{size}} bytes",
-    "tooMany": "Too many URLs from your address. Try again in a minute.",
-    "error": "Could not create a URL. Try again.",
     "cta": {
       "title": "Receive webhooks for real",
       "body": "A free Railhook account keeps every request, verifies Stripe, GitHub and Shopify signatures, retries delivery to your service when it is down, and forwards to localhost while you develop.",
       "button": "Start free",
       "docs": "Receive your first webhook"
-    }
+    },
+    "disabled": "The webhook tester is not enabled on this server. Its operator can turn it on with PUBLIC_TESTER_ENABLED=true.",
+    "errors": {
+      "tooMany": "Too many URLs from your address. Try again in a minute.",
+      "tooManyActive": "Your address already has three live URLs. Use one of them, or wait for one to expire.",
+      "busy": "The tester is busy right now. Try again in a little while.",
+      "captcha": "The check did not pass. Please try again.",
+      "generic": "Could not create a URL. Try again."
+    },
+    "limits": {
+      "title": "How it works, and its limits",
+      "lifetime": "A URL lives for 24 hours, then it is deleted with everything it received.",
+      "kept": "It keeps the latest 100 requests, up to 1 MB in total; each body up to 64 KB.",
+      "rate": "Up to 10 requests a second per URL, and three live URLs per visitor.",
+      "masked": "Authorization, cookies and signature headers are masked, but anyone with the URL can see what it received — don't send production secrets.",
+      "methods": "Any method — GET, POST, PUT, PATCH, DELETE — answered with 200 and {\"ok\": true}."
+    },
+    "masked": "Anyone with this URL can read what it received, so Authorization, cookies and signature headers are masked."
   }
 }

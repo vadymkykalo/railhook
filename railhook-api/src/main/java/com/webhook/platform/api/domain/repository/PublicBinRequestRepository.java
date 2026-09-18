@@ -16,10 +16,17 @@ public interface PublicBinRequestRepository extends JpaRepository<PublicBinReque
 
     List<PublicBinRequest> findByBinIdOrderByIdDesc(UUID binId, Pageable pageable);
 
-    /** Deletes everything in the bin older than its {@code keep} newest requests. */
+    /**
+     * Keeps the bin's newest requests: at most {@code keep} of them, and only as many as fit in
+     * {@code budgetBytes} of bodies counted newest first. The newest one always stays.
+     */
     @Modifying
-    @Query(value = "DELETE FROM public_bin_requests WHERE bin_id = :binId AND id <= ("
-            + "SELECT id FROM public_bin_requests WHERE bin_id = :binId ORDER BY id DESC OFFSET :keep LIMIT 1)",
+    @Query(value = "DELETE FROM public_bin_requests WHERE id IN ("
+            + "SELECT id FROM (SELECT id, "
+            + "ROW_NUMBER() OVER (ORDER BY id DESC) AS position, "
+            + "SUM(COALESCE(octet_length(body), 0)) OVER (ORDER BY id DESC) AS running_bytes "
+            + "FROM public_bin_requests WHERE bin_id = :binId) newest_first "
+            + "WHERE position > 1 AND (position > :keep OR running_bytes > :budgetBytes))",
             nativeQuery = true)
-    int trimToNewest(@Param("binId") UUID binId, @Param("keep") int keep);
+    int trimToNewest(@Param("binId") UUID binId, @Param("keep") int keep, @Param("budgetBytes") long budgetBytes);
 }

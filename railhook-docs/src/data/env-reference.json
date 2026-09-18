@@ -1449,6 +1449,29 @@
       ]
     },
     {
+      "title": "Public webhook tester",
+      "variables": [
+        {
+          "name": "PUBLIC_TESTER_ENABLED",
+          "default": null,
+          "example": "false",
+          "description": "/tester on the public site: anyone, without an account, makes a URL that records the requests\nsent to it for a day. It is how railhook.io lets people try Railhook before signing up.\n\nOff by default, so a self-hosted install opens nothing anonymous: the page says the tester is\nnot enabled and the API answers 404. When on, it is bounded — three live URLs per address,\nPUBLIC_TESTER_MAX_ACTIVE live URLs overall, the latest 100 requests within 1 MB per URL — and\nasks for the registration CAPTCHA when one is configured."
+        },
+        {
+          "name": "PUBLIC_TESTER_PER_ADDRESS",
+          "default": null,
+          "example": "3",
+          "description": "/tester on the public site: anyone, without an account, makes a URL that records the requests\nsent to it for a day. It is how railhook.io lets people try Railhook before signing up.\n\nOff by default, so a self-hosted install opens nothing anonymous: the page says the tester is\nnot enabled and the API answers 404. When on, it is bounded — three live URLs per address,\nPUBLIC_TESTER_MAX_ACTIVE live URLs overall, the latest 100 requests within 1 MB per URL — and\nasks for the registration CAPTCHA when one is configured."
+        },
+        {
+          "name": "PUBLIC_TESTER_MAX_ACTIVE",
+          "default": null,
+          "example": "5000",
+          "description": "/tester on the public site: anyone, without an account, makes a URL that records the requests\nsent to it for a day. It is how railhook.io lets people try Railhook before signing up.\n\nOff by default, so a self-hosted install opens nothing anonymous: the page says the tester is\nnot enabled and the API answers 404. When on, it is bounded — three live URLs per address,\nPUBLIC_TESTER_MAX_ACTIVE live URLs overall, the latest 100 requests within 1 MB per URL — and\nasks for the registration CAPTCHA when one is configured."
+        }
+      ]
+    },
+    {
       "title": "Web analytics",
       "variables": [
         {

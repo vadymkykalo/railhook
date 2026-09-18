@@ -34,9 +34,19 @@ import java.util.UUID;
  *
  * <p>Nothing here is tenant data — there is no organization behind a public URL — so every
  * method runs in the system scope. The bounds are what keep an anonymous, public store from
- * being one worth abusing: a day's life, the latest {@value #KEEP_REQUESTS} requests, the first
- * {@value #MAX_BODY_CHARS} characters of each body, credentials masked at the write (anyone who
- * has the URL can read it), and the rate limits the controllers apply.
+ * being one worth abusing, and each closes a different way in:
+ * <ul>
+ *   <li>per URL: the latest {@value #KEEP_REQUESTS} requests within {@value #BUDGET_BYTES} bytes of
+ *       bodies, each body cut at {@value #MAX_BODY_CHARS} characters — so one URL is at most a
+ *       megabyte however hard it is fed;</li>
+ *   <li>per address: at most {@code perAddress} live URLs, on top of the per-minute rate limit
+ *       and the challenge the controller asks for — a limit per minute alone still lets one
+ *       address hold thousands;</li>
+ *   <li>overall: at most {@code maxActive} live URLs, so even many addresses cannot grow the
+ *       tables past a known size — the tester says it is busy instead;</li>
+ *   <li>and a day's life, with credentials masked at the write, since anyone with the URL can
+ *       read it.</li>
+ * </ul>
  */
 @Slf4j
 @Service
@@ -44,6 +54,7 @@ public class PublicBinService {
 
     static final int KEEP_REQUESTS = 100;
     static final int MAX_BODY_CHARS = 65_536;
+    static final long BUDGET_BYTES = 1_048_576;
     static final Duration LIFETIME = Duration.ofDays(1);
     private static final int SLUG_LENGTH = 24;
     private static final String SLUG_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -55,29 +66,62 @@ public class PublicBinService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final String appBaseUrl;
+    private final boolean enabled;
+    private final int perAddress;
+    private final long maxActive;
 
     public PublicBinService(PublicBinRepository binRepository,
                             PublicBinRequestRepository requestRepository,
                             TrustedProxyResolver trustedProxyResolver,
                             ObjectMapper objectMapper,
                             Clock clock,
-                            @Value("${app.base-url:http://localhost:5173}") String appBaseUrl) {
+                            @Value("${app.base-url:http://localhost:5173}") String appBaseUrl,
+                            @Value("${public-bin.enabled:false}") boolean enabled,
+                            @Value("${public-bin.per-address:3}") int perAddress,
+                            @Value("${public-bin.max-active:5000}") long maxActive) {
         this.binRepository = binRepository;
         this.requestRepository = requestRepository;
         this.trustedProxyResolver = trustedProxyResolver;
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.appBaseUrl = appBaseUrl.replaceAll("/+$", "");
+        this.enabled = enabled;
+        this.perAddress = perAddress;
+        this.maxActive = maxActive;
+    }
+
+    /** Why a URL was not made; the controller turns it into a status and an error code. */
+    public static class LimitReached extends RuntimeException {
+        private final boolean overall;
+
+        LimitReached(boolean overall, String message) {
+            super(message);
+            this.overall = overall;
+        }
+
+        /** True when the tester as a whole is full, false when it is this address. */
+        public boolean isOverall() {
+            return overall;
+        }
     }
 
     @SystemTenant("a public tester URL belongs to no organization")
     @Transactional
-    public PublicBinResponse create() {
+    public PublicBinResponse create(String creatorIp) {
+        requireEnabled();
         Instant now = Instant.now(clock);
+        if (binRepository.countByExpiresAtAfter(now) >= maxActive) {
+            throw new LimitReached(true, "The webhook tester is busy. Try again later.");
+        }
+        if (creatorIp != null && binRepository.countByCreatorIpAndExpiresAtAfter(creatorIp, now) >= perAddress) {
+            throw new LimitReached(false,
+                    "Your address already has " + perAddress + " live tester URLs. Use one of them or wait for one to expire.");
+        }
         PublicBin bin = binRepository.save(PublicBin.builder()
                 .id(UUID.randomUUID())
                 .slug(newSlug())
                 .expiresAt(now.plus(LIFETIME))
+                .creatorIp(creatorIp)
                 .build());
         return toResponse(bin, List.of());
     }
@@ -107,7 +151,7 @@ public class PublicBinService {
                 .sourceIp(trustedProxyResolver.resolve(request))
                 .build());
         binRepository.incrementRequestCount(bin.getId());
-        requestRepository.trimToNewest(bin.getId(), KEEP_REQUESTS);
+        requestRepository.trimToNewest(bin.getId(), KEEP_REQUESTS, BUDGET_BYTES);
         return saved.getId();
     }
 
@@ -131,7 +175,18 @@ public class PublicBinService {
         }
     }
 
+    /**
+     * Off by default: a self-hosted install that never asked for it answers as though the tester
+     * did not exist, rather than opening an anonymous store on someone's own server.
+     */
+    private void requireEnabled() {
+        if (!enabled) {
+            throw new NotFoundException("The webhook tester is not enabled on this server");
+        }
+    }
+
     private PublicBin live(String slug) {
+        requireEnabled();
         return binRepository.findBySlugAndExpiresAtAfter(slug, Instant.now(clock))
                 .orElseThrow(() -> new NotFoundException("This tester URL does not exist or has expired"));
     }

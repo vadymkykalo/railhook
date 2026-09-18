@@ -10,13 +10,19 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import com.webhook.platform.api.service.captcha.CaptchaVerifier;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -35,7 +41,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * rate-limited per address, keeps a bounded number of requests of a bounded size, expires, and
  * never shows a credential it was sent.
  */
+@TestPropertySource(properties = { "public-bin.enabled=true", "public-bin.max-active=40" })
 public class PublicWebhookTesterIntegrationTest extends AbstractIntegrationTest {
+
+    private static final AtomicInteger NEXT_ADDRESS = new AtomicInteger(1);
+
+    @MockitoBean
+    private CaptchaVerifier captchaVerifier;
 
     @Autowired
     private MockMvc mockMvc;
@@ -55,6 +67,7 @@ public class PublicWebhookTesterIntegrationTest extends AbstractIntegrationTest 
     @BeforeEach
     void allowCaptures() {
         when(redisRateLimiterService.tryAcquireForSlug(anyString(), anyInt())).thenReturn(true);
+        when(captchaVerifier.verify(any(), anyString())).thenReturn(true);
     }
 
     /** Relative to the row's own created_at, so the database and the JVM need not share a zone. */
@@ -62,11 +75,26 @@ public class PublicWebhookTesterIntegrationTest extends AbstractIntegrationTest 
         jdbcTemplate.update("UPDATE public_bins SET expires_at = created_at - INTERVAL '1 second' WHERE slug = ?", slug);
     }
 
+    /** From an address of its own, so the per-address cap is exercised only where it is meant to be. */
     private JsonNode create() throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/public/bins"))
+        return create("198.51.100." + NEXT_ADDRESS.getAndIncrement());
+    }
+
+    private JsonNode create(String address) throws Exception {
+        MvcResult result = mockMvc.perform(createFrom(address))
                 .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private static MockHttpServletRequestBuilder createFrom(String address) {
+        return post("/api/v1/public/bins")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"captchaToken\":\"token\"}")
+                .with(request -> {
+                    request.setRemoteAddr(address);
+                    return request;
+                });
     }
 
     private JsonNode read(String slug) throws Exception {
@@ -156,7 +184,58 @@ public class PublicWebhookTesterIntegrationTest extends AbstractIntegrationTest 
     @Test
     public void makingUrlsIsLimitedPerAddress() throws Exception {
         when(authRateLimiterService.allowPublicBin(anyString())).thenReturn(false);
-        mockMvc.perform(post("/api/v1/public/bins")).andExpect(status().isTooManyRequests());
+        mockMvc.perform(createFrom("203.0.113.1")).andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    public void oneAddressHoldsAtMostThreeLiveUrls() throws Exception {
+        String address = "203.0.113.50";
+        create(address);
+        create(address);
+        String third = create(address).get("slug").asText();
+        mockMvc.perform(createFrom(address))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.error").value("too_many_active_urls"));
+
+        // An expired one no longer counts.
+        expire(third);
+        create(address);
+    }
+
+    @Test
+    public void aFailedChallengeMakesNoUrl() throws Exception {
+        when(captchaVerifier.verify(any(), anyString())).thenReturn(false);
+        mockMvc.perform(createFrom("203.0.113.60")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void aUrlKeepsAtMostOneMegabyteOfBodies() throws Exception {
+        String slug = create().get("slug").asText();
+        for (int i = 0; i < 20; i++) {
+            mockMvc.perform(post("/hook/p/" + slug).content("b".repeat(60_000))).andExpect(status().isOk());
+        }
+        Long stored = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM(octet_length(r.body)), 0) FROM public_bin_requests r "
+                        + "JOIN public_bins b ON b.id = r.bin_id WHERE b.slug = ?", Long.class, slug);
+        assertThat(stored).isLessThanOrEqualTo(1_048_576L).isGreaterThan(900_000L);
+        assertThat(read(slug).get("requestCount").asLong()).isEqualTo(20);
+    }
+
+    @Test
+    public void thePlatformHoldsABoundedNumberOfLiveUrls() throws Exception {
+        long live = jdbcTemplate.queryForObject("SELECT count(*) FROM public_bins WHERE expires_at > now()", Long.class);
+        int filler = (int) Math.max(0, 40 - live);
+        try {
+            for (int i = 0; i < filler; i++) {
+                jdbcTemplate.update("INSERT INTO public_bins (id, slug, expires_at, creator_ip) "
+                        + "VALUES (gen_random_uuid(), ?, now() + INTERVAL '1 hour', '192.0.2.1')", "filler" + i + "x".repeat(10));
+            }
+            mockMvc.perform(createFrom("203.0.113.70"))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.error").value("tester_busy"));
+        } finally {
+            jdbcTemplate.update("DELETE FROM public_bins WHERE slug LIKE 'filler%'");
+        }
     }
 
     @Test

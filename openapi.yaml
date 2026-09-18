@@ -2131,22 +2131,41 @@ paths:
       - Webhook Tester
       summary: Make a tester URL
       description: "A URL that records every request sent to it for a day: the latest\
-        \ 100, with the first 64 KB of each body and credentials masked. Anyone who\
-        \ has the URL can read what it received."
+        \ 100 within 1 MB of bodies, the first 64 KB of each, with credentials masked.\
+        \ Anyone who has the URL can read what it received. At most three live URLs\
+        \ per address."
       operationId: createPublicBin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicBinCreateRequest"
       responses:
         "201":
           description: The URL
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PublicBinResponse"
-        "429":
-          description: Too many URLs made from this address
+                type: object
+        "400":
+          description: The challenge was not passed
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PublicBinResponse"
+                type: object
+        "429":
+          description: "Too many URLs made from this address, or it already holds\
+            \ three live ones"
+          content:
+            '*/*':
+              schema:
+                type: object
+        "503":
+          description: The tester holds as many live URLs as it allows; try later
+          content:
+            '*/*':
+              schema:
+                type: object
   /api/v1/projects:
     get:
       tags:
@@ -8648,49 +8667,11 @@ components:
         createdAt:
           type: string
           format: date-time
-    PublicBinResponse:
+    PublicBinCreateRequest:
       type: object
       properties:
-        slug:
+        captchaToken:
           type: string
-        url:
-          type: string
-        expiresAt:
-          type: string
-          format: date-time
-        requestCount:
-          type: integer
-          format: int64
-        requests:
-          type: array
-          items:
-            $ref: "#/components/schemas/Request"
-    Request:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        method:
-          type: string
-        query:
-          type: string
-        headers:
-          $ref: "#/components/schemas/JsonNode"
-        body:
-          type: string
-        bodyTruncated:
-          type: boolean
-        sizeBytes:
-          type: integer
-          format: int64
-        contentType:
-          type: string
-        sourceIp:
-          type: string
-        receivedAt:
-          type: string
-          format: date-time
     StepExecutionResponse:
       type: object
       properties:
@@ -10017,6 +9998,49 @@ components:
           format: date-time
         projectName:
           type: string
+    PublicBinResponse:
+      type: object
+      properties:
+        slug:
+          type: string
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        requestCount:
+          type: integer
+          format: int64
+        requests:
+          type: array
+          items:
+            $ref: "#/components/schemas/Request"
+    Request:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        method:
+          type: string
+        query:
+          type: string
+        headers:
+          $ref: "#/components/schemas/JsonNode"
+        body:
+          type: string
+        bodyTruncated:
+          type: boolean
+        sizeBytes:
+          type: integer
+          format: int64
+        contentType:
+          type: string
+        sourceIp:
+          type: string
+        receivedAt:
+          type: string
+          format: date-time
     PageWorkflowExecutionResponse:
       type: object
       properties:

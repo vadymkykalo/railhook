@@ -88,6 +88,9 @@ const PRERENDER_CONFIG_JS = `window.__RAILHOOK__ = ${JSON.stringify({
   captchaSiteKey: '',
   captchaScriptUrl: '',
   webAnalyticsToken: '',
+  // The prerendered pages are the public site's, where the tester is on; a self-hosted install
+  // re-renders from its own /config.js on load.
+  publicTester: true,
 })};\n`;
 
 /** The same SPA fallback nginx serves, so the browser sees production routing. */

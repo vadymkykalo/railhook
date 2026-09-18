@@ -301,6 +301,13 @@ webhook:
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
 
+# The webhook tester on the public site (/tester): anonymous URLs that record requests for a
+# day. Off unless PUBLIC_TESTER_ENABLED=true, so a self-hosted install opens nothing anonymous.
+public-bin:
+  enabled: ${PUBLIC_TESTER_ENABLED:false}
+  per-address: ${PUBLIC_TESTER_PER_ADDRESS:3}
+  max-active: ${PUBLIC_TESTER_MAX_ACTIVE:5000}
+
 test-endpoint:
   base-url: ${TEST_ENDPOINT_BASE_URL:http://localhost:8080}
   max-per-project: ${TEST_ENDPOINT_MAX_PER_PROJECT:10}

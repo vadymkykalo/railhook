@@ -39,9 +39,12 @@ type Config = {
   captchaSiteKey?: string;
   captchaScriptUrl?: string;
   webAnalyticsToken?: string;
+  publicTester?: boolean;
 };
 
-const EMPTY: Config = { contactDomain: '', siteUrl: '', captchaSiteKey: '', captchaScriptUrl: '', webAnalyticsToken: '' };
+const EMPTY: Config = {
+  contactDomain: '', siteUrl: '', captchaSiteKey: '', captchaScriptUrl: '', webAnalyticsToken: '', publicTester: false,
+};
 
 /** Runs the entrypoint script as the container would, and evaluates what it wrote. */
 function runEntrypoint(env: Record<string, string | undefined>) {
@@ -177,6 +180,29 @@ describe('registration challenge', () => {
       expect(js).not.toContain('alert');
       expect(stderr).toMatch(/RAILHOOK_CAPTCHA_/);
     }
+  });
+});
+
+describe('public webhook tester', () => {
+  it('is on only for an exact "true", so a self-hosted install opens nothing anonymous', () => {
+    expect(runEntrypoint({ RAILHOOK_PUBLIC_TESTER: 'true' }).config?.publicTester).toBe(true);
+    for (const value of [undefined, '', 'false', 'yes', '1', 'true"};alert(1);//']) {
+      const { config, js } = runEntrypoint({ RAILHOOK_PUBLIC_TESTER: value });
+      expect(config?.publicTester, String(value)).toBe(false);
+      expect(js).not.toContain('alert');
+    }
+  });
+
+  it('reads the same switch as the API in Compose, and is off in Helm unless set', () => {
+    const compose = read('docker-compose.yml');
+    const ui = compose.slice(compose.indexOf('\n  ui:'), compose.indexOf('\n  caddy:'));
+    const api = compose.slice(compose.indexOf('\n  api:'), compose.indexOf('\n  worker:'));
+    expect(ui).toMatch(/^\s+RAILHOOK_PUBLIC_TESTER: \$\{PUBLIC_TESTER_ENABLED:-false\}$/m);
+    expect(api).toMatch(/^\s+PUBLIC_TESTER_ENABLED: \$\{PUBLIC_TESTER_ENABLED:-false\}$/m);
+    expect(read('deploy/helm/railhook/templates/ui-deployment.yaml'))
+      .toMatch(/name: RAILHOOK_PUBLIC_TESTER\s+value: \{\{ \.Values\.ui\.publicTester \| default false \| quote \}\}/);
+    expect(read('deploy/helm/railhook/values.yaml')).toMatch(/^ {2}publicTester: false$/m);
+    expect(read('.env.dist')).toMatch(/^#\s*PUBLIC_TESTER_ENABLED=false$/m);
   });
 });
 

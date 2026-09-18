@@ -16,6 +16,10 @@ public interface PublicBinRepository extends JpaRepository<PublicBin, UUID> {
 
     Optional<PublicBin> findBySlugAndExpiresAtAfter(String slug, Instant now);
 
+    long countByExpiresAtAfter(Instant now);
+
+    long countByCreatorIpAndExpiresAtAfter(String creatorIp, Instant now);
+
     @Modifying
     @Query("UPDATE PublicBin b SET b.requestCount = b.requestCount + 1 WHERE b.id = :id")
     void incrementRequestCount(@Param("id") UUID id);
