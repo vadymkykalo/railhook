@@ -60,6 +60,15 @@ class MutatingHandlerScopeDeclarationTest {
      * <p>Adding an entry here is a security decision — say why, and prefer annotating instead.
      */
     private static final Set<String> DOCUMENTED_EXEMPTIONS = new TreeSet<>(Set.of(
+            // The customer portal: a portal session, never an API key, is the caller —
+            // SecurityConfig refuses an API key on /api/v1/portal/** outright, so there is no
+            // scope to check. PortalService confines every row to the session's Consumer.
+            "PortalController.portalCreateEndpoint",
+            "PortalController.portalUpdateEndpoint",
+            "PortalController.portalDeleteEndpoint",
+            "PortalController.portalRotateEndpointSecret",
+            "PortalController.portalRetryDelivery",
+
             // Authentication: these mint or exchange the credential itself, so an API-key
             // scope cannot apply. Public paths in SecurityConfig.
             "AuthController.register",
@@ -133,6 +142,16 @@ class MutatingHandlerScopeDeclarationTest {
             // Unauthenticated by design — whitelisted public paths in SecurityConfig.
             "BillingController.handleWebhook",
             "IngressController.receiveWebhook",
+            // The public site's webhook tester: anonymous by design (/api/v1/public/** in
+            // SecurityConfig), rate-limited per address, and it touches no tenant data at all.
+            "PublicBinController.create",
+            // The MCP server's OAuth endpoints, called by an app rather than a person: open
+            // registration (RFC 7591), the token endpoint and revocation. Public in
+            // McpSecurityConfig; the app's client credentials, code + PKCE verifier or refresh
+            // token are what authorize each call, and no API key is ever the caller.
+            "McpOAuthController.registerOAuthClient",
+            "McpOAuthController.issueOAuthToken",
+            "McpOAuthController.revokeOAuthToken",
 
             // Platform-admin only, gated on the PLATFORM_ADMIN authority for /api/v1/admin/**
             // in SecurityConfig rather than on a tenant scope.

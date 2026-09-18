@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter, Navigate, redirect } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import AppLayout from './layout/AppLayout';
 import PublicLayout from './layout/PublicLayout';
@@ -17,8 +17,11 @@ const ForgotPasswordPage = lazy(() => import('./auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./auth/ResetPasswordPage'));
 const AcceptInvitePage = lazy(() => import('./auth/AcceptInvitePage'));
 const DeviceApprovePage = lazy(() => import('./auth/DeviceApprovePage'));
+const OAuthConsentPage = lazy(() => import('./auth/OAuthConsentPage'));
 const AuthCallbackPage = lazy(() => import('./auth/AuthCallbackPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
+const PricingPage = lazy(() => import('./pages/PricingPage'));
+const TesterPage = lazy(() => import('./pages/TesterPage'));
 const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.PrivacyPage })));
 const TermsPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.TermsPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -64,6 +67,8 @@ const WorkflowBuilderPage = lazy(() => import('./pages/WorkflowBuilderPage'));
 const TunnelsPage = lazy(() => import('./pages/TunnelsPage'));
 const TestConsolePage = lazy(() => import('./pages/TestConsolePage'));
 const SharedDebugPage = lazy(() => import('./pages/SharedDebugPage'));
+const PortalPage = lazy(() => import('./pages/PortalPage'));
+const ConsumersPage = lazy(() => import('./pages/ConsumersPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 function PageLoader() {
@@ -90,10 +95,13 @@ export const router = createBrowserRouter([
             path: '/',
             element: <S><LandingPage /></S>,
           },
-          /* There are no paid plans to price; old /pricing links land on how to run it. */
           {
             path: '/pricing',
-            loader: () => redirect('/#run'),
+            element: <S><PricingPage /></S>,
+          },
+          {
+            path: '/tester',
+            element: <S><TesterPage /></S>,
           },
           {
             path: '/contact',
@@ -147,6 +155,20 @@ export const router = createBrowserRouter([
         path: '/device',
         element: <S><DeviceApprovePage /></S>,
       },
+      /* The customer portal: what a customer embeds for their own user. No Railhook session and no
+         layout — its one credential is the portal session token in the URL's fragment. nginx
+         serves it under a location of its own, the one route here another site may frame. */
+      {
+        path: '/portal',
+        element: <S><PortalPage /></S>,
+      },
+      /* Where an MCP app (claude.ai, ChatGPT) sends a person to connect Railhook. The API's
+         /oauth/authorize parks the request and redirects here; signed out, the page goes through
+         /login and back. */
+      {
+        path: '/oauth/consent',
+        element: <S><OAuthConsentPage /></S>,
+      },
       /* Where the API sends the browser after "Continue with Google", with a one-time code to trade
          for a session. */
       {
@@ -193,6 +215,10 @@ export const router = createBrowserRouter([
           {
             path: 'projects/:projectId/deliveries',
             element: <S><DeliveriesPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/consumers',
+            element: <S><ConsumersPage /></S>,
           },
           {
             path: 'projects/:projectId/events',

@@ -33,9 +33,18 @@ const TURNSTILE = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=
  * asserted here, because any one missing fails silently.
  */
 
-type Config = { contactDomain?: string; siteUrl?: string; captchaSiteKey?: string; captchaScriptUrl?: string };
+type Config = {
+  contactDomain?: string;
+  siteUrl?: string;
+  captchaSiteKey?: string;
+  captchaScriptUrl?: string;
+  webAnalyticsToken?: string;
+  publicTester?: boolean;
+};
 
-const EMPTY: Config = { contactDomain: '', siteUrl: '', captchaSiteKey: '', captchaScriptUrl: '' };
+const EMPTY: Config = {
+  contactDomain: '', siteUrl: '', captchaSiteKey: '', captchaScriptUrl: '', webAnalyticsToken: '', publicTester: false,
+};
 
 /** Runs the entrypoint script as the container would, and evaluates what it wrote. */
 function runEntrypoint(env: Record<string, string | undefined>) {
@@ -174,6 +183,63 @@ describe('registration challenge', () => {
   });
 });
 
+describe('public webhook tester', () => {
+  it('is on only for an exact "true", so a self-hosted install opens nothing anonymous', () => {
+    expect(runEntrypoint({ RAILHOOK_PUBLIC_TESTER: 'true' }).config?.publicTester).toBe(true);
+    for (const value of [undefined, '', 'false', 'yes', '1', 'true"};alert(1);//']) {
+      const { config, js } = runEntrypoint({ RAILHOOK_PUBLIC_TESTER: value });
+      expect(config?.publicTester, String(value)).toBe(false);
+      expect(js).not.toContain('alert');
+    }
+  });
+
+  it('reads the same switch as the API in Compose, and is off in Helm unless set', () => {
+    const compose = read('docker-compose.yml');
+    const ui = compose.slice(compose.indexOf('\n  ui:'), compose.indexOf('\n  caddy:'));
+    const api = compose.slice(compose.indexOf('\n  api:'), compose.indexOf('\n  worker:'));
+    expect(ui).toMatch(/^\s+RAILHOOK_PUBLIC_TESTER: \$\{PUBLIC_TESTER_ENABLED:-false\}$/m);
+    expect(api).toMatch(/^\s+PUBLIC_TESTER_ENABLED: \$\{PUBLIC_TESTER_ENABLED:-false\}$/m);
+    expect(read('deploy/helm/railhook/templates/ui-deployment.yaml'))
+      .toMatch(/name: RAILHOOK_PUBLIC_TESTER\s+value: \{\{ \.Values\.ui\.publicTester \| default false \| quote \}\}/);
+    expect(read('deploy/helm/railhook/values.yaml')).toMatch(/^ {2}publicTester: false$/m);
+    expect(read('.env.dist')).toMatch(/^#\s*PUBLIC_TESTER_ENABLED=false$/m);
+  });
+});
+
+describe('web analytics', () => {
+  it('turns on with a Cloudflare Web Analytics token, which stays out of the log', () => {
+    const token = '0123456789abcdef0123456789abcdef';
+    const { config, stdout } = runEntrypoint({ RAILHOOK_WEB_ANALYTICS_TOKEN: ` ${token} ` });
+    expect(config).toEqual({ ...EMPTY, webAnalyticsToken: token });
+    expect(stdout).toMatch(/web analytics on/);
+    expect(stdout).not.toContain(token);
+  });
+
+  it('is off by default, so a self-hosted install reports nothing to anyone', () => {
+    const { config, stdout } = runEntrypoint({});
+    expect(config?.webAnalyticsToken).toBe('');
+    expect(stdout).toMatch(/web analytics off/);
+  });
+
+  it('stays off, rather than failing the container, on a value that could break out of the config', () => {
+    const { status, js, config, stderr } = runEntrypoint({ RAILHOOK_WEB_ANALYTICS_TOKEN: 'abc"};alert(1);//' });
+    expect(status).toBe(0);
+    expect(config).toEqual(EMPTY);
+    expect(js).not.toContain('alert');
+    expect(stderr).toMatch(/RAILHOOK_WEB_ANALYTICS_TOKEN/);
+  });
+
+  it('is loaded by the app and by the docs, after the runtime config it reads', () => {
+    const html = read('railhook-ui/index.html');
+    const config = html.search(/<script src="\/config\.js"><\/script>/);
+    const analytics = html.search(/<script src="\/analytics\.js" defer><\/script>/);
+    expect(analytics, '<script src="/analytics.js" defer>').toBeGreaterThan(config);
+    const docs = read('railhook-docs/astro.config.mjs');
+    expect(docs).toMatch(/src: '\/config\.js'/);
+    expect(docs).toMatch(/src: '\/analytics\.js'/);
+  });
+});
+
 describe('nginx serves the runtime config', () => {
   const conf = read('railhook-ui/nginx.conf');
   const body = locationBody(conf, '= /config.js');
@@ -269,6 +335,7 @@ describe('the settings reach the container', () => {
 
   it('.env.dist documents the contact domain and the challenge site key', () => {
     const envDist = read('.env.dist');
+    expect(envDist).toMatch(/^#\s*WEB_ANALYTICS_TOKEN=$/m);
     expect(envDist).toMatch(/^RAILHOOK_CONTACT_DOMAIN=$/m);
     expect(envDist).toMatch(/^#\s*CAPTCHA_SITE_KEY=$/m);
     expect(envDist).toMatch(/^#\s*CAPTCHA_SCRIPT_URL=/m);
@@ -285,18 +352,21 @@ describe('the settings reach the container', () => {
     expect(read('install.sh')).toMatch(/^APP_BASE_URL=\$\{BASE_URL\}$/m);
   });
 
-  it('Compose passes all four to the ui service', () => {
+  it('Compose passes all five to the ui service', () => {
     expect(ui).toMatch(/^\s+RAILHOOK_CONTACT_DOMAIN: \$\{RAILHOOK_CONTACT_DOMAIN:-\}$/m);
     expect(ui).toMatch(/^\s+RAILHOOK_SITE_URL: \$\{APP_BASE_URL:-\}$/m);
     expect(ui).toMatch(/^\s+RAILHOOK_CAPTCHA_SITE_KEY: \$\{CAPTCHA_SITE_KEY:-\}$/m);
     expect(ui).toMatch(/^\s+RAILHOOK_CAPTCHA_SCRIPT_URL: \$\{CAPTCHA_SCRIPT_URL:-\}$/m);
+    expect(ui).toMatch(/^\s+RAILHOOK_WEB_ANALYTICS_TOKEN: \$\{WEB_ANALYTICS_TOKEN:-\}$/m);
   });
 
-  it('the Helm chart passes all four to the UI pod', () => {
+  it('the Helm chart passes all five to the UI pod', () => {
     expect(deployment).toMatch(/name: RAILHOOK_CONTACT_DOMAIN\s+value: \{\{ \.Values\.ui\.contactDomain \| default "" \| quote \}\}/);
     expect(deployment).toMatch(/name: RAILHOOK_SITE_URL\s+value: \{\{ include "railhook\.appBaseUrl" \. \| quote \}\}/);
     expect(deployment).toMatch(/name: RAILHOOK_CAPTCHA_SITE_KEY\s+value: \{\{ \.Values\.ui\.captcha\.siteKey \| default "" \| quote \}\}/);
     expect(deployment).toMatch(/name: RAILHOOK_CAPTCHA_SCRIPT_URL\s+value: \{\{ \.Values\.ui\.captcha\.scriptUrl \| default "" \| quote \}\}/);
+    expect(deployment).toMatch(/name: RAILHOOK_WEB_ANALYTICS_TOKEN\s+value: \{\{ \.Values\.ui\.webAnalyticsToken \| default "" \| quote \}\}/);
     expect(read('deploy/helm/railhook/values.yaml')).toMatch(/^ {2}contactDomain: ""$/m);
+    expect(read('deploy/helm/railhook/values.yaml')).toMatch(/^ {2}webAnalyticsToken: ""$/m);
   });
 });

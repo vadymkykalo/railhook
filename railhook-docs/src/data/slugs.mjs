@@ -48,6 +48,7 @@ export const SIDEBAR_GROUPS = [
       'outgoing/schema-registry',
       'outgoing/workflows',
       'outgoing/endpoint-security',
+      'outgoing/customer-portal',
     ],
   },
   {
@@ -56,9 +57,21 @@ export const SIDEBAR_GROUPS = [
     slugs: ['incoming/sources', 'incoming/destinations', 'incoming/verification'],
   },
   {
+    label: 'Provider guides',
+    uk: 'Гайди провайдерів',
+    slugs: [
+      'guides/stripe-webhooks',
+      'guides/github-webhooks',
+      'guides/gitlab-webhooks',
+      'guides/shopify-webhooks',
+      'guides/slack-webhooks',
+      'guides/twilio-webhooks',
+    ],
+  },
+  {
     label: 'Tools',
     uk: 'Інструменти',
-    slugs: ['tools/cli', 'tools/sdks'],
+    slugs: ['tools/cli', 'tools/sdks', 'tools/mcp'],
   },
   {
     label: 'Platform',
@@ -70,6 +83,17 @@ export const SIDEBAR_GROUPS = [
       'platform/alerts',
       'platform/errors-limits',
       'platform/observability',
+    ],
+  },
+  {
+    label: 'Compare',
+    uk: 'Порівняння',
+    slugs: [
+      'compare/svix',
+      'compare/hookdeck',
+      'compare/convoy',
+      'compare/hook0',
+      'compare/open-source-webhook-tools',
     ],
   },
   {

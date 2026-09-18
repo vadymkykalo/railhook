@@ -17,6 +17,10 @@ export interface RuntimeConfig {
   captchaSiteKey?: string;
   /** The challenge provider's script. Only set alongside a site key. */
   captchaScriptUrl?: string;
+  /** Cloudflare Web Analytics token. Empty means no analytics, which is the default. */
+  webAnalyticsToken?: string;
+  /** Whether the public webhook tester (/tester) is on. Off unless the deployment says so. */
+  publicTester?: boolean;
 }
 
 declare global {
@@ -25,7 +29,7 @@ declare global {
   }
 }
 
-function read(key: keyof RuntimeConfig): string | undefined {
+function read(key: Exclude<keyof RuntimeConfig, 'publicTester'>): string | undefined {
   const value = typeof window !== 'undefined' ? window.__RAILHOOK__?.[key] : undefined;
   return (typeof value === 'string' && value.trim()) || undefined;
 }
@@ -48,4 +52,14 @@ export function captchaSiteKey(): string | undefined {
 /** The challenge script; Turnstile's when a site key is set without one. */
 export function captchaScriptUrl(): string {
   return read('captchaScriptUrl') ?? 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+}
+
+/** The Cloudflare Web Analytics token; undefined when analytics is off. */
+export function webAnalyticsToken(): string | undefined {
+  return read('webAnalyticsToken');
+}
+
+/** Whether the public webhook tester is on for this deployment. */
+export function publicTesterEnabled(): boolean {
+  return typeof window !== 'undefined' && window.__RAILHOOK__?.publicTester === true;
 }

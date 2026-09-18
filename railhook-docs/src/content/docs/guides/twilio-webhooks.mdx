@@ -1,0 +1,108 @@
+---
+title: Receive Twilio webhooks reliably
+description: Twilio retries a webhook once by default. Put Railhook in front of your app to verify X-Twilio-Signature, store every status callback, and forward it to your service with retries and replay.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This guide puts Railhook between Twilio and your application for Twilio's informational webhooks, such as message status callbacks. Twilio sends them to a Railhook source, which verifies the signature, stores each one as it arrived and forwards it to your service with retries.
+
+## Why Twilio webhooks need a buffer
+
+By default Twilio waits 5 seconds to connect and 15 seconds for a response, and retries a webhook once, only when the connection itself failed. A `5xx` from your app or a slow response is not retried unless you add connection overrides to the URL. ([Twilio: Webhooks connection overrides](https://www.twilio.com/docs/usage/webhooks/webhooks-connection-overrides))
+
+So a status callback that arrives while your app is restarting is usually lost, and your records of which messages were delivered drift from Twilio's. With Railhook in front:
+
+- Twilio is answered as soon as the callback is stored.
+- Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed Forwards**.
+- A callback carrying an `I-Twilio-Idempotency-Token` Railhook has already stored is answered with the stored copy and not forwarded again.
+
+<Aside type="caution" title="Not for webhooks that must answer with TwiML">
+Twilio documents that incoming call and message webhooks need a TwiML response, while informational webhooks only need a success response. ([Twilio: Getting started with webhooks](https://www.twilio.com/docs/usage/webhooks/getting-started-twilio-webhooks)) The ingress answers `202` with a small JSON body of its own and never returns TwiML, so point only informational webhooks, such as status callbacks, at a source. A webhook whose response tells Twilio what to do next has to reach your app directly.
+</Aside>
+
+## Connect Twilio
+
+You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Create the source** with your Twilio auth token, from the Twilio Console. Twilio signs its requests with it:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Twilio","providerType":"TWILIO","verificationMode":"PROVIDER","hmacSecret":"'"$TWILIO_AUTH_TOKEN"'"}'
+   ```
+
+   Keep the `id` and the `ingressUrl` from the response.
+
+2. **Add a destination**, the URL of your own service:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/twilio","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+3. **Give Twilio the URL.** Pass the `ingressUrl` exactly as the source shows it wherever Twilio takes a status callback URL, such as the `StatusCallback` parameter when you send a message. Keep the method `POST`: the ingress accepts nothing else.
+
+4. **Send a message.** Its status callbacks appear under **Incoming → Received**, with one forward per destination.
+
+</Steps>
+
+## How the signature is checked
+
+Twilio's `X-Twilio-Signature` is a base64 HMAC-SHA1 computed with the auth token. For a form-encoded request it covers the URL followed by every parameter sorted by name; for other requests it covers the URL, and the `bodySHA256` query parameter must match the body. A request that does not match is answered `401` and not stored.
+
+<Aside type="caution" title="Twilio signs the URL">
+Railhook rebuilds the signed URL from its configured public address, not from the incoming request, so verification survives a reverse proxy. On a self-hosted instance that address is `APP_BASE_URL`, which the installer sets from `--domain`, or `TUNNEL_INGRESS_BASE_URL` when webhooks arrive on a different host. Give Twilio exactly the ingress URL the source shows. Any other spelling of the URL fails verification.
+</Aside>
+
+## What your service receives
+
+The body exactly as Twilio sent it, byte for byte, with its form-encoded `Content-Type`, so your service parses it as it would a direct callback. `X-Twilio-Signature` is not forwarded, and it would not verify against your URL anyway: your service authenticates Railhook through the destination's credentials instead. See [Destinations](/docs/incoming/destinations/#what-the-destination-receives).
+
+## Develop locally with the CLI
+
+<Steps>
+
+1. Install the CLI and log in, as in [CLI](/docs/tools/cli/), then open a tunnel to your app's port:
+
+   ```bash
+   railhook listen 3000
+   ```
+
+2. Add a second destination to the source with the printed public URL and your route appended, such as `https://<host>/tunnel/<slug>/webhooks/twilio`. It reaches `http://localhost:3000/webhooks/twilio`.
+
+3. Send a test message with the ingress URL as its status callback, and each callback arrives in your local app. Disable that destination when you stop the tunnel.
+
+</Steps>
+
+## Replay after an outage
+
+Replay what arrived while your service was down. Each replayed callback goes to every destination of the source as a new forward:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
+```
+
+Replay reaches back as far as events are kept: 7 days on Railhook Cloud, and whatever you configure when self-hosting. A status callback describes a state, so applying the same one twice should be harmless; make sure your handler treats it that way. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
+  <LinkCard title="Sources" href="/docs/incoming/sources/" description="The ingress URL, and what it answers." />
+  <LinkCard title="Configuration" href="/docs/self-hosting/configuration/" description="Set the public address Twilio signs." />
+</CardGrid>

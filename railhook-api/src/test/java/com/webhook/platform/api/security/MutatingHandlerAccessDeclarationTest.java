@@ -76,6 +76,15 @@ class MutatingHandlerAccessDeclarationTest {
             "DeviceAuthController.pollDeviceToken",
             "BillingController.handleWebhook",
             "IngressController.receiveWebhook",
+            // The public site's webhook tester: anonymous by design (/api/v1/public/** in
+            // SecurityConfig), rate-limited per address, and it touches no tenant data at all.
+            "PublicBinController.create",
+            // The MCP server's OAuth protocol endpoints: called by an app with its client
+            // credentials, a code + PKCE verifier or a refresh token, never by a member, so there
+            // is no role to require. Public paths in McpSecurityConfig, outside /api.
+            "McpOAuthController.registerOAuthClient",
+            "McpOAuthController.issueOAuthToken",
+            "McpOAuthController.revokeOAuthToken",
 
             // Act on the caller's own account rather than on tenant data, so a membership role
             // is not the right question: a Viewer may change their own password.
@@ -108,6 +117,16 @@ class MutatingHandlerAccessDeclarationTest {
             // caller who is supposed to make it.
             "PlatformAdminOrganizationController.suspend",
             "PlatformAdminOrganizationController.reinstate",
+
+            // The customer portal: authenticated by a portal session, which holds no membership
+            // role at all — SecurityConfig admits only PORTAL_SESSION on /api/v1/portal/**, and
+            // PortalService confines every row to the session's Consumer. The session is the whole
+            // of the caller's authority, so there is no level to require.
+            "PortalController.portalCreateEndpoint",
+            "PortalController.portalUpdateEndpoint",
+            "PortalController.portalDeleteEndpoint",
+            "PortalController.portalRotateEndpointSecret",
+            "PortalController.portalRetryDelivery",
 
             // The API key IS the intended caller, and what it may do is decided by its scope:
             // these carry @RequireScope instead. See MutatingHandlerScopeDeclarationTest.

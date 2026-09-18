@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.Endpoint;
+import com.webhook.platform.api.domain.repository.ConsumerRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
@@ -22,6 +23,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -59,7 +61,7 @@ class EndpointSecretRotationTest {
     void setUp() throws Exception {
         registry = buildRegistry();
         service = new EndpointService(
-                endpointRepository, projectRepository, WebClient.builder(), registry,
+                endpointRepository, projectRepository, mock(ConsumerRepository.class), WebClient.builder(), registry,
                 true, Collections.emptyList(), false);
 
         when(endpointRepository.saveAndFlush(any(Endpoint.class))).thenAnswer(inv -> inv.getArgument(0));

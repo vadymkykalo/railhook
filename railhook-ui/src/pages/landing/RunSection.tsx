@@ -72,6 +72,11 @@ export default function RunSection() {
           </div>
         </article>
       </div>
+      <p className="mt-6 text-center">
+        <Link to="/pricing" className="text-sm font-medium text-primary hover:underline">
+          {t('landing.run.compare')} →
+        </Link>
+      </p>
     </Band>
   );
 }

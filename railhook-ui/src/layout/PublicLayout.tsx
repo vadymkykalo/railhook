@@ -2,7 +2,7 @@ import { useId, useLayoutEffect, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Github, Mail, type LucideIcon } from 'lucide-react';
-import { contactDomain } from '../lib/runtimeConfig';
+import { contactDomain, publicTesterEnabled } from '../lib/runtimeConfig';
 import { RailhookIcon } from '../components/icons/RailhookIcon';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import ThemeToggle from '../components/ThemeToggle';
@@ -144,6 +144,8 @@ export function Footer() {
             <RouteLink to="/#product">{t('footer.overview')}</RouteLink>
             <RouteLink to="/#cloud">{t('footer.cloud')}</RouteLink>
             <RouteLink to="/#self-host">{t('footer.selfHost')}</RouteLink>
+            <RouteLink to="/pricing">{t('footer.pricing')}</RouteLink>
+            {publicTesterEnabled() && <RouteLink to="/tester">{t('footer.tester')}</RouteLink>}
             <RouteLink to="/login">{t('footer.signIn')}</RouteLink>
           </Column>
           <Column title={t('footer.docs')}>

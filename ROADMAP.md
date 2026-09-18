@@ -28,17 +28,6 @@ not: nothing called `AlertService.fireAlert`, all four `AlertType` values were u
 outside their enum, and every rule a user created was inert. The evaluator that closed that
 gap is what makes the rest of this item the small piece it was always described as.
 
-### An app portal for the customer's own users
-
-Today a Railhook customer manages their end-users' endpoints on those users' behalf. There is
-no view a customer can embed in their own product for their users to register an endpoint,
-see why a delivery failed, and replay it. `SharedDebugLinkController` shares a single event —
-useful, but not a portal.
-
-This is the single largest structural gap against Svix, and it is the thing people pay for:
-it moves webhook support out of the customer's inbox. It needs a scoped session model for a
-non-Railhook user, an embeddable surface, and enough theming not to look borrowed.
-
 ## Known gaps, not yet scheduled
 
 Each of these is a real absence, listed so nobody has to discover it mid-evaluation.

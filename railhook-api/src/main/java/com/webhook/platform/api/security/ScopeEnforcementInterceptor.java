@@ -167,6 +167,10 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
             organizationId = jwt.getOrganizationId();
         } else if (authentication instanceof ApiKeyAuthenticationToken apiKey) {
             organizationId = apiKey.getOrganizationId();
+        } else if (authentication instanceof PortalSessionAuthenticationToken portal) {
+            // A Consumer registering an Endpoint from the portal is the organization changing
+            // something, whoever's browser the request came from.
+            organizationId = portal.getOrganizationId();
         } else {
             // Unauthenticated, or the platform admin - who is the one able to lift a suspension
             // and must not be locked out by it.

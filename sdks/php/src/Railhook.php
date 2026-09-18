@@ -10,10 +10,12 @@ use Railhook\Api\Subscriptions;
 use Railhook\Api\Deliveries;
 use Railhook\Api\IncomingSources;
 use Railhook\Api\IncomingEvents;
+use Railhook\Api\Consumers;
+use Railhook\Api\PortalSessions;
 
 class Railhook
 {
-    private const SDK_VERSION = '2.20.13';
+    private const SDK_VERSION = '2.21.0';
 
     private string $apiKey;
     private string $baseUrl;
@@ -25,6 +27,8 @@ class Railhook
     public readonly Deliveries $deliveries;
     public readonly IncomingSources $incomingSources;
     public readonly IncomingEvents $incomingEvents;
+    public readonly Consumers $consumers;
+    public readonly PortalSessions $portalSessions;
 
     public function __construct(
         string $apiKey,
@@ -45,6 +49,8 @@ class Railhook
         $this->deliveries = new Deliveries($this);
         $this->incomingSources = new IncomingSources($this);
         $this->incomingEvents = new IncomingEvents($this);
+        $this->consumers = new Consumers($this);
+        $this->portalSessions = new PortalSessions($this);
     }
 
     /**

@@ -65,10 +65,12 @@ a month, 3 projects, 7 days of history). Paid plans with support and higher limi
 | | |
 |---|---|
 | **Delivery** | Retry ladder · per-endpoint ordering · rate limits · shared circuit breaker |
+| **Customer portal** | Embed a portal where your own customers register endpoints, pick event types, and see and retry their deliveries — in your brand colours |
 | **Recovery** | Failed Messages with bulk retry · Time Machine replay |
 | **Signing** | HMAC-SHA256 in [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks) and legacy headers · secret rotation |
 | **Shaping** | Rules · JSONPath transformations · schema registry · workflows · wildcard subscriptions |
-| **Developing** | CLI tunnel to `localhost` · test endpoints · transformation preview · delivery dry-run |
+| **Developing** | CLI tunnel to `localhost` · test endpoints · transformation preview · delivery dry-run · [free webhook tester](https://railhook.io/tester) |
+| **AI agents** | MCP server at `/mcp` — Claude, Cursor or any MCP client can send events, manage endpoints and replay deliveries |
 | **Security** | Tenant isolation · AES-256-GCM secrets at rest · SSRF protection · mTLS · PII masking · audit log |
 | **Access** | Organizations and projects · Owner / Developer / Viewer roles · API keys |
 | **Operating** | Prometheus metrics · Grafana dashboards · 22 alert rules · data retention · GDPR export · Helm chart |
@@ -107,6 +109,18 @@ curl -fsSL https://railhook.io/install-cli.sh | bash
 Receive webhooks on `localhost` while you develop — `railhook login`, then `railhook listen 3000`.
 `railhook events <projectId> --follow` tails events; `railhook replay <projectId> --dry-run` previews a replay.
 Install and usage: [CLI docs](https://railhook.io/docs/tools/cli/).
+
+## AI agents (MCP)
+
+Railhook serves the Model Context Protocol at `/mcp`, authenticated with a project API key:
+
+```bash
+claude mcp add --transport http railhook https://railhook.io/mcp \
+  --header "Authorization: Bearer $RAILHOOK_API_KEY"
+```
+
+Clients that only speak stdio run `npx -y @railhook/mcp`. Setup for Cursor and Claude Desktop:
+[MCP docs](https://railhook.io/docs/tools/mcp/).
 
 ## Documentation
 

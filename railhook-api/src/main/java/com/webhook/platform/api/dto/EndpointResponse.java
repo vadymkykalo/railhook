@@ -16,6 +16,8 @@ import java.util.UUID;
 public class EndpointResponse {
     private UUID id;
     private UUID projectId;
+    /** The Consumer this endpoint belongs to, or null when it is the customer's own. */
+    private UUID consumerId;
     private String url;
     private String description;
     private Boolean enabled;

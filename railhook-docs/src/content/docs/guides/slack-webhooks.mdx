@@ -1,0 +1,106 @@
+---
+title: Receive Slack events reliably
+description: Answer Slack's Events API within three seconds every time — Railhook verifies X-Slack-Signature, handles the url_verification challenge, and forwards events to your service with retries and replay.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This guide puts Railhook between Slack's Events API and your app. Slack sends its events to a Railhook source, which verifies the signature, stores each event as it arrived and forwards it to your service with retries. Slack only ever talks to Railhook, which answers straight away, so a slow handler no longer gets your event subscriptions disabled.
+
+## Why Slack events need a buffer
+
+Slack asks your app to answer each event with a `2xx` within three seconds. It retries a failed event three times, nearly immediately, after 1 minute and after 5 minutes, marking each retry with an `x-slack-retry-num` header. If your app fails to answer at least 5% of events within 60 minutes, Slack temporarily disables its event subscriptions and emails the app's owner. ([Slack: The Events API](https://docs.slack.dev/apis/events-api/))
+
+Three seconds is tight for any handler that calls a database or another API, and a retry window of about five minutes does not cover a deploy that goes wrong. With Railhook in front:
+
+- Slack is answered as soon as the event is stored, well inside the three seconds.
+- Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed Forwards**.
+- A Slack retry carries the same `event_id`. Railhook recognises it, answers with the stored copy and does not forward it twice.
+
+<Aside type="caution" title="Events API only">
+The ingress answers `202` with a small JSON body of its own. Use a source for the Events API, where Slack only needs a `2xx`. Slash commands and interactive components, whose response Slack shows to the user, have to reach your app directly.
+</Aside>
+
+## Connect Slack
+
+You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Copy the signing secret.** In your app's settings at api.slack.com, open **Basic Information** and copy the **Signing Secret** under **App Credentials**.
+
+2. **Create the source** with that secret:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Slack","providerType":"SLACK","verificationMode":"PROVIDER","hmacSecret":"'"$SLACK_SIGNING_SECRET"'"}'
+   ```
+
+   Keep the `id` and the `ingressUrl` from the response.
+
+3. **Add a destination**, the URL of your own service:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/slack","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+4. **Enable events in Slack.** Open **Event Subscriptions**, turn it on, and paste the `ingressUrl` as the **Request URL**. Slack sends a `url_verification` challenge; Railhook verifies its signature and answers with the challenge, so the URL is accepted. The challenge is not an event: nothing is stored or forwarded.
+
+5. **Subscribe to bot events**, save, and trigger one, such as a message in a channel the app is in. It appears under **Incoming → Received**, with one forward per destination.
+
+</Steps>
+
+## How the signature is checked
+
+Railhook reads `X-Slack-Signature` and `X-Slack-Request-Timestamp`, computes `v0=` followed by the hex HMAC-SHA256 of `v0:<timestamp>:<raw body>` with the signing secret, and compares the two. The timestamp must be within 300 seconds of Railhook's clock. A request that does not match is answered `401` and not stored. This is the scheme Slack documents in [Verifying requests from Slack](https://docs.slack.dev/authentication/verifying-requests-from-slack/).
+
+## What your service receives
+
+The body exactly as Slack sent it, byte for byte, with its `Content-Type`. `X-Slack-Signature` is not forwarded: your service authenticates Railhook through the destination's credentials, and does not need the signing secret. Each request carries `Idempotency-Key`, stable across attempts. See [Destinations](/docs/incoming/destinations/#what-the-destination-receives).
+
+## Develop locally with the CLI
+
+<Steps>
+
+1. Install the CLI and log in, as in [CLI](/docs/tools/cli/), then open a tunnel to your app's port:
+
+   ```bash
+   railhook listen 3000
+   ```
+
+2. Add a second destination to the source with the printed public URL and your route appended, such as `https://<host>/tunnel/<slug>/webhooks/slack`. It reaches `http://localhost:3000/webhooks/slack`.
+
+3. Post a message in a test workspace, and the verified event arrives in your local app. The Request URL in Slack stays the ingress URL, so you never re-verify it when the tunnel restarts. Disable that destination when you stop the tunnel.
+
+</Steps>
+
+## Replay after an outage
+
+Replay what arrived while your service was down. Each replayed event goes to every destination of the source as a new forward:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
+```
+
+Replay reaches back as far as events are kept: 7 days on Railhook Cloud, and whatever you configure when self-hosting. Keep your handler idempotent on `event_id`, since a replay can send events your service already processed. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Sources" href="/docs/incoming/sources/" description="What the ingress answers, including the Slack handshake." />
+  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
+  <LinkCard title="CLI" href="/docs/tools/cli/" description="Tunnels, events and replays from the terminal." />
+</CardGrid>

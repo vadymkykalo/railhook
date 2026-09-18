@@ -14,13 +14,18 @@
        entire dependency's CVEs with a blanket regex unless the finding
        explains why that's necessary.
 
-  Empty today: the CI runner cannot complete a
-  full NVD data sync locally without an NVD API key (NVD rate-limits/blocks
-  unauthenticated and datacenter-IP requests — see the comment on the
-  "Run OWASP Dependency-Check" step in .github/workflows/ci.yml), so no
-  findings have been triaged yet. The first real CI run with a working NVD
-  sync is expected to surface findings that need entries here; add them then,
-  reviewed, not preemptively.
 -->
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+  <!--
+    False positive, wrong CPE match (reviewed in the 2.21.0 release PR, #259). Spring AI's jars
+    are version 2.0.1, and the analyzer matched that version against VMware's discontinued
+    "VMware Server 2.0.1" hypervisor (cpe:2.3:a:vmware:server), attaching its 2009–2010 CVEs
+    (CVE-2009-3732, CVE-2010-1141, …). Spring AI is not VMware Server and contains none of that
+    code. Only that CPE is suppressed: cpe:2.3:a:vmware:spring_ai still reports any real
+    Spring AI CVE.
+  -->
+  <suppress>
+    <packageUrl regex="true">^pkg:maven/org\.springframework\.ai/.*$</packageUrl>
+    <cpe>cpe:/a:vmware:server</cpe>
+  </suppress>
 </suppressions>

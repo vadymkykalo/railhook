@@ -1,0 +1,108 @@
+---
+title: Надійне приймання вебхуків Twilio
+description: Twilio за замовчуванням повторює вебхук лише раз. Поставте Railhook перед застосунком — перевірка X-Twilio-Signature, збереження кожного status callback і пересилання на ваш сервіс із повторами та повтором подій.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Цей гайд ставить Railhook між Twilio і вашим застосунком для інформаційних вебхуків Twilio, як-от status callbacks повідомлень. Twilio надсилає їх на джерело Railhook, яке перевіряє підпис, зберігає кожен у тому вигляді, в якому він надійшов, і пересилає на ваш сервіс із повторами.
+
+## Чому вебхукам Twilio потрібен буфер
+
+За замовчуванням Twilio чекає 5 секунд на з'єднання й 15 секунд на відповідь і повторює вебхук один раз — лише коли не вдалося саме з'єднання. `5xx` від вашого застосунку чи повільна відповідь не повторюються, якщо не додати до адреси connection overrides. ([Twilio: Webhooks connection overrides](https://www.twilio.com/docs/usage/webhooks/webhooks-connection-overrides))
+
+Тож status callback, що надійшов під час перезапуску застосунку, зазвичай губиться, і ваші записи про доставлені повідомлення розходяться з даними Twilio. З Railhook попереду:
+
+- Twilio отримує відповідь, щойно callback збережено.
+- Ваш сервіс отримує до 5 спроб на кожне пересилання, з очікуваннями від 1 хвилини до 1 години, а те, що все одно не вдалося, потрапляє в **«Невдалі пересилання»**.
+- На callback з `I-Twilio-Idempotency-Token`, який Railhook уже зберіг, відповідають збереженою копією, і його не пересилають удруге.
+
+<Aside type="caution" title="Не для вебхуків, що мають відповідати TwiML">
+Twilio зазначає, що вебхуки вхідних дзвінків і повідомлень потребують відповіді TwiML, а інформаційним вебхукам потрібна лише успішна відповідь. ([Twilio: Getting started with webhooks](https://www.twilio.com/docs/usage/webhooks/getting-started-twilio-webhooks)) Ingress відповідає `202` із власним невеликим JSON-тілом і ніколи не повертає TwiML, тож спрямовуйте на джерело лише інформаційні вебхуки, як-от status callbacks. Вебхук, чия відповідь каже Twilio, що робити далі, має надходити у ваш застосунок напряму.
+</Aside>
+
+## Підключення Twilio
+
+Знадобляться проєкт Railhook і API-ключ. Усе нижче також можна зробити в розділі **Вхідні** панелі керування.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Створіть джерело** з вашим auth token із Twilio Console. Twilio підписує ним свої запити:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Twilio","providerType":"TWILIO","verificationMode":"PROVIDER","hmacSecret":"'"$TWILIO_AUTH_TOKEN"'"}'
+   ```
+
+   Збережіть `id` і `ingressUrl` із відповіді.
+
+2. **Додайте призначення** — адресу вашого сервісу:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/twilio","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+3. **Передайте адресу Twilio.** Вказуйте `ingressUrl` точно так, як його показує джерело, скрізь, де Twilio приймає адресу status callback, наприклад у параметрі `StatusCallback` під час надсилання повідомлення. Залиште метод `POST`: інших ingress не приймає.
+
+4. **Надішліть повідомлення.** Його status callbacks з'являться в розділі **Вхідні → Отримані**, з одним пересиланням на кожне призначення.
+
+</Steps>
+
+## Як перевіряється підпис
+
+`X-Twilio-Signature` від Twilio — це base64 HMAC-SHA1, обчислений з auth token. Для запиту у form-encoded він охоплює адресу, за якою йдуть усі параметри, відсортовані за назвою; для інших запитів — адресу, а параметр запиту `bodySHA256` має збігатися з тілом. Запит, що не збігається, отримує `401` і не зберігається.
+
+<Aside type="caution" title="Twilio підписує адресу">
+Railhook відновлює підписану адресу з налаштованої публічної адреси, а не з вхідного запиту, тож перевірка переживає reverse proxy. На власному сервері ця адреса — `APP_BASE_URL`, яку інсталятор задає з `--domain`, або `TUNNEL_INGRESS_BASE_URL`, коли вебхуки надходять на інший хост. Передайте Twilio точно ту ingress-адресу, яку показує джерело. Будь-яке інше написання адреси не пройде перевірку.
+</Aside>
+
+## Що отримує ваш сервіс
+
+Тіло точно таке, яким його надіслав Twilio, байт у байт, з його form-encoded `Content-Type`, тож ваш сервіс розбирає його так само, як прямий callback. `X-Twilio-Signature` не пересилається, та й не пройшов би перевірку з вашою адресою: ваш сервіс автентифікує Railhook за обліковими даними призначення. Див. [Призначення](/docs/uk/incoming/destinations/#що-отримує-призначення).
+
+## Локальна розробка з CLI
+
+<Steps>
+
+1. Встановіть CLI й увійдіть, як описано в [CLI](/docs/uk/tools/cli/), а потім відкрийте тунель до порту вашого застосунку:
+
+   ```bash
+   railhook listen 3000
+   ```
+
+2. Додайте джерелу друге призначення з виведеною публічною адресою й вашим маршрутом у кінці, наприклад `https://<host>/tunnel/<slug>/webhooks/twilio`. Запит потрапить на `http://localhost:3000/webhooks/twilio`.
+
+3. Надішліть тестове повідомлення з ingress-адресою як status callback, і кожен callback надійде у ваш локальний застосунок. Вимкніть це призначення, коли закриєте тунель.
+
+</Steps>
+
+## Повтор подій після збою
+
+Відтворіть те, що надійшло, поки ваш сервіс лежав. Кожен відтворений callback іде на кожне призначення джерела як нове пересилання:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
+```
+
+Повтор сягає так далеко, як довго зберігаються події: 7 днів у Railhook Cloud і скільки налаштуєте на власному сервері. Status callback описує стан, тож застосування того самого двічі має бути нешкідливим; переконайтеся, що ваш обробник поводиться саме так. Див. [Повтор](/docs/uk/outgoing/replay/#повтор-вхідних-вебхуків).
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Перевірка вхідних вебхуків" href="/docs/uk/incoming/verification/" description="Схема підпису кожного провайдера й захист від повторного використання." />
+  <LinkCard title="Джерела" href="/docs/uk/incoming/sources/" description="Ingress-адреса і що вона відповідає." />
+  <LinkCard title="Конфігурація" href="/docs/uk/self-hosting/configuration/" description="Задайте публічну адресу, яку підписує Twilio." />
+</CardGrid>

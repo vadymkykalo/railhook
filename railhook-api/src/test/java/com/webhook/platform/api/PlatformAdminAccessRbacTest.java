@@ -20,6 +20,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.RequestBuilder;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -272,6 +274,63 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
      * the same rule the admin API applies — listed, verified and active — so a listed address
      * nobody has proved is not called an admin.
      */
+    /**
+     * How far the last month's sign-ups got: verified the address, created a project, sent an event.
+     * The database is shared by every test in the class, so the counts are read before and after.
+     */
+    @Test
+    public void theOverviewShowsHowFarRecentSignupsGot() throws Exception {
+        String auth = "Bearer " + registerVerified(ADMIN_EMAIL).token();
+        JsonNode before = activation(auth);
+
+        // Whether a new account starts verified depends on the deployment's mail settings, so the
+        // one that stopped at sign-up is put there explicitly.
+        User stopped = userRepository.findById(register("funnel-stopped-at-signup@example.com").userId()).orElseThrow();
+        stopped.setEmailVerified(false);
+        userRepository.save(stopped);
+        Account active = registerVerified("funnel-sent-an-event@example.com");
+        UUID projectId = UUID.randomUUID();
+        jdbcTemplate.update("INSERT INTO projects (id, organization_id, name) VALUES (?, ?, 'p')",
+                projectId, active.organizationId());
+        jdbcTemplate.update("INSERT INTO events (id, organization_id, project_id, event_type, payload, created_at) "
+                        + "VALUES (?, ?, ?, 'order.completed', '{}'::jsonb, now())",
+                UUID.randomUUID(), active.organizationId(), projectId);
+
+        JsonNode after = activation(auth);
+        assertThat(after.get("signups").asLong() - before.get("signups").asLong()).isEqualTo(2);
+        assertThat(after.get("verified").asLong() - before.get("verified").asLong()).isEqualTo(1);
+        assertThat(after.get("organizations").asLong() - before.get("organizations").asLong()).isEqualTo(2);
+        assertThat(after.get("withProject").asLong() - before.get("withProject").asLong()).isEqualTo(1);
+        assertThat(after.get("withEvent").asLong() - before.get("withEvent").asLong()).isEqualTo(1);
+    }
+
+    @Test
+    public void theOverviewCountsEachOfTheLastThirtyDays() throws Exception {
+        String auth = "Bearer " + registerVerified(ADMIN_EMAIL).token();
+        MvcResult result = mockMvc.perform(get("/api/v1/admin/overview").header("Authorization", auth))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode overview = objectMapper.readTree(result.getResponse().getContentAsString());
+        JsonNode days = overview.get("daily30d");
+
+        assertThat(days).hasSize(30);
+        long signups = 0;
+        for (JsonNode day : days) {
+            signups += day.get("signups").asLong();
+        }
+        // Every account in this database was made by these tests, just now.
+        assertThat(signups).isEqualTo(overview.get("signups30d").asLong());
+        assertThat(days.get(29).get("date").asText())
+                .isEqualTo(LocalDate.now(ZoneOffset.UTC).toString());
+    }
+
+    private JsonNode activation(String auth) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/admin/overview").header("Authorization", auth))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("activation30d");
+    }
+
     @Test
     public void theListsMarkPlatformAdminsByTheRuleThePanelEnforces() throws Exception {
         Account admin = registerVerified(ADMIN_EMAIL);

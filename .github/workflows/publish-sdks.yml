@@ -40,7 +40,7 @@ on:
   workflow_dispatch:
     inputs:
       sdk:
-        description: 'SDK to publish (node, python, php, all)'
+        description: 'SDK to publish (node, python, php, mcp, all)'
         required: true
         default: 'all'
         type: choice
@@ -49,6 +49,7 @@ on:
           - node
           - python
           - php
+          - mcp
       ref:
         description: 'Tag to publish from, e.g. v2.7.0 (defaults to this branch)'
         required: false
@@ -135,6 +136,116 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Mirrors publish-node step for step, and for the same reasons; see the comments there. The
+  # package needs its own Trusted Publisher on npmjs.com (package settings -> Trusted Publisher ->
+  # this repository, workflow `publish-sdks.yml`) before the first OIDC publish can succeed.
+  publish-mcp:
+    name: Publish MCP bridge to npm (@railhook/mcp)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # npm Trusted Publishing + --provenance
+    if: >
+      github.event_name == 'push' ||
+      inputs.sdk == 'all' ||
+      inputs.sdk == 'mcp'
+    defaults:
+      run:
+        working-directory: sdks/mcp
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check version drift
+        id: check
+        run: |
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED_VERSION=$(npm view @railhook/mcp version 2>/dev/null || echo "")
+          echo "local=$LOCAL_VERSION published=$PUBLISHED_VERSION"
+          if [ "$LOCAL_VERSION" = "$PUBLISHED_VERSION" ]; then
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.check.outputs.should_publish == 'true'
+        run: npm ci
+
+      - name: Run tests
+        if: steps.check.outputs.should_publish == 'true'
+        run: npm test
+
+      - name: Build
+        if: steps.check.outputs.should_publish == 'true'
+        run: npm run build
+
+      - name: Upgrade npm for Trusted Publishing
+        if: steps.check.outputs.should_publish == 'true'
+        run: npm install -g npm@latest
+
+      - name: Publish to npm
+        if: steps.check.outputs.should_publish == 'true'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # The MCP Registry (registry.modelcontextprotocol.io) lists io.github.vadymkykalo/railhook, which
+  # is what VS Code, GitHub and other MCP hosts search. sdks/mcp/server.json declares both the remote
+  # server at https://railhook.io/mcp and the npm bridge; the registry checks the npm package's
+  # mcpName, so this runs after that package is on npm. The io.github namespace is proven with this
+  # workflow's GitHub OIDC token — there is no secret to keep.
+  publish-mcp-registry:
+    name: Publish to the MCP Registry
+    needs: publish-mcp
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    if: >
+      github.event_name == 'push' ||
+      inputs.sdk == 'all' ||
+      inputs.sdk == 'mcp'
+    defaults:
+      run:
+        working-directory: sdks/mcp
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Wait for the npm package this entry points at
+        run: |
+          VERSION=$(node -p "require('./server.json').packages[0].version")
+          for i in $(seq 1 30); do
+            if npm view "@railhook/mcp@$VERSION" version >/dev/null 2>&1; then exit 0; fi
+            sleep 20
+          done
+          echo "::error::@railhook/mcp@$VERSION is not on npm"; exit 1
+
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate with GitHub OIDC
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish
+        # A re-run for a version already listed is not a failure.
+        run: |
+          set +e
+          OUTPUT=$(./mcp-publisher publish 2>&1); STATUS=$?
+          echo "$OUTPUT"
+          if [ $STATUS -ne 0 ] && echo "$OUTPUT" | grep -qi "already exists"; then exit 0; fi
+          exit $STATUS
 
   publish-python:
     name: Publish Python SDK to PyPI (railhook)
@@ -291,7 +402,7 @@ jobs:
 
           # Packagist derives the version from the git tag and advises against a hardcoded
           # one. The monorepo copy keeps the field because scripts/check-version-drift.sh
-          # reads it as one of the seven places the version has to agree; the published copy
+          # reads it as one of the eight places the version has to agree; the published copy
           # drops it, which is what the split repository has done by hand since 1.1.0.
           php -r '
             $f = "composer.json";

@@ -12,6 +12,7 @@ info:
     ## Authentication
     - **API key** (`X-API-Key` header): project-scoped calls, including sending events. What the SDKs use.
     - **Bearer token**: account and organization calls made on behalf of a signed-in user.
+    - **Portal session** (`Authorization: Bearer rhp_…`): the `/api/v1/portal/**` calls the embedded customer portal makes for one Consumer. Opened by your backend with an API key.
 
     Guides: [/docs/](/docs/)
   contact:
@@ -31,6 +32,9 @@ servers:
 security:
 - bearerAuth: []
 tags:
+- name: Consumers
+  description: "Your own users, their endpoints, and the portal sessions you open\
+    \ for them"
 - name: Test Endpoints
   description: Webhook testing tool - temporary request bin endpoints
 - name: Dashboard
@@ -43,6 +47,9 @@ tags:
   description: "Operator view of every tenant, and suspension (platform admin only)"
 - name: Events
   description: Event history and test events
+- name: Portal
+  description: "What the embedded customer portal calls, authenticated by a portal\
+    \ session"
 - name: Events
   description: Event ingestion and history
 - name: Organizations
@@ -78,6 +85,8 @@ tags:
   description: Incoming webhook events monitoring
 - name: Ingress
   description: Public incoming webhook ingress endpoint
+- name: MCP apps
+  description: "Connecting AI apps to a project over OAuth, for the MCP server"
 - name: Events
   description: Event ingestion API
 - name: Subscriptions
@@ -92,6 +101,8 @@ tags:
   description: Visual workflow automation
 - name: Transform Preview
   description: Preview payload transformations and dry-run deliveries
+- name: Webhook Tester
+  description: Public webhook tester URLs that need no account
 - name: Deliveries
   description: "Delivery status, attempts, and replay operations"
 - name: Authentication
@@ -240,6 +251,202 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/WebhookCaptureResponse"
+  /hook/p/{slug}:
+    get:
+      tags:
+      - Webhook Tester
+      summary: Send a request to a tester URL
+      description: "Any method, any body. Recorded and answered with 200."
+      operationId: capturePublicBinRequestGet
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: Recorded
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+        "404":
+          description: "No such URL, or it has expired"
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+        "429":
+          description: Too many requests to this URL
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+    put:
+      tags:
+      - Webhook Tester
+      summary: Send a request to a tester URL
+      description: "Any method, any body. Recorded and answered with 200."
+      operationId: capturePublicBinRequestPut
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: Recorded
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+        "404":
+          description: "No such URL, or it has expired"
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+        "429":
+          description: Too many requests to this URL
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+    post:
+      tags:
+      - Webhook Tester
+      summary: Send a request to a tester URL
+      description: "Any method, any body. Recorded and answered with 200."
+      operationId: capturePublicBinRequestPost
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: Recorded
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+        "404":
+          description: "No such URL, or it has expired"
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+        "429":
+          description: Too many requests to this URL
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+    delete:
+      tags:
+      - Webhook Tester
+      summary: Send a request to a tester URL
+      description: "Any method, any body. Recorded and answered with 200."
+      operationId: capturePublicBinRequestDelete
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: Recorded
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+        "404":
+          description: "No such URL, or it has expired"
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+        "429":
+          description: Too many requests to this URL
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+    patch:
+      tags:
+      - Webhook Tester
+      summary: Send a request to a tester URL
+      description: "Any method, any body. Recorded and answered with 200."
+      operationId: capturePublicBinRequestPatch
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: Recorded
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+        "404":
+          description: "No such URL, or it has expired"
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
+        "429":
+          description: Too many requests to this URL
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: {}
   /tunnel/{slug}:
     get:
       tags:
@@ -1578,6 +1785,95 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/projects/{projectId}/consumers/{consumerId}:
+    get:
+      tags:
+      - Consumers
+      summary: Get consumer
+      operationId: getConsumer
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: consumerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ConsumerResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+    put:
+      tags:
+      - Consumers
+      summary: Update consumer
+      operationId: updateConsumer
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: consumerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsumerRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ConsumerResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+    delete:
+      tags:
+      - Consumers
+      summary: Delete consumer
+      description: "Deletes the consumer, deletes its endpoints and ends its portal\
+        \ sessions"
+      operationId: deleteConsumer
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: consumerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Consumer deleted
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/projects/{projectId}/alerts/rules/{ruleId}:
     put:
       tags:
@@ -1640,6 +1936,73 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/portal/endpoints/{endpointId}:
+    get:
+      tags:
+      - Portal
+      summary: Get portal endpoint
+      operationId: portalGetEndpoint
+      parameters:
+      - name: endpointId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PortalEndpointResponse"
+      security:
+      - portalSession: []
+    put:
+      tags:
+      - Portal
+      summary: Update portal endpoint
+      description: Absent fields are left alone; eventTypes replaces the set
+      operationId: portalUpdateEndpoint
+      parameters:
+      - name: endpointId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortalEndpointRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PortalEndpointResponse"
+      security:
+      - portalSession: []
+    delete:
+      tags:
+      - Portal
+      summary: Delete portal endpoint
+      operationId: portalDeleteEndpoint
+      parameters:
+      - name: endpointId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Endpoint deleted
+      security:
+      - portalSession: []
   /api/v1/orgs/{orgId}:
     get:
       tags:
@@ -1927,6 +2290,47 @@ paths:
                 $ref: "#/components/schemas/TunnelCreateResponse"
       security:
       - bearerAuth: []
+  /api/v1/public/bins:
+    post:
+      tags:
+      - Webhook Tester
+      summary: Make a tester URL
+      description: "A URL that records every request sent to it for a day: the latest\
+        \ 100 within 1 MB of bodies, the first 64 KB of each, with credentials masked.\
+        \ Anyone who has the URL can read what it received. At most three live URLs\
+        \ per address."
+      operationId: createPublicBin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicBinCreateRequest"
+      responses:
+        "201":
+          description: The URL
+          content:
+            '*/*':
+              schema:
+                type: object
+        "400":
+          description: The challenge was not passed
+          content:
+            '*/*':
+              schema:
+                type: object
+        "429":
+          description: "Too many URLs made from this address, or it already holds\
+            \ three live ones"
+          content:
+            '*/*':
+              schema:
+                type: object
+        "503":
+          description: The tester holds as many live URLs as it allows; try later
+          content:
+            '*/*':
+              schema:
+                type: object
   /api/v1/projects:
     get:
       tags:
@@ -3607,6 +4011,159 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/projects/{projectId}/consumers:
+    get:
+      tags:
+      - Consumers
+      summary: List consumers
+      description: Returns the project's consumers; externalId narrows it to one
+      operationId: listConsumers
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: externalId
+        in: query
+        description: Your own id for the user
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          default:
+          - "createdAt,DESC"
+          items:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageConsumerResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+    post:
+      tags:
+      - Consumers
+      summary: Create consumer
+      description: "Registers one of your users, identified by your own id"
+      operationId: createConsumer
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsumerRequest"
+        required: true
+      responses:
+        "201":
+          description: Consumer created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ConsumerResponse"
+        "409":
+          description: A consumer with this externalId already exists
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ConsumerResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/consumers/{consumerId}/portal-sessions:
+    post:
+      tags:
+      - Consumers
+      summary: Create portal session
+      description: Opens the customer portal for this consumer. The response carries
+        the token once; only its hash is stored.
+      operationId: createPortalSession
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: consumerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortalSessionRequest"
+      responses:
+        "201":
+          description: Session created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PortalSessionResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+    delete:
+      tags:
+      - Consumers
+      summary: Revoke portal sessions
+      description: Ends every open portal session of this consumer
+      operationId: revokePortalSessions
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: consumerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Sessions revoked
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/projects/{projectId}/api-keys:
     get:
       tags:
@@ -3834,6 +4391,97 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/portal/endpoints:
+    get:
+      tags:
+      - Portal
+      summary: List portal endpoints
+      description: The consumer's own endpoints
+      operationId: portalListEndpoints
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PortalEndpointResponse"
+      security:
+      - portalSession: []
+    post:
+      tags:
+      - Portal
+      summary: Create portal endpoint
+      description: Registers an endpoint for the consumer. The signing secret is in
+        this response only.
+      operationId: portalCreateEndpoint
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortalEndpointRequest"
+        required: true
+      responses:
+        "201":
+          description: Endpoint created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PortalEndpointResponse"
+        "402":
+          description: The project has reached its plan's endpoint limit
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PortalEndpointResponse"
+      security:
+      - portalSession: []
+  /api/v1/portal/endpoints/{endpointId}/rotate-secret:
+    post:
+      tags:
+      - Portal
+      summary: Rotate portal endpoint secret
+      description: "A new signing secret, shown in this response only. The old one\
+        \ keeps verifying for 24 hours."
+      operationId: portalRotateEndpointSecret
+      parameters:
+      - name: endpointId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PortalEndpointResponse"
+      security:
+      - portalSession: []
+  /api/v1/portal/deliveries/{deliveryId}/retry:
+    post:
+      tags:
+      - Portal
+      summary: Retry portal delivery
+      description: Puts a failed delivery back on its retry ladder for another attempt
+      operationId: portalRetryDelivery
+      parameters:
+      - name: deliveryId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "202":
+          description: Retry scheduled
+        "409":
+          description: An attempt at this delivery is under way
+      security:
+      - portalSession: []
   /api/v1/orgs/{orgId}/members:
     get:
       tags:
@@ -4013,6 +4661,81 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/oauth/requests/{requestId}/deny:
+    post:
+      tags:
+      - MCP apps
+      summary: Decline an MCP app's sign-in request
+      description: Ends the request and returns the URL that tells the app access
+        was denied.
+      operationId: denyMcpConsentRequest
+      parameters:
+      - name: requestId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Declined; follow redirectUrl
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentDecisionResponse"
+        "404":
+          description: "Expired, already answered, or never existed"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentDecisionResponse"
+      security:
+      - bearerAuth: []
+  /api/v1/oauth/requests/{requestId}/approve:
+    post:
+      tags:
+      - MCP apps
+      summary: Approve an MCP app's sign-in request
+      description: "Connects the app to one project of the caller's organization with\
+        \ READ_ONLY or READ_WRITE access — the same scope an API key carries. Any\
+        \ member may grant READ_ONLY; READ_WRITE takes a role that may create an API\
+        \ key. Returns the URL to send the browser to, carrying the authorization\
+        \ code."
+      operationId: approveMcpConsentRequest
+      parameters:
+      - name: requestId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/McpConsentApproveRequest"
+        required: true
+      responses:
+        "200":
+          description: Approved; follow redirectUrl
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentDecisionResponse"
+        "403":
+          description: The caller's role may not grant READ_WRITE
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentDecisionResponse"
+        "404":
+          description: "Request expired or answered, or project not found"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentDecisionResponse"
+      security:
+      - bearerAuth: []
   /api/v1/events:
     post:
       tags:
@@ -5113,6 +5836,32 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/SharedDebugLinkPublicResponse"
+  /api/v1/public/bins/{slug}:
+    get:
+      tags:
+      - Webhook Tester
+      summary: Read a tester URL
+      description: "The URL and the requests it received, newest first."
+      operationId: getPublicBin
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The URL and its requests
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PublicBinResponse"
+        "404":
+          description: "No such URL, or it has expired"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PublicBinResponse"
   /api/v1/projects/{projectId}/workflows/{id}/executions:
     get:
       tags:
@@ -5485,6 +6234,31 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/projects/{projectId}/mcp-grants:
+    get:
+      tags:
+      - MCP apps
+      summary: List connected MCP apps
+      description: "Apps connected to this project through OAuth sign-in, newest first."
+      operationId: listMcpGrants
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/McpGrantResponse"
+      security:
+      - bearerAuth: []
   /api/v1/projects/{projectId}/incoming-events:
     get:
       tags:
@@ -6054,6 +6828,38 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/projects/{projectId}/consumers/{consumerId}/endpoints:
+    get:
+      tags:
+      - Consumers
+      summary: List consumer endpoints
+      description: The endpoints registered for this consumer
+      operationId: listConsumerEndpoints
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: consumerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EndpointResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/projects/{projectId}/alerts/events:
     get:
       tags:
@@ -6121,6 +6927,109 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/portal/session:
+    get:
+      tags:
+      - Portal
+      summary: Get portal session
+      description: "The consumer and project this session is for, and the event types\
+        \ it can subscribe to"
+      operationId: portalGetSession
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PortalSessionInfoResponse"
+      security:
+      - portalSession: []
+  /api/v1/portal/deliveries:
+    get:
+      tags:
+      - Portal
+      summary: List portal deliveries
+      description: "Deliveries to the consumer's endpoints, newest first"
+      operationId: portalListDeliveries
+      parameters:
+      - name: endpointId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - PENDING
+          - PROCESSING
+          - SUCCESS
+          - FAILED
+          - DLQ
+      - name: page
+        in: query
+        description: Zero-based page index (0..N)
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          default:
+          - "createdAt,DESC"
+          items:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PagePortalDeliveryResponse"
+      security:
+      - portalSession: []
+  /api/v1/portal/deliveries/{deliveryId}/attempts:
+    get:
+      tags:
+      - Portal
+      summary: List portal delivery attempts
+      description: "Every attempt at one delivery, with request and response"
+      operationId: portalListDeliveryAttempts
+      parameters:
+      - name: deliveryId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeliveryAttemptResponse"
+      security:
+      - portalSession: []
   /api/v1/orgs:
     get:
       tags:
@@ -6173,6 +7082,37 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/oauth/requests/{requestId}:
+    get:
+      tags:
+      - MCP apps
+      summary: Describe an MCP app's sign-in request
+      description: "What the consent screen shows: the app's name, the host its code\
+        \ will be sent to, the access it asked for, and whether the caller's role\
+        \ may grant write access."
+      operationId: describeMcpConsentRequest
+      parameters:
+      - name: requestId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: "The request, still waiting for an answer"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentRequestResponse"
+        "404":
+          description: "Expired, already answered, or never existed"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/McpConsentRequestResponse"
+      security:
+      - bearerAuth: []
   /api/v1/deliveries:
     get:
       tags:
@@ -7100,6 +8040,32 @@ paths:
       responses:
         "200":
           description: OK
+      security:
+      - bearerAuth: []
+  /api/v1/projects/{projectId}/mcp-grants/{grantId}:
+    delete:
+      tags:
+      - MCP apps
+      summary: Disconnect an MCP app
+      description: "Revokes the app's access to this project at once: its access and\
+        \ refresh tokens stop working, and it has to be connected again from the app."
+      operationId: revokeMcpGrant
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: grantId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Disconnected
       security:
       - bearerAuth: []
   /api/v1/projects/{projectId}/debug-links/{linkId}:
@@ -8052,6 +9018,11 @@ components:
           - LEGACY
           - STANDARD
           - BOTH
+        consumerId:
+          type: string
+          format: uuid
+          description: "The Consumer this endpoint belongs to, which puts it in that\
+            \ Consumer's portal. Absent leaves the current assignment alone."
       required:
       - url
     EndpointResponse:
@@ -8061,6 +9032,9 @@ components:
           type: string
           format: uuid
         projectId:
+          type: string
+          format: uuid
+        consumerId:
           type: string
           format: uuid
         url:
@@ -8102,6 +9076,45 @@ components:
           - BOTH
         standardWebhooksSecret:
           type: string
+    ConsumerRequest:
+      type: object
+      properties:
+        externalId:
+          type: string
+          description: "Your own identifier for this user, unique within the project\
+            \ — typically the user or tenant id in your database."
+          maxLength: 255
+          minLength: 0
+        name:
+          type: string
+          description: "Shown at the top of the portal. Absent: the externalId on\
+            \ create, unchanged on update."
+          maxLength: 255
+          minLength: 0
+      required:
+      - externalId
+    ConsumerResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        externalId:
+          type: string
+        name:
+          type: string
+        endpointCount:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     AlertRuleRequest:
       type: object
       properties:
@@ -8215,6 +9228,61 @@ components:
         updatedAt:
           type: string
           format: date-time
+    PortalEndpointRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          minLength: 1
+          pattern: ""
+        description:
+          type: string
+          maxLength: 500
+          minLength: 0
+        enabled:
+          type: boolean
+        eventTypes:
+          type: array
+          description: "The event types this Endpoint receives. Replaces the current\
+            \ set; absent leaves it alone. Wildcards: order.* (one segment), order.**\
+            \ and ** (everything)."
+          items:
+            type: string
+            pattern: "^(\\*{1,2}|[a-z][a-z0-9_]*)(\\.([a-z][a-z0-9_]*|\\*{1,2}))*$"
+          maxItems: 100
+          minItems: 0
+      required:
+      - url
+    PortalEndpointResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+        eventTypes:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        secret:
+          type: string
+          description: "The signing secret: present only in the response that created\
+            \ or rotated it."
+        standardWebhooksSecret:
+          type: string
+          description: The same secret as a Standard Webhooks library expects it (whsec_…);
+            present only with secret.
     UpdateOrganizationRequest:
       type: object
       properties:
@@ -8402,6 +9470,11 @@ components:
         createdAt:
           type: string
           format: date-time
+    PublicBinCreateRequest:
+      type: object
+      properties:
+        captchaToken:
+          type: string
     StepExecutionResponse:
       type: object
       properties:
@@ -9038,6 +10111,44 @@ components:
           minItems: 1
       required:
       - deliveryIds
+    PortalSessionRequest:
+      type: object
+      properties:
+        ttlMinutes:
+          type: integer
+          format: int32
+          description: "How long the session lasts, in minutes. Defaults to 60."
+          maximum: 1440
+          minimum: 1
+        allowedOrigin:
+          type: string
+          description: "The origin of the page that embeds the portal, e.g. https://app.example.com.\
+            \ When set, the portal refuses to render inside any other page."
+          example: https://app.example.com
+          pattern: "^(https://[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*|http://(?:localhost|127\\\
+            .0\\.0\\.1))(?::[0-9]{1,5})?$"
+    PortalSessionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        consumerId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          description: "The portal, ready to open or to put in an iframe's src. The\
+            \ token travels in the fragment, which a browser never sends to a server."
+        token:
+          type: string
+          description: The bearer token for /api/v1/portal/**. Shown once; only its
+            hash is stored.
+        allowedOrigin:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
     ApiKeyRequest:
       type: object
       properties:
@@ -9147,6 +10258,25 @@ components:
           format: date-time
         inviteUrl:
           type: string
+    McpConsentDecisionResponse:
+      type: object
+      properties:
+        redirectUrl:
+          type: string
+    McpConsentApproveRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        scope:
+          type: string
+          enum:
+          - READ_WRITE
+          - READ_ONLY
+      required:
+      - projectId
+      - scope
     EventIngestResponse:
       type: object
       properties:
@@ -9728,6 +10858,49 @@ components:
           format: date-time
         projectName:
           type: string
+    PublicBinResponse:
+      type: object
+      properties:
+        slug:
+          type: string
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        requestCount:
+          type: integer
+          format: int64
+        requests:
+          type: array
+          items:
+            $ref: "#/components/schemas/Request"
+    Request:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        method:
+          type: string
+        query:
+          type: string
+        headers:
+          $ref: "#/components/schemas/JsonNode"
+        body:
+          type: string
+        bodyTruncated:
+          type: boolean
+        sizeBytes:
+          type: integer
+          format: int64
+        contentType:
+          type: string
+        sourceIp:
+          type: string
+        receivedAt:
+          type: string
+          format: date-time
     PageWorkflowExecutionResponse:
       type: object
       properties:
@@ -9957,6 +11130,34 @@ components:
           type: boolean
         empty:
           type: boolean
+    McpGrantResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        clientName:
+          type: string
+        clientUri:
+          type: string
+        redirectHost:
+          type: string
+        scope:
+          type: string
+          enum:
+          - READ_WRITE
+          - READ_ONLY
+        approvedByEmail:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
     PageIncomingSourceResponse:
       type: object
       properties:
@@ -10468,6 +11669,38 @@ components:
           type: boolean
         empty:
           type: boolean
+    PageConsumerResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsumerResponse"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
     PageApiKeyResponse:
       type: object
       properties:
@@ -10568,6 +11801,131 @@ components:
           type: boolean
         empty:
           type: boolean
+    PortalSessionInfoResponse:
+      type: object
+      properties:
+        consumerName:
+          type: string
+        projectName:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        allowedOrigin:
+          type: string
+          description: "The origin the portal may be embedded in, or null for any."
+        eventTypes:
+          type: array
+          description: "Event types an Endpoint can subscribe to: the project's event\
+            \ catalog when it has one, otherwise the types it has sent recently."
+          items:
+            type: string
+    PagePortalDeliveryResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortalDeliveryResponse"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    PortalDeliveryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+        endpointId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - PENDING
+          - PROCESSING
+          - SUCCESS
+          - FAILED
+          - DLQ
+        attemptCount:
+          type: integer
+          format: int32
+        maxAttempts:
+          type: integer
+          format: int32
+        nextRetryAt:
+          type: string
+          format: date-time
+        lastAttemptAt:
+          type: string
+          format: date-time
+        succeededAt:
+          type: string
+          format: date-time
+        failedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    DeliveryAttemptResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        deliveryId:
+          type: string
+          format: uuid
+        attemptNumber:
+          type: integer
+          format: int32
+        requestHeaders:
+          type: string
+        requestBody:
+          type: string
+        httpStatusCode:
+          type: integer
+          format: int32
+        responseHeaders:
+          type: string
+        responseBody:
+          type: string
+        errorMessage:
+          type: string
+        durationMs:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
     ApiKeyData:
       type: object
       properties:
@@ -10784,6 +12142,28 @@ components:
         createdAt:
           type: string
           format: date-time
+    McpConsentRequestResponse:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        clientName:
+          type: string
+        clientUri:
+          type: string
+        redirectHost:
+          type: string
+        requestedScope:
+          type: string
+          enum:
+          - READ_WRITE
+          - READ_ONLY
+        canGrantWrite:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
     DeliveryResponse:
       type: object
       properties:
@@ -10860,37 +12240,6 @@ components:
           type: boolean
         empty:
           type: boolean
-    DeliveryAttemptResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        deliveryId:
-          type: string
-          format: uuid
-        attemptNumber:
-          type: integer
-          format: int32
-        requestHeaders:
-          type: string
-        requestBody:
-          type: string
-        httpStatusCode:
-          type: integer
-          format: int32
-        responseHeaders:
-          type: string
-        responseBody:
-          type: string
-        errorMessage:
-          type: string
-        durationMs:
-          type: integer
-          format: int32
-        createdAt:
-          type: string
-          format: date-time
     DashboardStatsResponse:
       type: object
       properties:
@@ -11406,6 +12755,24 @@ components:
           type: boolean
         empty:
           type: boolean
+    Activation:
+      type: object
+      properties:
+        signups:
+          type: integer
+          format: int64
+        verified:
+          type: integer
+          format: int64
+        organizations:
+          type: integer
+          format: int64
+        withProject:
+          type: integer
+          format: int64
+        withEvent:
+          type: integer
+          format: int64
     AdminSignupResponse:
       type: object
       properties:
@@ -11436,6 +12803,18 @@ components:
         createdAt:
           type: string
           format: date-time
+    Day:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        signups:
+          type: integer
+          format: int64
+        events:
+          type: integer
+          format: int64
     PlatformOverviewResponse:
       type: object
       properties:
@@ -11475,6 +12854,12 @@ components:
         organizationsNearQuota:
           type: integer
           format: int64
+        daily30d:
+          type: array
+          items:
+            $ref: "#/components/schemas/Day"
+        activation30d:
+          $ref: "#/components/schemas/Activation"
         recentSignups:
           type: array
           items:
@@ -11715,3 +13100,8 @@ components:
         \ of tenant org membership — required for cross-tenant admin endpoints"
       name: X-Platform-Admin-Token
       in: header
+    portalSession:
+      type: http
+      description: "Portal session token, returned once by POST /api/v1/projects/{projectId}/consumers/{consumerId}/portal-sessions"
+      scheme: bearer
+      bearerFormat: rhp_…

@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,7 @@ public class PlatformAdminOverviewService {
     static final double NEAR_QUOTA = 0.8;
 
     private static final int RECENT_SIGNUPS = 10;
+    private static final int DAILY_DAYS = 30;
     private static final List<DeliveryStatus> FAILED = List.of(DeliveryStatus.FAILED, DeliveryStatus.DLQ);
 
     private final OrganizationRepository organizationRepository;
@@ -76,8 +78,48 @@ public class PlatformAdminOverviewService {
                 .deliveriesFailed24h(deliveryRepository.countByStatusInAndCreatedAtGreaterThanEqual(FAILED, dayAgo))
                 .activeTunnels(tunnelSessionRepository.countByStatus(TunnelStatus.ACTIVE))
                 .organizationsNearQuota(organizationsNearQuota(BillingPeriod.current(clock)))
+                .activation30d(activation(now.minus(Duration.ofDays(30))))
+                .daily30d(daily(LocalDate.ofInstant(now, ZoneOffset.UTC)))
                 .recentSignups(recentSignups())
                 .generatedAt(now)
+                .build();
+    }
+
+    /**
+     * The last 30 days including today, with zeroes for the days nothing happened, so a chart of
+     * it has no gaps to interpolate across.
+     */
+    private List<PlatformOverviewResponse.Day> daily(LocalDate today) {
+        LocalDate first = today.minusDays(DAILY_DAYS - 1);
+        Instant since = first.atStartOfDay(ZoneOffset.UTC).toInstant();
+        Map<LocalDate, Long> signups = perDay(userRepository.countPerDaySince(since));
+        Map<LocalDate, Long> events = perDay(eventRepository.countPerDaySince(since));
+        List<PlatformOverviewResponse.Day> days = new ArrayList<>(DAILY_DAYS);
+        for (LocalDate day = first; !day.isAfter(today); day = day.plusDays(1)) {
+            days.add(PlatformOverviewResponse.Day.builder()
+                    .date(day)
+                    .signups(signups.getOrDefault(day, 0L))
+                    .events(events.getOrDefault(day, 0L))
+                    .build());
+        }
+        return days;
+    }
+
+    private static Map<LocalDate, Long> perDay(List<Object[]> rows) {
+        Map<LocalDate, Long> counts = new HashMap<>();
+        for (Object[] row : rows) {
+            counts.put((LocalDate) row[0], ((Number) row[1]).longValue());
+        }
+        return counts;
+    }
+
+    private PlatformOverviewResponse.Activation activation(Instant since) {
+        return PlatformOverviewResponse.Activation.builder()
+                .signups(userRepository.countByCreatedAtGreaterThanEqual(since))
+                .verified(userRepository.countByCreatedAtGreaterThanEqualAndEmailVerifiedTrue(since))
+                .organizations(organizationRepository.countByCreatedAtGreaterThanEqual(since))
+                .withProject(organizationRepository.countCreatedSinceWithProject(since))
+                .withEvent(organizationRepository.countCreatedSinceWithEvent(since))
                 .build();
     }
 

@@ -1657,7 +1657,9 @@
     "signIn": "Sign in",
     "tagline": "Open-source webhook gateway. Send and receive webhooks, in our cloud or on your own servers.",
     "talkToUs": "Talk to us",
-    "terms": "Terms of Service"
+    "terms": "Terms of Service",
+    "pricing": "Pricing",
+    "tester": "Webhook tester"
   },
   "incidents": {
     "addNote": "Add Note",
@@ -2057,13 +2059,15 @@
       "codeTitle": "Send an event with one API call",
       "languages": "Language",
       "response": "2 deliveries created",
-      "readDocs": "Read the docs"
+      "readDocs": "Read the docs",
+      "mcpTitle": "AI agents (MCP)",
+      "mcpBody": "Let Claude, Cursor or any MCP client send events and replay deliveries."
     },
     "directions": {
       "inBody": "One address per service. Railhook checks that Stripe or GitHub really sent it, then passes it on to your app.",
       "inTag": "Receive",
       "inTitle": "Webhooks from other services",
-      "outBody": "Your customer adds a URL. Railhook delivers each event there, signed, and tries again if their server is down.",
+      "outBody": "Your customers add their URLs themselves, in a portal you embed in your product. Railhook delivers each event there, signed, and tries again if their server is down.",
       "outTag": "Send",
       "outTitle": "Webhooks for your customers",
       "scene": {
@@ -2165,7 +2169,8 @@
         "pill": "Open source · MIT",
         "title": "On your servers"
       },
-      "title": "Run it your way"
+      "title": "Run it your way",
+      "compare": "Pricing and questions"
     }
   },
   "legal": {
@@ -2262,6 +2267,54 @@
       "title": "Terms of Service"
     },
     "updated": "Last updated: {{date}}"
+  },
+  "mcpApps": {
+    "approvedBy": "Approved by",
+    "connected": "Connected",
+    "description": "AI apps such as claude.ai and ChatGPT that were connected to this project by signing in. Each one acts with the access chosen when it was connected, and stops working when it is disconnected or when the person who connected it loses access.",
+    "empty": "No apps are connected to this project.",
+    "emptyHint": "To connect one, add a custom connector in claude.ai or ChatGPT with this URL and sign in:",
+    "loadFailed": "Could not load the connected apps.",
+    "revoke": "Disconnect",
+    "revokeDialog": {
+      "description": "The app loses access to this project at once.",
+      "impactImmediate": "Its tokens stop working immediately; calls in progress fail.",
+      "impactReconnect": "To use it again, someone has to connect it again from the app.",
+      "title": "Disconnect app"
+    },
+    "revokeFailed": "Could not disconnect the app.",
+    "revokeNamed": "Disconnect {{name}}",
+    "revoked": "{{name}} was disconnected",
+    "title": "Connected AI apps"
+  },
+  "mcpConsent": {
+    "access": "Access",
+    "approve": "Connect",
+    "approveFailed": "Could not connect the app. Try again from the app.",
+    "deny": "Cancel",
+    "denyFailed": "Could not cancel the request.",
+    "errorSubtitle": "The app sent a request Railhook cannot accept.",
+    "errorTitle": "This app can't be connected",
+    "expiredHint": "Go back to the app and start connecting Railhook again.",
+    "expiredSubtitle": "A request from an app is valid for ten minutes and can be answered once.",
+    "expiredTitle": "This request has expired",
+    "footer": "You can disconnect the app at any time from the project's API keys page.",
+    "loadingTitle": "Connect an app",
+    "missingRequest": "The link is missing the app's request. Start again from the app.",
+    "noProjects": "This organization has no projects yet. Create one in the dashboard, then connect the app again.",
+    "organization": "Organization",
+    "project": "Project",
+    "projectHint": "The app will see and change nothing outside this project.",
+    "readOnlyHint": "List endpoints, subscriptions and deliveries",
+    "readWriteHint": "Also create endpoints and subscriptions, send events, replay deliveries",
+    "returning": "Returning you to {{host}}…",
+    "returningSubtitle": "You can close this tab if {{host}} does not open.",
+    "returningTitle": "Done",
+    "returnsTo": "Sign-in returns to",
+    "subtitle": "It will use Railhook's MCP tools on one project, with the access you choose.",
+    "title": "Connect {{client}} to Railhook",
+    "trustNote": "Only connect apps you trust. The name is chosen by the app itself; {{host}} is where access will be handed over.",
+    "writeNeedsRole": "Read & write can be granted by an owner or developer of the organization."
   },
   "members": {
     "actions": "Actions",
@@ -2389,6 +2442,14 @@
     "terms": {
       "title": "Terms of Service — Railhook",
       "description": "The terms for using Railhook Cloud: the Free plan limits, acceptable use and liability."
+    },
+    "pricing": {
+      "title": "Pricing — Railhook: free webhook gateway, in the cloud or self-hosted",
+      "description": "Railhook is free: a cloud plan with 10,000 events a month, or every feature on your own servers under the MIT licence, with no licence key."
+    },
+    "tester": {
+      "title": "Webhook tester — inspect webhook requests online, free | Railhook",
+      "description": "Get a free URL, send it a webhook from Stripe, GitHub or curl, and see the method, headers and body that arrived. No account needed, kept for 24 hours."
     }
   },
   "mtls": {
@@ -2483,7 +2544,8 @@
     "transformations": "Transformations",
     "tunnels": "Tunnels",
     "usage": "Usage",
-    "workflows": "Workflows"
+    "workflows": "Workflows",
+    "consumers": "Consumers"
   },
   "notFound": {
     "backToDashboard": "Back to Dashboard",
@@ -2753,7 +2815,23 @@
         "users": "Accounts"
       },
       "noSignups": "No accounts yet",
-      "recentSignups": "Recent sign-ups"
+      "recentSignups": "Recent sign-ups",
+      "activation": {
+        "title": "Activation, last 30 days",
+        "description": "Each step against the one before it.",
+        "signups": "Signed up",
+        "verified": "Verified their address",
+        "organizations": "New organizations",
+        "withProject": "Created a project",
+        "withEvent": "Sent an event"
+      },
+      "daily": {
+        "period": "Last 30 days",
+        "signups": "Sign-ups per day",
+        "signupsSeries": "Sign-ups",
+        "events": "Events per day",
+        "eventsSeries": "Events"
+      }
     },
     "reauth": {
       "action": "Sign in again",
@@ -4043,6 +4121,261 @@
       "workflows": "Automations that run a sequence of steps when an event arrives.",
       "analytics": "How deliveries are going over time: success rate, latency, alerts and usage.",
       "develop": "Tools for trying things out: send test events, shape payloads, and inspect what arrives."
+    }
+  },
+  "pricing": {
+    "title": "Free, in our cloud or on your servers",
+    "lead": "Start on the cloud's free plan, or run everything yourself under the MIT licence. Neither needs a card.",
+    "cloud": {
+      "pill": "Railhook Cloud",
+      "title": "Cloud Free",
+      "price": "Free",
+      "body": "{{events}} events a month, {{projects}} projects, {{endpoints}} endpoints per project and {{retention}} days of history. Every feature is included.",
+      "later": "Later we'll add paid plans with support and higher limits.",
+      "cta": "Start free"
+    },
+    "selfHosted": {
+      "pill": "Open source · MIT",
+      "title": "Self-hosted",
+      "price": "Free",
+      "body": "The same software with every feature, no plan limits and no licence key. One command installs it with PostgreSQL, Kafka and Redis on a server with Docker and 4 GB of RAM.",
+      "cta": "Read the install guide"
+    },
+    "faq": {
+      "title": "Questions",
+      "free": {
+        "q": "Is Railhook really free?",
+        "a": "Yes. The cloud's Free plan includes every feature within its limits, and the self-hosted edition is the same software under the MIT licence, with no limits and no licence key."
+      },
+      "limit": {
+        "q": "What happens when I reach the monthly event limit?",
+        "a": "The API refuses new events with a quota_exceeded error until the next month starts. Events it accepted before that are still delivered and retried."
+      },
+      "card": {
+        "q": "Do I need a credit card?",
+        "a": "No. Sign up with an email address or a Google account and send your first event."
+      },
+      "paid": {
+        "q": "Will there be paid plans?",
+        "a": "Later we'll add paid plans with support and higher limits. The self-hosted edition stays complete and free."
+      },
+      "selfHost": {
+        "q": "What do I need to run it myself?",
+        "a": "A server with Docker and 4 GB of RAM. One command installs Railhook with PostgreSQL, Kafka and Redis, and sets up HTTPS on your domain."
+      }
+    }
+  },
+  "tester": {
+    "eyebrow": "Free tool · no account",
+    "title": "Webhook tester",
+    "lead": "Get a URL, send it a webhook from Stripe, GitHub or curl, and see exactly what arrived: method, headers and body. Nothing to install, and it keeps what it receives for 24 hours.",
+    "createHint": "Your URL records every request sent to it — the latest 100, with the first 64 KB of each body — and shows them here as they arrive.",
+    "create": "Create a test URL",
+    "creating": "Creating…",
+    "loading": "Loading your URL…",
+    "yourUrl": "Your URL",
+    "tryIt": "Try it",
+    "copy": "Copy",
+    "copied": "Copied",
+    "expires": "Expires {{time}}",
+    "newUrl": "New URL",
+    "requests": "Requests",
+    "received": "{{count}} received",
+    "waiting": "Waiting for the first request…",
+    "select": "Pick a request to see its headers and body.",
+    "query": "Query",
+    "headers": "Headers",
+    "body": "Body",
+    "truncated": "Only the first 64 KB of this body was kept.",
+    "from": "from {{ip}}",
+    "size": "{{size}} bytes",
+    "cta": {
+      "title": "Receive webhooks for real",
+      "body": "A free Railhook account keeps every request, verifies Stripe, GitHub and Shopify signatures, retries delivery to your service when it is down, and forwards to localhost while you develop.",
+      "button": "Start free",
+      "docs": "Receive your first webhook"
+    },
+    "disabled": "The webhook tester is not enabled on this server. Its operator can turn it on with PUBLIC_TESTER_ENABLED=true.",
+    "errors": {
+      "tooMany": "Too many URLs from your address. Try again in a minute.",
+      "tooManyActive": "Your address already has three live URLs. Use one of them, or wait for one to expire.",
+      "busy": "The tester is busy right now. Try again in a little while.",
+      "captcha": "The check did not pass. Please try again.",
+      "generic": "Could not create a URL. Try again."
+    },
+    "limits": {
+      "title": "How it works, and its limits",
+      "lifetime": "A URL lives for 24 hours, then it is deleted with everything it received.",
+      "kept": "It keeps the latest 100 requests, up to 1 MB in total; each body up to 64 KB.",
+      "rate": "Up to 10 requests a second per URL, and three live URLs per visitor.",
+      "masked": "Authorization, cookies and signature headers are masked, but anyone with the URL can see what it received — don't send production secrets.",
+      "methods": "Any method — GET, POST, PUT, PATCH, DELETE — answered with 200 and {\"ok\": true}."
+    },
+    "masked": "Anyone with this URL can read what it received, so Authorization, cookies and signature headers are masked."
+  },
+  "consumers": {
+    "title": "Consumers",
+    "description": "Your own users who receive your webhooks. Each one gets a portal to register their endpoints and see what was delivered to them.",
+    "new": "New consumer",
+    "name": "Name",
+    "externalId": "External ID",
+    "endpoints": "Endpoints",
+    "created": "Created",
+    "endpointCount": "{{count}} endpoints",
+    "endpointCount_one": "{{count}} endpoint",
+    "endpointCount_few": "{{count}} endpoints",
+    "endpointCount_many": "{{count}} endpoints",
+    "endpointCount_other": "{{count}} endpoints",
+    "openPortal": "Open portal",
+    "empty": {
+      "title": "No consumers yet",
+      "description": "Create one for each of your users who receives webhooks, then embed their portal in your product so they can manage their own endpoints."
+    },
+    "toast": {
+      "created": "Consumer created",
+      "createFailed": "Couldn't create the consumer",
+      "deleted": "Consumer deleted",
+      "deleteFailed": "Couldn't delete the consumer",
+      "sessionFailed": "Couldn't open a portal session",
+      "loadFailed": "Couldn't load consumers"
+    },
+    "createDialog": {
+      "title": "New consumer",
+      "description": "A consumer is one of your users. Railhook groups the endpoints registered for them and shows them only their own.",
+      "externalIdHint": "Your own ID for this user, such as the user or account ID in your database. Unique within the project.",
+      "namePlaceholder": "Acme Ltd"
+    },
+    "deleteDialog": {
+      "title": "Delete {{name}}?",
+      "description": "Its {{count}} endpoints will be deleted and stop receiving events, and every open portal session ends. Past deliveries stay in the project.",
+      "description_one": "Its {{count}} endpoint will be deleted and stop receiving events, and every open portal session ends. Past deliveries stay in the project.",
+      "description_few": "Its {{count}} endpoints will be deleted and stop receiving events, and every open portal session ends. Past deliveries stay in the project.",
+      "description_many": "Its {{count}} endpoints will be deleted and stop receiving events, and every open portal session ends. Past deliveries stay in the project.",
+      "description_other": "Its {{count}} endpoints will be deleted and stop receiving events, and every open portal session ends. Past deliveries stay in the project."
+    },
+    "endpointsSheet": {
+      "title": "Endpoints of {{name}}",
+      "description": "Registered by this consumer in their portal, or assigned to them through the API.",
+      "empty": "This consumer has no endpoints yet"
+    },
+    "embed": {
+      "button": "Embed snippet",
+      "title": "Embed the portal for {{name}}",
+      "description": "Creates a portal session and gives you an iframe to try it. In production your backend creates a new session each time the user opens the page.",
+      "allowedOrigin": "Allowed origin",
+      "allowedOriginHint": "The origin of the page that will embed the portal, such as https://app.example.com. Leave it empty to allow any page.",
+      "allowedOriginInvalid": "Enter an https origin with no path, such as https://app.example.com.",
+      "generate": "Create session",
+      "snippet": "iframe",
+      "expires": "This link expires {{date}}.",
+      "docs": "How to open sessions from your backend"
+    }
+  },
+  "portal": {
+    "title": "Webhooks",
+    "subtitle": "{{consumer}} · {{project}}",
+    "loadFailed": "Couldn't load this portal",
+    "missing": {
+      "title": "This link is incomplete",
+      "description": "The portal link has no session in it. Open it again from the page that gave it to you."
+    },
+    "expired": {
+      "title": "This session has ended",
+      "description": "Portal sessions last a limited time. Reload the page you opened it from to start a new one."
+    },
+    "wrongOrigin": {
+      "title": "This portal can't be shown here",
+      "description": "It was opened for a different website. Open it from the page that embeds it."
+    },
+    "tabs": {
+      "endpoints": "Endpoints",
+      "deliveries": "Deliveries"
+    },
+    "eventTypes": {
+      "all": "All event types"
+    },
+    "endpoints": {
+      "add": "Add endpoint",
+      "description": "The URLs events are sent to, and which events each one receives.",
+      "url": "URL",
+      "eventTypes": "Event types",
+      "status": "Status",
+      "created": "Created",
+      "noEventTypes": "None — receives nothing",
+      "moreTypes": "+{{count}} more",
+      "rotateSecret": "Rotate signing secret",
+      "loadFailed": "Couldn't load your endpoints",
+      "empty": {
+        "title": "No endpoints yet",
+        "description": "Add the URL that should receive events, and choose which events it gets."
+      },
+      "toast": {
+        "created": "Endpoint added",
+        "createFailed": "Couldn't add the endpoint",
+        "updated": "Endpoint saved",
+        "updateFailed": "Couldn't save the endpoint",
+        "deleted": "Endpoint deleted",
+        "deleteFailed": "Couldn't delete the endpoint",
+        "rotateFailed": "Couldn't rotate the secret"
+      },
+      "deleteDialog": {
+        "title": "Delete this endpoint?",
+        "description": "It stops receiving events straight away. Its past deliveries stay listed."
+      },
+      "rotateDialog": {
+        "title": "Rotate the signing secret?",
+        "description": "A new secret is created and shown once. The old one keeps working for 24 hours, so you can update your server without missing a delivery.",
+        "confirm": "Rotate"
+      }
+    },
+    "secret": {
+      "title": "Your signing secret",
+      "description": "Use it to verify that deliveries come from us. It is shown only now — copy it somewhere safe.",
+      "label": "Signing secret",
+      "standardLabel": "Standard Webhooks secret (whsec_…)",
+      "done": "I've saved it"
+    },
+    "endpointDialog": {
+      "createTitle": "Add endpoint",
+      "editTitle": "Edit endpoint",
+      "description": "Events are sent to this URL as signed HTTPS POST requests.",
+      "url": "URL",
+      "urlHint": "Must be reachable from the internet.",
+      "descriptionLabel": "Description",
+      "enabled": "Receiving events",
+      "eventTypes": "Event types",
+      "noKnownTypes": "No event types have been sent yet. Add one below.",
+      "customType": "Event type",
+      "customTypePlaceholder": "order.created or order.*",
+      "addType": "Add",
+      "invalidType": "Use lowercase words separated by dots, such as order.created. * and ** are wildcards.",
+      "removeType": "Remove {{type}}",
+      "noneSelected": "With no event types selected, this endpoint receives nothing.",
+      "create": "Add endpoint"
+    },
+    "deliveries": {
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "endpoint": "Endpoint",
+      "allEndpoints": "All endpoints",
+      "eventType": "Event type",
+      "attempts": "Attempts",
+      "created": "Created",
+      "open": "Open delivery {{type}}",
+      "loadFailed": "Couldn't load deliveries",
+      "empty": {
+        "title": "No deliveries yet",
+        "description": "Events sent to your endpoints appear here, with every attempt and the response your server gave."
+      },
+      "retry": "Retry",
+      "retryHint": "Retrying sends this event to the endpoint again, with a fresh set of attempts.",
+      "attemptsTitle": "Attempts",
+      "attemptsFailed": "Couldn't load the attempts",
+      "noAttempts": "No attempt has been made yet.",
+      "toast": {
+        "retried": "Retry scheduled",
+        "retryFailed": "Couldn't retry the delivery"
+      }
     }
   }
 }

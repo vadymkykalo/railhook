@@ -40,6 +40,42 @@ export interface paths {
         patch: operations["captureRequestPatch"];
         trace?: never;
     };
+    "/hook/p/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Send a request to a tester URL
+         * @description Any method, any body. Recorded and answered with 200.
+         */
+        get: operations["capturePublicBinRequestGet"];
+        /**
+         * Send a request to a tester URL
+         * @description Any method, any body. Recorded and answered with 200.
+         */
+        put: operations["capturePublicBinRequestPut"];
+        /**
+         * Send a request to a tester URL
+         * @description Any method, any body. Recorded and answered with 200.
+         */
+        post: operations["capturePublicBinRequestPost"];
+        /**
+         * Send a request to a tester URL
+         * @description Any method, any body. Recorded and answered with 200.
+         */
+        delete: operations["capturePublicBinRequestDelete"];
+        options?: never;
+        head?: never;
+        /**
+         * Send a request to a tester URL
+         * @description Any method, any body. Recorded and answered with 200.
+         */
+        patch: operations["capturePublicBinRequestPatch"];
+        trace?: never;
+    };
     "/tunnel/{slug}": {
         parameters: {
             query?: never;
@@ -432,6 +468,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/consumers/{consumerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get consumer */
+        get: operations["getConsumer"];
+        /** Update consumer */
+        put: operations["updateConsumer"];
+        post?: never;
+        /**
+         * Delete consumer
+         * @description Deletes the consumer, deletes its endpoints and ends its portal sessions
+         */
+        delete: operations["deleteConsumer"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/alerts/rules/{ruleId}": {
         parameters: {
             query?: never;
@@ -451,6 +509,28 @@ export interface paths {
          * @description Removes the rule. The alerts it has already fired stay in the history.
          */
         delete: operations["deleteAlertRule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/endpoints/{endpointId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get portal endpoint */
+        get: operations["portalGetEndpoint"];
+        /**
+         * Update portal endpoint
+         * @description Absent fields are left alone; eventTypes replaces the set
+         */
+        put: operations["portalUpdateEndpoint"];
+        post?: never;
+        /** Delete portal endpoint */
+        delete: operations["portalDeleteEndpoint"];
         options?: never;
         head?: never;
         patch?: never;
@@ -586,6 +666,26 @@ export interface paths {
          * @description Creates a new tunnel session for CLI use. The tunnelToken is returned only once.
          */
         post: operations["createTunnel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/bins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a tester URL
+         * @description A URL that records every request sent to it for a day: the latest 100 within 1 MB of bodies, the first 64 KB of each, with credentials masked. Anyone who has the URL can read what it received. At most three live URLs per address.
+         */
+        post: operations["createPublicBin"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1396,6 +1496,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/consumers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List consumers
+         * @description Returns the project's consumers; externalId narrows it to one
+         */
+        get: operations["listConsumers"];
+        put?: never;
+        /**
+         * Create consumer
+         * @description Registers one of your users, identified by your own id
+         */
+        post: operations["createConsumer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/consumers/{consumerId}/portal-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create portal session
+         * @description Opens the customer portal for this consumer. The response carries the token once; only its hash is stored.
+         */
+        post: operations["createPortalSession"];
+        /**
+         * Revoke portal sessions
+         * @description Ends every open portal session of this consumer
+         */
+        delete: operations["revokePortalSessions"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/api-keys": {
         parameters: {
             query?: never;
@@ -1504,6 +1652,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/portal/endpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List portal endpoints
+         * @description The consumer's own endpoints
+         */
+        get: operations["portalListEndpoints"];
+        put?: never;
+        /**
+         * Create portal endpoint
+         * @description Registers an endpoint for the consumer. The signing secret is in this response only.
+         */
+        post: operations["portalCreateEndpoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/endpoints/{endpointId}/rotate-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate portal endpoint secret
+         * @description A new signing secret, shown in this response only. The old one keeps verifying for 24 hours.
+         */
+        post: operations["portalRotateEndpointSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/deliveries/{deliveryId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry portal delivery
+         * @description Puts a failed delivery back on its retry ladder for another attempt
+         */
+        post: operations["portalRetryDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{orgId}/members": {
         parameters: {
             query?: never;
@@ -1602,6 +1814,46 @@ export interface paths {
          * @description Accepts an organization membership invite using the invite token
          */
         post: operations["acceptInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/oauth/requests/{requestId}/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline an MCP app's sign-in request
+         * @description Ends the request and returns the URL that tells the app access was denied.
+         */
+        post: operations["denyMcpConsentRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/oauth/requests/{requestId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve an MCP app's sign-in request
+         * @description Connects the app to one project of the caller's organization with READ_ONLY or READ_WRITE access — the same scope an API key carries. Any member may grant READ_ONLY; READ_WRITE takes a role that may create an API key. Returns the URL to send the browser to, carrying the authorization code.
+         */
+        post: operations["approveMcpConsentRequest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2354,6 +2606,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/bins/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a tester URL
+         * @description The URL and the requests it received, newest first.
+         */
+        get: operations["getPublicBin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/workflows/{id}/executions": {
         parameters: {
             query?: never;
@@ -2534,6 +2806,26 @@ export interface paths {
          * @description Returns current status and progress of a replay session
          */
         get: operations["getReplaySession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/mcp-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List connected MCP apps
+         * @description Apps connected to this project through OAuth sign-in, newest first.
+         */
+        get: operations["listMcpGrants"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2830,6 +3122,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/consumers/{consumerId}/endpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List consumer endpoints
+         * @description The endpoints registered for this consumer
+         */
+        get: operations["listConsumerEndpoints"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/alerts/events": {
         parameters: {
             query?: never;
@@ -2870,6 +3182,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/portal/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get portal session
+         * @description The consumer and project this session is for, and the event types it can subscribe to
+         */
+        get: operations["portalGetSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List portal deliveries
+         * @description Deliveries to the consumer's endpoints, newest first
+         */
+        get: operations["portalListDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/deliveries/{deliveryId}/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List portal delivery attempts
+         * @description Every attempt at one delivery, with request and response
+         */
+        get: operations["portalListDeliveryAttempts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs": {
         parameters: {
             query?: never;
@@ -2902,6 +3274,26 @@ export interface paths {
          * @description Exports all organization data in machine-readable JSON format. Includes organization info, members, projects, endpoints, subscriptions, incoming sources/destinations, API keys (metadata only), and audit logs. No decrypted secrets are included. Owner only.
          */
         get: operations["exportOrganizationData"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/oauth/requests/{requestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Describe an MCP app's sign-in request
+         * @description What the consent screen shows: the app's name, the host its code will be sent to, the access it asked for, and whether the caller's role may grant write access.
+         */
+        get: operations["describeMcpConsentRequest"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3458,6 +3850,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/mcp-grants/{grantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Disconnect an MCP app
+         * @description Revokes the app's access to this project at once: its access and refresh tokens stop working, and it has to be connected again from the app.
+         */
+        delete: operations["revokeMcpGrant"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/debug-links/{linkId}": {
         parameters: {
             query?: never;
@@ -4000,12 +4412,19 @@ export interface components {
             allowedSourceIps?: string;
             /** @enum {string} */
             signatureScheme?: "LEGACY" | "STANDARD" | "BOTH";
+            /**
+             * Format: uuid
+             * @description The Consumer this endpoint belongs to, which puts it in that Consumer's portal. Absent leaves the current assignment alone.
+             */
+            consumerId?: string;
         };
         EndpointResponse: {
             /** Format: uuid */
             id?: string;
             /** Format: uuid */
             projectId?: string;
+            /** Format: uuid */
+            consumerId?: string;
             url?: string;
             description?: string;
             enabled?: boolean;
@@ -4027,6 +4446,26 @@ export interface components {
             /** @enum {string} */
             signatureScheme?: "LEGACY" | "STANDARD" | "BOTH";
             standardWebhooksSecret?: string;
+        };
+        ConsumerRequest: {
+            /** @description Your own identifier for this user, unique within the project — typically the user or tenant id in your database. */
+            externalId: string;
+            /** @description Shown at the top of the portal. Absent: the externalId on create, unchanged on update. */
+            name?: string;
+        };
+        ConsumerResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            projectId?: string;
+            externalId?: string;
+            name?: string;
+            /** Format: int64 */
+            endpointCount?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         AlertRuleRequest: {
             name: string;
@@ -4079,6 +4518,29 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        PortalEndpointRequest: {
+            url: string;
+            description?: string;
+            enabled?: boolean;
+            /** @description The event types this Endpoint receives. Replaces the current set; absent leaves it alone. Wildcards: order.* (one segment), order.** and ** (everything). */
+            eventTypes?: string[];
+        };
+        PortalEndpointResponse: {
+            /** Format: uuid */
+            id?: string;
+            url?: string;
+            description?: string;
+            enabled?: boolean;
+            eventTypes?: string[];
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            /** @description The signing secret: present only in the response that created or rotated it. */
+            secret?: string;
+            /** @description The same secret as a Standard Webhooks library expects it (whsec_…); present only with secret. */
+            standardWebhooksSecret?: string;
         };
         UpdateOrganizationRequest: {
             name: string;
@@ -4196,6 +4658,9 @@ export interface components {
             status?: "ACTIVE" | "CLOSED" | "EXPIRED";
             /** Format: date-time */
             createdAt?: string;
+        };
+        PublicBinCreateRequest: {
+            captchaToken?: string;
         };
         StepExecutionResponse: {
             /** Format: uuid */
@@ -4587,6 +5052,31 @@ export interface components {
         DlqRetryRequest: {
             deliveryIds: string[];
         };
+        PortalSessionRequest: {
+            /**
+             * Format: int32
+             * @description How long the session lasts, in minutes. Defaults to 60.
+             */
+            ttlMinutes?: number;
+            /**
+             * @description The origin of the page that embeds the portal, e.g. https://app.example.com. When set, the portal refuses to render inside any other page.
+             * @example https://app.example.com
+             */
+            allowedOrigin?: string;
+        };
+        PortalSessionResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            consumerId?: string;
+            /** @description The portal, ready to open or to put in an iframe's src. The token travels in the fragment, which a browser never sends to a server. */
+            url?: string;
+            /** @description The bearer token for /api/v1/portal/**. Shown once; only its hash is stored. */
+            token?: string;
+            allowedOrigin?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+        };
         ApiKeyRequest: {
             name: string;
             /** @enum {string} */
@@ -4641,6 +5131,15 @@ export interface components {
             /** Format: date-time */
             inviteExpiresAt?: string;
             inviteUrl?: string;
+        };
+        McpConsentDecisionResponse: {
+            redirectUrl?: string;
+        };
+        McpConsentApproveRequest: {
+            /** Format: uuid */
+            projectId: string;
+            /** @enum {string} */
+            scope: "READ_WRITE" | "READ_ONLY";
         };
         EventIngestResponse: {
             /** Format: uuid */
@@ -4932,6 +5431,30 @@ export interface components {
             linkExpiresAt?: string;
             projectName?: string;
         };
+        PublicBinResponse: {
+            slug?: string;
+            url?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            /** Format: int64 */
+            requestCount?: number;
+            requests?: components["schemas"]["Request"][];
+        };
+        Request: {
+            /** Format: int64 */
+            id?: number;
+            method?: string;
+            query?: string;
+            headers?: components["schemas"]["JsonNode"];
+            body?: string;
+            bodyTruncated?: boolean;
+            /** Format: int64 */
+            sizeBytes?: number;
+            contentType?: string;
+            sourceIp?: string;
+            /** Format: date-time */
+            receivedAt?: string;
+        };
         PageWorkflowExecutionResponse: {
             /** Format: int32 */
             totalPages?: number;
@@ -5067,6 +5590,22 @@ export interface components {
             first?: boolean;
             last?: boolean;
             empty?: boolean;
+        };
+        McpGrantResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            projectId?: string;
+            clientName?: string;
+            clientUri?: string;
+            redirectHost?: string;
+            /** @enum {string} */
+            scope?: "READ_WRITE" | "READ_ONLY";
+            approvedByEmail?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            lastUsedAt?: string;
         };
         PageIncomingSourceResponse: {
             /** Format: int32 */
@@ -5370,6 +5909,24 @@ export interface components {
             last?: boolean;
             empty?: boolean;
         };
+        PageConsumerResponse: {
+            /** Format: int32 */
+            totalPages?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["ConsumerResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"];
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            numberOfElements?: number;
+            first?: boolean;
+            last?: boolean;
+            empty?: boolean;
+        };
         PageApiKeyResponse: {
             /** Format: int32 */
             totalPages?: number;
@@ -5426,6 +5983,78 @@ export interface components {
             first?: boolean;
             last?: boolean;
             empty?: boolean;
+        };
+        PortalSessionInfoResponse: {
+            consumerName?: string;
+            projectName?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            /** @description The origin the portal may be embedded in, or null for any. */
+            allowedOrigin?: string;
+            /** @description Event types an Endpoint can subscribe to: the project's event catalog when it has one, otherwise the types it has sent recently. */
+            eventTypes?: string[];
+        };
+        PagePortalDeliveryResponse: {
+            /** Format: int32 */
+            totalPages?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["PortalDeliveryResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"];
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            numberOfElements?: number;
+            first?: boolean;
+            last?: boolean;
+            empty?: boolean;
+        };
+        PortalDeliveryResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            eventId?: string;
+            eventType?: string;
+            /** Format: uuid */
+            endpointId?: string;
+            /** @enum {string} */
+            status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
+            /** Format: int32 */
+            attemptCount?: number;
+            /** Format: int32 */
+            maxAttempts?: number;
+            /** Format: date-time */
+            nextRetryAt?: string;
+            /** Format: date-time */
+            lastAttemptAt?: string;
+            /** Format: date-time */
+            succeededAt?: string;
+            /** Format: date-time */
+            failedAt?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        DeliveryAttemptResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            deliveryId?: string;
+            /** Format: int32 */
+            attemptNumber?: number;
+            requestHeaders?: string;
+            requestBody?: string;
+            /** Format: int32 */
+            httpStatusCode?: number;
+            responseHeaders?: string;
+            responseBody?: string;
+            errorMessage?: string;
+            /** Format: int32 */
+            durationMs?: number;
+            /** Format: date-time */
+            createdAt?: string;
         };
         ApiKeyData: {
             /** Format: uuid */
@@ -5546,6 +6175,18 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
+        McpConsentRequestResponse: {
+            /** Format: uuid */
+            requestId?: string;
+            clientName?: string;
+            clientUri?: string;
+            redirectHost?: string;
+            /** @enum {string} */
+            requestedScope?: "READ_WRITE" | "READ_ONLY";
+            canGrantWrite?: boolean;
+            /** Format: date-time */
+            expiresAt?: string;
+        };
         DeliveryResponse: {
             /** Format: uuid */
             id?: string;
@@ -5589,25 +6230,6 @@ export interface components {
             first?: boolean;
             last?: boolean;
             empty?: boolean;
-        };
-        DeliveryAttemptResponse: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            deliveryId?: string;
-            /** Format: int32 */
-            attemptNumber?: number;
-            requestHeaders?: string;
-            requestBody?: string;
-            /** Format: int32 */
-            httpStatusCode?: number;
-            responseHeaders?: string;
-            responseBody?: string;
-            errorMessage?: string;
-            /** Format: int32 */
-            durationMs?: number;
-            /** Format: date-time */
-            createdAt?: string;
         };
         DashboardStatsResponse: {
             deliveryStats?: components["schemas"]["DeliveryStats"];
@@ -5900,6 +6522,18 @@ export interface components {
             last?: boolean;
             empty?: boolean;
         };
+        Activation: {
+            /** Format: int64 */
+            signups?: number;
+            /** Format: int64 */
+            verified?: number;
+            /** Format: int64 */
+            organizations?: number;
+            /** Format: int64 */
+            withProject?: number;
+            /** Format: int64 */
+            withEvent?: number;
+        };
         AdminSignupResponse: {
             /** Format: uuid */
             userId?: string;
@@ -5914,6 +6548,14 @@ export interface components {
             organizationName?: string;
             /** Format: date-time */
             createdAt?: string;
+        };
+        Day: {
+            /** Format: date */
+            date?: string;
+            /** Format: int64 */
+            signups?: number;
+            /** Format: int64 */
+            events?: number;
         };
         PlatformOverviewResponse: {
             /** Format: int64 */
@@ -5940,6 +6582,8 @@ export interface components {
             activeTunnels?: number;
             /** Format: int64 */
             organizationsNearQuota?: number;
+            daily30d?: components["schemas"]["Day"][];
+            activation30d?: components["schemas"]["Activation"];
             recentSignups?: components["schemas"]["AdminSignupResponse"][];
             /** Format: date-time */
             generatedAt?: string;
@@ -6195,6 +6839,256 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["WebhookCaptureResponse"];
+                };
+            };
+        };
+    };
+    capturePublicBinRequestGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such URL, or it has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Too many requests to this URL */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    capturePublicBinRequestPut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such URL, or it has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Too many requests to this URL */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    capturePublicBinRequestPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such URL, or it has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Too many requests to this URL */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    capturePublicBinRequestDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such URL, or it has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Too many requests to this URL */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    capturePublicBinRequestPatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such URL, or it has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Too many requests to this URL */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -7363,6 +8257,77 @@ export interface operations {
             };
         };
     };
+    getConsumer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                consumerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ConsumerResponse"];
+                };
+            };
+        };
+    };
+    updateConsumer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                consumerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsumerRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ConsumerResponse"];
+                };
+            };
+        };
+    };
+    deleteConsumer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                consumerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Consumer deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     updateAlertRule: {
         parameters: {
             query?: never;
@@ -7403,6 +8368,74 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Rule deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    portalGetEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpointId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalEndpointResponse"];
+                };
+            };
+        };
+    };
+    portalUpdateEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpointId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalEndpointRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalEndpointResponse"];
+                };
+            };
+        };
+    };
+    portalDeleteEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpointId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Endpoint deleted */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -7703,6 +8736,57 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["TunnelCreateResponse"];
+                };
+            };
+        };
+    };
+    createPublicBin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PublicBinCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The URL */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
+                };
+            };
+            /** @description The challenge was not passed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
+                };
+            };
+            /** @description Too many URLs made from this address, or it already holds three live ones */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
+                };
+            };
+            /** @description The tester holds as many live URLs as it allows; try later */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
                 };
             };
         };
@@ -9046,6 +10130,120 @@ export interface operations {
             };
         };
     };
+    listConsumers: {
+        parameters: {
+            query?: {
+                /** @description Your own id for the user */
+                externalId?: string;
+                /** @description Zero-based page index (0..N) */
+                page?: number;
+                /** @description The size of the page to be returned */
+                size?: number;
+                /** @description Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+                sort?: string[];
+            };
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageConsumerResponse"];
+                };
+            };
+        };
+    };
+    createConsumer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsumerRequest"];
+            };
+        };
+        responses: {
+            /** @description Consumer created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ConsumerResponse"];
+                };
+            };
+            /** @description A consumer with this externalId already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ConsumerResponse"];
+                };
+            };
+        };
+    };
+    createPortalSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                consumerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PortalSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Session created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalSessionResponse"];
+                };
+            };
+        };
+    };
+    revokePortalSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                consumerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sessions revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listApiKeys: {
         parameters: {
             query?: {
@@ -9221,6 +10419,108 @@ export interface operations {
             };
         };
     };
+    portalListEndpoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalEndpointResponse"][];
+                };
+            };
+        };
+    };
+    portalCreateEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalEndpointRequest"];
+            };
+        };
+        responses: {
+            /** @description Endpoint created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalEndpointResponse"];
+                };
+            };
+            /** @description The project has reached its plan's endpoint limit */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalEndpointResponse"];
+                };
+            };
+        };
+    };
+    portalRotateEndpointSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpointId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalEndpointResponse"];
+                };
+            };
+        };
+    };
+    portalRetryDelivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Retry scheduled */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description An attempt at this delivery is under way */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     getMembers: {
         parameters: {
             query?: never;
@@ -9358,6 +10658,81 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["MemberResponse"];
+                };
+            };
+        };
+    };
+    denyMcpConsentRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Declined; follow redirectUrl */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentDecisionResponse"];
+                };
+            };
+            /** @description Expired, already answered, or never existed */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentDecisionResponse"];
+                };
+            };
+        };
+    };
+    approveMcpConsentRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["McpConsentApproveRequest"];
+            };
+        };
+        responses: {
+            /** @description Approved; follow redirectUrl */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentDecisionResponse"];
+                };
+            };
+            /** @description The caller's role may not grant READ_WRITE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentDecisionResponse"];
+                };
+            };
+            /** @description Request expired or answered, or project not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentDecisionResponse"];
                 };
             };
         };
@@ -10615,6 +11990,37 @@ export interface operations {
             };
         };
     };
+    getPublicBin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The URL and its requests */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicBinResponse"];
+                };
+            };
+            /** @description No such URL, or it has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublicBinResponse"];
+                };
+            };
+        };
+    };
     listExecutions: {
         parameters: {
             query?: {
@@ -10872,6 +12278,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ReplaySessionResponse"];
+                };
+            };
+        };
+    };
+    listMcpGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpGrantResponse"][];
                 };
             };
         };
@@ -11286,6 +12714,29 @@ export interface operations {
             };
         };
     };
+    listConsumerEndpoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                consumerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EndpointResponse"][];
+                };
+            };
+        };
+    };
     listAlertEvents: {
         parameters: {
             query?: {
@@ -11331,6 +12782,77 @@ export interface operations {
                     "*/*": {
                         [key: string]: number;
                     };
+                };
+            };
+        };
+    };
+    portalGetSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PortalSessionInfoResponse"];
+                };
+            };
+        };
+    };
+    portalListDeliveries: {
+        parameters: {
+            query?: {
+                endpointId?: string;
+                status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
+                /** @description Zero-based page index (0..N) */
+                page?: number;
+                /** @description The size of the page to be returned */
+                size?: number;
+                /** @description Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+                sort?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagePortalDeliveryResponse"];
+                };
+            };
+        };
+    };
+    portalListDeliveryAttempts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DeliveryAttemptResponse"][];
                 };
             };
         };
@@ -11382,6 +12904,37 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["GdprExportDto"];
+                };
+            };
+        };
+    };
+    describeMcpConsentRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request, still waiting for an answer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentRequestResponse"];
+                };
+            };
+            /** @description Expired, already answered, or never existed */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["McpConsentRequestResponse"];
                 };
             };
         };
@@ -12219,6 +13772,27 @@ export interface operations {
         responses: {
             /** @description OK */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    revokeMcpGrant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                grantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

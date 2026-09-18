@@ -1,0 +1,49 @@
+---
+title: Railhook vs Hook0 — MIT-licensed Hook0 alternative
+description: Looking for a Hook0 alternative? Railhook is an MIT-licensed webhook gateway that sends webhooks to your customers and receives them from providers.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Use this page to decide between Hook0 and Railhook. Hook0 is a service for sending webhooks to your customers, with an EU-hosted cloud. Railhook sends them too, receives webhooks from providers as well, and is MIT-licensed.
+
+<Aside title="Verified 2026-09-18">
+Hook0 details come from [hook0.com/pricing](https://www.hook0.com/pricing) as it read on 18 September 2026. Products change: check them before you decide, and send a correction as a pull request if something here is out of date.
+</Aside>
+
+## Side by side
+
+| | Railhook | Hook0 |
+|---|---|---|
+| Licence | MIT, approved by the OSI | SSPL, source-available |
+| Sending webhooks to your customers | Yes | Yes |
+| Receiving webhooks from providers | Yes | — |
+| Where the hosted service runs | railhook.io | The EU, in France by default |
+
+A dash means Hook0's pages we checked did not settle the point. It is not a claim that the feature is missing.
+
+## When Hook0 is the better choice
+
+- **Your hosted data must stay in the EU.** Hook0 Cloud runs in the EU, in France by default. If a hosted service is a must and data residency is the deciding point, that settles it. With Railhook, self-host in the region you need.
+- **You need a hosted service beyond a free plan.** Hook0 offers paid hosted plans. Railhook Cloud is free-plan only for now, so a volume above its limits means self-hosting.
+
+## When Railhook is the better choice
+
+- **The licence matters to you.** The Server Side Public License is source-available, not an open-source licence approved by the OSI, and it places conditions on offering the software as a service. Railhook is MIT: you can run it, change it and ship it inside your own product.
+- **You also receive webhooks.** Railhook verifies Stripe, GitHub, GitLab, Shopify, Slack and Twilio signatures, stores what arrives and forwards it to your services with retries and replay. Outgoing deliveries and incoming forwards share one dashboard and one list of failed messages.
+- **You want to develop locally against real webhooks.** `railhook listen 3000` tunnels a public URL to your machine. See [CLI](/docs/tools/cli/).
+
+## What Railhook does not have
+
+Railhook delivers over HTTP only and has no OpenTelemetry. See [How Railhook compares](/docs/resources/comparison/#what-railhook-does-not-have) for the full list before you decide.
+
+## Moving from Hook0
+
+Recreate each Hook0 application as a Railhook project, and each URL your customers receive webhooks at as an endpoint with its subscriptions, then send each event to both platforms until you trust the new one. Railhook signs with the Standard Webhooks headers, so check what your receivers verify before you switch them. [Migrate to Railhook](/docs/resources/migrating/) walks through a migration with both platforms live.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Migrate to Railhook" href="/docs/resources/migrating/" description="Move without a maintenance window." />
+  <LinkCard title="Send your first webhook" href="/docs/start/send-first-webhook/" description="Create an endpoint and send an event." />
+  <LinkCard title="How Railhook compares" href="/docs/resources/comparison/" description="Railhook next to every alternative, gaps included." />
+</CardGrid>

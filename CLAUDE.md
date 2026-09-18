@@ -52,8 +52,9 @@ rather than a list here. Each failure names its remedy. Three whose remedy nobod
   *why*, which a spec cannot — but never hand-write an endpoint table: that is what the
   4,000-line page this replaced was, and nothing kept it in sync. `railhook-docs/CLAUDE.md`
   has the page rules.
-- **The version lives in seven places** — reactor pom, `deploy/helm/railhook/Chart.yaml` (version
-  *and* appVersion), `railhook-ui/package.json`, all three SDK manifests under `sdks/`.
+- **The version lives in eight places** — reactor pom, `deploy/helm/railhook/Chart.yaml` (version
+  *and* appVersion), `railhook-ui/package.json`, all three SDK manifests under `sdks/`, and the
+  MCP bridge's `sdks/mcp/package.json` (and its MCP Registry entry, `sdks/mcp/server.json`).
   Never bump one by hand: `make version-set VERSION=2.4.0`; `make version-check` mirrors CI.
 - **Per-module JaCoCo ratchets** bind to `verify`, and CI runs them only after merging the unit
   *and* integration exec files. `mvn verify` over a partial test selection trips them against

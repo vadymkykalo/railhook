@@ -8,6 +8,7 @@ import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.PlatformAdminAuthenticationToken;
 import com.webhook.platform.api.security.PlatformAdminUserAuthenticationToken;
+import com.webhook.platform.api.security.PortalSessionAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -22,7 +23,8 @@ import java.io.IOException;
  * being handed one. This is the request half of making org ownership a
  * property of data access; {@link TenantContext#runAsSystem} is the other half.
  *
- * <p>A JWT maps to the organization in the token, an API key to the one owning its project, and
+ * <p>A JWT maps to the organization in the token, an API key to the one owning its project, a
+ * portal session to the one owning its Consumer, and
  * a platform admin to {@link TenantContext#SYSTEM} — not being a member of any organization, and
  * meant to see across them. An unauthenticated request gets nothing: the public paths have a
  * tenant but no caller identity, so leaving the scope unset is what forces them to discover their
@@ -54,6 +56,8 @@ public class TenantContextFilter extends OncePerRequestFilter {
             TenantContext.set(jwt.getOrganizationId());
         } else if (authentication instanceof ApiKeyAuthenticationToken apiKey) {
             TenantContext.set(apiKey.getOrganizationId());
+        } else if (authentication instanceof PortalSessionAuthenticationToken portal) {
+            TenantContext.set(portal.getOrganizationId());
         } else if (authentication instanceof PlatformAdminAuthenticationToken) {
             TenantContext.set(TenantContext.SYSTEM);
         }

@@ -33,6 +33,13 @@ public class DeliverySpecification {
         return (root, query, cb) -> root.get("status").in(statuses);
     }
 
+    /** Always a restriction: an empty collection matches nothing, never everything. */
+    public static Specification<Delivery> hasEndpointIdIn(Collection<UUID> endpointIds) {
+        return (root, query, cb) -> endpointIds.isEmpty()
+                ? cb.disjunction()
+                : root.get("endpointId").in(endpointIds);
+    }
+
     public static Specification<Delivery> hasEndpointId(UUID endpointId) {
         return (root, query, cb) -> {
             if (endpointId == null) {

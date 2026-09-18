@@ -1,0 +1,51 @@
+---
+title: Railhook vs Hookdeck — open-source Hookdeck alternative
+description: Looking for a Hookdeck alternative you can self-host? Railhook receives and sends webhooks under the MIT licence, where Hookdeck's receiving gateway is SaaS only.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Use this page to decide between Hookdeck and Railhook. Hookdeck is two products: Event Gateway for receiving webhooks and Outpost for sending them. Railhook does both in one product, and this page compares it with each half.
+
+<Aside title="Verified 2026-09-18">
+Hookdeck details come from [hookdeck.com/pricing](https://hookdeck.com/pricing) and [github.com/hookdeck/outpost](https://github.com/hookdeck/outpost) as they read on 18 September 2026. Products change: check them before you decide, and send a correction as a pull request if something here is out of date.
+</Aside>
+
+## Side by side
+
+| | Railhook | Hookdeck Event Gateway | Hookdeck Outpost |
+|---|---|---|---|
+| Direction | Receiving and sending | Receiving | Sending |
+| Licence | MIT | Closed source, SaaS only | Apache-2.0 |
+| Self-hostable | Yes, every feature | No | Yes |
+| Delivers to queues and event buses | No, HTTP only | — | Yes: SQS, Kafka, EventBridge, Pub/Sub, RabbitMQ and more |
+| Customer-facing portal | Yes, embeddable | — | Yes |
+| OpenTelemetry | No | — | Yes |
+| Free CLI for local development | Yes | Yes, with the Console | — |
+
+A dash means the pages we checked did not settle the point, or it does not apply to that product. It is not a claim that the feature is missing.
+
+## When Hookdeck is the better choice
+
+- **Your customers' receivers are queues, not HTTP services.** Outpost delivers to SQS, Kafka, EventBridge, Pub/Sub and RabbitMQ. Railhook delivers over HTTP only.
+- **You want a portal your customers use themselves, styled with your own CSS.** Outpost has a user portal. Railhook has an embeddable [customer portal](/docs/outgoing/customer-portal/) too, but its theming is a brand colour, a logo, light or dark and the language.
+- **You want traces.** Outpost exports OpenTelemetry. Railhook exposes Prometheus metrics and no traces.
+- **You receive webhooks and never want to run anything.** Event Gateway is a managed service with paid plans. Railhook Cloud is free-plan only for now, so a volume above its limits means self-hosting.
+
+## When Railhook is the better choice
+
+- **You must self-host the receiving side.** Event Gateway is closed source and runs only as Hookdeck's SaaS. Railhook's ingress, verification, forwarding and replay are all in the MIT repository, so provider webhooks never have to pass through a third party.
+- **You receive and send.** Hookdeck splits the directions into two products with two deployments. In Railhook, incoming forwards and outgoing deliveries share one attempt lifecycle, one dashboard and one list of failed messages.
+- **You decide how long webhooks are kept.** A self-hosted Railhook keeps stored webhooks for as long as you configure, and replays any of them to your services again. See [Data retention](/docs/resources/data-retention/).
+- **You want provider verification without writing it.** Railhook verifies Stripe, GitHub, GitLab, Shopify, Slack and Twilio signatures itself and refuses a forged webhook with `401` before storing it. See [Verification](/docs/incoming/verification/).
+
+## Moving from Hookdeck
+
+An Event Gateway source becomes a Railhook source, and its destinations become the source's destinations. An Outpost destination becomes a Railhook endpoint. Create the Railhook source and its destinations first, send a test webhook to the ingress URL, then change the provider's webhook URL to it. [Migrate to Railhook](/docs/resources/migrating/) has the full mapping.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Migrate to Railhook" href="/docs/resources/migrating/" description="Concept mapping and a migration with both platforms live." />
+  <LinkCard title="Receive your first webhook" href="/docs/start/receive-first-webhook/" description="Create a source and forward to a destination." />
+  <LinkCard title="How Railhook compares" href="/docs/resources/comparison/" description="Railhook next to every alternative, gaps included." />
+</CardGrid>

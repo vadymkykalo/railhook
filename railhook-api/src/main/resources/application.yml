@@ -28,6 +28,24 @@ spring:
       preferred-json-mapper: jackson2
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  # The remote MCP server: Streamable HTTP at /mcp on the API origin, authenticated with a
+  # project API key. Stateless, so any API replica can answer any call and nothing about a
+  # session has to be shared between them. Tools are in com.webhook.platform.api.mcp.
+  ai:
+    mcp:
+      server:
+        enabled: ${MCP_ENABLED:true}
+        name: railhook
+        protocol: STATELESS
+        type: SYNC
+        instructions: >-
+          Railhook delivers a customer's events to the endpoints subscribed to them. The API key or
+          sign-in this server was given belongs to one project; every tool acts on that project only.
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: false
   task:
     scheduling:
       pool:
@@ -283,6 +301,13 @@ webhook:
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
 
+# The webhook tester on the public site (/tester): anonymous URLs that record requests for a
+# day. Off unless PUBLIC_TESTER_ENABLED=true, so a self-hosted install opens nothing anonymous.
+public-bin:
+  enabled: ${PUBLIC_TESTER_ENABLED:false}
+  per-address: ${PUBLIC_TESTER_PER_ADDRESS:3}
+  max-active: ${PUBLIC_TESTER_MAX_ACTIVE:5000}
+
 test-endpoint:
   base-url: ${TEST_ENDPOINT_BASE_URL:http://localhost:8080}
   max-per-project: ${TEST_ENDPOINT_MAX_PER_PROJECT:10}
@@ -436,6 +461,13 @@ tunnel:
 
 device-auth:
   cleanup-interval-ms: ${DEVICE_AUTH_CLEANUP_INTERVAL_MS:300000}
+
+# Sign-in for the MCP server: claude.ai / ChatGPT connectors register themselves, send a person
+# through the consent screen and get OAuth tokens for one project. The issuer is app.base-url.
+# Off, /mcp takes API keys only and the /oauth and /.well-known endpoints answer 404.
+mcp:
+  oauth:
+    enabled: ${MCP_OAUTH_ENABLED:true}
 
 logging:
   level:

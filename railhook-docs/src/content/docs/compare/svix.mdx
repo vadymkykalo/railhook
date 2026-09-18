@@ -1,0 +1,54 @@
+---
+title: Railhook vs Svix — open-source Svix alternative
+description: Looking for a Svix alternative? Railhook is an MIT-licensed webhook gateway that sends and receives webhooks, with every feature in the self-hosted build.
+---
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Use this page to decide between Svix and Railhook, or to judge whether Railhook can replace Svix for you. It says where Svix is the better choice as plainly as where Railhook is.
+
+<Aside title="Verified 2026-09-18">
+Svix details come from [svix.com/pricing](https://www.svix.com/pricing/) and [github.com/svix/svix-webhooks](https://github.com/svix/svix-webhooks) as they read on 18 September 2026. Products change: check them before you decide, and send a correction as a pull request if something here is out of date.
+</Aside>
+
+## Side by side
+
+| | Railhook | Svix |
+|---|---|---|
+| Licence of the server | MIT | MIT |
+| Held back from the open-source build | Nothing | The App Portal and transformations |
+| Sending webhooks to your customers | Yes | Yes (Svix Dispatch) |
+| Receiving webhooks from providers | Yes, in the same product | Yes, as a separate product (Svix Ingest) |
+| Customer-facing portal | Yes, embeddable, in the open-source build | App Portal, hosted only |
+| OpenTelemetry | No | Yes |
+| SDKs | Node.js, Python, PHP | 9 languages |
+| Terraform provider | No | Yes |
+| Compliance | None claimed | SOC 2, HIPAA |
+| Localhost tunnel in the CLI | Yes | — |
+
+A dash means Svix's pages we checked did not settle the point. It is not a claim that the feature is missing.
+
+## When Svix is the better choice
+
+- **You want the most mature customer portal.** Svix's App Portal has been in production for years. Railhook's [customer portal](/docs/outgoing/customer-portal/) does the core of it — your users register endpoints, choose event types, inspect attempts and retry failed deliveries — but its theming stops at a colour, a logo, light or dark and the language.
+- **You need a compliance story today.** Svix states SOC 2 and HIPAA. Railhook claims neither.
+- **Your stack is not Node.js, Python or PHP.** Svix ships SDKs in 9 languages and a Terraform provider. Railhook has three SDKs and no Terraform provider; anything else calls the REST API directly.
+- **You want traces.** Svix exports OpenTelemetry. Railhook exposes Prometheus metrics and no traces.
+
+## When Railhook is the better choice
+
+- **You self-host and want every feature.** Svix's open-source server leaves out the App Portal and transformations. Railhook's MIT repository is the whole product: the embeddable customer portal, transformations, workflows, per-endpoint ordering, replay and PII masking run on your own server with no licence key.
+- **You both send and receive webhooks.** In Railhook, outgoing deliveries to your customers and incoming webhooks from Stripe, GitHub, Shopify and others share one attempt lifecycle, one dashboard and one list of failed messages. Svix offers the two directions as separate products.
+- **You want to develop against real webhooks locally.** `railhook listen 3000` opens a tunnel from a public URL to your machine, so a provider's test webhook reaches the code in your editor. See [CLI](/docs/tools/cli/).
+- **Your receivers already verify Svix signatures.** Railhook signs with the [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks) headers, the same scheme Svix libraries verify, so receivers keep working once they have the new secret.
+
+## Moving from Svix
+
+A Svix application becomes a Railhook project, a message becomes an event, and the event types on an endpoint become subscriptions. Svix Ingest's sources and destinations become Railhook sources and destinations. Because the signature scheme is the same, you can send every event to both platforms for as long as you need confidence, then stop sending to Svix. [Migrate to Railhook](/docs/resources/migrating/) has the mapping and a migration without a maintenance window.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Migrate to Railhook" href="/docs/resources/migrating/" description="Concept mapping and a migration with both platforms live." />
+  <LinkCard title="How Railhook compares" href="/docs/resources/comparison/" description="Railhook next to every alternative, gaps included." />
+  <LinkCard title="Quickstart" href="/docs/start/quickstart/" description="Sign up or install, and send a first event." />
+</CardGrid>

@@ -39,9 +39,14 @@ from .types import (
     IncomingEventListParams,
     IncomingForwardAttempt,
     ReplayEventResponse,
+    Consumer,
+    ConsumerCreateParams,
+    ConsumerUpdateParams,
+    PortalSession,
+    PortalSessionCreateParams,
 )
 
-__version__ = "2.20.13"
+__version__ = "2.21.0"
 
 # Backward-compatible aliases
 WebhookPlatform = Railhook
@@ -84,4 +89,9 @@ __all__ = [
     "IncomingEventListParams",
     "IncomingForwardAttempt",
     "ReplayEventResponse",
+    "Consumer",
+    "ConsumerCreateParams",
+    "ConsumerUpdateParams",
+    "PortalSession",
+    "PortalSessionCreateParams",
 ]

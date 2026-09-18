@@ -47,6 +47,18 @@ Subscriptions. The incoming direction's counterpart is a Source together with it
 Destinations.
 _Avoid_: integration, pipeline, link, channel
 
+**Consumer**:
+One of the customer's own users — whoever receives the customer's events at the Endpoints
+registered for them. It groups those Endpoints, and is what a Portal Session is scoped to.
+Known to the customer by their own id for it (the external id), not by Railhook's.
+_Avoid_: tenant (that is the Organization), customer (that is Railhook's user), application,
+app, subscriber, end user
+
+**Portal Session**:
+A short-lived credential the customer's backend opens for one Consumer, so the embedded
+portal can show that Consumer its own Endpoints and Deliveries and act on nothing else.
+_Avoid_: portal token, magic link, app portal login
+
 ### Incoming
 
 **Source**:
@@ -157,3 +169,10 @@ _Avoid_: account, tenant, workspace, team
 **Project**:
 A division of an Organization's work that endpoints, sources and API keys belong to.
 _Avoid_: app, environment, namespace
+
+**MCP Grant**:
+One AI app's sign-in to the MCP server, approved by a person for exactly one Project with the
+same READ_ONLY or READ_WRITE scope an API key carries. It is an API key with a person behind
+it: it stops working when that person could no longer approve it. The UI calls it a
+connected app.
+_Avoid_: connection (that is an Endpoint and its Subscriptions), integration, authorization

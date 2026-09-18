@@ -1449,6 +1449,40 @@
       ]
     },
     {
+      "title": "Public webhook tester",
+      "variables": [
+        {
+          "name": "PUBLIC_TESTER_ENABLED",
+          "default": null,
+          "example": "false",
+          "description": "/tester on the public site: anyone, without an account, makes a URL that records the requests\nsent to it for a day. It is how railhook.io lets people try Railhook before signing up.\n\nOff by default, so a self-hosted install opens nothing anonymous: the page says the tester is\nnot enabled and the API answers 404. When on, it is bounded — three live URLs per address,\nPUBLIC_TESTER_MAX_ACTIVE live URLs overall, the latest 100 requests within 1 MB per URL — and\nasks for the registration CAPTCHA when one is configured."
+        },
+        {
+          "name": "PUBLIC_TESTER_PER_ADDRESS",
+          "default": null,
+          "example": "3",
+          "description": "/tester on the public site: anyone, without an account, makes a URL that records the requests\nsent to it for a day. It is how railhook.io lets people try Railhook before signing up.\n\nOff by default, so a self-hosted install opens nothing anonymous: the page says the tester is\nnot enabled and the API answers 404. When on, it is bounded — three live URLs per address,\nPUBLIC_TESTER_MAX_ACTIVE live URLs overall, the latest 100 requests within 1 MB per URL — and\nasks for the registration CAPTCHA when one is configured."
+        },
+        {
+          "name": "PUBLIC_TESTER_MAX_ACTIVE",
+          "default": null,
+          "example": "5000",
+          "description": "/tester on the public site: anyone, without an account, makes a URL that records the requests\nsent to it for a day. It is how railhook.io lets people try Railhook before signing up.\n\nOff by default, so a self-hosted install opens nothing anonymous: the page says the tester is\nnot enabled and the API answers 404. When on, it is bounded — three live URLs per address,\nPUBLIC_TESTER_MAX_ACTIVE live URLs overall, the latest 100 requests within 1 MB per URL — and\nasks for the registration CAPTCHA when one is configured."
+        }
+      ]
+    },
+    {
+      "title": "Web analytics",
+      "variables": [
+        {
+          "name": "WEB_ANALYTICS_TOKEN",
+          "default": null,
+          "example": null,
+          "description": "Cloudflare Web Analytics on the public pages, the dashboard and the docs. Cookieless, so it\nneeds no consent banner. Empty is the default and means no analytics script at all — a\nself-hosted install reports nothing to anyone.\n\nThe token is the one Cloudflare shows under Analytics & Logs → Web Analytics → Manage site\n(the JS snippet's \"token\"). Read by the UI container when it starts: set it and run\n`docker compose up -d ui`, no rebuild."
+        }
+      ]
+    },
+    {
       "title": "Sign in with google",
       "variables": [
         {
@@ -1568,6 +1602,23 @@
           "default": "7",
           "example": null,
           "description": "Tunnel request log retention (days). tunnel_request_log is partitioned weekly,\nso retention is a DROP TABLE of whole expired partitions by the partition\nmaintenance job (PARTITION_MAINTENANCE_CRON), not a row-by-row delete of its own."
+        }
+      ]
+    },
+    {
+      "title": "Mcp server (ai agents)",
+      "variables": [
+        {
+          "name": "MCP_ENABLED",
+          "default": "true",
+          "example": null,
+          "description": "The remote MCP server at <your origin>/mcp, which lets an AI agent (Claude Code,\nCursor, Claude Desktop) send events and inspect endpoints, subscriptions and\ndeliveries. It authenticates with a project API key and can do nothing that key\ncannot; a READ_ONLY key gets the read tools only. Set to false to turn /mcp off."
+        },
+        {
+          "name": "MCP_OAUTH_ENABLED",
+          "default": "true",
+          "example": null,
+          "description": "Sign-in for the MCP server, so claude.ai and ChatGPT can connect it as a custom\nconnector: the app registers itself (OAuth dynamic client registration), the\nperson approves it for one project with read-only or read & write access on a\nconsent screen, and the app gets short-lived tokens for that project. The\nconnections are listed, and revocable, next to the project's API keys. It is\nserved from APP_BASE_URL, which must therefore be the public origin. Set to false\nto accept API keys only."
         }
       ]
     },

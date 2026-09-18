@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.entity.ApiKey;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.ApiKeyRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.mcp.McpServerConfig;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.util.CryptoUtils;
 import jakarta.servlet.FilterChain;
@@ -25,6 +26,7 @@ import java.util.Optional;
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String API_KEY_HEADER = "X-API-Key";
+    private static final String BEARER_PREFIX = "Bearer ";
     private final ApiKeyRepository apiKeyRepository;
     private final ProjectRepository projectRepository;
 
@@ -37,7 +39,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        String apiKeyValue = request.getHeader(API_KEY_HEADER);
+        String apiKeyValue = apiKeyOf(request);
 
         if (apiKeyValue != null && !apiKeyValue.isEmpty()) {
             String keyHash = CryptoUtils.hashApiKey(apiKeyValue);
@@ -77,5 +79,28 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * The key from {@code X-API-Key}, or — on the MCP endpoint only — from
+     * {@code Authorization: Bearer}, which is the one header many MCP clients know how to send.
+     *
+     * <p>Confined to that path so the rest of the API keeps a single way in for a key: a bearer
+     * token everywhere else is a JWT, and {@link JwtAuthenticationFilter} ignores a bearer value
+     * it cannot parse, so the two never claim the same request.
+     */
+    private static String apiKeyOf(HttpServletRequest request) {
+        String header = request.getHeader(API_KEY_HEADER);
+        if (header != null && !header.isEmpty()) {
+            return header;
+        }
+        if (!McpServerConfig.ENDPOINT.equals(request.getRequestURI())) {
+            return null;
+        }
+        String authorization = request.getHeader("Authorization");
+        if (authorization != null && authorization.startsWith(BEARER_PREFIX)) {
+            return authorization.substring(BEARER_PREFIX.length()).trim();
+        }
+        return null;
     }
 }

@@ -1,10 +1,10 @@
 ---
 title: How Railhook compares
-description: Railhook next to Svix, Hookdeck and Convoy as of 2026-09, including what Railhook does not have.
+description: Railhook next to Svix, Hookdeck, Convoy and Hook0 as of 2026-09, including what Railhook does not have.
 ---
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Use this page to shortlist a webhook platform. It compares Railhook with Svix, Hookdeck and Convoy on points each vendor states in its own public documentation, and it lists Railhook's gaps as plainly as its strengths.
+Use this page to shortlist a webhook platform. It compares Railhook with Svix, Hookdeck, Convoy and Hook0 on points each vendor states in its own public documentation, and it lists Railhook's gaps as plainly as its strengths.
 
 <Aside title="As of 2026-09">
 Competitor details come from the linked public pages as they read in September 2026. Products change: read their documentation before you decide, and send a correction as a pull request if something here is out of date.
@@ -18,26 +18,37 @@ Competitor details come from the linked public pages as they read in September 2
 | Sends webhooks to your customers | Yes | Yes | Yes (Outpost) | Yes |
 | Receives webhooks from providers | Yes | Yes (Svix Ingest) | Yes (Event Gateway) | Yes |
 | Delivers to queues and cloud services, not only HTTP | No | — | Yes (Outpost) | — |
-| Customer-facing portal | No | App Portal, in the hosted version only | User portal (Outpost) | Portal Links |
+| Customer-facing portal | Yes, embeddable and self-hosted | App Portal, in the hosted version only | User portal (Outpost) | Portal Links |
 | OpenTelemetry | No | Yes (server) | Yes (Outpost) | — |
 | Every feature self-hosted without a licence key | Yes | — | — | No |
 
 A dash means the vendor's pages we checked did not settle the point either way. It is not a claim that the feature is missing.
 
+## Compare in depth
+
+<CardGrid>
+  <LinkCard title="Railhook vs Svix" href="/docs/compare/svix/" description="An MIT Svix alternative with both directions in one product." />
+  <LinkCard title="Railhook vs Hookdeck" href="/docs/compare/hookdeck/" description="Self-host the receiving side that Hookdeck runs only as SaaS." />
+  <LinkCard title="Railhook vs Convoy" href="/docs/compare/convoy/" description="Both directions, MIT instead of the Elastic License." />
+  <LinkCard title="Railhook vs Hook0" href="/docs/compare/hook0/" description="MIT instead of the SSPL, and incoming webhooks too." />
+  <LinkCard title="Open-source webhook tools compared" href="/docs/compare/open-source-webhook-tools/" description="All five self-hostable projects, licence first." />
+</CardGrid>
+
 ## Railhook
 
 - **Both directions in one place.** Outgoing events to your customers' endpoints and incoming webhooks from providers share one attempt lifecycle, one dashboard and one set of failed messages.
 - **Nothing held back from self-hosting.** Every feature is in the MIT repository, with no licence key. `BILLING_ENABLED` defaults to `false`.
-- **Railhook Cloud** runs at railhook.io on a free plan. Paid plans with higher limits are coming.
+- **Railhook Cloud** runs at railhook.io on a free plan. Paid plans with support and higher limits will come later.
 - **Standard Webhooks signatures**, alongside Railhook's own `X-Signature` header, with a grace window when a secret is rotated.
 - **Per-endpoint ordering**, opt-in, with a timeout so one stuck delivery cannot block an endpoint forever.
 - **Replay creates new deliveries** from stored events (Time Machine in the dashboard) instead of re-sending the original.
 - **A built-in request bin and a localhost tunnel** in the CLI.
 - **A workflow builder** that goes beyond single-step transformations.
+- **An embeddable customer portal**, self-hosted like everything else: your own users register endpoints, choose event types, see their deliveries and retry failed ones. Sessions are short-lived and can be pinned to the origin that embeds them. See [Customer portal](/docs/outgoing/customer-portal/).
 
 ### What Railhook does not have
 
-- **No customer-facing portal.** You manage your customers' endpoints on their behalf. A shareable debug link covers one event; there is nothing embeddable. This is the largest gap, and it is first on the roadmap.
+- **A young customer portal.** Theming is a brand colour, a logo, light or dark and the language; there is no custom CSS, no custom domain for the portal, and no view of the event catalog's schemas.
 - **HTTP delivery only.** No SQS, S3, EventBridge, Pub/Sub, RabbitMQ or Kafka destinations.
 - **No SSO (SAML or OIDC) and no SCIM.**
 - **No OpenTelemetry.** Prometheus metrics are thorough; there are no traces.
@@ -69,6 +80,12 @@ A dash means the vendor's pages we checked did not settle the point either way. 
 - Portal Links generate a customer-facing dashboard of an endpoint's deliveries, as a one-time link or one you embed. ([Portal Links](https://getconvoy.io/docs/product-manual/portal-links))
 
 **Choose Convoy** if you want both directions and an embeddable delivery view, and its licence terms fit.
+
+## Hook0
+
+- Hook0 is a service for sending webhooks to your customers. It is licensed under the Server Side Public License, and its hosted service runs in the EU, in France by default. ([Hook0](https://www.hook0.com/pricing))
+
+**Choose Hook0** if a hosted sending service must keep its data in the EU and its licence terms fit.
 
 ## Next steps
 

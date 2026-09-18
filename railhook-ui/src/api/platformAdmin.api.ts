@@ -27,6 +27,22 @@ export interface AdminSignup {
   createdAt: string;
 }
 
+export interface PlatformDay {
+  /** `YYYY-MM-DD`. */
+  date: string;
+  signups: number;
+  events: number;
+}
+
+/** How far the last 30 days' sign-ups got; each figure is a subset of the one before it. */
+export interface PlatformActivation {
+  signups: number;
+  verified: number;
+  organizations: number;
+  withProject: number;
+  withEvent: number;
+}
+
 export interface PlatformOverview {
   organizations: number;
   suspendedOrganizations: number;
@@ -40,6 +56,9 @@ export interface PlatformOverview {
   deliveriesFailed24h: number;
   activeTunnels: number;
   organizationsNearQuota: number;
+  /** Oldest first, one entry for each of the last 30 days, today included. */
+  daily30d: PlatformDay[];
+  activation30d: PlatformActivation;
   recentSignups: AdminSignup[];
   generatedAt: string;
 }

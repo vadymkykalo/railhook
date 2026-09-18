@@ -1,0 +1,110 @@
+---
+title: Надійне приймання вебхуків GitLab
+description: Не дайте GitLab вимкнути ваш вебхук, коли застосунок повільний чи недоступний — Railhook перевіряє X-Gitlab-Token, відповідає одразу й пересилає на ваш сервіс із повторами та повтором подій.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Цей гайд ставить Railhook між GitLab і вашим застосунком. GitLab надсилає вебхуки на джерело Railhook, яке перевіряє секретний токен, зберігає кожен вебхук у тому вигляді, в якому він надійшов, і пересилає на ваш сервіс із повторами. GitLab спілкується лише з Railhook, який відповідає одразу, тож повільний чи недоступний сервіс більше не рахується проти вебхука.
+
+## Чому вебхукам GitLab потрібен буфер
+
+GitLab вимикає вебхук, що постійно падає. Після чотирьох невдач поспіль його вимкнено тимчасово — спершу на одну хвилину, а з наступними невдачами до 24 годин; після 40 невдач поспіль його вимкнено назавжди, і сам він не вмикається. Також GitLab просить відповідати до спливання таймауту й бути готовим до дублікатів подій, коли вебхук сплив за таймаутом. ([GitLab: Webhooks](https://docs.gitlab.com/user/project/integrations/webhooks/))
+
+Тож кілька невдалих деплоїв можуть вимкнути вашу інтеграцію так, що ніхто й не помітить. З Railhook попереду:
+
+- На запити GitLab відповідають, щойно їх збережено, тож вони не спливають за таймаутом і не падають через ваш сервіс.
+- Ваш сервіс отримує до 5 спроб на кожне пересилання, з очікуваннями від 1 хвилини до 1 години, а те, що все одно не вдалося, потрапляє в **«Невдалі пересилання»**.
+- На дублікат із тим самим заголовком `webhook-id` чи `Idempotency-Key` відповідають збереженою копією, і його не пересилають удруге.
+
+## Підключення GitLab
+
+Знадобляться проєкт Railhook і API-ключ. Усе нижче також можна зробити в розділі **Вхідні** панелі керування.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Оберіть секретний токен.** Для GitLab ви обираєте його самі:
+
+   ```bash
+   export GITLAB_WEBHOOK_TOKEN=$(openssl rand -hex 32)
+   ```
+
+2. **Створіть джерело** з цим токеном як секретом:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"GitLab","providerType":"GITLAB","verificationMode":"PROVIDER","hmacSecret":"'"$GITLAB_WEBHOOK_TOKEN"'"}'
+   ```
+
+   Збережіть `id` і `ingressUrl` із відповіді.
+
+3. **Додайте призначення** — адресу вашого сервісу:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/gitlab","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+4. **Зареєструйте вебхук у GitLab.** У проєкті чи групі відкрийте **Settings → Webhooks** і додайте новий вебхук. Вставте `ingressUrl` як **URL**, той самий токен як **Secret token** і оберіть потрібні тригери.
+
+5. **Надішліть тест** кнопкою **Test** вебхука. Він з'явиться в розділі **Вхідні → Отримані**, з одним пересиланням на кожне призначення.
+
+</Steps>
+
+## Як перевіряється токен
+
+GitLab не підписує тіло; він надсилає секретний токен у заголовку `X-Gitlab-Token`. Railhook перевіряє, що заголовок дорівнює секрету джерела, і відповідає `401`, нічого не зберігаючи, коли це не так. Оскільки токен — не підпис, тримайте ingress-адресу в таємниці й використовуйте HTTPS.
+
+<Aside type="note">
+GitLab також уміє підписувати вебхуки токеном підпису. Railhook перевіряє лише секретний токен, тож використовуйте поле **Secret token**.
+</Aside>
+
+## Що отримує ваш сервіс
+
+Тіло точно таке, яким його надіслав GitLab, байт у байт. Railhook передає далі заголовки подій GitLab — `X-Gitlab-Event`, `X-Gitlab-Event-UUID` і `X-Gitlab-Instance`, — тож ваш сервіс відрізнить push від merge request. `X-Gitlab-Token` ніколи не пересилається: ваш сервіс автентифікує Railhook за обліковими даними призначення. Див. [Призначення](/docs/uk/incoming/destinations/#що-отримує-призначення).
+
+## Локальна розробка з CLI
+
+<Steps>
+
+1. Встановіть CLI й увійдіть, як описано в [CLI](/docs/uk/tools/cli/), а потім відкрийте тунель до порту вашого застосунку:
+
+   ```bash
+   railhook listen 3000
+   ```
+
+2. Додайте джерелу друге призначення з виведеною публічною адресою й вашим маршрутом у кінці, наприклад `https://<host>/tunnel/<slug>/webhooks/gitlab`. Запит потрапить на `http://localhost:3000/webhooks/gitlab`.
+
+3. Натисніть **Test** у вебхуку GitLab, і вебхук надійде у ваш локальний застосунок із заголовком `X-Gitlab-Event`. Вимкніть це призначення, коли закриєте тунель.
+
+</Steps>
+
+## Повтор подій після збою
+
+Відтворіть те, що надійшло, поки ваш сервіс лежав. Кожен відтворений вебхук іде на кожне призначення джерела як нове пересилання:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
+```
+
+Повтор сягає так далеко, як довго зберігаються події: 7 днів у Railhook Cloud і скільки налаштуєте на власному сервері. Зробіть обробник ідемпотентним щодо того, про що вебхук, — наприклад, коміту чи merge request у тілі, — бо повтор може надіслати вебхуки, які ваш сервіс уже обробив. Див. [Повтор](/docs/uk/outgoing/replay/#повтор-вхідних-вебхуків).
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Перевірка вхідних вебхуків" href="/docs/uk/incoming/verification/" description="Схема підпису кожного провайдера й захист від повторного використання." />
+  <LinkCard title="Джерела" href="/docs/uk/incoming/sources/" description="Що відповідає ingress і як дедуплікуються повторні надсилання." />
+  <LinkCard title="Вебхуки GitHub" href="/docs/uk/guides/github-webhooks/" description="Те саме налаштування для GitHub." />
+</CardGrid>

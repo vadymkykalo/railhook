@@ -54,6 +54,8 @@ class Endpoint:
     mtls_enabled: bool = False
     verification_status: Optional[str] = None
     updated_at: Optional[str] = None
+    #: The Consumer this endpoint belongs to, or None when it is your own.
+    consumer_id: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Endpoint":
@@ -70,6 +72,7 @@ class Endpoint:
             mtls_enabled=data.get("mtlsEnabled") or False,
             verification_status=data.get("verificationStatus"),
             updated_at=data.get("updatedAt"),
+            consumer_id=data.get("consumerId"),
         )
 
 
@@ -81,6 +84,8 @@ class EndpointCreateParams:
     rate_limit_per_second: Optional[int] = None
     secret: Optional[str] = None
     allowed_source_ips: Optional[str] = None
+    #: Registers the endpoint for one of your Consumers, which puts it in their portal.
+    consumer_id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         result: Dict[str, Any] = {"url": self.url, "enabled": self.enabled}
@@ -92,6 +97,8 @@ class EndpointCreateParams:
             result["secret"] = self.secret
         if self.allowed_source_ips is not None:
             result["allowedSourceIps"] = self.allowed_source_ips
+        if self.consumer_id is not None:
+            result["consumerId"] = self.consumer_id
         return result
 
 
@@ -103,6 +110,8 @@ class EndpointUpdateParams:
     rate_limit_per_second: Optional[int] = None
     secret: Optional[str] = None
     allowed_source_ips: Optional[str] = None
+    #: Moves the endpoint to another Consumer of the same project. None leaves it alone.
+    consumer_id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         result: Dict[str, Any] = {}
@@ -118,6 +127,8 @@ class EndpointUpdateParams:
             result["secret"] = self.secret
         if self.allowed_source_ips is not None:
             result["allowedSourceIps"] = self.allowed_source_ips
+        if self.consumer_id is not None:
+            result["consumerId"] = self.consumer_id
         return result
 
 
@@ -678,4 +689,88 @@ class ReplayEventResponse:
             status=data["status"],
             event_id=data["eventId"],
             destinations_count=data["destinationsCount"],
+        )
+
+
+@dataclass
+class Consumer:
+    """One of your own users, grouping the endpoints registered for them."""
+
+    id: str
+    #: Your own identifier for the user, unique within the project.
+    external_id: str
+    name: str
+    created_at: str
+    project_id: Optional[str] = None
+    #: Live endpoints registered for this Consumer.
+    endpoint_count: int = 0
+    updated_at: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Consumer":
+        return cls(
+            id=data["id"],
+            external_id=data["externalId"],
+            name=data["name"],
+            created_at=data["createdAt"],
+            project_id=data.get("projectId"),
+            endpoint_count=data.get("endpointCount") or 0,
+            updated_at=data.get("updatedAt"),
+        )
+
+
+@dataclass
+class ConsumerCreateParams:
+    external_id: str
+    #: Shown at the top of the portal. Defaults to external_id on create, unchanged on update.
+    name: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {"externalId": self.external_id}
+        if self.name is not None:
+            result["name"] = self.name
+        return result
+
+
+#: The update body has the same shape: external_id required, name None to leave it unchanged.
+ConsumerUpdateParams = ConsumerCreateParams
+
+
+@dataclass
+class PortalSessionCreateParams:
+    #: Minutes the session lasts, 1-1440. None: the API default of 60.
+    ttl_minutes: Optional[int] = None
+    #: The https origin of the page that embeds the portal, e.g. https://app.example.com.
+    allowed_origin: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {}
+        if self.ttl_minutes is not None:
+            result["ttlMinutes"] = self.ttl_minutes
+        if self.allowed_origin is not None:
+            result["allowedOrigin"] = self.allowed_origin
+        return result
+
+
+@dataclass
+class PortalSession:
+    """A new portal session. ``token`` is returned here and never again."""
+
+    id: str
+    consumer_id: str
+    #: The portal, ready to open or to use as an iframe's src.
+    url: str
+    token: str
+    expires_at: str
+    allowed_origin: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "PortalSession":
+        return cls(
+            id=data["id"],
+            consumer_id=data["consumerId"],
+            url=data["url"],
+            token=data["token"],
+            expires_at=data["expiresAt"],
+            allowed_origin=data.get("allowedOrigin"),
         )

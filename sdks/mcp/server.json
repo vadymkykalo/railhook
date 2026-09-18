@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.vadymkykalo/railhook",
+  "title": "Railhook",
+  "description": "Webhooks for AI agents: send events, manage endpoints, inspect and retry deliveries.",
+  "websiteUrl": "https://railhook.io/docs/tools/mcp/",
+  "repository": {
+    "url": "https://github.com/vadymkykalo/railhook",
+    "source": "github",
+    "subfolder": "sdks/mcp"
+  },
+  "version": "2.21.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://railhook.io/mcp"
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@railhook/mcp",
+      "version": "2.21.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "RAILHOOK_API_KEY",
+          "description": "A Railhook project API key. A READ_ONLY key is enough to explore.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "RAILHOOK_BASE_URL",
+          "description": "Your Railhook origin when self-hosted. Defaults to https://railhook.io.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

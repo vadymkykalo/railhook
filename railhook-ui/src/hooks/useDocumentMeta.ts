@@ -58,12 +58,14 @@ export function useDocumentMeta({
   useEffect(() => {
     const site = siteUrl();
     document.title = title;
-    document.documentElement.lang = i18n.language.split('-')[0];
+    const lang = i18n.language.split('-')[0];
+    document.documentElement.lang = lang;
 
     upsertMeta('meta[name="description"]', 'name', 'description', description);
     upsertMeta('meta[property="og:title"]', 'property', 'og:title', title);
     upsertMeta('meta[property="og:description"]', 'property', 'og:description', description);
     upsertMeta('meta[property="og:url"]', 'property', 'og:url', `${site}${path}`);
+    upsertMeta('meta[property="og:locale"]', 'property', 'og:locale', lang === 'uk' ? 'uk_UA' : 'en_US');
     upsertMeta('meta[name="twitter:title"]', 'name', 'twitter:title', title);
     upsertMeta('meta[name="twitter:description"]', 'name', 'twitter:description', description);
     upsertCanonical(`${site}${path === '/' ? '/' : path}`);

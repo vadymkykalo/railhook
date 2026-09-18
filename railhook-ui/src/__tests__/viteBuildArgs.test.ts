@@ -87,10 +87,16 @@ describe('VITE_ build arguments', () => {
 describe('content-security-policy ownership', () => {
   const nginxConf = read('railhook-ui/nginx.conf');
   const securityHeaders = read('railhook-ui/nginx-security-headers.conf');
+  const commonHeaders = read('railhook-ui/nginx-security-headers-common.conf');
 
   it('nginx does not send a Content-Security-Policy of its own', () => {
-    expect(nginxConf).not.toMatch(/add_header\s+Content-Security-Policy/i);
+    // One exception, and it cannot collide with the meta tag: the customer portal's
+    // frame-ancestors, the one directive a meta tag is not allowed to carry. A policy header with
+    // anything else in it would be intersected with the meta tag's, which is the bug this guards.
+    const policies = [...nginxConf.matchAll(/add_header\s+Content-Security-Policy\s+"([^"]*)"/gi)].map((m) => m[1]);
+    expect(policies).toEqual(['frame-ancestors $portal_frame_ancestors']);
     expect(securityHeaders).not.toMatch(/add_header\s+Content-Security-Policy/i);
+    expect(commonHeaders).not.toMatch(/add_header\s+Content-Security-Policy/i);
   });
 
   it('nginx still sends the headers that are not policy, and cannot be set from a meta tag', () => {
@@ -98,7 +104,7 @@ describe('content-security-policy ownership', () => {
     // actually stops this being framed and has to survive. The headers live in a snippet that
     // nginx.conf includes; nginxSecurityHeaders.test.ts holds every location to it.
     expect(securityHeaders).toMatch(/add_header\s+X-Frame-Options/i);
-    expect(securityHeaders).toMatch(/add_header\s+X-Content-Type-Options/i);
-    expect(securityHeaders).toMatch(/add_header\s+Referrer-Policy/i);
+    expect(commonHeaders).toMatch(/add_header\s+X-Content-Type-Options/i);
+    expect(commonHeaders).toMatch(/add_header\s+Referrer-Policy/i);
   });
 });

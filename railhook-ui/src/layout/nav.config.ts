@@ -72,10 +72,11 @@ export const PROJECT_SECTIONS: NavSection[] = [
     nameKey: 'nav.connections',
     path: (projectId) => p(projectId, 'connections'),
     icon: Network,
-    owns: ['connections', 'connection-setup', 'endpoints', 'subscriptions', 'incoming-sources', 'transformations', 'rules', 'schemas', 'pii-rules'],
+    owns: ['connections', 'connection-setup', 'endpoints', 'consumers', 'subscriptions', 'incoming-sources', 'transformations', 'rules', 'schemas', 'pii-rules'],
     tabs: [
       tab('nav.connections', 'connections', Network),
       tab('nav.endpoints', 'endpoints', Webhook),
+      tab('nav.consumers', 'consumers', Users),
       tab('nav.subscriptions', 'subscriptions', Bell),
       tab('nav.incomingSources', 'incoming-sources', ArrowDownToLine),
       tab('nav.transformations', 'transformations', Repeat2),

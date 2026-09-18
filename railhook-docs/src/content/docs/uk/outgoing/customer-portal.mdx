@@ -1,0 +1,220 @@
+---
+title: Портал для клієнтів
+description: Вбудуйте у свій продукт сторінку, де ваші власні користувачі реєструють ендпоінти, обирають типи подій, бачать свої доставки й повторюють невдалі.
+---
+import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Портал для клієнтів — це сторінка, яку ви вбудовуєте у свій продукт. На ній кожен ваш користувач реєструє власні ендпоінти, обирає, які типи подій отримувати, бачить кожну доставку на ці ендпоінти з запитом і відповіддю кожної спроби та повторює ті, що не вдалися. Це забирає підтримку вебхуків із вашої пошти: на питання «чому ми не отримали вебхук?» відповідає сторінка — тому, хто питає.
+
+Кожного вашого користувача Railhook називає **Consumer**. Consumer групує ендпоінти, зареєстровані для цього користувача, а **сесія порталу** — короткоживучі облікові дані, що дозволяють порталу діяти рівно від імені одного Consumer.
+
+## Як це складається докупи
+
+<Steps>
+
+1. Ваш бекенд створює Consumer для кожного вашого користувача, який отримує вебхуки, з ключем — вашим власним id користувача.
+2. Коли цей користувач відкриває сторінку вебхуків у вашому продукті, ваш бекенд відкриває сесію порталу для його Consumer своїм API-ключем.
+3. Ваша сторінка вставляє `url` сесії в `<iframe>`. Портал працює в ньому й звертається до Railhook токеном сесії — і нічим іншим.
+
+</Steps>
+
+## Створення Consumer
+
+`POST /api/v1/projects/{projectId}/consumers` приймає `externalId` і необов'язковий `name`. `externalId` — ваш власний id користувача, унікальний у межах проєкту, тож бекенд може знову знайти Consumer, не зберігаючи id Railhook: `GET /api/v1/projects/{projectId}/consumers?externalId=user_123` повертає його. `name` показується вгорі порталу й за замовчуванням дорівнює `externalId`. Другий Consumer з тим самим `externalId` відхиляється з `409`.
+
+<Tabs syncKey="lang">
+  <TabItem label="Node.js">
+    ```ts
+    import { Railhook } from '@railhook/node';
+
+    const railhook = new Railhook({
+      apiKey: process.env.RAILHOOK_API_KEY,
+      baseUrl: 'https://railhook.io', // or your instance
+    });
+
+    const consumer = await railhook.consumers.create(projectId, { externalId: 'user_123', name: 'Acme Ltd' });
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    import os
+
+    from railhook import ConsumerCreateParams, Railhook
+
+    client = Railhook(
+        api_key=os.environ["RAILHOOK_API_KEY"],
+        base_url="https://railhook.io",  # or your instance
+    )
+
+    consumer = client.consumers.create(
+        project_id,
+        ConsumerCreateParams(external_id="user_123", name="Acme Ltd"),
+    )
+    ```
+  </TabItem>
+  <TabItem label="PHP">
+    ```php
+    <?php
+    use Railhook\Railhook;
+
+    $client = new Railhook(
+        apiKey: getenv('RAILHOOK_API_KEY'),
+        baseUrl: 'https://railhook.io', // or your instance
+    );
+
+    $consumer = $client->consumers->create($projectId, ['externalId' => 'user_123', 'name' => 'Acme Ltd']);
+    ```
+  </TabItem>
+  <TabItem label="cURL">
+    ```bash
+    curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/consumers" \
+      -H "X-API-Key: $API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"externalId":"user_123","name":"Acme Ltd"}'
+    ```
+  </TabItem>
+</Tabs>
+
+## Ендпоінти для Consumer
+
+Consumer може реєструвати ендпоінти сам, у порталі. Ендпоінти, якими ви вже керуєте від імені користувача, переходять у його портал, коли ви задаєте їм `consumerId` під час створення чи оновлення:
+
+```bash
+curl -X PUT "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/endpoints/$ENDPOINT_ID" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://hooks.acme.example/railhook","consumerId":"'"$CONSUMER_ID"'"}'
+```
+
+Consumer має належати до того самого проєкту, що й ендпоінт; будь-який інший — `404`. Якщо в оновленні немає `consumerId`, ендпоінт лишається там, де був. `GET /api/v1/projects/{projectId}/consumers/{consumerId}/endpoints` показує ендпоінти Consumer.
+
+Ендпоінт без Consumer — лише ваш: він не з'являється в жодному порталі.
+
+## Відкриття сесії порталу
+
+Відкривайте сесію зі свого бекенда щоразу, коли користувач завантажує сторінку, запитом `POST /api/v1/projects/{projectId}/consumers/{consumerId}/portal-sessions`. Тіло необов'язкове:
+
+| Поле | За замовчуванням | Значення |
+|---|---|---|
+| `ttlMinutes` | `60` | Скільки триває сесія, від 1 до 1440 (24 години). |
+| `allowedOrigin` | немає | Origin сторінки, що вбудовує портал, наприклад `https://app.example.com`. Якщо задано, портал відображається всередині цієї сторінки й ніде більше. |
+
+Відповідь містить `id`, `consumerId`, `url`, `token`, `allowedOrigin` і `expiresAt`. Токен є в цій відповіді й більше ніде: Railhook зберігає лише його SHA-256-хеш.
+
+<Tabs syncKey="lang">
+  <TabItem label="Node.js">
+    ```ts
+    const session = await railhook.portalSessions.create(projectId, consumer.id, {
+      ttlMinutes: 60,
+      allowedOrigin: 'https://app.example.com',
+    });
+    // session.url → hand it to your page
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    from railhook import PortalSessionCreateParams
+
+    session = client.portal_sessions.create(
+        project_id,
+        consumer.id,
+        PortalSessionCreateParams(ttl_minutes=60, allowed_origin="https://app.example.com"),
+    )
+    # session.url → hand it to your page
+    ```
+  </TabItem>
+  <TabItem label="PHP">
+    ```php
+    $session = $client->portalSessions->create($projectId, $consumer['id'], [
+        'ttlMinutes' => 60,
+        'allowedOrigin' => 'https://app.example.com',
+    ]);
+    // $session['url'] → hand it to your page
+    ```
+  </TabItem>
+  <TabItem label="cURL">
+    ```bash
+    curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/consumers/$CONSUMER_ID/portal-sessions" \
+      -H "X-API-Key: $API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"ttlMinutes":60,"allowedOrigin":"https://app.example.com"}'
+    ```
+  </TabItem>
+</Tabs>
+
+Відкриття сесії — це запис, тому потрібен API-ключ `READ_WRITE`.
+
+## Вбудовування
+
+Вставте `url` в iframe на своїй сторінці:
+
+```html title="webhooks.html"
+<iframe
+  src="https://railhook.example.com/portal?origin=https://app.example.com#rhp_…"
+  style="width: 100%; height: 720px; border: 0"
+  title="Webhooks"
+></iframe>
+```
+
+URL має вигляд `<APP_BASE_URL>/portal#<token>` або `<APP_BASE_URL>/portal?origin=<allowedOrigin>#<token>`, якщо в сесії є дозволений origin. Токен передається у фрагменті після `#`, який браузер ніколи не надсилає на сервер, тож він не потрапляє ні в журнал доступу, ні в заголовок `Referer`. Портал прибирає його з адресного рядка, щойно завантажиться, і тримає лише в пам'яті.
+
+<Aside type="caution">
+Токен — це облікові дані до ендпоінтів вашого користувача. Відкривайте сесію на сервері, коли запитують сторінку, передавайте URL одразу на сторінку й не пишіть його у власні журнали.
+</Aside>
+
+Щоб показати портал поза вашим продуктом, наприклад з інструмента підтримки, відкрийте `url` у новій вкладці: сесія без `allowedOrigin` працює і як окрема сторінка, і у фреймі.
+
+## Вигляд, як у вашому продукті
+
+Додайте ці параметри запиту в URL перед `#`:
+
+| Параметр | Значення |
+|---|---|
+| `primary` | Колір вашого бренду як hex-код із 3 або 6 цифр: `primary=1D4BFF`, або з `#`, закодованим як `%23`. |
+| `logo` | `https://`-адреса зображення, яке показується в шапці порталу. |
+| `theme` | `light` або `dark`. Без нього портал слідує системним налаштуванням глядача. |
+| `lang` | `en` або `uk`. Без нього портал слідує мові браузера глядача, а якщо це не `en` і не `uk` — англійській. |
+
+Значення, яке портал не може використати, ігнорується, і діє значення за замовчуванням.
+
+```text
+https://railhook.example.com/portal?origin=https://app.example.com&primary=1D4BFF&theme=dark&lang=uk#rhp_…
+```
+
+## Що може Consumer
+
+Consumer може:
+
+- бачити власні ендпоінти, створювати, редагувати й видаляти їх: URL, опис, увімкнення й типи подій, які отримує кожен;
+- побачити секрет підпису ендпоінта один раз — коли ендпоінт створено або секрет ротовано;
+- переглядати доставки на свої ендпоінти з фільтром за статусом;
+- бачити кожну спробу доставки з її запитом і відповіддю, замаскованими за [правилами PII](/docs/uk/platform/pii-masking/) проєкту;
+- повторити невдалу доставку — це повертає її на [драбину повторів](/docs/uk/outgoing/retries/).
+
+Consumer не може:
+
+- бачити чи змінювати ендпоінти й доставки іншого Consumer або власні ендпоінти проєкту;
+- задавати ліміт швидкості, список дозволених IP, mTLS чи схему підпису — це лишається вашими рішеннями;
+- звертатися до будь-чого поза `/api/v1/portal/`. Токен сесії більше нічого не автентифікує, а вхід у панель чи API-ключ на маршрутах порталу відхиляються.
+
+Коли ваш проєкт оголошує свої типи подій у [реєстрі схем](/docs/uk/outgoing/schema-registry/), портал пропонує саме їх і не приймає інших; шаблон на кшталт `order.*` приймається, якщо він збігається з оголошеним типом. Якщо жодного не оголошено, портал пропонує типи, які проєкт надсилав за останні 7 днів, і ті, на які вже підписані його ендпоінти.
+
+Ендпоінти, які створює Consumer, враховуються в ліміті ендпоінтів вашого плану для проєкту, як і будь-які інші.
+
+## Модель безпеки
+
+- **Токен.** 32 випадкові байти за префіксом `rhp_`, повертаються один раз і зберігаються лише як SHA-256-хеш, як і API-ключ.
+- **Тривалість.** Від 1 хвилини до 24 годин. Прострочена сесія отримує `401`, і портал показує, що сесія завершилася. Відкрийте нову.
+- **Відкликання.** `DELETE /api/v1/projects/{projectId}/consumers/{consumerId}/portal-sessions` одразу завершує всі відкриті сесії Consumer — саме це треба зробити, якщо токен міг витекти. Видалення Consumer теж завершує його сесії та видаляє його ендпоінти, щоб нічого не продовжувало доставлятися користувачеві, якого вже немає.
+- **Де можна вбудувати.** `allowedOrigin` — це `https://`-origin або `http://localhost` чи `http://127.0.0.1` з будь-яким портом на час розробки. Із ним сторінка порталу віддається з `Content-Security-Policy: frame-ancestors <цей origin>`, тож браузер відмовляється показувати її всередині будь-якої іншої сторінки, а портал відмовляється відображатися, коли origin у його URL не збігається з origin сесії. Без нього портал може вбудувати будь-яка `https://`-сторінка та `http://localhost`. Усі інші сторінки Railhook не дозволяють жодному іншому сайту вбудовувати себе у фрейм.
+- **Ліміт запитів.** Запити порталу обмежуються на сесію, тож скрипт, що крутиться на одному токені, витрачає власний бюджет, а не бюджет вашої панелі.
+
+Ендпоінти порталу перелічено в розділі **Portal**, а ті, що викликає ваш бекенд, — у розділі **Consumers** [довідника API](/docs/uk/api-reference/).
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Ендпоінти й підписки" href="/docs/uk/outgoing/endpoints-subscriptions/" description="Що реєструє Consumer і як збігаються типи подій." />
+  <LinkCard title="Повторні спроби та невдалі повідомлення" href="/docs/uk/outgoing/retries/" description="Драбина, якою знову йде повторена доставка." />
+  <LinkCard title="Довідник API" href="/docs/uk/api-reference/" description="Кожен запит і відповідь Consumers і Portal." />
+</CardGrid>

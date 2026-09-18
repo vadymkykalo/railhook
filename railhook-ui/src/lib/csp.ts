@@ -1,4 +1,4 @@
-import { captchaScriptUrl, captchaSiteKey } from './runtimeConfig';
+import { captchaScriptUrl, captchaSiteKey, webAnalyticsToken } from './runtimeConfig';
 
 /**
  * Injects the Content-Security-Policy meta tag.
@@ -9,6 +9,8 @@ import { captchaScriptUrl, captchaSiteKey } from './runtimeConfig';
  * Runtime (window.__RAILHOOK__, written by the UI container):
  *   captchaSiteKey         — presence of this turns the registration challenge on, which is
  *                            what widens script-src and frame-src below.
+ *   webAnalyticsToken      — presence of this loads Cloudflare's beacon (public/analytics.js),
+ *                            which widens script-src and connect-src to Cloudflare's two hosts.
  *
  * In development (localhost), connect-src automatically includes http://localhost:* and ws://localhost:*.
  * In production, only 'self' + VITE_API_URL origin are allowed.
@@ -70,12 +72,19 @@ export function initCSP() {
     frameSources.push(captchaOrigin);
   }
 
+  if (webAnalyticsToken()) {
+    scriptSources.push('https://static.cloudflareinsights.com');
+    connectSources.add('https://cloudflareinsights.com');
+  }
+
   const policy = [
     "default-src 'self'",
     `script-src ${scriptSources.join(' ')}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob:",
+    // The portal shows a logo from wherever the customer hosts it (portalParams.ts accepts
+    // https only). Nothing else loads a foreign image, so only that page is widened.
+    window.location.pathname === '/portal' ? "img-src 'self' data: blob: https:" : "img-src 'self' data: blob:",
     `connect-src ${[...connectSources].join(' ')}`,
     frameSources.length ? `frame-src ${frameSources.join(' ')}` : "frame-src 'none'",
     "object-src 'none'",

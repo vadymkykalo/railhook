@@ -136,6 +136,7 @@ class EntityMappingParityIntegrationTest {
         // --- Outgoing: Endpoint columns the delivery path does not consult.
         exempt("endpoints.description", "dashboard-only label; carries no delivery behaviour");
         exempt("endpoints.created_at", "informational; the worker neither reads nor writes it");
+        exempt("endpoints.consumer_id", "api-only: groups Endpoints for the customer portal; carries no delivery behaviour");
 
         // The four secret-rotation columns were exempt here with the note "IF DUAL-SIGNING
         // DURING A GRACE PERIOD IS EVER IMPLEMENTED, the worker is where it lands, and these

@@ -65,6 +65,10 @@ class NativeQueryTenantPredicateTest {
      * {@code TenantContext.runAsSystem}. Getting that wrong is a cross-tenant read.
      */
     private static final Set<String> SYSTEM_PATHS = new TreeSet<>(Set.of(
+            // The public webhook tester's tables belong to no organization and have no
+            // organization_id to predicate on; PublicBinService calls this only under
+            // @SystemTenant, keeping each anonymous URL to its latest hundred requests.
+            "PublicBinRequestRepository.trimToNewest",
             // SequenceReconciliationService is @SystemTenant and sweeps every organization by
             // design: it looks for ordered Deliveries whose post-commit sequence backfill never
             // happened because the ingest process died. Those rows belong to whichever tenant
