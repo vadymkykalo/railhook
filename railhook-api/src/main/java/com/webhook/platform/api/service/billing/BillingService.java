@@ -16,7 +16,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
+import java.time.ZoneOffset;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -167,6 +167,20 @@ public class BillingService {
 
     // ── Checkout (create payment page) ──────────────────────────────
 
+    /**
+     * Starts a paid checkout and returns the provider's payment page.
+     *
+     * <p>The subscription is created here, {@code PENDING}, before the customer pays: the
+     * organization and plan come from the request, and the row is stored under whatever the
+     * provider's payment callback will carry — WayForPay's signed orderReference, or for Stripe the
+     * customer its first invoice names. The first successful payment finds this row and activates
+     * it ({@link #processWebhook}). Nothing used to create one, so a paid checkout found no
+     * subscription, logged a warning, and left the organization on Free.
+     *
+     * <p>The organization row lock serialises two checkouts started together; a newer checkout
+     * expires the pending one, and a checkout is refused while a subscription is live — a second
+     * would be charged beside the first.
+     */
     @Transactional
     public String createCheckoutSession(String planName,
                                          String providerCode, String billingInterval,
@@ -181,28 +195,51 @@ public class BillingService {
             throw new ConflictException("Paid plans are not available on this deployment: no payment provider is configured.");
         }
         BillingInterval interval = parseBillingInterval(billingInterval);
+        long catalogPriceCents = interval == BillingInterval.YEARLY
+                ? plan.getPriceYearlyCents() : plan.getPriceMonthlyCents();
+        if (catalogPriceCents <= 0) {
+            throw new ConflictException("Plan '" + plan.getName() + "' is not sold through checkout.");
+        }
 
-        // For providers that support customers (Stripe), create one if needed
+        organizationRepository.lockById(organizationId);
+        if (subscriptionRepository.findActiveByOrganizationId(organizationId).isPresent()) {
+            throw new ConflictException("This organization already has a subscription. Cancel it before "
+                    + "starting a checkout for another plan.");
+        }
+
+        // A provider customer outlives its subscriptions, so an earlier one is reused.
         String externalCustomerId = null;
         if (provider.supports(BillingCapability.CUSTOMERS)) {
-            var existingSub = subscriptionRepository.findActiveByOrganizationId(organizationId);
-            externalCustomerId = existingSub.map(BillingSubscription::getExternalCustomerId).orElse(null);
+            externalCustomerId = subscriptionRepository
+                    .findFirstByOrganizationIdAndProviderCodeAndExternalCustomerIdIsNotNullOrderByCreatedAtDesc(
+                            organizationId, provider.getProviderCode())
+                    .map(BillingSubscription::getExternalCustomerId)
+                    .orElse(null);
             if (externalCustomerId == null) {
                 externalCustomerId = provider.createCustomer(organizationId, org.getName(), org.getBillingEmail());
             }
         }
 
-        long priceCents = interval == BillingInterval.YEARLY
-                ? plan.getPriceYearlyCents() : plan.getPriceMonthlyCents();
+        long priceCents = provider.checkoutPriceCents(plan.getName(), interval, catalogPriceCents);
+        String currency = provider.getDefaultCurrency();
 
         BillingProvider.CreatePaymentResult result = provider.createPaymentPage(
                 new BillingProvider.CreatePaymentRequest(
                         organizationId, externalCustomerId, planName,
-                        priceCents, provider.getDefaultCurrency(),
+                        priceCents, currency,
                         successUrl, cancelUrl,
                         Map.of("organizationId", organizationId.toString(),
                                "billingInterval", interval.name())
                 ));
+
+        // A managed provider (Stripe) creates its subscription when the session completes, and
+        // its callbacks name that and the customer, never the session. Any other provider's
+        // callbacks carry the reference its payment page was created under.
+        boolean managed = provider.supports(BillingCapability.MANAGED_SUBSCRIPTIONS);
+        lifecycleService.createPending(plan, provider.getProviderCode(), currency, interval, priceCents,
+                externalCustomerId,
+                managed ? null : result.externalSessionId(),
+                managed ? result.externalSessionId() : null);
 
         log.info("Checkout created: org={} plan={} provider={}", organizationId, planName, provider.getProviderCode());
         return result.redirectUrl();
@@ -296,7 +333,8 @@ public class BillingService {
             sub = subscriptionRepository.findByExternalSubscriptionId(event.externalSubscriptionId()).orElse(null);
         }
         if (sub == null && event.externalCustomerId() != null) {
-            sub = subscriptionRepository.findByExternalCustomerId(event.externalCustomerId()).orElse(null);
+            sub = subscriptionRepository.findFirstByExternalCustomerIdOrderByCreatedAtDesc(event.externalCustomerId())
+                    .orElse(null);
         }
 
         final BillingSubscription subscription = sub;
@@ -307,6 +345,14 @@ public class BillingService {
                     log.info("Billing webhook: payment {} already recorded as succeeded, ignoring replay",
                             event.externalPaymentId());
                 } else if (subscription != null) {
+                    // Stripe's subscription exists only once the checkout completes; its first
+                    // invoice finds the pending row by customer, and binds it here.
+                    if (subscription.getExternalSubscriptionId() == null && event.externalSubscriptionId() != null) {
+                        lifecycleService.setExternalIds(subscription.getId(),
+                                subscription.getExternalCustomerId() != null
+                                        ? subscription.getExternalCustomerId() : event.externalCustomerId(),
+                                event.externalSubscriptionId());
+                    }
                     BillingPayment payment = BillingPayment.builder()
                             .organizationId(subscription.getOrganizationId())
                             .subscriptionId(subscription.getId())
@@ -325,11 +371,23 @@ public class BillingService {
                                 event.cardLast4(), event.cardBrand());
                     }
 
-                    Instant periodStart = event.periodStart() != null ? event.periodStart() : Instant.now();
-                    Instant periodEnd = event.periodEnd() != null ? event.periodEnd() : Instant.now().plus(Duration.ofDays(30));
-                    if (subscription.getStatus() == SubscriptionStatus.ACTIVE) {
+                    if (isUnpaidCheckout(subscription)) {
+                        if (!activateCheckout(subscription, event)) {
+                            return;
+                        }
+                    } else if (subscription.getStatus() == SubscriptionStatus.ACTIVE) {
+                        // Without periods from the provider, the paid period follows on from the
+                        // current one rather than restarting today.
+                        Instant periodStart = event.periodStart() != null ? event.periodStart()
+                                : subscription.getCurrentPeriodEnd() != null ? subscription.getCurrentPeriodEnd()
+                                : Instant.now();
+                        Instant periodEnd = event.periodEnd() != null ? event.periodEnd()
+                                : periodAfter(periodStart, subscription.getBillingInterval());
                         lifecycleService.renew(subscription.getId(), periodStart, periodEnd);
                     } else {
+                        Instant periodStart = event.periodStart() != null ? event.periodStart() : Instant.now();
+                        Instant periodEnd = event.periodEnd() != null ? event.periodEnd()
+                                : periodAfter(periodStart, subscription.getBillingInterval());
                         lifecycleService.activate(subscription.getId(), periodStart, periodEnd);
                     }
 
@@ -359,16 +417,28 @@ public class BillingService {
                             .failureMessage(event.failureMessage())
                             .build();
                     paymentRepository.save(payment);
-                    lifecycleService.markPastDue(subscription.getId(),
-                            "Payment failed: " + event.failureCode());
+                    // A declined first payment leaves the checkout open for another attempt.
+                    // Nothing was ever paid, so there is nothing past due and no dunning to start.
+                    if (!isUnpaidCheckout(subscription)) {
+                        lifecycleService.markPastDue(subscription.getId(),
+                                "Payment failed: " + event.failureCode());
+                    }
                 }
             }
             case "customer.subscription.deleted" -> {
-                if (subscription != null) {
+                if (subscription != null && isUnpaidCheckout(subscription)) {
+                    lifecycleService.abandon(subscription.getId(), "Checkout dropped by provider");
+                } else if (subscription != null) {
                     lifecycleService.cancel(subscription.getId(), "Cancelled externally by provider");
                 }
             }
             case "customer.subscription.updated" -> {
+                if (subscription != null && isUnpaidCheckout(subscription)) {
+                    // Only a payment activates a checkout; the update that precedes it does not.
+                    log.debug("Billing webhook: subscription update for unpaid checkout {}, ignoring",
+                            subscription.getId());
+                    return;
+                }
                 if (subscription != null && event.planName() != null) {
                     planRepository.findByName(event.planName()).ifPresent(plan ->
                             lifecycleService.changePlan(subscription.getId(), plan));
@@ -379,7 +449,8 @@ public class BillingService {
             }
             case "payment.refunded" -> {
                 if (event.externalPaymentId() != null) {
-                    paymentRepository.findByExternalPaymentId(event.externalPaymentId()).ifPresent(payment -> {
+                    paymentRepository.findFirstByProviderCodeAndExternalPaymentIdAndStatusInOrderByCreatedAtDesc(
+                            provider.getProviderCode(), event.externalPaymentId(), SETTLED_BY_SUCCESS).ifPresent(payment -> {
                         // A refund for less than the charge is a partial one. This used to record
                         // the smaller figure in refundedCents and still stamp the row REFUNDED, so
                         // the status said the customer's money was back and the amount said it was
@@ -395,6 +466,56 @@ public class BillingService {
             }
             default -> log.debug("Unhandled billing webhook event: {}", event.eventType());
         }
+    }
+
+    /**
+     * A checkout that has not been paid: {@code PENDING}, or expired by a newer checkout before
+     * the customer paid this one (it was never activated, so it has no period).
+     */
+    private static boolean isUnpaidCheckout(BillingSubscription subscription) {
+        return subscription.getStatus() == SubscriptionStatus.PENDING
+                || (subscription.getStatus() == SubscriptionStatus.EXPIRED && subscription.getCurrentPeriodStart() == null);
+    }
+
+    /**
+     * The first payment for a checkout: the organization moves to the plan it paid for.
+     *
+     * <p>A customer can open a second checkout and then pay on the first page anyway. That payment
+     * is real, so the checkout it paid for is the one activated and any other open checkout is
+     * expired. If the organization already has a live subscription it has paid twice: the payment
+     * is recorded (the caller already saved it) for a refund, and no second subscription goes live.
+     *
+     * @return whether the checkout was activated
+     */
+    private boolean activateCheckout(BillingSubscription checkout, BillingProvider.BillingWebhookEvent event) {
+        UUID organizationId = checkout.getOrganizationId();
+        organizationRepository.lockById(organizationId);
+        var live = subscriptionRepository.findActiveByOrganizationId(organizationId)
+                .filter(other -> !other.getId().equals(checkout.getId()));
+        if (live.isPresent()) {
+            log.error("Billing webhook: payment {} for checkout {} arrived while subscription {} is live for "
+                            + "org {} — the organization has paid twice; refund the payment in the provider",
+                    event.externalPaymentId(), checkout.getId(), live.get().getId(), organizationId);
+            return false;
+        }
+        for (BillingSubscription other : subscriptionRepository.findByOrganizationIdAndStatus(
+                organizationId, SubscriptionStatus.PENDING)) {
+            if (!other.getId().equals(checkout.getId())) {
+                lifecycleService.abandon(other.getId(), "An earlier checkout was paid");
+            }
+        }
+        Instant periodStart = event.periodStart() != null ? event.periodStart() : Instant.now();
+        Instant periodEnd = event.periodEnd() != null ? event.periodEnd()
+                : periodAfter(periodStart, checkout.getBillingInterval());
+        lifecycleService.activate(checkout.getId(), periodStart, periodEnd);
+        log.info("Checkout paid: sub={} org={} plan={}", checkout.getId(), organizationId,
+                checkout.getPlan() != null ? checkout.getPlan().getName() : null);
+        return true;
+    }
+
+    private static Instant periodAfter(Instant start, BillingInterval interval) {
+        BillingInterval effective = interval != null ? interval : BillingInterval.MONTHLY;
+        return start.atZone(ZoneOffset.UTC).plus(effective.getPeriod()).toInstant();
     }
 
     /**

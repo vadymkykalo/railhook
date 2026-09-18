@@ -2,6 +2,8 @@ package com.webhook.platform.api.domain.entity;
 
 import com.webhook.platform.api.domain.enums.InvoiceStatus;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.TenantId;
@@ -81,10 +83,12 @@ public class BillingInvoice {
     @Column(name = "pdf_url", length = 2048)
     private String pdfUrl;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "line_items", columnDefinition = "jsonb")
     @Builder.Default
     private String lineItems = "[]";
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     @Builder.Default
     private String metadata = "{}";

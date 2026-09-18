@@ -10,15 +10,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,7 +58,7 @@ class SubscriptionLifecycleServiceTest {
         org = Organization.builder().id(ORG_ID).name("Test Org").build();
     }
 
-    // ── createSubscription ──────────────────────────────────────────
+    // ── createPending ───────────────────────────────────────────────
 
 
     /**
@@ -74,51 +77,95 @@ class SubscriptionLifecycleServiceTest {
     }
 
     @Test
-    void createSubscription_savesWithActiveStatus() {
-        Instant start = Instant.now();
-        Instant end = start.plusSeconds(86400 * 30);
-
-        when(subscriptionRepository.save(any(BillingSubscription.class)))
+    void createPending_opensACheckoutWithoutTouchingThePlan() {
+        when(subscriptionRepository.findByOrganizationIdAndStatus(ORG_ID, SubscriptionStatus.PENDING))
+                .thenReturn(List.of());
+        when(subscriptionRepository.saveAndFlush(any(BillingSubscription.class)))
                 .thenAnswer(inv -> {
                     BillingSubscription s = inv.getArgument(0);
                     s.setId(SUB_ID);
                     return s;
                 });
-        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
 
-        BillingSubscription result = service.createSubscription( starterPlan, "stripe", "USD", BillingInterval.MONTHLY, start, end);
+        BillingSubscription result = service.createPending(starterPlan, "wayforpay", "UAH",
+                BillingInterval.MONTHLY, 29900L, null, "railhook_" + ORG_ID + "_1", null);
 
-        assertThat(result.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(result.getStatus()).isEqualTo(SubscriptionStatus.PENDING);
         assertThat(result.getOrganizationId()).isEqualTo(ORG_ID);
         assertThat(result.getPlan()).isEqualTo(starterPlan);
-        assertThat(result.getProviderCode()).isEqualTo("stripe");
-        assertThat(result.getCurrency()).isEqualTo("USD");
+        assertThat(result.getProviderCode()).isEqualTo("wayforpay");
+        assertThat(result.getCurrency()).isEqualTo("UAH");
+        assertThat(result.getPriceCents()).isEqualTo(29900L);
+        assertThat(result.getExternalSubscriptionId()).isEqualTo("railhook_" + ORG_ID + "_1");
+        assertThat(result.getCurrentPeriodStart()).isNull();
 
-        // Event logged
         ArgumentCaptor<BillingSubscriptionEvent> eventCap = ArgumentCaptor.forClass(BillingSubscriptionEvent.class);
         verify(eventRepository).save(eventCap.capture());
         assertThat(eventCap.getValue().getEventType()).isEqualTo(SubscriptionEventType.CREATED);
-        assertThat(eventCap.getValue().getToStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(eventCap.getValue().getToStatus()).isEqualTo(SubscriptionStatus.PENDING);
 
-        // Org plan synced
-        verify(organizationRepository).save(org);
-        assertThat(org.getPlan()).isEqualTo(starterPlan);
-        verify(entitlementService).evictPlanCache(any());
+        // Nothing is paid yet: the organization keeps its plan until the first payment.
+        verify(organizationRepository, never()).save(any());
+        verify(entitlementService, never()).evictPlanCache(any());
     }
 
     @Test
-    void createSubscription_defaultsCurrencyAndInterval() {
-        when(subscriptionRepository.save(any())).thenAnswer(inv -> {
-            BillingSubscription s = inv.getArgument(0);
-            s.setId(SUB_ID);
-            return s;
-        });
-        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
+    void createPending_expiresTheCheckoutItReplaces() {
+        BillingSubscription earlier = buildSub(SubscriptionStatus.PENDING);
+        earlier.setCurrentPeriodStart(null);
+        earlier.setCurrentPeriodEnd(null);
+        when(subscriptionRepository.findByOrganizationIdAndStatus(ORG_ID, SubscriptionStatus.PENDING))
+                .thenReturn(List.of(earlier));
+        when(subscriptionRepository.saveAndFlush(any(BillingSubscription.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        BillingSubscription result = service.createSubscription( starterPlan, "wayforpay", null, null, Instant.now(), Instant.now());
+        service.createPending(proPlan, "stripe", "USD", BillingInterval.MONTHLY, 9900L, "cus_1", null, "cs_1");
 
-        assertThat(result.getCurrency()).isEqualTo("USD");
-        assertThat(result.getBillingInterval()).isEqualTo(BillingInterval.MONTHLY);
+        assertThat(earlier.getStatus()).isEqualTo(SubscriptionStatus.EXPIRED);
+        // Flushed before the new row is inserted: Hibernate would otherwise insert first, and
+        // the one-open-subscription-per-organization index would reject the insert.
+        InOrder order = inOrder(subscriptionRepository);
+        order.verify(subscriptionRepository).saveAndFlush(earlier);
+        order.verify(subscriptionRepository).saveAndFlush(argThat(s -> s.getStatus() == SubscriptionStatus.PENDING));
+    }
+
+    @Test
+    void createPending_recordsAManagedProvidersCheckoutSession() {
+        when(subscriptionRepository.findByOrganizationIdAndStatus(ORG_ID, SubscriptionStatus.PENDING))
+                .thenReturn(List.of());
+        when(subscriptionRepository.saveAndFlush(any(BillingSubscription.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BillingSubscription result = service.createPending(proPlan, "stripe", "USD",
+                BillingInterval.YEARLY, 99000L, "cus_1", null, "cs_test_1");
+
+        assertThat(result.getExternalCustomerId()).isEqualTo("cus_1");
+        assertThat(result.getExternalSubscriptionId()).isNull();
+        assertThat(result.getMetadata()).contains("\"checkoutSessionId\":\"cs_test_1\"");
+        assertThat(result.getBillingInterval()).isEqualTo(BillingInterval.YEARLY);
+    }
+
+    // ── abandon ─────────────────────────────────────────────────────
+
+    @Test
+    void abandon_expiresAPendingCheckoutAndLeavesThePlanAlone() {
+        BillingSubscription sub = buildSub(SubscriptionStatus.PENDING);
+        when(subscriptionRepository.findById(SUB_ID)).thenReturn(Optional.of(sub));
+
+        service.abandon(SUB_ID, "Checkout dropped by provider");
+
+        assertThat(sub.getStatus()).isEqualTo(SubscriptionStatus.EXPIRED);
+        verify(subscriptionRepository).saveAndFlush(sub);
+        verify(organizationRepository, never()).save(any());
+    }
+
+    @Test
+    void abandon_leavesAPaidSubscriptionAlone() {
+        BillingSubscription sub = buildSub(SubscriptionStatus.ACTIVE);
+        when(subscriptionRepository.findById(SUB_ID)).thenReturn(Optional.of(sub));
+
+        service.abandon(SUB_ID, "late");
+
+        assertThat(sub.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+        verify(subscriptionRepository, never()).saveAndFlush(any());
     }
 
     // ── activate ────────────────────────────────────────────────────

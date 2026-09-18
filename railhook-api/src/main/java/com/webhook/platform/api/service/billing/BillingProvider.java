@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service.billing;
 
+import com.webhook.platform.api.domain.entity.BillingInterval;
+
 import java.time.Instant;
 import java.util.*;
 
@@ -32,6 +34,17 @@ public interface BillingProvider {
     }
 
     // ── Core: payment page (every paid provider has this) ───────────
+
+    /**
+     * What a checkout for this plan charges, in the provider's {@link #getDefaultCurrency() currency}'s
+     * minor unit. The catalog price is the default; a provider that prices plans in its own table
+     * (WayForPay prices in UAH, the catalog in USD) answers from that table, and throws
+     * {@link IllegalArgumentException} for a plan or interval it has no price for. The amount is
+     * stored on the subscription, and renewals charge the same amount.
+     */
+    default long checkoutPriceCents(String planName, BillingInterval interval, long catalogPriceCents) {
+        return catalogPriceCents;
+    }
 
     /** Create a hosted payment / checkout page. Returns URL to redirect user. */
     default CreatePaymentResult createPaymentPage(CreatePaymentRequest request) {

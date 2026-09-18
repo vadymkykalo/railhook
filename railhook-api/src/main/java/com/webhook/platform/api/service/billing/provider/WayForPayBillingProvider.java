@@ -1,22 +1,26 @@
 package com.webhook.platform.api.service.billing.provider;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webhook.platform.api.domain.entity.BillingInterval;
 import com.webhook.platform.api.service.billing.BillingCapability;
 import com.webhook.platform.api.service.billing.BillingProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -87,55 +91,98 @@ public class WayForPayBillingProvider implements BillingProvider {
     @Override
     public String getDefaultCurrency() { return "UAH"; }
 
-    // ── Payment page (Purchase redirect) ────────────────────────────
+    // ── Pricing ─────────────────────────────────────────────────────
 
+    /**
+     * WayForPay charges in UAH from its own price table ({@code WAYFORPAY_PLAN_PRICES}), which
+     * holds one monthly price per plan. There is no yearly price to charge, and charging the
+     * monthly one for a year would undercharge twelvefold, so a yearly checkout is refused.
+     */
+    @Override
+    public long checkoutPriceCents(String planName, BillingInterval interval, long catalogPriceCents) {
+        if (interval != BillingInterval.MONTHLY) {
+            throw new IllegalArgumentException("WayForPay billing is monthly only; choose monthly billing");
+        }
+        Long priceCents = planPrices.get(planName);
+        if (priceCents == null) {
+            throw new IllegalArgumentException("No WayForPay price configured for plan: " + planName);
+        }
+        return priceCents;
+    }
+
+    // ── Payment page (Purchase, offline behaviour) ──────────────────
+
+    /**
+     * Asks WayForPay for a payment link and returns it, with the order reference the callbacks
+     * will carry.
+     *
+     * <p>A Purchase is a form the browser POSTs to WayForPay; {@code behavior=offline} makes the
+     * same request answer {@code {"url": ...}} instead, which is what lets a JSON API hand the
+     * browser a redirect. This used to build the whole form and then return the bare endpoint,
+     * so the customer arrived at WayForPay with no order.
+     *
+     * <p>No {@code regularMode}: that asks WayForPay to run its own monthly schedule on top of the
+     * renewals {@code BillingSchedulerService} already charges against the card token — a second
+     * charge every month that no cancellation in Railhook reaches.
+     */
     @Override
     public CreatePaymentResult createPaymentPage(CreatePaymentRequest request) {
-        Long priceCents = planPrices.get(request.planName());
-        if (priceCents == null) {
-            throw new IllegalArgumentException("No WayForPay price configured for plan: " + request.planName());
-        }
-
         String orderRef = "railhook_" + request.organizationId() + "_" + System.currentTimeMillis();
         long orderDate = Instant.now().getEpochSecond();
-        String amount = String.valueOf(priceCents / 100.0);
+        String amount = formatAmount(request.amountCents());
         String currency = request.currency() != null ? request.currency() : "UAH";
         String productName = "Railhook " + request.planName() + " plan";
 
         String signString = String.join(";",
                 merchantAccount, merchantDomain, orderRef, String.valueOf(orderDate),
                 amount, currency, productName, "1", amount);
-        String signature = hmacMd5(signString);
 
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put("merchantAccount", merchantAccount);
-        params.put("merchantAuthType", "SimpleSignature");
-        params.put("merchantDomainName", merchantDomain);
-        params.put("merchantSignature", signature);
-        params.put("merchantTransactionSecureType", "AUTO");
-        params.put("merchantTransactionType", "SALE");
-        params.put("orderReference", orderRef);
-        params.put("orderDate", orderDate);
-        params.put("amount", amount);
-        params.put("currency", currency);
-        params.put("productName", new String[]{productName});
-        params.put("productPrice", new String[]{amount});
-        params.put("productCount", new String[]{"1"});
-        params.put("returnUrl", request.successUrl());
-        params.put("serviceUrl", serviceUrl);
-        params.put("regularMode", "monthly");
-        params.put("regularAmount", amount);
-        params.put("regularOn", "1");
-        params.put("clientAccountId", request.organizationId().toString());
-
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("merchantAccount", merchantAccount);
+        form.add("merchantAuthType", "SimpleSignature");
+        form.add("merchantDomainName", merchantDomain);
+        form.add("merchantSignature", hmacMd5(signString));
+        form.add("merchantTransactionSecureType", "AUTO");
+        form.add("merchantTransactionType", "SALE");
+        form.add("orderReference", orderRef);
+        form.add("orderDate", String.valueOf(orderDate));
+        form.add("amount", amount);
+        form.add("currency", currency);
+        form.add("productName[]", productName);
+        form.add("productPrice[]", amount);
+        form.add("productCount[]", "1");
+        form.add("returnUrl", request.successUrl());
+        form.add("serviceUrl", serviceUrl);
+        form.add("clientAccountId", request.organizationId().toString());
         if (request.metadata() != null && request.metadata().containsKey("email")) {
-            params.put("clientEmail", request.metadata().get("email"));
+            form.add("clientEmail", request.metadata().get("email"));
+        }
+
+        String responseBody = webClient.post()
+                .uri(PAYMENT_URL + "?behavior=offline")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .accept(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromFormData(form))
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+        JsonNode resp;
+        try {
+            resp = objectMapper.readTree(responseBody == null ? "{}" : responseBody);
+        } catch (Exception e) {
+            throw new IllegalStateException("WayForPay returned an unreadable payment-link response", e);
+        }
+        String url = resp.path("url").asText("");
+        if (url.isBlank()) {
+            throw new IllegalStateException("WayForPay did not return a payment link: "
+                    + resp.path("reason").asText("no reason given")
+                    + " (" + resp.path("reasonCode").asText("") + ")");
         }
 
         log.info("WayForPay: created payment page for plan {} org {} orderRef={}",
                 request.planName(), request.organizationId(), orderRef);
-
-        return new CreatePaymentResult(PAYMENT_URL + "?behavior=offline", orderRef);
+        return new CreatePaymentResult(url, orderRef);
     }
 
     // ── Merchant-initiated recurring charge ──────────────────────────
@@ -146,7 +193,7 @@ public class WayForPayBillingProvider implements BillingProvider {
                 ? request.orderReference()
                 : "railhook_rec_" + request.organizationId() + "_" + System.currentTimeMillis();
         long orderDate = Instant.now().getEpochSecond();
-        String amount = String.valueOf(request.amountCents() / 100.0);
+        String amount = formatAmount(request.amountCents());
         String currency = request.currency() != null ? request.currency() : "UAH";
 
         String signString = String.join(";",
@@ -216,18 +263,22 @@ public class WayForPayBillingProvider implements BillingProvider {
             String cardPan = body.path("cardPan").asText("");
             String cardType = body.path("cardType").asText("");
             String recToken = body.path("recToken").asText(null);
-            long amountRaw = body.path("amount").asLong(0);
+            String amountAsSent = topLevelAmountText(rawPayload);
             String currency = body.path("currency").asText("UAH");
             String authCode = body.path("authCode").asText("");
 
-            // Verify HMAC_MD5 signature
-            String signString = String.join(";",
-                    merchantAccount, orderRef, String.valueOf(amountRaw), currency,
-                    authCode, cardPan, status, reasonCode);
-            String expectedSig = hmacMd5(signString);
-
-            if (!MessageDigest.isEqual(expectedSig.getBytes(StandardCharsets.UTF_8),
-                    merchantSig.getBytes(StandardCharsets.UTF_8))) {
+            // The signature covers the amount as WayForPay wrote it. It used to be read with
+            // asLong, which signed "299" for a callback saying 299.5 — every price with kopecks
+            // failed verification and was dropped. The literal is taken off the wire, and its
+            // trailing-zero-free form is accepted too, since "299.00" and "299" are one amount.
+            boolean signed = false;
+            for (String amount : amountForms(amountAsSent)) {
+                String expectedSig = hmacMd5(String.join(";",
+                        merchantAccount, orderRef, amount, currency, authCode, cardPan, status, reasonCode));
+                signed |= MessageDigest.isEqual(expectedSig.getBytes(StandardCharsets.UTF_8),
+                        merchantSig.getBytes(StandardCharsets.UTF_8));
+            }
+            if (!signed) {
                 log.warn("WayForPay: invalid webhook signature for orderRef={}", orderRef);
                 return null;
             }
@@ -243,14 +294,18 @@ public class WayForPayBillingProvider implements BillingProvider {
             }
 
             String eventType = mapTransactionStatus(status);
-            long amountCents = (long) (amountRaw * 100);
+            long amountCents = amountAsSent.isEmpty() ? 0
+                    : new BigDecimal(amountAsSent).movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValueExact();
 
             log.info("WayForPay: webhook orderRef={} status={} eventType={}", orderRef, status, eventType);
 
+            // A checkout's orderReference is the reference its pending subscription was stored
+            // under — WayForPay has no subscription object, and the first order anchors the series.
+            // Renewal references are not: the scheduler settles those synchronously.
             return new BillingWebhookEvent(
                     eventType,
                     organizationId,
-                    null,
+                    organizationId != null ? orderRef : null,
                     orderRef,
                     null,
                     amountCents,
@@ -270,6 +325,40 @@ public class WayForPayBillingProvider implements BillingProvider {
     }
 
     // ── Internal helpers ────────────────────────────────────────────
+
+    /** Minor units as WayForPay writes an amount: {@code 29900 → "299"}, {@code 29950 → "299.5"}. */
+    static String formatAmount(long cents) {
+        return BigDecimal.valueOf(cents, 2).stripTrailingZeros().toPlainString();
+    }
+
+    /** The top-level {@code amount} exactly as it appears in the payload, or "" when absent. */
+    private String topLevelAmountText(String rawPayload) throws java.io.IOException {
+        try (JsonParser parser = objectMapper.getFactory().createParser(rawPayload)) {
+            if (parser.nextToken() != JsonToken.START_OBJECT) {
+                return "";
+            }
+            while (parser.nextToken() == JsonToken.FIELD_NAME) {
+                String name = parser.currentName();
+                JsonToken value = parser.nextToken();
+                if ("amount".equals(name) && value.isScalarValue() && value != JsonToken.VALUE_NULL) {
+                    return parser.getText().trim();
+                }
+                parser.skipChildren();
+            }
+            return "";
+        }
+    }
+
+    private static Set<String> amountForms(String amountAsSent) {
+        Set<String> forms = new LinkedHashSet<>();
+        forms.add(amountAsSent);
+        try {
+            forms.add(new BigDecimal(amountAsSent).stripTrailingZeros().toPlainString());
+        } catch (NumberFormatException ignored) {
+            // Not a number: only the literal can match, and a signature over it will not.
+        }
+        return forms;
+    }
 
     /**
      * The organization a checkout or fallback recurring reference was issued for, or null when the

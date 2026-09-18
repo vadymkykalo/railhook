@@ -218,6 +218,38 @@ class BillingSchedulerServiceTest {
         assertThat(invCap.getAllValues().get(0).getTotalCents()).isEqualTo(29000L);
     }
 
+    @Test
+    void processRenewals_chargesWhatTheCheckoutCharged() {
+        BillingSubscription sub = buildSub(SubscriptionStatus.ACTIVE, "wayforpay");
+        sub.setRecurringTokenEncrypted("enc_token");
+        sub.setCurrency("UAH");
+        sub.setPriceCents(119900L);
+        sub.setCurrentPeriodEnd(Instant.now().minus(1, ChronoUnit.HOURS));
+        List<BillingProvider.RecurringChargeRequest> charged = new java.util.ArrayList<>();
+        BillingProvider recording = new BillingProvider() {
+            @Override public String getProviderCode() { return "wayforpay"; }
+            @Override public String getDisplayName() { return "WayForPay"; }
+            @Override public Set<BillingCapability> capabilities() { return EnumSet.of(BillingCapability.MERCHANT_RECURRING); }
+            @Override public BillingWebhookEvent parseWebhook(String raw, Map<String, String> h) { return null; }
+            @Override public ChargeResult chargeRecurring(RecurringChargeRequest req) {
+                charged.add(req);
+                return new ChargeResult(true, "ext_pay_1", "4242", "visa", null, null);
+            }
+        };
+        when(providerRegistry.all()).thenReturn(List.of(recording));
+        when(subscriptionRepository.findDueForRenewal(any(), eq("wayforpay"))).thenReturn(List.of(sub));
+        when(invoiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.processRenewals();
+
+        // The catalog price is USD cents; charging it in the subscription's UAH renewed a
+        // 1199 UAH plan at 29 UAH.
+        assertThat(charged).singleElement().satisfies(req -> {
+            assertThat(req.amountCents()).isEqualTo(119900L);
+            assertThat(req.currency()).isEqualTo("UAH");
+        });
+    }
+
     // ── processGracePeriodExpiry ─────────────────────────────────────
 
     @Test
