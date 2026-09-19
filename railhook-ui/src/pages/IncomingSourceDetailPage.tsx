@@ -15,6 +15,8 @@ import AttemptRail from '../components/AttemptRail';
 import RetryJitterNote from '../components/RetryJitterNote';
 import { ladderTicks } from './ConnectionSetupPage';
 import { PROVIDER_SIGNATURE_HEADERS } from '../lib/publicSnippets';
+import { ingressCurlSnippet } from '../lib/integrationSnippets';
+import IntegrationSnippet from '../components/IntegrationSnippet';
 import type {
   IncomingDestinationResponse, IncomingDestinationRequest, IncomingAuthType, IncomingSourceResponse, ProviderType,
 } from '../types/api.types';
@@ -69,13 +71,6 @@ function signatureHeaderOf(source: IncomingSourceResponse): string | undefined {
     if (header) return header;
   }
   return source.hmacHeaderName || 'X-Signature';
-}
-
-function ingressCurl(source: IncomingSourceResponse, header: string | undefined): string {
-  const lines = [`curl -X POST ${source.ingressUrl} \\`, '  -H "Content-Type: application/json" \\'];
-  if (header) lines.push(`  -H "${header}: ${source.hmacSignaturePrefix ?? ''}<hmac-sha256-hex-of-body>" \\`);
-  lines.push(`  -d '{"event": "test", "data": {}}'`);
-  return lines.join('\n');
 }
 
 // `key` maps to incomingDestinations.retryPresets.<key>.{label,desc}.
@@ -340,15 +335,14 @@ export default function IncomingSourceDetailPage() {
                 </p>
               ) : (
                 <>
-                  <div className="mono-label mb-1.5">{t('incomingSources.howToSend.curlExample')}</div>
-                  <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-rail bg-secondary/40 p-3 font-mono text-[11px] text-muted-foreground">
-                    {ingressCurl(source, signatureHeaderOf(source))}
-                  </pre>
-                  {signatureHeaderOf(source) && (
-                    <p className="mt-1.5 text-[11px] text-muted-foreground">
-                      {t('incomingSources.howToSend.signedCurl', { header: signatureHeaderOf(source) })}
-                    </p>
-                  )}
+                  <IntegrationSnippet
+                    title={t('incomingSources.howToSend.curlExample')}
+                    samples={ingressCurlSnippet(source.ingressUrl, signatureHeaderOf(source), source.hmacSignaturePrefix)}
+                    footer={signatureHeaderOf(source)
+                      ? t('incomingSources.howToSend.signedCurl', { header: signatureHeaderOf(source) })
+                      : undefined}
+                    docsLink="incoming/sources"
+                  />
                 </>
               )}
             </div>

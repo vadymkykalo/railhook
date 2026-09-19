@@ -288,6 +288,11 @@
       "revokeFailed": "Failed to revoke API key",
       "revoked": "API key revoked successfully",
       "rotateFailed": "Could not rotate the key. Please try again."
+    },
+    "snippet": {
+      "title": "Send your first event",
+      "footer": "Set RAILHOOK_API_KEY to the key above. Keep it out of your source code.",
+      "footerGeneric": "Set RAILHOOK_API_KEY to a key from this page. Keep it out of your source code."
     }
   },
   "auditLog": {
@@ -1427,7 +1432,11 @@
     "verificationRetry": "Verification failed — retry?",
     "verified": "Verified",
     "verify": "Verify",
-    "verifyEndpoint": "Verify endpoint"
+    "verifyEndpoint": "Verify endpoint",
+    "snippet": {
+      "title": "Verify the signature on your receiver",
+      "footer": "WEBHOOK_SECRET is the endpoint’s signing secret, shown once when it is created or rotated."
+    }
   },
   "errorBoundary": {
     "description": "An unexpected error occurred. Reloading usually fixes it — if it keeps happening, share the details below with your team.",
@@ -1631,7 +1640,11 @@
       "noSubscriptionMatch": "Event sent, but no active subscriptions match '{{eventType}}'. No deliveries were created.",
       "zeroDeliveries": "Event sent, but 0 deliveries were created. Check your subscriptions."
     },
-    "viewDeliveries": "View deliveries for this event"
+    "viewDeliveries": "View deliveries for this event",
+    "snippet": {
+      "title": "Send an event from your backend",
+      "footer": "Every endpoint subscribed to the type gets a delivery."
+    }
   },
   "footer": {
     "apiReference": "API reference",
@@ -1980,7 +1993,7 @@
     "hmacNotConfigured": "No HMAC",
     "howToSend": {
       "copy": "Copy URL",
-      "curlExample": "Example cURL request:",
+      "curlExample": "Example cURL request",
       "description": "Configure your provider to send webhooks to the ingress URL below:",
       "signedByProvider": "{{provider}} signs every webhook in the {{header}} header. Send a test event from {{provider}}'s dashboard: an unsigned request, such as a plain cURL, is rejected with 401.",
       "signedCurl": "Replace the placeholder with the HMAC-SHA256 of the exact body, signed with this source's secret. Without a valid {{header}} the request is rejected with 401.",
@@ -3871,6 +3884,9 @@
       "closeFailed": "Failed to close tunnel",
       "closed": "Tunnel closed",
       "loadFailed": "Failed to load tunnels"
+    },
+    "snippet": {
+      "title": "Install the CLI and open a tunnel"
     }
   },
   "usage": {
@@ -4299,10 +4315,10 @@
     "endpointCount_few": "{{count}} endpoints",
     "endpointCount_many": "{{count}} endpoints",
     "endpointCount_other": "{{count}} endpoints",
-    "openPortal": "Open portal",
+    "openPortal": "Preview portal",
     "empty": {
       "title": "No consumers yet",
-      "description": "Create one for each of your users who receives webhooks, then embed their portal in your product so they can manage their own endpoints. The “Open portal” button appears on the Consumer's row."
+      "description": "The portal lets each of your users manage their own webhook endpoints inside your product. Create a consumer for each user who receives webhooks — by hand here to try it, or from your backend with the code below."
     },
     "toast": {
       "created": "Consumer created",
@@ -4341,7 +4357,15 @@
       "generate": "Create session",
       "snippet": "iframe",
       "expires": "This link expires {{date}}.",
-      "docs": "How to open sessions from your backend"
+      "docs": "How to open sessions from your backend",
+      "backendTitle": "The same session from your backend"
+    },
+    "integrate": {
+      "heading": "Integrate the portal",
+      "backendTitle": "Your backend: create a consumer and open its portal",
+      "pageTitle": "Your page: embed the portal",
+      "backendFooter": "Needs a read-write API key. Replace user_123 with your own id for the user.",
+      "pageFooter": "Open a new session every time the page loads: it expires after an hour by default."
     }
   },
   "portal": {
@@ -5274,6 +5298,11 @@
     "ended": "The demo session has ended. You can open a new one any time.",
     "readOnlyTooltip": "Read-only demo — create a free account to do this",
     "readOnlyError": "This is a read-only demo. Create a free account to make changes."
+  },
+  "snippet": {
+    "copied": "Copied",
+    "languages": "Language",
+    "docs": "Full guide in the docs"
   },
   "guides": {
     "title": "How it works",
