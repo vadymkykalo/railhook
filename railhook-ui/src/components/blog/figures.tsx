@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { CHROME, SERIES } from '../charts/chartTheme';
 import { cn } from '../../lib/utils';
+import { WEBHOOKS_GUIDE_FIGURES } from './figures/webhooks-guide';
 
 /**
  * The drawings a post can place with `:::figure <key>`.
@@ -18,11 +19,11 @@ import { cn } from '../../lib/utils';
  * To add one: write the component, register it in `FIGURES`, and name the key in a post.
  */
 
-const AXIS = { stroke: CHROME.rail, strokeWidth: 1 };
-const LABEL = 'text-[11px]';
-const MONO = 'font-mono text-[10px]';
+export const AXIS = { stroke: CHROME.rail, strokeWidth: 1 };
+export const LABEL = 'text-[11px]';
+export const MONO = 'font-mono text-[10px]';
 
-function Figure({
+export function Figure({
   label,
   caption,
   viewBox,
@@ -313,4 +314,5 @@ export const FIGURES: Record<string, () => JSX.Element> = {
   'provider-retries': ProviderRetries,
   'retry-ladder': RetryLadder,
   gateway: GatewayPipeline,
+  ...WEBHOOKS_GUIDE_FIGURES,
 };

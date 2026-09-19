@@ -4762,6 +4762,153 @@
       "tester": "Try the webhook tester"
     },
     "figures": {
+      "pollingVsPush": {
+        "aria": "Two timelines. Polling sends a request every interval; the ones before the order is created come back empty, and the order is noticed only at the next poll after it happens — seven requests, one useful. A webhook sends one request at the moment the order is created.",
+        "caption": "Polling pays for every empty answer and still hears about the order up to one interval late. A webhook costs one request and arrives when the event happens.",
+        "event": "order created",
+        "time": "time →",
+        "polling": {
+          "title": "Polling",
+          "body": "you ask every interval",
+          "empty": "nothing new",
+          "found": "found it",
+          "lag": "up to one interval late",
+          "tally": "7 requests, 1 useful"
+        },
+        "push": {
+          "title": "Webhook",
+          "body": "they tell you once",
+          "request": "POST, as it happens",
+          "tally": "1 request, 1 useful"
+        }
+      },
+      "webhookAnatomy": {
+        "aria": "An annotated webhook request. The request line says where it goes: a URL the receiver registered. The webhook-id header is its identity, the same on every retry and the key to deduplicate on. The webhook-timestamp header is its freshness: reject it when it is older than about five minutes. The webhook-signature header is the proof: an HMAC-SHA256 of the id, the timestamp and the body. The JSON body says what happened: the event type and its data.",
+        "caption": "Three headers carry everything a receiver needs to trust the request: which event it is, when it was sent, and proof that nobody changed it on the way.",
+        "target": {
+          "title": "Where",
+          "body": "a URL the receiver registered for this event"
+        },
+        "id": {
+          "title": "Identity",
+          "body": "the same on every retry: your deduplication key"
+        },
+        "timestamp": {
+          "title": "Freshness",
+          "body": "older than ~5 minutes? reject: the replay window"
+        },
+        "signature": {
+          "title": "Proof",
+          "body": "HMAC-SHA256 of id.timestamp.body, in base64"
+        },
+        "body": {
+          "title": "What happened",
+          "body": "the event type, and its data"
+        }
+      },
+      "receiverAck": {
+        "aria": "Three lanes against the sender's timeout. The handler verifies the signature, records the event id and enqueues the event, then answers 200 OK well inside the timeout. A worker picks the event up from the queue and does the slow work — email, stock, other APIs — with nobody waiting. Doing the same work inside the handler runs past the timeout, so the sender counts a failure and retries.",
+        "caption": "Acknowledge inside the budget, work outside it. The handler's only job is to make the event safe; the worker's job is everything else.",
+        "budget": "the sender's timeout budget (GitHub: 10 s)",
+        "timeout": "timeout",
+        "lane": {
+          "request": {
+            "title": "Handler",
+            "body": "the sender is waiting"
+          },
+          "worker": {
+            "title": "Worker",
+            "body": "nobody is waiting"
+          },
+          "inline": {
+            "title": "All inline",
+            "body": "work in the handler"
+          }
+        },
+        "step": {
+          "verify": "verify",
+          "record": "record id",
+          "enqueue": "enqueue"
+        },
+        "ok": "200 OK",
+        "work": "award points · email a receipt · call the warehouse",
+        "inlineWork": "the same work, in the request",
+        "workNote": "as long as it takes; a failure is yours to retry",
+        "inlineFail": "timed out → the sender retries"
+      },
+      "retryBackoff": {
+        "aria": "Two timelines on a logarithmic axis from now to one day, with the endpoint down for the first three hours. With retries on the Standard Webhooks example schedule, attempts at 0, 5 seconds, about 5 minutes, 35 minutes and 2 hours 35 minutes fail during the outage, and the attempt at 7 hours 35 minutes is delivered. With a single attempt, the event fails at once and is lost unless someone redelivers it.",
+        "caption": "The Standard Webhooks example schedule against a three-hour outage, as time since the first attempt on a log scale. Back-off turns an outage into a delay; a single attempt turns it into a loss.",
+        "outage": "your endpoint is down (3 hours)",
+        "back": "back up",
+        "tick": {
+          "now": "0",
+          "minute": "1 min",
+          "hour": "1 h",
+          "day": "1 day"
+        },
+        "retries": {
+          "title": "With retries",
+          "body": "exponential back-off",
+          "result": "delivered"
+        },
+        "once": {
+          "title": "One attempt",
+          "body": "no retries",
+          "result": "failed: lost unless someone redelivers it"
+        }
+      },
+      "duplicateDelivery": {
+        "aria": "A sequence between a sender and a receiver. The first POST, with webhook-id msg_2mQ8…, is processed and the order recorded, but the 200 response is lost to a timeout. The sender retries with the same webhook-id. The receiver has already stored that id, skips the work and answers 200 OK. Without the check, the retry would create a second order.",
+        "caption": "A retry after a lost response is the most ordinary duplicate there is. The id that stays the same across retries is what makes the second arrival harmless.",
+        "sender": "Sender",
+        "receiver": "Receiver",
+        "post": "POST · webhook-id: msg_2mQ8…",
+        "processed": "order recorded, id stored",
+        "lost": "200 lost: timed out",
+        "retry": "retry · the same webhook-id: msg_2mQ8…",
+        "seen": "id already seen → skip",
+        "ok": "200 OK",
+        "without": "without the check: a second order"
+      },
+      "outOfOrder": {
+        "aria": "Three events in the order they happened — order.created, order.updated, order.cancelled — and the order they arrived in: updated, cancelled, and created last, because its first attempt failed and it came back as a retry. Updated and cancelled are applied; created is skipped, because its version is older than the one already stored.",
+        "caption": "Arrival order is whatever the network and the retries made it. A version check turns a late order.created from a resurrection into a no-op.",
+        "happened": "happened",
+        "arrived": "arrived",
+        "event": {
+          "created": "order.created (v1)",
+          "updated": "order.updated (v2)",
+          "cancelled": "order.cancelled (v3)"
+        },
+        "verdict": {
+          "updated": "apply: v2",
+          "cancelled": "apply: v3",
+          "created": "skip: older than v3"
+        },
+        "rule": "apply an event only if its version is newer than what you have"
+      },
+      "secretRotation": {
+        "aria": "Two timelines of a secret rotation. With an overlap, the old secret keeps signing after the rotation until it is retired, so between the rotation and your deploy each request carries two v1 signatures and one of them always verifies. Without an overlap, the old secret stops the instant it is rotated, and every request between the rotation and your deploy fails verification.",
+        "caption": "Rotation without an overlap is an outage you scheduled yourself. Signing with both secrets for a while — Stripe allows up to 24 hours — lets the receiver deploy whenever it is ready.",
+        "overlap": {
+          "title": "With an overlap",
+          "body": "the sender signs with both",
+          "result": "two v1 signatures per request: either one verifies"
+        },
+        "cutover": {
+          "title": "Without one",
+          "body": "old secret stops at once",
+          "result": "every request fails"
+        },
+        "marker": {
+          "rotate": "secret rotated",
+          "deploy": "you deploy it",
+          "retire": "old one retired"
+        },
+        "old": "old secret",
+        "new": "new secret"
+      },
       "providerRetries": {
         "aria": "A timeline comparing how long three providers keep trying an endpoint that is down. Stripe backs off exponentially for up to three days. GitHub makes one attempt with a ten-second timeout and never retries on its own, leaving a three-day window in which you can redeliver by hand. Shopify makes up to eight calls inside four hours, and removes the webhook subscription after repeated failure within a day.",
         "caption": "Three policies on one axis, log-scaled so the first minute is as visible as the third day. Every figure is sourced in the table below.",

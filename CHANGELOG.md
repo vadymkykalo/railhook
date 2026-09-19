@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Blog: "What is a webhook? How webhooks work, and the six ways they break in production"** — a
+  beginner-to-intermediate guide: webhooks against API polling, a real signed Standard Webhooks
+  request, verification on the raw body in Node and Python, acknowledging fast, deduplicating and
+  ordering, then downtime, timeouts, duplicates, out-of-order delivery, signature and rotation
+  mistakes and silent drops, each with its fix. Seven new diagrams; Ukrainian translation
+  alongside.
+
 ## [2.25.0] - 2026-09-19
 
 ### Added
