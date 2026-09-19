@@ -230,6 +230,7 @@ export default function ReplayPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={t('nav.outgoing')}
+        title={t('nav.replay')}
         description={<Trans i18nKey="replay.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
       />
 

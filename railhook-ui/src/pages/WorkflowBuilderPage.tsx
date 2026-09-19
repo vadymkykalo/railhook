@@ -320,7 +320,7 @@ function WorkflowBuilderInner() {
             onClick={() => toggleMutation.mutate(!workflow.enabled)}
           >
             {workflow.enabled ? <ToggleRight className="h-4 w-4 text-ok" aria-hidden /> : <ToggleLeft className="h-4 w-4" aria-hidden />}
-            {workflow.enabled ? t('workflows.builder.enabled') : t('workflows.builder.disabled')}
+            {workflow.enabled ? t('common.enabled') : t('common.disabled')}
           </Button>
           <Button
             size="sm"

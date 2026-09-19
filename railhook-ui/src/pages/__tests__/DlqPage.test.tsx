@@ -99,7 +99,7 @@ describe('DlqPage', () => {
     vi.mocked(dlqApi.list).mockResolvedValue(emptyPage());
     vi.mocked(dlqApi.getStats).mockResolvedValue(EMPTY_STATS);
     renderDlq();
-    expect(await screen.findByText(/no failed messages|no items/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no failed deliveries/i)).toBeInTheDocument();
   });
 
   it('renders populated rows when DLQ items exist', async () => {
@@ -149,7 +149,7 @@ describe('DlqPage', () => {
     renderDlq();
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
-    expect(screen.queryByText(/no failed messages|no items/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no failed deliveries/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 });

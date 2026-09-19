@@ -104,7 +104,7 @@ export default function AnalyticsPage() {
   if (isError || !analytics) {
     return (
       <div className="p-4 lg:p-6">
-        <PageHeader eyebrow={period} description={t('analytics.subtitle')} />
+        <PageHeader eyebrow={period} title={t('nav.metrics')} description={t('analytics.subtitle')} />
         <ErrorState error={error} fallbackKey="analytics.loadFailed" onRetry={() => refetch()} />
       </div>
     );
@@ -116,6 +116,7 @@ export default function AnalyticsPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={period}
+        title={t('nav.metrics')}
         description={t('analytics.subtitle')}
         actions={
           <Button variant="outline" size="sm" onClick={refresh} disabled={isFetching}>

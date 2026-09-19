@@ -91,8 +91,8 @@ export const PROJECT_SECTIONS: NavSection[] = [
     icon: Radio,
     owns: ['events', 'incoming-events'],
     tabs: [
-      tab('nav.outgoing', 'events', Radio),
-      tab('nav.incoming', 'incoming-events', ArrowDownToLine),
+      tab('nav.outgoingEvents', 'events', Radio),
+      tab('nav.incomingEvents', 'incoming-events', ArrowDownToLine),
     ],
   },
   {

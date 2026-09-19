@@ -81,7 +81,7 @@
     "subtitle": "Monitor delivery health and get notified of issues",
     "tabs": {
       "events": "Alert History",
-      "rules": "Alert Rules"
+      "rules": "Alert rules"
     },
     "threshold": "Threshold",
     "tiles": {
@@ -93,7 +93,7 @@
       "unresolved": "Unresolved",
       "unresolvedHint": "Alerts waiting on a decision"
     },
-    "title": "Alerts",
+    "title": "Alert rules",
     "toast": {
       "allResolved": "{{count}} alerts resolved",
       "createFailed": "Failed to create alert rule",
@@ -114,7 +114,7 @@
         "label": "Consecutive Failures"
       },
       "DLQ_THRESHOLD": {
-        "hint": "Triggers when DLQ count exceeds threshold",
+        "hint": "Triggers when failed deliveries exceed the threshold",
         "label": "DLQ Threshold"
       },
       "FAILURE_RATE": {
@@ -561,7 +561,7 @@
     "events": "Events this month",
     "featureMtls": "mTLS",
     "featureReplay": "Replay",
-    "featureRules": "Rules engine",
+    "featureRules": "Routing rules",
     "featureTunnels": "CLI tunnels",
     "featureWorkflows": "Workflows",
     "free": "Free",
@@ -632,7 +632,7 @@
     "close": "close",
     "dashboard": "Dashboard",
     "deliveries": "Deliveries",
-    "dlq": "Dead Letter Queue",
+    "dlq": "Failed deliveries",
     "documentation": "Documentation",
     "endpoints": "Endpoints",
     "events": "Events",
@@ -852,7 +852,7 @@
     "subDisabled": "Sub off",
     "subscriptions": "{{count}} subscriptions",
     "subtitle": "Visual overview of event routing for <strong>{{project}}</strong>",
-    "title": "Connection Map",
+    "title": "Connections",
     "toggleSubscription": "Enable {{eventType}}",
     "unsubscribed": "Unsubscribed Endpoints",
     "unsubscribedDesc": "These endpoints have no active subscriptions and won't receive any events"
@@ -984,7 +984,7 @@
     "projectPicker": "Project",
     "quickActions": {
       "deliveries": "Deliveries",
-      "dlq": "Failed Messages",
+      "dlq": "Failed deliveries",
       "endpoints": "Endpoints",
       "events": "Events",
       "incomingEvents": "Received",
@@ -1015,7 +1015,7 @@
       "delivered": "Delivered",
       "deliveredHint": "{{percent}}% of everything sent",
       "deliveries": "Deliveries",
-      "dlq": "Failed Messages",
+      "dlq": "Failed deliveries",
       "dlqBadge": "In the DLQ",
       "dlqDesc": "Max retries exceeded",
       "failed": "Failed",
@@ -1058,7 +1058,7 @@
     "bulkReplay": "Replay All {{status}}",
     "bulkReplayDialog": {
       "confirm": "Replay All",
-      "description": "This will re-send {{count}} deliveries with status {{status}}. Each delivery gets 3 more attempts, the first sent straight away.",
+      "description": "This will replay {{count}} deliveries with status {{status}}. Each delivery gets 3 more attempts, the first sent straight away.",
       "title": "Replay all {{status}} deliveries?",
       "warning": "Bulk replay may cause duplicate deliveries if the destination is not idempotent. Make sure your consumers can handle repeated events."
     },
@@ -1122,7 +1122,7 @@
       "SUCCESS": "Success"
     },
     "statusExplain": {
-      "DLQ": "Moved to dead letter queue after {{count}} attempts",
+      "DLQ": "Moved to failed deliveries after {{count}} attempts",
       "FAILED": "Delivery failed permanently",
       "PENDING_NEW": "Queued for first attempt",
       "PENDING_RETRY": "Retrying {{time}}",
@@ -1257,16 +1257,15 @@
     "ladderExhausted_other": "Retry ladder exhausted after {{count}} attempts",
     "last24h": "Last 24 Hours",
     "last7d": "Last 7 Days",
-    "noItems": "No items in DLQ",
+    "noItems": "No failed deliveries",
     "noItemsDesc": "All deliveries are being processed successfully",
-    "pageTitle": "Failed Messages",
     "projectNotFound": "Project not found",
     "purgeAll": "Clear all",
     "purgeDialog": {
-      "description": "This will permanently delete all {{count}} failed messages. This action cannot be undone.",
+      "description": "This will permanently delete all {{count}} failed deliveries. This action cannot be undone.",
       "impactIrreversible": "These items cannot be recovered or retried after purging",
       "impactItems": "{{count}} failed deliveries will be permanently deleted",
-      "title": "Purge All DLQ Items?"
+      "title": "Clear all failed deliveries?"
     },
     "purging": "Purging...",
     "replayOne": "Replay this delivery",
@@ -1277,7 +1276,6 @@
     "selectAll": "Select all",
     "selectItem": "Select row",
     "subtitle": "Failed deliveries for <strong>{{project}}</strong>",
-    "title": "Failed Messages",
     "toast": {
       "bulkReplayed": "{{count}} deliveries queued for replay",
       "bulkReplayed_few": "{{count}} deliveries queued for replay",
@@ -1783,12 +1781,10 @@
       "description": "This destination will be permanently deleted. Incoming webhooks will no longer be forwarded to this URL.",
       "title": "Delete destination?"
     },
-    "disabled": "Disabled",
     "editDialog": {
       "description": "Update the forwarding destination configuration",
       "title": "Edit Destination"
     },
-    "enabled": "Enabled",
     "ladderLabel": "Retry ladder: {{count}} attempts",
     "ladderSummary": "{{attempts}} attempts · {{timeout}}s timeout",
     "maxAttempts": "Max Attempts",
@@ -1843,6 +1839,12 @@
       "urlRequired": "URL is required",
       "validJson": "Valid JSON",
       "validate": "Validate"
+    },
+    "authTypes": {
+      "NONE": "No authentication",
+      "BEARER": "Bearer token",
+      "BASIC": "Basic auth",
+      "CUSTOM_HEADER": "Custom header"
     }
   },
   "incomingDlq": {
@@ -1864,16 +1866,16 @@
     "last7d": "Last 7 Days",
     "noItems": "No abandoned forwards",
     "noItemsDesc": "Every incoming webhook is reaching its destinations",
-    "pageTitle": "Failed Forwards",
-    "purgeAll": "Purge All",
+    "pageTitle": "Failed forwards",
+    "purgeAll": "Clear all",
     "purgeDialog": {
       "description": "This will permanently delete all {{count}} abandoned forwards. This action cannot be undone.",
       "impactIrreversible": "These forwards cannot be recovered or retried after purging",
       "impactItems": "{{count}} abandoned forwards will be permanently deleted",
-      "title": "Purge All Failed Forwards?"
+      "title": "Clear all failed forwards?"
     },
-    "retryOne": "Retry this forward",
-    "retrySelected": "Retry selected ({{count}})",
+    "retryOne": "Replay this forward",
+    "retrySelected": "Replay selected ({{count}})",
     "subtitle": "Incoming webhooks that never reached their destination in <strong>{{project}}</strong>",
     "toast": {
       "bulkRetried": "{{count}} forwards queued for retry",
@@ -1930,9 +1932,9 @@
     "noEventsDesc": "Events will appear here when external providers send webhooks to your sources",
     "noEventsNoSourcesDesc": "You need to create an incoming source first. Set up an ingress endpoint, then send webhooks to it.",
     "noVerification": "No verification",
-    "pageTitle": "Received events",
+    "pageTitle": "Incoming events",
     "replay": {
-      "description": "This will re-send the event to all enabled destinations. Note: this may cause duplicate processing if the destination is not idempotent.",
+      "description": "This will replay the event to all enabled destinations. Note: this may cause duplicate processing if the destination is not idempotent.",
       "idempotencyWarning": "Ensure your destinations handle duplicate events (idempotency).",
       "replaying": "Replaying...",
       "submit": "Replay Event",
@@ -1955,7 +1957,6 @@
     "verified": "Verified"
   },
   "incomingSources": {
-    "active": "Active",
     "columnSource": "Source",
     "create": "Create Source",
     "createDialog": {
@@ -1988,7 +1989,6 @@
     "descriptionV2": "Providers whose webhooks arrive here, and how each one is proven genuine before it is forwarded.",
     "destinations": "Destinations",
     "detailDescription": "Webhooks arriving at this URL are verified, then forwarded to every destination below.",
-    "disabled": "Disabled",
     "editDialog": {
       "description": "Update the incoming webhook source configuration",
       "title": "Edit Incoming Source"
@@ -2020,7 +2020,7 @@
     "slug": "Slug",
     "status": "Status",
     "subtitle": "Manage incoming webhook sources for <strong>{{project}}</strong>",
-    "title": "Incoming Sources",
+    "title": "Sources",
     "toast": {
       "createFailed": "Failed to create incoming source",
       "created": "Incoming source created",
@@ -2185,9 +2185,9 @@
         "tab": "Deliveries"
       },
       "failed": {
-        "alt": "Railhook failed messages: deliveries that exhausted their retries, with a replay button",
+        "alt": "Railhook failed deliveries: deliveries that exhausted their retries, with a replay button",
         "caption": "What ran out of retries waits here until you replay it, one or all at once.",
-        "tab": "Failed messages"
+        "tab": "Failed deliveries"
       },
       "incoming": {
         "alt": "Railhook incoming events from Stripe and GitHub, each marked with its signature verification result",
@@ -2539,7 +2539,7 @@
     },
     "demo": {
       "title": "Live demo — the Railhook dashboard with sample data | Railhook",
-      "description": "Open the real Railhook dashboard with a day of sample webhook traffic: deliveries, retries, failed messages, Stripe and GitHub sources. Read-only, no sign-up."
+      "description": "Open the real Railhook dashboard with a day of sample webhook traffic: deliveries, retries, failed deliveries, Stripe and GitHub sources. Read-only, no sign-up."
     }
   },
   "mtls": {
@@ -2570,7 +2570,7 @@
     "platformOrganizations": "Organizations",
     "platformOverview": "Overview",
     "platformUsers": "Users",
-    "alerts": "Alerts",
+    "alerts": "Alert rules",
     "allDeliveries": "All deliveries",
     "allProjects": "All projects",
     "analytics": "Analytics",
@@ -2587,7 +2587,7 @@
     "dashboard": "Dashboard",
     "deliveries": "Deliveries",
     "develop": "Develop",
-    "dlq": "Failed Messages",
+    "dlq": "Failed deliveries",
     "documentation": "Documentation",
     "endpoints": "Endpoints",
     "eventDiff": "Event Diff",
@@ -2596,8 +2596,8 @@
     "filterProjects": "Filter projects",
     "incidents": "Incidents",
     "incoming": "Incoming",
-    "incomingDlq": "Failed Forwards",
-    "incomingEvents": "Received",
+    "incomingDlq": "Failed forwards",
+    "incomingEvents": "Incoming events",
     "incomingSources": "Sources",
     "lightMode": "Light mode",
     "loggedOut": "Logged out successfully",
@@ -2611,14 +2611,14 @@
     "organization": "Organization",
     "outgoing": "Outgoing",
     "overview": "Overview",
-    "piiRules": "PII Masking",
+    "piiRules": "PII masking",
     "pipeline": "Pipeline",
     "profile": "Profile",
     "project": "Project",
     "recovery": "Recovery",
-    "replay": "Time Machine",
+    "replay": "Replay by time range",
     "resources": "Resources",
-    "rules": "Rules",
+    "rules": "Routing rules",
     "schemas": "Schemas",
     "search": "Search",
     "security": "Security",
@@ -2635,7 +2635,8 @@
     "tunnels": "Tunnels",
     "usage": "Usage",
     "workflows": "Workflows",
-    "consumers": "Consumers & portal"
+    "consumers": "Consumers & portal",
+    "outgoingEvents": "Outgoing events"
   },
   "notFound": {
     "backToDashboard": "Back to Dashboard",
@@ -2648,7 +2649,7 @@
     "allDone": "You're all set — Railhook is carrying your webhooks.",
     "allDoneAction": "Read the quickstart",
     "dismiss": "Dismiss",
-    "progress": "{{done}} of {{total}}",
+    "progress": "{{done}}/{{total}}",
     "restore": "Getting started",
     "steps": {
       "addDestination": "Add a destination",
@@ -2733,7 +2734,7 @@
     "securityDesc": "Authentication and access control configuration",
     "since": "Since {{date}}",
     "subtitle": "Manage your organization details and membership",
-    "title": "Organization Settings",
+    "title": "Organization",
     "toast": {
       "updateFailed": "Failed to update organization",
       "updated": "Organization updated"
@@ -2815,7 +2816,7 @@
     },
     "status": "Status",
     "subtitle": "Configure which fields are masked before sharing event payloads",
-    "title": "PII Masking Rules",
+    "title": "PII masking",
     "toast": {
       "createFailed": "Failed to create rule",
       "created": "Masking rule created",
@@ -3075,8 +3076,7 @@
     "live": "Live",
     "newReplay": "New Replay",
     "noSessions": "No replay sessions",
-    "noSessionsDesc": "Create a replay to re-deliver events from a specific time range",
-    "pageTitle": "Time Machine",
+    "noSessionsDesc": "Start a replay to send the events of a time range again, as new deliveries",
     "projectNotFound": "Project not found",
     "quickRanges": {
       "1h": "Last hour",
@@ -3122,7 +3122,6 @@
       "RUNNING": "Running"
     },
     "subtitle": "Replay events by time range for <strong>{{project}}</strong>",
-    "title": "Event Time Machine",
     "toast": {
       "cancelFailed": "Failed to cancel replay",
       "cancelled": "Replay session cancelled",
@@ -3258,7 +3257,7 @@
       "total": "Total Rules"
     },
     "subtitle": "Define IF-THEN rules to route, transform, or drop events automatically.",
-    "title": "Rules Engine",
+    "title": "Routing rules",
     "toggleFailed": "Failed to toggle rule",
     "updated": "Rule updated successfully",
     "updatedAt": "Updated"
@@ -3333,7 +3332,7 @@
       "ACTIVE": "Active"
     },
     "subtitle": "Manage event type contracts, versioned schemas, and track breaking changes",
-    "title": "Schema Registry",
+    "title": "Schemas",
     "typeCount": "Event types · {{count}}",
     "typeDescription": "Description",
     "typeName": "Name",
@@ -3466,7 +3465,7 @@
       "select": "Timezone",
       "title": "Timezone"
     },
-    "title": "Settings",
+    "title": "Profile",
     "toast": {
       "passwordChanged": "Password changed successfully",
       "profileUpdated": "Profile updated successfully"
@@ -3898,7 +3897,7 @@
   },
   "usage": {
     "breakdown": {
-      "dlq": "Dead Letter Queue",
+      "dlq": "Failed deliveries",
       "failed": "Failed",
       "pending": "Pending / Processing",
       "success": "Successful",
@@ -3948,7 +3947,7 @@
       "unlimited": "No limit on your plan"
     },
     "resources": {
-      "alertRules": "Alert Rules",
+      "alertRules": "Alert rules",
       "endpoints": "Active Endpoints",
       "sources": "Incoming Sources"
     },
@@ -3967,7 +3966,7 @@
       "incoming": "Incoming events",
       "incomingHint": "Received from your sources"
     },
-    "title": "Usage & Metrics",
+    "title": "Usage",
     "traffic": {
       "delivered": "Delivered",
       "desc": "Delivered and failed, one bar per day",
@@ -3994,10 +3993,8 @@
       "back": "Back to workflows",
       "closeHistory": "Close history",
       "configureNode": "Configure Node",
-      "disabled": "Disabled",
       "dragToAdd": "Drag to add",
       "edgesCount": "{{count}} edges",
-      "enabled": "Enabled",
       "executionHistory": "Execution History",
       "history": "History",
       "invalidJson": "The trigger payload is not valid JSON. Fix it and run again.",
@@ -4213,7 +4210,7 @@
     "purpose": {
       "connections": "Where your events go: endpoints, subscriptions, incoming sources and the rules between them.",
       "events": "Every event your application sends or receives, with its payload and the deliveries it made.",
-      "deliveries": "Each attempt to deliver an event — retries, failures, and the failed messages you can send again.",
+      "deliveries": "Each attempt to deliver an event — retries, failures, and the failed deliveries you can replay.",
       "workflows": "Automations that run a sequence of steps when an event arrives.",
       "analytics": "How deliveries are going over time: success rate, latency, alerts and usage.",
       "develop": "Tools for trying things out: send test events, shape payloads, and inspect what arrives.",
@@ -4311,7 +4308,7 @@
     "masked": "Anyone with this URL can read what it received, so Authorization, cookies and signature headers are masked."
   },
   "consumers": {
-    "title": "Consumers",
+    "title": "Consumers & portal",
     "description": "Your own users who receive your webhooks. Each one gets a portal to register their endpoints and see what was delivered to them.",
     "new": "New consumer",
     "name": "Name",
@@ -5293,7 +5290,7 @@
   "demo": {
     "page": {
       "title": "The live demo",
-      "lead": "The real Railhook dashboard, signed in to a sample shop with a day of traffic: deliveries, retries, a failed message, Stripe and GitHub webhooks. Look at anything — nothing can be changed.",
+      "lead": "The real Railhook dashboard, signed in to a sample shop with a day of traffic: deliveries, retries, a failed delivery, Stripe and GitHub webhooks. Look at anything — nothing can be changed.",
       "opening": "Opening the demo…",
       "start": "Open the demo",
       "failed": "The demo could not be opened.",
@@ -5338,7 +5335,7 @@
     "deliveries": {
       "step1": "A delivery is one event on its way to one endpoint. It is done when the endpoint answers with a 2xx.",
       "step2": "A failed attempt is retried on a schedule. Every attempt is kept with its request and the response it got.",
-      "step3": "When the retries run out, the delivery moves to <strong>Failed Messages</strong>, where you can retry it once the endpoint is fixed."
+      "step3": "When the retries run out, the delivery moves to <strong>Failed deliveries</strong>, where you can replay it once the endpoint is fixed."
     },
     "consumers": {
       "step1": "The customer portal is a page you embed in your own product. On it, each of your users registers their own webhook endpoints, picks event types and sees what was delivered — without asking your support.",
@@ -5386,13 +5383,11 @@
     "schemas": "The JSON schema each event type is checked against",
     "piiRules": "Fields masked before a payload is shared",
     "events": "Every event sent and every webhook received",
-    "outgoing": "Events your backend sent",
-    "incoming": "Webhooks received from your sources",
     "deliveries": "Each event’s way to each endpoint, attempt by attempt",
     "allDeliveries": "Every delivery, with its attempts",
-    "dlq": "Deliveries Railhook stopped retrying, ready to retry by hand",
+    "dlq": "Deliveries Railhook stopped retrying, ready to replay by hand",
     "incomingDlq": "Incoming webhooks that never reached their destination",
-    "replay": "Send stored events again, as new deliveries",
+    "replay": "Replay the stored events of a time range, as new deliveries",
     "workflows": "Automations triggered by events",
     "analytics": "Delivery rates, latency, alerts and usage",
     "metrics": "Success rate and latency over time",
@@ -5405,6 +5400,8 @@
     "eventDiff": "Compare two events’ payloads side by side",
     "testEndpoints": "Temporary URLs that capture what is sent to them",
     "tunnels": "Forward deliveries to a server on your laptop",
-    "apiKeys": "Keys your backend uses to call the API"
+    "apiKeys": "Keys your backend uses to call the API",
+    "outgoingEvents": "Events your backend sent",
+    "incomingEvents": "Webhooks received from your sources"
   }
 }

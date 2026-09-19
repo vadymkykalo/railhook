@@ -107,7 +107,7 @@ describe('IncomingDlqPage', () => {
     renderIncomingDlq();
 
     await screen.findByText('Stripe');
-    await userEvent.click(screen.getByRole('button', { name: /retry this forward/i }));
+    await userEvent.click(screen.getByRole('button', { name: /replay this forward/i }));
 
     await waitFor(() => expect(incomingDlqApi.retrySingle)
       .toHaveBeenCalledWith(TEST_PROJECT_ID, 'attempt-1'));

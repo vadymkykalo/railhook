@@ -146,6 +146,7 @@ export default function DlqPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={t('nav.outgoing')}
+        title={t('nav.dlq')}
         description={<Trans i18nKey="dlq.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={
           // Replaying what you ticked is what this page is for; wiping the whole queue is the
