@@ -9,12 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Article: "AI-written code you can trust: how a production webhook gateway was built with
-  Claude Code"** — how Railhook was built by directing an AI agent, and the harness that makes
-  that code deployable: per-area `CLAUDE.md` files, a domain glossary, ratchet tests, generated
-  references, phone-width browser tests and deploy verification, each with the real incident
-  behind it. Numbers come from this repository's git history, with the method for each. Four
-  figures, and a Ukrainian translation alongside.
+- **Article: "How to build software with an AI coding agent that you can actually trust"** —
+  lessons from building Railhook by directing an AI agent, each drawn from a real incident: where
+  the agent was confidently wrong, why written rules are not enough, and the checks that now refuse
+  each class of bug. Two figures, and a Ukrainian translation alongside.
 
 ## [2.25.0] - 2026-09-19
 

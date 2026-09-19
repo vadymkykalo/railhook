@@ -1,332 +1,227 @@
 ---
-title: AI-written code you can trust: how a production webhook gateway was built with Claude Code
-lead: An AI agent wrote nearly all of Railhook's code. What made that code worth deploying wasn't a better prompt. It was a repository that refuses wrong changes on its own, and a person who decided what "wrong" means.
-description: A Claude Code case study with real git numbers. Eight practices for building production software with AI agents: ratchet tests, generated references, phone checks and deploy checks.
+title: How to build software with an AI coding agent that you can actually trust
+lead: An AI agent wrote nearly all of the code behind a production system I run. It is fast, fluent and sometimes confidently wrong. What made its work trustworthy wasn't a better prompt. It was a codebase that refuses wrong changes, and a person who decides what "wrong" means.
+description: What building a production system with an AI coding agent taught me: where agents fail, why instructions aren't enough, and how to make AI-written code trustworthy.
 date: 2026-09-22
 author: Vadym Kykalo
-tags: [ai agents, claude code, engineering, testing, case study]
+tags: [ai agents, claude code, engineering, testing, software quality]
 sourcesCheckedOn: 2026-09-19
 ---
 
-On 22 August a review of the delivery pipelines turned up a bug that had been in production for
-several releases. Every event bigger than 1 KB was being delivered, and HMAC-signed, as a
-gzip+Base64 blob instead of JSON. The schema had a `payload_compressed` column and the API set it.
-The worker's copy of the entity never mapped that column, so the worker never knew. Every test
-passed.
+For several releases, every large event my webhook gateway delivered went out as a compressed blob
+instead of JSON. The database knew the payload was compressed. One of the two services that read it
+had never been told to look. Every test passed, and I didn't notice until a review I asked for went
+looking.
 
-I didn't write that bug, and I didn't write the fix. Claude Code wrote both, the same way it wrote
-nearly all of Railhook over many rounds of me setting direction, reviewing and pushing back. I'm a
-senior Java developer. My part was knowing what correct looks like for this kind of system.
+I didn't write that bug, and I didn't write the fix. An AI coding agent, Claude Code, wrote both,
+the same way it wrote nearly all of [Railhook](https://github.com/vadymkykalo/railhook): over many
+rounds of me setting direction, reviewing and pushing back. I'm a senior Java developer. My part was
+knowing what correct looks like for this kind of system.
 
-The part of that fix worth writing about is the test it added. It fails the build whenever a
-column exists in the schema and one service maps it while the other doesn't. That bug can't
-happen again, and no prompt I could have written would make the same promise. That is the whole
-argument of this article. **You can't review every line an agent writes. What you can do is build
-a repository that refuses wrong changes on its own.**
+The fix did more than add the missing field. It added a check that fails the build whenever the two
+services disagree about what the database contains. That bug can't come back, and no prompt I could
+have written would make the same promise.
 
-## What the history shows
+That is the main thing I learned. **I can't review every line an agent writes. What I can do is
+build a codebase that refuses wrong changes on its own, and keep for myself the decisions about what
+"wrong" means.** Below are the lessons that got me there, each with the moment that taught it.
 
-Every number here comes from the public repository, so each row says how it was measured.
+## 1. I learned the agent is fluent, not careful
 
-| Measure | Value | How it was counted |
-|---|---|---|
-| First commit, first release | 15 Dec 2025, `v1.0.0` on 17 Dec | `git log --reverse`, `git tag` |
-| Commits | 1,413, of which 1,088 are not merges | `git rev-list --count HEAD`, `--no-merges` |
-| Releases | 60 tags, 42 of them in September 2026 | `git for-each-ref refs/tags` by creation date |
-| Commits with a `Co-Authored-By: Claude` trailer | 648 of 1,088; 648 of the 743 made since 20 Aug 2026 | case-insensitive grep over each commit body |
-| Code, tests excluded / test code | about 132,900 / 83,900 lines | `git ls-files`, without lockfiles, generated types, `openapi.yaml` or images |
-| Test methods | 1,681 api · 348 worker · 228 common · 79 cli · about 880 UI cases | `@Test` / `@ParameterizedTest`; `it(` / `test(` |
-| Ratchet guards | 22 classes, 56 test methods | files carrying `@Tag("ratchet")` |
-| CI | 18 jobs in `ci.yml`, 37 across 10 workflows | job keys under `jobs:` |
-| `fix:` vs `feat:` commits since 20 Aug | 331 vs 91 | subject prefix |
+Railhook moves webhooks in two directions: out from a customer's system to their endpoints, and in
+from providers like Stripe to the customer's services. The incoming side started life as a copy of
+the outgoing side. Both copies read well and both had tests. Over time, fixes landed on one copy and
+never reached the other.
 
-Two things this table doesn't say on its own. First, the trailer only starts on 20 August 2026,
-in the same commit that added `CLAUDE.md`. The 345 commits before that carry no trailer and mostly
-one-word messages: "fix" 115 times, "add feature" 72, "impl" 30. Git can't tell you who wrote them.
-I'm telling you it was the agent too, and on that point you have only my word. There were also no
-commits at all from April to July.
+When I had a review compare them side by side, the worst gap was this: on the incoming side, a slow
+database write *after* the receiver had already answered "OK" could be mistaken for a timeout. The
+error path then marked the delivery as failed and sent it again. A webhook the receiver had already
+accepted went out twice.
 
-:::figure ai-commit-history
+Nothing in that code looked wrong to me. That's what makes it dangerous. An agent writes plausible
+code very quickly, and it will happily write the same logic twice. Each copy passes its own review.
+The drift between them is invisible until something breaks in production.
 
-Second, look at the last row. Since the harness went in, fixes outnumber features more than three
-to one. Much of that is the harness doing its job, as reviews and ratchets dig up bugs that were
-already there. It is also the honest price of working this way. An agent produces code that looks
-finished very quickly, and a lot of it is wrong at the edges.
+The fix I asked for was structural. Both directions now run through one shared implementation, and
+the rules that were each learned from a real bug sit right at the top of that file, in plain
+sentences: once the receiver has answered "OK", nothing that goes wrong afterwards may turn it into
+a retry. The agent reads the file it is about to change, so that is where the scars have to be.
 
-## The loop, and who owns each step
+The same file-level note works in the other direction. Agents love symmetry. My two directions
+deliberately give up after different amounts of time, and without a sentence saying "these differ on
+purpose, don't make them agree," an eager agent would "fix" that.
+
+**What I took from it: collapse duplication early, and write what went wrong into the code the agent
+will read, not into a wiki it will never open.**
+
+## 2. It told me things that weren't true, in the same confident voice
+
+My upgrade script had a comment saying the background worker restarts last, after the database
+migrations have run. The code directly below it restarted the worker first. On one production
+deploy, the new worker came up before the new schema existed, failed its startup check, crashed and
+restarted. The only trace was a restart counter.
+
+It wasn't a one-off. My project's roadmap once said the alerting system "already counts" consecutive
+failures. In fact nothing ever triggered an alert, so every alert rule a user had created did
+nothing at all. A backup script promised a verification step that existed nowhere.
+
+Every one of those sentences was specific, fluent and plausible. None of them was true. An agent
+writes a comment or a README the way it writes code: it produces what *should* be there. It can't
+tell that apart from what *is* there, and it sounds exactly as sure either way.
+
+What changed: the upgrade order became a test. Anything a machine can derive is now derived instead
+of written. The API spec is generated from the running server and compared in CI, the frontend's
+types are generated from the spec, and the configuration reference in the docs is generated from the
+file that defines the configuration. Nobody, human or agent, hand-writes an endpoint table any more.
+
+**What I took from it: everything an agent writes in prose is a claim, not a fact. I make each claim
+checkable now, or I don't let it stay.**
+
+## 3. I learned that a written rule is only a request
+
+Claude Code reads a short instructions file from the repository at the start of every session, plus
+another from any subdirectory it works in ([Claude Code
+docs](https://code.claude.com/docs/en/memory)). I keep one for the whole repository and one each for
+the frontend and the docs. They help a lot. Each rule carries its reason, because the reason is what
+lets the agent handle a case the rule didn't foresee. Next to them sits a glossary that names each
+domain concept once and lists the synonyms to avoid, because two names for one thing is how two
+implementations of one thing start.
+
+Then there was the merge rule. It said "squash merge is preferred," with no reason given. A release
+was squash-merged into the main branch, which rewrote its history, and the next release conflicted
+on files that were byte-for-byte identical. I had the rule rewritten, with the reason spelled out.
+The next day, another branch was squash-merged into main anyway.
+
+Nobody set out to break the rule. That is simply what a written rule is: Claude Code's own
+documentation says these files are "context, not enforced configuration." The rule now lives in the
+repository's branch settings, which refuse a squash merge into main.
+
+**What I took from it: write rules down, with reasons. When a rule is broken once, rewrite it. When
+it's broken twice, stop asking and enforce it.**
+
+## 4. The most valuable thing I built is a codebase that says no
+
+A raw SQL insert in a nightly job bypassed the filter that scopes every query to one customer. At
+five past midnight, every night, it failed on a missing customer id, and a `catch` block swallowed
+the error. Nothing reported it, and no test was looking.
+
+The answer is a kind of test I've come to rely on more than any other: a *ratchet*. It scans the
+codebase for a pattern, accepts today's known exceptions, each with a written reason, and fails the
+build on any new one. Mine now require every raw SQL query to state whether it is scoped to a
+customer, forbid service methods from taking a customer id as a parameter, and make every endpoint
+that changes data declare who may call it.
+
+Two details matter far more with an agent than with a human colleague. First, a ratchet must check
+that it actually found something to scan. A scan that silently matches nothing passes, and you'd
+never know. Second, its failure message has to say how to fix the problem, because the next reader
+of that message is the agent:
+
+```java
+assertEquals(Set.of(), offenders,
+        "These service methods take an organization as a parameter. [...] "
+                + "If the organization genuinely comes off a row rather than off the caller, "
+                + "add the method to DOCUMENTED_EXEMPTIONS with a reason.");
+```
+
+The agent reads that message and does what it says. It is the most effective prompt in the whole
+repository, because it arrives at the exact moment of the mistake.
+
+Recurring procedures went the same way. How to change the database schema, and how to name a test so
+it runs in the right CI job, became *skills*: instructions the agent loads when a task matches them
+([Claude Code docs](https://code.claude.com/docs/en/skills)). "Write the failing test first" is a
+single line in the instructions file. Put together, every change goes around the same loop:
 
 :::figure ai-harness-loop
 
-The agent is one box out of eight. A change starts as a task file that I wrote or approved. The
-agent loads the rules for the part of the repository it is in and writes a failing test before the
-code. Local checks and CI then either refuse the change, and it goes back to the agent, or let it
-through. A release goes out only when a named person approves the deploy, and a check from outside
-confirms the site is actually serving the new version. When something still gets through, it
-becomes a new rule, skill or ratchet. That last arrow is what makes the loop worth having.
+**What I took from it: I can't review everything the agent writes, so the codebase reviews it. Every
+class of bug I find becomes a check that refuses the whole class.**
 
-## 1. Write the rules down where the agent reads them, and expect them to fail
+## 5. Some bugs only exist on a real phone, or in production
 
-Claude Code loads `CLAUDE.md` at the start of a session. A `CLAUDE.md` in a subdirectory loads
-when the agent reads a file there
-([Claude Code docs, *How Claude remembers your project*](https://code.claude.com/docs/en/memory)).
-Railhook has three: the root one, `railhook-ui/CLAUDE.md` and `railhook-docs/CLAUDE.md`. They
-state rules together with the reason for each. From `CLAUDE.md`:
+My registration form was cut off at the right edge of an iPhone. iOS Safari zooms into any input
+whose text is smaller than 16 pixels, and after that the page no longer fits the screen. No unit
+test can see that, and neither could the agent. I had to hold the phone.
 
-```text
-- **Never hand-roll an org check.** `@TenantId` makes Hibernate scope every query to the caller's
-  organization, `findById` included; a service method taking an `organizationId` fails the build.
-```
+Now a browser test opens every page at a phone width and a desktop width and fails on sideways
+scrolling or on any input an iPhone would zoom into. Later it caught the same problem on a new page,
+but only once that page had been added to the test's list.
 
-Next to them sits `CONTEXT.md`, a glossary the agent has to use. Each term comes with the words
-to avoid, because two names for one thing are how two implementations of one thing start. From
-`CONTEXT.md`:
+Deploys taught the same lesson. One release answered "200 OK" while the server was still serving the
+previous version of the site, and the deploy pipeline called it a success. Now the pipeline asks the
+live site which version it is serving, and fails if the answer is wrong.
 
-```text
-**Delivery**:
-The obligation to get one event to one endpoint, held until it succeeds or is abandoned.
-Distinct from the individual tries it takes.
-_Avoid_: send, dispatch, job
-```
+**What I took from it: check the software where users meet it. A green pipeline is not the
+release.**
 
-**What went wrong.** The early rule said "squash merge is preferred" and nothing more. A release
-PR was squash-merged into `main`, which rewrote its commits under new hashes, and the merge for
-release 2.3.0 then reported 19 conflicts, 12 of them between byte-identical files. The rule was
-rewritten on 22 August. On 23 August another PR was squash-merged into `main` all the same. Now a ruleset on `main` blocks squash and rebase. Claude
-Code's own documentation says as much: these files are "context, not enforced configuration."
+## 6. A guardrail only refuses the bug it names
 
-**Adopt it.** Keep one short instructions file per area, with the reason next to each rule. If the
-agent breaks a rule once, rewrite the rule. If it breaks it twice, turn it into a check.
+After all of this, the most serious bug still got through. An API key for one project could reset
+the signing secret of an endpoint in *another* project of the same account, and get the new secret
+back.
 
-## 2. Turn conventions into ratchets
-
-A ratchet is a test that allows today's exceptions and refuses new ones. Railhook has 22 of them.
-They check that native queries carry a tenancy predicate, that no service method takes an
-organization id, that every mutating handler declares its access level and scope, that outbound
-HTTP clients declare SSRF protection, that entities and schema agree, that applied migrations never
-change, that the committed OpenAPI spec matches the served one, and that an upgrade restarts
-services in the right order. This is the core of one, `ServiceTenantParameterTest`:
-
-```java
-// Vacuity guard: a scan that finds nothing would pass this test while checking nothing.
-assertTrue(classesScanned >= 40,
-        "Expected to scan at least 40 service classes, found " + classesScanned
-                + " — the classpath scan is broken, not the code");
-assertTrue(methodsScanned >= 300,
-        "Expected to scan at least 300 public service methods, found " + methodsScanned);
-
-assertEquals(Set.of(), offenders,
-        "These service methods take an organization as a parameter. Org "
-                + "ownership a property of data access: read TenantContext, or enter a scope "
-                + "with TenantContext.runAs / @SystemTenant. If the organization genuinely "
-                + "comes off a row rather than off the caller, add the method to "
-                + "DOCUMENTED_EXEMPTIONS with a reason.");
-```
-
-It has three parts, and all three matter with an agent. There is a frozen exemption list where
-every entry carries a reason. There is a vacuity guard, because a scan that silently finds nothing
-passes. And there is a failure message that names the fix, because the next reader of that
-message is the agent, and it follows it.
-
-:::figure ai-ratchet-growth
-
-**What went wrong.** A native `INSERT` into `usage_daily` fell outside Hibernate's tenant filter
-and hit a `NOT NULL organization_id` at 00:05 every night. A catch block swallowed it. Now
-`NativeQueryTenantPredicateTest` makes every native query declare which kind it is. The
-`payload_compressed` bug from the opening became `EntityMappingParityIntegrationTest`.
-
-**Adopt it.** Once you find a class of bug, write the check that makes the whole class fail the
-build. Word its failure message as an instruction.
-
-## 3. Put invariants where the change will be made
-
-Railhook sends in two directions, and for a while the incoming pipeline was a copy of the outgoing
-one. A review recorded in commit `2070d30` found three fixes that had been made on one side and never carried across.
-One of them meant a slow database write after a `2xx` could trip the HTTP timeout, overwrite the
-`SUCCESS` and schedule a duplicate forward. Now one `AttemptRunner` serves both directions, and its
-javadoc is the list of things that went wrong before. From `AttemptRunner.java`:
-
-```java
- * <p>Six invariants, each of which was once correct on one direction and wrong on the other:
- *
- * <ol>
- *   <li>No DB, Redis or Kafka work inside the reactive chain — a write there can trip the
- *       HTTP timeout and drive the failure path over a SUCCESS already written. The same rule
- *       applies after the chain: once a 2xx is in hand, nothing that goes wrong while writing
- *       it down may reclassify it as something to retry.</li>
- *   <li>No successor Attempt unless {@link AttemptStore#finalise} reports it wrote.</li>
- *   <li>Every path that takes a concurrency permit releases it, including those that throw
- *       before the request is built.</li>
- *   <li>A failed transformation never lets the raw payload out.</li>
-```
-
-The opposite also needs saying. Agents like symmetry, so `RetryLadderDefaults` says outright that
-the two directions' retry ladders "differ deliberately and must not be 'fixed' into agreement."
-
-**Adopt it.** The agent reads the file it is about to edit. Record what went wrong there, not in a
-wiki it will never open.
-
-## 4. Generate references instead of writing them
-
-`openapi.yaml` is committed and semantically diffed against the spec the server actually serves.
-The UI's API types are generated from it, and a compile-time contract fails the typecheck when the
-hand-written mirror drifts. The docs' configuration reference is generated from `.env.dist`. The
-endpoint table that used to be written by hand, a 4,000-line page that nothing kept in sync, is
-gone.
-
-**What went wrong.** An agent writes prose that sounds as if it has been checked. A backup script
-promised a check, `make verify-backup-parity`, that existed in neither the Makefile nor CI. The
-Helm README said Flyway runs in an init container that had already been removed. The roadmap said
-alerting "already counts the condition" when nothing called `fireAlert`, so every alert rule a
-user created did nothing. The upgrade helper's comment said the worker restarted last, and the
-code started it first. Each was corrected, and the backup promise became a real check,
-`BackupFlagParityTest`.
-
-**Adopt it.** Anything a machine can derive, derive, and fail CI when it goes stale. Keep prose for
-the *why*.
-
-## 5. Tests first, and make each test land where it can run
-
-The rule is one line of `CLAUDE.md`: "New behaviour is written test-first — a failing test stating
-the expected result, then the implementation." Procedures that came up again and again became
-skills, instructions the agent loads when a task matches them
-([Claude Code docs, *Extend Claude with skills*](https://code.claude.com/docs/en/skills)).
-`db-migration` covers the three-file rule for schema changes. `backend-tests` explains that a test
-class's name decides its CI job, and `scripts/check-test-routing.sh` enforces it:
-
-```bash
-INTEGRATION_SUFFIXES='(IntegrationTest|IT|RepositoryTest|ConcurrencyTest|RbacTest|IsolationTest)\.java$'
-NEEDS_DOCKER='@Testcontainers|@SpringBootTest|AbstractIntegrationTest|GenericContainer|PostgreSQLContainer|KafkaContainer'
-
-while IFS= read -r file; do
-    if [[ "$file" =~ $INTEGRATION_SUFFIXES ]]; then
-        continue
-    fi
-    if grep -qE "$NEEDS_DOCKER" "$file"; then
-        misrouted+=("$file")
-    fi
-done < <(find . -path ./node_modules -prune -o -path '*/src/test/java/*' -name '*Test.java' -print)
-```
-
-**What went wrong.** A Testcontainers test named `FooTest` passes on a laptop with Docker running
-and fails in the unit job, where Docker isn't available, and it looks like a broken test rather
-than a misnamed one. Separately, a repository-wide rename changed a comment inside an
-already-applied migration and every other gate stayed green. That became `MigrationChecksumTest`.
-
-**Adopt it.** Once you've explained a procedure to the agent twice, write it up as a skill.
-
-## 6. Look at it on a phone, in a real browser
-
-jsdom can't see a page that scrolls sideways, and it can't see iOS Safari zooming into a focused
-field. The e2e suite in `railhook-ui/e2e/layout.spec.ts` loads every page on its list in
-Chromium, at 390 px and at 1440 px, and fails on any field an iPhone would zoom into:
-
-```javascript
-async function smallFields(page: Page) {
-  return page.evaluate(() =>
-    Array.from(document.querySelectorAll<HTMLElement>('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select'))
-      .filter((el) => el.getBoundingClientRect().width > 0 && parseFloat(getComputedStyle(el).fontSize) < 16)
-      .map((el) => `${el.tagName.toLowerCase()}#${el.id || el.getAttribute('name') || '?'} ${getComputedStyle(el).fontSize}`),
-  );
-}
-```
-
-**What went wrong.** The registration form was cut off at the right edge of an iPhone in
-production. The test was written after that. On 19 September the same check caught a field on the
-signature verifier page, but only once that page had been added to the test's list. A guard only
-checks what it names.
-
-**Adopt it.** Run a real browser at a phone width in CI, and keep its list of pages complete.
-
-## 7. Verify the deploy from outside, and keep probing after
-
-Deploying is a manual workflow gated by a named approver. The deploy key on the host can run
-`deploy <tag>` and `status` and nothing else. After a deploy, the workflow checks the result from
-the outside. From `.github/workflows/deploy-prod.yml`:
-
-```bash
-# A 200 is not the release. 2.17.0 answered 200 while the host still served the
-# previous UI, pinned by an override, and this step called it deployed. The UI image
-# serves its own version; the query string keeps any cache out of the answer.
-want="${VERSION#v}"
-served=""
-for attempt in $(seq 1 12); do
-  served=$(curl -fsS --max-time 10 "https://railhook.io/version.txt?deploy=${GITHUB_RUN_ID}-${attempt}" | tr -d '[:space:]' || true)
-  [ "$served" = "$want" ] && break
-```
-
-**What went wrong.** On the 2.20.7 deploy the upgrade helper restarted the worker before the new
-API had run its migrations. The worker failed schema validation, crashed once and came back, and
-only the restart count showed it. `UpgradeOrderTest` now pins the order. Every night a k6 run
-brings up the whole stack and fails if FIFO ordering breaks under a backlog.
-
-**Adopt it.** A green pipeline isn't the release. Check the version the site is actually serving,
-from outside.
-
-## 8. Run agents in parallel, but keep them apart
-
-Several agents often work at once, each on its own branch in its own git worktree. Each branch
-gets one task file in `.claude/tasks/`, and `CLAUDE.md` calls that "the only one that authorizes writing code."
-Proposals live in `.claude/features/` and are "not work orders." Shared files are where parallel
-work collides, so translation keys arrive as hand-off files and a script merges them. The script
-refuses a key that two agents define differently.
-
-**Adopt it.** One branch, one worktree and one written task per agent, and a merge step for the
-files they all touch.
-
-## What still got through
+My tenant checks did exactly what they were built to do. They guard the boundary between customers.
+Nobody had named the boundary between projects *inside* one customer, so nothing guarded it. The fix
+came with tests for every place that looks something up by project today. A check that refuses the
+*next* unscoped lookup doesn't exist yet, and I'd rather say so than pretend otherwise.
 
 :::figure ai-bug-guardrail
 
-Between 13 and 18 September, 2.20.0 was followed by thirteen patch releases, and several of them
-were security fixes. In one, an API key for one project could rotate the signing secret of another
-project's endpoint in the same organization and get the new secret back. The tenancy ratchets
-guard the *organization* boundary, and nothing guarded the *project* boundary inside one. In
-another, a workflow node took a project id from its saved configuration, nothing checked it, and a
-workflow could write events into another organization's project. The fixes came with tests,
-including `ProjectResourceScopeIsolationTest` for every lookup that exists today. There is no
-ratchet yet that refuses the *next* unscoped lookup.
+**What I took from it: every guardrail has the shape of the bug that created it. The next incident
+will come from a kind of bug nobody has named yet, so after each fix I ask what the kind is, not
+only what the bug was.**
 
-A guardrail only refuses the bug it names. The next incident usually comes from the kind nobody
-has named yet.
+## What stayed with me
 
-## What the human does
+In my experience the agent is genuinely good at a lot. It reads a large codebase quickly, follows
+conventions once they're written down, writes thorough tests when asked, and explains in a commit
+message why a change is shaped the way it is. What it doesn't do is decide.
 
-The repository shows where the human decisions are. `ARCHITECTURE.md` records failure modes and
-scaling limits alongside the design. `ROADMAP.md` lists known gaps and what is deliberately not
-planned, such as exactly-once delivery or a hosted-only tier. The deploy workflow calls deploying
-"the one action here that is not reversible by reverting a commit", which is why a person
-approves it. The agent proposes, and often proposes
-well. Deciding scope, saying no, and approving what touches production stay with a person.
+Architecture stays with me, and so does the honest record of what each choice cost. I keep separate
+copies of shared data models in two services. That decision stands, it caused the bug this article
+opened with, and a check now pays for it. The roadmap says plainly what the system won't do,
+including exactly-once delivery. The architecture is good and not perfect, and the docs say where:
+the outbox is polled rather than streamed, there's no distributed tracing yet, and some recovery
+procedures aren't written down.
 
-## The architecture, honestly
+Scope stays with me too. Each branch has one written task, and the repository's instructions call it
+"the only one that authorizes writing code." Ideas live somewhere else and are "not work orders."
+When several agents work at once, each gets its own branch and working copy, so they can't step on
+each other.
 
-Some of it is strong. The event, its deliveries and the outbox row are written in one
-transaction, so a client either gets a `201` and the work will happen, or gets an error and none
-of it exists. Claim tokens fence off a worker's late write. Tenancy is enforced by Hibernate's
-`@TenantId` rather than by checks someone has to remember. Ordering is per endpoint, and the
-nightly probe tests it.
+And production stays with a person. Deploying is a manual step that someone approves by name,
+because, in the deploy workflow's own words, it is "the one action here that is not reversible by
+reverting a commit."
 
-Some of it isn't ideal. A poller announces the outbox, not change-data-capture: one fewer moving
-part, paid for with polling. The API and the worker keep separate copies of shared entities. That
-decision was kept, and it has already cost the two production bugs a ratchet now guards against.
-Delivery is at-least-once by design. There is no trace export. A rolling upgrade with two versions
-running at once is untested. And there is no written procedure for reconciling Postgres, Kafka and
-Redis after a restore from backup. The repository's own docs list every one of these.
+## What I'd tell you before you try this
 
-## A checklist to start with
+**You won't type less. You'll decide more.** The work moves from writing code to saying what correct
+means, precisely enough that a machine can check it.
 
-- One short instructions file per area of the code, with the reason next to each rule.
-- A glossary with an "avoid" line for every term.
-- Tests first, with the test's name deciding where it runs.
-- A ratchet for every class of bug you find: frozen exemptions, a vacuity guard, a failure
-  message written as an instruction.
-- Generated references (API spec, types, config) with a CI check for drift.
-- Invariants in the javadoc of the file where the next change will be made.
-- A real browser at a phone width in CI.
-- A manual deploy with a named approver, and a check from outside that the served version is the
-  one you shipped.
-- One worktree and one task file per agent.
-- After every incident, ask which check would have refused it, and write that check.
+**The agent finishes fast, and the edges take the time.** Code that looks done arrives almost
+immediately. Most of the real work is finding where it's wrong at the edges: two copies that drifted
+apart, a comment describing code that isn't there, a boundary nobody named.
 
-Everything above is in the [Railhook repository](https://github.com/vadymkykalo/railhook), MIT
-licensed, harness included.
+**Believe checks, not sentences.** An agent sounds just as confident when it's wrong as when it's
+right. Your trust has to come from something that runs.
+
+**Every surprise is a check you haven't written yet.** None of the guardrails I've described was
+designed up front. Each grew out of something that went wrong, and I don't know another way to grow
+them.
+
+**Keep production human.** Let the agent write the deploy script. Don't let it press the button.
+
+### The checklist
+
+- One short instructions file per area of the code, with the reason next to every rule.
+- A glossary that names each concept once and lists the words to avoid.
+- Failing test first, and a written procedure for where each kind of test lives.
+- A ratchet for every class of bug you find: known exceptions with reasons, a check that the scan
+  found something, and a failure message written as an instruction.
+- Generated references (API spec, types, configuration) with a CI check for drift.
+- One implementation of anything that must behave the same in two places.
+- The rules learned from past bugs, written into the files where the next change will happen.
+- A real browser at phone width in CI.
+- A deploy someone approves by name, and a check from outside that the site serves the version you
+  shipped.
+- One branch, one working copy and one written task per agent.
+- After every incident: which check would have refused this? Write that check.
