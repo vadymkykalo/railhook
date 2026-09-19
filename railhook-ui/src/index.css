@@ -63,6 +63,25 @@
     --warning: 31.7 100% 34.9%;
     --warning-foreground: 0 0% 100%;
 
+    /* Syntax — an IDE's palette, grown from the cobalt. No status hue. Every
+       value clears AA (>= 5.4:1) on paper and on mist. The code surface
+       (.surface-ink, below) and the dark page carry their own set. */
+    --code-fg: #0B0E1A;
+    --code-comment: #5A6072;
+    --code-punct: #4A5064;
+    --code-keyword: #1D4BFF;             /* cobalt — the words of the language */
+    --code-key: #1D4BFF;
+    --code-string: #9A4A1F;              /* terracotta */
+    --code-number: #4338B0;              /* numbers, literals, CONSTANTS */
+    --code-type: #0B6A9E;                /* types, generics, built-ins */
+    --code-function: #7A5B00;            /* calls and declarations */
+    --code-annotation: #B0246A;          /* @Annotations, decorators */
+    --code-variable: #0B6A9E;
+
+    /* Secondary text inside a blog figure: a step darker than slate (9.2:1
+       rather than 6.3:1), because it is set at 12px and scaled down on a phone. */
+    --figure-soft: 225 14% 30%;          /* #424757 */
+
     --radius: 0.625rem;                  /* 10px controls; cards are rounded-xl = 16px */
     --sidebar-width: 15rem;
     --header-height: 3.5rem;
@@ -111,6 +130,21 @@
     --success-foreground: 226.7 29% 6.1%;
     --warning: 34.8 85.4% 59.6%;
     --warning-foreground: 226.7 29% 6.1%;
+
+    --figure-soft: 222 18% 76%;          /* #B7BDCD  10.3:1 on the dark card */
+
+    /* The same set the code surface uses: >= 5.9:1 on this ground. */
+    --code-fg: #E6E8F2;
+    --code-comment: #8A90A6;
+    --code-punct: #A0A7BD;
+    --code-keyword: #8BA3FF;
+    --code-key: #8BA3FF;
+    --code-string: #F5B89A;
+    --code-number: #B6C4FF;
+    --code-type: #6CC4FF;
+    --code-function: #F2D17E;
+    --code-annotation: #FF9EC4;
+    --code-variable: #6CC4FF;
   }
 }
 
@@ -202,6 +236,19 @@
     --success-foreground: 233.3 39.1% 9%;
     --warning: 34.8 85.4% 59.6%;
     --warning-foreground: 233.3 39.1% 9%;
+
+    /* Syntax on ink: >= 5.9:1 on #0E1020 and on the dark page's #06070D. */
+    --code-fg: #E6E8F2;
+    --code-comment: #8A90A6;
+    --code-punct: #A0A7BD;
+    --code-keyword: #8BA3FF;
+    --code-key: #8BA3FF;
+    --code-string: #F5B89A;
+    --code-number: #B6C4FF;
+    --code-type: #6CC4FF;
+    --code-function: #F2D17E;
+    --code-annotation: #FF9EC4;
+    --code-variable: #6CC4FF;
   }
 
   /* On a dark page the code surface drops below the ground rather than
@@ -239,6 +286,22 @@
   from { opacity: 0; transform: scale(0.97); }
   to { opacity: 1; transform: scale(1); }
 }
+
+/* ── Syntax tokens ───────────────────────────────────────────────────────
+   Emitted by SyntaxHighlight. Outside any @layer so the purge never drops a
+   class that only a grammar produces. */
+.tok-comment { color: var(--code-comment); font-style: italic; }
+.tok-punct { color: var(--code-punct); }
+.tok-keyword { color: var(--code-keyword); font-weight: 500; }
+.tok-key { color: var(--code-key); }
+.tok-string { color: var(--code-string); }
+.tok-number { color: var(--code-number); }
+.tok-type { color: var(--code-type); }
+.tok-function { color: var(--code-function); }
+.tok-annotation { color: var(--code-annotation); }
+.tok-variable { color: var(--code-variable); }
+.tok-flag { color: var(--code-number); }
+.tok-member { color: var(--code-fg); }
 
 /* ── The attempt rail ────────────────────────────────────────────────────
    The signature device. A hairline with tick marks at exponential spacing,

@@ -134,7 +134,8 @@ describe('LandingPage', () => {
     renderLanding();
     const install = document.getElementById('install') as HTMLElement;
     expect(install).not.toBeNull();
-    expect(within(install).getByText(INSTALL)).toBeInTheDocument();
+    // Coloured token by token, so the command is the text of the whole line, not of one node.
+    expect(within(install).getByTestId('install-command').textContent).toBe(INSTALL);
     expect(within(install).getByRole('button', { name: en.landing.install.copyAria })).toBeInTheDocument();
   });
 

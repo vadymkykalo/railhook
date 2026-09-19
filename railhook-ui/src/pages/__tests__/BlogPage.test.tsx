@@ -53,6 +53,22 @@ describe('BlogPage', () => {
     for (const tag of post.tags) expect(within(article).getByText(tag)).toBeInTheDocument();
   });
 
+  it('makes the whole card one link: a single link per card, stretched over it', () => {
+    // jsdom does not hit-test a pseudo-element, so the click on the card body is verified in a
+    // browser; what can drift here is the structure the stretched link depends on.
+    renderBlog();
+    for (const post of posts) {
+      const link = screen.getByRole('link', { name: post.title });
+      const card = link.closest('article') as HTMLElement;
+      expect(within(card).getAllByRole('link')).toEqual([link]);
+      expect(link).toHaveAttribute('data-stretched-link');
+      expect(link.className).toMatch(/after:absolute/);
+      expect(link.className).toMatch(/after:inset-0/);
+      expect(card.className).toMatch(/\brelative\b/);
+      expect(card.className).toMatch(/cursor-pointer/);
+    }
+  });
+
   it('announces the feed in the head and links it on the page', () => {
     renderBlog();
     const alternate = document.head.querySelector('link[rel="alternate"][type="application/rss+xml"]');

@@ -22,8 +22,33 @@ import { BUILT_WITH_AI_FIGURES } from './figures/built-with-ai';
  */
 
 export const AXIS = { stroke: CHROME.rail, strokeWidth: 1 };
-export const LABEL = 'text-[11px]';
-export const MONO = 'font-mono text-[10px]';
+/**
+ * The type sizes every figure draws with, in viewBox units — which is pixels on a desktop, where a
+ * 720-wide drawing sits in a column about that wide, and roughly five-sixths of that on a phone,
+ * where the drawing keeps its minimum width and scrolls. Set so the smallest word on a phone is
+ * still about 10px.
+ */
+export const LABEL = 'text-[13px]';
+export const MONO = 'font-mono text-[12px]';
+/** Secondary text — notes, ticks, sub-lines: a stronger grey than `CHROME.muted`, which is for lines. */
+export const SOFT = 'hsl(var(--figure-soft))';
+
+/** Splits a sentence into lines of at most `max` characters, at spaces. */
+export function wrapWords(text: string, max: number): string[] {
+  const lines: string[] = [];
+  let current = '';
+  for (const word of text.split(' ')) {
+    if (current && current.length + 1 + word.length > max) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = current ? `${current} ${word}` : word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
 
 export function Figure({
   label,
@@ -46,7 +71,7 @@ export function Figure({
           aria-label={label}
           viewBox={viewBox}
           preserveAspectRatio="xMidYMid meet"
-          className={cn('h-auto w-full min-w-[520px]', className)}
+          className={cn('h-auto w-full min-w-[600px]', className)}
         >
           {children}
         </svg>
@@ -58,7 +83,7 @@ export function Figure({
 
 /** Seconds onto the 0…3-day axis, log-scaled: the first minute matters as much as the last day. */
 const SPAN_SECONDS = 259_200;
-const X0 = 168;
+const X0 = 214;
 const X1 = 702;
 
 function timeX(seconds: number): number {
@@ -106,7 +131,7 @@ function ProviderRetries() {
             x={timeX(tick.seconds)}
             y={264}
             textAnchor="middle"
-            fill={CHROME.muted}
+            fill={SOFT}
             className={MONO}
           >
             {f(`tick.${tick.key}`)}
@@ -120,7 +145,7 @@ function ProviderRetries() {
           <text x={36} y={lane.y - 5} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
             {f(`${lane.key}.name`)}
           </text>
-          <text x={36} y={lane.y + 10} fill={CHROME.muted} className={MONO}>
+          <text x={36} y={lane.y + 10} fill={SOFT} className={MONO}>
             {f(`${lane.key}.timeout`)}
           </text>
         </g>
@@ -140,7 +165,7 @@ function ProviderRetries() {
       <text x={timeX(60)} y={lanes[0].y + 4} fill={CHROME.ink} className={LABEL}>
         {f('stripe.body')}
       </text>
-      <text x={X1} y={lanes[0].y - 16} textAnchor="end" fill={CHROME.muted} className={MONO}>
+      <text x={X1} y={lanes[0].y - 16} textAnchor="end" fill={SOFT} className={MONO}>
         {f('stripe.end')}
       </text>
 
@@ -158,7 +183,7 @@ function ProviderRetries() {
       <text x={timeX(0) + 14} y={lanes[1].y - 8} fill={CHROME.ink} className={LABEL}>
         {f('github.body')}
       </text>
-      <text x={X1} y={lanes[1].y - 16} textAnchor="end" fill={CHROME.muted} className={MONO}>
+      <text x={X1} y={lanes[1].y - 16} textAnchor="end" fill={SOFT} className={MONO}>
         {f('github.end')}
       </text>
 
@@ -214,16 +239,16 @@ function RetryLadder() {
             <text x={x + width / 2} y={baseline - height - 8} textAnchor="middle" fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
               {f(`wait.${index}`)}
             </text>
-            <text x={x + width / 2} y={baseline + 16} textAnchor="middle" fill={CHROME.muted} className={MONO}>
+            <text x={x + width / 2} y={baseline + 16} textAnchor="middle" fill={SOFT} className={MONO}>
               {t('blog.figures.retryLadder.attempt', { number: index + 2 })}
             </text>
           </g>
         );
       })}
-      <text x={56} y={20} fill={CHROME.muted} className={LABEL}>
+      <text x={56} y={20} fill={SOFT} className={LABEL}>
         {f('axis')}
       </text>
-      <text x={690} y={baseline + 34} textAnchor="end" fill={CHROME.muted} className={LABEL}>
+      <text x={690} y={baseline + 34} textAnchor="end" fill={SOFT} className={LABEL}>
         {f('total')}
       </text>
     </Figure>
@@ -240,7 +265,7 @@ function GatewayPipeline() {
     { key: 'app', x: 522, width: 190, logos: [] as string[] },
   ];
   const y = 40;
-  const height = 124;
+  const height = 132;
   const middle = y + height / 2;
 
   return (
@@ -266,15 +291,19 @@ function GatewayPipeline() {
           <text x={box.x + box.width / 2} y={y + 28} textAnchor="middle" fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
             {f(`${box.key}.title`)}
           </text>
-          <text x={box.x + box.width / 2} y={y + 48} textAnchor="middle" fill={CHROME.muted} className={MONO}>
-            {f(`${box.key}.body`)}
+          <text x={box.x + box.width / 2} y={y + 48} textAnchor="middle" fill={SOFT} className={MONO}>
+            {wrapWords(f(`${box.key}.body`), 24).map((part, row) => (
+              <tspan key={row} x={box.x + box.width / 2} dy={row === 0 ? 0 : 16}>
+                {part}
+              </tspan>
+            ))}
           </text>
           {box.logos.map((logo, index) => (
             <image
               key={logo}
               href={`/logos/brand/${logo}.svg`}
               x={box.x + box.width / 2 - 32 + index * 24}
-              y={y + 62}
+              y={y + 76}
               width={16}
               height={16}
             />
@@ -285,11 +314,11 @@ function GatewayPipeline() {
       {/* What the gateway does, inside its own box: the three checks on the way in, then the one
           thing the stored copy makes possible afterwards. */}
       {['verify', 'dedup', 'store'].map((step, index) => (
-        <text key={step} x={boxes[1].x + 18} y={y + 72 + index * 15} fill={SERIES.brand} className={MONO}>
+        <text key={step} x={boxes[1].x + 18} y={y + 70 + index * 16} fill={SERIES.brand} className={MONO}>
           {f(`step.${step}`)}
         </text>
       ))}
-      <text x={boxes[1].x + 18} y={y + 72 + 3 * 15} fill={CHROME.muted} className={MONO}>
+      <text x={boxes[1].x + 18} y={y + 70 + 3 * 16} fill={SOFT} className={MONO}>
         {f('replay')}
       </text>
 

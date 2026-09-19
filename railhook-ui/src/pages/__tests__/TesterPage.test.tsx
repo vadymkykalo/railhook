@@ -79,7 +79,8 @@ describe('TesterPage', () => {
     await userEvent.click(screen.getByRole('button', { name: en.tester.create }));
 
     expect(await screen.findByText(URL)).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(`curl .*${URL}`))).toBeInTheDocument();
+    const command = screen.getByText((_, node) => node?.tagName === 'CODE' && /^curl /.test(node.textContent ?? ''));
+    expect(command.textContent).toContain(URL);
     expect(localStorage.getItem(STORAGE_KEY)).toBe(SLUG);
     expect(await screen.findByText(en.tester.waiting)).toBeInTheDocument();
   });

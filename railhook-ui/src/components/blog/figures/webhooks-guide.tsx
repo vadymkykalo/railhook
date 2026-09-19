@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { CHROME, SERIES } from '../../charts/chartTheme';
 import { cn } from '../../../lib/utils';
-import { AXIS, Figure, LABEL, MONO } from '../figures';
+import { AXIS, Figure, LABEL, MONO, SOFT, wrapWords } from '../figures';
 
 /**
  * The drawings for "Webhooks, explained", placed with `:::figure <key>`.
@@ -199,41 +199,59 @@ const WIRE = [
   { text: '  "data": { "order_id": "ord_8412", … } }', note: null },
 ] as const;
 
-/** One webhook request, with what each part of it is for. */
+/**
+ * One webhook request, with what each part of it is for.
+ *
+ * Set larger than the other figures — it is read line by line, not glanced at. The request keeps
+ * its own line spacing and the callouts keep theirs, joined by elbow leaders: three of the five
+ * annotated lines are adjacent, and callouts pinned to them would stack into each other.
+ */
 function WebhookAnatomy() {
   const f = useFigureText('webhookAnatomy');
-  const top = 34;
-  const step = 34;
-  const boxRight = 352;
+  const firstLine = 50;
+  const step = 32;
+  const boxRight = 404;
+  const calloutX = 440;
+  const calloutTop = 44;
+  const calloutStep = 62;
+  const notes = WIRE.map((line, index) => ({ ...line, y: firstLine + index * step })).filter((line) => line.note);
 
   return (
-    <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 720 314">
-      <rect x={8} y={top - 22} width={boxRight - 8} height={WIRE.length * step + 18} rx={10} fill="none" stroke={CHROME.rail} />
-      {WIRE.map((line, index) => {
-        const y = top + index * step;
+    <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 720 344">
+      <rect x={8} y={firstLine - 26} width={boxRight - 8} height={WIRE.length * step + 12} rx={10} fill="none" stroke={CHROME.rail} />
+      {WIRE.map((line, index) => (
+        <text
+          key={index}
+          x={22}
+          y={firstLine + index * step}
+          fill={line.note ? CHROME.ink : SOFT}
+          style={{ whiteSpace: 'pre' }}
+          className={cn('font-mono text-[14px]', line.note && line.note !== 'body' && 'font-semibold')}
+        >
+          {line.text}
+        </text>
+      ))}
+      {notes.map((line, index) => {
+        const y = calloutTop + index * calloutStep;
         return (
-          <g key={index}>
-            <text
-              x={22}
-              y={y}
-              fill={line.note ? CHROME.ink : CHROME.muted}
-              style={{ whiteSpace: 'pre' }}
-              className={cn(MONO, line.note && line.note !== 'body' && 'font-semibold')}
-            >
-              {line.text}
+          <g key={line.note}>
+            <circle cx={boxRight - 6} cy={line.y - 5} r={2.5} fill={SERIES.brand} />
+            <path
+              d={`M ${boxRight - 6} ${line.y - 5} L ${boxRight + 10} ${line.y - 5} L ${calloutX - 14} ${y - 5} L ${calloutX - 6} ${y - 5}`}
+              fill="none"
+              stroke={SERIES.brand}
+              strokeWidth={1}
+            />
+            <text x={calloutX} y={y} fill={CHROME.ink} className="text-[16px] font-semibold">
+              {f(`${line.note}.title`)}
             </text>
-            {line.note && (
-              <>
-                <line x1={boxRight + 4} y1={y - 3} x2={boxRight + 34} y2={y - 3} stroke={SERIES.brand} strokeWidth={1} />
-                <circle cx={boxRight + 4} cy={y - 3} r={2.5} fill={SERIES.brand} />
-                <text x={boxRight + 42} y={y - 6} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
-                  {f(`${line.note}.title`)}
-                </text>
-                <text x={boxRight + 42} y={y + 8} fill={CHROME.muted} className={MONO}>
-                  {f(`${line.note}.body`)}
-                </text>
-              </>
-            )}
+            <text x={calloutX} y={y + 20} fill={SOFT} className="text-[14px]">
+              {wrapWords(f(`${line.note}.body`), 36).map((part, row) => (
+                <tspan key={row} x={calloutX} dy={row === 0 ? 0 : 18}>
+                  {part}
+                </tspan>
+              ))}
+            </text>
           </g>
         );
       })}
@@ -244,13 +262,13 @@ function WebhookAnatomy() {
 /** Answer inside the sender's budget, do the work where nobody is waiting. */
 function ReceiverAck() {
   const f = useFigureText('receiverAck');
-  const X0 = 150;
-  const budgetEnd = 470;
+  const X0 = 176;
+  const budgetEnd = 490;
   const lanes = { request: 70, worker: 150, inline: 236 };
   const steps = [
-    { key: 'verify', x: X0, width: 56 },
-    { key: 'record', x: X0 + 60, width: 56 },
-    { key: 'enqueue', x: X0 + 120, width: 56 },
+    { key: 'verify', x: X0, width: 66 },
+    { key: 'record', x: X0 + 72, width: 66 },
+    { key: 'enqueue', x: X0 + 144, width: 66 },
   ];
 
   return (
@@ -265,7 +283,7 @@ function ReceiverAck() {
       {/* Drawn through the two lanes the sender is waiting on, and not through the worker's. */}
       <line x1={budgetEnd} y1={24} x2={budgetEnd} y2={lanes.request + 30} stroke={CHROME.ink} strokeWidth={1} strokeDasharray="4 3" />
       <line x1={budgetEnd} y1={lanes.inline - 22} x2={budgetEnd} y2={lanes.inline + 14} stroke={CHROME.ink} strokeWidth={1} strokeDasharray="4 3" />
-      <text x={X0} y={20} fill={CHROME.muted} className={MONO}>
+      <text x={X0} y={20} fill={SOFT} className={MONO}>
         {f('budget')}
       </text>
       <text x={budgetEnd + 6} y={20} fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
@@ -277,7 +295,7 @@ function ReceiverAck() {
           <text x={12} y={y - 4} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
             {f(`lane.${key}.title`)}
           </text>
-          <text x={12} y={y + 11} fill={CHROME.muted} className={MONO}>
+          <text x={12} y={y + 11} fill={SOFT} className={MONO}>
             {f(`lane.${key}.body`)}
           </text>
         </g>
@@ -287,28 +305,28 @@ function ReceiverAck() {
       {steps.map((step) => (
         <g key={step.key}>
           <rect x={step.x} y={lanes.request - 12} width={step.width} height={20} rx={4} fill={SERIES.brand} opacity={0.85} />
-          <text x={step.x + step.width / 2} y={lanes.request + 22} textAnchor="middle" fill={CHROME.muted} className={MONO}>
+          <text x={step.x + step.width / 2} y={lanes.request + 22} textAnchor="middle" fill={SOFT} className={MONO}>
             {f(`step.${step.key}`)}
           </text>
         </g>
       ))}
-      <line x1={X0 + 182} y1={lanes.request - 2} x2={X0 + 214} y2={lanes.request - 2} stroke={SERIES.ok} strokeWidth={1.5} markerEnd="url(#wg-ack-arrow-ok)" />
-      <text x={X0 + 220} y={lanes.request + 2} fill={SERIES.ok} className={cn(MONO, 'font-semibold')}>
+      <line x1={X0 + 216} y1={lanes.request - 2} x2={X0 + 244} y2={lanes.request - 2} stroke={SERIES.ok} strokeWidth={1.5} markerEnd="url(#wg-ack-arrow-ok)" />
+      <text x={X0 + 250} y={lanes.request + 2} fill={SERIES.ok} className={cn(MONO, 'font-semibold')}>
         {f('ok')}
       </text>
 
       {/* The queue hands the event to a worker, which takes as long as the work takes. */}
       <path
-        d={`M ${X0 + 148} ${lanes.request + 26} L ${X0 + 148} ${lanes.worker - 12}`}
+        d={`M ${X0 + 177} ${lanes.request + 26} L ${X0 + 177} ${lanes.worker - 12}`}
         fill="none"
         stroke={CHROME.muted}
         markerEnd="url(#wg-ack-arrow)"
       />
-      <rect x={X0 + 120} y={lanes.worker - 10} width={430} height={20} rx={4} fill={SERIES.brand} opacity={0.3} />
-      <text x={X0 + 130} y={lanes.worker + 4} fill={CHROME.ink} className={MONO}>
+      <rect x={X0 + 144} y={lanes.worker - 10} width={380} height={20} rx={4} fill={SERIES.brand} opacity={0.3} />
+      <text x={X0 + 154} y={lanes.worker + 4} fill={CHROME.ink} className={MONO}>
         {f('work')}
       </text>
-      <text x={708} y={lanes.worker + 26} textAnchor="end" fill={CHROME.muted} className={MONO}>
+      <text x={708} y={lanes.worker + 26} textAnchor="end" fill={SOFT} className={MONO}>
         {f('workNote')}
       </text>
 
@@ -322,7 +340,7 @@ function ReceiverAck() {
         <line x1={-5} y1={-5} x2={5} y2={5} stroke={SERIES.halt} strokeWidth={2} />
         <line x1={-5} y1={5} x2={5} y2={-5} stroke={SERIES.halt} strokeWidth={2} />
       </g>
-      <text x={budgetEnd + 6} y={lanes.inline + 26} fill={SERIES.halt} className={cn(MONO, 'font-semibold')}>
+      <text x={708} y={lanes.inline + 26} textAnchor="end" fill={SERIES.halt} className={cn(MONO, 'font-semibold')}>
         {f('inlineFail')}
       </text>
     </Figure>
@@ -347,7 +365,7 @@ const BACKOFF_SPAN = 86_400;
 function RetryBackoff() {
   const f = useFigureText('retryBackoff');
   const X0 = 172;
-  const X1 = 700;
+  const X1 = 650;
   const x = (seconds: number) => X0 + (Math.log1p(seconds) / Math.log1p(BACKOFF_SPAN)) * (X1 - X0);
   const retryY = 104;
   const onceY = 184;
@@ -366,7 +384,7 @@ function RetryBackoff() {
       <text x={x(0) + 6} y={40} fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
         {f('outage')}
       </text>
-      <text x={x(OUTAGE_SECONDS) + 6} y={40} fill={CHROME.muted} className={MONO}>
+      <text x={x(OUTAGE_SECONDS) + 6} y={40} fill={SOFT} className={MONO}>
         {f('back')}
       </text>
 
@@ -374,7 +392,7 @@ function RetryBackoff() {
       {ticks.map((tick) => (
         <g key={tick.key}>
           <line x1={x(tick.seconds)} y1={220} x2={x(tick.seconds)} y2={226} {...AXIS} />
-          <text x={x(tick.seconds)} y={240} textAnchor="middle" fill={CHROME.muted} className={MONO}>
+          <text x={x(tick.seconds)} y={240} textAnchor="middle" fill={SOFT} className={MONO}>
             {f(`tick.${tick.key}`)}
           </text>
         </g>
@@ -389,7 +407,7 @@ function RetryBackoff() {
           <text x={12} y={lane.y - 4} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
             {f(`${lane.key}.title`)}
           </text>
-          <text x={12} y={lane.y + 11} fill={CHROME.muted} className={MONO}>
+          <text x={12} y={lane.y + 11} fill={SOFT} className={MONO}>
             {f(`${lane.key}.body`)}
           </text>
         </g>
@@ -405,7 +423,7 @@ function RetryBackoff() {
               x={x(attempt.seconds)}
               y={index % 2 === 0 ? retryY - 12 : retryY + 20}
               textAnchor="middle"
-              fill={CHROME.muted}
+              fill={SOFT}
               className={MONO}
             >
               {attempt.label}
@@ -483,7 +501,7 @@ function DuplicateDelivery() {
       </text>
 
       {/* Without the check, the second arrival does the work a second time. */}
-      <text x={receiver + 12} y={rows.retry + 22} fill={CHROME.muted} className={MONO}>
+      <text x={receiver + 12} y={rows.retry + 22} fill={SOFT} className={MONO}>
         {f('without')}
       </text>
     </Figure>
@@ -494,7 +512,7 @@ function DuplicateDelivery() {
 function OutOfOrder() {
   const f = useFigureText('outOfOrder');
   const left = 150;
-  const right = 440;
+  const right = 410;
   const rowY = (index: number) => 70 + index * 52;
   const happened = ['created', 'updated', 'cancelled'];
   /** Arrival order: `created` failed its first attempt and came back last, as a retry. */
@@ -503,10 +521,10 @@ function OutOfOrder() {
 
   return (
     <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 720 240">
-      <text x={left} y={30} textAnchor="end" fill={CHROME.muted} className={cn(LABEL, 'font-semibold')}>
+      <text x={left} y={30} textAnchor="end" fill={SOFT} className={cn(LABEL, 'font-semibold')}>
         {f('happened')}
       </text>
-      <text x={right} y={30} fill={CHROME.muted} className={cn(LABEL, 'font-semibold')}>
+      <text x={right} y={30} fill={SOFT} className={cn(LABEL, 'font-semibold')}>
         {f('arrived')}
       </text>
 
@@ -541,14 +559,14 @@ function OutOfOrder() {
             x={708}
             y={rowY(index) + 4}
             textAnchor="end"
-            fill={verdict[key] === 'apply' ? SERIES.ok : CHROME.muted}
+            fill={verdict[key] === 'apply' ? SERIES.ok : SOFT}
             className={cn(MONO, 'font-semibold')}
           >
             {f(`verdict.${key}`)}
           </text>
         </g>
       ))}
-      <text x={708} y={226} textAnchor="end" fill={CHROME.muted} className={MONO}>
+      <text x={708} y={226} textAnchor="end" fill={SOFT} className={MONO}>
         {f('rule')}
       </text>
     </Figure>
@@ -565,7 +583,7 @@ function SecretRotation() {
   const deploy = 440;
   const overlapY = 84;
   const cutY = 186;
-  const barHeight = 14;
+  const barHeight = 18;
 
   return (
     <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 720 250">
@@ -577,7 +595,7 @@ function SecretRotation() {
           <text x={12} y={lane.y - 4} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
             {f(`${lane.key}.title`)}
           </text>
-          <text x={12} y={lane.y + 11} fill={CHROME.muted} className={MONO}>
+          <text x={12} y={lane.y + 11} fill={SOFT} className={MONO}>
             {f(`${lane.key}.body`)}
           </text>
         </g>
@@ -599,34 +617,34 @@ function SecretRotation() {
       ))}
 
       {/* With an overlap: the old secret keeps signing until it retires, alongside the new one. */}
-      <rect x={X0} y={overlapY - 20} width={retire - X0} height={barHeight} rx={4} fill={SERIES.brand} opacity={0.35} />
+      <rect x={X0} y={overlapY - 22} width={retire - X0} height={barHeight} rx={4} fill={SERIES.brand} opacity={0.35} />
       <text x={X0 + 6} y={overlapY - 9} fill={CHROME.ink} className={MONO}>
         {f('old')}
       </text>
       <rect x={rotate} y={overlapY + 2} width={X1 - rotate} height={barHeight} rx={4} fill={SERIES.brand} opacity={0.85} />
-      <text x={retire + 8} y={overlapY + 13} fill={CHROME.surface} className={cn(MONO, 'font-semibold')}>
+      <text x={retire + 8} y={overlapY + 15} fill={CHROME.surface} className={cn(MONO, 'font-semibold')}>
         {f('new')}
       </text>
       <text x={(rotate + retire) / 2} y={overlapY + 36} textAnchor="middle" fill={SERIES.ok} className={cn(MONO, 'font-semibold')}>
         {f('overlap.result')}
       </text>
-      <line x1={retire} y1={overlapY - 24} x2={retire} y2={overlapY + 20} stroke={CHROME.muted} strokeWidth={1} />
-      <text x={retire + 4} y={overlapY - 26} fill={CHROME.muted} className={MONO}>
+      <line x1={retire} y1={overlapY - 26} x2={retire} y2={overlapY + 22} stroke={CHROME.muted} strokeWidth={1} />
+      <text x={retire + 4} y={overlapY - 30} fill={SOFT} className={MONO}>
         {f('marker.retire')}
       </text>
 
       {/* Without: the old secret stops the instant it is rotated, and every request until the
           deploy fails verification. */}
-      <rect x={X0} y={cutY - 20} width={rotate - X0} height={barHeight} rx={4} fill={SERIES.brand} opacity={0.35} />
+      <rect x={X0} y={cutY - 22} width={rotate - X0} height={barHeight} rx={4} fill={SERIES.brand} opacity={0.35} />
       <text x={X0 + 6} y={cutY - 9} fill={CHROME.ink} className={MONO}>
         {f('old')}
       </text>
       <rect x={rotate} y={cutY + 2} width={X1 - rotate} height={barHeight} rx={4} fill={SERIES.brand} opacity={0.85} />
-      <rect x={rotate} y={cutY - 20} width={deploy - rotate} height={barHeight} rx={4} fill={SERIES.halt} opacity={0.3} />
+      <rect x={rotate} y={cutY - 22} width={deploy - rotate} height={barHeight} rx={4} fill={SERIES.halt} opacity={0.3} />
       <text x={(rotate + deploy) / 2} y={cutY - 9} textAnchor="middle" fill={SERIES.halt} className={cn(MONO, 'font-semibold')}>
         {f('cutover.result')}
       </text>
-      <text x={retire + 8} y={cutY + 13} fill={CHROME.surface} className={cn(MONO, 'font-semibold')}>
+      <text x={retire + 8} y={cutY + 15} fill={CHROME.surface} className={cn(MONO, 'font-semibold')}>
         {f('new')}
       </text>
     </Figure>

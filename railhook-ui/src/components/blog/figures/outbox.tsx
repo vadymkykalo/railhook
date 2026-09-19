@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { CHROME, SERIES } from '../../charts/chartTheme';
 import { cn } from '../../../lib/utils';
-import { Figure } from '../figures';
+import { Figure, LABEL, MONO, SOFT, wrapWords } from '../figures';
 
 /**
  * The drawings for the transactional outbox post: the three delivery semantics, the dual write,
@@ -13,9 +13,7 @@ import { Figure } from '../figures';
  * phone the type shrinks less.
  */
 
-const LABEL = 'text-[11px]';
-const MONO = 'font-mono text-[10px]';
-const NARROW = 'min-w-[480px]';
+const NARROW = 'min-w-[520px]';
 
 type Tone = 'ok' | 'halt' | 'brand' | 'skipped';
 
@@ -98,13 +96,18 @@ function DualWrite() {
                 x={xs[index]}
                 y={lane.y - 14}
                 textAnchor="middle"
-                fill={tone === 'skipped' ? CHROME.muted : CHROME.ink}
+                fill={tone === 'skipped' ? SOFT : CHROME.ink}
                 className={LABEL}
               >
                 {f(`${lane.key}.step${index}`)}
               </text>
-              <text x={xs[index]} y={lane.y + 22} textAnchor="middle" fill={CHROME.muted} className={MONO}>
-                {f(`${lane.key}.note${index}`)}
+              <text x={xs[index]} y={lane.y + 22} textAnchor="middle" fill={SOFT} className={MONO}>
+                {/* Wrapped: four notes share a 620-wide row, and a Ukrainian one runs to 25 characters. */}
+                {wrapWords(f(`${lane.key}.note${index}`), 20).map((part, row) => (
+                  <tspan key={row} x={xs[index]} dy={row === 0 ? 0 : 15}>
+                    {part}
+                  </tspan>
+                ))}
               </text>
             </g>
           ))}
@@ -151,88 +154,88 @@ function OutboxPipeline() {
 
       {/* Row one: accepted. */}
       {box(8, 20, 158, 118, 'api')}
-      <text x={22} y={62} fill={CHROME.muted} className={MONO}>
+      <text x={22} y={62} fill={SOFT} className={MONO}>
         {f('api.line0')}
       </text>
-      <text x={22} y={78} fill={CHROME.muted} className={MONO}>
+      <text x={22} y={78} fill={SOFT} className={MONO}>
         {f('api.line1')}
       </text>
       <text x={22} y={116} fill={SERIES.brand} className={cn(MONO, 'font-semibold')}>
         {f('api.line2')}
       </text>
 
-      {box(206, 20, 206, 150, 'postgres', true)}
+      {box(200, 20, 212, 150, 'postgres', true)}
       <image href="/logos/brand/postgresql.svg" x={384} y={28} width={18} height={18} />
-      <text x={220} y={58} fill={CHROME.muted} className={MONO}>
+      <text x={212} y={58} fill={SOFT} className={MONO}>
         {f('postgres.tx')}
       </text>
       {['events', 'deliveries', 'outbox'].map((row, index) => (
         <g key={row}>
           <rect
-            x={220}
+            x={212}
             y={68 + index * 30}
-            width={178}
+            width={186}
             height={22}
             rx={4}
             fill={SERIES.brand}
             opacity={row === 'outbox' ? 0.2 : 0.08}
           />
-          <text x={230} y={83 + index * 30} fill={CHROME.ink} className={MONO}>
+          <text x={222} y={83 + index * 30} fill={CHROME.ink} className={MONO}>
             {f(`postgres.${row}`)}
           </text>
         </g>
       ))}
 
-      {box(452, 20, 160, 118, 'publisher')}
+      {box(440, 20, 172, 118, 'publisher')}
       {['line0', 'line1', 'line2'].map((line, index) => (
-        <text key={line} x={466} y={62 + index * 16} fill={CHROME.muted} className={MONO}>
+        <text key={line} x={450} y={62 + index * 17} fill={SOFT} className={MONO}>
           {f(`publisher.${line}`)}
         </text>
       ))}
 
       {/* Row two: announced, then attempted. */}
-      {box(452, 222, 160, 108, 'kafka')}
+      {box(440, 222, 172, 108, 'kafka')}
       {/* The Kafka mark has no light version, so on ink it sits on a light tile, as on the landing page. */}
       <rect x={584} y={228} width={20} height={20} rx={4} className="fill-transparent dark:fill-foreground" />
       <image href="/logos/brand/apachekafka.svg" x={586} y={230} width={16} height={16} />
-      <text x={466} y={264} fill={CHROME.muted} className={MONO}>
+      <text x={450} y={264} fill={SOFT} className={MONO}>
         {f('kafka.line0')}
       </text>
-      <text x={466} y={280} fill={CHROME.muted} className={MONO}>
+      <text x={450} y={281} fill={SOFT} className={MONO}>
         {f('kafka.line1')}
       </text>
 
-      {box(206, 222, 206, 108, 'worker', true)}
-      <text x={220} y={264} fill={CHROME.muted} className={MONO}>
+      {box(200, 222, 212, 108, 'worker', true)}
+      <text x={212} y={264} fill={SOFT} className={MONO}>
         {f('worker.line0')}
       </text>
-      <text x={220} y={280} fill={CHROME.muted} className={MONO}>
+      <text x={212} y={281} fill={SOFT} className={MONO}>
         {f('worker.line1')}
       </text>
-      <text x={220} y={310} fill={SERIES.retry} className={cn(MONO, 'font-semibold')}>
+      <text x={212} y={310} fill={SERIES.retry} className={cn(MONO, 'font-semibold')}>
         {f('worker.line2')}
       </text>
 
       {box(8, 222, 158, 108, 'endpoint')}
-      <text x={22} y={264} fill={CHROME.muted} className={MONO}>
+      <text x={22} y={264} fill={SOFT} className={MONO}>
         {f('endpoint.line0')}
       </text>
-      <text x={22} y={280} fill={CHROME.muted} className={MONO}>
+      <text x={22} y={280} fill={SOFT} className={MONO}>
         {f('endpoint.line1')}
       </text>
-      <text x={22} y={296} fill={CHROME.muted} className={MONO}>
+      <text x={22} y={296} fill={SOFT} className={MONO}>
         {f('endpoint.line2')}
       </text>
 
       {/* The arrows, in the order the Event travels them. */}
-      <line x1={166} y1={79} x2={202} y2={79} stroke={CHROME.muted} markerEnd={arrow} />
-      <line x1={412} y1={79} x2={448} y2={79} stroke={CHROME.muted} markerEnd={arrow} />
+      <line x1={166} y1={79} x2={196} y2={79} stroke={CHROME.muted} markerEnd={arrow} />
+      <line x1={412} y1={79} x2={436} y2={79} stroke={CHROME.muted} markerEnd={arrow} />
       <line x1={532} y1={138} x2={532} y2={218} stroke={CHROME.muted} markerEnd={arrow} />
-      <text x={540} y={184} fill={CHROME.muted} className={MONO}>
+      <text x={540} y={184} fill={SOFT} className={MONO}>
         {f('arrow.produce')}
       </text>
-      <line x1={452} y1={276} x2={416} y2={276} stroke={CHROME.muted} markerEnd={arrow} />
-      <line x1={206} y1={276} x2={170} y2={276} stroke={CHROME.muted} markerEnd={arrow} />
+      <line x1={440} y1={276} x2={416} y2={276} stroke={CHROME.muted} markerEnd={arrow} />
+      <line x1={200} y1={276} x2={170} y2={276} stroke={CHROME.muted} markerEnd={arrow} />
 
       {/* The worker proves ownership against the rows the API wrote. */}
       <line x1={290} y1={218} x2={290} y2={174} stroke={SERIES.brand} strokeWidth={1.5} markerEnd={arrow} />
@@ -245,7 +248,7 @@ function OutboxPipeline() {
 
 /** Seconds onto the ordering timeline. */
 const ORDER_X0 = 88;
-const ORDER_X1 = 600;
+const ORDER_X1 = 560;
 const ORDER_SPAN = 90;
 
 function secondsX(seconds: number): number {
@@ -296,10 +299,10 @@ function OrderingHold() {
       <text x={secondsX(0) + 10} y={lanes[0] - 12} fill={CHROME.ink} className={LABEL}>
         {f('first.fail')}
       </text>
-      <text x={secondsX(retryAt) + 10} y={lanes[0] - 12} fill={CHROME.ink} className={LABEL}>
+      <text x={secondsX(retryAt)} y={lanes[0] - 12} textAnchor="middle" fill={CHROME.ink} className={LABEL}>
         {f('first.ok')}
       </text>
-      <text x={secondsX(8)} y={lanes[0] + 4} fill={SERIES.retry} className={MONO}>
+      <text x={(secondsX(0) + secondsX(retryAt)) / 2} y={lanes[0] + 4} textAnchor="middle" fill={SERIES.retry} className={MONO}>
         {f('first.wait')}
       </text>
 
@@ -322,10 +325,10 @@ function OrderingHold() {
           </g>
         );
       })}
-      <text x={secondsX(arrivals[0]) + 8} y={lanes[1] - 12} fill={CHROME.muted} className={MONO}>
+      <text x={secondsX(arrivals[0]) + 8} y={lanes[1] - 12} fill={SOFT} className={MONO}>
         {f('parked')}
       </text>
-      <text x={secondsX(releases[2]) + 12} y={lanes[3] + 4} fill={CHROME.ink} className={LABEL}>
+      <text x={secondsX(releases[2]) + 8} y={lanes[3] + 24} textAnchor="end" fill={CHROME.ink} className={LABEL}>
         {f('released')}
       </text>
 
@@ -342,10 +345,10 @@ function OrderingHold() {
       <text x={secondsX(gapTimeoutAt) + 6} y={18} fill={SERIES.halt} className={cn(MONO, 'font-semibold')}>
         {f('timeout.title')}
       </text>
-      <text x={secondsX(gapTimeoutAt) + 6} y={lanes[2] + 4} fill={CHROME.muted} className={MONO}>
+      <text x={secondsX(gapTimeoutAt) + 6} y={lanes[2] + 2} fill={SOFT} className={MONO}>
         {f('timeout.line0')}
       </text>
-      <text x={secondsX(gapTimeoutAt) + 6} y={lanes[2] + 18} fill={CHROME.muted} className={MONO}>
+      <text x={secondsX(gapTimeoutAt) + 6} y={lanes[2] + 18} fill={SOFT} className={MONO}>
         {f('timeout.line1')}
       </text>
 
@@ -353,7 +356,7 @@ function OrderingHold() {
       {[0, 15, 30, 45, 60, 75, 90].map((seconds) => (
         <g key={seconds}>
           <line x1={secondsX(seconds)} y1={axis} x2={secondsX(seconds)} y2={axis + 5} stroke={CHROME.rail} />
-          <text x={secondsX(seconds)} y={axis + 18} textAnchor="middle" fill={CHROME.muted} className={MONO}>
+          <text x={secondsX(seconds)} y={axis + 18} textAnchor="middle" fill={SOFT} className={MONO}>
             {t('blog.figures.orderingHold.tick', { seconds })}
           </text>
         </g>
@@ -398,7 +401,7 @@ function DeliverySemantics() {
           <text x={columns[index]} y={52} textAnchor="middle" fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
             {f(`${column}.title`)}
           </text>
-          <text x={columns[index]} y={68} textAnchor="middle" fill={CHROME.muted} className={MONO}>
+          <text x={columns[index]} y={68} textAnchor="middle" fill={SOFT} className={MONO}>
             {f(`${column}.note`)}
           </text>
         </g>
@@ -410,7 +413,7 @@ function DeliverySemantics() {
           <text x={16} y={row.y - 2} fill={row.strong ? SERIES.brand : CHROME.ink} className={cn(LABEL, 'font-semibold')}>
             {f(`${row.key}.name`)}
           </text>
-          <text x={16} y={row.y + 13} fill={CHROME.muted} className={MONO}>
+          <text x={16} y={row.y + 13} fill={SOFT} className={MONO}>
             {f(`${row.key}.rule`)}
           </text>
           {row.cells ? (
@@ -448,7 +451,7 @@ function DeliverySemantics() {
                 stroke={CHROME.muted}
                 strokeDasharray="3 3"
               />
-              <text x={(columns[0] + columns[1]) / 2} y={row.y + 2} textAnchor="middle" fill={CHROME.muted} className={MONO}>
+              <text x={(columns[0] + columns[1]) / 2} y={row.y + 2} textAnchor="middle" fill={SOFT} className={MONO}>
                 {f(`${row.key}.cell`)}
               </text>
             </g>
