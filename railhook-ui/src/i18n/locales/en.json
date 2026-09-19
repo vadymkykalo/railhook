@@ -2068,7 +2068,9 @@
       "response": "2 deliveries created",
       "readDocs": "Read the docs",
       "mcpTitle": "AI agents (MCP)",
-      "mcpBody": "Let Claude, Cursor or any MCP client send events and replay deliveries."
+      "mcpBody": "Let Claude, Cursor or any MCP client send events and replay deliveries.",
+      "portalTitle": "Customer portal",
+      "portalBody": "Embed a page where your own users add endpoints, see their deliveries and retry the failed ones."
     },
     "directions": {
       "inBody": "One address per service. Railhook checks that Stripe or GitHub really sent it, then passes it on to your app.",
@@ -4300,7 +4302,7 @@
     "openPortal": "Open portal",
     "empty": {
       "title": "No consumers yet",
-      "description": "Create one for each of your users who receives webhooks, then embed their portal in your product so they can manage their own endpoints."
+      "description": "Create one for each of your users who receives webhooks, then embed their portal in your product so they can manage their own endpoints. The “Open portal” button appears on the Consumer's row."
     },
     "toast": {
       "created": "Consumer created",
