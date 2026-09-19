@@ -4829,6 +4829,144 @@
         },
         "loop": "its own retry ladder",
         "replay": "replay, 7 days"
+      },
+      "dualWrite": {
+        "aria": "Three timelines of the same event, each with a process crash in it. Commit, then publish: the event is committed and the client told 201, the process dies, the publish never runs, and the event is accepted but never delivered. Publish, then commit: the message reaches Kafka, the commit fails and rolls back, the client gets an error and retries, and a worker receives a message about a row that does not exist. Outbox: the event and its outbox row are committed together, the client told 201, the process dies, and on restart the publisher finds the pending row and publishes it, so the event is delivered late and perhaps twice, but never lost.",
+        "caption": "The same crash in three places. Only the ordering that never has to do two things at once survives it, and its cost is that a message can go out twice.",
+        "commitFirst": {
+          "title": "Commit, then publish",
+          "outcome": "accepted, never delivered",
+          "step0": "COMMIT",
+          "note0": "event row saved",
+          "step1": "201 Created",
+          "note1": "client moves on",
+          "step2": "process dies",
+          "note2": "deploy, OOM, kill -9",
+          "step3": "publish",
+          "note3": "never runs"
+        },
+        "publishFirst": {
+          "title": "Publish, then commit",
+          "outcome": "a message about nothing",
+          "step0": "publish",
+          "note0": "message in Kafka",
+          "step1": "COMMIT fails",
+          "note1": "rolled back",
+          "step2": "500",
+          "note2": "client retries",
+          "step3": "worker reads it",
+          "note3": "no such row"
+        },
+        "outbox": {
+          "title": "Outbox: one transaction, then relay",
+          "outcome": "delivered: late, maybe twice",
+          "step0": "COMMIT",
+          "note0": "event + outbox row",
+          "step1": "201 Created",
+          "note1": "client moves on",
+          "step2": "process dies",
+          "note2": "the same crash",
+          "step3": "publisher",
+          "note3": "finds the row, publishes"
+        }
+      },
+      "outboxPipeline": {
+        "aria": "The pipeline. The API receives POST /api/v1/events and, in one Postgres transaction, writes the event, one delivery per matching subscription and one outbox row per delivery, then answers 201. A publisher polls the outbox every second with FOR UPDATE SKIP LOCKED and produces each row to Kafka's deliveries.dispatch topic, keyed by endpoint id. A worker consumes the message, claims the delivery row in Postgres with a fence token, and the Attempt Runner sends the signed request to the endpoint, whose webhook-id header is the delivery id. A failure goes back to Postgres as next_retry_at for the retry ladder.",
+        "caption": "Kafka carries the news; Postgres keeps the obligation. Every arrow after the first box can fail and be tried again, because the rows it announces are already committed.",
+        "api": {
+          "title": "API",
+          "line0": "POST /api/v1/events",
+          "line1": "Idempotency-Key",
+          "line2": "201 after COMMIT"
+        },
+        "postgres": {
+          "title": "Postgres",
+          "tx": "one transaction",
+          "events": "events: 1 row",
+          "deliveries": "deliveries: 1 per match",
+          "outbox": "outbox_messages: 1 each"
+        },
+        "publisher": {
+          "title": "Outbox publisher",
+          "line0": "polls every 1s",
+          "line1": "FOR UPDATE SKIP LOCKED",
+          "line2": "SENDING → PUBLISHED"
+        },
+        "kafka": {
+          "title": "Kafka",
+          "line0": "deliveries.dispatch",
+          "line1": "key = endpoint id"
+        },
+        "worker": {
+          "title": "Worker · Attempt Runner",
+          "line0": "claim · admit · send",
+          "line1": "classify · finalise",
+          "line2": "fail → next_retry_at"
+        },
+        "endpoint": {
+          "title": "Endpoint",
+          "line0": "signed POST",
+          "line1": "webhook-id =",
+          "line2": "the Delivery id"
+        },
+        "arrow": {
+          "produce": "produce",
+          "claim": "Claim + fence token"
+        }
+      },
+      "orderingHold": {
+        "aria": "A timeline of four ordered deliveries to one endpoint. Sequence 1 fails its first attempt at zero seconds and waits on its retry ladder; its second attempt succeeds at about 44 seconds. Sequences 2, 3 and 4 arrive a few seconds apart and are parked, which is a deferral and spends no attempt. When sequence 1 succeeds, they are released and delivered in order. A dashed line at 63 seconds marks the gap timeout, sixty seconds after sequence 2 was first parked: had sequence 1 still been failing by then, the parked deliveries would have gone without it.",
+        "caption": "Ordering is a hold, not a wall. A predecessor that recovers inside the gap timeout keeps the order; one that does not is overtaken, and webhook_ordering_gap_timeout_total counts it. The timings are illustrative; the 60-second default is not.",
+        "seq": "seq {{number}}",
+        "tick": "{{seconds}}s",
+        "first": {
+          "fail": "attempt 1: 503",
+          "ok": "attempt 2: 200",
+          "wait": "on the ladder, ~1m jittered"
+        },
+        "parked": "parked: a Deferral, no Attempt spent",
+        "released": "cursor moves, released in order",
+        "timeout": {
+          "title": "gap timeout: 60s",
+          "line0": "past this line,",
+          "line1": "seq 2 goes without seq 1"
+        }
+      },
+      "deliverySemantics": {
+        "aria": "A table of delivery semantics against two failures. In the first, the request is lost on the way and the receiver never sees it. In the second, the receiver processes the request and the response is lost. The sender sees the same thing in both: a timeout. At-most-once never resends, so the first case loses the event and the second processes it once. At-least-once resends until it hears back, so the first case processes it once and the second processes it twice. Exactly-once would need the sender to tell the two cases apart, which it cannot. At-least-once with the receiver deduplicating on webhook-id processes the event once in both cases.",
+        "caption": "The sender cannot tell a lost request from a lost response. Exactly-once delivery would need it to; exactly-once effect only needs the receiver to remember what it has done.",
+        "sees": "what the sender sees in both: a timeout",
+        "lost": {
+          "title": "request lost",
+          "note": "receiver never saw it"
+        },
+        "ackLost": {
+          "title": "response lost",
+          "note": "receiver processed it"
+        },
+        "atMostOnce": {
+          "name": "at-most-once",
+          "rule": "send, never resend",
+          "cell0": "lost",
+          "cell1": "processed once"
+        },
+        "atLeastOnce": {
+          "name": "at-least-once",
+          "rule": "resend until acknowledged",
+          "cell0": "processed once",
+          "cell1": "processed twice"
+        },
+        "exactlyOnce": {
+          "name": "exactly-once",
+          "rule": "resend only if not processed",
+          "cell": "needs to know which column it is in"
+        },
+        "dedupe": {
+          "name": "at-least-once + dedupe",
+          "rule": "receiver keys on webhook-id",
+          "cell0": "processed once",
+          "cell1": "processed once"
+        }
       }
     }
   }

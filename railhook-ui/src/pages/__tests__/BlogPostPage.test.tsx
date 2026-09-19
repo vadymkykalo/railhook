@@ -16,6 +16,9 @@ import { blogPosts } from '../../lib/blog';
  */
 const POST = blogPosts('en')[0];
 
+/** The provider comparison, for the assertions that are about its content rather than the contract. */
+const PROVIDERS = 'stripe-github-shopify-when-your-endpoint-is-down';
+
 function renderPost(slug = POST.slug, signedIn = false) {
   return renderPage(<BlogPostPage />, {
     path: '/blog/:slug',
@@ -78,7 +81,7 @@ describe('BlogPostPage', () => {
     expect(within(article).getAllByRole('heading', { level: 2 }).length).toBeGreaterThan(2);
   });
 
-  it('draws its diagrams, each with a text alternative, in the vendors’ own bundled logos', () => {
+  it('draws its diagrams, each with a text alternative and a caption', () => {
     renderPost();
     const figures = screen.getAllByRole('figure');
     expect(figures.length).toBeGreaterThanOrEqual(2);
@@ -86,6 +89,10 @@ describe('BlogPostPage', () => {
       expect(within(figure).getByRole('img').getAttribute('aria-label')?.length).toBeGreaterThan(40);
       expect(figure.querySelector('figcaption')?.textContent).toBeTruthy();
     }
+  });
+
+  it('draws the provider timeline in the vendors’ own bundled logos', () => {
+    renderPost(PROVIDERS);
     const timeline = screen.getByRole('img', { name: en.blog.figures.providerRetries.aria });
     const logos = Array.from(timeline.querySelectorAll('image')).map((image) => image.getAttribute('href'));
     for (const name of ['stripe', 'github', 'shopify']) {
@@ -94,7 +101,7 @@ describe('BlogPostPage', () => {
   });
 
   it('compares the providers in a table, with their logos and links to their own docs', () => {
-    renderPost();
+    renderPost(PROVIDERS);
     const table = screen.getByRole('table');
     expect(within(table).getAllByRole('columnheader').length).toBeGreaterThanOrEqual(4);
     expect(within(table).getAllByRole('row').length).toBe(4);
