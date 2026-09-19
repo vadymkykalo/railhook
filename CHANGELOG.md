@@ -20,13 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it; how the publisher, the Claim and its fence, the Attempt Runner's invariants and the retry
   ladders absorb every duplicate but the one a receiver dedupes on `webhook-id`; and what a polling
   publisher leaves open compared with CDC. Four new diagrams, in English and Ukrainian.
-
-- **Article: "AI-written code you can trust: how a production webhook gateway was built with
-  Claude Code"** — how Railhook was built by directing an AI agent, and the harness that makes
-  that code deployable: per-area `CLAUDE.md` files, a domain glossary, ratchet tests, generated
-  references, phone-width browser tests and deploy verification, each with the real incident
-  behind it. Numbers come from this repository's git history, with the method for each. Four
-  figures, and a Ukrainian translation alongside.
+- **Article: "How to build software with an AI coding agent that you can actually trust"** —
+  lessons from building Railhook by directing an AI agent, each drawn from a real incident: where
+  the agent was confidently wrong, why written rules are not enough, and the checks that now refuse
+  each class of bug. Two figures, and a Ukrainian translation alongside.
 
 - **A live demo, "Try the live demo"**, on the landing page's hero, on `/pricing` and in the
   Developers menu: `/demo` opens the real dashboard signed in to a sample organization — project
