@@ -5,7 +5,8 @@ import java.util.UUID;
 
 /**
  * What the public demo is set up with: the Endpoints and Subscriptions of project "Acme Shop",
- * its two Sources and their Destinations. Fixed ids, so seeding it twice finds it already there.
+ * its two Sources and their Destinations, and three Workflows. Fixed ids, so seeding it twice
+ * finds it already there.
  *
  * <p>Every URL is on a {@code .example} host (RFC 2606): reserved for documentation, never
  * delegated, so nothing here names a machine anybody runs. Nothing is ever sent to them either —
@@ -77,6 +78,102 @@ final class DemoCatalog {
             "https://hooks.chat-relay.example/services/T0ACME/B0DEPLOYS", Profile.MOSTLY_RELIABLE, 95);
 
     static final List<DemoDestination> DESTINATIONS = List.of(STRIPE_TO_BILLING, GITHUB_TO_CI, GITHUB_TO_CHAT);
+
+    /**
+     * A workflow as the builder saves it: {@code definition} is the canvas's own JSON — nodes with
+     * a type, a position and their data, edges between them — which the engine runs as it is.
+     * The nodes are listed in an order the edges allow, which is the order {@link DemoHistory}
+     * walks them in.
+     */
+    record DemoWorkflow(UUID id, String name, String description, String eventTypePattern, String definition) {
+
+        String triggerConfig() {
+            return "{\"eventTypePattern\":\"" + eventTypePattern + "\"}";
+        }
+    }
+
+    /** A branch: large orders alert the sales channel, the rest earn loyalty points. */
+    static final DemoWorkflow HIGH_VALUE_ORDERS = new DemoWorkflow(id(0x60), "Route high-value orders",
+            "Orders of $100 or more alert the sales channel; every other order earns loyalty points.",
+            "order.created", """
+            {"nodes": [
+              {"id": "trigger", "type": "webhookTrigger", "position": {"x": 240, "y": 0},
+               "data": {"label": "Order created", "eventTypePattern": "order.created"}},
+              {"id": "is_high_value", "type": "branch", "position": {"x": 240, "y": 130},
+               "data": {"label": "Total $100 or more?", "conditions": {"type": "group", "op": "AND", "children": [
+                 {"type": "predicate", "field": "data.total", "operator": "GTE", "value": 100, "valueType": "NUMBER"}]}}},
+              {"id": "vip_alert", "type": "transform", "position": {"x": 40, "y": 280},
+               "data": {"label": "Build the sales alert",
+                        "template": "{\\"text\\": \\"High-value order {{data.id}}: {{data.total}} {{data.currency}} from {{data.customer.email}}\\", \\"order_id\\": \\"{{data.id}}\\", \\"total\\": \\"{{data.total}}\\"}"}},
+              {"id": "notify_sales", "type": "delivery", "position": {"x": 40, "y": 410},
+               "data": {"label": "Alert the sales channel", "endpointId": "%s", "eventType": "order.high_value"}},
+              {"id": "loyalty_points", "type": "transform", "position": {"x": 440, "y": 280},
+               "data": {"label": "Work out loyalty points",
+                        "template": "{\\"customer_id\\": \\"{{data.customer.id}}\\", \\"order_id\\": \\"{{data.id}}\\", \\"order_total\\": \\"{{data.total}}\\", \\"reason\\": \\"order\\"}"}},
+              {"id": "credit_points", "type": "delivery", "position": {"x": 440, "y": 410},
+               "data": {"label": "Credit the points", "endpointId": "%s", "eventType": "loyalty.points_earned"}}
+            ],
+            "edges": [
+              {"id": "trigger-is_high_value", "source": "trigger", "target": "is_high_value"},
+              {"id": "is_high_value-vip_alert", "source": "is_high_value", "sourceHandle": "true", "target": "vip_alert"},
+              {"id": "vip_alert-notify_sales", "source": "vip_alert", "target": "notify_sales"},
+              {"id": "is_high_value-loyalty_points", "source": "is_high_value", "sourceHandle": "false", "target": "loyalty_points"},
+              {"id": "loyalty_points-credit_points", "source": "loyalty_points", "target": "credit_points"}
+            ]}
+            """.formatted(ALERTS.id(), ORDERS.id()));
+
+    /** A filter and a delay: a declined card gets five minutes to be retried before billing chases it. */
+    static final DemoWorkflow CARD_DECLINES = new DemoWorkflow(id(0x61), "Chase declined cards",
+            "Waits five minutes after a declined card payment over $50, then asks billing to send the customer a retry link.",
+            "payment.failed", """
+            {"nodes": [
+              {"id": "trigger", "type": "webhookTrigger", "position": {"x": 240, "y": 0},
+               "data": {"label": "Payment failed", "eventTypePattern": "payment.failed"}},
+              {"id": "declined_over_50", "type": "filter", "position": {"x": 240, "y": 130},
+               "data": {"label": "Card declined, over $50", "conditions": {"type": "group", "op": "AND", "children": [
+                 {"type": "predicate", "field": "data.failure_code", "operator": "EQ", "value": "card_declined", "valueType": "STRING"},
+                 {"type": "predicate", "field": "data.amount", "operator": "GT", "value": 50, "valueType": "NUMBER"}]}}},
+              {"id": "wait", "type": "delay", "position": {"x": 240, "y": 260},
+               "data": {"label": "Give the customer five minutes", "delaySeconds": 300}},
+              {"id": "retry_link", "type": "transform", "position": {"x": 240, "y": 390},
+               "data": {"label": "Build the retry request",
+                        "template": "{\\"payment_id\\": \\"{{data.id}}\\", \\"order_id\\": \\"{{data.order_id}}\\", \\"amount\\": \\"{{data.amount}}\\", \\"currency\\": \\"{{data.currency}}\\", \\"action\\": \\"send_retry_link\\"}"}},
+              {"id": "ask_billing", "type": "delivery", "position": {"x": 240, "y": 520},
+               "data": {"label": "Ask billing to send a retry link", "endpointId": "%s", "eventType": "payment.retry_requested"}}
+            ],
+            "edges": [
+              {"id": "trigger-declined_over_50", "source": "trigger", "target": "declined_over_50"},
+              {"id": "declined_over_50-wait", "source": "declined_over_50", "target": "wait"},
+              {"id": "wait-retry_link", "source": "wait", "target": "retry_link"},
+              {"id": "retry_link-ask_billing", "source": "retry_link", "target": "ask_billing"}
+            ]}
+            """.formatted(BILLING.id()));
+
+    /** A wildcard trigger and a filter of two conditions: delivered parcels turn into review requests. */
+    static final DemoWorkflow SHIPMENT_REVIEWS = new DemoWorkflow(id(0x62), "Ask for a review on delivery",
+            "Every shipment event is checked; a parcel UPS or DHL has delivered becomes a review request.",
+            "shipment.*", """
+            {"nodes": [
+              {"id": "trigger", "type": "webhookTrigger", "position": {"x": 240, "y": 0},
+               "data": {"label": "Any shipment event", "eventTypePattern": "shipment.*"}},
+              {"id": "delivered", "type": "filter", "position": {"x": 240, "y": 130},
+               "data": {"label": "Delivered by UPS or DHL", "conditions": {"type": "group", "op": "AND", "children": [
+                 {"type": "predicate", "field": "data.status", "operator": "EQ", "value": "delivered", "valueType": "STRING"},
+                 {"type": "predicate", "field": "data.carrier", "operator": "IN", "value": ["UPS", "DHL"], "valueType": "ARRAY_STRING"}]}}},
+              {"id": "review_request", "type": "transform", "position": {"x": 240, "y": 260},
+               "data": {"label": "Build the review request",
+                        "template": "{\\"order_id\\": \\"{{data.order_id}}\\", \\"carrier\\": \\"{{data.carrier}}\\", \\"tracking_number\\": \\"{{data.tracking_number}}\\", \\"template\\": \\"review_request_v2\\"}"}},
+              {"id": "send_request", "type": "delivery", "position": {"x": 240, "y": 390},
+               "data": {"label": "Hand it to the order service", "endpointId": "%s", "eventType": "review.requested"}}
+            ],
+            "edges": [
+              {"id": "trigger-delivered", "source": "trigger", "target": "delivered"},
+              {"id": "delivered-review_request", "source": "delivered", "target": "review_request"},
+              {"id": "review_request-send_request", "source": "review_request", "target": "send_request"}
+            ]}
+            """.formatted(ORDERS.id()));
+
+    static final List<DemoWorkflow> WORKFLOWS = List.of(HIGH_VALUE_ORDERS, CARD_DECLINES, SHIPMENT_REVIEWS);
 
     static List<DemoSubscription> subscriptionsFor(String eventType) {
         return SUBSCRIPTIONS.stream().filter(s -> s.eventType().equals(eventType)).toList();
