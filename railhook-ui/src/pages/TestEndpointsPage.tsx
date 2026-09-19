@@ -16,6 +16,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
 import { cn } from '../lib/utils';
 import { formatJson } from '../lib/json';
 
@@ -160,13 +161,15 @@ export default function TestEndpointsPage() {
     );
   }
 
+  // Shown to everyone, disabled with the reason for a member who may not use it: an empty page
+  // with no button at all read as a broken one.
   const createButton = (label: string) => (
-    canManageTestEndpoints ? (
+    <PermissionGate allowed={canManageTestEndpoints}>
       <Button onClick={handleCreate} disabled={creating}>
         {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
         {label}
       </Button>
-    ) : null
+    </PermissionGate>
   );
 
   if (loadError) {
