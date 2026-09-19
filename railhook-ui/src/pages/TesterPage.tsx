@@ -6,6 +6,7 @@ import { Check, Copy, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import CaptchaWidget, { isCaptchaConfigured } from '../components/CaptchaWidget';
 import JsonBlock from '../components/JsonBlock';
+import SyntaxHighlight from '../components/SyntaxHighlight';
 import { publicBinApi, type PublicBin, type PublicBinRequest } from '../api/publicBin.api';
 import { queryKeys } from '../api/queries';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
@@ -99,6 +100,7 @@ function CopyButton({ value }: { value: string }) {
 }
 
 function CodeLine({ value, prompt = false }: { value: string; prompt?: boolean }) {
+  // A prompted line is a shell command and is coloured as one; a bare line is a URL, which is data.
   return (
     <div className="surface-ink flex items-center gap-3 overflow-hidden rounded-xl border border-rail py-2.5 pl-4 pr-3">
       <pre
@@ -107,7 +109,7 @@ function CodeLine({ value, prompt = false }: { value: string; prompt?: boolean }
           prompt && "before:select-none before:text-muted-foreground before:content-['$_']",
         )}
       >
-        <code>{value}</code>
+        <code>{prompt ? <SyntaxHighlight code={value} language="bash" /> : value}</code>
       </pre>
       <CopyButton value={value} />
     </div>

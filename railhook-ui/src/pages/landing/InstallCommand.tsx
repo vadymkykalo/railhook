@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
+import SyntaxHighlight from '../../components/SyntaxHighlight';
 
 export const INSTALL_COMMAND = 'curl -fsSL https://railhook.io/install.sh | bash';
 
@@ -50,7 +51,9 @@ export default function InstallCommand({ label = false, id, className }: { label
             data-testid="install-command"
             className="min-w-0 flex-1 overflow-x-auto whitespace-pre py-1 font-mono text-[13px] leading-relaxed [scrollbar-width:thin] before:select-none before:text-muted-foreground before:content-['$_'] sm:text-sm"
           >
-            <code>{INSTALL_COMMAND}</code>
+            <code>
+              <SyntaxHighlight code={INSTALL_COMMAND} language="bash" />
+            </code>
           </pre>
           <button
             type="button"

@@ -46,6 +46,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gauges (and so the `webhook_dlq_depth` alert) leave it out.
 - Docs: **Self-hosting → Live demo**, how to turn it on and why it is off, in English and
   Ukrainian.
+- **Syntax highlighting like an IDE on the public site.** Blog code blocks are coloured by kind
+  (keywords, strings, numbers and constants, comments, types and generics, Java `@Annotations`,
+  function calls, punctuation) in Java, JavaScript/TypeScript, Python, SQL, YAML, JSON, HTTP and
+  shell; an unknown language stays plain text. The install command and the tester's `curl` are
+  coloured too. It is the site's own scanner — no highlighting library, nothing compiled at
+  runtime, so the CSP is unchanged — about 1 kB gzipped more, only on the pages that show code.
+  The palette grows from the brand cobalt, avoids every status colour and clears WCAG AA in both
+  themes.
+
+### Changed
+
+- **Blog figures are easier to read**: every label and note is set 2px larger, secondary text is
+  a darker grey, and the figures that crowded were re-laid out. "Anatomy of a webhook request" is
+  set larger still, with its five callouts spaced apart and their descriptions wrapped.
+- **Blog byline, tags and the "sources checked" note are larger**, and a whole post card on
+  `/blog` is now the link, with a focus ring around the card.
 
 ### Fixed
 

@@ -1,16 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { CHROME, SERIES } from '../../charts/chartTheme';
 import { cn } from '../../../lib/utils';
-import { Figure } from '../figures';
+import { AXIS, Figure, LABEL, MONO, SOFT } from '../figures';
 
 /**
  * The figures of "how to build software with an AI coding agent that you can actually trust":
  * the loop every change goes around, and the bugs that became guardrails.
  */
 
-const AXIS = { stroke: CHROME.rail, strokeWidth: 1 };
-const LABEL = 'text-[11px]';
-const MONO = 'font-mono text-[10px]';
 
 function useFigureText(key: string) {
   const { t } = useTranslation();
@@ -31,9 +28,9 @@ const OWNER_STROKE: Record<Owner, { stroke: string; width: number; dash?: string
 
 function HarnessLoop() {
   const f = useFigureText('aiHarnessLoop');
-  const width = 152;
+  const width = 164;
   const height = 70;
-  const gap = 23;
+  const gap = 20;
   const x = (column: number) => 16 + column * (width + gap);
   const rowTop = 64;
   const rowBottom = 232;
@@ -50,7 +47,7 @@ function HarnessLoop() {
   const incident = { x: x(1), y: 344, width: 2 * width + gap, height: 40 };
 
   return (
-    <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 720 400">
+    <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 740 400">
       <defs>
         <marker id="ai-loop-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
           <path d="M0,0 L8,4 L0,8 z" fill={CHROME.muted} />
@@ -97,13 +94,13 @@ function HarnessLoop() {
               strokeWidth={style.width}
               strokeDasharray={style.dash}
             />
-            <text x={left + 12} y={box.y + 22} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+            <text x={left + 10} y={box.y + 22} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
               {f(`box.${box.key}.title`)}
             </text>
-            <text x={left + 12} y={box.y + 41} fill={CHROME.muted} className={MONO}>
+            <text x={left + 10} y={box.y + 41} fill={SOFT} className={MONO}>
               {f(`box.${box.key}.line1`)}
             </text>
-            <text x={left + 12} y={box.y + 56} fill={CHROME.muted} className={MONO}>
+            <text x={left + 10} y={box.y + 57} fill={SOFT} className={MONO}>
               {f(`box.${box.key}.line2`)}
             </text>
           </g>
@@ -190,13 +187,13 @@ function HarnessLoop() {
         markerEnd="url(#ai-loop-arrow)"
       />
       <path
-        d={`M ${incident.x + incident.width} ${incident.y + incident.height / 2} L 708 ${incident.y + incident.height / 2} L 708 48 L ${x(1) + width / 2} 48 L ${x(1) + width / 2} ${rowTop - 3}`}
+        d={`M ${incident.x + incident.width} ${incident.y + incident.height / 2} L 732 ${incident.y + incident.height / 2} L 732 48 L ${x(1) + width / 2} 48 L ${x(1) + width / 2} ${rowTop - 3}`}
         fill="none"
         stroke={SERIES.brand}
         strokeWidth={1.5}
         markerEnd="url(#ai-loop-arrow-brand)"
       />
-      <text x={700} y={incident.y + incident.height / 2 - 8} textAnchor="end" fill={SERIES.brand} className={cn(MONO, 'font-semibold')}>
+      <text x={724} y={incident.y + incident.height / 2 - 8} textAnchor="end" fill={SERIES.brand} className={cn(MONO, 'font-semibold')}>
         {f('feedback')}
       </text>
     </Figure>
@@ -210,7 +207,7 @@ function BugGuardrail() {
   const f = useFigureText('aiBugGuardrail');
   const top = 54;
   const row = 50;
-  const columns = { bug: 16, caught: 316, guard: 486 };
+  const columns = { bug: 16, caught: 300, guard: 486 };
 
   return (
     <Figure label={f('aria')} caption={f('caption')} viewBox={`0 0 720 ${top + BUGS.length * row + 8}`}>
@@ -220,7 +217,7 @@ function BugGuardrail() {
         </marker>
       </defs>
       {(['bug', 'caught', 'guard'] as const).map((column) => (
-        <text key={column} x={columns[column]} y={30} fill={CHROME.muted} className={cn(MONO, 'uppercase tracking-wider')}>
+        <text key={column} x={columns[column]} y={30} fill={SOFT} className={cn(MONO, 'uppercase tracking-wider')}>
           {f(`head.${column}`)}
         </text>
       ))}
@@ -233,10 +230,10 @@ function BugGuardrail() {
             <text x={columns.bug} y={y + 12} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
               {f(`row.${bug}.bug`)}
             </text>
-            <text x={columns.bug} y={y + 28} fill={CHROME.muted} className={MONO}>
+            <text x={columns.bug} y={y + 28} fill={SOFT} className={MONO}>
               {f(`row.${bug}.detail`)}
             </text>
-            <text x={columns.caught} y={y + 12} fill={CHROME.muted} className={MONO}>
+            <text x={columns.caught} y={y + 12} fill={SOFT} className={MONO}>
               {f(`row.${bug}.caught`)}
             </text>
             <line
