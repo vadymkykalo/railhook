@@ -29,8 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with nothing of the demo's left does nothing.
 - The demo's order amounts were formatted with the server's locale, so on a comma-decimal locale no
   numeric workflow condition could read them; they use a fixed format now.
-- The Ukrainian AI article reads naturally, and it no longer carries the note about provider
-  figures, which it has none of.
+- The Ukrainian AI article reads naturally.
 
 ## [2.26.0] - 2026-09-19
 
