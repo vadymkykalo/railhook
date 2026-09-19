@@ -1,5 +1,7 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.security.DemoSessions;
+import com.webhook.platform.api.security.AllowedInDemo;
 import com.webhook.platform.api.domain.enums.SessionClient;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.ChangePasswordRequest;
@@ -209,6 +211,7 @@ public class AuthController {
             @ApiResponse(responseCode = "204", description = "Logged out successfully"),
             @ApiResponse(responseCode = "401", description = "Not authenticated")
     })
+    @AllowedInDemo(reason = "ends the caller's own demo session; the demo branch below touches nothing else")
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@CookieValue(value = "refresh_token", required = false) String cookieRefreshToken,
             @RequestBody(required = false) LogoutRequest request,
@@ -218,6 +221,12 @@ public class AuthController {
         String accessToken = (authHeader != null && authHeader.startsWith("Bearer "))
                 ? authHeader.substring(7)
                 : null;
+        if (DemoSessions.isCurrent()) {
+            // The demo token only. A refresh cookie in this browser belongs to whoever uses it
+            // for their real account, and leaving the demo must not sign them out of that.
+            authService.logout(accessToken, null);
+            return ResponseEntity.noContent().build();
+        }
         String refreshToken = cookieRefreshToken != null ? cookieRefreshToken
                 : (request != null ? request.getRefreshToken() : null);
 
@@ -295,6 +304,7 @@ public class AuthController {
                 auth.requireUserId(),
                 auth.role());
         response.setPlatformAdmin(platformAdminAccessService.offersPanelTo(auth.requireUserId()));
+        response.setDemo(DemoSessions.isCurrent());
         return ResponseEntity.ok(response);
     }
 

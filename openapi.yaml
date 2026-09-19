@@ -37,12 +37,49 @@ tags:
     \ for them"
 - name: Test Endpoints
   description: Webhook testing tool - temporary request bin endpoints
+- name: Transformations
+  description: Reusable payload transformation templates
+- name: Organizations
+  description: Organization management
+- name: Schema Registry
+  description: Event type catalog and schema versioning
+- name: Device Authentication
+  description: Device code flow for CLI authentication
+- name: Rules
+  description: Event routing and filtering rules
+- name: Subscriptions
+  description: Event type subscriptions
+- name: Endpoints
+  description: Webhook endpoint configuration
+- name: Encryption Admin
+  description: Encryption key management and rotation (platform-admin operator credential
+    only)
+- name: Incidents
+  description: Incident management with timeline and RCA
+- name: Tunnels
+  description: CLI tunnel session management
+- name: Transform Preview
+  description: Preview payload transformations and dry-run deliveries
+- name: Webhook Tester
+  description: Public webhook tester URLs that need no account
+- name: Authentication
+  description: User registration and login
+- name: Projects
+  description: Project management and dashboard statistics
+- name: Organizations
+  description: Organization and member management
+- name: Projects
+  description: Project management
+- name: Billing
+  description: "Plan catalog, usage, and subscription management"
+- name: API Keys
+  description: API key management for event ingestion
+- name: Usage
+  description: Project usage statistics and metrics
 - name: Dashboard
   description: "Project dashboard, statistics and analytics"
 - name: Incoming Sources
   description: Incoming webhook source configuration
-- name: Transformations
-  description: Reusable payload transformation templates
 - name: Organization Admin
   description: "Operator view of every tenant, and suspension (platform admin only)"
 - name: Events
@@ -52,37 +89,24 @@ tags:
     \ session"
 - name: Events
   description: Event ingestion and history
-- name: Organizations
-  description: Organization management
-- name: Schema Registry
-  description: Event type catalog and schema versioning
 - name: Client Errors
   description: Failures reported by the dashboard
-- name: Device Authentication
-  description: Device code flow for CLI authentication
-- name: Rules
-  description: Event routing and filtering rules
 - name: Alerts
   description: Alert rules and fired alert events
-- name: Subscriptions
-  description: Event type subscriptions
 - name: Event Time Machine
   description: Replay events by time range and filters
 - name: Webhook Capture
   description: Public endpoints to receive and capture webhook requests
 - name: Authentication
   description: "User registration, login, and session management"
-- name: Endpoints
-  description: Webhook endpoint configuration
 - name: Incoming Destinations
   description: Incoming webhook forwarding destinations
 - name: Platform Admin
   description: Deployment-wide overview and accounts (platform admin only)
-- name: Encryption Admin
-  description: Encryption key management and rotation (platform-admin operator credential
-    only)
 - name: Incoming Events
   description: Incoming webhook events monitoring
+- name: Demo
+  description: Read-only sessions in the public demo organization
 - name: Ingress
   description: Public incoming webhook ingress endpoint
 - name: MCP apps
@@ -93,44 +117,22 @@ tags:
   description: Event type subscriptions for endpoints
 - name: PII Masking
   description: PII masking rules for payload sanitization
-- name: Incidents
-  description: Incident management with timeline and RCA
 - name: Contact
   description: Messages from the public site to the deployment's support address
-- name: Tunnels
-  description: CLI tunnel session management
 - name: Workflows
   description: Visual workflow automation
-- name: Transform Preview
-  description: Preview payload transformations and dry-run deliveries
-- name: Webhook Tester
-  description: Public webhook tester URLs that need no account
 - name: Deliveries
   description: "Delivery status, attempts, and replay operations"
-- name: Authentication
-  description: User registration and login
 - name: Tunnel Ingress
   description: Public tunnel ingress endpoints
-- name: Projects
-  description: Project management and dashboard statistics
-- name: Organizations
-  description: Organization and member management
 - name: Dead Letter Queue
   description: DLQ management operations
-- name: Projects
-  description: Project management
-- name: Billing
-  description: "Plan catalog, usage, and subscription management"
 - name: Organizations
   description: Organization member management
-- name: API Keys
-  description: API key management for event ingestion
 - name: Debug Links
   description: Shareable debug links with PII-safe payloads
 - name: Deliveries
   description: Delivery status and replay operations
-- name: Usage
-  description: Project usage statistics and metrics
 paths:
   /hook/{slug}:
     get:
@@ -2292,6 +2294,52 @@ paths:
                 $ref: "#/components/schemas/TunnelCreateResponse"
       security:
       - bearerAuth: []
+  /api/v1/public/demo/session:
+    post:
+      tags:
+      - Demo
+      summary: Open a demo session
+      description: "A short-lived, read-only access token for the demo organization.\
+        \ It cannot be refreshed, and every request that would change something is\
+        \ refused with 403 `demo_read_only`. Ten sessions a minute per address, behind\
+        \ the registration challenge where one is configured."
+      operationId: createDemoSession
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DemoSessionRequest"
+      responses:
+        "200":
+          description: The session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoSessionResponse"
+        "400":
+          description: The challenge was not passed
+          content:
+            '*/*':
+              schema:
+                type: object
+        "404":
+          description: The demo is not enabled on this server
+          content:
+            '*/*':
+              schema:
+                type: object
+        "429":
+          description: Too many demo sessions from this address
+          content:
+            '*/*':
+              schema:
+                type: object
+        "503":
+          description: The demo data is still being prepared
+          content:
+            '*/*':
+              schema:
+                type: object
   /api/v1/public/contact:
     post:
       tags:
@@ -9521,6 +9569,19 @@ components:
         createdAt:
           type: string
           format: date-time
+    DemoSessionRequest:
+      type: object
+      properties:
+        captchaToken:
+          type: string
+    DemoSessionResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
     PublicContactRequest:
       type: object
       properties:
@@ -12670,6 +12731,8 @@ components:
         hasPassword:
           type: boolean
         platformAdmin:
+          type: boolean
+        demo:
           type: boolean
     AuditLogResponse:
       type: object

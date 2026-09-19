@@ -21,7 +21,8 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     List<Event> findByProjectIdAndEventTypeContainingIgnoreCase(UUID projectId, String eventType);
     Page<Event> findByProjectId(UUID projectId, Pageable pageable);
 
-    long countByCreatedAtGreaterThanEqual(Instant since);
+    /** Events since then, one organization's excepted: the platform overview leaves the public demo out. */
+    long countByCreatedAtGreaterThanEqualAndOrganizationIdNot(Instant since, UUID excludedOrganizationId);
 
     /** The distinct event types a project has sent since {@code since}: the portal's picker. */
     @Query("SELECT DISTINCT e.eventType FROM Event e WHERE e.projectId = :projectId AND e.createdAt >= :since")
@@ -33,10 +34,13 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
             + "WHERE e.createdAt >= :from AND e.createdAt < :to GROUP BY e.organizationId")
     List<Object[]> countPerOrganizationBetween(@Param("from") Instant from, @Param("to") Instant to);
 
-    /** {@code [day, count]} of events created since then, one row per calendar day that has any. */
+    /**
+     * {@code [day, count]} of events created since then, one row per calendar day that has any,
+     * one organization's excepted.
+     */
     @Query("SELECT CAST(e.createdAt AS LocalDate), COUNT(e) FROM Event e WHERE e.createdAt >= :since "
-            + "GROUP BY CAST(e.createdAt AS LocalDate)")
-    List<Object[]> countPerDaySince(@Param("since") Instant since);
+            + "AND e.organizationId <> :excluded GROUP BY CAST(e.createdAt AS LocalDate)")
+    List<Object[]> countPerDaySinceExcluding(@Param("since") Instant since, @Param("excluded") UUID excludedOrganizationId);
 
     /** As {@link #countPerOrganizationBetween}, for the given organizations only. */
     @Query("SELECT e.organizationId, COUNT(e) FROM Event e WHERE e.organizationId IN :organizationIds "

@@ -308,6 +308,13 @@ public-bin:
   per-address: ${PUBLIC_TESTER_PER_ADDRESS:3}
   max-active: ${PUBLIC_TESTER_MAX_ACTIVE:5000}
 
+# The live demo (/demo on the public site): a read-only session in a seeded organization for
+# anyone who asks. Off unless DEMO_ENABLED=true, so a self-hosted install opens nothing anonymous.
+demo:
+  enabled: ${DEMO_ENABLED:false}
+  session-ttl-minutes: ${DEMO_SESSION_TTL_MINUTES:30}
+  refresh-interval-minutes: ${DEMO_REFRESH_INTERVAL_MINUTES:60}
+
 test-endpoint:
   base-url: ${TEST_ENDPOINT_BASE_URL:http://localhost:8080}
   max-per-project: ${TEST_ENDPOINT_MAX_PER_PROJECT:10}

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -128,6 +129,35 @@ public class JwtUtil {
                 .subject(userId.toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
+                .signWith(secretKey)
+                .compact();
+    }
+
+    /**
+     * Name of the claim marking a public demo session. Present only on tokens
+     * {@link #generateDemoAccessToken} mints; see {@link DemoSessions} for what it switches off.
+     */
+    public static final String CLAIM_DEMO = "demo";
+
+    /**
+     * An access token for the public demo: the one demo person, in the demo organization, as a
+     * Viewer, for {@code ttl}. Deliberately an access token only — there is no refresh token and no
+     * session row behind it, so it cannot be renewed, listed or turned into a CLI grant, and it
+     * ends when it expires.
+     */
+    public String generateDemoAccessToken(UUID userId, UUID organizationId, Duration ttl) {
+        long now = System.currentTimeMillis();
+        return Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .claim("userId", userId.toString())
+                .claim("organizationId", organizationId.toString())
+                .claim("role", MembershipRole.VIEWER.name())
+                .claim("typ", TOKEN_TYPE_ACCESS)
+                .claim(CLAIM_EMAIL_VERIFIED, true)
+                .claim(CLAIM_DEMO, true)
+                .subject(userId.toString())
+                .issuedAt(new Date(now))
+                .expiration(new Date(now + ttl.toMillis()))
                 .signWith(secretKey)
                 .compact();
     }

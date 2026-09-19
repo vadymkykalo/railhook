@@ -205,6 +205,9 @@ ui:
   # The public webhook tester page (/tester). Turn it on together with
   # api.env.PUBLIC_TESTER_ENABLED: "true"; off, the page says so.
   publicTester: false
+  # The live demo's entry points (/demo). Turn it on together with
+  # api.env.DEMO_ENABLED: "true"; off, the page says the demo is not enabled here.
+  publicDemo: false
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
     # (multi-arch: linux/amd64, linux/arm64).

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.security.RefusedInDemo;
 import com.webhook.platform.api.dto.AuditLogResponse;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.AuditLogService;
@@ -45,6 +46,7 @@ public class AuditLogController {
             description = "The same entries the listing returns, under the same filters, streamed "
                     + "as CSV rather than paged. A from= or to= that is not a yyyy-MM-dd date is "
                     + "rejected rather than ignored.")
+    @RefusedInDemo
     @GetMapping("/export")
     public void exportCsv(
             AuthContext auth,
