@@ -7,9 +7,6 @@ import { useEvents, useProject } from '../api/queries';
 import PageSkeleton from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
-import IntegrationSnippet from '../components/IntegrationSnippet';
-import { sendEventSnippets } from '../lib/integrationSnippets';
-import { apiBaseUrl } from '../lib/publicSnippets';
 import StatusBadge, { type StatusKind } from '../components/StatusBadge';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/button';
@@ -145,23 +142,12 @@ export default function EventsPage() {
     </PermissionGate>
   );
 
-  const sendSnippet = (
-    <IntegrationSnippet
-      title={t('events.snippet.title')}
-      samples={sendEventSnippets({ baseUrl: apiBaseUrl() })}
-      footer={t('events.snippet.footer')}
-      docsLink="start/send-first-webhook"
-    />
-  );
-  const noEventsYet = events.length === 0 && !search;
-
   return (
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={t('nav.outgoing')}
         description={<Trans i18nKey="events.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={sendAction}
-        guide={{ id: 'events', docsLink: 'start/send-first-webhook', children: noEventsYet ? undefined : sendSnippet }}
       />
 
       <FilterBar>
@@ -183,18 +169,15 @@ export default function EventsPage() {
       </FilterBar>
 
       {events.length === 0 ? (
-        <>
-          <EmptyState
-            icon={Radio}
-            title={search ? t('common.noResults') : t('events.noEvents')}
-            description={search ? t('events.noMatchDesc') : t('events.noEventsDesc')}
-            action={search ? (
-              <Button variant="outline" onClick={() => setSearch('')}>{t('common.clearSearch')}</Button>
-            ) : sendAction}
-            docsLink={search ? undefined : 'api-reference'}
-          />
-          {noEventsYet && <div className="mt-6">{sendSnippet}</div>}
-        </>
+        <EmptyState
+          icon={Radio}
+          title={search ? t('common.noResults') : t('events.noEvents')}
+          description={search ? t('events.noMatchDesc') : t('events.noEventsDesc')}
+          action={search ? (
+            <Button variant="outline" onClick={() => setSearch('')}>{t('common.clearSearch')}</Button>
+          ) : sendAction}
+          docsLink={search ? undefined : 'api-reference'}
+        />
       ) : (
         <div className="animate-fade-in">
           <div className="overflow-hidden rounded-lg border border-rail bg-card">

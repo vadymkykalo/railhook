@@ -201,7 +201,6 @@ export default function IncomingSourcesPage() {
         title={t('incomingSources.title')}
         description={t('incomingSources.descriptionV2', 'Providers whose webhooks arrive here, and how each one is proven genuine before it is forwarded.')}
         actions={!isError && sources.length > 0 ? newSourceButton : undefined}
-        guide={{ id: 'incomingSources', docsLink: 'incoming/sources' }}
       />
 
       {isError ? (

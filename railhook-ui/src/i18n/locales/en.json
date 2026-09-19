@@ -288,11 +288,6 @@
       "revokeFailed": "Failed to revoke API key",
       "revoked": "API key revoked successfully",
       "rotateFailed": "Could not rotate the key. Please try again."
-    },
-    "snippet": {
-      "title": "Send your first event",
-      "footer": "Set RAILHOOK_API_KEY to the key above. Keep it out of your source code.",
-      "footerGeneric": "Set RAILHOOK_API_KEY to a key from this page. Keep it out of your source code."
     }
   },
   "auditLog": {
@@ -1432,11 +1427,7 @@
     "verificationRetry": "Verification failed — retry?",
     "verified": "Verified",
     "verify": "Verify",
-    "verifyEndpoint": "Verify endpoint",
-    "snippet": {
-      "title": "Verify the signature on your receiver",
-      "footer": "WEBHOOK_SECRET is the endpoint’s signing secret, shown once when it is created or rotated."
-    }
+    "verifyEndpoint": "Verify endpoint"
   },
   "errorBoundary": {
     "description": "An unexpected error occurred. Reloading usually fixes it — if it keeps happening, share the details below with your team.",
@@ -1640,11 +1631,7 @@
       "noSubscriptionMatch": "Event sent, but no active subscriptions match '{{eventType}}'. No deliveries were created.",
       "zeroDeliveries": "Event sent, but 0 deliveries were created. Check your subscriptions."
     },
-    "viewDeliveries": "View deliveries for this event",
-    "snippet": {
-      "title": "Send an event from your backend",
-      "footer": "Every endpoint subscribed to the type gets a delivery."
-    }
+    "viewDeliveries": "View deliveries for this event"
   },
   "footer": {
     "apiReference": "API reference",
@@ -1993,7 +1980,7 @@
     "hmacNotConfigured": "No HMAC",
     "howToSend": {
       "copy": "Copy URL",
-      "curlExample": "Example cURL request",
+      "curlExample": "Example cURL request:",
       "description": "Configure your provider to send webhooks to the ingress URL below:",
       "signedByProvider": "{{provider}} signs every webhook in the {{header}} header. Send a test event from {{provider}}'s dashboard: an unsigned request, such as a plain cURL, is rejected with 401.",
       "signedCurl": "Replace the placeholder with the HMAC-SHA256 of the exact body, signed with this source's secret. Without a valid {{header}} the request is rejected with 401.",
@@ -2630,7 +2617,7 @@
     "tunnels": "Tunnels",
     "usage": "Usage",
     "workflows": "Workflows",
-    "consumers": "Consumers & portal"
+    "consumers": "Consumers"
   },
   "notFound": {
     "backToDashboard": "Back to Dashboard",
@@ -2659,13 +2646,10 @@
       "sendEvent": "Send your first event",
       "sendEventDesc": "Send a test event and watch it go out.",
       "verifySource": "Verify what it sends",
-      "verifySourceDesc": "Check signatures so only the real provider can reach you.",
-      "offerPortal": "Give your users a portal",
-      "offerPortalDesc": "Embed a page where your users register their own endpoints."
+      "verifySourceDesc": "Check signatures so only the real provider can reach you."
     },
     "subtitle": "What's left before your webhooks are flowing.",
-    "title": "Getting started",
-    "optional": "Optional"
+    "title": "Getting started"
   },
   "org": {
     "currentOrganization": "Current organization: {{name}}",
@@ -3886,9 +3870,6 @@
       "closeFailed": "Failed to close tunnel",
       "closed": "Tunnel closed",
       "loadFailed": "Failed to load tunnels"
-    },
-    "snippet": {
-      "title": "Install the CLI and open a tunnel"
     }
   },
   "usage": {
@@ -4317,10 +4298,10 @@
     "endpointCount_few": "{{count}} endpoints",
     "endpointCount_many": "{{count}} endpoints",
     "endpointCount_other": "{{count}} endpoints",
-    "openPortal": "Preview portal",
+    "openPortal": "Open portal",
     "empty": {
       "title": "No consumers yet",
-      "description": "The portal lets each of your users manage their own webhook endpoints inside your product. Create a consumer for each user who receives webhooks — by hand here to try it, or from your backend with the code below."
+      "description": "Create one for each of your users who receives webhooks, then embed their portal in your product so they can manage their own endpoints. The “Open portal” button appears on the Consumer's row."
     },
     "toast": {
       "created": "Consumer created",
@@ -4359,15 +4340,7 @@
       "generate": "Create session",
       "snippet": "iframe",
       "expires": "This link expires {{date}}.",
-      "docs": "How to open sessions from your backend",
-      "backendTitle": "The same session from your backend"
-    },
-    "integrate": {
-      "heading": "Integrate the portal",
-      "backendTitle": "Your backend: create a consumer and open its portal",
-      "pageTitle": "Your page: embed the portal",
-      "backendFooter": "Needs a read-write API key. Replace user_123 with your own id for the user.",
-      "pageFooter": "Open a new session every time the page loads: it expires after an hour by default."
+      "docs": "How to open sessions from your backend"
     }
   },
   "portal": {
@@ -5300,101 +5273,5 @@
     "ended": "The demo session has ended. You can open a new one any time.",
     "readOnlyTooltip": "Read-only demo — create a free account to do this",
     "readOnlyError": "This is a read-only demo. Create a free account to make changes."
-  },
-  "snippet": {
-    "copied": "Copied",
-    "languages": "Language",
-    "docs": "Full guide in the docs"
-  },
-  "guides": {
-    "title": "How it works",
-    "docs": "Read the guide",
-    "endpoints": {
-      "step1": "Add the URL that should receive events. Railhook generates its signing secret and shows it once — store it on the receiving server.",
-      "step2": "Subscribe the endpoint to event types on <strong>Subscriptions</strong>. Without a subscription it receives nothing.",
-      "step3": "On the receiving server, check the signature of every request with that secret before acting on it. The code is below.",
-      "step4": "<strong>Test</strong> on a row sends a sample request and shows what the endpoint answered."
-    },
-    "subscriptions": {
-      "step1": "A subscription says one endpoint wants one event type: <code>order.completed</code>, or a pattern such as <code>order.*</code>.",
-      "step2": "When your backend sends an event, Railhook creates one delivery for every endpoint with a matching subscription.",
-      "step3": "An event no subscription matches is stored but delivered nowhere. When an endpoint gets nothing, look here first."
-    },
-    "events": {
-      "step1": "An event is something that happened in your system: a type and a JSON payload, sent by your backend with one API call. The code is below.",
-      "step2": "Railhook stores it and creates a delivery for each endpoint subscribed to its type.",
-      "step3": "Click a row to see the payload and what happened to each delivery. <strong>Send Event</strong> sends one from here to try it."
-    },
-    "deliveries": {
-      "step1": "A delivery is one event on its way to one endpoint. It is done when the endpoint answers with a 2xx.",
-      "step2": "A failed attempt is retried on a schedule. Every attempt is kept with its request and the response it got.",
-      "step3": "When the retries run out, the delivery moves to <strong>Failed Messages</strong>, where you can retry it once the endpoint is fixed."
-    },
-    "consumers": {
-      "step1": "The customer portal is a page you embed in your own product. On it, each of your users registers their own webhook endpoints, picks event types and sees what was delivered — without asking your support.",
-      "step2": "A consumer is one of those users. Your backend creates one per user, keyed by your own id for them.",
-      "step3": "Each time the user opens your webhooks page, your backend opens a portal session and puts its URL in an <code>iframe</code>. The code is below.",
-      "step4": "<strong>Preview portal</strong> on a consumer’s row opens exactly what that user sees."
-    },
-    "incomingSources": {
-      "step1": "A source is a service that sends webhooks to you: Stripe, GitHub, Shopify or any other.",
-      "step2": "Create one to get its ingress URL, and paste that URL into the provider’s webhook settings.",
-      "step3": "Add the provider’s signing secret, so Railhook rejects anything the provider did not sign.",
-      "step4": "Add a destination on the source’s page. Railhook forwards every verified webhook there and retries when it fails."
-    },
-    "apiKeys": {
-      "step1": "Your backend calls the Railhook API with an API key in the <code>X-API-Key</code> header. A key works for this project only.",
-      "step2": "The key is shown once, when it is created. Keep it in your secret store, for example as <code>RAILHOOK_API_KEY</code>.",
-      "step3": "Sending events and opening portal sessions need a read-write key; a read-only key can only read.",
-      "step4": "Rotate a key to replace it without downtime: the old one keeps working until the window you choose closes."
-    },
-    "transformations": {
-      "step1": "A transformation is a JSON template that reshapes an event’s payload before it reaches an endpoint.",
-      "step2": "Write the template with expressions such as <code>${$.data.orderId}</code> and check the result in the live preview.",
-      "step3": "Attach it to a subscription: every delivery for that subscription then carries the reshaped payload instead of the original."
-    },
-    "rules": {
-      "step1": "A rule looks inside an event before any delivery exists, and matches on its type and payload.",
-      "step2": "A matching rule can send the event to an extra endpoint, reshape it, or drop it.",
-      "step3": "Rules run by priority, then subscriptions are matched. A rule that drops events with no conditions stops every event of its type."
-    },
-    "tunnels": {
-      "step1": "A tunnel gives a server on your laptop a public URL, so deliveries can reach code you are running locally.",
-      "step2": "Install the CLI, sign in, and run <code>railhook listen 3000</code> with the port your server listens on. The commands are below.",
-      "step3": "Point an endpoint at the URL the CLI prints. Requests reach your machine for as long as the CLI runs."
-    }
-  },
-  "navHints": {
-    "overview": "Project health and the getting-started checklist",
-    "connections": "Where events go: endpoints, subscriptions, sources and what reshapes them",
-    "endpoints": "URLs that receive your events, and their signing secrets",
-    "consumers": "Your users, and the portal you embed so they manage their own endpoints",
-    "subscriptions": "Which event types each endpoint receives",
-    "incomingSources": "Services that send webhooks to you, such as Stripe and GitHub",
-    "transformations": "Templates that reshape a payload before it is delivered",
-    "rules": "Route, reshape or drop events by what they contain",
-    "schemas": "The JSON schema each event type is checked against",
-    "piiRules": "Fields masked before a payload is shared",
-    "events": "Every event sent and every webhook received",
-    "outgoing": "Events your backend sent",
-    "incoming": "Webhooks received from your sources",
-    "deliveries": "Each event’s way to each endpoint, attempt by attempt",
-    "allDeliveries": "Every delivery, with its attempts",
-    "dlq": "Deliveries Railhook stopped retrying, ready to retry by hand",
-    "incomingDlq": "Incoming webhooks that never reached their destination",
-    "replay": "Send stored events again, as new deliveries",
-    "workflows": "Automations triggered by events",
-    "analytics": "Delivery rates, latency, alerts and usage",
-    "metrics": "Success rate and latency over time",
-    "alerts": "Get notified when delivery goes wrong",
-    "incidents": "Group related failures and record what was done",
-    "usage": "What this project used, and what your plan allows",
-    "develop": "Tools for building and debugging an integration",
-    "testConsole": "Send an event, ping an endpoint or check a signature",
-    "transformStudio": "Try a transformation for an incoming destination",
-    "eventDiff": "Compare two events’ payloads side by side",
-    "testEndpoints": "Temporary URLs that capture what is sent to them",
-    "tunnels": "Forward deliveries to a server on your laptop",
-    "apiKeys": "Keys your backend uses to call the API"
   }
 }

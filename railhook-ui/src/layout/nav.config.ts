@@ -192,16 +192,6 @@ export const PLATFORM_SECTION: NavSection = {
 /** API keys live per project, so they hang off the project rail's settings tab. */
 export const PROJECT_SETTINGS_TABS: NavEntry[] = [tab('nav.apiKeys', 'api-keys', Key)];
 
-/**
- * The one-line "what is this" for an entry, shown when the pointer rests on it: `nav.consumers`
- * reads `navHints.consumers`. A label has to stay a word or two, and several of them — Consumers,
- * Time Machine, Failed Forwards — say nothing to someone who has not read the docs yet. An entry
- * with no hint in the locale files simply has none.
- */
-export function hintKeyOf(entry: NavEntry): string {
-  return entry.nameKey.replace(/^nav\./, 'navHints.');
-}
-
 /** The route segment currently in view, from either URL shape. */
 export function segmentOf(pathname: string): string {
   const afterAdmin = pathname.replace(/^\/admin\/?/, '');

@@ -37,8 +37,6 @@ import {
 import MtlsConfigModal from '../components/MtlsConfigModal';
 import SignatureSchemePicker from '../components/SignatureSchemePicker';
 import SecretField from '../components/SecretField';
-import IntegrationSnippet from '../components/IntegrationSnippet';
-import { verifySignatureSnippets } from '../lib/integrationSnippets';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
@@ -86,9 +84,6 @@ export default function EndpointsPage() {
   const [toggleId, setToggleId] = useState<string | null>(null);
   const [rotateId, setRotateId] = useState<string | null>(null);
   const [newSecret, setNewSecret] = useState<string | null>(null);
-  // Which endpoint the secret on screen belongs to, so the verification code next to it is routed
-  // on that endpoint's path and checks the headers it is actually sent.
-  const [secretOwner, setSecretOwner] = useState<{ url?: string; scheme?: SignatureScheme } | null>(null);
   const [testId, setTestId] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<EndpointTestResponse | null>(null);
@@ -148,7 +143,6 @@ export default function EndpointsPage() {
       setRateLimitPerSecond(undefined);
       setAllowedSourceIps('');
       setSignatureScheme('BOTH');
-      setSecretOwner({ url, scheme: signatureScheme });
       setNewSecret(secret);
       showSuccess(t('endpoints.toast.created'));
     } catch (err) {
@@ -191,8 +185,6 @@ export default function EndpointsPage() {
     if (!rotateId) return;
     try {
       const response = await rotateSecret.mutateAsync(rotateId);
-      const rotated = displayEndpoints.find((e) => e.id === rotateId);
-      setSecretOwner({ url: rotated?.url, scheme: rotated?.signatureScheme });
       setNewSecret(response.secret || null);
       showSuccess(t('endpoints.toast.secretRotated'));
     } catch (err) {
@@ -204,7 +196,6 @@ export default function EndpointsPage() {
   const closeSecretDialog = () => {
     setRotateId(null);
     setNewSecret(null);
-    setSecretOwner(null);
   };
 
   const handleTest = async (endpointId: string) => {
@@ -289,18 +280,6 @@ export default function EndpointsPage() {
         title={t('endpoints.title')}
         description={t('endpoints.descriptionV2', 'Every URL registered to receive this project’s events, with the secret its signatures are computed from.')}
         actions={!isError && displayEndpoints.length > 0 ? newEndpointButton : undefined}
-        guide={{
-          id: 'endpoints',
-          docsLink: 'outgoing/endpoints-subscriptions',
-          children: (
-            <IntegrationSnippet
-              title={t('endpoints.snippet.title')}
-              samples={verifySignatureSnippets({})}
-              footer={t('endpoints.snippet.footer')}
-              docsLink="outgoing/signatures"
-            />
-          ),
-        }}
       />
 
       {isError ? (
@@ -574,19 +553,13 @@ export default function EndpointsPage() {
 
       {/* The secret is shown once, masked until asked for. */}
       <Dialog open={!!newSecret} onOpenChange={closeSecretDialog}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('endpoints.secretDialog.title')}</DialogTitle>
             <DialogDescription>{t('endpoints.secretDialog.description')}</DialogDescription>
           </DialogHeader>
           {newSecret && <SecretField secret={newSecret} />}
           <p className="text-sm text-muted-foreground">{t('endpoints.secretDialog.hint')}</p>
-          <IntegrationSnippet
-            title={t('endpoints.snippet.title')}
-            samples={verifySignatureSnippets({ scheme: secretOwner?.scheme, endpointUrl: secretOwner?.url })}
-            footer={t('endpoints.snippet.footer')}
-            docsLink="outgoing/signatures"
-          />
           <DialogFooter>
             <Button onClick={closeSecretDialog}>{t('endpoints.secretDialog.done')}</Button>
           </DialogFooter>

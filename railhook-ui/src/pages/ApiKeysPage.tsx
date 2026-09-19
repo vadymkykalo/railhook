@@ -16,9 +16,7 @@ import { apiKeysApi, ApiKeyResponse, ApiKeyScope } from '../api/apiKeys.api';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse, PageResponse } from '../types/api.types';
 import { cn } from '../lib/utils';
-import { apiBaseUrl } from '../lib/publicSnippets';
-import { sendEventSnippets } from '../lib/integrationSnippets';
-import IntegrationSnippet from '../components/IntegrationSnippet';
+import { sendEventCurl } from '../lib/publicSnippets';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -194,18 +192,6 @@ export default function ApiKeysPage() {
             </Button>
           </PermissionGate>
         }
-        guide={{
-          id: 'apiKeys',
-          docsLink: 'platform/authentication',
-          children: (
-            <IntegrationSnippet
-              title={t('apiKeys.snippet.title')}
-              samples={sendEventSnippets({ baseUrl: apiBaseUrl() })}
-              footer={t('apiKeys.snippet.footerGeneric')}
-              docsLink="start/send-first-webhook"
-            />
-          ),
-        }}
       />
 
       {apiKeys.length === 0 ? (
@@ -437,7 +423,7 @@ export default function ApiKeysPage() {
 
       {/* The one and only sighting of the secret. */}
       <Dialog open={!!newApiKey} onOpenChange={(open) => { if (!open) { setNewApiKey(null); setCopied(false); } }}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('apiKeys.keyDialog.title', { name: newApiKey?.name ?? '' })}</DialogTitle>
             <DialogDescription>{t('apiKeys.keyDialog.description')}</DialogDescription>
@@ -467,12 +453,12 @@ export default function ApiKeysPage() {
               </Button>
             </div>
 
-            <IntegrationSnippet
-              title={t('apiKeys.keyDialog.howToUse')}
-              samples={sendEventSnippets({ baseUrl: apiBaseUrl() })}
-              footer={t('apiKeys.snippet.footer')}
-              docsLink="start/send-first-webhook"
-            />
+            <div className="space-y-1.5">
+              <p className="mono-label">{t('apiKeys.keyDialog.howToUse')}</p>
+              <pre className="overflow-x-auto rounded-lg border border-rail bg-secondary/60 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
+{sendEventCurl({ payload: '{"type":"user.created","data":{"userId":"123"}}', apiKey: '$RAILHOOK_API_KEY' })}
+              </pre>
+            </div>
           </div>
 
           <DialogFooter>

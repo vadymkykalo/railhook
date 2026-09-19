@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, Check, Sparkles, X } from 'lucide-react';
-import { useConsumersPaged, useOnboardingStatus, useIncomingSources } from '../api/queries';
+import { useOnboardingStatus, useIncomingSources } from '../api/queries';
 import {
   isDismissed, progressOf, readIntent, setDismissed, stepsFor, trackFor,
   writeIntent, type Step, type StepKey, type Track,
@@ -45,7 +45,6 @@ const LAUNCH: Record<StepKey, Launch> = {
   createApiKey: { kind: 'route', segment: 'api-keys' },
   sendEvent: { kind: 'dialog', dialog: 'testEvent' },
   seeDelivery: { kind: 'route', segment: 'deliveries' },
-  offerPortal: { kind: 'route', segment: 'consumers' },
   createSource: { kind: 'route', segment: 'incoming-sources' },
   verifySource: { kind: 'route', segment: 'incoming-sources' },
   addDestination: { kind: 'route', segment: 'incoming-sources' },
@@ -76,11 +75,8 @@ function StepRow({ step, index, onLaunch }: { step: Step; index: number; onLaunc
           {step.done ? <Check className="h-3 w-3" /> : index + 1}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-baseline gap-x-2">
-            <span className={cn('text-sm font-medium', step.done && 'text-muted-foreground line-through')}>
-              {t(`onboarding.steps.${step.key}`)}
-            </span>
-            {step.optional && <span className="mono-label">{t('onboarding.optional')}</span>}
+          <span className={cn('block text-sm font-medium', step.done && 'text-muted-foreground line-through')}>
+            {t(`onboarding.steps.${step.key}`)}
           </span>
           {!step.done && (
             <span className="mt-0.5 block text-[13px] leading-snug text-muted-foreground">
@@ -111,19 +107,10 @@ export default function GettingStarted({ projectId }: { projectId: string | unde
   const [dialog, setDialog] = useState<'connection' | 'testEvent' | null>(null);
 
   const track = status ? trackFor(status, intent) : null;
-  // One row is enough to know whether any Consumer exists, and only the outgoing track asks.
-  const { data: consumerPage } = useConsumersPaged(
-    track === 'send' || track === 'both' ? projectId : undefined,
-    0,
-    1
-  );
-  const hasConsumers = (consumerPage?.totalElements ?? 0) > 0;
 
   const steps = useMemo(
-    () => (status && track
-      ? stepsFor(track, { status, sources: sourcePage?.content ?? [], hasConsumers })
-      : []),
-    [status, track, sourcePage, hasConsumers]
+    () => (status && track ? stepsFor(track, { status, sources: sourcePage?.content ?? [] }) : []),
+    [status, track, sourcePage]
   );
   const progress = progressOf(steps);
 

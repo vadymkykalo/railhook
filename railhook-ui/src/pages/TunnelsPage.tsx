@@ -5,10 +5,6 @@ import { showApiError, showSuccess } from '../lib/toast';
 import { formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
-import IntegrationSnippet from '../components/IntegrationSnippet';
-import { cliTunnelSnippets } from '../lib/integrationSnippets';
-import { apiBaseUrl } from '../lib/publicSnippets';
-import { siteUrl } from '../lib/siteUrl';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import PermissionGate from '../components/PermissionGate';
@@ -88,17 +84,6 @@ export default function TunnelsPage() {
         eyebrow={status ? t('tunnels.openCount', { count: status.activeTunnels }) : undefined}
         title={t('tunnels.title')}
         description={t('tunnels.subtitle')}
-        guide={{
-          id: 'tunnels',
-          docsLink: 'tools/cli',
-          children: (
-            <IntegrationSnippet
-              title={t('tunnels.snippet.title')}
-              samples={cliTunnelSnippets({ siteUrl: siteUrl(), apiUrl: apiBaseUrl() })}
-              docsLink="tools/cli"
-            />
-          ),
-        }}
         actions={
           <Button variant="outline" onClick={loadData}>
             <RefreshCw className="h-4 w-4" aria-hidden /> {t('tunnels.refresh')}

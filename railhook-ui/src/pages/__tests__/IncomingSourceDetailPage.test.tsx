@@ -72,9 +72,7 @@ describe('IncomingSourceDetailPage — how a request is signed', () => {
       providerType: 'GENERIC', verificationMode: 'HMAC_GENERIC', hmacHeaderName: 'X-Acme-Signature', hmacSignaturePrefix: 'sha256=',
     });
 
-    // Highlighted, so the command is split across spans: read it off the code panel as a whole.
-    const example = await screen.findByRole('tabpanel');
-    expect(example).toHaveTextContent('curl -X POST');
+    const example = await screen.findByText(/curl -X POST/);
     expect(example).toHaveTextContent('-H "X-Acme-Signature: sha256=<hmac-sha256-hex-of-body>"');
     expect(screen.getByText('HMAC (generic)')).toBeInTheDocument();
   });
@@ -82,8 +80,7 @@ describe('IncomingSourceDetailPage — how a request is signed', () => {
   it('keeps the plain cURL for a source that checks nothing', async () => {
     renderSource({ providerType: 'GENERIC', verificationMode: 'NONE', hmacHeaderName: undefined, hmacSecretConfigured: false });
 
-    const example = await screen.findByRole('tabpanel');
-    expect(example).toHaveTextContent('curl -X POST');
+    const example = await screen.findByText(/curl -X POST/);
     expect(example).not.toHaveTextContent('Signature');
     expect(screen.getByText('None')).toBeInTheDocument();
   });

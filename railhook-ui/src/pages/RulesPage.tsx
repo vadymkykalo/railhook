@@ -222,7 +222,6 @@ export default function RulesPage() {
         title={t('rules.title')}
         description={t('rules.subtitle')}
         actions={!loadFailed && rules.length > 0 ? createButton : undefined}
-        guide={{ id: 'rules', docsLink: 'outgoing/rules' }}
       />
 
       {loadFailed ? (

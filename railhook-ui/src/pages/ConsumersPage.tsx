@@ -15,9 +15,7 @@ import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import { EnabledBadge } from '../components/StatusBadge';
 import ConfirmDialog from '../components/ConfirmDialog';
-import IntegrationSnippet from '../components/IntegrationSnippet';
-import { consumerPortalSnippets, portalIframeSnippet } from '../lib/integrationSnippets';
-import { apiBaseUrl } from '../lib/publicSnippets';
+import JsonBlock from '../components/JsonBlock';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { usePermissions } from '../auth/usePermissions';
@@ -42,13 +40,16 @@ import { TablePagination } from '../components/ui/table-pagination';
  * The everyday path is the customer's backend: it creates a Consumer when one of its users turns
  * on webhooks and opens a portal session each time that user visits the page embedding it. This
  * screen is for everything around that: seeing who has what, opening a Consumer's portal to look
- * at what they see, and getting an embed snippet to try before writing any backend code — and,
- * next to all of it, the backend code itself, since "what do I call" is the first question.
+ * at what they see, and getting an embed snippet to try before writing any backend code.
  */
 
 /** The same shapes the API accepts for a session's allowed origin. */
 const ORIGIN_PATTERN =
   /^(https:\/\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*|http:\/\/(?:localhost|127\.0\.0\.1))(?::[0-9]{1,5})?$/;
+
+function iframeSnippet(url: string): string {
+  return `<iframe\n  src="${url}"\n  style="width: 100%; height: 720px; border: 0"\n  title="Webhooks"\n></iframe>`;
+}
 
 export default function ConsumersPage() {
   const { t, i18n } = useTranslation();
@@ -153,22 +154,6 @@ export default function ConsumersPage() {
     );
   }
 
-  const integration = (
-    <div className="space-y-3">
-      <IntegrationSnippet
-        title={t('consumers.integrate.backendTitle')}
-        samples={consumerPortalSnippets({ baseUrl: apiBaseUrl(), projectId: projectId! })}
-        footer={t('consumers.integrate.backendFooter')}
-        docsLink="outgoing/customer-portal"
-      />
-      <IntegrationSnippet
-        title={t('consumers.integrate.pageTitle')}
-        samples={portalIframeSnippet()}
-        footer={t('consumers.integrate.pageFooter')}
-      />
-    </div>
-  );
-
   const newButton = (
     <PermissionGate allowed={canManageEndpoints}>
       <VerificationGate>
@@ -186,12 +171,6 @@ export default function ConsumersPage() {
         title={t('consumers.title')}
         description={t('consumers.description')}
         actions={!consumers.isError && list.length > 0 ? newButton : undefined}
-        guide={{
-          id: 'consumers',
-          docsLink: 'outgoing/customer-portal',
-          // An empty page shows the code under its empty state, where nobody can collapse it away.
-          children: list.length > 0 ? integration : undefined,
-        }}
       />
 
       {consumers.isError || project.isError ? (
@@ -201,19 +180,13 @@ export default function ConsumersPage() {
           onRetry={() => { project.refetch(); consumers.refetch(); }}
         />
       ) : list.length === 0 ? (
-        <>
-          <EmptyState
-            icon={Users}
-            title={t('consumers.empty.title')}
-            description={t('consumers.empty.description')}
-            action={newButton}
-            docsLink="outgoing/customer-portal"
-          />
-          <section aria-labelledby="consumers-integrate" className="mt-6">
-            <h3 id="consumers-integrate" className="mb-3 text-sm font-semibold">{t('consumers.integrate.heading')}</h3>
-            {integration}
-          </section>
-        </>
+        <EmptyState
+          icon={Users}
+          title={t('consumers.empty.title')}
+          description={t('consumers.empty.description')}
+          action={newButton}
+          docsLink="outgoing/customer-portal"
+        />
       ) : (
         <>
           <Card className="overflow-hidden">
@@ -401,14 +374,7 @@ export default function ConsumersPage() {
             </form>
           ) : (
             <div className="space-y-3">
-              <IntegrationSnippet title={t('consumers.embed.snippet')} samples={portalIframeSnippet(embedSession.url)} />
-              {embedFor && (
-                <IntegrationSnippet
-                  title={t('consumers.embed.backendTitle')}
-                  samples={consumerPortalSnippets({ baseUrl: apiBaseUrl(), projectId: projectId!, consumerId: embedFor.id })}
-                  docsLink="outgoing/customer-portal"
-                />
-              )}
+              <JsonBlock label={t('consumers.embed.snippet')} value={iframeSnippet(embedSession.url)} />
               <p className="text-xs text-muted-foreground">
                 {t('consumers.embed.expires', { date: formatDateTime(embedSession.expiresAt) })}{' '}
                 <a

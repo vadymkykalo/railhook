@@ -22,7 +22,6 @@ export type StepKey =
   | 'createApiKey'
   | 'sendEvent'
   | 'seeDelivery'
-  | 'offerPortal'
   | 'createSource'
   | 'verifySource'
   | 'addDestination';
@@ -30,11 +29,6 @@ export type StepKey =
 export interface Step {
   key: StepKey;
   done: boolean;
-  /**
-   * Worth offering, not worth demanding: shown in the list, left out of the count. Not every
-   * sender has users who manage their own endpoints, and "all done" cannot wait on one who has none.
-   */
-  optional?: boolean;
 }
 
 export interface OnboardingInputs {
@@ -46,11 +40,6 @@ export interface OnboardingInputs {
    * the list DTO carries the evidence — so it is read here rather than guessed.
    */
   sources: IncomingSourceResponse[];
-  /**
-   * Whether the project has any Consumer — the evidence that a portal is being offered. The
-   * onboarding endpoint does not report it; the card reads it from the consumer list.
-   */
-  hasConsumers?: boolean;
 }
 
 export const INTENT_KEY = 'railhook_intent';
@@ -94,7 +83,6 @@ const OUTGOING = (i: OnboardingInputs): Step[] => [
   { key: 'createApiKey', done: i.status.hasApiKeys },
   { key: 'sendEvent', done: i.status.hasEvents },
   { key: 'seeDelivery', done: i.status.hasDeliveries },
-  { key: 'offerPortal', done: !!i.hasConsumers, optional: true },
 ];
 
 const INCOMING = (i: OnboardingInputs): Step[] => [
@@ -119,9 +107,8 @@ export function stepsFor(track: Track, inputs: OnboardingInputs): Step[] {
 }
 
 export function progressOf(steps: Step[]): { done: number; total: number; allDone: boolean } {
-  const required = steps.filter((s) => !s.optional);
-  const done = required.filter((s) => s.done).length;
-  return { done, total: required.length, allDone: required.length > 0 && done === required.length };
+  const done = steps.filter((s) => s.done).length;
+  return { done, total: steps.length, allDone: steps.length > 0 && done === steps.length };
 }
 
 export function readIntent(): Track | null {

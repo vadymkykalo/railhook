@@ -26,16 +26,12 @@ vi.mock('../../api/events.api', () => ({
 vi.mock('../../api/schemas.api', () => ({
   schemasApi: { listEventTypes: vi.fn() },
 }));
-vi.mock('../../api/consumers.api', () => ({
-  consumersApi: { listPaged: vi.fn() },
-}));
 
 import GettingStarted from '../GettingStarted';
 import { dashboardApi } from '../../api/dashboard.api';
 import { incomingSourcesApi } from '../../api/incomingSources.api';
 import { subscriptionsApi } from '../../api/subscriptions.api';
 import { schemasApi } from '../../api/schemas.api';
-import { consumersApi } from '../../api/consumers.api';
 
 const NOTHING: OnboardingStatus = {
   hasEndpoints: false,
@@ -78,27 +74,9 @@ beforeEach(() => {
   localStorage.clear();
   vi.mocked(subscriptionsApi.list).mockResolvedValue([]);
   vi.mocked(schemasApi.listEventTypes).mockResolvedValue([]);
-  vi.mocked(consumersApi.listPaged).mockResolvedValue({ ...emptyPage, size: 1 } as never);
 });
 
 describe('GettingStarted', () => {
-  it('offers the customer portal as an optional step, outside the count', async () => {
-    localStorage.setItem(INTENT_KEY, 'send');
-    render();
-    const step = await screen.findByRole('button', { name: /Give your users a portal/ });
-    expect(step).toHaveTextContent('Optional');
-    expect(screen.getByText('0 of 4')).toBeInTheDocument();
-  });
-
-  it('ticks the portal step once the project has a consumer', async () => {
-    localStorage.setItem(INTENT_KEY, 'send');
-    vi.mocked(consumersApi.listPaged).mockResolvedValue({ ...emptyPage, totalElements: 1, size: 1 } as never);
-    render({ hasEndpoints: true });
-    await waitFor(() => expect(
-      screen.getByRole('button', { name: /Give your users a portal/ }).closest('li'),
-    ).toHaveAttribute('data-done', 'true'));
-  });
-
   it('asks for the direction when the account is empty and nothing was answered', async () => {
     render();
     expect(await screen.findByText('What brings you to Railhook?')).toBeInTheDocument();
