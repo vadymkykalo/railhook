@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { CHROME, SERIES } from '../charts/chartTheme';
 import { cn } from '../../lib/utils';
 import { WEBHOOKS_GUIDE_FIGURES } from './figures/webhooks-guide';
+import { OUTBOX_FIGURES } from './figures/outbox';
 
 /**
  * The drawings a post can place with `:::figure <key>`.
@@ -315,4 +316,5 @@ export const FIGURES: Record<string, () => JSX.Element> = {
   'retry-ladder': RetryLadder,
   gateway: GatewayPipeline,
   ...WEBHOOKS_GUIDE_FIGURES,
+  ...OUTBOX_FIGURES,
 };

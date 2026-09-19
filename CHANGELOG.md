@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ordering, then downtime, timeouts, duplicates, out-of-order delivery, signature and rotation
   mistakes and silent drops, each with its fix. Seven new diagrams; Ukrainian translation
   alongside.
+- **Blog: "The transactional outbox, or how Railhook never loses an event it has accepted"** —
+  at-most-once, at-least-once and exactly-once over HTTP; the dual write and how the outbox closes
+  it; how the publisher, the Claim and its fence, the Attempt Runner's invariants and the retry
+  ladders absorb every duplicate but the one a receiver dedupes on `webhook-id`; and what a polling
+  publisher leaves open compared with CDC. Four new diagrams, in English and Ukrainian.
+
+### Fixed
+
+- `npm run blog:og` drew only the first post's social card: the second timed out on the reused
+  browser page. Each card now gets a page of its own.
+- Two blog headings that reduce to the same anchor (common in Ukrainian, where only Latin words
+  survive) no longer share one; the second is numbered, so the contents link to both.
 
 ## [2.25.0] - 2026-09-19
 
