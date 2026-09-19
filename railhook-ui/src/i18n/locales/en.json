@@ -4301,7 +4301,7 @@
     "openPortal": "Open portal",
     "empty": {
       "title": "No consumers yet",
-      "description": "Create one for each of your users who receives webhooks, then embed their portal in your product so they can manage their own endpoints. The “Open portal” button appears on the Consumer's row."
+      "description": "Create one for each of your users who receives webhooks, then embed their portal in your product so they can manage their own endpoints."
     },
     "toast": {
       "created": "Consumer created",
