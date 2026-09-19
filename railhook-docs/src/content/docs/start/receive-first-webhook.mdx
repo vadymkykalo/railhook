@@ -4,7 +4,7 @@ description: Connect a provider as a source, give it the ingress URL, and forwar
 ---
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Railhook can receive webhooks from a third-party provider, check that they really came from it, and forward them to your own services. You need a project ID and an API key. You can also do all of this under **Incoming** in the dashboard.
+Railhook can receive webhooks from a third-party provider, check that they really came from it, and forward them to your own services. You need a project ID and an API key. You can also do all of this under **Receive webhooks** in the dashboard.
 
 <Aside type="tip">
 Only want to see what a provider sends before connecting it? The free [webhook tester](https://railhook.io/tester) gives you a URL that shows every request it receives, with no account.
@@ -60,7 +60,7 @@ export PROJECT_ID=...
 
 4. **Send a test and watch it arrive**
 
-   Send a test webhook from the provider's dashboard. It shows up under **Incoming → Incoming events**, with one forward per destination. A forward that runs out of retries moves to **Failed forwards**.
+   Send a test webhook from the provider's dashboard. It shows up under **Events → Incoming events**, with one forward per destination. A forward that runs out of retries moves to **Failed forwards**.
 
 </Steps>
 

@@ -18,7 +18,7 @@ What that leaves to you:
 
 ## Connect Stripe
 
-You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+You need a Railhook project and an API key. Everything below can also be done under **Receive webhooks** in the dashboard.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -61,7 +61,7 @@ export PROJECT_ID=...
      -d '{"url":"https://api.example.com/webhooks/stripe","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
    ```
 
-5. **Send a test event** from Stripe, or run `stripe trigger payment_intent.succeeded`. It appears under **Incoming → Incoming events**, with one forward per destination.
+5. **Send a test event** from Stripe, or run `stripe trigger payment_intent.succeeded`. It appears under **Events → Incoming events**, with one forward per destination.
 
 </Steps>
 

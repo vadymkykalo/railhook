@@ -22,7 +22,7 @@ The ingress answers `202` with a small JSON body of its own. Use a source for th
 
 ## Connect Slack
 
-You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+You need a Railhook project and an API key. Everything below can also be done under **Receive webhooks** in the dashboard.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -56,7 +56,7 @@ export PROJECT_ID=...
 
 4. **Enable events in Slack.** Open **Event Subscriptions**, turn it on, and paste the `ingressUrl` as the **Request URL**. Slack sends a `url_verification` challenge; Railhook verifies its signature and answers with the challenge, so the URL is accepted. The challenge is not an event: nothing is stored or forwarded.
 
-5. **Subscribe to bot events**, save, and trigger one, such as a message in a channel the app is in. It appears under **Incoming → Incoming events**, with one forward per destination.
+5. **Subscribe to bot events**, save, and trigger one, such as a message in a channel the app is in. It appears under **Events → Incoming events**, with one forward per destination.
 
 </Steps>
 

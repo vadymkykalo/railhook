@@ -19,7 +19,7 @@ Four hours is a short window for a bad deploy, and five seconds is a tight budge
 
 ## Connect Shopify
 
-You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+You need a Railhook project and an API key. Everything below can also be done under **Receive webhooks** in the dashboard.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -68,7 +68,7 @@ export PROJECT_ID=...
    shopify app webhook trigger --api-version=2026-07 --topic=orders/create --address="$INGRESS_URL"
    ```
 
-   It appears under **Incoming → Incoming events**, with one forward per destination.
+   It appears under **Events → Incoming events**, with one forward per destination.
 
 </Steps>
 
