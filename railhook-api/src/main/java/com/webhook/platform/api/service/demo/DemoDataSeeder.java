@@ -46,8 +46,8 @@ import java.util.concurrent.TimeUnit;
  * Every row names the demo organization explicitly, which is also why this runs as the system
  * tenant: there is no request, and no tenant filter to apply to plain JDBC.
  *
- * <p>Only exists where {@code demo.enabled} is true. Turning the demo off leaves the rows where
- * they are and stops refreshing them; nothing can sign in to see them.
+ * <p>Only exists where {@code demo.enabled} is true. Where it is false, {@link DemoDataRemover}
+ * takes its place and deletes whatever an earlier boot with the demo on left behind.
  */
 @Slf4j
 @Service
@@ -55,7 +55,7 @@ import java.util.concurrent.TimeUnit;
 public class DemoDataSeeder {
 
     /** "RAILDEMO": serialises seeding across API replicas that start together. */
-    private static final long ADVISORY_LOCK_KEY = 0x5241494c44454d4fL;
+    static final long ADVISORY_LOCK_KEY = 0x5241494c44454d4fL;
 
     /** Before any real sign-up could have happened, so no signup or activation window counts them. */
     private static final Timestamp PINNED_CREATED_AT = Timestamp.from(Instant.parse("2024-01-01T00:00:00Z"));
@@ -189,13 +189,27 @@ public class DemoDataSeeder {
         }
     }
 
+    /** The demo's traffic, as deleted: how many rows of each went. */
+    record DeletedHistory(int forwards, int incomingEvents, int attempts, int deliveries, int events) {
+    }
+
+    /**
+     * Deletes the demo organization's traffic, children first. Every statement names the demo
+     * organization, and nothing else. The caller holds the transaction and the advisory lock.
+     */
+    static DeletedHistory deleteHistory(JdbcTemplate jdbc) {
+        int forwards = jdbc.update("DELETE FROM incoming_forward_attempts WHERE organization_id = ?",
+                DemoTenant.ORGANIZATION_ID);
+        int incomingEvents = jdbc.update("DELETE FROM incoming_events WHERE organization_id = ?",
+                DemoTenant.ORGANIZATION_ID);
+        int attempts = jdbc.update("DELETE FROM delivery_attempts WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
+        int deliveries = jdbc.update("DELETE FROM deliveries WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
+        int events = jdbc.update("DELETE FROM events WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
+        return new DeletedHistory(forwards, incomingEvents, attempts, deliveries, events);
+    }
+
     private void replaceHistory(DemoHistory history) {
-        // Children first; every statement names the demo organization, and nothing else.
-        jdbc.update("DELETE FROM incoming_forward_attempts WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
-        jdbc.update("DELETE FROM incoming_events WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
-        jdbc.update("DELETE FROM delivery_attempts WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
-        jdbc.update("DELETE FROM deliveries WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
-        jdbc.update("DELETE FROM events WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
+        deleteHistory(jdbc);
 
         batch("INSERT INTO events (id, organization_id, project_id, event_type, payload, payload_compressed, created_at) "
                         + "VALUES (?, ?, ?, ?, ?::jsonb, false, ?)",

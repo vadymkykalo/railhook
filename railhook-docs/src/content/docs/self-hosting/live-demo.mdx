@@ -20,7 +20,7 @@ A visitor can open every screen and read everything in it. They cannot change an
 
 The demo hands a session to anyone who asks for one. On a deployment that serves only your own team that is an anonymous way in you have no reason to open, so with `DEMO_ENABLED=false`, the default:
 
-- no demo organization is created;
+- no demo organization is created, and one left from when the demo was on is removed;
 - the entry points on the landing page, on `/pricing` and in the **Developers** menu are hidden;
 - the session endpoint, `POST /api/v1/public/demo/session`, answers `404`.
 
@@ -74,7 +74,9 @@ The demo is kept out of the deployment's own numbers: the [platform admin](/docs
 
 ## Turning it off
 
-Set `DEMO_ENABLED=false` and run `./railhook start`. No new session can be opened and the entry points disappear; a session already open lasts until it expires. The demo organization stays in the database, unused, and is no longer refreshed.
+Set `DEMO_ENABLED=false` and run `./railhook start`. No new session can be opened and the entry points disappear; a session already open lasts until it expires, but finds the demo empty.
+
+As it starts, the API also removes the demo: the organization, its account, project, endpoints, sources and all of its history. It deletes only the demo's own rows, found by ids no other organization can have, and writes one line to the API log saying what it removed. Once nothing of the demo is left, later starts do nothing. Turning the demo back on creates it again from scratch.
 
 All three variables are in the [configuration reference](/docs/self-hosting/configuration/), and the session endpoint in the [API reference](/docs/api-reference/).
 

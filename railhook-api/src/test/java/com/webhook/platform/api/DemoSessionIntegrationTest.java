@@ -6,6 +6,7 @@ import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.RegisterRequest;
 import com.webhook.platform.api.security.AllowedInDemo;
 import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.service.demo.DemoDataRemover;
 import com.webhook.platform.api.service.demo.DemoDataSeeder;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.demo.DemoTenant;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -78,6 +80,9 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private DemoDataSeeder seeder;
+
+    @Autowired
+    private ApplicationContext applicationContext;
 
     @Autowired
     @Qualifier("requestMappingHandlerMapping")
@@ -321,6 +326,13 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
     }
 
     // ── Seeding ────────────────────────────────────────────────────
+
+    @Test
+    void withTheDemoOnNothingRemovesIt() {
+        assertThat(applicationContext.getBeansOfType(DemoDataRemover.class)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM organizations WHERE id = ?",
+                Integer.class, DemoTenant.ORGANIZATION_ID)).isOne();
+    }
 
     @Test
     void seedingAgainChangesTheSetupNotAtAllAndReplacesTheHistory() {

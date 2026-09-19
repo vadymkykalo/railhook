@@ -83,6 +83,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `npm run blog:og` drew only the first post's social card: the second timed out on the reused
   browser page. Each card now gets a page of its own.
+- **Turning the live demo off now removes its data.** With `DEMO_ENABLED=false` the demo
+  organization, its person, project, Endpoints, Subscriptions, Sources, Destinations and its whole
+  history stayed in the database for good. The API now deletes them on its next start — by the
+  demo's fixed ids only, under the seeder's lock, and not at all while the demo is on. A start
+  with nothing of the demo's left does nothing.
 - Two blog headings that reduce to the same anchor (common in Ukrainian, where only Latin words
   survive) no longer share one; the second is numbered, so the contents link to both.
 
