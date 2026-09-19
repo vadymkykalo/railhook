@@ -25,6 +25,8 @@ export interface RuntimeConfig {
   publicTester?: boolean;
   /** Whether the live demo (/demo) is on. Off unless the deployment says so. */
   publicDemo?: boolean;
+  /** Whether the blog (/blog) is on: railhook.io's own content, off unless the deployment says so. */
+  publicBlog?: boolean;
 }
 
 declare global {
@@ -33,7 +35,7 @@ declare global {
   }
 }
 
-function read(key: Exclude<keyof RuntimeConfig, 'publicTester' | 'publicDemo'>): string | undefined {
+function read(key: Exclude<keyof RuntimeConfig, 'publicTester' | 'publicDemo' | 'publicBlog'>): string | undefined {
   const value = typeof window !== 'undefined' ? window.__RAILHOOK__?.[key] : undefined;
   return (typeof value === 'string' && value.trim()) || undefined;
 }
@@ -76,4 +78,9 @@ export function publicTesterEnabled(): boolean {
 /** Whether the live demo is on for this deployment. */
 export function publicDemoEnabled(): boolean {
   return typeof window !== 'undefined' && window.__RAILHOOK__?.publicDemo === true;
+}
+
+/** Whether the blog is on for this deployment — railhook.io's, never a self-hosted install's by default. */
+export function publicBlogEnabled(): boolean {
+  return typeof window !== 'undefined' && window.__RAILHOOK__?.publicBlog === true;
 }

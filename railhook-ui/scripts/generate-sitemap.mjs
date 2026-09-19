@@ -12,17 +12,21 @@
  * `scripts/prerender.mjs` reads the same module, so a URL in the sitemap is a URL that was
  * rendered to static HTML.
  *
- *   npm run seo:sitemap             regenerate (commit the result)
- *   npm run seo:sitemap -- --check  fail if the committed copy is stale
+ * Two files, because the blog is off unless a deployment turns it on (BLOG_ENABLED):
+ * `sitemap.xml` lists everything, the blog included, and `sitemap-without-blog.xml` lists the
+ * rest. nginx serves one or the other as /sitemap.xml, from the container's setting — a crawler
+ * is never sent to a post that answers 404.
+ *
+ *   npm run seo:sitemap             regenerate both (commit the result)
+ *   npm run seo:sitemap -- --check  fail if either committed copy is stale
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
-import { publicRoutes } from './public-routes.mjs';
+import { isBlogPath, publicRoutes } from './public-routes.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const OUT = resolve(here, '../public/sitemap.xml');
 
 /**
  * A sitemap has to carry absolute URLs — the spec allows nothing else — but the
@@ -45,30 +49,45 @@ function urlEntry({ path, priority, changefreq }) {
   ].join('\n');
 }
 
-const entries = publicRoutes();
+function sitemap(entries) {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...entries.map(urlEntry),
+    '</urlset>',
+    '',
+  ].join('\n');
+}
 
-const xml = [
-  '<?xml version="1.0" encoding="UTF-8"?>',
-  '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-  ...entries.map(urlEntry),
-  '</urlset>',
-  '',
-].join('\n');
+const routes = publicRoutes();
+const FILES = [
+  { name: 'sitemap.xml', entries: routes },
+  { name: 'sitemap-without-blog.xml', entries: routes.filter((route) => !isBlogPath(route.path)) },
+];
 
-if (process.argv.includes('--check')) {
+const check = process.argv.includes('--check');
+let stale = false;
+for (const { name, entries } of FILES) {
+  const out = resolve(here, '../public', name);
+  const xml = sitemap(entries);
+  if (!check) {
+    writeFileSync(out, xml);
+    console.log(`Wrote public/${name} (${entries.length} URLs).`);
+    continue;
+  }
   let current = '';
   try {
-    current = readFileSync(OUT, 'utf8');
+    current = readFileSync(out, 'utf8');
   } catch {
-    console.error('public/sitemap.xml is missing. Run: npm run seo:sitemap');
-    process.exit(1);
+    console.error(`public/${name} is missing. Run: npm run seo:sitemap`);
+    stale = true;
+    continue;
   }
   if (current !== xml) {
-    console.error('public/sitemap.xml is stale. Run: npm run seo:sitemap');
-    process.exit(1);
+    console.error(`public/${name} is stale. Run: npm run seo:sitemap`);
+    stale = true;
+    continue;
   }
-  console.log(`sitemap.xml is up to date (${entries.length} URLs).`);
-} else {
-  writeFileSync(OUT, xml);
-  console.log(`Wrote public/sitemap.xml (${entries.length} URLs).`);
+  console.log(`${name} is up to date (${entries.length} URLs).`);
 }
+if (stale) process.exit(1);
