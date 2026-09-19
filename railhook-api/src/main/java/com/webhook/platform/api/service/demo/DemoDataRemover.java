@@ -102,6 +102,7 @@ public class DemoDataRemover {
         jdbc.update("DELETE FROM incoming_sources WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         jdbc.update("DELETE FROM subscriptions WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         jdbc.update("DELETE FROM endpoints WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
+        jdbc.update("DELETE FROM consumers WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         jdbc.update("DELETE FROM memberships WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         jdbc.update("DELETE FROM projects WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         boolean organization = jdbc.update("DELETE FROM organizations WHERE id = ?", DemoTenant.ORGANIZATION_ID) > 0;

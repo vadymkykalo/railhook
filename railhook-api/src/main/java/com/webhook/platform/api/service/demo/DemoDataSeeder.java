@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
  * Keeps the public demo's organization in place and its history recent.
  *
  * <p>Two halves, both idempotent. The organization, its one member, project "Acme Shop", its
- * Endpoints, Subscriptions, Sources and Destinations are inserted with fixed ids and
+ * Endpoints, its one Consumer, Subscriptions, Sources and Destinations are inserted with fixed ids and
  * {@code ON CONFLICT DO NOTHING}: seeding twice finds them there and changes nothing. The traffic
  * is replaced — the demo's Events, Deliveries, Attempts, Incoming Events and Forwards are deleted
  * and {@link DemoHistory} written again, ending at the current time — so the dashboard and the
@@ -159,6 +159,16 @@ public class DemoDataSeeder {
                     endpoint.id(), DemoTenant.ORGANIZATION_ID, DemoTenant.PROJECT_ID, endpoint.url(),
                     endpoint.description(), secret.getCiphertext(), secret.getIv(), secret.getKeyVersion(),
                     PINNED_CREATED_AT, PINNED_CREATED_AT, PINNED_CREATED_AT);
+        }
+        jdbc.update("INSERT INTO consumers (id, organization_id, project_id, external_id, name, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING",
+                DemoCatalog.NORTHWIND.id(), DemoTenant.ORGANIZATION_ID, DemoTenant.PROJECT_ID,
+                DemoCatalog.NORTHWIND.externalId(), DemoCatalog.NORTHWIND.name(), PINNED_CREATED_AT, PINNED_CREATED_AT);
+        // An update rather than a column on the insert: a demo seeded before it had a Consumer
+        // already has these endpoints, and inserting them again changes nothing.
+        for (DemoEndpoint endpoint : DemoCatalog.NORTHWIND_ENDPOINTS) {
+            jdbc.update("UPDATE endpoints SET consumer_id = ? WHERE id = ? AND consumer_id IS DISTINCT FROM ?",
+                    DemoCatalog.NORTHWIND.id(), endpoint.id(), DemoCatalog.NORTHWIND.id());
         }
         for (DemoSubscription subscription : DemoCatalog.SUBSCRIPTIONS) {
             jdbc.update("INSERT INTO subscriptions (id, organization_id, project_id, endpoint_id, event_type, enabled, "
