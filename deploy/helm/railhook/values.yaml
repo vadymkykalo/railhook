@@ -208,6 +208,9 @@ ui:
   # The live demo's entry points (/demo). Turn it on together with
   # api.env.DEMO_ENABLED: "true"; off, the page says the demo is not enabled here.
   publicDemo: false
+  # The blog (/blog, its posts and its feed): railhook.io's own articles. Off — the
+  # default, and right for a self-hosted install — /blog answers 404 and the sitemap lists no posts.
+  publicBlog: false
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
     # (multi-arch: linux/amd64, linux/arm64).

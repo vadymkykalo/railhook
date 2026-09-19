@@ -49,6 +49,8 @@ spec:
               value: {{ .Values.ui.publicTester | default false | quote }}
             - name: RAILHOOK_PUBLIC_DEMO
               value: {{ .Values.ui.publicDemo | default false | quote }}
+            - name: RAILHOOK_PUBLIC_BLOG
+              value: {{ .Values.ui.publicBlog | default false | quote }}
           ports:
             # 5173, not 80: the image is nginx serving `listen 5173`
             # (railhook-ui/nginx.conf) and EXPOSE 5173. While this said

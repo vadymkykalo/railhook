@@ -4,3 +4,4 @@
  * are enumerated, and without this the import is an implicit `any` the build refuses.
  */
 export declare function publicRoutes(): { path: string; priority: string; changefreq: string }[];
+export declare function isBlogPath(path: string): boolean;

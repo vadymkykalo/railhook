@@ -42,11 +42,12 @@ type Config = {
   statusPageUrl?: string;
   publicTester?: boolean;
   publicDemo?: boolean;
+  publicBlog?: boolean;
 };
 
 const EMPTY: Config = {
   contactDomain: '', siteUrl: '', captchaSiteKey: '', captchaScriptUrl: '', webAnalyticsToken: '', statusPageUrl: '', publicTester: false,
-  publicDemo: false,
+  publicDemo: false, publicBlog: false,
 };
 
 /** Runs the entrypoint script as the container would, and evaluates what it wrote. */
@@ -68,6 +69,9 @@ function runEntrypoint(env: Record<string, string | undefined>) {
   if (js) new Function('window', js)(window);
   return { status: result.status, stdout: result.stdout, stderr: result.stderr, js, siteConf, config: window.__RAILHOOK__ };
 }
+
+/** The snippet's origin line; the blog switch follows it on a line of its own. */
+const originLine = (siteConf: string) => siteConf.split('\n')[0];
 
 function locationBody(conf: string, head: string): string | undefined {
   const re = /^\s*location\s+([^{]+)\{/gm;
@@ -103,7 +107,7 @@ describe('the entrypoint writes the runtime config', () => {
       });
       expect(status).toBe(0);
       expect(config).toEqual(EMPTY);
-      expect(siteConf.trim()).toBe('set $railhook_site_url "";');
+      expect(originLine(siteConf)).toBe('set $railhook_site_url "";');
     }
   });
 
@@ -136,7 +140,7 @@ describe('public origin', () => {
     const { status, config, siteConf } = runEntrypoint({ RAILHOOK_SITE_URL: ' https://railhook.io/ ' });
     expect(status).toBe(0);
     expect(config?.siteUrl).toBe('https://railhook.io');
-    expect(siteConf.trim()).toBe('set $railhook_site_url "https://railhook.io";');
+    expect(originLine(siteConf)).toBe('set $railhook_site_url "https://railhook.io";');
   });
 
   it('accepts http and a port, which is what a self-hosted install on its own box has', () => {
@@ -148,7 +152,7 @@ describe('public origin', () => {
       const { status, stderr, config, siteConf } = runEntrypoint({ RAILHOOK_SITE_URL: value });
       expect(status, value).toBe(0);
       expect(config?.siteUrl, value).toBe('');
-      expect(siteConf.trim(), value).toBe('set $railhook_site_url "";');
+      expect(originLine(siteConf), value).toBe('set $railhook_site_url "";');
       expect(stderr, value).toMatch(/RAILHOOK_SITE_URL/);
     }
   });
@@ -232,6 +236,47 @@ describe('live demo', () => {
   });
 });
 
+/**
+ * The blog is railhook.io's own content. The image carries it because railhook.io runs the same
+ * image as every self-hosted install, so it is off unless the deployment turns it on — in the
+ * page, which hides the links, and in nginx, which answers 404 for the pages and the feed.
+ */
+describe('blog', () => {
+  it('is off by default, in the page and in nginx', () => {
+    const { config, siteConf, stdout } = runEntrypoint({});
+    expect(config?.publicBlog).toBe(false);
+    expect(siteConf).toMatch(/^set \$railhook_blog "off";$/m);
+    expect(stdout).toMatch(/blog off/);
+  });
+
+  it('is on only for an exact "true"', () => {
+    const on = runEntrypoint({ RAILHOOK_PUBLIC_BLOG: ' true ' });
+    expect(on.config).toEqual({ ...EMPTY, publicBlog: true });
+    expect(on.siteConf).toMatch(/^set \$railhook_blog "on";$/m);
+    for (const value of [undefined, '', 'false', 'yes', '1', 'TRUE', 'true"};alert(1);//', 'true";set $a 1;#']) {
+      const { config, js, siteConf } = runEntrypoint({ RAILHOOK_PUBLIC_BLOG: value });
+      expect(config?.publicBlog, String(value)).toBe(false);
+      expect(js).not.toContain('alert');
+      expect(siteConf.trim().split('\n'), String(value)).toEqual(['set $railhook_site_url "";', 'set $railhook_blog "off";']);
+    }
+  });
+
+  it('is BLOG_ENABLED in Compose and ui.publicBlog in Helm, off unless set', () => {
+    const compose = read('docker-compose.yml');
+    const ui = compose.slice(compose.indexOf('\n  ui:'), compose.indexOf('\n  caddy:'));
+    expect(ui).toMatch(/^\s+RAILHOOK_PUBLIC_BLOG: \$\{BLOG_ENABLED:-false\}$/m);
+    expect(read('deploy/helm/railhook/templates/ui-deployment.yaml'))
+      .toMatch(/name: RAILHOOK_PUBLIC_BLOG\s+value: \{\{ \.Values\.ui\.publicBlog \| default false \| quote \}\}/);
+    expect(read('deploy/helm/railhook/values.yaml')).toMatch(/^ {2}publicBlog: false$/m);
+    expect(read('.env.dist')).toMatch(/^#\s*BLOG_ENABLED=false$/m);
+  });
+
+  it('is rendered on by the prerender, whose pages are railhook.io\'s', () => {
+    expect(read('railhook-ui/scripts/prerender.mjs')).toMatch(/^\s+publicBlog: true,$/m);
+    expect(read('railhook-ui/public/config.js')).toMatch(/publicBlog: false/);
+  });
+});
+
 describe('web analytics', () => {
   it('turns on with a Cloudflare Web Analytics token, which stays out of the log', () => {
     const token = '0123456789abcdef0123456789abcdef';
@@ -289,6 +334,13 @@ describe('nginx serves the runtime config', () => {
 describe('nginx substitutes the public origin', () => {
   const conf = read('railhook-ui/nginx.conf');
 
+  it('defines the blog switch off, then includes the value the entrypoint wrote over it', () => {
+    const defaults = conf.search(/^\s*set \$railhook_blog "off";/m);
+    const include = conf.search(new RegExp(`^\\s*include ${escapeRegExp(SITE_CONF)};`, 'm'));
+    expect(defaults, 'default').toBeGreaterThan(-1);
+    expect(include, 'include').toBeGreaterThan(defaults);
+  });
+
   it('defines the variable, then includes the value the entrypoint wrote over it', () => {
     const defaults = conf.search(/^\s*set \$railhook_site_url "";/m);
     const include = conf.search(new RegExp(`^\\s*include ${escapeRegExp(SITE_CONF)};`, 'm'));
@@ -318,6 +370,7 @@ describe('the build leaves the placeholder origin, and nothing else, where an or
     'railhook-ui/index.html',
     'railhook-ui/public/robots.txt',
     'railhook-ui/public/sitemap.xml',
+    'railhook-ui/public/sitemap-without-blog.xml',
     'railhook-ui/scripts/generate-sitemap.mjs',
     'railhook-ui/scripts/prerender.mjs',
     'railhook-docs/astro.config.mjs',

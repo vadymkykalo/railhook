@@ -19,7 +19,7 @@ import { RailhookIcon } from '../../components/icons/RailhookIcon';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
 import { Button } from '../../components/ui/button';
 import { useAuth } from '../../auth/auth.store';
-import { publicDemoEnabled, publicTesterEnabled, statusPageUrl } from '../../lib/runtimeConfig';
+import { publicBlogEnabled, publicDemoEnabled, publicTesterEnabled, statusPageUrl } from '../../lib/runtimeConfig';
 import { cn } from '../../lib/utils';
 import { REPO_URL } from './plans';
 import { WRAP } from './primitives';
@@ -80,7 +80,8 @@ export default function LandingNav() {
   ];
   const developers = useDeveloperLinks();
   const reading = [
-    { to: '/blog', label: t('landing.nav.blog') },
+    // railhook.io's own articles: nowhere to link on a deployment that does not serve them.
+    ...(publicBlogEnabled() ? [{ to: '/blog', label: t('landing.nav.blog') }] : []),
     { to: '/about', label: t('landing.nav.about') },
   ];
   const linkClass = 'transition-colors hover:text-foreground';

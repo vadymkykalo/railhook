@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lessons from building Railhook by directing an AI agent, each drawn from a real incident: where
   the agent was confidently wrong, why written rules are not enough, and the checks that now refuse
   each class of bug. Two figures, and a Ukrainian translation alongside.
+- **`BLOG_ENABLED` switches the blog on, and it is off by default.** The blog is railhook.io's own
+  content, carried by the one image every install runs. Off — the default for a self-hosted
+  install — nginx answers `/blog`, every post, their social cards and `/blog/rss.xml` with `404`,
+  the header and footer carry no Blog link, and `/sitemap.xml` is a variant that lists no blog
+  URLs. Set `BLOG_ENABLED=true` (Helm: `ui.publicBlog: true`) to serve it; the UI container reads
+  it at startup.
 
 - **A live demo, "Try the live demo"**, on the landing page's hero, on `/pricing` and in the
   Developers menu: `/demo` opens the real dashboard signed in to a sample organization — project

@@ -5,6 +5,7 @@ import AppLayout from './layout/AppLayout';
 import PublicLayout from './layout/PublicLayout';
 import ProtectedRoute from './auth/ProtectedRoute';
 import RouteErrorScreen from './components/RouteErrorScreen';
+import { publicBlogEnabled } from './lib/runtimeConfig';
 
 // Lazy-loaded pages — each becomes its own chunk
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -90,6 +91,15 @@ function S({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
 
+/**
+ * The blog is railhook.io's own content, off unless the deployment turns it on (BLOG_ENABLED).
+ * Off, nginx already answers 404 for /blog; this renders the same not-found page when the app
+ * gets there without asking nginx — a client-side navigation.
+ */
+function BlogOnly({ children }: { children: React.ReactNode }) {
+  return publicBlogEnabled() ? children : <NotFoundPage />;
+}
+
 export const router = createBrowserRouter([
   /* One pathless root so every route, public ones included, shares an errorElement. */
   {
@@ -133,7 +143,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/blog',
-            element: <S><BlogPage /></S>,
+            element: <S><BlogOnly><BlogPage /></BlogOnly></S>,
           },
           /* One route for every post. The slugs are the directories under
              src/content/blog/, which scripts/public-routes.mjs enumerates for the sitemap and
@@ -141,7 +151,7 @@ export const router = createBrowserRouter([
              already answered 404 for it. */
           {
             path: '/blog/:slug',
-            element: <S><BlogPostPage /></S>,
+            element: <S><BlogOnly><BlogPostPage /></BlogOnly></S>,
           },
           {
             path: '/contact',

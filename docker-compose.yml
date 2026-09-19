@@ -647,6 +647,8 @@ services:
       RAILHOOK_PUBLIC_TESTER: ${PUBLIC_TESTER_ENABLED:-false}
       # The live demo's entry points, the same switch the API reads.
       RAILHOOK_PUBLIC_DEMO: ${DEMO_ENABLED:-false}
+      # The blog (/blog): railhook.io's own content, off on a self-hosted install.
+      RAILHOOK_PUBLIC_BLOG: ${BLOG_ENABLED:-false}
     depends_on:
       - api
     logging:
