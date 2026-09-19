@@ -23,6 +23,8 @@ export interface RuntimeConfig {
   statusPageUrl?: string;
   /** Whether the public webhook tester (/tester) is on. Off unless the deployment says so. */
   publicTester?: boolean;
+  /** Whether the live demo (/demo) is on. Off unless the deployment says so. */
+  publicDemo?: boolean;
 }
 
 declare global {
@@ -31,7 +33,7 @@ declare global {
   }
 }
 
-function read(key: Exclude<keyof RuntimeConfig, 'publicTester'>): string | undefined {
+function read(key: Exclude<keyof RuntimeConfig, 'publicTester' | 'publicDemo'>): string | undefined {
   const value = typeof window !== 'undefined' ? window.__RAILHOOK__?.[key] : undefined;
   return (typeof value === 'string' && value.trim()) || undefined;
 }
@@ -69,4 +71,9 @@ export function statusPageUrl(): string | undefined {
 /** Whether the public webhook tester is on for this deployment. */
 export function publicTesterEnabled(): boolean {
   return typeof window !== 'undefined' && window.__RAILHOOK__?.publicTester === true;
+}
+
+/** Whether the live demo is on for this deployment. */
+export function publicDemoEnabled(): boolean {
+  return typeof window !== 'undefined' && window.__RAILHOOK__?.publicDemo === true;
 }

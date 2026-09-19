@@ -672,6 +672,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/demo/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open a demo session
+         * @description A short-lived, read-only access token for the demo organization. It cannot be refreshed, and every request that would change something is refused with 403 `demo_read_only`. Ten sessions a minute per address, behind the registration challenge where one is configured.
+         */
+        post: operations["createDemoSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/contact": {
         parameters: {
             query?: never;
@@ -4679,6 +4699,14 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
+        DemoSessionRequest: {
+            captchaToken?: string;
+        };
+        DemoSessionResponse: {
+            accessToken?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+        };
         PublicContactRequest: {
             /** Format: email */
             email: string;
@@ -6463,6 +6491,7 @@ export interface components {
             emailDeliveryEnabled?: boolean;
             hasPassword?: boolean;
             platformAdmin?: boolean;
+            demo?: boolean;
         };
         AuditLogResponse: {
             /** Format: uuid */
@@ -8765,6 +8794,66 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["TunnelCreateResponse"];
+                };
+            };
+        };
+    };
+    createDemoSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DemoSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description The session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoSessionResponse"];
+                };
+            };
+            /** @description The challenge was not passed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
+                };
+            };
+            /** @description The demo is not enabled on this server */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
+                };
+            };
+            /** @description Too many demo sessions from this address */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
+                };
+            };
+            /** @description The demo data is still being prepared */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
                 };
             };
         };

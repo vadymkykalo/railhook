@@ -26,6 +26,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     long countByCreatedAtGreaterThanEqual(Instant since);
 
+    long countByIdNot(UUID excludedId);
+
+    Page<User> findByIdNot(UUID excludedId, Pageable pageable);
+
     long countByCreatedAtGreaterThanEqualAndEmailVerifiedTrue(Instant since);
 
     /** {@code [day, count]} of accounts created since then, one row per calendar day that has any. */

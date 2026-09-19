@@ -18,6 +18,7 @@ import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.security.SuspensionCheck;
+import com.webhook.platform.common.demo.DemoTenant;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 import com.webhook.platform.api.service.ingress.IngressOutcome;
@@ -273,6 +274,12 @@ public class IngressService {
             log.warn("Rejecting incoming webhook: organization {} is suspended (sourceId={})",
                     source.getOrganizationId(), source.getId());
             throw new OrganizationSuspendedException("Organization is suspended");
+        }
+        // The demo's Sources are on show with their ingress URLs, to everyone. Taking webhooks on
+        // them would let any visitor write into the read-only demo, and have the worker forward
+        // what they sent. Refused the way a suspension is: nothing here is accepting webhooks.
+        if (DemoTenant.isDemoOrganization(source.getOrganizationId())) {
+            throw new OrganizationSuspendedException("The demo organization does not take webhooks");
         }
         return source;
     }

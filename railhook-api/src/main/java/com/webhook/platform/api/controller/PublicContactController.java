@@ -1,5 +1,6 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.security.AllowedInDemo;
 import com.webhook.platform.api.dto.PublicContactRequest;
 import com.webhook.platform.api.security.ProjectScopeExempt;
 import com.webhook.platform.api.security.TrustedProxyResolver;
@@ -46,6 +47,7 @@ public class PublicContactController {
     @ApiResponse(responseCode = "400", description = "A field is invalid, or the challenge was not passed")
     @ApiResponse(responseCode = "429", description = "Too many messages from this address, or the form's daily ceiling is reached")
     @ApiResponse(responseCode = "503", description = "This deployment has no support address")
+    @AllowedInDemo(reason = "anonymous by design; mails the deployment's support address and touches no tenant data")
     @PostMapping
     public ResponseEntity<Map<String, String>> send(@Valid @RequestBody PublicContactRequest body,
                                                     HttpServletRequest request) {

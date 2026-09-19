@@ -1,5 +1,6 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.security.AllowedInDemo;
 import com.webhook.platform.api.dto.PublicBinCreateRequest;
 import com.webhook.platform.api.dto.PublicBinResponse;
 import com.webhook.platform.api.security.ProjectScopeExempt;
@@ -47,6 +48,7 @@ public class PublicBinController {
     @ApiResponse(responseCode = "400", description = "The challenge was not passed")
     @ApiResponse(responseCode = "429", description = "Too many URLs made from this address, or it already holds three live ones")
     @ApiResponse(responseCode = "503", description = "The tester holds as many live URLs as it allows; try later")
+    @AllowedInDemo(reason = "anonymous by design; a tester URL belongs to no organization")
     @PostMapping
     public ResponseEntity<?> create(@RequestBody(required = false) PublicBinCreateRequest body,
                                     HttpServletRequest request) {

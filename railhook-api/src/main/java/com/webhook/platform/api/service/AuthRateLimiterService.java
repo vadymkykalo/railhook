@@ -40,6 +40,9 @@ public class AuthRateLimiterService {
     static final int PUBLIC_BIN_PER_IP_PER_MINUTE = 5;
     private static final String CONTACT_KEY_PREFIX = "rate_limiter:contact:ip:";
     static final int CONTACT_PER_IP_PER_MINUTE = 2;
+    private static final String DEMO_SESSION_KEY_PREFIX = "rate_limiter:demo_session:ip:";
+    /** Demo sessions one address may open in a minute: a visitor needs one, a room behind one NAT a few. */
+    static final int DEMO_SESSION_PER_IP_PER_MINUTE = 10;
     private static final String OAUTH_REGISTER_KEY_PREFIX = "rate_limiter:oauth:register:ip:";
     /**
      * Not the sign-up bucket's 5: a hosted app registers from its own servers, so every person who
@@ -113,6 +116,11 @@ public class AuthRateLimiterService {
     /** A message from the public site's contact form, which needs no account and sends mail. */
     public boolean allowContactMessage(String ip) {
         return tryAcquire(CONTACT_KEY_PREFIX + ip, CONTACT_PER_IP_PER_MINUTE);
+    }
+
+    /** Opening a public demo session, which needs no account and mints a token. */
+    public boolean allowDemoSession(String ip) {
+        return tryAcquire(DEMO_SESSION_KEY_PREFIX + ip, DEMO_SESSION_PER_IP_PER_MINUTE);
     }
 
     public boolean allowRegister(String ip) {

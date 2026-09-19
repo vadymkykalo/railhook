@@ -90,8 +90,14 @@ if [ "$(trim "${RAILHOOK_PUBLIC_TESTER:-}")" = "true" ]; then
     public_tester=true
 fi
 
+# The live demo's entry points, on only for an exact "true" — the page's half of DEMO_ENABLED.
+public_demo=false
+if [ "$(trim "${RAILHOOK_PUBLIC_DEMO:-}")" = "true" ]; then
+    public_demo=true
+fi
+
 cat > "$OUT" <<CONF
-window.__RAILHOOK__ = {"contactDomain": "${domain}", "siteUrl": "${site}", "captchaSiteKey": "${captcha_key}", "captchaScriptUrl": "${captcha_script}", "webAnalyticsToken": "${analytics_token}", "statusPageUrl": "${status_url}", "publicTester": ${public_tester}};
+window.__RAILHOOK__ = {"contactDomain": "${domain}", "siteUrl": "${site}", "captchaSiteKey": "${captcha_key}", "captchaScriptUrl": "${captcha_script}", "webAnalyticsToken": "${analytics_token}", "statusPageUrl": "${status_url}", "publicTester": ${public_tester}, "publicDemo": ${public_demo}};
 CONF
 
 cat > "$SITE_CONF_OUT" <<CONF

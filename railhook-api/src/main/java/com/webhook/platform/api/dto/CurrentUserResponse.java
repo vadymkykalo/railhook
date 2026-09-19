@@ -35,4 +35,10 @@ public class CurrentUserResponse {
      * admin request is checked again on the server, including how recent the sign-in is.
      */
     private boolean platformAdmin;
+
+    /**
+     * Whether this is the public demo: a read-only session anyone can open, which the dashboard
+     * shows with a banner and greyed-out actions. Every change is refused on the server regardless.
+     */
+    private boolean demo;
 }

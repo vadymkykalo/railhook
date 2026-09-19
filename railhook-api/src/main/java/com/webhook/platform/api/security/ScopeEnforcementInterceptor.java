@@ -2,6 +2,7 @@ package com.webhook.platform.api.security;
 
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.exception.DemoReadOnlyException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -184,13 +185,47 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
         });
     }
 
+    /**
+     * Refuses every change from the public demo, and the few reads it has no business making.
+     *
+     * <p>Keyed off the HTTP method, like the suspension gate below, and for a stronger reason
+     * than that gate has: a demo token goes to anyone who asks, so "which handlers change
+     * something" must not be a list somebody keeps. {@link RequireAccess} would have been that
+     * list — and the handlers exempt from it (changing a password or an address, managing
+     * members, approving a CLI or an MCP app, the customer portal) are exactly the ones a
+     * stranger holding the demo's identity should reach least.
+     *
+     * <p>First, before anything that might answer differently: a demo caller learns nothing
+     * from any other gate. The way past it is {@link AllowedInDemo}, and only a handler that
+     * changes nothing of the demo's carries it.
+     */
+    void enforceDemoReadOnly(HttpServletRequest request, Object handler, Authentication authentication) {
+        if (!DemoSessions.isDemo(authentication)) {
+            return;
+        }
+        HandlerMethod handlerMethod = handler instanceof HandlerMethod hm ? hm : null;
+        if (READ_METHODS.contains(request.getMethod())) {
+            if (handlerMethod != null && handlerMethod.hasMethodAnnotation(RefusedInDemo.class)) {
+                throw new DemoReadOnlyException();
+            }
+            return;
+        }
+        if (handlerMethod != null && handlerMethod.hasMethodAnnotation(AllowedInDemo.class)) {
+            return;
+        }
+        log.debug("Demo session refused: {} {}", request.getMethod(), request.getRequestURI());
+        throw new DemoReadOnlyException();
+    }
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        enforceDemoReadOnly(request, handler, authentication);
+
         if (!(handler instanceof HandlerMethod handlerMethod)) {
             return true;
         }
-
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         enforceProjectScope(request, handlerMethod, authentication);
         enforceAccessLevel(handlerMethod, authentication);

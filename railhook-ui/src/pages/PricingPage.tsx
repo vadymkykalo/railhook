@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/button';
+import TryDemoButton from '../components/site/TryDemoButton';
 import { useAuth } from '../auth/auth.store';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useJsonLd } from '../hooks/useJsonLd';
@@ -69,7 +70,7 @@ export default function PricingPage() {
               })}
             </p>
             <p className="text-sm text-muted-foreground">{t('pricing.cloud.later')}</p>
-            <div className="mt-auto pt-3">
+            <div className="mt-auto flex flex-wrap gap-2.5 pt-3">
               <Button asChild className="max-sm:w-full">
                 {isAuthenticated ? (
                   <Link to="/admin/dashboard">{t('landing.nav.goToDashboard')}</Link>
@@ -77,6 +78,7 @@ export default function PricingPage() {
                   <Link to="/register">{t('pricing.cloud.cta')}</Link>
                 )}
               </Button>
+              <TryDemoButton variant="outline" className="max-sm:w-full" />
             </div>
           </article>
 

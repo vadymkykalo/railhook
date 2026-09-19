@@ -14,6 +14,8 @@ Disallow: /accept-invite
 Disallow: /device
 Disallow: /oauth/
 Disallow: /shared/
+# Opening it opens a demo session: nothing to index, and a crawler has no use for one.
+Disallow: /demo
 
 # nginx replaces the placeholder origin below with the container's RAILHOOK_SITE_URL.
 # The second sitemap is the docs site's own (railhook-docs/, served at /docs/).
