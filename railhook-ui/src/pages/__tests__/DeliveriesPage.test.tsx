@@ -130,6 +130,22 @@ describe('DeliveriesPage', () => {
     expect(link).toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/events/event-1`);
   });
 
+  it('puts status and event type on a phone card’s first line, and lets a long URL end in an ellipsis', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([{ ...DELIVERY, eventType: 'order.created' }]));
+    renderDeliveries();
+
+    const eventCell = (await screen.findByRole('link', { name: 'order.created' })).closest('td')!;
+    const row = eventCell.closest('tr')!;
+    const titled = Array.from(row.querySelectorAll('td[data-card-title]'));
+    expect(titled).toHaveLength(2);
+    expect(titled[1]).toBe(eventCell);
+    expect(titled[0]).toHaveTextContent(en.deliveries.status.SUCCESS);
+
+    // A flex link cannot ellipsize its own text; the text has to sit in a box that can.
+    expect(screen.getByText('https://example.com/webhook')).toHaveClass('truncate');
+  });
+
   it('heads the page with the same words as its tab', async () => {
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
     vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([DELIVERY]));

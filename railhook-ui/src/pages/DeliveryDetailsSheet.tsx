@@ -816,15 +816,18 @@ export default function DeliveryDetailsSheet({
                 disabled={delivery.status === 'SUCCESS' || dryRunLoading}
               >
                 {dryRunLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Eye className="mr-2 h-4 w-4" />}
-                {t('deliveryDetails.dryRun.button')}
+                <span className="truncate">{t('deliveryDetails.dryRun.button')}</span>
               </Button>
               <Button
                 onClick={() => setShowReplayDialog(true)}
                 disabled={delivery.status === 'SUCCESS'}
-                className="flex-1"
+                className="min-w-0 flex-1"
+                aria-label={t('deliveryDetails.replayDelivery')}
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
-                {t('deliveryDetails.replayDelivery')}
+                {/* A phone has room for the verb, not the whole phrase. */}
+                <span className="truncate sm:hidden">{t('deliveryDetails.replay')}</span>
+                <span className="truncate max-sm:hidden">{t('deliveryDetails.replayDelivery')}</span>
               </Button>
             </div>
             </>

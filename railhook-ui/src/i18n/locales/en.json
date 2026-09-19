@@ -1158,7 +1158,7 @@
     "diagnosis": {
       "attemptLabel": "#{{number}}",
       "category": "Error Type",
-      "noMoreRetries": "No more retries — moved to DLQ",
+      "noMoreRetries": "No more retries — moved to failed deliveries",
       "retryTimeline": "Retry Timeline",
       "suggestedFix": "Suggested Fix",
       "title": "Error Diagnosis"
@@ -1275,7 +1275,7 @@
     "searchActive": "Search",
     "selectAll": "Select all",
     "selectItem": "Select row",
-    "subtitle": "Failed deliveries for <strong>{{project}}</strong>",
+    "subtitle": "Deliveries Railhook stopped retrying in <strong>{{project}}</strong>. Replay them once the endpoint is fixed.",
     "toast": {
       "bulkReplayed": "{{count}} deliveries queued for replay",
       "bulkReplayed_few": "{{count}} deliveries queued for replay",
@@ -5306,7 +5306,8 @@
     "exited": "You left the demo",
     "ended": "The demo session has ended. You can open a new one any time.",
     "readOnlyTooltip": "Read-only demo — create a free account to do this",
-    "readOnlyError": "This is a read-only demo. Create a free account to make changes."
+    "readOnlyError": "This is a read-only demo. Create a free account to make changes.",
+    "bannerShort": "Read-only demo"
   },
   "snippet": {
     "copied": "Copied",

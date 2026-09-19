@@ -248,15 +248,15 @@ export default function DlqPage() {
                           />
                         </TableCell>
                       )}
-                      <TableCell>
+                      <TableCell data-card-title>
                         <span className="flex flex-col items-start gap-1">
                           <StatusBadge kind="halt" label={t('dlq.abandoned')} />
-                          <span className="text-[11px] text-muted-foreground">
+                          <span className="text-[11px] text-muted-foreground max-sm:hidden">
                             {t('dlq.ladderExhausted', { count: item.attemptCount })}
                           </span>
                         </span>
                       </TableCell>
-                      <TableCell><code className="font-mono text-[13px]">{item.eventType}</code></TableCell>
+                      <TableCell data-card-title><code className="font-mono text-[13px]">{item.eventType}</code></TableCell>
                       <TableCell>
                         <span className="block max-w-[200px] truncate font-mono text-[13px]" title={item.endpointUrl}>{item.endpointUrl}</span>
                       </TableCell>
