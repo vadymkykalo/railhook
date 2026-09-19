@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.27.0] - 2026-09-20
+
+### Added
+
+- **The customer portal on the landing page**: a card in the developer section says what it is and
+  links to its guide.
+- **The live demo shows three working workflows**, each with a day and a half of runs: one branches
+  high-value orders from the rest, one filters declined card payments and waits before asking
+  billing to retry, one asks for a review only on UPS or DHL deliveries. Read-only, like the rest of
+  the demo.
+
+### Changed
+
+- The landing header drops its "Self-host" link: Pricing and the install section already cover it.
+
+### Fixed
+
+- **Turning the live demo off now removes its data.** With `DEMO_ENABLED=false` the demo
+  organization, its person, project, Endpoints, Subscriptions, Sources, Destinations and its whole
+  history stayed in the database for good. The API now deletes them on its next start — by the
+  demo's fixed ids only, under the seeder's lock, and not at all while the demo is on. A start
+  with nothing of the demo's left does nothing.
+- The demo's order amounts were formatted with the server's locale, so on a comma-decimal locale no
+  numeric workflow condition could read them; they use a fixed format now.
+- The Ukrainian AI article reads naturally.
+
 ## [2.26.0] - 2026-09-19
 
 ### Added

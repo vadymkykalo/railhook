@@ -2068,7 +2068,9 @@
       "response": "2 deliveries created",
       "readDocs": "Read the docs",
       "mcpTitle": "AI agents (MCP)",
-      "mcpBody": "Let Claude, Cursor or any MCP client send events and replay deliveries."
+      "mcpBody": "Let Claude, Cursor or any MCP client send events and replay deliveries.",
+      "portalTitle": "Customer portal",
+      "portalBody": "Embed a page where your own users add endpoints, see their deliveries and retry the failed ones."
     },
     "directions": {
       "inBody": "One address per service. Railhook checks that Stripe or GitHub really sent it, then passes it on to your app.",
@@ -2127,7 +2129,6 @@
       "label": "Main",
       "openMenu": "Open menu",
       "product": "Product",
-      "selfHost": "Self-host",
       "signIn": "Sign in",
       "startFree": "Start free",
       "pricing": "Pricing",

@@ -4,11 +4,14 @@ import com.webhook.platform.api.service.demo.DemoCatalog.DemoDestination;
 import com.webhook.platform.api.service.demo.DemoCatalog.DemoEndpoint;
 import com.webhook.platform.api.service.demo.DemoCatalog.DemoSource;
 import com.webhook.platform.api.service.demo.DemoCatalog.DemoSubscription;
+import com.webhook.platform.api.service.demo.DemoCatalog.DemoWorkflow;
 import com.webhook.platform.api.service.demo.DemoHistory.AttemptRow;
 import com.webhook.platform.api.service.demo.DemoHistory.DeliveryRow;
 import com.webhook.platform.api.service.demo.DemoHistory.EventRow;
 import com.webhook.platform.api.service.demo.DemoHistory.ForwardRow;
 import com.webhook.platform.api.service.demo.DemoHistory.IncomingEventRow;
+import com.webhook.platform.api.service.demo.DemoHistory.WorkflowExecutionRow;
+import com.webhook.platform.api.service.demo.DemoHistory.WorkflowStepRow;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.common.demo.DemoTenant;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
@@ -35,10 +38,10 @@ import java.util.concurrent.TimeUnit;
  * Keeps the public demo's organization in place and its history recent.
  *
  * <p>Two halves, both idempotent. The organization, its one member, project "Acme Shop", its
- * Endpoints, Subscriptions, Sources and Destinations are inserted with fixed ids and
- * {@code ON CONFLICT DO NOTHING}: seeding twice finds them there and changes nothing. The traffic
- * is replaced — the demo's Events, Deliveries, Attempts, Incoming Events and Forwards are deleted
- * and {@link DemoHistory} written again, ending at the current time — so the dashboard and the
+ * Endpoints, Subscriptions, Sources, Destinations and Workflows are inserted with fixed ids and
+ * {@code ON CONFLICT}: seeding twice finds them there and changes nothing. The traffic is
+ * replaced — the demo's Events, Deliveries, Attempts, Incoming Events, Forwards and workflow runs
+ * are deleted and {@link DemoHistory} written again, ending at the current time — so the dashboard and the
  * analytics always show the last day rather than the day the server started.
  *
  * <p>JDBC rather than the entities: the history needs its own timestamps, which
@@ -46,8 +49,8 @@ import java.util.concurrent.TimeUnit;
  * Every row names the demo organization explicitly, which is also why this runs as the system
  * tenant: there is no request, and no tenant filter to apply to plain JDBC.
  *
- * <p>Only exists where {@code demo.enabled} is true. Turning the demo off leaves the rows where
- * they are and stops refreshing them; nothing can sign in to see them.
+ * <p>Only exists where {@code demo.enabled} is true. Where it is false, {@link DemoDataRemover}
+ * takes its place and deletes whatever an earlier boot with the demo on left behind.
  */
 @Slf4j
 @Service
@@ -55,7 +58,7 @@ import java.util.concurrent.TimeUnit;
 public class DemoDataSeeder {
 
     /** "RAILDEMO": serialises seeding across API replicas that start together. */
-    private static final long ADVISORY_LOCK_KEY = 0x5241494c44454d4fL;
+    static final long ADVISORY_LOCK_KEY = 0x5241494c44454d4fL;
 
     /** Before any real sign-up could have happened, so no signup or activation window counts them. */
     private static final Timestamp PINNED_CREATED_AT = Timestamp.from(Instant.parse("2024-01-01T00:00:00Z"));
@@ -110,8 +113,9 @@ public class DemoDataSeeder {
             seedStructure(now);
             replaceHistory(history);
         });
-        log.info("Public demo seeded: {} events, {} deliveries, {} incoming events",
-                history.events.size(), history.deliveries.size(), history.incomingEvents.size());
+        log.info("Public demo seeded: {} events, {} deliveries, {} incoming events, {} workflow runs",
+                history.events.size(), history.deliveries.size(), history.incomingEvents.size(),
+                history.workflowExecutions.size());
     }
 
     private void seedStructure(Instant now) {
@@ -187,15 +191,52 @@ public class DemoDataSeeder {
                     destination.id(), DemoTenant.ORGANIZATION_ID, destination.source().id(), destination.url(),
                     DemoCatalog.INCOMING_DELAYS, PINNED_CREATED_AT, PINNED_CREATED_AT);
         }
+        // Enabled, because they are shown working; nothing can trigger them, since the demo takes
+        // no events. Unlike the rows above, a workflow is brought back in line with the catalog
+        // when it differs: its history is generated from the catalog's definition, and a demo seeded
+        // by an earlier release would otherwise show runs of nodes its canvas does not have. No
+        // visitor can edit one, so there is no change of anybody's to overwrite.
+        for (DemoWorkflow workflow : DemoCatalog.WORKFLOWS) {
+            jdbc.update("INSERT INTO workflows (id, organization_id, project_id, name, description, enabled, definition, "
+                            + "trigger_type, trigger_config, version, created_at, updated_at) "
+                            + "VALUES (?, ?, ?, ?, ?, true, ?::jsonb, 'WEBHOOK_EVENT', ?::jsonb, 1, ?, ?) "
+                            + "ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, "
+                            + "enabled = true, definition = EXCLUDED.definition, trigger_type = EXCLUDED.trigger_type, "
+                            + "trigger_config = EXCLUDED.trigger_config "
+                            + "WHERE (workflows.name, workflows.description, workflows.enabled, workflows.definition, "
+                            + "workflows.trigger_type, workflows.trigger_config) IS DISTINCT FROM (EXCLUDED.name, "
+                            + "EXCLUDED.description, true, EXCLUDED.definition, EXCLUDED.trigger_type, EXCLUDED.trigger_config)",
+                    workflow.id(), DemoTenant.ORGANIZATION_ID, DemoTenant.PROJECT_ID, workflow.name(),
+                    workflow.description(), workflow.definition(), workflow.triggerConfig(),
+                    PINNED_CREATED_AT, PINNED_CREATED_AT);
+        }
+    }
+
+    /** The demo's traffic, as deleted: how many rows of each went. */
+    record DeletedHistory(int workflowExecutions, int forwards, int incomingEvents, int attempts, int deliveries,
+                          int events) {
+    }
+
+    /**
+     * Deletes the demo organization's traffic, children first. Every statement names the demo
+     * organization, and nothing else. The caller holds the transaction and the advisory lock.
+     */
+    static DeletedHistory deleteHistory(JdbcTemplate jdbc) {
+        jdbc.update("DELETE FROM workflow_step_executions WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
+        int workflowExecutions = jdbc.update("DELETE FROM workflow_executions WHERE organization_id = ?",
+                DemoTenant.ORGANIZATION_ID);
+        int forwards = jdbc.update("DELETE FROM incoming_forward_attempts WHERE organization_id = ?",
+                DemoTenant.ORGANIZATION_ID);
+        int incomingEvents = jdbc.update("DELETE FROM incoming_events WHERE organization_id = ?",
+                DemoTenant.ORGANIZATION_ID);
+        int attempts = jdbc.update("DELETE FROM delivery_attempts WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
+        int deliveries = jdbc.update("DELETE FROM deliveries WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
+        int events = jdbc.update("DELETE FROM events WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
+        return new DeletedHistory(workflowExecutions, forwards, incomingEvents, attempts, deliveries, events);
     }
 
     private void replaceHistory(DemoHistory history) {
-        // Children first; every statement names the demo organization, and nothing else.
-        jdbc.update("DELETE FROM incoming_forward_attempts WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
-        jdbc.update("DELETE FROM incoming_events WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
-        jdbc.update("DELETE FROM delivery_attempts WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
-        jdbc.update("DELETE FROM deliveries WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
-        jdbc.update("DELETE FROM events WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
+        deleteHistory(jdbc);
 
         batch("INSERT INTO events (id, organization_id, project_id, event_type, payload, payload_compressed, created_at) "
                         + "VALUES (?, ?, ?, ?, ?::jsonb, false, ?)",
@@ -233,6 +274,20 @@ public class DemoDataSeeder {
                         f.destinationId(), f.attemptNumber(), f.status(), ts(f.startedAt()), ts(f.finishedAt()),
                         f.requestHeaders(), f.requestBody(), f.responseCode(), f.responseHeaders(), f.responseBody(),
                         f.errorMessage(), ts(f.createdAt())});
+
+        batch("INSERT INTO workflow_executions (id, organization_id, workflow_id, trigger_event_id, status, "
+                        + "trigger_data, started_at, completed_at, error_message, duration_ms, depth) "
+                        + "VALUES (?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, 0)",
+                history.workflowExecutions, (WorkflowExecutionRow x) -> new Object[]{x.id(), DemoTenant.ORGANIZATION_ID,
+                        x.workflowId(), x.triggerEventId(), x.status(), x.triggerData(), ts(x.startedAt()),
+                        ts(x.completedAt()), x.errorMessage(), x.durationMs()});
+
+        batch("INSERT INTO workflow_step_executions (id, organization_id, execution_id, node_id, node_type, status, "
+                        + "input_data, output_data, error_message, attempt_count, duration_ms, started_at, completed_at, "
+                        + "created_at) VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, 1, ?, ?, ?, ?)",
+                history.workflowSteps, (WorkflowStepRow w) -> new Object[]{w.id(), DemoTenant.ORGANIZATION_ID,
+                        w.executionId(), w.nodeId(), w.nodeType(), w.status(), w.inputData(), w.outputData(),
+                        w.errorMessage(), w.durationMs(), ts(w.startedAt()), ts(w.completedAt()), ts(w.createdAt())});
     }
 
     private interface Row<T> {

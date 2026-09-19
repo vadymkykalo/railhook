@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowUpRight, BookOpen, Bot, Braces, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, BookOpen, Bot, Braces, LayoutPanelTop, ShieldCheck } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { highlight, type CodeLanguage } from '../../components/SyntaxHighlight';
 import { useAuth } from '../../auth/auth.store';
@@ -368,6 +368,12 @@ export default function DeveloperSection() {
               icon={<Bot className="h-5 w-5" aria-hidden="true" />}
               title={t('landing.developer.mcpTitle')}
               body={t('landing.developer.mcpBody')}
+            />
+            <LinkCard
+              href="/docs/outgoing/customer-portal/"
+              icon={<LayoutPanelTop className="h-5 w-5" aria-hidden="true" />}
+              title={t('landing.developer.portalTitle')}
+              body={t('landing.developer.portalBody')}
             />
           </div>
           <CodeWindow />

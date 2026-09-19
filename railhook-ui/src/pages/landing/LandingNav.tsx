@@ -39,11 +39,11 @@ import { WRAP } from './primitives';
  * everything else.
  *
  * Pricing is the page people look for first, and it covers both the free cloud plan and
- * self-hosting, so it took the place of a "Cloud" link that pointed at the same section as
- * "Self-host".
+ * self-hosting, so neither gets a link of its own: a "Self-host" link to the install section
+ * only repeated what Pricing and the page itself already say.
  *
  * Section links are router `Link`s to "/#id" because this header is also mounted on /contact,
- * where a bare "#run" would point nowhere; `LandingPage` scrolls to the hash on arrival. Docs is a
+ * where a bare "#product" would point nowhere; `LandingPage` scrolls to the hash on arrival. Docs is a
  * plain anchor: it is served as its own static site, not a route in this app.
  *
  * The menu button sits outside the `<nav>` landmark: it is not a destination, and on a wide
@@ -76,7 +76,6 @@ export default function LandingNav() {
   const sections = [
     { to: '/#product', label: t('landing.nav.product') },
     { to: '/pricing', label: t('landing.nav.pricing') },
-    { to: '/#run', label: t('landing.nav.selfHost') },
   ];
   const developers = useDeveloperLinks();
   const reading = [
