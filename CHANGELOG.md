@@ -63,6 +63,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Blog byline, tags and the "sources checked" note are larger**, and a whole post card on
   `/blog` is now the link, with a focus ring around the card.
 
+### Changed
+
+- **The Ukrainian text reads as if a Ukrainian developer wrote it.** The dashboard, the public
+  pages, the docs and the blog were edited string by string against the English, against a new
+  glossary (`railhook-ui/src/i18n/GLOSSARY.uk.md`) that fixes one rendering per term and the style
+  rules around it: a retry ladder is «розклад повторних спроб», not «драбина»; a replay is
+  «відтворення» and no longer shares a word with a retry; Failed Messages are «Недоставлені
+  повідомлення»; a payload is «вміст» or «тіло запиту». Calques, stray English and mixed forms
+  (ендпойнт/ендпоінт, акаунт/обліковий запис) are gone.
+
 ### Fixed
 
 - `npm run blog:og` drew only the first post's social card: the second timed out on the reused

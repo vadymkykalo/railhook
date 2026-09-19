@@ -1,38 +1,38 @@
 ---
 title: Моніторинг
-description: Перевірки здоров'я, метрики Prometheus, вбудований стек Grafana зі сповіщеннями про хост, контейнери, доступність і журнали, та сигнали, на які варто ставити сповіщення.
+description: Перевірки стану, метрики Prometheus, вбудований стек Grafana зі сповіщеннями про хост, контейнери, доступність і логи, а також сигнали, на які варто налаштувати сповіщення.
 ---
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Railhook віддає перевірки здоров'я на публічному порту, а метрики Prometheus — на внутрішніх портах. У репозиторії є необов'язковий стек моніторингу — Grafana, Prometheus, Alertmanager, Loki та експортери для хоста, контейнерів і доступності, — який запускається поруч однією командою.
+Railhook надає перевірки стану на публічному порту, а метрики Prometheus — на внутрішніх. У репозиторії є необов'язковий стек моніторингу — Grafana, Prometheus, Alertmanager, Loki та експортери для хоста, контейнерів і доступності, — який можна запустити поруч однією командою.
 
-## Перевірки здоров'я
+## Перевірки стану
 
-`RAILHOOK_URL` — адреса вашого інстансу: `http://localhost` після типового встановлення, `http://localhost:<port>`, якщо ви передали `--port`, `https://<ваш домен>` з `--domain`.
+`RAILHOOK_URL` — адреса вашого інстансу: `http://localhost` після типового встановлення, `http://localhost:<port>`, якщо ви передали `--port`, або `https://<your domain>`, якщо встановлювали з `--domain`.
 
 ```bash
 curl -f "$RAILHOOK_URL/actuator/health/liveness"
 curl -f "$RAILHOOK_URL/actuator/health/readiness"
 ```
 
-nginx проксує лише шляхи health. Решта шляхів `/actuator/` на публічному порту відповідає `404`.
+nginx проксує лише шляхи перевірок стану. Будь-який інший шлях `/actuator/` на публічному порту відповідає `404`.
 
 ## Метрики
 
-Метрики доступні на окремих керувальних портах, лише всередині мережі Docker, і не потребують облікових даних:
+Метрики доступні на окремих портах керування (management) лише всередині мережі Docker і не потребують облікових даних:
 
 | Сервіс | Адреса метрик |
 |---|---|
 | API | `http://api:8082/actuator/prometheus` |
 | Воркер | `http://worker:8081/actuator/prometheus` |
 
-На публічний порт їх навмисно не проксовано: метрики розкрили б назви ендпоінтів і обсяги трафіку будь-кому, хто спитає.
+На публічний порт їх навмисно не проксовано: метрики розкрили б назви ендпоінтів і обсяги трафіку будь-кому, хто їх запросить.
 
-Обидва сервіси публікують їх завжди, незалежно від того, чи запущено вбудований стек, тож ці порти може збирати будь-який ваш Prometheus: бакети затримок HTTP-запитів, метрики клієнтів Kafka та лічильники прийнятих подій, створених доставок, спрацьованих правил і очищення даних. Мітки лишаються обмеженими — жодних ідентифікаторів організацій, проєктів чи ендпоінтів.
+Обидва сервіси публікують їх завжди, незалежно від того, чи запущено вбудований стек, тож ці порти може опитувати будь-який наявний у вас Prometheus: бакети затримок HTTP-запитів, метрики клієнтів Kafka та лічильники прийнятих подій, створених доставок, спрацювань правил і очищення застарілих даних. Кількість значень міток обмежена — жодних ідентифікаторів організацій, проєктів чи ендпоінтів.
 
 ## Вбудований стек
 
-`monitoring/` у репозиторії — другий Compose-проєкт: Grafana, Prometheus, Alertmanager, Loki і Promtail, node-exporter, cAdvisor та blackbox-exporter. Він вимкнений, доки ви його не запустите, а його ліміти пам'яті разом дають 1,5 ГБ.
+`monitoring/` у репозиторії — другий Compose-проєкт: Grafana, Prometheus, Alertmanager, Loki і Promtail, node-exporter, cAdvisor та blackbox-exporter. Він вимкнений, доки ви його не запустите, а його ліміти пам'яті в сумі становлять 1,5 ГБ.
 
 Порт публікує лише Grafana, на `127.0.0.1:3001`. Prometheus, Alertmanager і Loki доступні лише всередині мережі стека; сторінки Explore та Alerting у Grafana читають усі три.
 
@@ -47,15 +47,15 @@ nginx проксує лише шляхи health. Решта шляхів `/actua
    echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
    ```
 
-2. **Вкажіть, куди йдуть сповіщення.** Пошта йде через той самий релей, яким уже користується платформа (`EMAIL_FROM`, `SMTP_*`), якщо ви не задали змінні `ALERTMANAGER_SMTP_*`. Кожен лист містить посилання на Grafana на `MONITORING_DOMAIN`; без домену лист пояснює, як відкрити Grafana через SSH-тунель.
+2. **Вкажіть, куди йдуть сповіщення.** Листи надсилаються через той самий SMTP-релей, яким уже користується платформа (`EMAIL_FROM`, `SMTP_*`), якщо ви не задали змінні `ALERTMANAGER_SMTP_*`. Кожен лист містить посилання на Grafana за адресою `MONITORING_DOMAIN`; якщо домену немає, лист пояснює, як відкрити Grafana через SSH-тунель.
 
    ```bash
    echo "ALERTMANAGER_EMAIL_TO=you@example.com" >> .env
    ```
 
-   Slack (`ALERTMANAGER_SLACK_WEBHOOK_URL`), загальний вебхук (`ALERTMANAGER_WEBHOOK_URL`) і Telegram (`ALERTMANAGER_TELEGRAM_BOT_TOKEN`, `ALERTMANAGER_TELEGRAM_CHAT_ID`) налаштовуються так само.
+   Slack (`ALERTMANAGER_SLACK_WEBHOOK_URL`), довільний вебхук (`ALERTMANAGER_WEBHOOK_URL`) і Telegram (`ALERTMANAGER_TELEGRAM_BOT_TOKEN`, `ALERTMANAGER_TELEGRAM_CHAT_ID`) налаштовуються так само.
 
-3. **Запустіть.**
+3. **Запустіть стек.**
 
    ```bash
    ./railhook monitoring up
@@ -73,16 +73,16 @@ nginx проксує лише шляхи health. Решта шляхів `/actua
 
 </Steps>
 
-`./railhook monitoring status` показує контейнери та стан кожної цілі Prometheus. `./railhook monitoring logs [service]` стежить за журналами. `./railhook monitoring down` зупиняє стек і зберігає його метрики та журнали.
+`./railhook monitoring status` показує контейнери та стан кожної цілі Prometheus. `./railhook monitoring logs [service]` показує логи в реальному часі. `./railhook monitoring down` зупиняє стек, зберігаючи його метрики та логи.
 
 ### Grafana на власному домені
 
-Задайте `MONITORING_DOMAIN=grafana.example.com` у `.env`, спрямуйте це ім'я на сервер і знову виконайте `./railhook monitoring up`. Команда додасть ім'я до Caddyfile і перезавантажить Caddy, який отримає сертифікат так само, як для платформи. З `--behind-proxy` спрямуйте власний проксі на `127.0.0.1:3001`.
+Задайте `MONITORING_DOMAIN=grafana.example.com` у `.env`, спрямуйте це доменне ім'я на сервер і знову виконайте `./railhook monitoring up`. Команда додасть ім'я до Caddyfile і перезавантажить Caddy, який отримає сертифікат так само, як для платформи. Якщо ви встановлювали з `--behind-proxy`, натомість спрямуйте на `127.0.0.1:3001` власний проксі.
 
 <Aside type="caution">
-Поставте перед цим ім'ям проксі з перевіркою особи, наприклад Cloudflare Access. Логін Grafana не має бути єдиним, що стоїть між інтернетом і вашими журналами. Якщо проксі охоплює всі шляхи, виключіть `/.well-known/acme-challenge/`, інакше Caddy не зможе поновити сертифікат.
+Поставте перед цим доменом identity-aware проксі, наприклад Cloudflare Access. Вхід у Grafana не має бути єдиним бар'єром між інтернетом і вашими логами. Якщо проксі охоплює всі шляхи, виключіть `/.well-known/acme-challenge/`, інакше Caddy не зможе оновити сертифікат.
 
-Деякі проксі взагалі не пускають Let's Encrypt до цього імені: Cloudflare з Always Use HTTPS переводить перевірку на HTTPS, де сертифіката ще немає. Тоді дайте Caddy готовий, наприклад origin-сертифікат Cloudflare для цього імені. Скопіюйте сертифікат і ключ у том даних Caddy, вкажіть їх у `.env` і знову виконайте `./railhook monitoring up`:
+Деякі проксі взагалі не пускають Let's Encrypt до цього імені: Cloudflare з Always Use HTTPS перенаправляє ACME-перевірку на HTTPS, де сертифіката ще немає. Тоді дайте Caddy готовий сертифікат, наприклад origin-сертифікат Cloudflare для цього імені. Скопіюйте сертифікат і ключ у том даних Caddy, вкажіть їх у `.env` і знову виконайте `./railhook monitoring up`:
 
 ```bash
 docker exec webhook-caddy mkdir -p /data/certs
@@ -109,16 +109,16 @@ printf '%s\n' MONITORING_TLS_CERT=/data/certs/grafana.example.com.pem \
 
 </Steps>
 
-`make monitoring-down` зупиняє його; `make monitoring-logs` показує його журнали.
+`make monitoring-down` зупиняє стек; `make monitoring-logs` показує його логи в реальному часі.
 
 ### Дашборди
 
 | Дашборд | Що показує |
 |---|---|
 | Railhook — Overview | Чи доступний публічний сайт, активні сповіщення, диск, пам'ять, CPU і вік резервної копії, далі — події, доставки, черги та DLQ |
-| Alerts | Кожне активне й очікуване сповіщення, чи працює сам ланцюжок сповіщень, історію та посилання, щоб приглушити сповіщення |
-| Errors | Рядки журналів з помилками й попередженнями за сервісами, найчастіші повідомлення про помилки, 4xx і 5xx в API та nginx, 401/403/429, невдалі доставки та ріст DLQ |
-| Logs | Рядки API, воркера, nginx інтерфейсу, Caddy, Postgres і резервного копіювання з фільтрами за сервісом, рівнем, текстом, correlation ID або organization ID |
+| Alerts | Усі активні й очікувані сповіщення, чи працює сам ланцюжок сповіщень, історія сповіщень і посилання, щоб приглушити будь-яке з них |
+| Errors | Рядки логів з помилками й попередженнями за сервісами, найчастіші повідомлення про помилки, 4xx і 5xx в API та nginx, 401/403/429, невдалі доставки та зростання DLQ |
+| Logs | Рядки логів API, воркера, nginx інтерфейсу, Caddy, Postgres і резервного копіювання з фільтрами за сервісом, рівнем, текстом, correlation ID або organization ID |
 | Host | Node Exporter Full: CPU, пам'ять, диски, мережа, файлові системи |
 | Containers | CPU, пам'ять відносно ліміту Compose, мережа й перезапуски для кожного контейнера |
 | Uptime | Стан перевірок, доступність за період, час відповіді, скільки днів лишилося сертифікату TLS, резервні копії |
@@ -126,7 +126,7 @@ printf '%s\n' MONITORING_TLS_CERT=/data/certs/grafana.example.com.pem \
 
 ### Які сповіщення надсилає
 
-Правила платформи — той самий набір, що постачає Helm-чарт. Понад них, для сервера:
+Правила для платформи — той самий набір, що входить у Helm-чарт. Крім них, для самого сервера є такі:
 
 | Сповіщення | Спрацьовує, коли |
 |---|---|
@@ -134,29 +134,29 @@ printf '%s\n' MONITORING_TLS_CERT=/data/certs/grafana.example.com.pem \
 | `HostMemoryHigh`, `HostOomKill` | Пам'ять зайнята більш ніж на 90% протягом 10 хвилин або ядро вбило процес |
 | `HostLoadHigh` | 15-хвилинне навантаження перевищує кількість CPU в 1,5 раза |
 | `ContainerRestarting`, `ContainerOomKilled`, `ContainerMemoryNearLimit` | Контейнер двічі перезапустився за 15 хвилин, досяг ліміту пам'яті або перевищує 90% від нього |
-| `PublicEndpointDown`, `PublicEndpointSlow` | Публічна адреса не відповідає або відповідає довше за 3 секунди ззовні |
-| `UiDown`, `CaddyDown` | nginx інтерфейсу або Caddy перестав відповідати всередині мережі |
+| `PublicEndpointDown`, `PublicEndpointSlow` | Публічний URL не відповідає ззовні або відповідає довше за 3 секунди |
+| `UiDown`, `CaddyDown` | nginx інтерфейсу або Caddy перестає відповідати всередині мережі |
 | `TlsCertificateExpiringSoon`, `TlsCertificateExpiryImminent` | Сертифікат спливає менш ніж за 14 днів або менш ніж за 3 |
-| `ErrorLogSpike`, `EdgeServerErrorSpike` | Сервіс пише понад 10 помилок на хвилину або nginx віддає понад 5 відповідей 5xx на хвилину |
+| `ErrorLogSpike`, `EdgeServerErrorSpike` | Сервіс пише в лог понад 10 помилок на хвилину або nginx віддає понад 5 відповідей 5xx на хвилину |
 | `BackupStale`, `BackupMissing` | Найновіша планова резервна копія старша за 26 годин або її немає |
 | `Watchdog` | Завжди. Надсилається лише на `ALERTMANAGER_HEARTBEAT_URL` |
 
 Перевірки запитують `https://RAILHOOK_DOMAIN/`, `/docs/` і `/actuator/health`; щоб перевіряти інші адреси, задайте `MONITORING_PROBE_URLS`.
 
 <Aside type="tip">
-Кожне інше сповіщення надсилає той самий сервер, який воно описує, тож жодне з них не повідомить, що сервер лежить. Спрямуйте `ALERTMANAGER_HEARTBEAT_URL` на сервіс heartbeat, наприклад healthchecks.io: він щохвилини отримує `Watchdog` і сповіщає вас, коли той перестає надходити.
+Будь-яке інше сповіщення надсилає той самий сервер, який воно описує, тож жодне з них не повідомить вам, що цей сервер ліг. Спрямуйте `ALERTMANAGER_HEARTBEAT_URL` на heartbeat-сервіс, наприклад healthchecks.io: він щохвилини отримує `Watchdog` і сповіщає вас, коли той перестає надходити.
 </Aside>
 
-Стек знаходить мережу Docker платформи за її міткою Compose. Якщо він обрав не ту, задайте `RAILHOOK_NETWORK`. Усі змінні — у [довіднику конфігурації](/docs/uk/self-hosting/configuration/).
+Стек знаходить мережу Docker платформи за її міткою Compose. Якщо він вибрав не ту мережу, задайте `RAILHOOK_NETWORK`. Усі змінні — у [довіднику конфігурації](/docs/uk/self-hosting/configuration/).
 
 ## На що ставити сповіщення
 
 | Метрика | Чому |
 |---|---|
-| `delivery_oldest_pending_age_seconds` | Вік найстарішої незавершеної доставки. Будь-яка причина проблем проявляється тут. `forward_oldest_pending_age_seconds` — вхідний відповідник |
-| `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Доставки й пересилання, яким забракло повторів і які потребують людини |
+| `delivery_oldest_pending_age_seconds` | Вік найстарішої незавершеної доставки. Хоч би що пішло не так, це видно тут. `forward_oldest_pending_age_seconds` — вхідний відповідник |
+| `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Доставки й пересилання, у яких закінчилися повторні спроби і які потребують уваги людини |
 | `outbox_oldest_pending_age_seconds` | Прийняті події, які ще не дійшли до Kafka |
-| `circuit_breaker_degraded_total` | Redis був недоступний, і запобіжник пропускав виклики без захисту |
+| `circuit_breaker_degraded_total` | Redis був недоступний, і circuit breaker пропускав виклики без захисту |
 
 ## Kubernetes
 
@@ -177,7 +177,7 @@ ServiceMonitor збирає метрики з порту `management` API та �
 ## Що далі
 
 <CardGrid>
-  <LinkCard title="Спостережуваність" description="Кожна метрика, згрупована за питанням, на яке відповідає." href="/docs/uk/platform/observability/" />
-  <LinkCard title="Сповіщення" description="Правила сповіщень, які ви налаштовуєте в панелі." href="/docs/uk/platform/alerts/" />
+  <LinkCard title="Спостережуваність" description="Кожна метрика, згрупована за питанням, на яке вона відповідає." href="/docs/uk/platform/observability/" />
+  <LinkCard title="Сповіщення" description="Правила сповіщень, які ви налаштовуєте в панелі керування." href="/docs/uk/platform/alerts/" />
   <LinkCard title="Вирішення проблем" description="Симптоми й виправлення." href="/docs/uk/self-hosting/troubleshooting/" />
 </CardGrid>
