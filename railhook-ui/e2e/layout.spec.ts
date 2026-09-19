@@ -10,7 +10,7 @@ import { EVENT_ID, PLATFORM_ORG_ID, PROJECT_ID, mockApi, mockNewOrganization } f
  * browser at a phone width and a desktop width.
  */
 
-const PUBLIC = ['/', '/contact', '/login', '/register', '/forgot-password', '/reset-password?token=e2e', '/verify-email?token=e2e', '/no-such-page'];
+const PUBLIC = ['/', '/pricing', '/tester', '/tools/webhook-signature', '/security', '/about', '/changelog', '/contact', '/login', '/register', '/forgot-password', '/reset-password?token=e2e', '/verify-email?token=e2e', '/no-such-page'];
 const ADMIN = [
   '/admin/dashboard',
   '/admin/projects',

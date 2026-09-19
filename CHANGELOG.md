@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The message widget could not be closed on a phone.** It opened as a small panel pinned to the
+  launcher, and with the keyboard up both its close button and the launcher were off screen. On a
+  phone it is now a full-screen sheet above the header, with the close button always in view and
+  the page behind it locked. Worse, while closed the panel still covered a phone screen
+  invisibly — a responsive `display` class beat the `hidden` attribute — and swallowed every tap
+  on the page behind it.
+- **The cookie notice's second button overflowed its border** on a phone, where the Ukrainian
+  "Політика конфіденційності" does not fit. The policy is now a link in the sentence and the
+  notice has one button.
+
 - **The nightly ordering probe measured other scenarios' traffic.** One load-receiver serves every
   scenario in a run and a retry ladder outlives the scenario that started it, so deliveries still
   draining from the failure-recovery run were counted as the ordering burst — 135 "out-of-order
