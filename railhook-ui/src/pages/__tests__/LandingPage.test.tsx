@@ -294,9 +294,10 @@ describe('LandingNav', () => {
     expect(interactive.length + 1).toBeLessThanOrEqual(11);
 
     const hrefs = within(nav).getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(expect.arrayContaining(['/#product', '/pricing', '/#run', '/blog', '/about', '/register', '/login']));
-    // Pricing covers both the cloud plan and self-hosting, so the header has no separate "Cloud".
+    expect(hrefs).toEqual(expect.arrayContaining(['/#product', '/pricing', '/blog', '/about', '/register', '/login']));
+    // Pricing covers both the cloud plan and self-hosting, so the header links to neither on its own.
     expect(within(nav).queryByRole('link', { name: 'Cloud' })).toBeNull();
+    expect(hrefs).not.toContain('/#run');
   });
 
   it('carries the language switch the footer gave up, and offers it inside the menu on a phone', async () => {
