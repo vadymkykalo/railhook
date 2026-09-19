@@ -16,7 +16,6 @@ import { showSuccess, showApiError } from '../lib/toast';
 import PageSkeleton, { SkeletonTable } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
-import DetailBreadcrumb from '../components/DetailBreadcrumb';
 import StatusBadge, { kindOfDeliveryStatus } from '../components/StatusBadge';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -121,7 +120,6 @@ export default function EventDetailPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <DetailBreadcrumb projectId={projectId} current={event.eventType} />
       <PageHeader
         eyebrow={
           <span className="flex items-center gap-2">

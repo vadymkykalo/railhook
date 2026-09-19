@@ -18,7 +18,7 @@ A few bad deploys can therefore switch your integration off without anyone notic
 
 ## Connect GitLab
 
-You need a Railhook project and an API key. Everything below can also be done under **Receive webhooks** in the dashboard.
+You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -56,7 +56,7 @@ export PROJECT_ID=...
 
 4. **Register the webhook in GitLab.** In the project or group, open **Settings → Webhooks** and add a new webhook. Paste the `ingressUrl` as the **URL**, the same token as the **Secret token**, and select the triggers you want.
 
-5. **Send a test** with the webhook's **Test** button. It appears under **Events → Incoming events**, with one forward per destination.
+5. **Send a test** with the webhook's **Test** button. It appears under **Incoming → Incoming events**, with one forward per destination.
 
 </Steps>
 

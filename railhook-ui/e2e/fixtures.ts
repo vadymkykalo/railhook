@@ -39,8 +39,6 @@ const page0 = (content: unknown[] = []) => ({ content, totalElements: content.le
  * that every list table was a 650–1060px desktop table swiped sideways at 390px.
  */
 const at = (minutesAgo: number) => new Date(Date.UTC(2026, 8, 13, 12, 0) - minutesAgo * 60_000).toISOString();
-export const ENDPOINT_ID = '00000000-0000-4000-8000-00000000e000';
-
 const ENDPOINTS = Array.from({ length: 6 }, (_, i) => ({
   id: `00000000-0000-4000-8000-00000000e${String(i).padStart(3, '0')}`,
   projectId: PROJECT_ID,
@@ -111,7 +109,6 @@ const resource = (current: number, limit: number) => ({ current, limit, percentU
 function body(url: URL): unknown {
   const p = url.pathname;
   if (p.endsWith('/endpoints')) return page0(ENDPOINTS);
-  if (p.endsWith(`/endpoints/${ENDPOINT_ID}`)) return ENDPOINTS[0];
   if (p.endsWith('/events')) return page0(EVENTS);
   if (p.endsWith('/deliveries') || p.endsWith(`/deliveries/projects/${PROJECT_ID}`)) return page0(DELIVERIES);
   if (p.endsWith('/auth/refresh')) return { accessToken: 'e2e-token', tokenType: 'Bearer', expiresIn: 3600 };
@@ -150,7 +147,7 @@ function body(url: URL): unknown {
   }
   if (p.endsWith('/admin/users')) return page0(PLATFORM_ACCOUNTS);
   if (p.endsWith('/billing/plans')) return [];
-  if (/\/(events|deliveries|endpoints|subscriptions|api-keys|incoming-sources|incoming-events|members|audit-log|transformations)$/.test(p)) {
+  if (/\/(events|deliveries|endpoints|subscriptions|api-keys|incoming-sources|incoming-events|members|audit-log)$/.test(p)) {
     return url.searchParams.has('page') || url.searchParams.has('size') ? page0() : [];
   }
   return {};

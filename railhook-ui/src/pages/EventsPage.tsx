@@ -11,11 +11,13 @@ import IntegrationSnippet from '../components/IntegrationSnippet';
 import { sendEventSnippets } from '../lib/integrationSnippets';
 import { apiBaseUrl } from '../lib/publicSnippets';
 import StatusBadge, { type StatusKind } from '../components/StatusBadge';
-import { Button, buttonVariants } from '../components/ui/button';
+import { useQueryClient } from '@tanstack/react-query';
+import { Button } from '../components/ui/button';
 import { Select } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { SortableTableHead, useSort } from '../components/ui/sortable-table-head';
 import { TablePagination } from '../components/ui/table-pagination';
+import SendTestEventModal from '../components/SendTestEventModal';
 import EventDetailsSheet from '../components/EventDetailsSheet';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
@@ -70,9 +72,11 @@ export default function EventsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const { sort, toggle: toggleSort, param: sortParam } = useSort('createdAt', 'desc');
+  const [showSendModal, setShowSendModal] = useState(false);
   const { canSendEvents, canCreateDebugLinks } = usePermissions();
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -134,11 +138,9 @@ export default function EventsPage() {
   const sendAction = (
     <PermissionGate allowed={canSendEvents}>
       <VerificationGate>
-        {/* The test console is the one place a test event is sent from: it also shows what each
-            endpoint answered, which a fire-and-forget dialog here could not. */}
-        <Link to={`/admin/projects/${projectId}/test-console`} className={buttonVariants()}>
-          <Plus className="h-4 w-4" aria-hidden /> {t('events.sendTest')}
-        </Link>
+        <Button onClick={() => setShowSendModal(true)}>
+          <Plus className="h-4 w-4" /> {t('events.sendTest')}
+        </Button>
       </VerificationGate>
     </PermissionGate>
   );
@@ -289,6 +291,13 @@ export default function EventsPage() {
           setSelectedEventId(null);
           navigate(`/admin/projects/${projectId}/deliveries?eventId=${id}`);
         }}
+      />
+
+      <SendTestEventModal
+        projectId={projectId!}
+        open={showSendModal}
+        onClose={() => setShowSendModal(false)}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['events', projectId] })}
       />
     </div>
   );

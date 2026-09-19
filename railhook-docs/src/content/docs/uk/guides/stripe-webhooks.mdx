@@ -18,7 +18,7 @@ Stripe повторює спроби. У live-режимі він до трьо�
 
 ## Підключення Stripe
 
-Знадобляться проєкт Railhook і API-ключ. Усе описане нижче можна зробити й у панелі керування, у розділі **«Прийом вебхуків»**.
+Знадобляться проєкт Railhook і API-ключ. Усе описане нижче можна зробити й у панелі керування, у розділі **«Вхідні»**.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -61,7 +61,7 @@ export PROJECT_ID=...
      -d '{"url":"https://api.example.com/webhooks/stripe","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
    ```
 
-5. **Надішліть тестову подію** зі Stripe або виконайте `stripe trigger payment_intent.succeeded`. Вона з'явиться в розділі **«Події» → «Вхідні події»** з одним пересиланням на кожне призначення.
+5. **Надішліть тестову подію** зі Stripe або виконайте `stripe trigger payment_intent.succeeded`. Вона з'явиться в розділі **«Вхідні» → «Вхідні події»** з одним пересиланням на кожне призначення.
 
 </Steps>
 

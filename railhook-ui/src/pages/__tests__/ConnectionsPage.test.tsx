@@ -1,13 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
-import { Route, Routes, useLocation } from 'react-router-dom';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
-import type {
-  EndpointResponse, IncomingDestinationResponse, IncomingSourceResponse, PageResponse, ProjectResponse,
-} from '../../types/api.types';
+import type { EndpointResponse, PageResponse, ProjectResponse } from '../../types/api.types';
 import type { SubscriptionResponse } from '../../api/subscriptions.api';
 
 vi.mock('../../api/projects.api', () => ({
@@ -32,20 +29,12 @@ vi.mock('../../api/subscriptions.api', () => ({
 vi.mock('../../api/deliveries.api', () => ({
   deliveriesApi: { listByProject: vi.fn() },
 }));
-vi.mock('../../api/incomingSources.api', () => ({
-  incomingSourcesApi: { list: vi.fn() },
-}));
-vi.mock('../../api/incomingDestinations.api', () => ({
-  incomingDestinationsApi: { list: vi.fn() },
-}));
 
 import ConnectionsPage from '../ConnectionsPage';
 import { projectsApi } from '../../api/projects.api';
 import { endpointsApi } from '../../api/endpoints.api';
 import { subscriptionsApi } from '../../api/subscriptions.api';
 import { deliveriesApi } from '../../api/deliveries.api';
-import { incomingSourcesApi } from '../../api/incomingSources.api';
-import { incomingDestinationsApi } from '../../api/incomingDestinations.api';
 
 const NOW = new Date().toISOString();
 
@@ -90,59 +79,44 @@ const SUBSCRIPTION: SubscriptionResponse = {
   updatedAt: NOW,
 };
 
-const SOURCE = {
-  id: 'source-1', projectId: TEST_PROJECT_ID, name: 'Stripe payments', slug: 'stripe', providerType: 'STRIPE',
-  status: 'ACTIVE', ingressPathToken: 'tok', ingressUrl: 'https://in.example.com/tok', verificationMode: 'PROVIDER',
-  hmacSecretConfigured: true, createdAt: NOW, updatedAt: NOW,
-} as IncomingSourceResponse;
-
-const DESTINATION = {
-  id: 'dest-1', incomingSourceId: SOURCE.id, url: 'https://billing.internal/stripe', authType: 'NONE',
-  authConfigured: false, enabled: true, maxAttempts: 5, timeoutSeconds: 30, retryDelays: '60,300',
-  createdAt: NOW, updatedAt: NOW,
-} as IncomingDestinationResponse;
-
-function page<T>(content: T[]): PageResponse<T> {
+function emptyDeliveryPage(): PageResponse<never> {
   return {
-    content, totalElements: content.length, totalPages: 1, size: 100, number: 0, first: true, last: true,
-  } as unknown as PageResponse<T>;
+    content: [], totalElements: 0, totalPages: 0, size: 100, number: 0, first: true, last: true,
+  } as unknown as PageResponse<never>;
 }
 
-function arrange({ sources = [] as IncomingSourceResponse[] } = {}) {
+function arrange(endpoint: EndpointResponse = ENDPOINT) {
   vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
-  vi.mocked(endpointsApi.list).mockResolvedValue([ENDPOINT]);
+  vi.mocked(endpointsApi.list).mockResolvedValue([endpoint]);
   vi.mocked(subscriptionsApi.list).mockResolvedValue([SUBSCRIPTION]);
-  vi.mocked(deliveriesApi.listByProject).mockResolvedValue(page([]));
-  vi.mocked(incomingSourcesApi.list).mockResolvedValue(page(sources));
-  vi.mocked(incomingDestinationsApi.list).mockResolvedValue(page([DESTINATION]));
-}
-
-function Where() {
-  return <p data-testid="where">{useLocation().pathname}</p>;
+  vi.mocked(deliveriesApi.listByProject).mockResolvedValue(emptyDeliveryPage());
 }
 
 function renderConnections() {
-  return renderPage(
-    <Routes>
-      <Route path="/admin/projects/:projectId/connections" element={<ConnectionsPage />} />
-      <Route path="*" element={<Where />} />
-    </Routes>,
-    { path: '*', initialEntry: `/admin/projects/${TEST_PROJECT_ID}/connections` },
-  );
+  return renderPage(<ConnectionsPage />, {
+    path: '/projects/:projectId/connections',
+    initialEntry: `/projects/${TEST_PROJECT_ID}/connections`,
+  });
 }
 
-/**
- * Connections is the one list of where events go. The endpoint and subscription tables left the
- * tab strip, so this page has to reach them, and a row has to open the endpoint it stands for.
- */
-describe('ConnectionsPage', () => {
+async function expandTheRow() {
+  const { default: userEvent } = await import('@testing-library/user-event');
+  const user = userEvent.setup();
+  await screen.findByText(ENDPOINT.url);
+  await user.click(screen.getByRole('button', { name: /details for/i }));
+  return user;
+}
+
+describe('ConnectionsPage — signature scheme', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('still opens the setup flow from "New connection"', async () => {
-    // The `open &&` mount guard in ConnectionSetupDialog is what this holds: without it the flow
-    // keeps the previous attempt's step, endpoint id and secret.
+  it('still opens the setup flow from "New connection" after the dialog moved out of this page', async () => {
+    // The dialog chrome now lives in ConnectionSetupDialog so the dashboard can
+    // open the same flow. This guards the extraction, and in particular the
+    // `open &&` mount guard: without it the flow keeps the previous attempt's
+    // step, endpoint id and secret.
     arrange();
     const user = userEvent.setup();
     renderConnections();
@@ -153,51 +127,95 @@ describe('ConnectionsPage', () => {
     expect(within(dialog).getByText('New connection')).toBeInTheDocument();
   });
 
-  it('opens the endpoint\'s page from anywhere on its row', async () => {
+  it('shows the endpoint’s current scheme as the selected option', async () => {
+    arrange({ ...ENDPOINT, signatureScheme: 'LEGACY' });
+    renderConnections();
+    await expandTheRow();
+
+    const group = await screen.findByRole('radiogroup', { name: /signature headers/i });
+    expect(group).toBeInTheDocument();
+    const legacy = screen.getByRole('radio', { name: 'X-Signature only' });
+    expect(legacy).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('has no detectable axe violations with the picker on screen', async () => {
     arrange();
-    renderConnections();
-
-    const row = (await screen.findByText(ENDPOINT.url)).closest('tr')!;
-    fireEvent.click(within(row).getByText('order.created'));
-
-    expect(await screen.findByTestId('where'))
-      .toHaveTextContent(`/admin/projects/${TEST_PROJECT_ID}/endpoints/${ENDPOINT.id}`);
-  });
-
-  it('reaches the raw endpoint and subscription tables that left the tab strip', async () => {
-    arrange();
-    renderConnections();
-    await screen.findByText(ENDPOINT.url);
-
-    expect(screen.getByRole('link', { name: 'All endpoints' }))
-      .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/endpoints`);
-    expect(screen.getByRole('link', { name: 'All subscriptions' }))
-      .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/subscriptions`);
-  });
-
-  it('shows the incoming half: each source and the destinations it forwards to', async () => {
-    arrange({ sources: [SOURCE] });
-    renderConnections();
-
-    const incoming = await screen.findByRole('region', { name: 'Incoming' });
-    expect(await within(incoming).findByText(DESTINATION.url)).toBeInTheDocument();
-    expect(within(incoming).getByRole('link', { name: 'Stripe payments' }))
-      .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/incoming-sources/${SOURCE.id}`);
-  });
-
-  it('says where to start receiving when there is no source yet', async () => {
-    arrange();
-    renderConnections();
-
-    const incoming = await screen.findByRole('region', { name: 'Incoming' });
-    expect(await within(incoming).findByRole('link', { name: 'Add a source' }))
-      .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/incoming-sources`);
-  });
-
-  it('has no detectable axe violations', async () => {
-    arrange({ sources: [SOURCE] });
     const { container } = renderConnections();
-    await screen.findByText(DESTINATION.url);
+    await expandTheRow();
+    await screen.findByRole('radiogroup', { name: /signature headers/i });
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('an endpoint created before the column existed reads as BOTH rather than nothing selected', async () => {
+    arrange({ ...ENDPOINT, signatureScheme: undefined });
+    renderConnections();
+    await expandTheRow();
+
+    const both = await screen.findByRole('radio', { name: 'Both header sets' });
+    expect(both).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('choosing a scheme saves it without clearing the rate limit the update also carries', async () => {
+    arrange();
+    vi.mocked(endpointsApi.update).mockResolvedValue({ ...ENDPOINT, signatureScheme: 'STANDARD' });
+    renderConnections();
+    const user = await expandTheRow();
+
+    await user.click(await screen.findByRole('radio', { name: 'Standard Webhooks only' }));
+
+    await waitFor(() =>
+      expect(endpointsApi.update).toHaveBeenCalledWith(TEST_PROJECT_ID, ENDPOINT.id, {
+        url: ENDPOINT.url,
+        description: ENDPOINT.description,
+        enabled: true,
+        rateLimitPerSecond: 25,
+        signatureScheme: 'STANDARD',
+      })
+    );
+  });
+});
+
+describe('ConnectionsPage — the Standard Webhooks secret', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('offers the whsec_ form alongside the raw secret after a rotation', async () => {
+    arrange();
+    vi.mocked(endpointsApi.rotateSecret).mockResolvedValue({
+      ...ENDPOINT,
+      secret: 'a'.repeat(64),
+      standardWebhooksSecret: 'whsec_c2VjcmV0LWJ5dGVz',
+    });
+    renderConnections();
+    const user = await expandTheRow();
+
+    await user.click(screen.getByRole('button', { name: /rotate secret/i }));
+    const confirm = await screen.findByRole('dialog');
+    await user.click(within(confirm).getByRole('button', { name: /rotate secret/i }));
+
+    const fields = await screen.findAllByTestId('signing-secret');
+    expect(fields).toHaveLength(2);
+    await user.click(screen.getAllByRole('button', { name: /reveal secret/i })[1]);
+    expect(screen.getByText('whsec_c2VjcmV0LWJ5dGVz')).toBeInTheDocument();
+  });
+
+  it('does not offer it for a LEGACY endpoint, which is sent no Standard Webhooks headers to verify', async () => {
+    arrange({ ...ENDPOINT, signatureScheme: 'LEGACY' });
+    vi.mocked(endpointsApi.rotateSecret).mockResolvedValue({
+      ...ENDPOINT,
+      signatureScheme: 'LEGACY',
+      secret: 'a'.repeat(64),
+      standardWebhooksSecret: 'whsec_c2VjcmV0LWJ5dGVz',
+    });
+    renderConnections();
+    const user = await expandTheRow();
+
+    await user.click(screen.getByRole('button', { name: /rotate secret/i }));
+    const confirm = await screen.findByRole('dialog');
+    await user.click(within(confirm).getByRole('button', { name: /rotate secret/i }));
+
+    const fields = await screen.findAllByTestId('signing-secret');
+    expect(fields).toHaveLength(1);
   });
 });

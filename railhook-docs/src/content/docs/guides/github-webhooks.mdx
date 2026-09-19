@@ -19,7 +19,7 @@ So one deploy, one crash or one slow handler at the wrong moment, and that push,
 
 ## Connect GitHub
 
-You need a Railhook project and an API key. Everything below can also be done under **Receive webhooks** in the dashboard.
+You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -57,7 +57,7 @@ export PROJECT_ID=...
      -d '{"url":"https://api.example.com/webhooks/github","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
    ```
 
-5. **Check the ping.** GitHub sends a `ping` event when the webhook is created. It appears under **Events → Incoming events** in Railhook.
+5. **Check the ping.** GitHub sends a `ping` event when the webhook is created. It appears under **Incoming → Incoming events** in Railhook.
 
 </Steps>
 

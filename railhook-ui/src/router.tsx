@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter, Navigate, useLocation } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import AppLayout from './layout/AppLayout';
 import PublicLayout from './layout/PublicLayout';
@@ -36,8 +36,6 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const ProjectSetupPage = lazy(() => import('./pages/ProjectSetupPage'));
 const EndpointsPage = lazy(() => import('./pages/EndpointsPage'));
-const EndpointDetailPage = lazy(() => import('./pages/EndpointDetailPage'));
-const ProjectSettingsPage = lazy(() => import('./pages/ProjectSettingsPage'));
 const DeliveriesPage = lazy(() => import('./pages/DeliveriesPage'));
 const EventsPage = lazy(() => import('./pages/EventsPage'));
 const SubscriptionsPage = lazy(() => import('./pages/SubscriptionsPage'));
@@ -98,15 +96,6 @@ function S({ children }: { children: React.ReactNode }) {
  * Off, nginx already answers 404 for /blog; this renders the same not-found page when the app
  * gets there without asking nginx — a client-side navigation.
  */
-/**
- * A moved page's old address, kept working: a bookmark or a link in the docs lands where the page
- * lives now, with its query string intact, and the old URL leaves the history.
- */
-function KeepQueryRedirect({ to }: { to: string }) {
-  const { search } = useLocation();
-  return <Navigate to={`${to}${search}`} replace relative="path" />;
-}
-
 function BlogOnly({ children }: { children: React.ReactNode }) {
   return publicBlogEnabled() ? children : <NotFoundPage />;
 }
@@ -274,14 +263,6 @@ export const router = createBrowserRouter([
             element: <S><EndpointsPage /></S>,
           },
           {
-            path: 'projects/:projectId/endpoints/:endpointId',
-            element: <S><EndpointDetailPage /></S>,
-          },
-          {
-            path: 'projects/:projectId/project-settings',
-            element: <S><ProjectSettingsPage /></S>,
-          },
-          {
             path: 'projects/:projectId/deliveries',
             element: <S><DeliveriesPage /></S>,
           },
@@ -370,13 +351,8 @@ export const router = createBrowserRouter([
             element: <S><TransformationsPage /></S>,
           },
           {
-            path: 'projects/:projectId/transformations/studio',
-            element: <S><TransformStudioPage /></S>,
-          },
-          {
-            // The studio's old address, from when it was a Develop tab of its own.
             path: 'projects/:projectId/transform-studio',
-            element: <KeepQueryRedirect to="../transformations/studio" />,
+            element: <S><TransformStudioPage /></S>,
           },
           {
             path: 'projects/:projectId/connection-setup',

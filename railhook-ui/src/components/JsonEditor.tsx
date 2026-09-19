@@ -70,10 +70,6 @@ export default function JsonEditor({
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
-  // True while a new `value` from the parent is written into the editor. That write is not an
-  // edit, and reporting it back as one made the Transform Studio forget which saved
-  // transformation had just been picked: loading its template read as the person typing.
-  const syncingRef = useRef(false);
 
   const appIsDark = useIsDarkTheme();
   const isDark = darkMode ?? appIsDark;
@@ -153,7 +149,7 @@ export default function JsonEditor({
         { dark: isDark },
       ),
       EditorView.updateListener.of((update) => {
-        if (update.docChanged && !syncingRef.current) {
+        if (update.docChanged) {
           onChangeRef.current?.(update.state.doc.toString());
         }
       }),
@@ -194,14 +190,9 @@ export default function JsonEditor({
     if (!view) return;
     const currentDoc = view.state.doc.toString();
     if (currentDoc !== value) {
-      syncingRef.current = true;
-      try {
-        view.dispatch({
-          changes: { from: 0, to: currentDoc.length, insert: value },
-        });
-      } finally {
-        syncingRef.current = false;
-      }
+      view.dispatch({
+        changes: { from: 0, to: currentDoc.length, insert: value },
+      });
     }
   }, [value]);
 

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { Route, Routes, useLocation } from 'react-router-dom';
 import '../../i18n';
 import en from '../../i18n/locales/en.json';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
@@ -29,10 +28,6 @@ const SOURCE: IncomingSourceResponse = {
 
 function page(items: IncomingSourceResponse[]): PageResponse<IncomingSourceResponse> {
   return { content: items, totalElements: items.length, totalPages: 1, size: 20, number: 0 } as PageResponse<IncomingSourceResponse>;
-}
-
-function Where() {
-  return <p data-testid="where">{useLocation().pathname}</p>;
 }
 
 async function openEdit() {
@@ -80,23 +75,6 @@ describe('IncomingSourcesPage — the list', () => {
     const row = (await screen.findByText('Payments')).closest('tr')!;
     expect(row).toHaveTextContent('payments-eu');
     expect(row).toHaveTextContent('Stripe');
-  });
-
-  it('opens the source from anywhere on its row, not only from its name', async () => {
-    vi.mocked(incomingSourcesApi.list).mockResolvedValue(page([SOURCE]));
-    renderPage(
-      <Routes>
-        <Route path="/projects/:projectId/incoming-sources" element={<IncomingSourcesPage />} />
-        <Route path="*" element={<Where />} />
-      </Routes>,
-      { path: '*', initialEntry: `/projects/${TEST_PROJECT_ID}/incoming-sources` },
-    );
-
-    const row = (await screen.findByText(SOURCE.ingressUrl)).closest('tr')!;
-    fireEvent.click(row.querySelector('td:last-child')!.previousElementSibling!);
-
-    expect(await screen.findByTestId('where'))
-      .toHaveTextContent(`/admin/projects/${TEST_PROJECT_ID}/incoming-sources/${SOURCE.id}`);
   });
 });
 

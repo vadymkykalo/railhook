@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, Search, ArrowDown, Link2, FlaskConical } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, Search, ArrowDown, Link2 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -201,15 +201,7 @@ export default function TransformationsPage() {
         eyebrow={t('transformations.count', { count: transformations.length })}
         title={t('transformations.title')}
         description={t('transformations.subtitle')}
-        actions={
-          <>
-            {/* The studio is this page's workbench: a transformation tried on a real event. */}
-            <Link to={`/admin/projects/${projectId}/transformations/studio`} className={buttonVariants({ variant: 'outline' })}>
-              <FlaskConical className="h-4 w-4" aria-hidden /> {t('transformations.openStudio')}
-            </Link>
-            {transformations.length > 0 && createButton(t('transformations.create'))}
-          </>
-        }
+        actions={transformations.length > 0 ? createButton(t('transformations.create')) : undefined}
         guide={{ id: 'transformations', docsLink: 'outgoing/transformations' }}
       />
 
@@ -250,16 +242,12 @@ export default function TransformationsPage() {
                 <TableHead>{t('transformations.status')}</TableHead>
                 <TableHead>{t('transformations.usedBy')}</TableHead>
                 <TableHead>{t('transformations.updated')}</TableHead>
-                <TableHead className="w-[150px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
+                {canManage && <TableHead className="w-[110px]"><span className="sr-only">{t('common.actions')}</span></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((item) => (
-                <TableRow
-                  key={item.id}
-                  className={canManage ? 'cursor-pointer' : undefined}
-                  onClick={canManage ? () => openEdit(item) : undefined}
-                >
+                <TableRow key={item.id}>
                   <TableCell><span className="text-[13px] font-medium">{item.name}</span></TableCell>
                   <TableCell>
                     <span className="block max-w-[250px] truncate text-[13px] text-muted-foreground">
@@ -283,16 +271,9 @@ export default function TransformationsPage() {
                     )}
                   </TableCell>
                   <TableCell><span className="font-mono text-xs text-muted-foreground">{formatDate(item.updatedAt)}</span></TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-1">
-                      <Link
-                        to={`/admin/projects/${projectId}/transformations/studio?transformationId=${item.id}`}
-                        className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-                      >
-                        <FlaskConical className="h-3.5 w-3.5" aria-hidden /> {t('transformations.tryOnEvent')}
-                      </Link>
-                      {canManage && (
-                        <>
+                  {canManage && (
+                    <TableCell>
+                      <div className="flex gap-1">
                         <Button variant="ghost" size="icon-sm" onClick={() => openEdit(item)} title={t('common.edit')} aria-label={t('common.edit')}>
                           <Settings className="h-3.5 w-3.5" />
                         </Button>
@@ -309,10 +290,9 @@ export default function TransformationsPage() {
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

@@ -10,17 +10,17 @@ These are the terms used throughout the docs, the API and the dashboard. Where t
 
 | Term | What it is | In the dashboard |
 |---|---|---|
-| **Outgoing** | Your event travels out of Railhook to endpoints your customers registered. Railhook is the sender and signs what it sends. | Send events |
-| **Incoming** | A third-party provider's webhook travels into Railhook and on to destinations you chose. Railhook is the receiver and verifies what it receives. | Receive webhooks |
+| **Outgoing** | Your event travels out of Railhook to endpoints your customers registered. Railhook is the sender and signs what it sends. | Outgoing |
+| **Incoming** | A third-party provider's webhook travels into Railhook and on to destinations you chose. Railhook is the receiver and verifies what it receives. | Incoming |
 
 ## Outgoing
 
 | Term | What it is | In the dashboard |
 |---|---|---|
 | **Event** | Something your system says happened, with a type (such as `order.completed`) and a payload. It exists whether or not anyone is listening. | Events |
-| **Endpoint** | A URL that is willing to receive events, together with the secret its signatures are computed from. | A page of its own, opened from Connections |
-| **Subscription** | A standing statement that one endpoint wants events of a given type. | On each endpoint's page |
-| **Connection** | One endpoint together with the subscriptions that point at it: the unit you configure, test and turn off. | Send events → Connections |
+| **Endpoint** | A URL that is willing to receive events, together with the secret its signatures are computed from. | Endpoints |
+| **Subscription** | A standing statement that one endpoint wants events of a given type. | Subscriptions |
+| **Connection** | One endpoint together with the subscriptions that point at it: the unit you configure, test and turn off. | Connections |
 | **Delivery** | The obligation to get one event to one endpoint, held until it succeeds or is abandoned. One event fans out into one delivery per matching subscription. | Deliveries |
 | **Sequence number** | An endpoint-scoped position on a delivery, used when ordering is on so deliveries to the same endpoint arrive in order. | — |
 
@@ -28,7 +28,7 @@ These are the terms used throughout the docs, the API and the dashboard. Where t
 
 | Term | What it is | In the dashboard |
 |---|---|---|
-| **Source** | A provider you have connected, together with what Railhook needs to prove a webhook came from it. | Receive webhooks → Sources |
+| **Source** | A provider you have connected, together with what Railhook needs to prove a webhook came from it. | Sources |
 | **Incoming event** | One webhook received from a source, kept exactly as it arrived. | Incoming events |
 | **Destination** | A URL you chose to receive incoming events, together with how to authenticate to it. | On each source |
 | **Forward** | The obligation to get one incoming event to one destination. The incoming counterpart of a delivery. | — |

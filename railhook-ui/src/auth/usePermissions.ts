@@ -22,7 +22,6 @@ export function usePermissions() {
         // Projects
         canCreateProject: hasMinRole(role, 'DEVELOPER'),
         canDeleteProject: role === 'OWNER',
-        canEditProject: hasMinRole(role, 'DEVELOPER'),
 
         // Endpoints
         canManageEndpoints: hasMinRole(role, 'DEVELOPER'),

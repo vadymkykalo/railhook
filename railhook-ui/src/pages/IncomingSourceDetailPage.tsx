@@ -17,7 +17,6 @@ import { ladderTicks } from './ConnectionSetupPage';
 import { PROVIDER_NAMES, PROVIDER_SIGNATURE_HEADERS } from '../lib/publicSnippets';
 import { ingressCurlSnippet } from '../lib/integrationSnippets';
 import IntegrationSnippet from '../components/IntegrationSnippet';
-import DetailBreadcrumb from '../components/DetailBreadcrumb';
 import type {
   IncomingDestinationResponse, IncomingDestinationRequest, IncomingAuthType, IncomingSourceResponse,
 } from '../types/api.types';
@@ -295,7 +294,6 @@ export default function IncomingSourceDetailPage() {
 
   return (
     <div className="p-4 lg:p-6">
-      <DetailBreadcrumb projectId={projectId} current={source.name} />
       <PageHeader
         eyebrow={`${PROVIDER_NAMES[source.providerType] ?? source.providerType} · ${source.slug}`}
         title={source.name}

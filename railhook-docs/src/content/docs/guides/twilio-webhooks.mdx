@@ -22,7 +22,7 @@ Twilio documents that incoming call and message webhooks need a TwiML response, 
 
 ## Connect Twilio
 
-You need a Railhook project and an API key. Everything below can also be done under **Receive webhooks** in the dashboard.
+You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -54,7 +54,7 @@ export PROJECT_ID=...
 
 3. **Give Twilio the URL.** Pass the `ingressUrl` exactly as the source shows it wherever Twilio takes a status callback URL, such as the `StatusCallback` parameter when you send a message. Keep the method `POST`: the ingress accepts nothing else.
 
-4. **Send a message.** Its status callbacks appear under **Events → Incoming events**, with one forward per destination.
+4. **Send a message.** Its status callbacks appear under **Incoming → Incoming events**, with one forward per destination.
 
 </Steps>
 
