@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
   Plus, Webhook, Loader2, Trash2, Power, PowerOff, RefreshCw, Send, ShieldCheck,
 } from 'lucide-react';
@@ -14,7 +14,7 @@ import StatusBadge, { EnabledBadge, type StatusKind } from '../components/Status
 import { endpointsApi, type EndpointTestResponse } from '../api/endpoints.api';
 import {
   useProject, useEndpointsPaged, useCreateEndpoint, useDeleteEndpoint, useUpdateEndpoint,
-  useRotateSecret, useVerifyEndpoint, useSkipVerification,
+  useRotateSecret, useVerifyEndpoint, useSkipVerification, useConsumerNames,
 } from '../api/queries';
 import type { EndpointResponse, SignatureScheme } from '../types/api.types';
 import { Button } from '../components/ui/button';
@@ -110,6 +110,9 @@ export default function EndpointsPage() {
   const endpoints = pageInfo?.content ?? [];
   const [localEndpointOverrides, setLocalEndpointOverrides] = useState<Record<string, EndpointResponse>>({});
   const displayEndpoints = endpoints.map((e) => localEndpointOverrides[e.id] ?? e);
+  // Only a project that hands endpoints to its own users has a Consumer column to show.
+  const showConsumers = displayEndpoints.some((e) => e.consumerId);
+  const { data: consumerNames } = useConsumerNames(projectId, showConsumers);
 
   // First load only; a page change keeps the previous rows (keepPreviousData).
   const loading = (projectLoading && !project) || (endpointsLoading && !pageInfo);
@@ -324,6 +327,7 @@ export default function EndpointsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('endpoints.url')}</TableHead>
+                  {showConsumers && <TableHead>{t('endpoints.consumer')}</TableHead>}
                   <TableHead>{t('endpoints.verification')}</TableHead>
                   <TableHead>{t('endpoints.status')}</TableHead>
                   <TableHead>{t('subscriptions.created')}</TableHead>
@@ -351,6 +355,20 @@ export default function EndpointsPage() {
                         )}
                       </div>
                     </TableCell>
+                    {showConsumers && (
+                      <TableCell>
+                        {endpoint.consumerId ? (
+                          <Link
+                            to={`/admin/projects/${projectId}/consumers`}
+                            className="text-[13px] underline-offset-4 hover:underline"
+                          >
+                            {consumerNames?.get(endpoint.consumerId) ?? endpoint.consumerId.substring(0, 8)}
+                          </Link>
+                        ) : (
+                          <span className="text-[13px] text-muted-foreground">{t('endpoints.ownEndpoint')}</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge

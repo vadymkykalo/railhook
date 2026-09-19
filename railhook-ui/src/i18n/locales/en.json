@@ -1438,7 +1438,9 @@
     "snippet": {
       "title": "Verify the signature on your receiver",
       "footer": "WEBHOOK_SECRET is the endpoint’s signing secret, shown once when it is created or rotated."
-    }
+    },
+    "consumer": "Consumer",
+    "ownEndpoint": "Your own"
   },
   "errorBoundary": {
     "description": "An unexpected error occurred. Reloading usually fixes it — if it keeps happening, share the details below with your team.",
@@ -4372,6 +4374,10 @@
       "pageTitle": "Your page: embed the portal",
       "backendFooter": "Needs a read-write API key. Replace user_123 with your own id for the user.",
       "pageFooter": "Open a new session every time the page loads: it expires after an hour by default."
+    },
+    "preview": {
+      "heading": "What your users see",
+      "caption": "The portal inside your own app: each consumer manages their endpoints and follows their deliveries, and sees nobody else’s."
     }
   },
   "portal": {
