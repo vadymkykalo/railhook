@@ -153,3 +153,25 @@ describe('DeliveriesPage', () => {
     expect(await screen.findByRole('heading', { level: 1, name: en.nav.allDeliveries })).toBeInTheDocument();
   });
 });
+
+/** The endpoint page's "All deliveries to this endpoint" lands here, and has to arrive filtered. */
+describe('DeliveriesPage — opened for one endpoint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(endpointsApi.list).mockResolvedValue([ENDPOINT]);
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([DELIVERY]));
+  });
+
+  it('asks only for that endpoint\'s deliveries', async () => {
+    renderPage(<DeliveriesPage />, {
+      path: '/projects/:projectId/deliveries',
+      initialEntry: `/projects/${TEST_PROJECT_ID}/deliveries?endpointId=${ENDPOINT.id}`,
+    });
+    await screen.findAllByText('https://example.com/webhook');
+    expect(deliveriesApi.listByProject).toHaveBeenCalled();
+    for (const call of vi.mocked(deliveriesApi.listByProject).mock.calls) {
+      expect(call[1]).toMatchObject({ endpointId: ENDPOINT.id });
+    }
+  });
+});

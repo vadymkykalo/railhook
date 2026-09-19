@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import '../../i18n';
 import en from '../../i18n/locales/en.json';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
@@ -104,5 +104,25 @@ describe('IncomingSourceDetailPage — how a request is signed', () => {
     expect(example).toHaveTextContent('curl -X POST');
     expect(example).not.toHaveTextContent('Signature');
     expect(screen.getByText('None')).toBeInTheDocument();
+  });
+});
+
+describe('IncomingSourceDetailPage — where it sits', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(incomingDestinationsApi.list).mockResolvedValue(
+      { content: [], totalElements: 0, totalPages: 0, size: 20, number: 0 } as never,
+    );
+    vi.mocked(transformationsApi.list).mockResolvedValue([] as never);
+  });
+
+  it('has a breadcrumb back to the list of sources, under Receive webhooks', async () => {
+    renderSource({});
+
+    const crumbs = await screen.findByRole('navigation', { name: /breadcrumb/i });
+    expect(within(crumbs).getByRole('link', { name: 'Receive webhooks' }))
+      .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/incoming-sources`);
+    expect(within(crumbs).getAllByRole('link', { name: 'Sources' })[0])
+      .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/incoming-sources`);
   });
 });

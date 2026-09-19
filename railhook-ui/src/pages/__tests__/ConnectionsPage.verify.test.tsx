@@ -32,6 +32,11 @@ vi.mock('../../api/subscriptions.api', () => ({
 vi.mock('../../api/deliveries.api', () => ({
   deliveriesApi: { listByProject: vi.fn() },
 }));
+vi.mock('../../api/incomingSources.api', () => ({
+  incomingSourcesApi: {
+    list: vi.fn().mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, size: 50, number: 0 }),
+  },
+}));
 
 import ConnectionsPage from '../ConnectionsPage';
 import { projectsApi } from '../../api/projects.api';
@@ -81,7 +86,7 @@ describe('ConnectionsPage — verifying an endpoint', () => {
   async function pressVerify() {
     const user = userEvent.setup();
     await screen.findByText(TUNNEL_ENDPOINT.url);
-    await user.click(screen.getByRole('button', { name: /verify endpoint/i }));
+    await user.click(screen.getByRole('button', { name: /^verify$/i }));
   }
 
   it('an offline tunnel is explained, with the command that brings it up', async () => {

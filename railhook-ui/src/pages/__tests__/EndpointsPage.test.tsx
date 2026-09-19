@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ProjectResponse, EndpointResponse, PageResponse } from '../../types/api.types';
@@ -57,6 +58,10 @@ function emptyPage<T>(): PageResponse<T> {
 
 function populatedPage<T>(items: T[]): PageResponse<T> {
   return { content: items, totalElements: items.length, totalPages: 1, size: 20, number: 0, first: true, last: true } as any;
+}
+
+function Where() {
+  return <p data-testid="where">{useLocation().pathname}</p>;
 }
 
 function renderEndpoints() {
@@ -204,6 +209,35 @@ describe('EndpointsPage', () => {
 
     expect(await screen.findByRole('columnheader', { name: /consumer/i })).toBeInTheDocument();
     expect(await screen.findByText('Northwind Logistics')).toBeInTheDocument();
+  });
+
+  it('opens the endpoint\'s own page from anywhere on its row', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(endpointsApi.listPaged).mockResolvedValue(populatedPage([ENDPOINT]));
+    renderPage(
+      <Routes>
+        <Route path="/projects/:projectId/endpoints" element={<EndpointsPage />} />
+        <Route path="*" element={<Where />} />
+      </Routes>,
+      { path: '*', initialEntry: `/projects/${TEST_PROJECT_ID}/endpoints` },
+    );
+
+    const row = (await screen.findByText('https://example.com/webhook')).closest('tr')!;
+    fireEvent.click(row.querySelector('td:last-child')!);
+
+    expect(await screen.findByTestId('where'))
+      .toHaveTextContent(`/admin/projects/${TEST_PROJECT_ID}/endpoints/${ENDPOINT.id}`);
+  });
+
+  it('leaves the actions to the endpoint\'s page, rather than a row of unlabelled icons', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(endpointsApi.listPaged).mockResolvedValue(populatedPage([ENDPOINT]));
+    renderEndpoints();
+
+    await screen.findByText('https://example.com/webhook');
+    for (const name of [/^test$/i, /^disable$/i, /rotate secret/i, /mtls/i, /^delete$/i]) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
   });
 
   it('asks for no consumers when none of the endpoints belongs to one', async () => {

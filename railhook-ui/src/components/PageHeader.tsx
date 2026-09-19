@@ -14,10 +14,12 @@ import PageGuide, { type PageGuideProps } from './PageGuide';
  * page, not the chrome, owns the heading.
  */
 export default function PageHeader({
-  eyebrow, title, description, actions, guide, className,
+  eyebrow, title, titleClassName, description, actions, guide, className,
 }: {
   eyebrow?: ReactNode;
   title?: string;
+  /** For a title that is a machine fact, such as an endpoint's URL: mono, and free to break. */
+  titleClassName?: string;
   description?: ReactNode;
   actions?: ReactNode;
   guide?: PageGuideProps;
@@ -27,7 +29,7 @@ export default function PageHeader({
     <div className={cn('flex flex-wrap items-start justify-between gap-4 pb-5', className)}>
       <div className="min-w-0">
         {eyebrow && <div className={cn('mono-label', title ? 'mb-1.5' : 'mb-1')}>{eyebrow}</div>}
-        {title && <h1 className="text-title">{title}</h1>}
+        {title && <h1 className={cn('text-title', titleClassName)}>{title}</h1>}
         {description && (
           <p className={cn('max-w-2xl text-sm text-muted-foreground', title && 'mt-1')}>{description}</p>
         )}

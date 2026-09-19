@@ -92,7 +92,8 @@ export default function DeliveriesPage() {
   const eventIdFilter = searchParams.get('eventId') || '';
 
   const [statusFilter, setStatusFilter] = useState('');
-  const [endpointFilter, setEndpointFilter] = useState('');
+  // Seeded from the URL: an endpoint's page links here for "all deliveries to this endpoint".
+  const [endpointFilter, setEndpointFilter] = useState(() => searchParams.get('endpointId') || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('24h');
   const [page, setPage] = useState(0);
