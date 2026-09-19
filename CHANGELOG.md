@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Article: "AI-written code you can trust: how a production webhook gateway was built with
+  Claude Code"** — how Railhook was built by directing an AI agent, and the harness that makes
+  that code deployable: per-area `CLAUDE.md` files, a domain glossary, ratchet tests, generated
+  references, phone-width browser tests and deploy verification, each with the real incident
+  behind it. Numbers come from this repository's git history, with the method for each. Four
+  figures, and a Ukrainian translation alongside.
+
 ## [2.25.0] - 2026-09-19
 
 ### Added

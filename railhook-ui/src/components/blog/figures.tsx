@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { CHROME, SERIES } from '../charts/chartTheme';
 import { cn } from '../../lib/utils';
+import { BUILT_WITH_AI_FIGURES } from './figures/built-with-ai';
 
 /**
  * The drawings a post can place with `:::figure <key>`.
@@ -22,7 +23,7 @@ const AXIS = { stroke: CHROME.rail, strokeWidth: 1 };
 const LABEL = 'text-[11px]';
 const MONO = 'font-mono text-[10px]';
 
-function Figure({
+export function Figure({
   label,
   caption,
   viewBox,
@@ -313,4 +314,5 @@ export const FIGURES: Record<string, () => JSX.Element> = {
   'provider-retries': ProviderRetries,
   'retry-ladder': RetryLadder,
   gateway: GatewayPipeline,
+  ...BUILT_WITH_AI_FIGURES,
 };

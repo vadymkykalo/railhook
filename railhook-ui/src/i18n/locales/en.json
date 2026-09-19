@@ -4829,6 +4829,153 @@
         },
         "loop": "its own retry ladder",
         "replay": "replay, 7 days"
+      },
+      "aiCommitHistory": {
+        "aria": "A bar chart of non-merge commits per month from December 2025 to September 2026: 66, 0, 127, 152, then nothing from April to July, then 323 in August and 420 in September. None carry a Co-Authored-By: Claude trailer before 20 August 2026; 230 of August's and 418 of September's do. Release tags per month: 1, 0, 4, 4, 0, 0, 0, 0, 9 and 42.",
+        "caption": "Non-merge commits per month, and release tags underneath. The trailer begins in the commit that added CLAUDE.md; earlier commits carry none, which records nothing either way about who wrote them.",
+        "legend": {
+          "trailer": "with a Co-Authored-By: Claude trailer",
+          "other": "without the trailer"
+        },
+        "monthRow": "month",
+        "releasesRow": "releases",
+        "harness": "20 Aug: CLAUDE.md + skills",
+        "month": {
+          "0": "Dec",
+          "1": "Jan",
+          "2": "Feb",
+          "3": "Mar",
+          "4": "Apr",
+          "5": "May",
+          "6": "Jun",
+          "7": "Jul",
+          "8": "Aug",
+          "9": "Sep"
+        }
+      },
+      "aiHarnessLoop": {
+        "aria": "A loop of eight steps. Top row, left to right: a task file the person writes, the rules and skill the agent loads, a failing test, the implementation. Bottom row, right to left: local checks, CI, release and a deploy a named person approves, and a verification from outside. Local checks and CI can refuse a change and send it back to the agent. Anything that still gets through becomes an incident, and each incident becomes a new rule, skill or ratchet that feeds back into the rules the agent loads.",
+        "caption": "The engineering loop around the agent. The agent owns three steps of eight; the person owns the task and the deploy; machine checks own the rest. The arrow along the right-hand side is the one that makes it improve.",
+        "owner": {
+          "human": "the person decides",
+          "agent": "the agent does",
+          "machine": "a machine check"
+        },
+        "box": {
+          "task": {
+            "title": "Task file",
+            "line1": ".claude/tasks/",
+            "line2": "one per branch"
+          },
+          "rules": {
+            "title": "Rules + skill",
+            "line1": "CLAUDE.md, CONTEXT.md",
+            "line2": ".claude/skills/"
+          },
+          "test": {
+            "title": "Failing test",
+            "line1": "states the result",
+            "line2": "named for its CI job"
+          },
+          "code": {
+            "title": "Implementation",
+            "line1": "written by the agent",
+            "line2": "reviewed by a person"
+          },
+          "local": {
+            "title": "Local checks",
+            "line1": "ratchets, types-check",
+            "line2": "docs-check, vitest"
+          },
+          "ci": {
+            "title": "CI",
+            "line1": "18 jobs in ci.yml",
+            "line2": "e2e at phone width"
+          },
+          "deploy": {
+            "title": "Release + deploy",
+            "line1": "version-set, tag",
+            "line2": "named approver"
+          },
+          "verify": {
+            "title": "Verify from outside",
+            "line1": "served version.txt",
+            "line2": "nightly load probe"
+          }
+        },
+        "refused": "refused: back to the agent",
+        "incident": "Incident → new rule, skill or ratchet",
+        "feedback": "feeds the rules"
+      },
+      "aiRatchetGrowth": {
+        "aria": "A step chart of ratchet test classes from 20 August to 19 September 2026: none before 22 August, 6 on 22 August, 10 on 23 August, 11 on 30 August, 12 on 6 September, 19 on 7 September, then 20, 21 and 22 by 18 September. Marked underneath: CLAUDE.md and the skills on 20 August, CONTEXT.md and AttemptRunner on 22 August, the production deploy workflow on 12 September, and the phone-width browser test on 13 September.",
+        "caption": "The harness grew in a month, and many of its pieces name the bug they were written after. Dated by the day each file was first added; the count is of the classes that carry @Tag(\"ratchet\") today.",
+        "axis": "ratchet test classes",
+        "tick": {
+          "start": "20 Aug",
+          "september": "1 Sep",
+          "end": "19 Sep"
+        },
+        "jump": "+7 in a day",
+        "milestone": {
+          "claude": "CLAUDE.md, skills",
+          "context": "CONTEXT.md, AttemptRunner",
+          "deploy": "production deploy workflow",
+          "e2e": "phone-width browser test"
+        }
+      },
+      "aiBugGuardrail": {
+        "aria": "Six bugs and the guardrail each became. Events over 1 KB sent as a gzip blob, found in a review, now refused by an entity mapping parity test. An incoming pipeline copied from the outgoing one, found in the same review, now one AttemptRunner with six invariants. A native insert failing every night, found during tenancy work, now a native query tenant predicate test. Squash merges into main, found at the next release merge, now blocked by a ruleset. A worker started before migrations on the 2.20.7 deploy, seen in the restart count, now an upgrade order test. A field that zoomed on an iPhone, seen in production, now a browser test at 390 and 1440 pixels.",
+        "caption": "Bug, how it was noticed, and what now refuses it. Three of the guardrails are ratchets the build runs, one is a browser test, one is a single shared implementation, and one is a repository setting.",
+        "head": {
+          "bug": "bug",
+          "caught": "noticed in",
+          "guard": "guardrail now"
+        },
+        "row": {
+          "compressed": {
+            "bug": "Events over 1 KB sent as a gzip blob",
+            "detail": "the worker never mapped a column",
+            "caught": "pipeline review",
+            "guard": "EntityMappingParity",
+            "guard2": "IntegrationTest"
+          },
+          "copied": {
+            "bug": "Incoming pipeline was a copy",
+            "detail": "three fixes never carried across",
+            "caught": "pipeline review",
+            "guard": "one AttemptRunner,",
+            "guard2": "six invariants"
+          },
+          "native": {
+            "bug": "A native INSERT failed nightly",
+            "detail": "at 00:05, swallowed by a catch",
+            "caught": "tenancy work",
+            "guard": "NativeQueryTenant",
+            "guard2": "PredicateTest"
+          },
+          "squash": {
+            "bug": "Squash merges into main, twice",
+            "detail": "19 conflicts on identical files",
+            "caught": "next release merge",
+            "guard": "ruleset on main",
+            "guard2": "blocks squash"
+          },
+          "upgrade": {
+            "bug": "Worker started before migrations",
+            "detail": "2.20.7 deploy, one crash",
+            "caught": "restart count",
+            "guard": "UpgradeOrderTest",
+            "guard2": "(ratchet)"
+          },
+          "zoom": {
+            "bug": "A field zoomed in on an iPhone",
+            "detail": "registration form cut off",
+            "caught": "production",
+            "guard": "browser test at",
+            "guard2": "390 px and 1440 px"
+          }
+        }
       }
     }
   }

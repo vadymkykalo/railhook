@@ -56,6 +56,11 @@
     <priority>0.3</priority>
   </url>
   <url>
+    <loc>https://site-url.railhook.invalid/blog/building-production-software-with-ai-agents</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://site-url.railhook.invalid/blog/stripe-github-shopify-when-your-endpoint-is-down</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>

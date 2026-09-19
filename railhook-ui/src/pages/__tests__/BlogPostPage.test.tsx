@@ -16,6 +16,9 @@ import { blogPosts } from '../../lib/blog';
  */
 const POST = blogPosts('en')[0];
 
+/** The two tests about provider logos and links are about that one article, whatever is newest. */
+const PROVIDERS_POST = 'stripe-github-shopify-when-your-endpoint-is-down';
+
 function renderPost(slug = POST.slug, signedIn = false) {
   return renderPage(<BlogPostPage />, {
     path: '/blog/:slug',
@@ -79,7 +82,7 @@ describe('BlogPostPage', () => {
   });
 
   it('draws its diagrams, each with a text alternative, in the vendors’ own bundled logos', () => {
-    renderPost();
+    renderPost(PROVIDERS_POST);
     const figures = screen.getAllByRole('figure');
     expect(figures.length).toBeGreaterThanOrEqual(2);
     for (const figure of figures) {
@@ -94,7 +97,7 @@ describe('BlogPostPage', () => {
   });
 
   it('compares the providers in a table, with their logos and links to their own docs', () => {
-    renderPost();
+    renderPost(PROVIDERS_POST);
     const table = screen.getByRole('table');
     expect(within(table).getAllByRole('columnheader').length).toBeGreaterThanOrEqual(4);
     expect(within(table).getAllByRole('row').length).toBe(4);
