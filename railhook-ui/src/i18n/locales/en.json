@@ -2660,10 +2660,13 @@
       "sendEvent": "Send your first event",
       "sendEventDesc": "Send a test event and watch it go out.",
       "verifySource": "Verify what it sends",
-      "verifySourceDesc": "Check signatures so only the real provider can reach you."
+      "verifySourceDesc": "Check signatures so only the real provider can reach you.",
+      "offerPortal": "Give your users a portal",
+      "offerPortalDesc": "Embed a page where your users register their own endpoints."
     },
     "subtitle": "What's left before your webhooks are flowing.",
-    "title": "Getting started"
+    "title": "Getting started",
+    "optional": "Optional"
   },
   "org": {
     "currentOrganization": "Current organization: {{name}}",
