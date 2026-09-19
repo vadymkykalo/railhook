@@ -126,9 +126,17 @@ describe('BlogPostPage', () => {
   });
 
   it('says when the provider figures were last checked', () => {
-    renderPost();
-    expect(POST.sourcesCheckedOn).toBeTruthy();
+    const cited = blogPosts('en').find((post) => post.sourcesCheckedOn);
+    expect(cited).toBeDefined();
+    renderPost(cited!.slug);
     expect(document.body.textContent).toContain(en.blog.sourcesCheckedOn.split('{{date}}')[0]);
+  });
+
+  it('says nothing about provider figures on a post that cites none', () => {
+    const uncited = blogPosts('en').find((post) => !post.sourcesCheckedOn);
+    expect(uncited).toBeDefined();
+    renderPost(uncited!.slug);
+    expect(document.body.textContent).not.toContain(en.blog.sourcesCheckedOn.split('{{date}}')[0]);
   });
 
   it('offers a table of contents built from the article’s own headings', () => {

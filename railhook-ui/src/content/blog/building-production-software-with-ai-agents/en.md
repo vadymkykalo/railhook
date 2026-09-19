@@ -5,7 +5,6 @@ description: What building a production system with an AI coding agent taught me
 date: 2026-09-22
 author: Vadym Kykalo
 tags: [ai agents, claude code, engineering, testing, software quality]
-sourcesCheckedOn: 2026-09-19
 ---
 
 For several releases, every large event my webhook gateway delivered went out as a compressed blob
