@@ -63,6 +63,7 @@ export default defineConfig({
       customCss: ['./src/styles/theme.css'],
       // The header's theme and language pickers, drawn like the dashboard's instead of as native selects.
       components: {
+        Header: './src/components/Header.astro',
         ThemeSelect: './src/components/ThemeToggle.astro',
         LanguageSelect: './src/components/LanguageSwitch.astro',
       },

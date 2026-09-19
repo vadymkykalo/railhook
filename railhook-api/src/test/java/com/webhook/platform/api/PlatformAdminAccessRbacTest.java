@@ -379,12 +379,16 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
         // The write is recorded against the organization acted on — where its owners will look —
         // and not against the admin's own organization, which had nothing to do with it. Only the
         // suspension's own rows: registering gave the admin a first project, audited in their
-        // organization as it should be.
+        // organization as it should be. The admin's account is shared with the other tests in this
+        // class, whose own PLATFORM_ADMIN_ACCESS rows would otherwise meet the count before this
+        // suspension's rows land: only rows about the suspended organization are counted.
         java.util.Set<String> suspensionActions = java.util.Set.of("ORGANIZATION_SUSPENDED", "PLATFORM_ADMIN_ACCESS");
         List<AuditLog> written = awaitAudit(() -> TenantContext.callAsSystem(() -> auditLogRepository.findAll()
                 .stream()
                 .filter(a -> admin.userId().equals(a.getUserId()))
                 .filter(a -> suspensionActions.contains(a.getAction()))
+                .filter(a -> tenant.organizationId().equals(a.getOrganizationId())
+                        || tenant.organizationId().equals(a.getResourceId()))
                 .toList()), 2);
 
         assertThat(written).anySatisfy(row -> {
@@ -397,8 +401,13 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
             assertThat(row.getResourceId()).isEqualTo(tenant.organizationId());
             assertThat(row.getClientIp()).isNotBlank();
         });
-        assertThat(written).noneSatisfy(row ->
-                assertThat(row.getOrganizationId()).isEqualTo(admin.organizationId()));
+        List<AuditLog> inAdminsOwn = TenantContext.callAsSystem(() -> auditLogRepository.findAll()
+                .stream()
+                .filter(a -> admin.userId().equals(a.getUserId()))
+                .filter(a -> "ORGANIZATION_SUSPENDED".equals(a.getAction()))
+                .filter(a -> admin.organizationId().equals(a.getOrganizationId()))
+                .toList());
+        assertThat(inAdminsOwn).isEmpty();
     }
 
     @Test
