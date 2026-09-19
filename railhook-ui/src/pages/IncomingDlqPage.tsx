@@ -37,7 +37,7 @@ function Metric({ label, value, halt }: { label: string; value: number; halt?: b
  * to an Endpoint.
  *
  * One difference is worth knowing while looking at it. Retrying here re-forwards to the one
- * Destination that failed and starts a fresh Retry Ladder for it; the Time Machine's replay,
+ * Destination that failed and starts a fresh Retry Ladder for it; replaying the event,
  * which was the only recovery before this page existed, fans an Incoming Event out to every
  * enabled Destination — including the ones that already received it.
  */
@@ -148,7 +148,7 @@ export default function IncomingDlqPage() {
         actions={
           <PermissionGate allowed={canManageDlq}>
             <VerificationGate>
-              <Button variant="destructive" onClick={() => setShowPurgeDialog(true)} disabled={!stats?.totalItems}>
+              <Button variant="outline" onClick={() => setShowPurgeDialog(true)} disabled={!stats?.totalItems}>
                 <Trash2 className="h-3.5 w-3.5" /> {t('incomingDlq.purgeAll')}
               </Button>
             </VerificationGate>

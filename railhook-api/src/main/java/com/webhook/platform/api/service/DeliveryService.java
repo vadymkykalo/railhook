@@ -33,7 +33,10 @@ import com.webhook.platform.api.security.AuthContext;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -109,7 +112,27 @@ public class DeliveryService {
         Delivery delivery = deliveryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
         validateDeliveryAccess(delivery, auth);
-        return DeliveryResponse.of(delivery);
+        return withEventTypes(List.of(delivery)).get(0);
+    }
+
+    /** One query for the whole page's event types, rather than one per row. */
+    private List<DeliveryResponse> withEventTypes(List<Delivery> deliveries) {
+        Map<UUID, String> eventTypes = eventTypesOf(deliveries);
+        return deliveries.stream().map(d -> DeliveryResponse.of(d, eventTypes.get(d.getEventId()))).toList();
+    }
+
+    private Page<DeliveryResponse> withEventTypes(Page<Delivery> deliveries) {
+        Map<UUID, String> eventTypes = eventTypesOf(deliveries.getContent());
+        return deliveries.map(d -> DeliveryResponse.of(d, eventTypes.get(d.getEventId())));
+    }
+
+    private Map<UUID, String> eventTypesOf(List<Delivery> deliveries) {
+        Set<UUID> eventIds = deliveries.stream().map(Delivery::getEventId).collect(Collectors.toSet());
+        if (eventIds.isEmpty()) {
+            return Map.of();
+        }
+        return eventRepository.findAllById(eventIds).stream()
+                .collect(Collectors.toMap(Event::getId, Event::getEventType));
     }
 
     public Page<DeliveryResponse> listDeliveries(UUID eventId, AuthContext auth, Pageable pageable) {
@@ -124,7 +147,7 @@ public class DeliveryService {
         } else {
             throw new IllegalArgumentException("eventId parameter is required");
         }
-        return deliveries.map(DeliveryResponse::of);
+        return withEventTypes(deliveries);
     }
 
     public Page<DeliveryResponse> listDeliveriesByProject(
@@ -156,7 +179,7 @@ public class DeliveryService {
 
         Page<Delivery> deliveries = deliveryRepository.findAll(spec, pageable);
 
-        return deliveries.map(DeliveryResponse::of);
+        return withEventTypes(deliveries);
     }
 
     @Transactional

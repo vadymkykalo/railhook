@@ -89,7 +89,7 @@ const CardTitle = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLHeadingElement>
 >(({ className, ...props }, ref) => (
-  <h3
+  <h2
     ref={ref}
     /* `text-2xl` predates the type scale; `text-title` is the scale's step for
        a panel heading and carries its own weight and tracking. */

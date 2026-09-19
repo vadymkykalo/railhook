@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import '../../i18n';
+import en from '../../i18n/locales/en.json';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { IncomingSourceResponse, PageResponse, ProjectResponse } from '../../types/api.types';
 
@@ -39,6 +40,43 @@ async function openEdit() {
 }
 
 const save = () => fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+describe('IncomingSourcesPage — the list', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+  });
+
+  it('names the provider once, the way the provider spells it, and says whether the source is on', async () => {
+    vi.mocked(incomingSourcesApi.list).mockResolvedValue(page([
+      { ...SOURCE, name: 'GitHub (acme/shop)', slug: 'github', providerType: 'GITHUB' },
+    ]));
+    renderPage(<IncomingSourcesPage />, {
+      path: '/projects/:projectId/incoming-sources',
+      initialEntry: `/projects/${TEST_PROJECT_ID}/incoming-sources`,
+    });
+
+    const row = (await screen.findByText('GitHub (acme/shop)')).closest('tr')!;
+    expect(row).toHaveTextContent('GitHub');
+    expect(row).not.toHaveTextContent('GITHUB');
+    expect(row).not.toHaveTextContent(/\bgithub\b/);
+    expect(row).toHaveTextContent(en.common.enabled);
+  });
+
+  it('keeps a slug that says something the provider does not', async () => {
+    vi.mocked(incomingSourcesApi.list).mockResolvedValue(page([
+      { ...SOURCE, name: 'Payments', slug: 'payments-eu', providerType: 'STRIPE' },
+    ]));
+    renderPage(<IncomingSourcesPage />, {
+      path: '/projects/:projectId/incoming-sources',
+      initialEntry: `/projects/${TEST_PROJECT_ID}/incoming-sources`,
+    });
+
+    const row = (await screen.findByText('Payments')).closest('tr')!;
+    expect(row).toHaveTextContent('payments-eu');
+    expect(row).toHaveTextContent('Stripe');
+  });
+});
 
 describe('IncomingSourcesPage — clearing a field on edit', () => {
   beforeEach(() => {

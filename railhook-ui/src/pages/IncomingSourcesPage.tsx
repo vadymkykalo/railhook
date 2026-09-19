@@ -9,7 +9,8 @@ import { formatRelativeTime } from '../lib/date';
 import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
-import StatusBadge from '../components/StatusBadge';
+import StatusBadge, { EnabledBadge } from '../components/StatusBadge';
+import { PROVIDER_NAMES } from '../lib/publicSnippets';
 import {
   useProject, useIncomingSources, useCreateIncomingSource, useUpdateIncomingSource,
   useDeleteIncomingSource,
@@ -241,9 +242,13 @@ export default function IncomingSourcesPage() {
                       >
                         {source.name}
                       </button>
+                      {/* The provider once, as it spells itself; the slug only when it says more than
+                          the provider does — a "github" slug beside a GitHub badge read "github GITHUB". */}
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] text-muted-foreground">{source.slug}</span>
-                        <Badge variant="outline" className="font-mono text-[10px]">{source.providerType}</Badge>
+                        <Badge variant="outline" className="text-[11px]">{PROVIDER_NAMES[source.providerType] ?? source.providerType}</Badge>
+                        {source.slug !== source.providerType.toLowerCase() && (
+                          <span className="font-mono text-[11px] text-muted-foreground">{source.slug}</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="max-w-[280px]">
@@ -270,10 +275,7 @@ export default function IncomingSourcesPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <StatusBadge
-                        kind={source.status === 'ACTIVE' ? 'ok' : 'idle'}
-                        label={source.status === 'ACTIVE' ? t('incomingSources.active') : t('incomingSources.disabled')}
-                      />
+                      <EnabledBadge enabled={source.status === 'ACTIVE'} />
                     </TableCell>
                     <TableCell>
                       <span className="font-mono text-[11px] text-muted-foreground">
@@ -357,7 +359,7 @@ export default function IncomingSourcesPage() {
                     onChange={(e) => setFormProvider(e.target.value as ProviderType)} disabled={saving}
                   >
                     {(formVerification === 'PROVIDER' ? VERIFIABLE_PROVIDERS : PROVIDER_TYPES)
-                      .map((p) => <option key={p} value={p}>{p}</option>)}
+                      .map((p) => <option key={p} value={p}>{PROVIDER_NAMES[p]}</option>)}
                   </Select>
                   {formVerification === 'PROVIDER' && (
                     <p className="text-xs text-muted-foreground">

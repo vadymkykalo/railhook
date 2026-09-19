@@ -5,7 +5,7 @@ import java.util.UUID;
 
 /**
  * What the public demo is set up with: the Endpoints and Subscriptions of project "Acme Shop",
- * its two Sources and their Destinations. Fixed ids, so seeding it twice finds it already there.
+ * the one Consumer its partner endpoint belongs to, its two Sources and their Destinations. Fixed ids, so seeding it twice finds it already there.
  *
  * <p>Every URL is on a {@code .example} host (RFC 2606): reserved for documentation, never
  * delegated, so nothing here names a machine anybody runs. Nothing is ever sent to them either —
@@ -21,6 +21,9 @@ final class DemoCatalog {
     enum Profile { RELIABLE, MOSTLY_RELIABLE, FLAKY }
 
     record DemoEndpoint(UUID id, String url, String description, Profile profile, int latencyMs, int jitterMs) {
+    }
+
+    record DemoConsumer(UUID id, String externalId, String name) {
     }
 
     record DemoSubscription(UUID id, DemoEndpoint endpoint, String eventType, int maxAttempts, String retryDelays) {
@@ -48,6 +51,15 @@ final class DemoCatalog {
             "https://hooks.chat-relay.example/services/T0ACME/B0ORDERS", "Team chat alerts", Profile.RELIABLE, 90, 40);
 
     static final List<DemoEndpoint> ENDPOINTS = List.of(ORDERS, BILLING, WAREHOUSE, ALERTS);
+
+    /**
+     * The warehouse partner, as one of Acme's own users: without a Consumer the portal screen
+     * has nothing to show a visitor, and the partner's endpoint is the one that would really be
+     * registered for somebody else.
+     */
+    static final DemoConsumer NORTHWIND = new DemoConsumer(id(0x50), "northwind-logistics", "Northwind Logistics");
+
+    static final List<DemoEndpoint> NORTHWIND_ENDPOINTS = List.of(WAREHOUSE);
 
     static final List<DemoSubscription> SUBSCRIPTIONS = List.of(
             new DemoSubscription(id(0x20), ORDERS, "order.created", 7, OUTGOING_DELAYS),

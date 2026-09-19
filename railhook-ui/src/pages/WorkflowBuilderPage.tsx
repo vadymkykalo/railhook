@@ -320,7 +320,7 @@ function WorkflowBuilderInner() {
             onClick={() => toggleMutation.mutate(!workflow.enabled)}
           >
             {workflow.enabled ? <ToggleRight className="h-4 w-4 text-ok" aria-hidden /> : <ToggleLeft className="h-4 w-4" aria-hidden />}
-            {workflow.enabled ? t('workflows.builder.enabled') : t('workflows.builder.disabled')}
+            {workflow.enabled ? t('common.enabled') : t('common.disabled')}
           </Button>
           <Button
             size="sm"
@@ -412,7 +412,7 @@ function WorkflowBuilderInner() {
       {showHistory && (
         <div className="max-h-80 overflow-y-auto border-t border-rail bg-card">
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-rail bg-card px-4 py-2">
-            <h3 className="mono-label">{t('workflows.builder.executionHistory')}</h3>
+            <h2 className="mono-label">{t('workflows.builder.executionHistory')}</h2>
             <Button variant="ghost" size="icon-sm" onClick={() => setShowHistory(false)} title={t('workflows.builder.closeHistory')} aria-label={t('workflows.builder.closeHistory')}>
               <ChevronDown className="h-4 w-4" />
             </Button>
@@ -487,7 +487,7 @@ function WorkflowBuilderInner() {
       {showTriggerDialog && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowTriggerDialog(false)}>
           <div className="w-[480px] max-w-[90vw] space-y-4 rounded-lg border border-rail bg-card p-5 shadow-elevated" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[15px] font-medium">{t('workflows.builder.testRun')}</h3>
+            <h2 className="text-[15px] font-medium">{t('workflows.builder.testRun')}</h2>
             <p className="text-xs text-muted-foreground">{t('workflows.builder.testRunHint')}</p>
             <textarea
               value={triggerPayload}

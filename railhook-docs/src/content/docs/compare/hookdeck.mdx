@@ -34,7 +34,7 @@ A dash means the pages we checked did not settle the point, or it does not apply
 ## When Railhook is the better choice
 
 - **You must self-host the receiving side.** Event Gateway is closed source and runs only as Hookdeck's SaaS. Railhook's ingress, verification, forwarding and replay are all in the MIT repository, so provider webhooks never have to pass through a third party.
-- **You receive and send.** Hookdeck splits the directions into two products with two deployments. In Railhook, incoming forwards and outgoing deliveries share one attempt lifecycle, one dashboard and one list of failed messages.
+- **You receive and send.** Hookdeck splits the directions into two products with two deployments. In Railhook, incoming forwards and outgoing deliveries share one attempt lifecycle, one dashboard and one place for failed deliveries and forwards.
 - **You decide how long webhooks are kept.** A self-hosted Railhook keeps stored webhooks for as long as you configure, and replays any of them to your services again. See [Data retention](/docs/resources/data-retention/).
 - **You want provider verification without writing it.** Railhook verifies Stripe, GitHub, GitLab, Shopify, Slack and Twilio signatures itself and refuses a forged webhook with `401` before storing it. See [Verification](/docs/incoming/verification/).
 

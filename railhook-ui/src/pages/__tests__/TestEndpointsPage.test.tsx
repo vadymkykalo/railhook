@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, screen } from '@testing-library/react';
 import '../../i18n';
+import en from '../../i18n/locales/en.json';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { CapturedRequestResponse, PageResponse, TestEndpointResponse } from '../../api/testEndpoints.api';
 
@@ -46,5 +47,25 @@ describe('TestEndpointsPage', () => {
 
     expect(screen.getByText('PUT')).toBeInTheDocument();
     expect(screen.queryByText('DELETE')).not.toBeInTheDocument();
+  });
+
+  it('shows a viewer the create button it may not use, and why, rather than an empty state with no way out', async () => {
+    vi.mocked(testEndpointsApi.list).mockResolvedValue([]);
+    const viewer = {
+      user: { id: 'user-2', email: 'viewer@example.com', fullName: 'Viewer', status: 'ACTIVE' as const },
+      organization: { id: 'org-1', name: 'Test Org', createdAt: new Date().toISOString() },
+      role: 'VIEWER' as const,
+      emailDeliveryEnabled: false,
+      hasPassword: true,
+      platformAdmin: false,
+    };
+    renderPage(<TestEndpointsPage />, {
+      path: '/projects/:projectId/test-endpoints',
+      initialEntry: `/projects/${TEST_PROJECT_ID}/test-endpoints`,
+      auth: { user: viewer },
+    });
+
+    const create = await screen.findByRole('button', { name: en.testEndpoints.create });
+    expect(create).toBeDisabled();
   });
 });

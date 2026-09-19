@@ -196,7 +196,7 @@ function DeliverySheet({
               </div>
             )}
 
-            <h3 className="mono-label mt-6">{t('portal.deliveries.attemptsTitle')}</h3>
+            <h2 className="mono-label mt-6">{t('portal.deliveries.attemptsTitle')}</h2>
             {attempts.isLoading ? (
               <SkeletonRows count={2} height="h-16" />
             ) : attempts.isError ? (

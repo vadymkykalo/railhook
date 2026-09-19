@@ -300,7 +300,7 @@ export default function DashboardPage() {
             <Card className="p-5">
               <div className="mb-1 flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-medium leading-tight">{t('dashboard.attention.title')}</h3>
+                  <h2 className="text-sm font-medium leading-tight">{t('dashboard.attention.title')}</h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">{t('dashboard.attention.desc')}</p>
                 </div>
                 {attentionTotal === 0 && <StatusBadge kind="ok" label={t('dashboard.attention.clearBadge')} />}
@@ -341,7 +341,7 @@ export default function DashboardPage() {
             <Card className="p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-medium leading-tight">{t('dashboard.inFlight.title')}</h3>
+                  <h2 className="text-sm font-medium leading-tight">{t('dashboard.inFlight.title')}</h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">{t('dashboard.inFlight.desc')}</p>
                 </div>
                 <Button
@@ -395,7 +395,7 @@ export default function DashboardPage() {
             <Card className="p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-medium leading-tight">{t('dashboard.endpointHealth.title')}</h3>
+                  <h2 className="text-sm font-medium leading-tight">{t('dashboard.endpointHealth.title')}</h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">{t('dashboard.endpointHealth.subtitle')}</p>
                 </div>
                 <Button
@@ -455,7 +455,7 @@ export default function DashboardPage() {
             <Card className="p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-medium leading-tight">{t('dashboard.recentEvents.title')}</h3>
+                  <h2 className="text-sm font-medium leading-tight">{t('dashboard.recentEvents.title')}</h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">{t('dashboard.recentEvents.subtitle')}</p>
                 </div>
                 <Button

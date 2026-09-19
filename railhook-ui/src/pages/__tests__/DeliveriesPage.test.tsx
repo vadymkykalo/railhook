@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { axe } from 'jest-axe';
 import '../../i18n';
+import en from '../../i18n/locales/en.json';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ProjectResponse, DeliveryResponse, PageResponse, EndpointResponse } from '../../types/api.types';
 
@@ -119,5 +120,36 @@ describe('DeliveriesPage', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     expect(screen.queryByText(/no deliveries found/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+  });
+
+  it('names each delivery by its event type, not by the event id', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([{ ...DELIVERY, eventType: 'order.created' }]));
+    renderDeliveries();
+    const link = await screen.findByRole('link', { name: 'order.created' });
+    expect(link).toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/events/event-1`);
+  });
+
+  it('puts status and event type on a phone card’s first line, and lets a long URL end in an ellipsis', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([{ ...DELIVERY, eventType: 'order.created' }]));
+    renderDeliveries();
+
+    const eventCell = (await screen.findByRole('link', { name: 'order.created' })).closest('td')!;
+    const row = eventCell.closest('tr')!;
+    const titled = Array.from(row.querySelectorAll('td[data-card-title]'));
+    expect(titled).toHaveLength(2);
+    expect(titled[1]).toBe(eventCell);
+    expect(titled[0]).toHaveTextContent(en.deliveries.status.SUCCESS);
+
+    // A flex link cannot ellipsize its own text; the text has to sit in a box that can.
+    expect(screen.getByText('https://example.com/webhook')).toHaveClass('truncate');
+  });
+
+  it('heads the page with the same words as its tab', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([DELIVERY]));
+    renderDeliveries();
+    expect(await screen.findByRole('heading', { level: 1, name: en.nav.allDeliveries })).toBeInTheDocument();
   });
 });

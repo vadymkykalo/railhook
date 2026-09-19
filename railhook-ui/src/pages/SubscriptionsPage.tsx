@@ -19,6 +19,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
+import { EnabledBadge } from '../components/StatusBadge';
 import { Select } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -369,9 +370,7 @@ export default function SubscriptionsPage() {
                               disabled={!canManageSubscriptions}
                               aria-label={t('connections.toggleSubscription', 'Enable {{eventType}}', { eventType: subscription.eventType })}
                             />
-                            <Badge variant={subscription.enabled ? 'ok' : 'idle'}>
-                              {subscription.enabled ? t('common.on') : t('common.off')}
-                            </Badge>
+                            <EnabledBadge enabled={subscription.enabled} />
                           </div>
                         </TableCell>
                         <TableCell>

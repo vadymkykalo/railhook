@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import '../../i18n';
+import en from '../../i18n/locales/en.json';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ProjectResponse, EndpointResponse } from '../../types/api.types';
 import type { DlqItemResponse, DlqStatsResponse, PageResponse } from '../../api/dlq.api';
@@ -97,7 +99,7 @@ describe('DlqPage', () => {
     vi.mocked(dlqApi.list).mockResolvedValue(emptyPage());
     vi.mocked(dlqApi.getStats).mockResolvedValue(EMPTY_STATS);
     renderDlq();
-    expect(await screen.findByText(/no failed messages|no items/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no failed deliveries/i)).toBeInTheDocument();
   });
 
   it('renders populated rows when DLQ items exist', async () => {
@@ -117,6 +119,29 @@ describe('DlqPage', () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
+  it('makes replaying the ticked rows the primary action, and clearing everything a secondary one', async () => {
+    const user = userEvent.setup();
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(dlqApi.list).mockResolvedValue(populatedPage([DLQ_ITEM]));
+    vi.mocked(dlqApi.getStats).mockResolvedValue(POPULATED_STATS);
+    vi.mocked(dlqApi.retryBulk).mockResolvedValue({ retried: 1 } as never);
+    renderDlq();
+    await screen.findByText('order.created');
+
+    const replay = screen.getByRole('button', { name: en.dlq.replaySelected.replace('{{count}}', '0') });
+    expect(replay).toBeDisabled();
+    const clearAll = screen.getByRole('button', { name: en.dlq.purgeAll });
+    expect(clearAll).not.toHaveClass('bg-halt');
+
+    await user.click(screen.getByRole('checkbox', { name: en.common.selectRow }));
+    await user.click(screen.getByRole('button', { name: en.dlq.replaySelected.replace('{{count}}', '1') }));
+    await waitFor(() => expect(dlqApi.retryBulk).toHaveBeenCalledWith(TEST_PROJECT_ID, ['delivery-1']));
+
+    await user.click(clearAll);
+    expect(await screen.findByText(en.dlq.purgeDialog.title)).toBeInTheDocument();
+    expect(dlqApi.purgeAll).not.toHaveBeenCalled();
+  });
+
   it('renders an explicit error state — not the empty state — when the API is down', async () => {
     vi.mocked(projectsApi.get).mockRejectedValue({ request: {}, message: 'Network Error' });
     vi.mocked(dlqApi.list).mockRejectedValue({ request: {}, message: 'Network Error' });
@@ -124,7 +149,7 @@ describe('DlqPage', () => {
     renderDlq();
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
-    expect(screen.queryByText(/no failed messages|no items/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no failed deliveries/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 });

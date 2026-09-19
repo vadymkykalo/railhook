@@ -120,17 +120,19 @@ fix it: its Retry Ladder is exhausted, or its target answered with a status no f
 attempt will change. Abandoned by Railhook, kept for a human to decide about. What no person
 can make succeed by retrying — a refused address, a disabled target — ends FAILED instead.
 _Avoid_: dead letters, graveyard
-_In the UI_: **Failed Messages**. The term the code and this document use is DLQ; the
-term the product shows an operator is Failed Messages, because "DLQ" is vocabulary you
-have to already know. The two are the same thing on purpose — do not rename one to
-match the other.
+_In the UI_: **Failed deliveries**, and **Failed forwards** in the incoming direction. The
+term the code and this document use is DLQ; the term the product shows an operator names
+what is in it, because "DLQ" is vocabulary you have to already know. (It said Failed
+Messages until the UI stopped saying "message", which is an _Avoid_ for Event.) The two are
+the same thing on purpose — do not rename one to match the other.
 
 **Replay**:
 Building fresh Deliveries from Events already in the store, with the same content and
 new Sequence Numbers, rather than re-sending the original Delivery.
 _Avoid_: resend, retry (a retry is the next Attempt on the *same* Delivery; a replay is
 a new Delivery)
-_In the UI_: **Time Machine**.
+_In the UI_: **Replay by time range**, for the screen that replays a stretch of history;
+**Replay** is the one verb for it everywhere else.
 
 ### Ordering
 

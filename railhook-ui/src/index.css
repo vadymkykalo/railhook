@@ -467,6 +467,16 @@
   .rh-table-stack > table > tbody > tr > td[data-cell="actions"] { justify-content: flex-end; }
   .rh-table-stack > table > tbody > tr > td[data-cell="wide"] { display: block; text-align: left; }
   .rh-table-stack > table > tbody > tr > td a { display: inline-flex; min-height: 2.5rem; align-items: center; }
+  /* A row can name its card's first line: the cells marked data-card-title share it, without
+     their labels, ahead of the labelled rest. */
+  .rh-table-stack > table > tbody > tr:has(> td[data-card-title]) {
+    flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 0.625rem;
+  }
+  .rh-table-stack > table > tbody > tr:has(> td[data-card-title]) > td:not(.hidden) { flex: 1 0 100%; }
+  .rh-table-stack > table > tbody > tr:has(> td[data-card-title]) > td[data-card-title]:not(.hidden) {
+    flex: 0 1 auto; order: -1; min-height: 2rem; justify-content: flex-start; text-align: left;
+  }
+  .rh-table-stack > table > tbody > tr > td[data-card-title]::before { content: none; }
 }
 
 /* ── The architecture diagram ────────────────────────────────────────────

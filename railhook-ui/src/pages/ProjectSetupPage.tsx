@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useProjects } from '../api/queries';
-import { sectionFor } from '../layout/nav.config';
+import { SETTINGS_SECTION, sectionFor, segmentOf } from '../layout/nav.config';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
@@ -43,8 +43,12 @@ export default function ProjectSetupPage() {
   if (projects.length > 0) return <Navigate to={`/admin/projects/${projects[0].id}/${segment}`} replace />;
   if (!section) return <Navigate to="/admin/dashboard" replace />;
 
-  const Icon = section.icon;
-  const purpose = section.nameKey.replace(/^nav\./, '');
+  // Settings is not a thing to set up, but its one project-scoped tab is: name that tab.
+  const entry = section === SETTINGS_SECTION
+    ? section.tabs.find((tab) => tab.owns.includes(segmentOf(`/admin/start/${segment}`))) ?? section
+    : section;
+  const Icon = entry.icon;
+  const purpose = entry.nameKey.replace(/^nav\./, '');
 
   return (
     <div className="p-4 lg:p-6">
@@ -52,7 +56,7 @@ export default function ProjectSetupPage() {
         <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-primary">
           <Icon className="h-5 w-5" aria-hidden />
         </div>
-        <h2 className="mt-4 text-title">{t(section.nameKey)}</h2>
+        <h1 className="mt-4 text-title">{t(entry.nameKey)}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{t(`setup.purpose.${purpose}`)}</p>
         <p className="mt-4 text-sm">{canCreateProject ? t('setup.needsProject') : t('setup.needsProjectViewer')}</p>
         <PermissionGate allowed={canCreateProject}>

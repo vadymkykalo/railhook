@@ -66,8 +66,8 @@ Railhook exports far more series than anyone should watch. These answer the ques
 | **`delivery_oldest_pending_age_seconds`** | **The best single health signal**: the age of the oldest unresolved delivery. A dead endpoint, a broker outage and a stuck worker all show up here. `forward_oldest_pending_age_seconds` is the incoming twin. |
 | `delivery_queue_depth`, `incoming_forward_queue_depth` | Work waiting. Steady is fine; always rising is not. |
 | `outbox_queue_depth`, `outbox_oldest_pending_age_seconds` | Events accepted but not yet handed to Kafka. A rising age means Kafka is unreachable: the events are safe, but not moving. |
-| `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Failed messages waiting for a person |
-| `delivery_escalated_to_dlq_total` | Deliveries moved to failed messages by the 96-hour hard cap rather than by running out of retries. Non-zero means something was degraded for days. |
+| `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Failed deliveries and forwards waiting for a person |
+| `delivery_escalated_to_dlq_total` | Deliveries moved to Failed deliveries by the 96-hour hard cap rather than by running out of retries. Non-zero means something was degraded for days. |
 
 ### Is a protection interfering?
 
@@ -109,7 +109,7 @@ The same rules ship in `monitoring/prometheus/alerts.yml` for Compose and in the
 | The platform is struggling | `RetryGovernorCooldown`, `RetryGovernorConsecutiveFailures`, `ApiErrorRateHigh` |
 | A process is down | `ApiDown`, `WorkerDown` |
 
-`DlqActionableBacklog` and `IncomingForwardDlqActionableBacklog` are the ones that need a person: they clear when someone retries or purges the failed messages. `CircuitBreakerDegraded` is the odd one out among the breaker alerts: it means the breaker is **not** working.
+`DlqActionableBacklog` and `IncomingForwardDlqActionableBacklog` are the ones that need a person: they clear when someone retries or purges the failed deliveries or forwards. `CircuitBreakerDegraded` is the odd one out among the breaker alerts: it means the breaker is **not** working.
 
 ## Logs
 

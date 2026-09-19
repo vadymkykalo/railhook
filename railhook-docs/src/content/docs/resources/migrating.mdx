@@ -53,7 +53,7 @@ See [Signatures](/docs/outgoing/signatures/) for verification code in each SDK l
 | **Attempt** (one HTTP request) | Attempt | Attempt | — |
 | **Source** (a provider you receive from) | Source (Ingest) | Source (Event Gateway) | Source |
 | **Destination** (where a received webhook goes) | Destination (Ingest) | Destination (Event Gateway) | — |
-| **Time Machine** (replay) | Replay | — | — |
+| **Replay by time range** | Replay | — | — |
 
 A dash means we found no direct equivalent in that vendor's documentation, not that the vendor lacks the capability.
 
@@ -70,7 +70,7 @@ Because receivers can verify both signature schemes, the old platform and Railho
 1. **Recreate the shape.** Create projects, endpoints and subscriptions through the API. See [Endpoints and subscriptions](/docs/outgoing/endpoints-subscriptions/).
 2. **Give each receiver its new secret** in `whsec_` form. It now accepts signatures from both platforms.
 3. **Send every event to both platforms** for as long as you need confidence. A receiver that deduplicates on `webhook-id` handles each Railhook delivery once.
-4. **Compare.** Watch `delivery_oldest_pending_age_seconds` and failed messages in Railhook against the old platform's numbers. See [Observability](/docs/platform/observability/).
+4. **Compare.** Watch `delivery_oldest_pending_age_seconds` and failed deliveries in Railhook against the old platform's numbers. See [Observability](/docs/platform/observability/).
 5. **Stop sending to the old platform.** There is no cutover moment.
 </Steps>
 

@@ -53,6 +53,11 @@ export function canonicalTimezone(tz: string): string {
   return RENAMED_ZONES[tz] ?? tz;
 }
 
+/** How each provider spells its own name, for a label; the enum is for the API. */
+export const PROVIDER_NAMES: Record<ProviderType, string> = {
+  GENERIC: 'Generic', GITHUB: 'GitHub', GITLAB: 'GitLab', STRIPE: 'Stripe', SHOPIFY: 'Shopify', SLACK: 'Slack', TWILIO: 'Twilio',
+};
+
 /**
  * The header each built-in provider signs its webhooks in — the one the API's verifier for that
  * provider reads (service/verification/*Verifier.java). A generic source names its own header.

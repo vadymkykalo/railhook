@@ -196,6 +196,8 @@ export default function DeliveryDetailsSheet({
     ? railFromDeliveryAttempts(attempts, delivery)
     : { attempts: [], maxAttempts: 0 };
 
+  const lastAttempt = attempts.length > 0 ? attempts[attempts.length - 1] : undefined;
+
   const getStatusBadge = (status: DeliveryResponse['status']) => (
     <StatusBadge kind={kindOfDeliveryStatus(status)} label={t(`deliveries.status.${status}`)} />
   );
@@ -263,6 +265,7 @@ export default function DeliveryDetailsSheet({
           {loading ? (
             <div className="mt-6"><SkeletonRows count={4} height="h-20" /></div>
           ) : delivery ? (
+            <>
             <div className="space-y-6 mt-6">
               {/* Status Banner */}
               {delivery.status === 'PROCESSING' && (
@@ -298,79 +301,69 @@ export default function DeliveryDetailsSheet({
                 </div>
               )}
 
-              {/* Trace Block */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('deliveryDetails.trace')}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {(() => {
-                    const firstAttempt = attempts[0];
-                    let requestId: string | null = null;
-                    if (firstAttempt?.requestHeaders) {
-                      try {
-                        const headers = JSON.parse(firstAttempt.requestHeaders);
-                        requestId = headers['X-Request-Id'] || headers['x-request-id'] || headers['X-Webhook-Id'] || headers['x-webhook-id'] || null;
-                      } catch { /* ignore */ }
-                    }
-                    const traceItems = [
-                      { label: t('deliveryDetails.deliveryId'), value: delivery.id, link: null },
-                      { label: t('deliveryDetails.eventId'), value: delivery.eventId, link: projectId ? `/admin/projects/${projectId}/events/${delivery.eventId}` : null },
-                      { label: t('deliveryDetails.endpointId'), value: delivery.endpointId, link: projectId ? `/admin/projects/${projectId}/endpoints` : null },
-                      ...(delivery.subscriptionId ? [{ label: t('deliveryDetails.subscriptionId'), value: delivery.subscriptionId, link: projectId ? `/admin/projects/${projectId}/subscriptions` : null }] : []),
-                      ...(requestId ? [{ label: t('deliveryDetails.requestId'), value: requestId, link: null }] : []),
-                    ];
-                    return traceItems.map(({ label, value, link }) => (
-                      <div key={label} className="group flex items-center justify-between gap-2 p-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors">
-                        <span className="text-xs font-medium text-muted-foreground shrink-0">{label}</span>
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <code className="text-xs font-mono truncate" title={value}>{value}</code>
-                          {link && (
-                            <Link to={link} onClick={onClose} className="shrink-0 text-primary hover:text-primary/80 transition-colors" title={t('deliveryDetails.goTo')} aria-label={t('deliveryDetails.goTo')}>
-                              <ExternalLink className="h-3 w-3" />
-                            </Link>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => copyToClipboard(value, label)}
-                            title={t('deliveryDetails.copyValue')}
-                            aria-label={t('deliveryDetails.copyValue')}
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                </CardContent>
-              </Card>
+              {getDiagnosisPanel()}
 
-              {/* Quick Actions — incident integration */}
-              {projectId && (delivery.status === 'FAILED' || delivery.status === 'DLQ') && (
-                <Card className="border-rail">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Link to={`/admin/projects/${projectId}/incidents`} onClick={onClose}>
-                        <Button variant="outline" size="sm">
-                          <Flame className="mr-1.5 h-3.5 w-3.5 text-halt" aria-hidden />
-                          {t('deliveryDetails.openIncidents')}
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCreateIncident}
-                        disabled={creatingIncident}
-                      >
-                        {creatingIncident ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
-                        {t('deliveryDetails.createIncident')}
-                      </Button>
+              {/* What the endpoint said the last time, without opening an attempt. */}
+              {lastAttempt && (
+                <section aria-labelledby="delivery-last-response" className="space-y-2 rounded-lg border border-rail p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 id="delivery-last-response" className="text-sm font-medium">{t('deliveryDetails.lastResponse')}</h2>
+                    <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {lastAttempt.httpStatusCode && (
+                        <Badge
+                          variant={lastAttempt.httpStatusCode >= 200 && lastAttempt.httpStatusCode < 300 ? 'ok' : 'halt'}
+                          className="px-1.5 py-0 font-mono text-[10px]"
+                        >
+                          {lastAttempt.httpStatusCode}
+                        </Badge>
+                      )}
+                      {lastAttempt.durationMs != null && <span className="font-mono">{lastAttempt.durationMs}ms</span>}
+                      <span>{formatDateTime(lastAttempt.createdAt)}</span>
+                    </span>
+                  </div>
+                  {lastAttempt.errorMessage && (
+                    <p className="rounded bg-halt-soft p-2 font-mono text-xs text-halt">{lastAttempt.errorMessage}</p>
+                  )}
+                  {lastAttempt.responseBody ? (
+                    <JsonBlock label={t('deliveryDetails.responseBody')} value={lastAttempt.responseBody} maxHeight="max-h-48" />
+                  ) : !lastAttempt.errorMessage && (
+                    <p className="text-xs text-muted-foreground">{t('deliveryDetails.noResponseBody')}</p>
+                  )}
+                </section>
+              )}
+
+              {dryRunResult && (
+                <Card className="border-rail bg-secondary/40">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Eye className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      {t('deliveryDetails.dryRun.title')}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t('deliveryDetails.dryRun.plan')}</span>
+                      <span className="font-mono text-xs max-w-[60%] text-right">{dryRunResult.plan}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t('deliveryDetails.dryRun.endpoint')}</span>
+                      <span className="font-mono text-xs truncate max-w-[60%]">{dryRunResult.endpointUrl}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t('deliveryDetails.dryRun.idempotencyKey')}</span>
+                      <span className="font-mono text-xs truncate max-w-[60%]">{dryRunResult.idempotencyKey}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t('deliveryDetails.dryRun.eventType')}</span>
+                      <span className="font-mono text-xs">{dryRunResult.eventType}</span>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setDryRunResult(null)} className="w-full mt-2">
+                      {t('deliveryDetails.dryRun.dismiss')}
+                    </Button>
                   </CardContent>
                 </Card>
               )}
+
 
               {/* Status & Progress */}
               <Card>
@@ -437,8 +430,6 @@ export default function DeliveryDetailsSheet({
                   </div>
                 </CardContent>
               </Card>
-
-              {getDiagnosisPanel()}
 
               {/* Latency Sparkline — only when ≥2 attempts with duration data */}
               {attempts.filter(a => a.durationMs != null).length >= 2 && (() => {
@@ -715,57 +706,6 @@ export default function DeliveryDetailsSheet({
                 </CardContent>
               </Card>
 
-              {dryRunResult && (
-                <Card className="border-rail bg-secondary/40">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Eye className="h-4 w-4 text-muted-foreground" aria-hidden />
-                      {t('deliveryDetails.dryRun.title')}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t('deliveryDetails.dryRun.plan')}</span>
-                      <span className="font-mono text-xs max-w-[60%] text-right">{dryRunResult.plan}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t('deliveryDetails.dryRun.endpoint')}</span>
-                      <span className="font-mono text-xs truncate max-w-[60%]">{dryRunResult.endpointUrl}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t('deliveryDetails.dryRun.idempotencyKey')}</span>
-                      <span className="font-mono text-xs truncate max-w-[60%]">{dryRunResult.idempotencyKey}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t('deliveryDetails.dryRun.eventType')}</span>
-                      <span className="font-mono text-xs">{dryRunResult.eventType}</span>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={() => setDryRunResult(null)} className="w-full mt-2">
-                      {t('deliveryDetails.dryRun.dismiss')}
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-
-              <div className="flex gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={handleDryRun}
-                  disabled={delivery.status === 'SUCCESS' || dryRunLoading}
-                >
-                  {dryRunLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Eye className="mr-2 h-4 w-4" />}
-                  {t('deliveryDetails.dryRun.button')}
-                </Button>
-                <Button
-                  onClick={() => setShowReplayDialog(true)}
-                  disabled={delivery.status === 'SUCCESS'}
-                  className="flex-1"
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  {t('deliveryDetails.replayDelivery')}
-                </Button>
-              </div>
-
               {delivery.attemptCount > 1 && delivery.status !== 'SUCCESS' && (
                 <div className="pt-2">
                   <p className="text-xs text-muted-foreground mb-2">{t('deliveryDetails.replayFromStep.label')}</p>
@@ -788,7 +728,109 @@ export default function DeliveryDetailsSheet({
                   </div>
                 </div>
               )}
+
+              {/* Quick Actions — incident integration */}
+              {projectId && (delivery.status === 'FAILED' || delivery.status === 'DLQ') && (
+                <Card className="border-rail">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link to={`/admin/projects/${projectId}/incidents`} onClick={onClose}>
+                        <Button variant="outline" size="sm">
+                          <Flame className="mr-1.5 h-3.5 w-3.5 text-halt" aria-hidden />
+                          {t('deliveryDetails.openIncidents')}
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCreateIncident}
+                        disabled={creatingIncident}
+                      >
+                        {creatingIncident ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                        {t('deliveryDetails.createIncident')}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* The ids are for pasting into a support ticket or a log search, not for reading
+                  first: closed until asked for. */}
+              <details className="rounded-lg border border-rail">
+                <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground">
+                  {t('deliveryDetails.trace')}
+                </summary>
+                <div className="space-y-2 px-4 pb-3">
+                  {(() => {
+                    const firstAttempt = attempts[0];
+                    let requestId: string | null = null;
+                    if (firstAttempt?.requestHeaders) {
+                      try {
+                        const headers = JSON.parse(firstAttempt.requestHeaders);
+                        requestId = headers['X-Request-Id'] || headers['x-request-id'] || headers['X-Webhook-Id'] || headers['x-webhook-id'] || null;
+                      } catch { /* ignore */ }
+                    }
+                    const traceItems = [
+                      { label: t('deliveryDetails.deliveryId'), value: delivery.id, link: null },
+                      { label: t('deliveryDetails.eventId'), value: delivery.eventId, link: projectId ? `/admin/projects/${projectId}/events/${delivery.eventId}` : null },
+                      { label: t('deliveryDetails.endpointId'), value: delivery.endpointId, link: projectId ? `/admin/projects/${projectId}/endpoints` : null },
+                      ...(delivery.subscriptionId ? [{ label: t('deliveryDetails.subscriptionId'), value: delivery.subscriptionId, link: projectId ? `/admin/projects/${projectId}/subscriptions` : null }] : []),
+                      ...(requestId ? [{ label: t('deliveryDetails.requestId'), value: requestId, link: null }] : []),
+                    ];
+                    return traceItems.map(({ label, value, link }) => (
+                      <div key={label} className="group flex items-center justify-between gap-2 p-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors">
+                        <span className="text-xs font-medium text-muted-foreground shrink-0">{label}</span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <code className="text-xs font-mono truncate" title={value}>{value}</code>
+                          {link && (
+                            <Link to={link} onClick={onClose} className="shrink-0 text-primary hover:text-primary/80 transition-colors" title={t('deliveryDetails.goTo')} aria-label={t('deliveryDetails.goTo')}>
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => copyToClipboard(value, label)}
+                            title={t('deliveryDetails.copyValue')}
+                            aria-label={t('deliveryDetails.copyValue')}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </details>
             </div>
+            {/* Replay is what a failed delivery is opened for, so it stays on screen however
+                far down the attempts go. */}
+            <div
+              data-sheet-footer
+              className="sticky -bottom-6 z-10 -mx-6 -mb-6 mt-6 flex gap-2 border-t border-rail bg-background px-6 py-3"
+            >
+              <Button
+                variant="outline"
+                onClick={handleDryRun}
+                disabled={delivery.status === 'SUCCESS' || dryRunLoading}
+              >
+                {dryRunLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Eye className="mr-2 h-4 w-4" />}
+                <span className="truncate">{t('deliveryDetails.dryRun.button')}</span>
+              </Button>
+              <Button
+                onClick={() => setShowReplayDialog(true)}
+                disabled={delivery.status === 'SUCCESS'}
+                className="min-w-0 flex-1"
+                aria-label={t('deliveryDetails.replayDelivery')}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {/* A phone has room for the verb, not the whole phrase. */}
+                <span className="truncate sm:hidden">{t('deliveryDetails.replay')}</span>
+                <span className="truncate max-sm:hidden">{t('deliveryDetails.replayDelivery')}</span>
+              </Button>
+            </div>
+            </>
           ) : loadError ? (
             <ErrorState
               error={loadError}

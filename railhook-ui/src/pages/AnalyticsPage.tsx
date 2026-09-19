@@ -104,7 +104,7 @@ export default function AnalyticsPage() {
   if (isError || !analytics) {
     return (
       <div className="p-4 lg:p-6">
-        <PageHeader eyebrow={period} description={t('analytics.subtitle')} />
+        <PageHeader eyebrow={period} title={t('nav.metrics')} description={t('analytics.subtitle')} />
         <ErrorState error={error} fallbackKey="analytics.loadFailed" onRetry={() => refetch()} />
       </div>
     );
@@ -116,6 +116,7 @@ export default function AnalyticsPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={period}
+        title={t('nav.metrics')}
         description={t('analytics.subtitle')}
         actions={
           <Button variant="outline" size="sm" onClick={refresh} disabled={isFetching}>
@@ -263,7 +264,7 @@ export default function AnalyticsPage() {
           <Card className="overflow-hidden lg:col-span-2">
             <div className="px-5 pb-3 pt-5">
               <div className="mono-label mb-1">{period}</div>
-              <h3 className="text-sm font-medium leading-tight">{t('analytics.endpointPerformance')}</h3>
+              <h2 className="text-sm font-medium leading-tight">{t('analytics.endpointPerformance')}</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">{t('analytics.endpointPerformanceDesc')}</p>
             </div>
             {endpointPerformance.length === 0 ? (

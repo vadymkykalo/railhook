@@ -233,6 +233,7 @@ export default function DeliveriesPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={t('nav.outgoing')}
+        title={t('nav.allDeliveries')}
         description={<Trans i18nKey="deliveries.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={replayAllMatching || undefined}
         guide={{ id: 'deliveries', docsLink: 'outgoing/retries' }}
@@ -361,31 +362,47 @@ export default function DeliveriesPage() {
                           )}
                         </TableCell>
                       )}
-                      <TableCell>
+                      {/* On a phone the status and the event type are the card's title line. */}
+                      <TableCell data-card-title>
                         <span className="flex flex-col items-start gap-1">
                           <StatusBadge
                             kind={kindOfDeliveryStatus(delivery.status)}
                             label={t(`deliveries.status.${delivery.status}`)}
                           />
                           {explain && (
-                            <span className="text-[11px] text-muted-foreground">{t(explain.key, explain.values)}</span>
+                            <span className="text-[11px] text-muted-foreground max-sm:hidden">{t(explain.key, explain.values)}</span>
                           )}
                         </span>
                       </TableCell>
-                      <TableCell>
-                        <CopyId
-                          value={delivery.eventId}
-                          to={`/admin/projects/${projectId}/events/${delivery.eventId}`}
-                        />
+                      <TableCell data-card-title>
+                        {/* The type says what was delivered; the id only says which one, and the
+                            event's own page shows it. */}
+                        {delivery.eventType ? (
+                          <Link
+                            to={`/admin/projects/${projectId}/events/${delivery.eventId}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex min-w-0 max-w-[220px] rounded font-mono text-[13px] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            title={delivery.eventType}
+                          >
+                            <span className="truncate">{delivery.eventType}</span>
+                          </Link>
+                        ) : (
+                          <CopyId
+                            value={delivery.eventId}
+                            to={`/admin/projects/${projectId}/events/${delivery.eventId}`}
+                          />
+                        )}
                       </TableCell>
                       <TableCell>
                         <Link
                           to={`/admin/projects/${projectId}/endpoints`}
                           onClick={(e) => e.stopPropagation()}
-                          className="block max-w-[220px] truncate rounded font-mono text-[13px] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="flex min-w-0 max-w-[220px] rounded font-mono text-[13px] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           title={getEndpointName(delivery.endpointId)}
                         >
-                          {getEndpointName(delivery.endpointId)}
+                          {/* The link is a flex box on a phone card, and a flex box cannot ellipsize its
+                              own text: the text sits in a box that can. */}
+                          <span className="truncate">{getEndpointName(delivery.endpointId)}</span>
                         </Link>
                       </TableCell>
                       <TableCell>

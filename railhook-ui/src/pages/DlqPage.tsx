@@ -146,15 +146,28 @@ export default function DlqPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={t('nav.outgoing')}
+        title={t('nav.dlq')}
         description={<Trans i18nKey="dlq.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={
-          <PermissionGate allowed={canManageDlq}>
-            <VerificationGate>
-              <Button variant="destructive" onClick={() => setShowPurgeDialog(true)} disabled={!stats?.totalItems}>
-                <Trash2 className="h-3.5 w-3.5" /> {t('dlq.purgeAll')}
-              </Button>
-            </VerificationGate>
-          </PermissionGate>
+          // Replaying what you ticked is what this page is for; wiping the whole queue is the
+          // rare, irreversible thing, so it is the quieter button and still asks first.
+          <>
+            <PermissionGate allowed={canManageDlq}>
+              <VerificationGate>
+                <Button onClick={handleReplaySelected} disabled={selectedCount === 0 || replaying}>
+                  {replaying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                  {t('dlq.replaySelected', { count: selectedCount })}
+                </Button>
+              </VerificationGate>
+            </PermissionGate>
+            <PermissionGate allowed={canManageDlq}>
+              <VerificationGate>
+                <Button variant="outline" onClick={() => setShowPurgeDialog(true)} disabled={!stats?.totalItems}>
+                  <Trash2 className="h-3.5 w-3.5" /> {t('dlq.purgeAll')}
+                </Button>
+              </VerificationGate>
+            </PermissionGate>
+          </>
         }
       />
 
@@ -189,14 +202,7 @@ export default function DlqPage() {
       ) : (
         <div className="animate-fade-in">
           <PermissionGate allowed={canManageDlq}>
-            <SelectionBar count={selectedCount} onClear={() => setSelectedIds(new Set())}>
-              <VerificationGate>
-                <Button size="sm" onClick={handleReplaySelected} disabled={replaying}>
-                  {replaying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                  {t('dlq.replaySelected', { count: selectedCount })}
-                </Button>
-              </VerificationGate>
-            </SelectionBar>
+            <SelectionBar count={selectedCount} onClear={() => setSelectedIds(new Set())}>{null}</SelectionBar>
           </PermissionGate>
 
           <div className="overflow-hidden rounded-lg border border-rail bg-card">
@@ -242,15 +248,15 @@ export default function DlqPage() {
                           />
                         </TableCell>
                       )}
-                      <TableCell>
+                      <TableCell data-card-title>
                         <span className="flex flex-col items-start gap-1">
                           <StatusBadge kind="halt" label={t('dlq.abandoned')} />
-                          <span className="text-[11px] text-muted-foreground">
+                          <span className="text-[11px] text-muted-foreground max-sm:hidden">
                             {t('dlq.ladderExhausted', { count: item.attemptCount })}
                           </span>
                         </span>
                       </TableCell>
-                      <TableCell><code className="font-mono text-[13px]">{item.eventType}</code></TableCell>
+                      <TableCell data-card-title><code className="font-mono text-[13px]">{item.eventType}</code></TableCell>
                       <TableCell>
                         <span className="block max-w-[200px] truncate font-mono text-[13px]" title={item.endpointUrl}>{item.endpointUrl}</span>
                       </TableCell>

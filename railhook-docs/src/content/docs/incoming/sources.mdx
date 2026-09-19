@@ -14,7 +14,7 @@ A **source** is one third-party provider you connect, such as Stripe or GitHub, 
 
 2. Railhook verifies it, as the source is configured to. A webhook that fails verification is refused and not stored.
 
-3. The webhook is stored as it arrived, as an **incoming event**. The dashboard lists these under **Received**.
+3. The webhook is stored as it arrived, as an **incoming event**. The dashboard lists these under **Incoming events**.
 
 4. Railhook creates one **forward** for each destination of the source, and works on each until it succeeds or is abandoned. See [Destinations](/docs/incoming/destinations/).
 
@@ -157,5 +157,5 @@ A provider that sends none of these is not deduplicated.
 <CardGrid>
   <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Where received webhooks are forwarded, and how." />
   <LinkCard title="Verification" href="/docs/incoming/verification/" description="How each provider's signature is checked." />
-  <LinkCard title="Replay and Time Machine" href="/docs/outgoing/replay/#replay-incoming-webhooks" description="Forward stored incoming events again." />
+  <LinkCard title="Replay" href="/docs/outgoing/replay/#replay-incoming-webhooks" description="Forward stored incoming events again." />
 </CardGrid>
