@@ -4,6 +4,7 @@ import { Crown, Wrench, Eye, Check } from 'lucide-react';
 import { Tooltip } from './ui/tooltip';
 import { cn } from '../lib/utils';
 import type { Role } from '../auth/usePermissions';
+import { useIsDemo } from '../auth/auth.store';
 
 interface PermissionGateProps {
   /** The permission boolean from usePermissions() */
@@ -25,12 +26,17 @@ export default function PermissionGate({
   children,
 }: PermissionGateProps) {
   const { t } = useTranslation();
+  const isDemo = useIsDemo();
 
   if (allowed) return children;
 
   if (fallback === 'hide') return null;
 
-  const tooltipText = tooltip || t('permissions.requiredRole', { role: t(`roles.${requiredRole}.name`) });
+  // In the live demo the role is not the reason, and naming one would send a visitor looking for
+  // a teammate to ask. What stands between them and the button is an account.
+  const tooltipText = isDemo
+    ? t('demo.readOnlyTooltip')
+    : tooltip || t('permissions.requiredRole', { role: t(`roles.${requiredRole}.name`) });
 
   return (
     <Tooltip content={tooltipText} side="top">

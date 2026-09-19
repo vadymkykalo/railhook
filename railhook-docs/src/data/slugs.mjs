@@ -30,6 +30,7 @@ export const SIDEBAR_GROUPS = [
       'self-hosting/upgrade-backup',
       'self-hosting/monitoring',
       'self-hosting/platform-admin',
+      'self-hosting/live-demo',
       'self-hosting/troubleshooting',
       'self-hosting/kubernetes',
     ],

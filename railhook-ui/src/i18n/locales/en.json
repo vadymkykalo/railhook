@@ -2098,7 +2098,8 @@
       "install": "Install on your server",
       "lead": "Send webhooks to your customers and receive them from Stripe, GitHub or any other service — in our cloud or on your own servers, with every delivery on record.",
       "startFree": "Start free",
-      "title": "Never lose a <em>webhook</em>"
+      "title": "Never lose a <em>webhook</em>",
+      "tryDemo": "Try the live demo"
     },
     "install": {
       "copied": "Copied",
@@ -2145,7 +2146,9 @@
       "devVerifierBody": "Check a Stripe, GitHub or Standard Webhooks signature.",
       "devStatus": "Status",
       "devStatusBody": "Live uptime of the site, the API and deliveries.",
-      "blog": "Blog"
+      "blog": "Blog",
+      "devDemo": "Live demo",
+      "devDemoBody": "The real dashboard with a day of sample traffic. No sign-up."
     },
     "product": {
       "analytics": {
@@ -2515,6 +2518,10 @@
     "blog": {
       "title": "Blog — Railhook",
       "description": "Writing about webhooks: provider retry policies, delivery failures, signature verification and what a gateway in front of them changes."
+    },
+    "demo": {
+      "title": "Live demo — the Railhook dashboard with sample data | Railhook",
+      "description": "Open the real Railhook dashboard with a day of sample webhook traffic: deliveries, retries, failed messages, Stripe and GitHub sources. Read-only, no sign-up."
     }
   },
   "mtls": {
@@ -4831,5 +4838,26 @@
         "replay": "replay, 7 days"
       }
     }
+  },
+  "demo": {
+    "page": {
+      "title": "The live demo",
+      "lead": "The real Railhook dashboard, signed in to a sample shop with a day of traffic: deliveries, retries, a failed message, Stripe and GitHub webhooks. Look at anything — nothing can be changed.",
+      "opening": "Opening the demo…",
+      "start": "Open the demo",
+      "failed": "The demo could not be opened.",
+      "retry": "Try again",
+      "disabled": "The live demo is not enabled on this server. Its operator can turn it on with DEMO_ENABLED=true.",
+      "home": "Back to the home page",
+      "signUp": "Or create a free account"
+    },
+    "banner": "You’re viewing a read-only demo.",
+    "bannerBody": "Start free to create your own.",
+    "startFree": "Start free",
+    "exit": "Exit demo",
+    "exited": "You left the demo",
+    "ended": "The demo session has ended. You can open a new one any time.",
+    "readOnlyTooltip": "Read-only demo — create a free account to do this",
+    "readOnlyError": "This is a read-only demo. Create a free account to make changes."
   }
 }

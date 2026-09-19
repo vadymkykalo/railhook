@@ -116,6 +116,22 @@ describe('http client session refresh', () => {
     expect(await Promise.race([queuedOutcome, Promise.resolve().then(() => pending)])).toBe('rejected');
     expect(refreshCalls).toBe(1);
   });
+
+  it('never refreshes a live-demo session: an expired demo simply ends', async () => {
+    // A demo token has no refresh token behind it. Refreshing would present this browser's own
+    // cookie and could put a demo tab into whoever's real account that cookie belongs to.
+    http.setDemo(true);
+    refreshReplies = [{ status: 200, data: { accessToken: 'fresh' } }];
+    const result = http.get('/api/v1/projects');
+    const settled = expect(result).rejects.toBeTruthy();
+    await vi.runAllTimersAsync();
+    await settled;
+
+    expect(refreshCalls).toBe(0);
+    expect(onLogout).toHaveBeenCalledTimes(1);
+    expect(http.getToken()).toBeNull();
+    expect(http.isDemo()).toBe(false);
+  });
 });
 
 /**

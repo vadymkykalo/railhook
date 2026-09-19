@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '../../components/ui/button';
+import TryDemoButton from '../../components/site/TryDemoButton';
 import { useAuth } from '../../auth/auth.store';
 import HeroBackdrop from './HeroBackdrop';
 import InstallCommand from './InstallCommand';
@@ -45,6 +46,7 @@ export default function HeroSection() {
           <Button asChild size="lg" variant="outline" className="max-sm:h-12 max-sm:w-full">
             <a href="#install">{t('landing.hero.install')}</a>
           </Button>
+          <TryDemoButton size="lg" className="max-sm:h-12 max-sm:w-full" />
         </div>
         {!isAuthenticated && <p className="mt-3 text-sm text-muted-foreground">{t('landing.hero.cloudNote')}</p>}
 

@@ -1484,6 +1484,29 @@
       ]
     },
     {
+      "title": "Live demo",
+      "variables": [
+        {
+          "name": "DEMO_ENABLED",
+          "default": null,
+          "example": "false",
+          "description": "\"Try the live demo\" on the public site: anyone, without an account, opens the real dashboard\nsigned in to a seeded demo organization (\"Acme Shop\") and can look at everything in it. It is\nhow railhook.io shows the product before a sign-up.\n\nOff by default, so a self-hosted install opens nothing anonymous: no demo organization is\ncreated, the entry points are hidden and the API answers 404. When on, the API seeds the demo\norganization at startup and rewrites its history every DEMO_REFRESH_INTERVAL_MINUTES so it\nalways shows the last day. A demo session is read-only on the server — every change is refused\n— and lasts DEMO_SESSION_TTL_MINUTES with no way to extend it. Ten sessions a minute per\naddress, behind the registration CAPTCHA when one is configured. The demo's URLs are on\nreserved .example hosts and nothing is ever delivered to them.\n\nRead by the UI container too (its entry points), so set it for both and restart both."
+        },
+        {
+          "name": "DEMO_SESSION_TTL_MINUTES",
+          "default": null,
+          "example": "30",
+          "description": "\"Try the live demo\" on the public site: anyone, without an account, opens the real dashboard\nsigned in to a seeded demo organization (\"Acme Shop\") and can look at everything in it. It is\nhow railhook.io shows the product before a sign-up.\n\nOff by default, so a self-hosted install opens nothing anonymous: no demo organization is\ncreated, the entry points are hidden and the API answers 404. When on, the API seeds the demo\norganization at startup and rewrites its history every DEMO_REFRESH_INTERVAL_MINUTES so it\nalways shows the last day. A demo session is read-only on the server — every change is refused\n— and lasts DEMO_SESSION_TTL_MINUTES with no way to extend it. Ten sessions a minute per\naddress, behind the registration CAPTCHA when one is configured. The demo's URLs are on\nreserved .example hosts and nothing is ever delivered to them.\n\nRead by the UI container too (its entry points), so set it for both and restart both."
+        },
+        {
+          "name": "DEMO_REFRESH_INTERVAL_MINUTES",
+          "default": null,
+          "example": "60",
+          "description": "\"Try the live demo\" on the public site: anyone, without an account, opens the real dashboard\nsigned in to a seeded demo organization (\"Acme Shop\") and can look at everything in it. It is\nhow railhook.io shows the product before a sign-up.\n\nOff by default, so a self-hosted install opens nothing anonymous: no demo organization is\ncreated, the entry points are hidden and the API answers 404. When on, the API seeds the demo\norganization at startup and rewrites its history every DEMO_REFRESH_INTERVAL_MINUTES so it\nalways shows the last day. A demo session is read-only on the server — every change is refused\n— and lasts DEMO_SESSION_TTL_MINUTES with no way to extend it. Ten sessions a minute per\naddress, behind the registration CAPTCHA when one is configured. The demo's URLs are on\nreserved .example hosts and nothing is ever delivered to them.\n\nRead by the UI container too (its entry points), so set it for both and restart both."
+        }
+      ]
+    },
+    {
       "title": "Web analytics",
       "variables": [
         {

@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **A live demo, "Try the live demo"**, on the landing page's hero, on `/pricing` and in the
+  Developers menu: `/demo` opens the real dashboard signed in to a sample organization — project
+  "Acme Shop" with four endpoints, successful and retried deliveries with their attempts, a
+  Failed Messages entry, Stripe and GitHub sources with verified incoming events, and analytics
+  for the last 24 hours. Off unless `DEMO_ENABLED=true` (with `DEMO_SESSION_TTL_MINUTES` and
+  `DEMO_REFRESH_INTERVAL_MINUTES`); a self-hosted install creates no demo organization, shows no
+  entry point and answers `404` on `POST /api/v1/public/demo/session`.
+- **The demo is read-only on the server, not only in the dashboard.** A demo session is a
+  30-minute Viewer access token with no refresh token, accepted only under `/api/`, and every
+  request from it other than `GET`, `HEAD` or `OPTIONS` is refused with `403 demo_read_only` —
+  including the handlers no role guards (password, email change, members, device and MCP
+  approval, the portal) — as are exports. Any credential for the demo organization is treated
+  the same way. Ten sessions a minute per address, behind the registration CAPTCHA where one is
+  configured. An integration test walks every state-changing handler the running API has; a
+  ratchet freezes the four that a demo session may call.
+- The demo's data is regenerated every hour so it always ends at the present, on reserved
+  `.example` hosts, with every delivery already finished and its sources refusing webhooks, so
+  the worker never has anything of it to send. The platform admin overview and the worker's DLQ
+  gauges (and so the `webhook_dlq_depth` alert) leave it out.
+- Docs: **Self-hosting → Live demo**, how to turn it on and why it is off, in English and
+  Ukrainian.
+
 ## [2.25.0] - 2026-09-19
 
 ### Added

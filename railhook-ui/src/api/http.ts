@@ -51,6 +51,8 @@ class HttpClient {
   private token: string | null = null;
   private refreshInFlight: Promise<string> | null = null;
   private onLogout: OnLogoutCallback | null = null;
+  /** A live-demo session: an access token with nothing to refresh it from. */
+  private demo = false;
 
   constructor() {
     this.client = axios.create({
@@ -77,6 +79,17 @@ class HttpClient {
       (response) => response,
       async (error: AxiosError) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+        if (error.response?.status === 401 && this.demo) {
+          // The demo's token has expired, and there is no refresh token behind it: presenting
+          // this browser's refresh cookie would sign a demo tab into whoever uses it for real.
+          this.token = null;
+          this.demo = false;
+          if (this.onLogout) {
+            this.onLogout();
+          }
+          return Promise.reject(error);
+        }
 
         if (
           error.response?.status === 401 &&
@@ -163,6 +176,15 @@ class HttpClient {
 
   setToken(token: string | null) {
     this.token = token;
+  }
+
+  /** Marks the session as the live demo's, whose token must never be refreshed. */
+  setDemo(demo: boolean) {
+    this.demo = demo;
+  }
+
+  isDemo(): boolean {
+    return this.demo;
   }
 
   getToken(): string | null {

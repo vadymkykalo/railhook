@@ -22,6 +22,7 @@ const AuthCallbackPage = lazy(() => import('./auth/AuthCallbackPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
 const TesterPage = lazy(() => import('./pages/TesterPage'));
+const DemoPage = lazy(() => import('./pages/DemoPage'));
 const SignatureVerifierPage = lazy(() => import('./pages/SignatureVerifierPage'));
 const SecurityPage = lazy(() => import('./pages/SecurityPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
@@ -108,6 +109,11 @@ export const router = createBrowserRouter([
           {
             path: '/tester',
             element: <S><TesterPage /></S>,
+          },
+          {
+            /* Not in the sitemap: it opens a session and moves on, there is nothing to index. */
+            path: '/demo',
+            element: <S><DemoPage /></S>,
           },
           {
             path: '/tools/webhook-signature',

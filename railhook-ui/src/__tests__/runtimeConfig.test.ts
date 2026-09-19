@@ -41,10 +41,12 @@ type Config = {
   webAnalyticsToken?: string;
   statusPageUrl?: string;
   publicTester?: boolean;
+  publicDemo?: boolean;
 };
 
 const EMPTY: Config = {
   contactDomain: '', siteUrl: '', captchaSiteKey: '', captchaScriptUrl: '', webAnalyticsToken: '', statusPageUrl: '', publicTester: false,
+  publicDemo: false,
 };
 
 /** Runs the entrypoint script as the container would, and evaluates what it wrote. */
@@ -204,6 +206,29 @@ describe('public webhook tester', () => {
       .toMatch(/name: RAILHOOK_PUBLIC_TESTER\s+value: \{\{ \.Values\.ui\.publicTester \| default false \| quote \}\}/);
     expect(read('deploy/helm/railhook/values.yaml')).toMatch(/^ {2}publicTester: false$/m);
     expect(read('.env.dist')).toMatch(/^#\s*PUBLIC_TESTER_ENABLED=false$/m);
+  });
+});
+
+describe('live demo', () => {
+  it('is on only for an exact "true", so a self-hosted install opens nothing anonymous', () => {
+    expect(runEntrypoint({ RAILHOOK_PUBLIC_DEMO: 'true' }).config?.publicDemo).toBe(true);
+    for (const value of [undefined, '', 'false', 'yes', '1', 'true"};alert(1);//']) {
+      const { config, js } = runEntrypoint({ RAILHOOK_PUBLIC_DEMO: value });
+      expect(config?.publicDemo, String(value)).toBe(false);
+      expect(js).not.toContain('alert');
+    }
+  });
+
+  it('reads the same switch as the API in Compose, and is off in Helm unless set', () => {
+    const compose = read('docker-compose.yml');
+    const ui = compose.slice(compose.indexOf('\n  ui:'), compose.indexOf('\n  caddy:'));
+    const api = compose.slice(compose.indexOf('\n  api:'), compose.indexOf('\n  worker:'));
+    expect(ui).toMatch(/^\s+RAILHOOK_PUBLIC_DEMO: \$\{DEMO_ENABLED:-false\}$/m);
+    expect(api).toMatch(/^\s+DEMO_ENABLED: \$\{DEMO_ENABLED:-false\}$/m);
+    expect(read('deploy/helm/railhook/templates/ui-deployment.yaml'))
+      .toMatch(/name: RAILHOOK_PUBLIC_DEMO\s+value: \{\{ \.Values\.ui\.publicDemo \| default false \| quote \}\}/);
+    expect(read('deploy/helm/railhook/values.yaml')).toMatch(/^ {2}publicDemo: false$/m);
+    expect(read('.env.dist')).toMatch(/^#\s*DEMO_ENABLED=false$/m);
   });
 });
 
