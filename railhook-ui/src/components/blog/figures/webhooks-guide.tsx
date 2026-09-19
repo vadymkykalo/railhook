@@ -28,85 +28,160 @@ function useFigureText(key: string) {
   return (path: string, values?: Record<string, unknown>) => t(`blog.figures.${key}.${path}`, values);
 }
 
-/** Polling asks on a timer and mostly hears "nothing"; a webhook speaks once, when it happens. */
+/**
+ * Polling asks on a timer and mostly hears "nothing new"; a webhook speaks once, when it happens.
+ *
+ * Every poll is drawn as the request it is — a `GET /orders` with its reply under it — so the
+ * wasted ones read as wasted without the caption. The order is created just after one poll, and
+ * the poll after it is the first to see it: the gap between the two is the lag polling costs.
+ */
 function PollingVsPush() {
   const f = useFigureText('pollingVsPush');
-  const X0 = 180;
   const X1 = 700;
-  const eventX = 452;
-  const polls = [200, 280, 360, 440, 520, 600, 680];
-  const found = 520;
-  const pollY = 86;
+  const pill = { width: 70, height: 20 };
+  const polls = Array.from({ length: 6 }, (_, index) => 176 + index * 88);
+  const found = 4;
+  /** Just after the poll before ends, so the wait for the next one is nearly a whole interval. */
+  const eventX = polls[found - 1] + pill.width + 4;
+  const center = (x: number) => x + pill.width / 2;
+  const pollY = 64;
   const pushY = 196;
+  const axisY = 250;
+  const REQUEST = 'font-mono text-[9px]';
 
   return (
-    <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 720 280">
+    <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 720 300">
       <defs>
         <Arrow id="wg-poll-arrow" />
+        <Arrow id="wg-poll-arrow-brand" colour={SERIES.brand} />
       </defs>
 
-      {/* The moment the order is created, through both lanes. */}
-      <line x1={eventX} y1={30} x2={eventX} y2={236} stroke={CHROME.ink} strokeWidth={1} strokeDasharray="3 3" />
-      <text x={eventX} y={22} textAnchor="middle" fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
+      {/* The moment the order is created, through both lanes: the one instant both rows share. */}
+      <line x1={eventX} y1={30} x2={eventX} y2={axisY} stroke={CHROME.ink} strokeWidth={1} strokeDasharray="3 3" />
+      <text x={eventX} y={22} textAnchor="middle" fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
         {f('event')}
       </text>
 
-      {[pollY, pushY].map((y) => (
-        <line key={y} x1={X0} y1={y} x2={X1} y2={y} {...AXIS} strokeDasharray="2 4" />
+      {/* Left column: what each row is, and what it cost. */}
+      {[
+        { key: 'polling', y: pollY + 6 },
+        { key: 'push', y: pushY + 4 },
+      ].map((lane) => (
+        <g key={lane.key}>
+          <text x={12} y={lane.y} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+            {f(`${lane.key}.title`)}
+          </text>
+          <text x={12} y={lane.y + 16} fill={CHROME.muted} className={MONO}>
+            {f(`${lane.key}.body`)}
+          </text>
+          <text x={12} y={lane.y + 34} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+            {f(`${lane.key}.tally`)}
+          </text>
+        </g>
       ))}
-      <line x1={X0} y1={236} x2={X1} y2={236} {...AXIS} markerEnd="url(#wg-poll-arrow)" />
-      <text x={X1} y={256} textAnchor="end" fill={CHROME.muted} className={MONO}>
+
+      {/* The timer: one interval between two polls. */}
+      <path
+        d={`M ${center(polls[0])} ${pollY - 10} L ${center(polls[0])} ${pollY - 14} L ${center(polls[1])} ${pollY - 14} L ${center(polls[1])} ${pollY - 10}`}
+        fill="none"
+        stroke={CHROME.muted}
+      />
+      <text x={(center(polls[0]) + center(polls[1])) / 2} y={pollY - 19} textAnchor="middle" fill={CHROME.muted} className={MONO}>
+        {f('polling.interval')}
+      </text>
+
+      {/* Polling: one GET per interval, each with its reply. Only the one after the order is useful. */}
+      {polls.map((x, index) => {
+        const useful = index === found;
+        const colour = useful ? SERIES.brand : SERIES.idle;
+        return (
+          <g key={x}>
+            <rect
+              x={x}
+              y={pollY - pill.height / 2}
+              width={pill.width}
+              height={pill.height}
+              rx={10}
+              fill={useful ? SERIES.brand : 'none'}
+              stroke={colour}
+              strokeWidth={1.25}
+            />
+            <text
+              x={center(x)}
+              y={pollY + 3}
+              textAnchor="middle"
+              fill={useful ? CHROME.surface : CHROME.muted}
+              className={cn(REQUEST, useful && 'font-semibold')}
+            >
+              GET /orders
+            </text>
+            <line
+              x1={center(x)}
+              y1={pollY + pill.height / 2 + 2}
+              x2={center(x)}
+              y2={pollY + 26}
+              stroke={colour}
+              markerEnd={useful ? 'url(#wg-poll-arrow-brand)' : 'url(#wg-poll-arrow)'}
+            />
+            <text
+              x={center(x)}
+              y={pollY + 42}
+              textAnchor="middle"
+              fill={useful ? SERIES.brand : CHROME.muted}
+              className={cn(MONO, useful && 'font-semibold')}
+            >
+              {f(useful ? 'polling.found' : 'polling.empty')}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* The lag: from the order to the poll that first sees it. */}
+      <path
+        d={`M ${eventX} ${pollY + 52} L ${eventX} ${pollY + 58} L ${center(polls[found])} ${pollY + 58} L ${center(polls[found])} ${pollY + 52}`}
+        fill="none"
+        stroke={CHROME.ink}
+      />
+      <text x={eventX + 4} y={pollY + 74} fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
+        {f('polling.lag')}
+      </text>
+
+      {/* Webhook: one POST, at the instant the order is created, to your endpoint. */}
+      <text x={eventX + 4} y={pushY - 16} fill={SERIES.brand} className={cn(MONO, 'font-semibold')}>
+        {f('push.when')}
+      </text>
+      <rect x={eventX} y={pushY - 10} width={44} height={20} rx={10} fill={SERIES.brand} />
+      <text x={eventX + 22} y={pushY + 3} textAnchor="middle" fill={CHROME.surface} className={cn(REQUEST, 'font-semibold')}>
+        POST
+      </text>
+      <line
+        x1={eventX + 48}
+        y1={pushY}
+        x2={X1 - 94}
+        y2={pushY}
+        stroke={SERIES.brand}
+        strokeWidth={1.5}
+        markerEnd="url(#wg-poll-arrow-brand)"
+      />
+      <rect x={X1 - 88} y={pushY - 12} width={88} height={24} rx={6} fill="none" stroke={CHROME.rail} />
+      <text x={X1 - 44} y={pushY + 4} textAnchor="middle" fill={CHROME.ink} className={MONO}>
+        {f('push.endpoint')}
+      </text>
+
+      {/* Time runs left to right. */}
+      <line x1={176} y1={axisY} x2={X1} y2={axisY} {...AXIS} markerEnd="url(#wg-poll-arrow)" />
+      <text x={X1} y={axisY + 14} textAnchor="end" fill={CHROME.muted} className={MONO}>
         {f('time')}
       </text>
 
-      {/* Lane titles. */}
-      <text x={12} y={pollY - 6} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
-        {f('polling.title')}
+      {/* Legend. */}
+      <rect x={176} y={axisY + 26} width={26} height={12} rx={6} fill="none" stroke={SERIES.idle} strokeWidth={1.25} />
+      <text x={208} y={axisY + 36} fill={CHROME.muted} className={MONO}>
+        {f('legend.wasted')}
       </text>
-      <text x={12} y={pollY + 10} fill={CHROME.muted} className={MONO}>
-        {f('polling.body')}
-      </text>
-      <text x={12} y={pushY - 6} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
-        {f('push.title')}
-      </text>
-      <text x={12} y={pushY + 10} fill={CHROME.muted} className={MONO}>
-        {f('push.body')}
-      </text>
-
-      {/* Polling: a request per interval. Empty answers are idle; one finds the order. */}
-      {polls.map((x) => (
-        <g key={x}>
-          <line x1={x} y1={pollY - 18} x2={x} y2={pollY - 6} stroke={x === found ? SERIES.brand : SERIES.idle} strokeWidth={1.5} />
-          <circle cx={x} cy={pollY} r={5} fill={x === found ? SERIES.brand : SERIES.idle} />
-        </g>
-      ))}
-      <text x={polls[1]} y={pollY + 24} textAnchor="middle" fill={CHROME.muted} className={MONO}>
-        {f('polling.empty')}
-      </text>
-      <text x={found} y={pollY - 24} textAnchor="middle" fill={SERIES.brand} className={cn(MONO, 'font-semibold')}>
-        {f('polling.found')}
-      </text>
-      {/* The lag: from the event to the poll that noticed it. */}
-      <path
-        d={`M ${eventX} ${pollY + 16} L ${eventX} ${pollY + 22} L ${found} ${pollY + 22} L ${found} ${pollY + 16}`}
-        fill="none"
-        stroke={CHROME.ink}
-        strokeWidth={1}
-      />
-      <text x={eventX + 6} y={pollY + 36} fill={CHROME.ink} className={MONO}>
-        {f('polling.lag')}
-      </text>
-      <text x={X1} y={pollY + 52} textAnchor="end" fill={CHROME.muted} className={MONO}>
-        {f('polling.tally')}
-      </text>
-
-      {/* Push: one request, at the moment it happens. */}
-      <circle cx={eventX} cy={pushY} r={6} fill={SERIES.brand} />
-      <text x={eventX + 14} y={pushY - 10} fill={SERIES.brand} className={cn(MONO, 'font-semibold')}>
-        {f('push.request')}
-      </text>
-      <text x={X1} y={pushY + 24} textAnchor="end" fill={CHROME.muted} className={MONO}>
-        {f('push.tally')}
+      <rect x={376} y={axisY + 26} width={26} height={12} rx={6} fill={SERIES.brand} />
+      <text x={408} y={axisY + 36} fill={CHROME.muted} className={MONO}>
+        {f('legend.useful')}
       </text>
     </Figure>
   );
