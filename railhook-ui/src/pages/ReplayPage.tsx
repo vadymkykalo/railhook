@@ -235,7 +235,7 @@ export default function ReplayPage() {
 
       <PermissionGate allowed={canReplayDeliveries}>
         <section className="mb-8 rounded-lg border border-rail bg-card p-4">
-          <h3 className="mono-label mb-3">{t('replay.selection')}</h3>
+          <h2 className="mono-label mb-3">{t('replay.selection')}</h2>
 
           <div className="mb-3 flex flex-wrap gap-1.5">
             {QUICK_RANGES.map((key) => (
@@ -324,7 +324,7 @@ export default function ReplayPage() {
       </PermissionGate>
 
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-[15px] font-medium">{t('replay.history')}</h3>
+        <h2 className="text-[15px] font-medium">{t('replay.history')}</h2>
         {pollingActive && (
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <RefreshCw className="h-3 w-3 animate-spin" aria-hidden />

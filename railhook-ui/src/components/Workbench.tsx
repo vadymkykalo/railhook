@@ -59,7 +59,7 @@ export function WorkbenchPanel({
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-rail px-4 py-2.5">
           <div className="min-w-0">
             {eyebrow && <div className="mono-label">{eyebrow}</div>}
-            {title && <h3 className="truncate text-[13px] font-medium">{title}</h3>}
+            {title && <h2 className="truncate text-[13px] font-medium">{title}</h2>}
             {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
           </div>
           {actions && <div className="flex flex-shrink-0 items-center gap-1">{actions}</div>}
@@ -130,7 +130,7 @@ export function ResultFrame({
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-rail px-4 py-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <StatusBadge kind={kind} label={statusLabel} />
-          <h3 className="truncate text-[13px] font-medium">{title}</h3>
+          <h2 className="truncate text-[13px] font-medium">{title}</h2>
         </div>
         {actions && <div className="flex flex-shrink-0 items-center gap-1">{actions}</div>}
       </header>

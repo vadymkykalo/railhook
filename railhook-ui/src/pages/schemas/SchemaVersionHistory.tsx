@@ -168,7 +168,7 @@ export default function SchemaVersionHistory({
         <header className="flex flex-wrap items-start justify-between gap-3 p-4">
           <div className="min-w-0">
             <div className="mono-label">{t('schemas.eventTypeEyebrow')}</div>
-            <h3 className="truncate font-mono text-[15px] font-medium">{eventType.name}</h3>
+            <h2 className="truncate font-mono text-[15px] font-medium">{eventType.name}</h2>
             {eventType.description && (
               <p className="mt-1 text-sm text-muted-foreground">{eventType.description}</p>
             )}
@@ -570,7 +570,7 @@ export function RecentSchemaChanges({ projectId }: { projectId: string }) {
     <section className="rounded-xl border border-rail bg-card shadow-card">
       <header className="flex flex-wrap items-center gap-2 border-b border-rail px-4 py-2.5">
         <History className="h-4 w-4 text-muted-foreground" aria-hidden />
-        <h3 className="text-[13px] font-medium">{t('schemas.board.title')}</h3>
+        <h2 className="text-[13px] font-medium">{t('schemas.board.title')}</h2>
         <span className="font-mono text-[11px] text-muted-foreground">{changes.length}</span>
         {breakingCount > 0 && (
           <StatusBadge kind="retry" label={t('schemas.board.breakingWithCount', { count: breakingCount })} />

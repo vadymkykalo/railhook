@@ -199,7 +199,7 @@ export default function EventDetailPage() {
         {activeTab === 'raw' && (
           <section className="overflow-hidden rounded-lg border border-rail bg-card">
             <div className="flex items-center justify-between border-b border-rail px-4 py-2.5">
-              <h3 className="text-[13px] font-medium">{t('eventDetail.rawPayload')}</h3>
+              <h2 className="text-[13px] font-medium">{t('eventDetail.rawPayload')}</h2>
               <Button variant="ghost" size="sm" onClick={() => handleCopy(formatPayload(event.payload), t('eventDetail.payloadCopied'))}>
                 <Copy className="h-3.5 w-3.5" /> {t('common.copy')}
               </Button>
@@ -212,10 +212,10 @@ export default function EventDetailPage() {
 
         {activeTab === 'sanitized' && (
           <section className="rounded-lg border border-rail bg-card p-4">
-            <h3 className="flex items-center gap-2 text-[13px] font-medium">
+            <h2 className="flex items-center gap-2 text-[13px] font-medium">
               <Shield className="h-4 w-4 text-muted-foreground" aria-hidden />
               {t('eventDetail.sanitized')}
-            </h3>
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground">{t('eventDetail.sanitizedHint')}</p>
             <p className="py-8 text-center text-sm text-muted-foreground">{t('eventDetail.sanitizedUseDebug')}</p>
             {debugLinks.length > 0 && (
@@ -238,7 +238,7 @@ export default function EventDetailPage() {
 
         {activeTab === 'schema' && (
           <section className="rounded-lg border border-rail bg-card p-4">
-            <h3 className="text-[13px] font-medium">{t('eventDetail.schemaInfo')}</h3>
+            <h2 className="text-[13px] font-medium">{t('eventDetail.schemaInfo')}</h2>
             {matchingSchema ? (
               <div className="mt-3 space-y-3">
                 <div className="flex items-center gap-2 font-mono text-[13px]">
@@ -342,7 +342,7 @@ export default function EventDetailPage() {
         {activeTab === 'debug' && (
           <section className="rounded-lg border border-rail bg-card">
             <div className="flex items-center justify-between border-b border-rail px-4 py-2.5">
-              <h3 className="text-[13px] font-medium">{t('eventDetail.tabs.debug')}</h3>
+              <h2 className="text-[13px] font-medium">{t('eventDetail.tabs.debug')}</h2>
               <Button size="sm" onClick={handleShareDebug} disabled={sharingDebug}>
                 {sharingDebug ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
                 {t('eventDetail.createLink')}

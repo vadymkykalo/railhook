@@ -280,7 +280,7 @@ function DangerZone({
     <section className="rounded-xl border border-halt/30 bg-halt-soft/50 p-5">
       <div className="flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-halt" aria-hidden />
-        <h3 className="text-[15px] font-medium text-halt">{t('orgSettings.dangerZone')}</h3>
+        <h2 className="text-[15px] font-medium text-halt">{t('orgSettings.dangerZone')}</h2>
       </div>
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 max-w-lg">

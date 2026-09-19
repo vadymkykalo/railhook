@@ -233,6 +233,7 @@ export default function DeliveriesPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={t('nav.outgoing')}
+        title={t('nav.allDeliveries')}
         description={<Trans i18nKey="deliveries.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={replayAllMatching || undefined}
         guide={{ id: 'deliveries', docsLink: 'outgoing/retries' }}
@@ -373,10 +374,23 @@ export default function DeliveriesPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <CopyId
-                          value={delivery.eventId}
-                          to={`/admin/projects/${projectId}/events/${delivery.eventId}`}
-                        />
+                        {/* The type says what was delivered; the id only says which one, and the
+                            event's own page shows it. */}
+                        {delivery.eventType ? (
+                          <Link
+                            to={`/admin/projects/${projectId}/events/${delivery.eventId}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="block max-w-[220px] truncate rounded font-mono text-[13px] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            title={delivery.eventType}
+                          >
+                            {delivery.eventType}
+                          </Link>
+                        ) : (
+                          <CopyId
+                            value={delivery.eventId}
+                            to={`/admin/projects/${projectId}/events/${delivery.eventId}`}
+                          />
+                        )}
                       </TableCell>
                       <TableCell>
                         <Link

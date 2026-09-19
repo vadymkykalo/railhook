@@ -172,7 +172,7 @@ export default function MembersPage() {
 
       {/* What each role grants, on the page that grants it. */}
       <section aria-labelledby="roles-heading" className="mb-6">
-        <h3 id="roles-heading" className="mono-label mb-2.5">{t('members.rolesHeading')}</h3>
+        <h2 id="roles-heading" className="mono-label mb-2.5">{t('members.rolesHeading')}</h2>
         <div className="grid gap-3 sm:grid-cols-3">
           {ROLES.map((role) => (
             <RoleCard key={role} role={role} count={members.filter((m) => m.role === role).length} />

@@ -164,7 +164,7 @@ export default function PiiRulesPage() {
         <section className="mb-4 rounded-xl border border-rail bg-card shadow-card">
           <header className="border-b border-rail px-4 py-2.5">
             <div className="mono-label">{t('piiRules.newRuleEyebrow')}</div>
-            <h3 className="text-[13px] font-medium">{t('piiRules.newRule')}</h3>
+            <h2 className="text-[13px] font-medium">{t('piiRules.newRule')}</h2>
           </header>
           <div className="space-y-4 p-4">
             <div className="grid gap-4 sm:grid-cols-3">

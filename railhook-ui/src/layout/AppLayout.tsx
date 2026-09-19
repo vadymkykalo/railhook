@@ -186,7 +186,8 @@ export default function AppLayout() {
             </Button>
 
             {section && (
-              <h1 className="truncate text-[15px] font-medium">{t(section.nameKey)}</h1>
+              // Plain text: the page's own header carries the h1, in the words of its tab.
+              <p className="truncate text-[15px] font-medium">{t(section.nameKey)}</p>
             )}
 
             <div className="flex-1" />

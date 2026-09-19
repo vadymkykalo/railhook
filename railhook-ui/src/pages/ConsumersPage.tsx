@@ -210,7 +210,7 @@ export default function ConsumersPage() {
             docsLink="outgoing/customer-portal"
           />
           <section aria-labelledby="consumers-integrate" className="mt-6">
-            <h3 id="consumers-integrate" className="mb-3 text-sm font-semibold">{t('consumers.integrate.heading')}</h3>
+            <h2 id="consumers-integrate" className="mb-3 text-sm font-semibold">{t('consumers.integrate.heading')}</h2>
             {integration}
           </section>
         </>

@@ -181,7 +181,9 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content.length()").value(4));
         mockMvc.perform(get("/api/v1/deliveries/projects/" + project).header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isNotEmpty());
+                .andExpect(jsonPath("$.content").isNotEmpty())
+                // The list names what was delivered, not only the id of the event it came from.
+                .andExpect(jsonPath("$.content[0].eventType").isString());
         mockMvc.perform(get("/api/v1/projects/" + project + "/dlq").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isNotEmpty());

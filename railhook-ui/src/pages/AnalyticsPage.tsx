@@ -263,7 +263,7 @@ export default function AnalyticsPage() {
           <Card className="overflow-hidden lg:col-span-2">
             <div className="px-5 pb-3 pt-5">
               <div className="mono-label mb-1">{period}</div>
-              <h3 className="text-sm font-medium leading-tight">{t('analytics.endpointPerformance')}</h3>
+              <h2 className="text-sm font-medium leading-tight">{t('analytics.endpointPerformance')}</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">{t('analytics.endpointPerformanceDesc')}</p>
             </div>
             {endpointPerformance.length === 0 ? (

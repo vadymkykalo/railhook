@@ -403,7 +403,7 @@ export default function IncomingSourceDetailPage() {
       </div>
 
       <div className="mb-3">
-        <h3 className="text-[15px] font-medium">{t('incomingDestinations.title')}</h3>
+        <h2 className="text-[15px] font-medium">{t('incomingDestinations.title')}</h2>
         <p className="text-sm text-muted-foreground">{t('incomingDestinations.subtitle')}</p>
       </div>
 
