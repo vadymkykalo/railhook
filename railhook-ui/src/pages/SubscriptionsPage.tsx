@@ -199,6 +199,7 @@ export default function SubscriptionsPage() {
         title={t('subscriptions.title')}
         description={t('subscriptions.descriptionV2', 'Each row is one endpoint asking for one type of event. An event with no matching subscription is delivered nowhere.')}
         actions={!failed && subscriptions.length > 0 ? newSubscriptionButton : undefined}
+        guide={{ id: 'subscriptions', docsLink: 'outgoing/endpoints-subscriptions' }}
       />
 
       {failed ? (

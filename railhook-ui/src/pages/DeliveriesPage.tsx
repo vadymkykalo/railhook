@@ -235,6 +235,7 @@ export default function DeliveriesPage() {
         eyebrow={t('nav.outgoing')}
         description={<Trans i18nKey="deliveries.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={replayAllMatching || undefined}
+        guide={{ id: 'deliveries', docsLink: 'outgoing/retries' }}
       />
 
       {eventIdFilter && (

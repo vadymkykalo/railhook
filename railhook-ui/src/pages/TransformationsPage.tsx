@@ -202,6 +202,7 @@ export default function TransformationsPage() {
         title={t('transformations.title')}
         description={t('transformations.subtitle')}
         actions={transformations.length > 0 ? createButton(t('transformations.create')) : undefined}
+        guide={{ id: 'transformations', docsLink: 'outgoing/transformations' }}
       />
 
       {transformations.length > 0 && (

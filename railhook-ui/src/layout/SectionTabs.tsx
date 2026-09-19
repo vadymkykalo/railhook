@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../lib/utils';
 import { hasMinRole, type Role } from '../auth/ProtectedRoute';
-import { sectionFor, segmentOf } from './nav.config';
+import { hintKeyOf, sectionFor, segmentOf } from './nav.config';
 
 /**
  * The second level of navigation, rendered once by the layout rather than by
@@ -17,7 +17,7 @@ import { sectionFor, segmentOf } from './nav.config';
  * navigation markup, matching its sibling.
  */
 export default function SectionTabs({ projectId, role }: { projectId?: string; role: Role }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const section = sectionFor(location.pathname);
   const segment = segmentOf(location.pathname);
@@ -36,10 +36,12 @@ export default function SectionTabs({ projectId, role }: { projectId?: string; r
         {tabs.map((tab) => {
           const active = tab.owns.includes(segment);
           const Icon = tab.icon;
+          const hint = hintKeyOf(tab);
           return (
             <Link
               key={tab.nameKey + tab.owns[0]}
               to={tab.path(projectId)}
+              title={i18n.exists(hint) ? t(hint) : undefined}
               aria-current={active ? 'page' : undefined}
               className={cn(
                 'flex items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-[13px] transition-colors max-sm:min-h-11',

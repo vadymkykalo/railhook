@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '../lib/utils';
+import PageGuide, { type PageGuideProps } from './PageGuide';
 
 /**
  * One page header for every admin page, so the title, the count and the primary
@@ -16,15 +17,16 @@ import { cn } from '../lib/utils';
  * description have the space.
  */
 export default function PageHeader({
-  eyebrow, title, description, actions, className,
+  eyebrow, title, description, actions, guide, className,
 }: {
   eyebrow?: ReactNode;
   title?: string;
   description?: ReactNode;
   actions?: ReactNode;
+  guide?: PageGuideProps;
   className?: string;
 }) {
-  return (
+  const header = (
     <div className={cn('flex flex-wrap items-start justify-between gap-4 pb-5', className)}>
       <div className="min-w-0">
         {eyebrow && <div className={cn('mono-label', title ? 'mb-1.5' : 'mb-1')}>{eyebrow}</div>}
@@ -35,5 +37,13 @@ export default function PageHeader({
       </div>
       {actions && <div className="flex flex-shrink-0 flex-wrap items-center gap-2 max-sm:w-full">{actions}</div>}
     </div>
+  );
+
+  if (!guide) return header;
+  return (
+    <>
+      {header}
+      <PageGuide {...guide} />
+    </>
   );
 }
