@@ -460,8 +460,91 @@ function DeliverySemantics() {
   );
 }
 
+/**
+ * The one duplicate no sender can prevent: the receiver commits, and its answer never arrives.
+ *
+ * Two lanes and time running right, like a sequence diagram turned on its side. The worker's
+ * lane says only what the worker can know, which is nothing between the request and the timeout.
+ */
+function LostAck() {
+  const { t } = useTranslation();
+  const f = (key: string) => t(`blog.figures.lostAck.${key}`);
+  const arrow = 'url(#lost-ack-arrow)';
+  const top = 70;
+  const bottom = 196;
+
+  return (
+    <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 620 262" className={NARROW}>
+      <defs>
+        <Arrowhead id="lost-ack-arrow" colour={CHROME.muted} />
+      </defs>
+
+      {/* The two parties. */}
+      <text x={16} y={top + 4} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+        {f('worker')}
+      </text>
+      <text x={16} y={bottom + 4} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+        {f('receiver')}
+      </text>
+      <line x1={116} y1={top} x2={604} y2={top} stroke={CHROME.rail} strokeWidth={1.5} />
+      <line x1={116} y1={bottom} x2={604} y2={bottom} stroke={CHROME.rail} strokeWidth={1.5} />
+
+      {/* Attempt 1 goes out. */}
+      <circle cx={130} cy={top} r={5} fill={SERIES.brand} />
+      <line x1={132} y1={top + 6} x2={176} y2={bottom - 8} stroke={CHROME.muted} markerEnd={arrow} />
+      <text x={130} y={top - 14} fill={CHROME.ink} className={LABEL}>
+        {f('send')}
+      </text>
+
+      {/* The receiver does the work and commits it. */}
+      <rect x={180} y={bottom - 8} width={150} height={16} rx={8} fill={SERIES.ok} opacity={0.2} />
+      <circle cx={330} cy={bottom} r={5} fill={SERIES.ok} />
+      <text x={186} y={bottom + 28} fill={CHROME.ink} className={LABEL}>
+        {f('commit')}
+      </text>
+      <text x={186} y={bottom + 43} fill={CHROME.muted} className={MONO}>
+        {f('commitNote')}
+      </text>
+
+      {/* Its 200 dies on the way back. */}
+      <line x1={334} y1={bottom - 8} x2={362} y2={140} stroke={CHROME.muted} strokeDasharray="4 3" />
+      <Cross x={368} y={132} />
+      <text x={354} y={128} textAnchor="end" fill={SERIES.halt} className={cn(MONO, 'font-semibold')}>
+        {f('lost')}
+      </text>
+
+      {/* What the worker sees meanwhile: nothing, then a timeout. */}
+      <line x1={136} y1={top} x2={452} y2={top} stroke={SERIES.retry} strokeWidth={2} strokeDasharray="2 4" />
+      <text x={300} y={top + 18} textAnchor="middle" fill={CHROME.muted} className={MONO}>
+        {f('silence')}
+      </text>
+      <circle cx={456} cy={top} r={5} fill={SERIES.retry} />
+      <text x={456} y={top - 30} textAnchor="middle" fill={SERIES.retry} className={cn(MONO, 'font-semibold')}>
+        {f('timeout')}
+      </text>
+      <text x={456} y={top - 16} textAnchor="middle" fill={CHROME.muted} className={MONO}>
+        {f('question')}
+      </text>
+
+      {/* Attempt 2, same id: the receiver's dedupe is the only thing that can tell. */}
+      <line x1={470} y1={top + 6} x2={514} y2={bottom - 8} stroke={CHROME.muted} markerEnd={arrow} />
+      <text x={506} y={top + 34} fill={CHROME.ink} className={LABEL}>
+        {f('retry')}
+      </text>
+      <text x={506} y={top + 49} fill={CHROME.ink} className={LABEL}>
+        {f('retryId')}
+      </text>
+      <circle cx={520} cy={bottom} r={5} fill={SERIES.ok} />
+      <text x={604} y={bottom + 28} textAnchor="end" fill={SERIES.ok} className={cn(MONO, 'font-semibold')}>
+        {f('dedupe')}
+      </text>
+    </Figure>
+  );
+}
+
 /** Registered into `FIGURES` in `../figures.tsx`. */
 export const OUTBOX_FIGURES: Record<string, () => JSX.Element> = {
+  'lost-ack': LostAck,
   'delivery-semantics': DeliverySemantics,
   'dual-write': DualWrite,
   'outbox-pipeline': OutboxPipeline,

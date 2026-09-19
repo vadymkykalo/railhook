@@ -5234,6 +5234,22 @@
             "guard2": "phone and desktop width"
           }
         }
+      },
+      "lostAck": {
+        "aria": "A timeline with two lanes, the Railhook worker above and your endpoint below. The worker sends attempt 1 carrying webhook-id d-42. Your endpoint does the work and commits it: the order is marked paid. Its 200 response is lost on the way back. All the worker sees is silence until its 30-second timeout, and at that moment it cannot tell whether the request was lost, is still being processed, or was processed and answered. It sends attempt 2 with the same webhook-id, and the endpoint's dedupe recognises it and answers 2xx without doing the work again.",
+        "caption": "The only duplicate Railhook cannot stop. The receiver has committed; the sender has seen nothing. Resending is the only way not to lose the event, and the unchanged webhook-id is the only way the receiver can tell.",
+        "worker": "Railhook",
+        "receiver": "your endpoint",
+        "send": "attempt 1, webhook-id d-42",
+        "commit": "BEGIN · mark order paid · COMMIT",
+        "commitNote": "done, in your database",
+        "lost": "200 lost on the way back",
+        "silence": "silence",
+        "timeout": "30s timeout",
+        "question": "lost? slow? done?",
+        "retry": "attempt 2,",
+        "retryId": "same d-42",
+        "dedupe": "seen d-42: 2xx, no work"
       }
     }
   },
