@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ladders absorb every duplicate but the one a receiver dedupes on `webhook-id`; and what a polling
   publisher leaves open compared with CDC. Four new diagrams, in English and Ukrainian.
 
+- **Article: "AI-written code you can trust: how a production webhook gateway was built with
+  Claude Code"** — how Railhook was built by directing an AI agent, and the harness that makes
+  that code deployable: per-area `CLAUDE.md` files, a domain glossary, ratchet tests, generated
+  references, phone-width browser tests and deploy verification, each with the real incident
+  behind it. Numbers come from this repository's git history, with the method for each. Four
+  figures, and a Ukrainian translation alongside.
+
 ### Fixed
 
 - `npm run blog:og` drew only the first post's social card: the second timed out on the reused
