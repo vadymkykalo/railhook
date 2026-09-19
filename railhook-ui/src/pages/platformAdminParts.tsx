@@ -238,7 +238,7 @@ export function EventsAgainstLimit({ current, limit }: { current: number; limit:
 export function PanelTitle({ title, meta }: { title: string; meta?: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-rail px-4 py-3">
-      <h2 className="text-[15px] font-medium">{title}</h2>
+      <h3 className="text-[15px] font-medium">{title}</h3>
       {meta !== undefined && <span className="mono-label">{meta}</span>}
     </div>
   );

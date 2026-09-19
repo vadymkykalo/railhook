@@ -84,7 +84,7 @@ describe('DeliveriesPage across the minute tick', () => {
       .mockResolvedValueOnce(page([DELIVERY]))
       .mockReturnValue(new Promise(() => {}));
     renderDeliveries();
-    fireEvent.click(await screen.findByText(ENDPOINT.url, { selector: 'td a span' }).then((a) => a.closest('tr')!));
+    fireEvent.click(await screen.findByText(ENDPOINT.url, { selector: 'td a' }).then((a) => a.closest('tr')!));
     await screen.findByRole('dialog');
 
     await act(async () => { vi.advanceTimersByTime(61_000); });

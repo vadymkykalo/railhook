@@ -36,12 +36,12 @@ A dash means the vendor's pages we checked did not settle the point either way. 
 
 ## Railhook
 
-- **Both directions in one place.** Outgoing events to your customers' endpoints and incoming webhooks from providers share one attempt lifecycle, one dashboard and one place for failed deliveries and forwards.
+- **Both directions in one place.** Outgoing events to your customers' endpoints and incoming webhooks from providers share one attempt lifecycle, one dashboard and one set of failed messages.
 - **Nothing held back from self-hosting.** Every feature is in the MIT repository, with no licence key. `BILLING_ENABLED` defaults to `false`.
 - **Railhook Cloud** runs at railhook.io on a free plan. Paid plans with support and higher limits will come later.
 - **Standard Webhooks signatures**, alongside Railhook's own `X-Signature` header, with a grace window when a secret is rotated.
 - **Per-endpoint ordering**, opt-in, with a timeout so one stuck delivery cannot block an endpoint forever.
-- **Replay creates new deliveries** from stored events (Replay by time range in the dashboard) instead of re-sending the original.
+- **Replay creates new deliveries** from stored events (Time Machine in the dashboard) instead of re-sending the original.
 - **A built-in request bin and a localhost tunnel** in the CLI.
 - **A workflow builder** that goes beyond single-step transformations.
 - **An embeddable customer portal**, self-hosted like everything else: your own users register endpoints, choose event types, see their deliveries and retry failed ones. Sessions are short-lived and can be pinned to the origin that embeds them. See [Customer portal](/docs/outgoing/customer-portal/).

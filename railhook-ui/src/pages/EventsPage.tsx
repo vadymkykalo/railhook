@@ -159,7 +159,6 @@ export default function EventsPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={t('nav.outgoing')}
-        title={t('nav.outgoingEvents')}
         description={<Trans i18nKey="events.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={sendAction}
         guide={{ id: 'events', docsLink: 'start/send-first-webhook', children: noEventsYet ? undefined : sendSnippet }}

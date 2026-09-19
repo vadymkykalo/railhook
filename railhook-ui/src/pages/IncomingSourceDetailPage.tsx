@@ -10,15 +10,15 @@ import { formatDateTime, formatRelativeTime } from '../lib/date';
 import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
-import StatusBadge, { EnabledBadge } from '../components/StatusBadge';
+import StatusBadge from '../components/StatusBadge';
 import AttemptRail from '../components/AttemptRail';
 import RetryJitterNote from '../components/RetryJitterNote';
 import { ladderTicks } from './ConnectionSetupPage';
-import { PROVIDER_NAMES, PROVIDER_SIGNATURE_HEADERS } from '../lib/publicSnippets';
+import { PROVIDER_SIGNATURE_HEADERS } from '../lib/publicSnippets';
 import { ingressCurlSnippet } from '../lib/integrationSnippets';
 import IntegrationSnippet from '../components/IntegrationSnippet';
 import type {
-  IncomingDestinationResponse, IncomingDestinationRequest, IncomingAuthType, IncomingSourceResponse,
+  IncomingDestinationResponse, IncomingDestinationRequest, IncomingAuthType, IncomingSourceResponse, ProviderType,
 } from '../types/api.types';
 import { transformApi } from '../api/transform.api';
 import {
@@ -54,6 +54,10 @@ import ConfirmDialog from '../components/ConfirmDialog';
  */
 
 const AUTH_TYPES: IncomingAuthType[] = ['NONE', 'BEARER', 'BASIC', 'CUSTOM_HEADER'];
+
+const PROVIDER_NAMES: Record<ProviderType, string> = {
+  GENERIC: 'Generic', GITHUB: 'GitHub', GITLAB: 'GitLab', STRIPE: 'Stripe', SHOPIFY: 'Shopify', SLACK: 'Slack', TWILIO: 'Twilio',
+};
 
 /**
  * The header a request to this source has to be signed in. A provider-verified source is checked
@@ -356,7 +360,10 @@ export default function IncomingSourceDetailPage() {
               <div className="flex items-center justify-between gap-4">
                 <dt className="text-muted-foreground">{t('endpoints.status')}</dt>
                 <dd>
-                  <EnabledBadge enabled={source.status === 'ACTIVE'} />
+                  <StatusBadge
+                    kind={source.status === 'ACTIVE' ? 'ok' : 'idle'}
+                    label={source.status === 'ACTIVE' ? t('incomingSources.active') : t('incomingSources.disabled')}
+                  />
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-4">
@@ -396,7 +403,7 @@ export default function IncomingSourceDetailPage() {
       </div>
 
       <div className="mb-3">
-        <h2 className="text-[15px] font-medium">{t('incomingDestinations.title')}</h2>
+        <h3 className="text-[15px] font-medium">{t('incomingDestinations.title')}</h3>
         <p className="text-sm text-muted-foreground">{t('incomingDestinations.subtitle')}</p>
       </div>
 
@@ -433,7 +440,7 @@ export default function IncomingSourceDetailPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-[11px]">{t(`incomingDestinations.authTypes.${dest.authType}`)}</Badge>
+                      <Badge variant="outline" className="font-mono text-[10px]">{dest.authType}</Badge>
                     </TableCell>
                     <TableCell className="w-[220px]">
                       <AttemptRail
@@ -448,7 +455,10 @@ export default function IncomingSourceDetailPage() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <EnabledBadge enabled={dest.enabled} />
+                      <StatusBadge
+                        kind={dest.enabled ? 'ok' : 'idle'}
+                        label={dest.enabled ? t('incomingDestinations.enabled') : t('incomingDestinations.disabled')}
+                      />
                     </TableCell>
                     <TableCell>
                       <span className="font-mono text-[11px] text-muted-foreground">
@@ -524,7 +534,7 @@ export default function IncomingSourceDetailPage() {
                   id="dest-auth" value={destAuthType}
                   onChange={(e) => setDestAuthType(e.target.value as IncomingAuthType)} disabled={destSaving}
                 >
-                  {AUTH_TYPES.map((a) => <option key={a} value={a}>{t(`incomingDestinations.authTypes.${a}`)}</option>)}
+                  {AUTH_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
                 </Select>
               </div>
               {destAuthType !== 'NONE' && (

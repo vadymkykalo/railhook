@@ -87,7 +87,7 @@ describe('GettingStarted', () => {
     render();
     const step = await screen.findByRole('button', { name: /Give your users a portal/ });
     expect(step).toHaveTextContent('Optional');
-    expect(screen.getByText('0/4')).toBeInTheDocument();
+    expect(screen.getByText('0 of 4')).toBeInTheDocument();
   });
 
   it('ticks the portal step once the project has a consumer', async () => {

@@ -13,7 +13,7 @@ Shopify expects your app to respond within five seconds. It retries a failed web
 Four hours is a short window for a bad deploy, and five seconds is a tight budget for an order handler. With Railhook in front:
 
 - Shopify is answered as soon as the webhook is stored, well inside the five seconds.
-- Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed forwards**.
+- Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed Forwards**.
 - A second delivery with the same `X-Shopify-Webhook-Id` is answered with the stored copy and not forwarded again.
 - Any stored webhook can be replayed for as long as events are kept, long after Shopify's four hours.
 
@@ -68,7 +68,7 @@ export PROJECT_ID=...
    shopify app webhook trigger --api-version=2026-07 --topic=orders/create --address="$INGRESS_URL"
    ```
 
-   It appears under **Incoming → Incoming events**, with one forward per destination.
+   It appears under **Incoming → Received**, with one forward per destination.
 
 </Steps>
 

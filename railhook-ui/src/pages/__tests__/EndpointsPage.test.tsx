@@ -23,14 +23,9 @@ vi.mock('../../api/endpoints.api', () => ({
   },
 }));
 
-vi.mock('../../api/consumers.api', () => ({
-  consumersApi: { listPaged: vi.fn() },
-}));
-
 import EndpointsPage from '../EndpointsPage';
 import { projectsApi } from '../../api/projects.api';
 import { endpointsApi } from '../../api/endpoints.api';
-import { consumersApi } from '../../api/consumers.api';
 
 const PROJECT: ProjectResponse = {
   id: TEST_PROJECT_ID,
@@ -185,34 +180,5 @@ describe('EndpointsPage', () => {
 
     await waitFor(() => expect(endpointsApi.listPaged).toHaveBeenCalledTimes(2));
     expect(screen.getByText('https://example.com/webhook')).toBeInTheDocument();
-  });
-
-  it('names the consumer an endpoint was registered for', async () => {
-    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
-    vi.mocked(endpointsApi.listPaged).mockResolvedValue(populatedPage([
-      { ...ENDPOINT, consumerId: 'consumer-1' },
-      { ...ENDPOINT, id: 'endpoint-2', url: 'https://own.example.com/hook' },
-    ]));
-    vi.mocked(consumersApi.listPaged).mockResolvedValue({
-      content: [{
-        id: 'consumer-1', projectId: TEST_PROJECT_ID, externalId: 'northwind', name: 'Northwind Logistics',
-        endpointCount: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      }],
-      totalElements: 1, totalPages: 1, size: 100, number: 0,
-    } as any);
-    renderEndpoints();
-
-    expect(await screen.findByRole('columnheader', { name: /consumer/i })).toBeInTheDocument();
-    expect(await screen.findByText('Northwind Logistics')).toBeInTheDocument();
-  });
-
-  it('asks for no consumers when none of the endpoints belongs to one', async () => {
-    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
-    vi.mocked(endpointsApi.listPaged).mockResolvedValue(populatedPage([ENDPOINT]));
-    renderEndpoints();
-
-    await screen.findByText('https://example.com/webhook');
-    expect(consumersApi.listPaged).not.toHaveBeenCalled();
-    expect(screen.queryByRole('columnheader', { name: /consumer/i })).not.toBeInTheDocument();
   });
 });

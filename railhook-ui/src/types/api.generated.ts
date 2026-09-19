@@ -6249,7 +6249,6 @@ export interface components {
             id?: string;
             /** Format: uuid */
             eventId?: string;
-            eventType?: string;
             /** Format: uuid */
             endpointId?: string;
             /** Format: uuid */

@@ -110,7 +110,7 @@ export default function UsagePage() {
         {/* Quota against limit — the question this tab exists to answer. */}
         <section>
           <div className="mb-3">
-            <h2 className="text-sm font-medium leading-tight">{t('usage.quota.title')}</h2>
+            <h3 className="text-sm font-medium leading-tight">{t('usage.quota.title')}</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {quota
                 ? t('usage.quota.desc', { from: formatDate(quota.periodStart), to: formatDate(quota.periodEnd) })
@@ -146,7 +146,7 @@ export default function UsagePage() {
           </ChartCard>
 
           <Card className="p-5">
-            <h2 className="text-sm font-medium leading-tight">{t('usage.mix.title')}</h2>
+            <h3 className="text-sm font-medium leading-tight">{t('usage.mix.title')}</h3>
             <p className="mb-4 mt-0.5 text-xs text-muted-foreground">{t('usage.mix.desc')}</p>
             <ShareBar segments={mix} total={mixTotal} />
             <p className="mt-5 border-t border-rail pt-4 font-mono text-xs text-muted-foreground">
@@ -165,7 +165,7 @@ export default function UsagePage() {
         {/* The chart's table twin: every plotted value readable without hovering. */}
         <Card className="overflow-hidden">
           <div className="px-5 pb-3 pt-5">
-            <h2 className="text-sm font-medium leading-tight">{t('usage.history.title')}</h2>
+            <h3 className="text-sm font-medium leading-tight">{t('usage.history.title')}</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">{t('usage.history.desc')}</p>
           </div>
           {history.length === 0 ? (

@@ -47,7 +47,7 @@ export default function ChartCard({
       <div className="flex flex-wrap items-start justify-between gap-3 px-5 pb-3 pt-5">
         <div className="min-w-0">
           {eyebrow && <div className="mono-label mb-1">{eyebrow}</div>}
-          <h2 className="text-sm font-medium leading-tight">{title}</h2>
+          <h3 className="text-sm font-medium leading-tight">{title}</h3>
           {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
         </div>
         {action && <div className="flex flex-shrink-0 items-center gap-2">{action}</div>}

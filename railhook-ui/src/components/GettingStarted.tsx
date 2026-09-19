@@ -171,7 +171,7 @@ export default function GettingStarted({ projectId }: { projectId: string | unde
       <Card className="mb-4 p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold">{t('onboarding.title')}</h2>
+            <h3 className="text-sm font-semibold">{t('onboarding.title')}</h3>
             {track && !progress.allDone && (
               <p className="mt-0.5 text-[13px] text-muted-foreground">{t('onboarding.subtitle')}</p>
             )}

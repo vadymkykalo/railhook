@@ -54,7 +54,7 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
   return (
     <div className="flex h-full w-80 flex-col overflow-y-auto border-l border-rail bg-card">
       <div className="flex items-center justify-between border-b border-rail px-4 py-3">
-        <h2 className="mono-label">{t('workflows.builder.configureNode')}</h2>
+        <h3 className="mono-label">{t('workflows.builder.configureNode')}</h3>
         <Button variant="ghost" size="icon-sm" onClick={onClose} title={t('common.close')} aria-label={t('common.close')}>
           <X className="h-4 w-4" />
         </Button>

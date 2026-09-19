@@ -14,7 +14,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
 
 2. Railhook перевіряє його так, як налаштовано джерело. Вебхук, що не пройшов перевірку, Railhook відхиляє й не зберігає.
 
-3. Railhook зберігає вебхук таким, яким той надійшов, — це **вхідна подія**. У панелі такі події зібрано в розділі **«Вхідні події»**.
+3. Railhook зберігає вебхук таким, яким той надійшов, — це **вхідна подія**. У панелі такі події зібрано в розділі **«Отримані»**.
 
 4. Railhook створює по одному **пересиланню** на кожне призначення джерела і доставляє кожне, доки воно не вдасться або Railhook його не полишить. Див. [Призначення](/docs/uk/incoming/destinations/).
 
@@ -157,5 +157,5 @@ Ingress відповідає провайдерові, а не людині. К�
 <CardGrid>
   <LinkCard title="Призначення" href="/docs/uk/incoming/destinations/" description="Куди і як Railhook пересилає отримані вебхуки." />
   <LinkCard title="Перевірка вхідних вебхуків" href="/docs/uk/incoming/verification/" description="Як Railhook перевіряє підпис кожного провайдера." />
-  <LinkCard title="Відтворення" href="/docs/uk/outgoing/replay/#відтворення-вхідних-вебхуків" description="Перешліть збережені вхідні події ще раз." />
+  <LinkCard title="Відтворення і «Машина часу»" href="/docs/uk/outgoing/replay/#відтворення-вхідних-вебхуків" description="Перешліть збережені вхідні події ще раз." />
 </CardGrid>

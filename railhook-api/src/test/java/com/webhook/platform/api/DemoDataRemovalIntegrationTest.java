@@ -36,8 +36,7 @@ class DemoDataRemovalIntegrationTest extends AbstractIntegrationTest {
 
     private static final List<String> DEMO_TABLES = List.of(
             "incoming_forward_attempts", "incoming_events", "incoming_destinations", "incoming_sources",
-            "delivery_attempts", "deliveries", "events", "subscriptions", "endpoints", "consumers", "projects",
-            "memberships");
+            "delivery_attempts", "deliveries", "events", "subscriptions", "endpoints", "projects", "memberships");
 
     @Autowired
     private MockMvc mockMvc;
@@ -87,7 +86,6 @@ class DemoDataRemovalIntegrationTest extends AbstractIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM organizations WHERE id = ?", DemoTenant.ORGANIZATION_ID)).isZero();
         assertThat(count("SELECT COUNT(*) FROM users WHERE id = ?", DemoTenant.USER_ID)).isZero();
         assertThat(count("SELECT COUNT(*) FROM projects WHERE id = ?", DemoTenant.PROJECT_ID)).isZero();
-        assertThat(count("SELECT COUNT(*) FROM consumers WHERE project_id = ?", DemoTenant.PROJECT_ID)).isZero();
 
         assertThat(rowsOf(neighbourOrganization)).isEqualTo(neighbourRowsBefore);
         assertThat(count("SELECT COUNT(*) FROM organizations WHERE id = ?", neighbourOrganization)).isOne();

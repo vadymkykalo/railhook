@@ -181,9 +181,7 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content.length()").value(4));
         mockMvc.perform(get("/api/v1/deliveries/projects/" + project).header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isNotEmpty())
-                // The list names what was delivered, not only the id of the event it came from.
-                .andExpect(jsonPath("$.content[0].eventType").isString());
+                .andExpect(jsonPath("$.content").isNotEmpty());
         mockMvc.perform(get("/api/v1/projects/" + project + "/dlq").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isNotEmpty());
@@ -352,45 +350,12 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
         assertThat(count("subscriptions")).isEqualTo(11);
         assertThat(count("incoming_sources")).isEqualTo(2);
         assertThat(count("incoming_destinations")).isEqualTo(3);
-        assertThat(count("consumers")).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT secret_encrypted FROM endpoints WHERE organization_id = ? "
                 + "ORDER BY id LIMIT 1", String.class, DemoTenant.ORGANIZATION_ID)).isEqualTo(secretBefore);
         // Replaced, not appended: the same order of magnitude, not twice or three times as much.
         assertThat(count("events")).isBetween((int) (eventsBefore * 0.8), (int) (eventsBefore * 1.2));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM deliveries WHERE organization_id = ? AND status = 'DLQ'",
                 Integer.class, DemoTenant.ORGANIZATION_ID)).isPositive();
-    }
-
-    @Test
-    void theDemoHasOneConsumerWhoseEndpointIsGroupedUnderIt() throws Exception {
-        String token = openSession();
-        String project = DemoTenant.PROJECT_ID.toString();
-
-        MvcResult consumers = mockMvc.perform(get("/api/v1/projects/" + project + "/consumers")
-                        .header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(1))
-                .andExpect(jsonPath("$.content[0].endpointCount").value(1))
-                .andReturn();
-        String consumerId = objectMapper.readTree(consumers.getResponse().getContentAsString())
-                .get("content").get(0).get("id").asText();
-
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM endpoints WHERE organization_id = ? AND consumer_id = ?",
-                Integer.class, DemoTenant.ORGANIZATION_ID, UUID.fromString(consumerId))).isOne();
-    }
-
-    @Test
-    void anEndpointSeededBeforeTheConsumerExistedIsGroupedUnderItOnTheNextSeed() {
-        // An installation seeded by an earlier release has the endpoints already, and inserting
-        // them again changes nothing, so the grouping cannot ride on the insert.
-        jdbc.update("UPDATE endpoints SET consumer_id = NULL WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
-        jdbc.update("DELETE FROM consumers WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
-
-        seeder.seed();
-
-        assertThat(count("consumers")).isOne();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM endpoints WHERE organization_id = ? "
-                + "AND consumer_id IS NOT NULL", Integer.class, DemoTenant.ORGANIZATION_ID)).isOne();
     }
 
     @Test

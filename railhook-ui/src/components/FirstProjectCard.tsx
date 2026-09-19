@@ -28,7 +28,7 @@ export default function FirstProjectCard() {
   return (
     <>
       <Card className="p-5 sm:p-6">
-        <h2 className="text-sm font-semibold">{t('onboarding.title')}</h2>
+        <h3 className="text-sm font-semibold">{t('onboarding.title')}</h3>
         <p className="mt-0.5 text-[13px] text-muted-foreground">{t('setup.firstRunSubtitle')}</p>
 
         <ol className="mt-4">

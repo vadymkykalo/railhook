@@ -147,7 +147,6 @@ export const queryKeys = {
         all: (projectId: string) => ['consumers', projectId] as const,
         paged: (projectId: string, page: number, size: number) => ['consumers', projectId, 'paged', page, size] as const,
         endpoints: (projectId: string, consumerId: string) => ['consumers', projectId, consumerId, 'endpoints'] as const,
-        names: (projectId: string) => ['consumers', projectId, 'names'] as const,
     },
     // The portal holds one session per page, so its keys carry no project or consumer: whose
     // data it is is decided by the token, and a page never sees a second one.
@@ -1148,21 +1147,6 @@ export function useConsumersPaged(projectId: string | undefined, page: number, s
         queryFn: () => consumersApi.listPaged(projectId!, page, size),
         enabled: !!projectId,
         placeholderData: keepPreviousData,
-    });
-}
-
-/**
- * Consumer names by id, for a list of endpoints to say whose each one is. Asked for only when
- * `needed`: a project whose endpoints belong to nobody has nothing to look up.
- */
-export function useConsumerNames(projectId: string | undefined, needed: boolean) {
-    return useQuery({
-        queryKey: queryKeys.consumers.names(projectId!),
-        queryFn: async () => {
-            const page = await consumersApi.listPaged(projectId!, 0, 100);
-            return new Map(page.content.map((consumer) => [consumer.id, consumer.name]));
-        },
-        enabled: !!projectId && needed,
     });
 }
 

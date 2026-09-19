@@ -52,7 +52,7 @@ export function FormSection({
     <section className="border-t border-rail pt-8 first:border-t-0 first:pt-0">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:gap-10">
         <div>
-          <h2 className="text-[15px] font-medium">{title}</h2>
+          <h3 className="text-[15px] font-medium">{title}</h3>
           {description && <p className="mt-1 text-sm leading-snug text-muted-foreground">{description}</p>}
         </div>
         <div className="min-w-0 space-y-4">
@@ -461,7 +461,7 @@ function EraseAccount() {
     <section className="rounded-xl border border-halt/30 bg-halt-soft/50 p-5">
       <div className="flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-halt" aria-hidden />
-        <h2 className="text-[15px] font-medium text-halt">{t('settings.erase.title')}</h2>
+        <h3 className="text-[15px] font-medium text-halt">{t('settings.erase.title')}</h3>
       </div>
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 max-w-lg">

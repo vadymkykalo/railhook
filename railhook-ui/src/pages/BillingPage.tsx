@@ -269,7 +269,7 @@ export default function BillingPage() {
                   <div className="min-w-0">
                     <p className="mono-label">{t('billing.currentPlan')}</p>
                     <div className="mt-1 flex flex-wrap items-baseline gap-3">
-                      <h2 className="text-title">{plan?.displayName}</h2>
+                      <h3 className="text-title">{plan?.displayName}</h3>
                       {isSelfHosted ? (
                         <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
                           <ShieldCheck className="h-4 w-4 text-primary" aria-hidden />

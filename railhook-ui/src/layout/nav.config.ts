@@ -91,8 +91,8 @@ export const PROJECT_SECTIONS: NavSection[] = [
     icon: Radio,
     owns: ['events', 'incoming-events'],
     tabs: [
-      tab('nav.outgoingEvents', 'events', Radio),
-      tab('nav.incomingEvents', 'incoming-events', ArrowDownToLine),
+      tab('nav.outgoing', 'events', Radio),
+      tab('nav.incoming', 'incoming-events', ArrowDownToLine),
     ],
   },
   {
@@ -143,13 +143,6 @@ export const PROJECT_SECTIONS: NavSection[] = [
 ];
 
 /**
- * API keys belong to a project, but they are a setting, not something you do to events — so they
- * sit in the Settings strip, built from the current project like any project tab. They used to be
- * reachable only from the command palette: Settings owned the route, and no tab led there.
- */
-export const API_KEYS_TAB: NavEntry = tab('nav.apiKeys', 'api-keys', Key);
-
-/**
  * Settings, reached from the sidebar footer rather than the rail.
  *
  * Only some of it is org-level. `/admin/settings` is the person's own profile —
@@ -166,7 +159,6 @@ export const SETTINGS_SECTION: NavSection = {
     orgTab('nav.profile', '/admin/settings', Settings),
     orgTab('nav.orgSettings', '/admin/org-settings', Building2, 'OWNER'),
     orgTab('nav.members', '/admin/members', Users, 'OWNER'),
-    API_KEYS_TAB,
     orgTab('nav.auditLog', '/admin/audit-log', FileText),
     orgTab('nav.billing', '/admin/billing', CreditCard, 'OWNER'),
   ],
@@ -196,6 +188,9 @@ export const PLATFORM_SECTION: NavSection = {
     { nameKey: 'nav.platformUsers', path: () => '/admin/platform/users', icon: Users, owns: ['platform-users'] },
   ],
 };
+
+/** API keys live per project, so they hang off the project rail's settings tab. */
+export const PROJECT_SETTINGS_TABS: NavEntry[] = [tab('nav.apiKeys', 'api-keys', Key)];
 
 /**
  * The one-line "what is this" for an entry, shown when the pointer rests on it: `nav.consumers`
@@ -242,6 +237,7 @@ const ROLE_BY_SEGMENT: ReadonlyMap<string, Role> = new Map(
     ...PROJECT_SECTIONS.flatMap((section) => [section as NavEntry, ...section.tabs]),
     SETTINGS_SECTION as NavEntry,
     ...SETTINGS_SECTION.tabs,
+    ...PROJECT_SETTINGS_TABS,
   ]
     .filter((entry) => entry.requiredRole)
     .flatMap((entry) => entry.owns.map((segment) => [segment, entry.requiredRole!] as const))

@@ -61,7 +61,7 @@ export PROJECT_ID=...
      -d '{"url":"https://api.example.com/webhooks/stripe","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
    ```
 
-5. **Send a test event** from Stripe, or run `stripe trigger payment_intent.succeeded`. It appears under **Incoming → Incoming events**, with one forward per destination.
+5. **Send a test event** from Stripe, or run `stripe trigger payment_intent.succeeded`. It appears under **Incoming → Received**, with one forward per destination.
 
 </Steps>
 
@@ -73,7 +73,7 @@ Railhook reads `Stripe-Signature`, computes the hex HMAC-SHA256 of `<t>.<raw bod
 
 The body exactly as Stripe sent it, byte for byte, with its `Content-Type`. `Stripe-Signature` is not forwarded: your service authenticates Railhook through the destination's credentials instead, so it does not need the Stripe secret at all. Each request carries `Idempotency-Key`, stable across attempts, and `X-Forward-Attempt`. See [Destinations](/docs/incoming/destinations/#what-the-destination-receives).
 
-A forward is retried on `408`, `429`, any `5xx`, a timeout or a connection error, up to 5 attempts. Any other `4xx` moves it to **Failed forwards** at once, where you can retry it after fixing your service.
+A forward is retried on `408`, `429`, any `5xx`, a timeout or a connection error, up to 5 attempts. Any other `4xx` moves it to **Failed Forwards** at once, where you can retry it after fixing your service.
 
 ## Develop locally with the CLI
 
@@ -89,7 +89,7 @@ Point a destination at your machine through a tunnel, and Stripe's test events r
 
 2. Add a second destination to the source with the printed public URL and your route appended, such as `https://<host>/tunnel/<slug>/webhooks/stripe`. A path after the tunnel URL is kept, so this reaches `http://localhost:3000/webhooks/stripe`.
 
-3. Trigger an event in your Stripe sandbox. When you stop the tunnel, disable or delete that destination so its forwards do not pile up in Failed forwards.
+3. Trigger an event in your Stripe sandbox. When you stop the tunnel, disable or delete that destination so its forwards do not pile up in Failed Forwards.
 
 </Steps>
 

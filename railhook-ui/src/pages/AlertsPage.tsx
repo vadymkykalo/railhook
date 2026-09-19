@@ -249,7 +249,7 @@ export default function AlertsPage() {
         {/* What fired — the surface that needs a human. */}
         <section>
           <div className="mb-3">
-            <h2 className="text-sm font-medium leading-tight">{t('alerts.history.title')}</h2>
+            <h3 className="text-sm font-medium leading-tight">{t('alerts.history.title')}</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">{t('alerts.history.desc')}</p>
           </div>
 
@@ -397,7 +397,7 @@ export default function AlertsPage() {
         {/* What is watching. */}
         <section>
           <div className="mb-3">
-            <h2 className="text-sm font-medium leading-tight">{t('alerts.rules.title')}</h2>
+            <h3 className="text-sm font-medium leading-tight">{t('alerts.rules.title')}</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">{t('alerts.rules.desc')}</p>
           </div>
 
@@ -428,7 +428,7 @@ export default function AlertsPage() {
                   <Card key={rule.id} className="p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="truncate text-sm font-medium">{rule.name}</h3>
+                        <h4 className="truncate text-sm font-medium">{rule.name}</h4>
                         {rule.description && (
                           <p className="mt-0.5 text-xs text-muted-foreground">{rule.description}</p>
                         )}

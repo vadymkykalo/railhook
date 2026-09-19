@@ -69,7 +69,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
 | `payloadTemplate` | Вбудований шаблон; діє, коли `transformationId` не задано. |
 | `customHeaders` | Додаткові HTTP-заголовки як JSON-об'єкт у рядку. |
 
-Якщо не вказати `maxAttempts` і `retryDelays`, діятиме типовий розклад повторних спроб для вихідних вебхуків, див. [Повторні спроби та невдалі доставки](/docs/uk/outgoing/retries/).
+Якщо не вказати `maxAttempts` і `retryDelays`, діятиме типовий розклад повторних спроб для вихідних вебхуків, див. [Повторні спроби та недоставлені повідомлення](/docs/uk/outgoing/retries/).
 
 ### Шаблони типів подій
 
@@ -200,6 +200,6 @@ webhook-signature: v1,<base64>
 
 <CardGrid>
   <LinkCard title="Перевірка підписів" href="/docs/uk/outgoing/signatures/" description="Переконайтеся, що доставка справді надійшла від Railhook." />
-  <LinkCard title="Повторні спроби та невдалі доставки" href="/docs/uk/outgoing/retries/" description="Що відбувається, коли ендпоінт не відповідає 2xx." />
-  <LinkCard title="Правила маршрутизації" href="/docs/uk/outgoing/rules/" description="Спрямовуйте, змінюйте чи відкидайте події залежно від їхнього вмісту." />
+  <LinkCard title="Повторні спроби та недоставлені повідомлення" href="/docs/uk/outgoing/retries/" description="Що відбувається, коли ендпоінт не відповідає 2xx." />
+  <LinkCard title="Правила" href="/docs/uk/outgoing/rules/" description="Спрямовуйте, змінюйте чи відкидайте події залежно від їхнього вмісту." />
 </CardGrid>

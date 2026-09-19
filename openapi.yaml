@@ -12313,8 +12313,6 @@ components:
         eventId:
           type: string
           format: uuid
-        eventType:
-          type: string
         endpointId:
           type: string
           format: uuid

@@ -1,10 +1,10 @@
 ---
-title: Retries and failed deliveries
+title: Retries and failed messages
 description: When Railhook tries a delivery again, when it gives up, and how to resend what it gave up on.
 ---
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-A delivery is an obligation to get one event to one endpoint. Railhook keeps trying it on a fixed schedule, the **retry ladder**, until the endpoint answers `2xx` or the ladder runs out. What it gives up on is kept in **Failed deliveries** for a person to decide about.
+A delivery is an obligation to get one event to one endpoint. Railhook keeps trying it on a fixed schedule, the **retry ladder**, until the endpoint answers `2xx` or the ladder runs out. What it gives up on is kept in **Failed Messages** for a person to decide about.
 
 ## Delivery statuses
 
@@ -14,7 +14,7 @@ A delivery is an obligation to get one event to one endpoint. Railhook keeps try
 | `PROCESSING` | Claimed by a worker for one attempt. A delivery left here by a worker that died is handed back to `PENDING`. |
 | `SUCCESS` | The endpoint answered `2xx`. Nothing more is sent. |
 | `FAILED` | Given up on because nobody can make another attempt help: the URL is refused, or the endpoint cannot receive it. |
-| `DLQ` | The ladder ran out, the endpoint answered with a status another attempt will not change, or the delivery outlived the age cap. Shown in the dashboard as **Failed deliveries**. |
+| `DLQ` | The ladder ran out, the endpoint answered with a status another attempt will not change, or the delivery outlived the age cap. Shown in the dashboard as **Failed Messages**. |
 
 ## What earns another attempt
 
@@ -24,7 +24,7 @@ A delivery is an obligation to get one event to one endpoint. Railhook keeps try
 | `408`, `429`, any `5xx` | Retried on the ladder. |
 | A connection error, a timeout, or a host that does not resolve | Retried on the ladder. |
 | The transformation failed to apply | Retried on the ladder. The raw payload is never sent instead. |
-| Any other `4xx`, or a `3xx` | `DLQ` on the first attempt, without the rest of the ladder. A `401`, a `404` or a redirect will not change on its own, but you can change it: fix the credentials or the URL, then retry from Failed deliveries. Redirects are not followed. |
+| Any other `4xx`, or a `3xx` | `DLQ` on the first attempt, without the rest of the ladder. A `401`, a `404` or a redirect will not change on its own, but you can change it: fix the credentials or the URL, then retry from Failed Messages. Redirects are not followed. |
 | The endpoint cannot receive it, for example it is not verified, or its URL is refused by the private address check | `FAILED` without an attempt. |
 
 ## The retry ladders
@@ -52,7 +52,7 @@ One attempt waits 30 seconds for a response unless the subscription sets `timeou
 
 ## The age cap
 
-A delivery still outstanding 96 hours after it was created is moved to Failed deliveries whatever its attempt count. A delivery you retried or resent by hand is measured from that moment instead, so an old delivery gets its new attempts. For incoming forwards the cap is 24 hours. The cap catches obligations that stopped moving; the ladder ends the ones that are failing.
+A delivery still outstanding 96 hours after it was created is moved to Failed Messages whatever its attempt count. A delivery you retried or resent by hand is measured from that moment instead, so an old delivery gets its new attempts. For incoming forwards the cap is 24 hours. The cap catches obligations that stopped moving; the ladder ends the ones that are failing.
 
 | Variable | Default | Direction |
 |---|---|---|
@@ -61,22 +61,22 @@ A delivery still outstanding 96 hours after it was created is moved to Failed de
 
 The worker refuses to start if a default ladder, at the top of its jitter, would not fit inside its cap.
 
-## Failed deliveries
+## Failed Messages
 
-Failed deliveries lists what Railhook abandoned: the endpoint, the event type, how many attempts were made and the last error. The same list is available from the API at `GET /api/v1/projects/{projectId}/dlq`.
+Failed Messages lists what Railhook abandoned: the endpoint, the event type, how many attempts were made and the last error. The same list is available from the API at `GET /api/v1/projects/{projectId}/dlq`.
 
-**Retrying from Failed deliveries** puts the same delivery back to `PENDING` and gives it 3 more attempts. It keeps its delivery id, its attempt history and its `Idempotency-Key`, so a receiver that already processed it can recognise the duplicate. The first new attempt is sent straight away. Retry one delivery with `POST /api/v1/projects/{projectId}/dlq/{deliveryId}/retry`, or several with `POST /api/v1/projects/{projectId}/dlq/retry`.
+**Retrying from Failed Messages** puts the same delivery back to `PENDING` and gives it 3 more attempts. It keeps its delivery id, its attempt history and its `Idempotency-Key`, so a receiver that already processed it can recognise the duplicate. The first new attempt is sent straight away. Retry one delivery with `POST /api/v1/projects/{projectId}/dlq/{deliveryId}/retry`, or several with `POST /api/v1/projects/{projectId}/dlq/retry`.
 
-For incoming webhooks the same screen is called **Failed forwards**. Retrying a failed forward creates a new forward to the same destination that starts again from attempt 1.
+For incoming webhooks the same screen is called **Failed Forwards**. Retrying a failed forward creates a new forward to the same destination that starts again from attempt 1.
 
 <Aside type="tip" title="Retry or replay?">
-A retry is the next attempt on the same delivery. A replay builds new deliveries from events already stored, and leaves the originals as they are. In the dashboard this is **Replay by time range**. See [Replay](/docs/outgoing/replay/).
+A retry is the next attempt on the same delivery. A replay builds new deliveries from events already stored, and leaves the originals as they are. The dashboard calls replay the Time Machine. See [Replay and Time Machine](/docs/outgoing/replay/).
 </Aside>
 
 ## Next steps
 
 <CardGrid>
-  <LinkCard title="Replay" href="/docs/outgoing/replay/" description="Resend one delivery, or rebuild deliveries for a time range." />
+  <LinkCard title="Replay and Time Machine" href="/docs/outgoing/replay/" description="Resend one delivery, or rebuild deliveries for a time range." />
   <LinkCard title="Ordering" href="/docs/outgoing/ordering/" description="How retries interact with ordered delivery." />
   <LinkCard title="Alerts" href="/docs/platform/alerts/" description="Get told when deliveries start failing." />
 </CardGrid>

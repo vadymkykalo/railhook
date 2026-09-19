@@ -10,7 +10,7 @@ Use this page to turn on the live demo: a **Try the live demo** button that open
 
 The demo is one organization, **Acme Inc.**, with one project, **Acme Shop**:
 
-- four endpoints with their subscriptions, including a partner endpoint that fails now and then, so there are retried deliveries and a Failed deliveries entry to look at;
+- four endpoints with their subscriptions, including a partner endpoint that fails now and then, so there are retried deliveries and a Failed Messages entry to look at;
 - a Stripe source and a GitHub source, with verified incoming events forwarded to their destinations;
 - about a day and a half of traffic, so the dashboard and analytics always show the last 24 hours.
 
@@ -70,7 +70,7 @@ A demo session is an access token for the demo organization with the **Viewer** 
 
 The API rewrites the demo's history every `DEMO_REFRESH_INTERVAL_MINUTES` (60 by default), so it always ends at the present. The organization, its endpoints and sources are created once and left as they are; only the events, deliveries and incoming events are replaced.
 
-The demo is kept out of the deployment's own numbers: the [platform admin](/docs/self-hosting/platform-admin/) overview does not count its organization, account or traffic, and its failed deliveries do not raise the `webhook_dlq_depth` alert.
+The demo is kept out of the deployment's own numbers: the [platform admin](/docs/self-hosting/platform-admin/) overview does not count its organization, account or traffic, and its Failed Messages do not raise the `webhook_dlq_depth` alert.
 
 ## Turning it off
 

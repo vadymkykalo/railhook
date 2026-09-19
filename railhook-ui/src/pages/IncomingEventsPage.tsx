@@ -334,7 +334,7 @@ export default function IncomingEventsPage() {
           {selectedEvent && (
             <div className="mt-6 space-y-6">
               <section className="rounded-lg border border-rail">
-                <h2 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.requestMeta')}</h2>
+                <h3 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.requestMeta')}</h3>
                 <dl className="divide-y divide-rail text-[13px]">
                   {[
                     { label: t('incomingEvents.columns.method'), value: selectedEvent.method },
@@ -362,7 +362,7 @@ export default function IncomingEventsPage() {
 
               <section className="rounded-lg border border-rail">
                 <div className="flex items-center justify-between border-b border-rail px-4 py-2.5">
-                  <h2 className="text-[13px] font-medium">{t('incomingEvents.detail.forwards')}</h2>
+                  <h3 className="text-[13px] font-medium">{t('incomingEvents.detail.forwards')}</h3>
                   {canReplayIncomingEvents && (
                     <Button size="sm" variant="outline" onClick={() => setReplayEventId(selectedEvent.id)}>
                       <RotateCcw className="h-3.5 w-3.5" /> {t('incomingEvents.replay.submit')}
@@ -462,7 +462,7 @@ export default function IncomingEventsPage() {
 
               {selectedEvent.headersJson && (
                 <section className="rounded-lg border border-rail">
-                  <h2 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.headers')}</h2>
+                  <h3 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.headers')}</h3>
                   <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-[11px]">
                     {formatJson(selectedEvent.headersJson)}
                   </pre>
@@ -471,7 +471,7 @@ export default function IncomingEventsPage() {
 
               {selectedEvent.bodyRaw && (
                 <section className="rounded-lg border border-rail">
-                  <h2 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.body')}</h2>
+                  <h3 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.body')}</h3>
                   <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-[11px]">
                     {formatJson(selectedEvent.bodyRaw)}
                   </pre>

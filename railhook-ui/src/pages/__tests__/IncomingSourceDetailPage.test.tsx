@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import '../../i18n';
-import en from '../../i18n/locales/en.json';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { IncomingSourceResponse } from '../../types/api.types';
 
@@ -78,23 +77,6 @@ describe('IncomingSourceDetailPage — how a request is signed', () => {
     expect(example).toHaveTextContent('curl -X POST');
     expect(example).toHaveTextContent('-H "X-Acme-Signature: sha256=<hmac-sha256-hex-of-body>"');
     expect(screen.getByText('HMAC (generic)')).toBeInTheDocument();
-  });
-
-  it('says in words how a destination is authenticated, not the enum', async () => {
-    vi.mocked(incomingDestinationsApi.list).mockResolvedValue({
-      content: [{
-        id: 'dest-1', incomingSourceId: 'source-1', url: 'https://ci.example.com/hook', authType: 'NONE',
-        authConfigured: false, enabled: true, maxAttempts: 5, timeoutSeconds: 30, retryDelays: '60,300',
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      }],
-      totalElements: 1, totalPages: 1, size: 20, number: 0,
-    } as never);
-    renderSource({});
-
-    const row = (await screen.findByText('https://ci.example.com/hook')).closest('tr')!;
-    expect(row).toHaveTextContent(en.incomingDestinations.authTypes.NONE);
-    expect(row).not.toHaveTextContent('NONE');
-    expect(row).toHaveTextContent(en.common.enabled);
   });
 
   it('keeps the plain cURL for a source that checks nothing', async () => {

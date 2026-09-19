@@ -40,10 +40,10 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 |---|---|
 | Підписка, `transformationId` | Збережена трансформація, яку застосовують до кожної доставки цієї підписки. |
 | Підписка, `payloadTemplate` | Вбудований шаблон; діє, коли `transformationId` не задано. |
-| Правило, дія `TRANSFORM` | Замінює трансформацію підписки для подій, які підпадають під правило. Якщо трансформацію задають кілька таких правил, діє останнє. Див. [Правила маршрутизації](/docs/uk/outgoing/rules/). |
+| Правило, дія `TRANSFORM` | Замінює трансформацію підписки для подій, які підпадають під правило. Якщо трансформацію задають кілька таких правил, діє останнє. Див. [Правила](/docs/uk/outgoing/rules/). |
 | Призначення, `transformationId` | Збережена трансформація, яку застосовують до вхідних вебхуків перед пересиланням. |
 | Призначення, `payloadTransform` | Один JSONPath-вираз, наприклад `$.data`; діє, коли `transformationId` не задано. |
-| Сценарій, вузол `transform` | Змінює структуру даних усередині сценарію. Див. [Сценарії](/docs/uk/outgoing/workflows/). |
+| Воркфлоу, вузол `transform` | Змінює структуру даних усередині воркфлоу. Див. [Воркфлоу](/docs/uk/outgoing/workflows/). |
 
 ## Коли трансформація спрацьовує
 
@@ -83,7 +83,7 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 ## Що далі
 
 <CardGrid>
-  <LinkCard title="Правила маршрутизації" href="/docs/uk/outgoing/rules/" description="Застосовуйте трансформацію лише до подій, які відповідають умові." />
+  <LinkCard title="Правила" href="/docs/uk/outgoing/rules/" description="Застосовуйте трансформацію лише до подій, які відповідають умові." />
   <LinkCard title="Призначення" href="/docs/uk/incoming/destinations/" description="Трансформуйте вхідні вебхуки перед пересиланням." />
-  <LinkCard title="Маскування персональних даних" href="/docs/uk/platform/pii-masking/" description="Приховуйте персональні дані там, де вміст подій читають люди." />
+  <LinkCard title="Маскування PII" href="/docs/uk/platform/pii-masking/" description="Приховуйте персональні дані там, де вміст подій читають люди." />
 </CardGrid>

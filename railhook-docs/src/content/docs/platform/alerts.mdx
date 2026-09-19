@@ -1,6 +1,6 @@
 ---
 title: Alerts and incidents
-description: Create alert rules that watch your project and notify someone when failures, latency or failed deliveries cross a threshold.
+description: Create alert rules that watch your project and notify someone when failures, latency or failed messages cross a threshold.
 ---
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
@@ -13,7 +13,7 @@ This page covers **alert rules** created in the dashboard. They watch your deliv
 ## Create a rule
 
 <Steps>
-1. Open the project's **Alert rules** page and create a rule.
+1. Open the project's **Alerts** page and create a rule.
 2. Pick a **condition** and a **threshold**.
 3. Pick a **window**. For `CONSECUTIVE_FAILURES`, also pick the **endpoint** to watch.
 4. Pick a **severity** and a **channel**.
@@ -26,7 +26,7 @@ This page covers **alert rules** created in the dashboard. They watch your deliv
 |---|---|
 | `FAILURE_RATE` | The share of the project's deliveries created in the window that failed, as a percentage, is at or above the threshold. Right when traffic is degrading rather than dead. |
 | `CONSECUTIVE_FAILURES` | The endpoint's most recent deliveries, as many as the threshold, all failed. Needs an endpoint: a rule without one never fires. Catches an endpoint that has gone away sooner than a rate can, because it does not need volume. |
-| `DLQ_THRESHOLD` | The number of the project's deliveries that moved to Failed deliveries in the window is at or above the threshold. This is the condition that says deliveries are being abandoned, not just retried. |
+| `DLQ_THRESHOLD` | The number of the project's deliveries that became failed messages in the window is at or above the threshold. This is the condition that says deliveries are being abandoned, not just retried. |
 | `LATENCY_THRESHOLD` | The project's p95 response time over the window, in milliseconds, is at or above the threshold. A slow endpoint uses up concurrency and eventually trips the circuit breaker. |
 
 A rule fires when its condition **starts** to hold, not on every evaluation while it keeps holding. One outage produces one notification, not one a minute.
@@ -76,6 +76,6 @@ An incident groups what happened into a record with a timeline. A `CRITICAL` rul
 ## Next steps
 
 <CardGrid>
-  <LinkCard title="Retries and failed deliveries" href="/docs/outgoing/retries/" description="What happens to a delivery before it counts as failed." />
+  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="What happens to a delivery before it counts as failed." />
   <LinkCard title="Observability" href="/docs/platform/observability/" description="Metrics and platform alerts for operators." />
 </CardGrid>

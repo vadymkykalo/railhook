@@ -100,7 +100,7 @@ export default function WorkflowsPage() {
 
       {showCreate && (
         <div className="animate-scale-in mb-5 rounded-lg border border-rail bg-card p-4">
-          <h2 className="mb-3 text-[15px] font-medium">{t('workflows.createWorkflow')}</h2>
+          <h3 className="mb-3 text-[15px] font-medium">{t('workflows.createWorkflow')}</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="workflow-name">{t('workflows.nameLabel')}</Label>

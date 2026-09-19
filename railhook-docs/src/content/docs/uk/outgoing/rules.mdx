@@ -1,5 +1,5 @@
 ---
-title: Правила маршрутизації
+title: Правила
 description: Як відбирати події за вмістом і ще до створення доставок спрямовувати їх на додатковий ендпоінт, трансформувати або відкидати.
 ---
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -87,5 +87,5 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/rules" \
 <CardGrid>
   <LinkCard title="Трансформації" href="/docs/uk/outgoing/transformations/" description="Як написати трансформацію, яку застосовує дія TRANSFORM." />
   <LinkCard title="Ендпоінти та підписки" href="/docs/uk/outgoing/endpoints-subscriptions/" description="Підбір підписок, що відбувається після правил." />
-  <LinkCard title="Сценарії" href="/docs/uk/outgoing/workflows/" description="Багатокрокова логіка, яка запускається, коли надходить подія." />
+  <LinkCard title="Воркфлоу" href="/docs/uk/outgoing/workflows/" description="Багатокрокова логіка, яка запускається, коли надходить подія." />
 </CardGrid>

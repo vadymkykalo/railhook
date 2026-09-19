@@ -83,13 +83,6 @@ describe('ConsumersPage', () => {
     expect(await screen.findByText(/no consumers yet/i)).toBeInTheDocument();
   });
 
-  it('shows what the portal looks like before anyone has built one', async () => {
-    vi.mocked(consumersApi.listPaged).mockResolvedValue(page([]));
-    renderConsumers();
-    const preview = await screen.findByRole('img', { name: /customer portal/i });
-    expect(preview).toHaveAttribute('src', '/screens/portal-light.webp');
-  });
-
   it('shows the backend code for the portal, prefilled with this project, when there are no consumers', async () => {
     const user = userEvent.setup();
     vi.mocked(consumersApi.listPaged).mockResolvedValue(page([]));

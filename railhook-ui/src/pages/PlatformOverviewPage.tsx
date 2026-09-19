@@ -42,7 +42,7 @@ function ActivationFunnel({ activation }: { activation: PlatformActivation }) {
 
   return (
     <Card className="p-5">
-      <h2 className="text-sm font-medium leading-tight">{title}</h2>
+      <h3 className="text-sm font-medium leading-tight">{title}</h3>
       <p className="mt-1 text-xs text-muted-foreground">{t('platformAdmin.overview.activation.description')}</p>
       <ul aria-label={title} className="mt-4 grid gap-3">
         {steps.map((step) => {

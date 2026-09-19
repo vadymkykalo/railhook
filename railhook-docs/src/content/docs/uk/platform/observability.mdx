@@ -66,8 +66,8 @@ Railhook експортує набагато більше метрик, ніж �
 | **`delivery_oldest_pending_age_seconds`** | **Найкращий окремий показник стану**: вік найстарішої незавершеної доставки. Тут видно і ендпоінт, що не відповідає, і збій брокера, і завислий воркер. `forward_oldest_pending_age_seconds` — така сама метрика для вхідного напрямку. |
 | `delivery_queue_depth`, `incoming_forward_queue_depth` | Скільки роботи чекає. Стабільне значення — нормально; якщо воно постійно зростає — ні. |
 | `outbox_queue_depth`, `outbox_oldest_pending_age_seconds` | Події, які прийнято, але ще не передано в Kafka. Якщо вік зростає, Kafka недоступна: події не втрачено, але вони нікуди не рухаються. |
-| `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Невдалі доставки й пересилання, що чекають на рішення людини |
-| `delivery_escalated_to_dlq_total` | Доставки, що потрапили до невдалих доставок через жорсткий ліміт у 96 годин, а не тому, що вичерпали повторні спроби. Ненульове значення означає, що щось працювало погано кілька днів. |
+| `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Недоставлені повідомлення, що чекають на рішення людини |
+| `delivery_escalated_to_dlq_total` | Доставки, що потрапили до недоставлених повідомлень через жорсткий ліміт у 96 годин, а не тому, що вичерпали повторні спроби. Ненульове значення означає, що щось працювало погано кілька днів. |
 
 ### Чи не заважають механізми захисту?
 
@@ -109,7 +109,7 @@ Railhook експортує набагато більше метрик, ніж �
 | Платформа не справляється | `RetryGovernorCooldown`, `RetryGovernorConsecutiveFailures`, `ApiErrorRateHigh` |
 | Процес не працює | `ApiDown`, `WorkerDown` |
 
-`DlqActionableBacklog` і `IncomingForwardDlqActionableBacklog` вимагають втручання людини: вони зникають, коли хтось повторює або очищає невдалі доставки чи пересилання. `CircuitBreakerDegraded` відрізняється від інших сповіщень про circuit breaker: воно означає, що circuit breaker **не** працює.
+`DlqActionableBacklog` і `IncomingForwardDlqActionableBacklog` вимагають втручання людини: вони зникають, коли хтось повторює або очищає недоставлені повідомлення. `CircuitBreakerDegraded` відрізняється від інших сповіщень про circuit breaker: воно означає, що circuit breaker **не** працює.
 
 ## Логи
 

@@ -14,7 +14,7 @@ So one deploy, one crash or one slow handler at the wrong moment, and that push,
 
 - Railhook answers GitHub as soon as the delivery is stored, well inside the 10 seconds.
 - Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour.
-- What still fails lands in **Failed forwards**, and any stored delivery can be replayed for as long as events are kept.
+- What still fails lands in **Failed Forwards**, and any stored delivery can be replayed for as long as events are kept.
 - A GitHub redelivery carries the same `X-GitHub-Delivery` id. Railhook recognises it, answers `202` with the stored copy and does not forward it twice.
 
 ## Connect GitHub
@@ -57,7 +57,7 @@ export PROJECT_ID=...
      -d '{"url":"https://api.example.com/webhooks/github","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
    ```
 
-5. **Check the ping.** GitHub sends a `ping` event when the webhook is created. It appears under **Incoming → Incoming events** in Railhook.
+5. **Check the ping.** GitHub sends a `ping` event when the webhook is created. It appears under **Incoming → Received** in Railhook.
 
 </Steps>
 

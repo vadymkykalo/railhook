@@ -25,7 +25,7 @@ export default function EmptyState({ icon: Icon, title, description, action, doc
       <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-rail bg-card">
         <Icon className="h-5 w-5 text-muted-foreground" />
       </div>
-      <h2 className="mb-1.5 text-[15px] font-medium">{title}</h2>
+      <h3 className="mb-1.5 text-[15px] font-medium">{title}</h3>
       {description && (
         <p className="mb-5 max-w-sm text-center text-sm text-muted-foreground">{description}</p>
       )}
@@ -84,7 +84,7 @@ export function ErrorState({
       <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-halt/30 bg-halt-soft">
         <AlertTriangle className="h-5 w-5 text-halt" />
       </div>
-      <h2 className="mb-1.5 text-[15px] font-medium">{title ?? t('common.loadErrorTitle')}</h2>
+      <h3 className="mb-1.5 text-[15px] font-medium">{title ?? t('common.loadErrorTitle')}</h3>
       <p className="mb-5 max-w-sm text-center text-sm text-muted-foreground">{resolvedDescription}</p>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry} disabled={retrying}>

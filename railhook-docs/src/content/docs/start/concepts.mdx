@@ -29,7 +29,7 @@ These are the terms used throughout the docs, the API and the dashboard. Where t
 | Term | What it is | In the dashboard |
 |---|---|---|
 | **Source** | A provider you have connected, together with what Railhook needs to prove a webhook came from it. | Sources |
-| **Incoming event** | One webhook received from a source, kept exactly as it arrived. | Incoming events |
+| **Incoming event** | One webhook received from a source, kept exactly as it arrived. | Received |
 | **Destination** | A URL you chose to receive incoming events, together with how to authenticate to it. | On each source |
 | **Forward** | The obligation to get one incoming event to one destination. The incoming counterpart of a delivery. | — |
 
@@ -41,8 +41,8 @@ Both directions share these.
 |---|---|---|
 | **Attempt** | One try at a delivery or a forward: one HTTP request and what it resolved to. | Attempts, on each delivery |
 | **Retry ladder** | How long to wait before each further attempt, and how many attempts there are before giving up. Outgoing: 7 attempts, waiting 1m, 5m, 15m, 1h, 6h, then 24h. Incoming: 5 attempts, up to 6h. | — |
-| **DLQ** | Where a delivery or forward lands once its retry ladder is used up, kept for a person to decide about. | Failed deliveries (outgoing), Failed forwards (incoming) |
-| **Replay** | Building fresh deliveries from events already stored. A retry is the next attempt on the same delivery; a replay is a new delivery. | Replay by time range |
+| **DLQ** | Where a delivery or forward lands once its retry ladder is used up, kept for a person to decide about. | Failed Messages (outgoing), Failed Forwards (incoming) |
+| **Replay** | Building fresh deliveries from events already stored. A retry is the next attempt on the same delivery; a replay is a new delivery. | Time Machine |
 | **Tunnel** | A local port on your machine made reachable at a public URL for as long as the CLI stays connected. | Tunnels |
 
 ## Tenancy
@@ -60,6 +60,6 @@ The two retry ladders differ on purpose. Relaying someone else's webhook is a di
 
 <CardGrid>
   <LinkCard title="Quickstart" description="Put the terms to work: send an event and watch it delivered." href="/docs/start/quickstart/" />
-  <LinkCard title="Retries and failed deliveries" description="The outgoing retry ladder in detail." href="/docs/outgoing/retries/" />
+  <LinkCard title="Retries and failed messages" description="The outgoing retry ladder in detail." href="/docs/outgoing/retries/" />
   <LinkCard title="Replay" description="When to retry and when to replay." href="/docs/outgoing/replay/" />
 </CardGrid>

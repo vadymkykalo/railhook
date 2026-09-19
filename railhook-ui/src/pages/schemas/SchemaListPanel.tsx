@@ -61,7 +61,7 @@ export default function SchemaListPanel({
       <header className="flex items-center justify-between gap-2 border-b border-rail px-4 py-2.5">
         <div>
           <div className="mono-label">{t('schemas.catalogEyebrow')}</div>
-          <h2 className="text-[13px] font-medium">{t('schemas.eventTypes')}</h2>
+          <h3 className="text-[13px] font-medium">{t('schemas.eventTypes')}</h3>
         </div>
         <Button size="sm" variant={showCreate ? 'secondary' : 'outline'} onClick={() => setShowCreate(!showCreate)}>
           {showCreate ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}

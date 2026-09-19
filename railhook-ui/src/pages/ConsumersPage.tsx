@@ -16,7 +16,6 @@ import EmptyState, { ErrorState } from '../components/EmptyState';
 import { EnabledBadge } from '../components/StatusBadge';
 import ConfirmDialog from '../components/ConfirmDialog';
 import IntegrationSnippet from '../components/IntegrationSnippet';
-import PortalPreview from '../components/PortalPreview';
 import { consumerPortalSnippets, portalIframeSnippet } from '../lib/integrationSnippets';
 import { apiBaseUrl } from '../lib/publicSnippets';
 import PermissionGate from '../components/PermissionGate';
@@ -210,12 +209,8 @@ export default function ConsumersPage() {
             action={newButton}
             docsLink="outgoing/customer-portal"
           />
-          <section aria-labelledby="consumers-preview" className="mt-6">
-            <h2 id="consumers-preview" className="mb-3 text-sm font-semibold">{t('consumers.preview.heading')}</h2>
-            <PortalPreview />
-          </section>
           <section aria-labelledby="consumers-integrate" className="mt-6">
-            <h2 id="consumers-integrate" className="mb-3 text-sm font-semibold">{t('consumers.integrate.heading')}</h2>
+            <h3 id="consumers-integrate" className="mb-3 text-sm font-semibold">{t('consumers.integrate.heading')}</h3>
             {integration}
           </section>
         </>

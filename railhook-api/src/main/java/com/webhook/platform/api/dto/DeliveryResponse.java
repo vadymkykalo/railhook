@@ -17,8 +17,6 @@ import java.util.UUID;
 public class DeliveryResponse {
     private UUID id;
     private UUID eventId;
-    /** The type of the event delivered, so a list of deliveries can say what each one carried. */
-    private String eventType;
     private UUID endpointId;
     private UUID subscriptionId;
     /**
@@ -38,11 +36,10 @@ public class DeliveryResponse {
     private Instant failedAt;
     private Instant createdAt;
 
-    public static DeliveryResponse of(Delivery delivery, String eventType) {
+    public static DeliveryResponse of(Delivery delivery) {
         return DeliveryResponse.builder()
                 .id(delivery.getId())
                 .eventId(delivery.getEventId())
-                .eventType(eventType)
                 .endpointId(delivery.getEndpointId())
                 .subscriptionId(delivery.getSubscriptionId())
                 .status(delivery.getStatus())
