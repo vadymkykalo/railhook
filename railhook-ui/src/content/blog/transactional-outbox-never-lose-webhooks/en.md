@@ -1,6 +1,6 @@
 ---
 title: The transactional outbox, or how Railhook never loses an event it has accepted
-lead: Your service gets a 201, and the pod that sent it is OOM-killed four milliseconds later. Whether that event still reaches every endpoint is decided by one Postgres transaction, and everything after it is built to assume the message arrives twice.
+lead: Your service gets a 201, and the pod that sent it is OOM-killed four milliseconds later. This is how Railhook still delivers that event, how close it gets to exactly-once, and the one step no sender can take on its own.
 description: "The transactional outbox pattern with Postgres, Kafka and Spring Boot: why dual writes lose events, and how Railhook never loses an accepted webhook."
 date: 2026-09-20
 author: Vadym Kykalo
@@ -12,43 +12,63 @@ Your checkout service sends `order.paid` to Railhook and gets `201 Created` back
 later the API pod that answered is OOM-killed. The event must still reach all five endpoints
 subscribed to it, possibly over the next 31 hours, and your service has already thrown its copy away.
 
-Here is the position this post defends: **a delivery guarantee can only start inside a database
-transaction.** Kafka, workers and retry ladders carry the guarantee; none of them can create it. So
-the first thing Railhook does with an event is make it and its announcement one commit, and
-everything downstream is written on the assumption that every message may arrive twice.
+This post is about how close Railhook gets to delivering that event exactly once, which is almost
+all the way, and about the last step, which no sender can take alone. The position it defends:
+**a delivery guarantee can only start inside a database transaction, and it can only end inside
+the receiver's.** Everything in between is built to assume a message may arrive twice, and then
+to make sure that almost none do.
 
 The vocabulary is the codebase's own. An **Event** is what your system announced. A **Delivery** is
 the obligation to get one Event to one endpoint. An **Attempt** is one HTTP request towards that.
 
-## What can "never lost" actually promise?
+## Why can't anyone deliver exactly once to your endpoint?
 
-Three delivery semantics, and it is worth being precise about each, because vendors blur them.
+Exactly-once delivery would mean your endpoint acts on every event once and only once. No sender
+can promise that over HTTP, Railhook included, and the reason is not effort. It takes four steps.
 
-- **At-most-once.** Send, never resend. If the request is lost, the event is lost. Nothing is ever
-  processed twice.
-- **At-least-once.** Resend until the receiver acknowledges. Nothing is lost, but if the receiver
-  processed the request and its response was lost, the resend is processed again.
-- **Exactly-once.** Every event processed once and only once.
+**The side effect is yours.** When your endpoint marks an order paid, it writes to your database,
+in your transaction. Everything Railhook knows about a Delivery lives in Railhook's Postgres. The
+one fact that decides whether a resend is a duplicate, *did the receiver act on it?*, is committed
+somewhere Railhook cannot read.
 
-The third is not available over HTTP to a server you do not control, and the reason fits in one
-sentence: when a request times out, the sender cannot tell whether the request was lost or the
-response was. Those two failures need opposite reactions (resend, or do not) and they look
-identical from the sending side. No retry policy, however clever, can choose correctly without
-information only the receiver has.
+**There is no transaction that spans both.** Inside one system, the answer to "two writes must
+agree" is a transaction. Across systems it is a two-phase commit: a coordinator both sides trust,
+and a prepare step both sides implement. A webhook is one POST to a stranger's server, with no
+prepare, no coordinator and nothing to roll back. Kafka's documentation reaches the same place
+from the other direction: exactly-once to an outside system "generally requires cooperation with
+such systems"
+([Apache Kafka, *Message Delivery Semantics*](https://kafka.apache.org/41/design/design/#message-delivery-semantics)).
+
+**The last message can always be lost.** Your endpoint commits, returns `200`, and the connection
+drops before the response reaches the worker. This is the Two Generals problem, described by
+[Akkoyunlu, Ekanadham and Huber in 1975](https://doi.org/10.1145/800213.806523) and given its name by
+[Jim Gray in 1978](https://doi.org/10.1007/3-540-08755-9_9): two parties talking over a channel that
+can lose messages can never both be sure they agree, because whatever message settles it can
+itself be lost. Acknowledging the acknowledgement only moves the doubt one message later.
+
+**A timeout says nothing.** After the Delivery's timeout (30 seconds by default) the worker has
+no answer. The request may never have arrived. It may have arrived and still be running. It may
+have committed and its response died on the way back. To the sender, all three are the same
+event: silence.
+
+:::figure lost-ack
+
+So every sender chooses one of two failures. Never resend, and some events are never processed:
+that is **at-most-once**. Resend until acknowledged, and some events are processed twice: that
+is **at-least-once**. There is no third button.
 
 :::figure delivery-semantics
 
-Kafka's own documentation draws the same line. Inside Kafka, exactly-once is achievable with
-transactions, but "exactly-once delivery for other destination systems generally requires
-cooperation with such systems"
-([Apache Kafka, *Message Delivery Semantics*](https://kafka.apache.org/41/design/design/#message-delivery-semantics)).
+Railhook resends, because an event you never got is worse than one you got twice and can detect.
+Even the silence is narrowed: once the status line of a `2xx` has arrived, the Attempt counts as
+delivered whether or not the body follows. That is invariant 6 in `AttemptRunner`, "Failing to read
+a response is never failing to deliver", and the comment beside it records why: a receiver that
+answered `2xx` and then dawdled over the body "used to collect the whole ladder — one delivery,
+seven arrivals".
 
-So Railhook promises exactly what can be kept: **at-least-once delivery end to end, and an
-exactly-once effect for a receiver that deduplicates on `webhook-id`.** The rest of this post is how
-each step keeps the first half and narrows the duplicates that the second half has to absorb.
-
-**Takeaway:** anyone promising exactly-once delivery to your HTTP endpoint is either counting on
-your deduplication or not counting.
+**Takeaway:** exactly-once delivery to a server you do not control is not a missing feature, it is
+an impossibility result. What can be built is an exactly-once *effect*, and the rest of this post
+is how Railhook gets as close to it as a sender can.
 
 ## Why can't the API just write to Postgres and publish to Kafka?
 
@@ -202,27 +222,42 @@ but it may not queue the next one.
 **Takeaway:** a message is a hint and the row is the truth. Every write that matters is
 conditional on still owning the row.
 
-## So what does Railhook actually guarantee?
+## How close does Railhook get?
 
-Step by step, where a duplicate can arise and what absorbs it:
+Here is every place a duplicate can enter, in the order an event travels, and what closes it.
+Each close is a unique index or a conditional `UPDATE` in Postgres, not an assumption about timing.
 
-| Step | How a duplicate arises | What absorbs it |
-|---|---|---|
-| Your POST to `/api/v1/events` | you retry after a timeout | `Idempotency-Key`, unique per project |
-| A provider's webhook arriving | the provider resends | provider event id, unique per Source |
-| Outbox to Kafka | publisher crashes after the send | the Claim: `WHERE status = 'PENDING'` |
-| Kafka to worker | redelivery, rebalance | the Claim, or the retry token swap |
-| A stalled worker | the sweep reassigns its row mid-Attempt | the fence keeps one outcome; your dedupe the second request |
-| Endpoint back to Railhook | your `2xx` is lost on the way | **your** dedupe on `webhook-id` |
+1. **Your POST is retried after a timeout.** Closed by `Idempotency-Key`, unique per project: the
+   retry gets back the Event it already created.
+2. **A provider resends its webhook.** Closed by the provider's own event id, unique per Source.
+3. **The API dies between storing the Event and announcing it.** Closed by the outbox: one
+   transaction, so there is no between.
+4. **The publisher dies after sending to Kafka, before marking the row.** The message goes out
+   twice, and the Claim turns the second copy into nothing: `WHERE status = 'PENDING'` matches once.
+5. **Kafka redelivers, or a rebalance replays a partition.** The same Claim, and on the retry path
+   the swap on the scheduler's token.
+6. **The retry scheduler and the consumer both write one row.** Closed by ownership: once the send
+   to Kafka succeeds, the scheduler never writes that row again.
+7. **A worker stalls and the sweep hands its Delivery to another.** The fence records one outcome
+   and queues one successor, whichever worker wakes up first.
+8. **An Attempt reached your endpoint and its outcome never made it back into Railhook's
+   Postgres.** The response was lost on the wire, or the worker holding it died or stalled before
+   writing it down. These are the same problem one hop apart, and the first section is why it
+   stays open.
 
-Railhook's side of each row is a unique index or a conditional `UPDATE`, not a timing assumption.
-Two rows end at your endpoint, and the common one is the last, the case from the figure at the top: an Attempt that
-succeeded at your end but was never recorded at ours. No transaction spans an HTTP call, so it
-cannot be engineered away upstream. It is why this post says *exactly-once effect* and not
-*exactly-once delivery*.
+Every duplicate that starts inside Railhook is stopped inside Railhook. What reaches your endpoint
+twice is only ever window 8: the same Delivery, carrying the same `webhook-id`, and that is exactly
+what the id is for. The last step is one line on your side, in the same transaction as the work:
 
-**Takeaway:** at-least-once end to end. Duplicates inside Railhook are absorbed there; the ones
-that cross an HTTP call are yours to absorb, and one index does it.
+```sql
+INSERT INTO processed_webhooks (webhook_id) VALUES ($1) ON CONFLICT DO NOTHING;
+```
+
+If it inserted nothing, you have done this one before: answer `2xx` and stop. A whole receiver is
+further down.
+
+**Takeaway:** seven windows closed in Postgres, one that the Two Generals keep open, and one unique
+index on your side that closes it.
 
 ## How long does Railhook keep trying?
 
