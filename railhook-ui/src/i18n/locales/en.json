@@ -1228,7 +1228,9 @@
       "tip4": "Inspect the error messages in delivery attempts below",
       "tip5": "Consider replaying the delivery after fixing the issue",
       "title": "Troubleshooting Tips"
-    }
+    },
+    "lastResponse": "Last response",
+    "noResponseBody": "The endpoint answered with an empty body."
   },
   "dlq": {
     "abandoned": "Abandoned",
