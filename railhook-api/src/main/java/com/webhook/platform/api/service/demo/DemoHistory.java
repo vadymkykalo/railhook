@@ -1,12 +1,23 @@
 package com.webhook.platform.api.service.demo;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.webhook.platform.api.service.demo.DemoCatalog.DemoDestination;
 import com.webhook.platform.api.service.demo.DemoCatalog.DemoEndpoint;
 import com.webhook.platform.api.service.demo.DemoCatalog.DemoSource;
 import com.webhook.platform.api.service.demo.DemoCatalog.DemoSubscription;
+import com.webhook.platform.api.service.demo.DemoCatalog.DemoWorkflow;
 import com.webhook.platform.api.service.demo.DemoCatalog.Profile;
+import com.webhook.platform.api.service.workflow.NodeExecutor;
+import com.webhook.platform.api.service.workflow.StepResult;
+import com.webhook.platform.api.service.workflow.executors.BranchNodeExecutor;
+import com.webhook.platform.api.service.workflow.executors.FilterNodeExecutor;
+import com.webhook.platform.api.service.workflow.executors.TransformNodeExecutor;
+import com.webhook.platform.api.service.workflow.executors.WebhookTriggerExecutor;
+import com.webhook.platform.common.retry.RetryLadderDefaults;
+import com.webhook.platform.common.util.EventTypeMatcher;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -14,16 +25,21 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * The demo's traffic: a day and a half of Events, Deliveries and Attempts, Incoming Events and
- * Forwards, ending just before {@code now}.
+ * Forwards, and the runs of the demo's Workflows, ending just before {@code now}.
  *
  * <p>Pure — a function of {@code now} and nothing else, from a fixed seed, so a test can hold it
  * and two replicas regenerating at the same instant write the same thing.
@@ -32,7 +48,9 @@ import java.util.UUID;
  * Delivery is SUCCESS or DLQ, a Forward attempt SUCCESS or FAILED, and nothing carries a
  * {@code next_retry_at}. The worker only ever acts on PENDING or PROCESSING rows, or on rows with a
  * retry due, so nothing generated here is ever picked up and sent — the demo's URLs are never
- * contacted, whatever they resolve to. {@code DemoHistoryTest} holds this.
+ * contacted, whatever they resolve to. Likewise a workflow run is COMPLETED or FAILED, never
+ * RUNNING or WAITING, the two states the workflow engine's recovery and resume jobs act on.
+ * {@code DemoHistoryTest} holds this.
  */
 final class DemoHistory {
 
@@ -68,11 +86,22 @@ final class DemoHistory {
                       Instant createdAt) {
     }
 
+    record WorkflowExecutionRow(UUID id, UUID workflowId, UUID triggerEventId, String status, String triggerData,
+                                Instant startedAt, Instant completedAt, String errorMessage, int durationMs) {
+    }
+
+    record WorkflowStepRow(UUID id, UUID executionId, String nodeId, String nodeType, String status,
+                           String inputData, String outputData, String errorMessage, int durationMs,
+                           Instant startedAt, Instant completedAt, Instant createdAt) {
+    }
+
     final List<EventRow> events = new ArrayList<>();
     final List<DeliveryRow> deliveries = new ArrayList<>();
     final List<AttemptRow> attempts = new ArrayList<>();
     final List<IncomingEventRow> incomingEvents = new ArrayList<>();
     final List<ForwardRow> forwards = new ArrayList<>();
+    final List<WorkflowExecutionRow> workflowExecutions = new ArrayList<>();
+    final List<WorkflowStepRow> workflowSteps = new ArrayList<>();
 
     private final Random random = new Random(SEED);
     private final Instant now;
@@ -88,6 +117,8 @@ final class DemoHistory {
         DemoHistory history = new DemoHistory(now);
         history.generateOutgoing();
         history.generateIncoming();
+        // Last, so the rows above are exactly what they were before the demo had workflows.
+        history.generateWorkflowRuns();
         return history;
     }
 
@@ -148,10 +179,16 @@ final class DemoHistory {
     }
 
     private void addDelivery(UUID eventId, String payload, DemoSubscription subscription, Instant eventAt) {
-        DemoEndpoint endpoint = subscription.endpoint();
+        addDelivery(eventId, payload, subscription.endpoint(), subscription.id(), subscription.maxAttempts(),
+                subscription.retryDelays(), eventAt);
+    }
+
+    /** One Delivery and its Attempts; {@code subscriptionId} is null for one a workflow created. */
+    private UUID addDelivery(UUID eventId, String payload, DemoEndpoint endpoint, UUID subscriptionId,
+                             int maxAttempts, String retryDelays, Instant eventAt) {
         UUID deliveryId = nextId();
-        List<Outcome> outcomes = outcomesFor(endpoint, subscription, eventAt);
-        long[] delays = parseDelays(subscription.retryDelays());
+        List<Outcome> outcomes = outcomesFor(endpoint, eventAt);
+        long[] delays = parseDelays(retryDelays);
 
         Instant attemptAt = eventAt.plusMillis(200 + random.nextInt(600));
         Instant last = attemptAt;
@@ -169,9 +206,10 @@ final class DemoHistory {
         }
 
         boolean succeeded = outcomes.get(outcomes.size() - 1).succeeded();
-        deliveries.add(new DeliveryRow(deliveryId, eventId, endpoint.id(), subscription.id(),
-                succeeded ? "SUCCESS" : "DLQ", outcomes.size(), subscription.maxAttempts(),
-                subscription.retryDelays(), eventAt, last, succeeded ? last : null, succeeded ? null : last));
+        deliveries.add(new DeliveryRow(deliveryId, eventId, endpoint.id(), subscriptionId,
+                succeeded ? "SUCCESS" : "DLQ", outcomes.size(), maxAttempts,
+                retryDelays, eventAt, last, succeeded ? last : null, succeeded ? null : last));
+        return deliveryId;
     }
 
     private record Outcome(Integer status, String body, String error, boolean timeout) {
@@ -192,7 +230,7 @@ final class DemoHistory {
      * The Attempts one Delivery took. A retry only where the whole ladder it needs fits before
      * {@link #SETTLED}; otherwise the Delivery simply succeeded first time.
      */
-    private List<Outcome> outcomesFor(DemoEndpoint endpoint, DemoSubscription subscription, Instant eventAt) {
+    private List<Outcome> outcomesFor(DemoEndpoint endpoint, Instant eventAt) {
         long age = Duration.between(eventAt, now).getSeconds();
         int roll = random.nextInt(100);
         Outcome success = endpoint.profile() == Profile.FLAKY ? ACCEPTED : OK;
@@ -254,7 +292,7 @@ final class DemoHistory {
                     items.add(item);
                 }
                 data.put("items", items);
-                data.put("total", String.format("%.2f", total));
+                data.put("total", String.format(Locale.ROOT, "%.2f", total));
                 data.put("currency", "USD");
                 if (type.equals("order.cancelled")) {
                     data.put("reason", "customer_request");
@@ -263,7 +301,7 @@ final class DemoHistory {
             case "payment.succeeded", "payment.failed", "invoice.paid" -> {
                 data.put("id", (type.equals("invoice.paid") ? "in_" : "pay_") + Long.toHexString(random.nextLong() & 0xffffffffffL));
                 data.put("order_id", order);
-                data.put("amount", String.format("%.2f", 15 + random.nextInt(18000) / 100.0));
+                data.put("amount", String.format(Locale.ROOT, "%.2f", 15 + random.nextInt(18000) / 100.0));
                 data.put("currency", "USD");
                 data.put("method", random.nextInt(4) == 0 ? "paypal" : "card");
                 if (type.equals("payment.failed")) {
@@ -425,6 +463,188 @@ final class DemoHistory {
         forwards.add(new ForwardRow(nextId(), incomingEventId, destination.id(), retried ? 2 : 1, "SUCCESS", at,
                 at.plusMillis(duration), requestHeaders, snippet, 200,
                 json(Map.of("Content-Type", "application/json")), "{\"ok\":true}", null, at));
+    }
+
+    // ── Workflows ───────────────────────────────────────────────────────────
+
+    /**
+     * The nodes whose outcome depends only on their configuration and their input, run by the
+     * engine's own executors: a condition the demo shows is a condition that really evaluates the
+     * way the run says it did. None of these four touches the database — the transform is inline,
+     * so its repository and saved-template runner are never reached.
+     */
+    private static final Map<String, NodeExecutor> PURE_EXECUTORS = Map.of(
+            "webhookTrigger", new WebhookTriggerExecutor(),
+            "filter", new FilterNodeExecutor(JSON),
+            "branch", new BranchNodeExecutor(JSON),
+            "transform", new TransformNodeExecutor(JSON, null, null));
+
+    private static final String NOT_TAKEN = "Parent nodes skipped or branch not taken";
+
+    /** Which run of "Route high-value orders" had its delivery node time out: the one failure shown. */
+    private static final int HIGH_VALUE_RUN_THAT_TIMES_OUT = 37;
+
+    private record Edge(String source, String sourceHandle) {
+    }
+
+    /**
+     * One run of each workflow per Event it matches, recorded the way {@code WorkflowEngine} records
+     * one: a step per node in order, SKIPPED for a node behind a filter that stopped the run or a
+     * branch not taken, WAITING for the delay the run was suspended at. A delivery node records
+     * the Event and the Delivery it would have created, so its step points at rows that exist.
+     *
+     * <p>Every run is finished: one that would still be waiting, or still due to write its
+     * delivery, at {@link #SETTLED} is left out, because the resume job would pick up a WAITING row
+     * and run the rest of it for real.
+     */
+    private void generateWorkflowRuns() {
+        List<EventRow> triggers = new ArrayList<>(events);
+        triggers.sort(Comparator.comparing(EventRow::createdAt));
+        for (DemoWorkflow workflow : DemoCatalog.WORKFLOWS) {
+            JsonNode definition = readTree(workflow.definition());
+            long longestWait = 0;
+            for (JsonNode node : definition.get("nodes")) {
+                longestWait += node.get("type").asText().equals("delay")
+                        ? node.get("data").get("delaySeconds").asLong() : 0;
+            }
+            int run = 0;
+            for (EventRow event : triggers) {
+                if (!EventTypeMatcher.matches(workflow.eventTypePattern(), event.eventType())) {
+                    continue;
+                }
+                if (event.createdAt().plusSeconds(longestWait + 30).isAfter(now.minus(SETTLED))) {
+                    continue;
+                }
+                run++;
+                boolean deliveryTimesOut = workflow == DemoCatalog.HIGH_VALUE_ORDERS && run == HIGH_VALUE_RUN_THAT_TIMES_OUT;
+                runWorkflow(workflow, definition, event, deliveryTimesOut);
+            }
+        }
+    }
+
+    private void runWorkflow(DemoWorkflow workflow, JsonNode definition, EventRow event, boolean deliveryTimesOut) {
+        Map<String, List<Edge>> incoming = new LinkedHashMap<>();
+        for (JsonNode edge : definition.get("edges")) {
+            incoming.computeIfAbsent(edge.get("target").asText(), k -> new ArrayList<>())
+                    .add(new Edge(edge.get("source").asText(),
+                            edge.hasNonNull("sourceHandle") ? edge.get("sourceHandle").asText() : null));
+        }
+
+        UUID executionId = nextId();
+        JsonNode trigger = readTree(event.payload());
+        // The trigger outbox is polled, so a run starts a moment after its Event.
+        Instant startedAt = event.createdAt().plusMillis(300 + random.nextInt(1200));
+        Instant at = startedAt;
+        Instant segmentStart = startedAt;
+        Map<String, JsonNode> outputs = new LinkedHashMap<>();
+        Set<String> skipped = new HashSet<>();
+        String failure = null;
+
+        for (JsonNode node : definition.get("nodes")) {
+            String nodeId = node.get("id").asText();
+            String type = node.get("type").asText();
+            JsonNode data = node.get("data");
+            List<Edge> parents = incoming.getOrDefault(nodeId, List.of());
+            at = at.plusMillis(1 + random.nextInt(3));
+
+            if (!parents.isEmpty() && parents.stream().allMatch(p -> blocked(p, skipped, outputs))) {
+                skipped.add(nodeId);
+                workflowSteps.add(new WorkflowStepRow(nextId(), executionId, nodeId, type, "SKIPPED", null, null,
+                        NOT_TAKEN, 0, at, at, at));
+                continue;
+            }
+            JsonNode input = parents.isEmpty() ? trigger : parents.stream()
+                    .filter(p -> !blocked(p, skipped, outputs))
+                    .map(p -> outputs.get(p.source()))
+                    .filter(Objects::nonNull)
+                    .findFirst().orElse(trigger);
+
+            StepResult result;
+            int duration;
+            switch (type) {
+                case "delay" -> {
+                    duration = 1 + random.nextInt(3);
+                    result = StepResult.waiting(at.plusSeconds(data.get("delaySeconds").asLong()), input);
+                }
+                case "delivery" -> {
+                    if (deliveryTimesOut) {
+                        duration = 30_000;
+                        result = StepResult.failed("Node timeout: delivery exceeded 30s limit");
+                    } else {
+                        duration = 12 + random.nextInt(30);
+                        result = StepResult.success(deliver(data, input, at));
+                    }
+                }
+                default -> {
+                    duration = random.nextInt(4);
+                    result = PURE_EXECUTORS.get(type).execute(data, input);
+                }
+            }
+            Instant done = at.plusMillis(duration);
+            workflowSteps.add(new WorkflowStepRow(nextId(), executionId, nodeId, type, result.status().name(),
+                    json(input), result.output() == null ? null : json(result.output()), result.errorMessage(),
+                    duration, at, done, done));
+            at = done;
+
+            switch (result.status()) {
+                case FAILED -> failure = result.errorMessage();
+                case SKIPPED -> skipped.add(nodeId);
+                case WAITING -> {
+                    outputs.put(nodeId, result.output());
+                    // Suspended until due, then taken up by the resume job's next poll.
+                    at = result.resumeAt().plusMillis(200 + random.nextInt(4800));
+                    segmentStart = at;
+                }
+                default -> outputs.put(nodeId, result.output());
+            }
+            if (failure != null) {
+                break;
+            }
+        }
+
+        Instant completedAt = at.plusMillis(1 + random.nextInt(3));
+        workflowExecutions.add(new WorkflowExecutionRow(executionId, workflow.id(), event.id(),
+                failure == null ? "COMPLETED" : "FAILED", event.payload(), startedAt, completedAt, failure,
+                (int) Duration.between(segmentStart, completedAt).toMillis()));
+    }
+
+    /** Whether a parent keeps a node from running: it was skipped, or it is a branch that went the other way. */
+    private static boolean blocked(Edge parent, Set<String> skipped, Map<String, JsonNode> outputs) {
+        if (skipped.contains(parent.source())) {
+            return true;
+        }
+        JsonNode output = outputs.get(parent.source());
+        if (output != null && output.has("_branchHandle")) {
+            return parent.sourceHandle() != null && !parent.sourceHandle().equals(output.get("_branchHandle").asText());
+        }
+        return false;
+    }
+
+    /** What a delivery node leaves behind: its input recorded as an Event, and a Delivery of it. */
+    private JsonNode deliver(JsonNode data, JsonNode input, Instant at) {
+        DemoEndpoint endpoint = DemoCatalog.ENDPOINTS.stream()
+                .filter(e -> e.id().toString().equals(data.get("endpointId").asText()))
+                .findFirst().orElseThrow();
+        String payload = json(input);
+        UUID eventId = nextId();
+        events.add(new EventRow(eventId, data.get("eventType").asText(), payload, at));
+        UUID deliveryId = addDelivery(eventId, payload, endpoint, null, 7, RetryLadderDefaults.OUTGOING_DELAYS, at);
+
+        ObjectNode output = JSON.createObjectNode();
+        output.put("deliveryId", deliveryId.toString());
+        output.put("eventId", eventId.toString());
+        output.put("endpointId", endpoint.id().toString());
+        output.put("endpointUrl", endpoint.url());
+        output.put("status", "PENDING");
+        return output;
+    }
+
+    private static JsonNode readTree(String json) {
+        try {
+            return JSON.readTree(json);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Could not read demo JSON", e);
+        }
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

@@ -194,6 +194,75 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void theDemoWorkflowsCanBeReadWithTheirRuns() throws Exception {
+        String token = openSession();
+        String project = DemoTenant.PROJECT_ID.toString();
+
+        MvcResult listed = mockMvc.perform(get("/api/v1/projects/" + project + "/workflows")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andReturn();
+        for (JsonNode workflow : objectMapper.readTree(listed.getResponse().getContentAsString())) {
+            assertThat(workflow.get("enabled").asBoolean()).as(workflow.get("name").asText()).isTrue();
+            assertThat(workflow.get("totalExecutions").asInt()).as(workflow.get("name").asText()).isPositive();
+            assertThat(workflow.get("definition").get("nodes").size()).isGreaterThan(2);
+            String id = workflow.get("id").asText();
+
+            mockMvc.perform(get("/api/v1/projects/" + project + "/workflows/" + id)
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.definition.edges").isNotEmpty());
+            MvcResult runs = mockMvc.perform(get("/api/v1/projects/" + project + "/workflows/" + id + "/executions")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content").isNotEmpty())
+                    .andExpect(jsonPath("$.content[0].steps").isNotEmpty())
+                    .andReturn();
+            String runId = objectMapper.readTree(runs.getResponse().getContentAsString())
+                    .get("content").get(0).get("id").asText();
+            mockMvc.perform(get("/api/v1/projects/" + project + "/workflows/" + id + "/executions/" + runId)
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.steps").isNotEmpty());
+        }
+    }
+
+    @Test
+    void theDemoWorkflowsCannotBeChangedRunOrDeleted() throws Exception {
+        String token = openSession();
+        String base = "/api/v1/projects/" + DemoTenant.PROJECT_ID + "/workflows/";
+        UUID workflow = jdbc.queryForObject("SELECT id FROM workflows WHERE organization_id = ? ORDER BY id LIMIT 1",
+                UUID.class, DemoTenant.ORGANIZATION_ID);
+        String definitionBefore = jdbc.queryForObject("SELECT definition::text FROM workflows WHERE id = ?",
+                String.class, workflow);
+        int runsBefore = count("workflow_executions");
+
+        mockMvc.perform(request(HttpMethod.PUT, base + workflow).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Hijacked\",\"definition\":{\"nodes\":[],\"edges\":[]}}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("demo_read_only"));
+        mockMvc.perform(request(HttpMethod.PATCH, base + workflow + "/toggle")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("demo_read_only"));
+        mockMvc.perform(post(base + workflow + "/trigger").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"data\":{\"total\":\"999.00\"}}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("demo_read_only"));
+        mockMvc.perform(request(HttpMethod.DELETE, base + workflow).header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("demo_read_only"));
+
+        assertThat(jdbc.queryForObject("SELECT definition::text FROM workflows WHERE id = ?", String.class, workflow))
+                .isEqualTo(definitionBefore);
+        assertThat(jdbc.queryForObject("SELECT enabled FROM workflows WHERE id = ?", Boolean.class, workflow)).isTrue();
+        assertThat(count("workflow_executions")).isEqualTo(runsBefore);
+    }
+
+    @Test
     void exportsAreRefusedAlthoughTheyAreReads() throws Exception {
         String token = openSession();
 
@@ -320,6 +389,12 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
                 Integer.class, DemoTenant.ORGANIZATION_ID)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox_messages WHERE project_id = ?",
                 Integer.class, DemoTenant.PROJECT_ID)).isZero();
+        // What the workflow engine picks up: a run to resume, a run presumed hung, a trigger to announce.
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM workflow_executions WHERE organization_id = ? "
+                        + "AND (status NOT IN ('COMPLETED', 'FAILED') OR resume_at IS NOT NULL)",
+                Integer.class, DemoTenant.ORGANIZATION_ID)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM workflow_trigger_outbox WHERE project_id = ?",
+                Integer.class, DemoTenant.PROJECT_ID)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM endpoints WHERE organization_id = ? "
                         + "AND url NOT LIKE 'https://%.example/%'",
                 Integer.class, DemoTenant.ORGANIZATION_ID)).isZero();
@@ -350,6 +425,7 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
         assertThat(count("subscriptions")).isEqualTo(11);
         assertThat(count("incoming_sources")).isEqualTo(2);
         assertThat(count("incoming_destinations")).isEqualTo(3);
+        assertThat(count("workflows")).isEqualTo(3);
         assertThat(jdbc.queryForObject("SELECT secret_encrypted FROM endpoints WHERE organization_id = ? "
                 + "ORDER BY id LIMIT 1", String.class, DemoTenant.ORGANIZATION_ID)).isEqualTo(secretBefore);
         // Replaced, not appended: the same order of magnitude, not twice or three times as much.

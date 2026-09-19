@@ -35,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DemoDataRemovalIntegrationTest extends AbstractIntegrationTest {
 
     private static final List<String> DEMO_TABLES = List.of(
+            "workflow_step_executions", "workflow_executions", "workflows",
             "incoming_forward_attempts", "incoming_events", "incoming_destinations", "incoming_sources",
             "delivery_attempts", "deliveries", "events", "subscriptions", "endpoints", "projects", "memberships");
 
@@ -82,6 +83,7 @@ class DemoDataRemovalIntegrationTest extends AbstractIntegrationTest {
         assertThat(removed.events()).isPositive();
         assertThat(removed.deliveries()).isPositive();
         assertThat(removed.incomingEvents()).isPositive();
+        assertThat(removed.workflowExecutions()).isPositive();
         assertThat(rowsOf(DemoTenant.ORGANIZATION_ID)).isZero();
         assertThat(count("SELECT COUNT(*) FROM organizations WHERE id = ?", DemoTenant.ORGANIZATION_ID)).isZero();
         assertThat(count("SELECT COUNT(*) FROM users WHERE id = ?", DemoTenant.USER_ID)).isZero();

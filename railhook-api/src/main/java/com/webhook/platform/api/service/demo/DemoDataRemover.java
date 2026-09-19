@@ -33,13 +33,13 @@ public class DemoDataRemover {
 
     /** What one run removed. {@code organization} and {@code user} say whether those rows went. */
     public record Removed(boolean organization, boolean user, int events, int deliveries, int attempts,
-                          int incomingEvents, int forwards) {
+                          int incomingEvents, int forwards, int workflowExecutions) {
 
-        static final Removed NOTHING = new Removed(false, false, 0, 0, 0, 0, 0);
+        static final Removed NOTHING = new Removed(false, false, 0, 0, 0, 0, 0, 0);
 
         public boolean anything() {
             return organization || user || events > 0 || deliveries > 0 || attempts > 0
-                    || incomingEvents > 0 || forwards > 0;
+                    || incomingEvents > 0 || forwards > 0 || workflowExecutions > 0;
         }
     }
 
@@ -75,10 +75,10 @@ public class DemoDataRemover {
         });
         if (removed != null && removed.anything()) {
             log.info("Demo disabled, its data removed: organization {}, user {}, {} events, {} deliveries, "
-                            + "{} attempts, {} incoming events, {} forwards",
+                            + "{} attempts, {} incoming events, {} forwards, {} workflow runs",
                     removed.organization() ? "deleted" : "absent", removed.user() ? "deleted" : "kept",
                     removed.events(), removed.deliveries(), removed.attempts(), removed.incomingEvents(),
-                    removed.forwards());
+                    removed.forwards(), removed.workflowExecutions());
         }
         return removed == null ? Removed.NOTHING : removed;
     }
@@ -98,6 +98,7 @@ public class DemoDataRemover {
 
         // The structure the seeder inserted, children first; the organization's cascades would
         // reach all of it, but an explicit order does not depend on every foreign key saying so.
+        jdbc.update("DELETE FROM workflows WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         jdbc.update("DELETE FROM incoming_destinations WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         jdbc.update("DELETE FROM incoming_sources WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         jdbc.update("DELETE FROM subscriptions WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
@@ -114,6 +115,6 @@ public class DemoDataRemover {
                 DemoTenant.USER_ID, DemoDataSeeder.DEMO_EMAIL, DemoTenant.USER_ID) > 0;
 
         return new Removed(organization, user, history.events(), history.deliveries(), history.attempts(),
-                history.incomingEvents(), history.forwards());
+                history.incomingEvents(), history.forwards(), history.workflowExecutions());
     }
 }
