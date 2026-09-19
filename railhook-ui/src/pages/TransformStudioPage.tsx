@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import {
   Play, Copy, RotateCcw, Download, Zap, Send, Globe, Shield, Wand2, X,
 } from 'lucide-react';
@@ -8,6 +8,7 @@ import { showSuccess, showApiError } from '../lib/toast';
 import { formatJson } from '../lib/json';
 import { useTransformPreview, useTransformations, useEvents, useEndpoints, useDeliveryDryRun } from '../api/queries';
 import PageHeader from '../components/PageHeader';
+import DetailBreadcrumb from '../components/DetailBreadcrumb';
 import { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import JsonEditor from '../components/JsonEditor';
@@ -59,6 +60,8 @@ function isUnchanged(input: string, output: string): boolean {
 export default function TransformStudioPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
+  const [searchParams] = useSearchParams();
+  const openedFor = searchParams.get('transformationId');
 
   const [mode, setMode] = useState<StudioMode>('preview');
   const [inputPayload, setInputPayload] = useState(SAMPLE_PAYLOAD);
@@ -86,6 +89,17 @@ export default function TransformStudioPage() {
   } = useEvents(projectId, 0, eventPageSize, 'createdAt,desc', eventSearch || undefined);
   const recentEvents = recentEventsData?.content ?? [];
   const hasMoreEvents = recentEventsData ? !recentEventsData.last : false;
+
+  // Opened from a transformation's row: start with that transformation loaded, once.
+  const [appliedOpenedFor, setAppliedOpenedFor] = useState(false);
+  useEffect(() => {
+    if (appliedOpenedFor || !openedFor) return;
+    const opened = transformations.find((item) => item.id === openedFor);
+    if (!opened) return;
+    setSelectedTransformationId(opened.id);
+    setTransformExpr(formatJson(opened.template));
+    setAppliedOpenedFor(true);
+  }, [appliedOpenedFor, openedFor, transformations]);
 
   const isJsonTemplate = () => transformExpr.trim().startsWith('{') || transformExpr.trim().startsWith('[');
 
@@ -269,8 +283,9 @@ export default function TransformStudioPage() {
 
         {transformations.length > 0 && (
           <div className="space-y-1.5">
-            <Label className="text-xs">{t('transform.savedTransformation')}</Label>
+            <Label htmlFor="studio-transformation" className="text-xs">{t('transform.savedTransformation')}</Label>
             <Select
+              id="studio-transformation"
               value={selectedTransformationId}
               onChange={(e) => {
                 const id = e.target.value;
@@ -366,6 +381,7 @@ export default function TransformStudioPage() {
 
   return (
     <div className="p-4 lg:p-6">
+      <DetailBreadcrumb projectId={projectId} current={t('transform.title')} />
       <PageHeader title={t('transform.title')} description={t('transform.subtitle')} />
       <Workbench
         input={input}

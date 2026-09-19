@@ -1,20 +1,15 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import {
-  Plus, Webhook, Loader2, Trash2, Power, PowerOff, RefreshCw, Send, ShieldCheck,
-} from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ChevronRight, Plus, Webhook, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useQueryClient } from '@tanstack/react-query';
-import { showApiError, showError, showSuccess, showCriticalSuccess } from '../lib/toast';
+import { showApiError, showError, showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge, { EnabledBadge, type StatusKind } from '../components/StatusBadge';
-import { endpointsApi, type EndpointTestResponse } from '../api/endpoints.api';
 import {
-  useProject, useEndpointsPaged, useCreateEndpoint, useDeleteEndpoint, useUpdateEndpoint,
-  useRotateSecret, useVerifyEndpoint, useSkipVerification, useConsumerNames,
+  useProject, useEndpointsPaged, useCreateEndpoint, useVerifyEndpoint, useSkipVerification, useConsumerNames,
 } from '../api/queries';
 import type { EndpointResponse, SignatureScheme } from '../types/api.types';
 import { Button } from '../components/ui/button';
@@ -30,11 +25,6 @@ import { TablePagination } from '../components/ui/table-pagination';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '../components/ui/alert-dialog';
-import MtlsConfigModal from '../components/MtlsConfigModal';
 import SignatureSchemePicker from '../components/SignatureSchemePicker';
 import SecretField from '../components/SecretField';
 import IntegrationSnippet from '../components/IntegrationSnippet';
@@ -42,13 +32,14 @@ import { verifySignatureSnippets } from '../lib/integrationSnippets';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
-import ConfirmDialog from '../components/ConfirmDialog';
 
 /**
  * The flat list of Endpoints — one half of a connection, for the times you
  * want to work on endpoints as endpoints: add one without subscribing it to
- * anything yet, retire one, or find the one whose verification never landed.
- * The Connections tab is where the two halves are seen together.
+ * anything yet, or find the one whose verification never landed. Connections
+ * is where the two halves are seen together, and a row here opens the
+ * endpoint's own page, which is where it is tested, turned off or deleted —
+ * those used to be a row of five unlabelled icons at the end of each row.
  */
 
 function generateSecret(): string {
@@ -74,7 +65,7 @@ export default function EndpointsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageEndpoints } = usePermissions();
-  const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [url, setUrl] = useState('');
@@ -82,17 +73,10 @@ export default function EndpointsPage() {
   const [rateLimitPerSecond, setRateLimitPerSecond] = useState<number | undefined>(undefined);
   const [allowedSourceIps, setAllowedSourceIps] = useState('');
   const [signatureScheme, setSignatureScheme] = useState<SignatureScheme>('BOTH');
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [toggleId, setToggleId] = useState<string | null>(null);
-  const [rotateId, setRotateId] = useState<string | null>(null);
   const [newSecret, setNewSecret] = useState<string | null>(null);
   // Which endpoint the secret on screen belongs to, so the verification code next to it is routed
   // on that endpoint's path and checks the headers it is actually sent.
   const [secretOwner, setSecretOwner] = useState<{ url?: string; scheme?: SignatureScheme } | null>(null);
-  const [testId, setTestId] = useState<string | null>(null);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<EndpointTestResponse | null>(null);
-  const [mtlsEndpoint, setMtlsEndpoint] = useState<EndpointResponse | null>(null);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [skippingId, setSkippingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
@@ -107,9 +91,7 @@ export default function EndpointsPage() {
     error: endpointsError, refetch: refetchEndpoints,
   } = useEndpointsPaged(projectId, currentPage, pageSize);
 
-  const endpoints = pageInfo?.content ?? [];
-  const [localEndpointOverrides, setLocalEndpointOverrides] = useState<Record<string, EndpointResponse>>({});
-  const displayEndpoints = endpoints.map((e) => localEndpointOverrides[e.id] ?? e);
+  const displayEndpoints = pageInfo?.content ?? [];
   // Only a project that hands endpoints to its own users has a Consumer column to show.
   const showConsumers = displayEndpoints.some((e) => e.consumerId);
   const { data: consumerNames } = useConsumerNames(projectId, showConsumers);
@@ -120,15 +102,9 @@ export default function EndpointsPage() {
   const retry = () => { refetchProject(); refetchEndpoints(); };
 
   const createEndpoint = useCreateEndpoint(projectId!);
-  const deleteEndpoint = useDeleteEndpoint(projectId!);
-  const updateEndpoint = useUpdateEndpoint(projectId!);
-  const rotateSecret = useRotateSecret(projectId!);
   const verifyEndpoint = useVerifyEndpoint(projectId!);
   const skipVerification = useSkipVerification(projectId!);
   const creating = createEndpoint.isPending;
-  const deleting = deleteEndpoint.isPending;
-  const toggling = updateEndpoint.isPending;
-  const rotating = rotateSecret.isPending;
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,81 +135,11 @@ export default function EndpointsPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
-    try {
-      await deleteEndpoint.mutateAsync(deleteId);
-      showCriticalSuccess(t('endpoints.toast.deleted'));
-      setDeleteId(null);
-    } catch (err) {
-      showApiError(err, 'endpoints.toast.deleteFailed');
-    }
-  };
 
-  const handleToggle = async () => {
-    const endpoint = displayEndpoints.find((e) => e.id === toggleId);
-    if (!endpoint) return;
-    try {
-      await updateEndpoint.mutateAsync({
-        id: endpoint.id,
-        data: {
-          url: endpoint.url,
-          description: endpoint.description,
-          enabled: !endpoint.enabled,
-          rateLimitPerSecond: endpoint.rateLimitPerSecond,
-        },
-      });
-      showSuccess(endpoint.enabled ? t('endpoints.toast.disabled') : t('endpoints.toast.enabled'));
-      setToggleId(null);
-    } catch (err) {
-      showApiError(err, 'endpoints.toast.toggleFailed');
-    }
-  };
-
-  const handleRotateSecret = async () => {
-    if (!rotateId) return;
-    try {
-      const response = await rotateSecret.mutateAsync(rotateId);
-      const rotated = displayEndpoints.find((e) => e.id === rotateId);
-      setSecretOwner({ url: rotated?.url, scheme: rotated?.signatureScheme });
-      setNewSecret(response.secret || null);
-      showSuccess(t('endpoints.toast.secretRotated'));
-    } catch (err) {
-      showApiError(err, 'endpoints.toast.rotateFailed');
-      setRotateId(null);
-    }
-  };
 
   const closeSecretDialog = () => {
-    setRotateId(null);
     setNewSecret(null);
     setSecretOwner(null);
-  };
-
-  const handleTest = async (endpointId: string) => {
-    if (!projectId) return;
-    setTestId(endpointId);
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const result = await endpointsApi.test(projectId, endpointId);
-      setTestResult(result);
-      if (result.success) {
-        showSuccess(t('endpoints.toast.testSuccess', { status: result.httpStatusCode, latency: result.latencyMs }));
-      } else {
-        showError(t('endpoints.toast.testFailed', { message: result.message }));
-      }
-    } catch (err) {
-      showApiError(err, 'endpoints.toast.testError');
-      setTestId(null);
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const closeTestDialog = () => {
-    setTestId(null);
-    setTestResult(null);
   };
 
   const handleVerify = async (endpointId: string) => {
@@ -264,8 +170,6 @@ export default function EndpointsPage() {
       setSkippingId(null);
     }
   };
-
-  const toggleEndpoint = displayEndpoints.find((e) => e.id === toggleId);
 
   if (loading) {
     return (
@@ -331,16 +235,25 @@ export default function EndpointsPage() {
                   <TableHead>{t('endpoints.verification')}</TableHead>
                   <TableHead>{t('endpoints.status')}</TableHead>
                   <TableHead>{t('subscriptions.created')}</TableHead>
-                  <TableHead className="w-[160px] text-right">
-                    <span className="sr-only">{t('common.actions')}</span>
-                  </TableHead>
+                  <TableHead className="hidden w-[36px] sm:table-cell"><span className="sr-only">{t('connections.open')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {displayEndpoints.map((endpoint) => (
-                  <TableRow key={endpoint.id}>
-                    <TableCell className="max-w-[320px]">
-                      <div className="truncate font-mono text-[13px]" title={endpoint.url}>{endpoint.url}</div>
+                  <TableRow
+                    key={endpoint.id}
+                    className="group/row cursor-pointer"
+                    onClick={() => navigate(`/admin/projects/${projectId}/endpoints/${endpoint.id}`)}
+                  >
+                    <TableCell data-card-title className="max-w-[320px]">
+                      <Link
+                        to={`/admin/projects/${projectId}/endpoints/${endpoint.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="block truncate rounded font-mono text-[13px] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        title={endpoint.url}
+                      >
+                        {endpoint.url}
+                      </Link>
                       <div className="flex items-center gap-2">
                         {endpoint.description && (
                           <span className="truncate text-xs text-muted-foreground">{endpoint.description}</span>
@@ -360,6 +273,7 @@ export default function EndpointsPage() {
                         {endpoint.consumerId ? (
                           <Link
                             to={`/admin/projects/${projectId}/consumers`}
+                            onClick={(e) => e.stopPropagation()}
                             className="text-[13px] underline-offset-4 hover:underline"
                           >
                             {consumerNames?.get(endpoint.consumerId) ?? endpoint.consumerId.substring(0, 8)}
@@ -381,7 +295,7 @@ export default function EndpointsPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleVerify(endpoint.id)}
+                              onClick={(e) => { e.stopPropagation(); handleVerify(endpoint.id); }}
                               disabled={verifyingId === endpoint.id}
                             >
                               {verifyingId === endpoint.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -390,7 +304,7 @@ export default function EndpointsPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleSkipVerification(endpoint.id)}
+                              onClick={(e) => { e.stopPropagation(); handleSkipVerification(endpoint.id); }}
                               disabled={skippingId === endpoint.id}
                             >
                               {skippingId === endpoint.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -406,54 +320,8 @@ export default function EndpointsPage() {
                         {formatDate(endpoint.createdAt)}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        {canManageEndpoints && (
-                          <>
-                            <Button
-                              variant="ghost" size="icon-sm"
-                              onClick={() => handleTest(endpoint.id)}
-                              disabled={testing && testId === endpoint.id}
-                              title={t('endpoints.test')} aria-label={t('endpoints.test')}
-                            >
-                              {testing && testId === endpoint.id
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <Send className="h-3.5 w-3.5" />}
-                            </Button>
-                            <Button
-                              variant="ghost" size="icon-sm"
-                              onClick={() => setToggleId(endpoint.id)}
-                              title={endpoint.enabled ? t('common.disable') : t('common.enable')}
-                              aria-label={endpoint.enabled ? t('common.disable') : t('common.enable')}
-                            >
-                              {endpoint.enabled ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
-                            </Button>
-                            <Button
-                              variant="ghost" size="icon-sm"
-                              onClick={() => setRotateId(endpoint.id)}
-                              title={t('endpoints.rotateSecret')} aria-label={t('endpoints.rotateSecret')}
-                            >
-                              <RefreshCw className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost" size="icon-sm"
-                              onClick={() => setMtlsEndpoint(endpoint)}
-                              title={endpoint.mtlsEnabled ? t('endpoints.configureMtls') : t('endpoints.enableMtls')}
-                              aria-label={endpoint.mtlsEnabled ? t('endpoints.configureMtls') : t('endpoints.enableMtls')}
-                            >
-                              <ShieldCheck className={endpoint.mtlsEnabled ? 'h-3.5 w-3.5 text-primary' : 'h-3.5 w-3.5'} />
-                            </Button>
-                            <Button
-                              variant="ghost" size="icon-sm"
-                              onClick={() => setDeleteId(endpoint.id)}
-                              title={t('common.delete')} aria-label={t('common.delete')}
-                              className="text-muted-foreground hover:text-halt"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                    <TableCell className="hidden sm:table-cell">
+                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover/row:text-foreground" aria-hidden />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -545,50 +413,6 @@ export default function EndpointsPage() {
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog
-        open={!!deleteId}
-        onOpenChange={(open) => !open && setDeleteId(null)}
-        title={t('endpoints.deleteDialog.title')}
-        description={t('endpoints.deleteDialog.description')}
-        onConfirm={handleDelete}
-        loading={deleting}
-      />
-
-      <AlertDialog open={!!toggleId && !newSecret} onOpenChange={(open) => !open && setToggleId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {toggleEndpoint?.enabled ? t('endpoints.toggleDialog.disableTitle') : t('endpoints.toggleDialog.enableTitle')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {toggleEndpoint?.enabled ? t('endpoints.toggleDialog.disableDesc') : t('endpoints.toggleDialog.enableDesc')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={toggling}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleToggle} disabled={toggling}>
-              {toggling && <Loader2 className="h-4 w-4 animate-spin" />}
-              {toggling ? t('endpoints.toggleDialog.processing') : t('common.confirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={!!rotateId && !newSecret} onOpenChange={(open) => !open && setRotateId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('endpoints.rotateDialog.title')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('endpoints.rotateDialog.description')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={rotating}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRotateSecret} disabled={rotating}>
-              {rotating && <Loader2 className="h-4 w-4 animate-spin" />}
-              {rotating ? t('endpoints.rotateDialog.rotating') : t('endpoints.rotateDialog.submit')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* The secret is shown once, masked until asked for. */}
       <Dialog open={!!newSecret} onOpenChange={closeSecretDialog}>
@@ -610,69 +434,6 @@ export default function EndpointsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <Dialog open={!!testResult} onOpenChange={closeTestDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{t('endpoints.testDialog.title')}</DialogTitle>
-            <DialogDescription>{t('endpoints.testDialog.description')}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="flex items-center gap-3 rounded-lg border border-rail p-4">
-              <StatusBadge
-                kind={testResult?.success ? 'ok' : 'halt'}
-                label={testResult?.success ? t('endpoints.testDialog.success') : t('endpoints.testDialog.failed')}
-              />
-              <span className="font-mono text-xs text-muted-foreground">
-                {testResult?.httpStatusCode ? `HTTP ${testResult.httpStatusCode} · ` : ''}
-                {testResult?.latencyMs ? `${testResult.latencyMs}ms` : t('endpoints.testDialog.noResponse')}
-              </span>
-            </div>
-
-            {testResult?.responseBody && (
-              <div className="space-y-1.5">
-                <div className="mono-label">{t('endpoints.testDialog.responseBody')}</div>
-                <pre className="max-h-48 overflow-auto rounded-md border border-rail bg-secondary/40 p-3 font-mono text-xs">
-                  {testResult.responseBody}
-                </pre>
-              </div>
-            )}
-
-            {testResult?.errorMessage && (
-              <div className="space-y-1.5">
-                <div className="mono-label">{t('endpoints.testDialog.errorMessage')}</div>
-                <p className="rounded-md border border-halt/30 bg-halt-soft p-3 text-sm text-halt">
-                  {testResult.errorMessage}
-                </p>
-              </div>
-            )}
-
-            {testResult?.message && (
-              <div className="space-y-1.5">
-                <div className="mono-label">{t('endpoints.testDialog.message')}</div>
-                <p className="text-sm text-muted-foreground">{testResult.message}</p>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={closeTestDialog}>{t('common.close')}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {mtlsEndpoint && projectId && (
-        <MtlsConfigModal
-          open={!!mtlsEndpoint}
-          onOpenChange={(open) => !open && setMtlsEndpoint(null)}
-          projectId={projectId}
-          endpoint={mtlsEndpoint}
-          onUpdate={(updated) => {
-            setLocalEndpointOverrides((prev) => ({ ...prev, [updated.id]: updated }));
-            queryClient.invalidateQueries({ queryKey: ['endpoints', projectId] });
-            setMtlsEndpoint(null);
-          }}
-        />
-      )}
     </div>
   );
 }

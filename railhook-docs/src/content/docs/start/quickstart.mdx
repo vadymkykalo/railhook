@@ -31,11 +31,11 @@ In about ten minutes you will have a project, an API key, and an event delivered
 
 2. **Create a project and an API key**
 
-   In the dashboard, create a project, then open **API Keys** and create a key with the `READ_WRITE` scope. The key is shown once. Only its hash is stored, so copy it now.
+   In the dashboard, create a project, then open **Settings → API Keys** and create a key with the `READ_WRITE` scope. The key is shown once. Only its hash is stored, so copy it now.
 
 3. **Add an endpoint and subscribe it**
 
-   Open **Endpoints** and add the URL that should receive the webhook. Then open **Subscriptions** and subscribe that endpoint to the event type `order.completed`.
+   Open **Send events → Connections** and choose **New connection**. Add the URL that should receive the webhook and subscribe it to the event type `order.completed`.
 
    <Aside type="caution">
    Railhook refuses to deliver to private and internal addresses by default. Use a URL that is reachable from the public internet.

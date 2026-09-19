@@ -233,11 +233,11 @@ export default function IncomingSourcesPage() {
               </TableHeader>
               <TableBody>
                 {sources.map((source) => (
-                  <TableRow key={source.id}>
-                    <TableCell>
+                  <TableRow key={source.id} className="cursor-pointer" onClick={() => openSource(source)}>
+                    <TableCell data-card-title>
                       <button
                         type="button"
-                        onClick={() => openSource(source)}
+                        onClick={(e) => { e.stopPropagation(); openSource(source); }}
                         className="text-left text-[13px] font-medium hover:text-primary hover:underline"
                       >
                         {source.name}
@@ -258,7 +258,7 @@ export default function IncomingSourcesPage() {
                         </code>
                         <Button
                           variant="ghost" size="icon-sm"
-                          onClick={() => copyIngressUrl(source.ingressUrl)}
+                          onClick={(e) => { e.stopPropagation(); copyIngressUrl(source.ingressUrl); }}
                           title={t('incomingSources.howToSend.copy')}
                           aria-label={t('incomingSources.howToSend.copy')}
                         >
@@ -287,13 +287,13 @@ export default function IncomingSourcesPage() {
                         {canManageIncomingSources && (
                           <>
                             <Button
-                              variant="ghost" size="icon-sm" onClick={() => openEdit(source)}
+                              variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); openEdit(source); }}
                               title={t('common.edit')} aria-label={t('common.edit')}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                             <Button
-                              variant="ghost" size="icon-sm" onClick={() => setDeleteId(source.id)}
+                              variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setDeleteId(source.id); }}
                               title={t('common.delete')} aria-label={t('common.delete')}
                               className="text-muted-foreground hover:text-halt"
                             >

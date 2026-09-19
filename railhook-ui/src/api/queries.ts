@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { projectsApi } from './projects.api';
 import { endpointsApi } from './endpoints.api';
 import { deliveriesApi, type DeliveryFilters, type BulkReplayRequest } from './deliveries.api';
@@ -57,6 +57,7 @@ export const queryKeys = {
     endpoints: {
         list: (projectId: string) => ['endpoints', projectId] as const,
         paged: (projectId: string, page: number, size: number) => ['endpoints', projectId, 'paged', page, size] as const,
+        detail: (projectId: string, id: string) => ['endpoints', projectId, 'detail', id] as const,
     },
     deliveries: {
         list: (projectId: string, filters: DeliveryFilters) => ['deliveries', projectId, filters] as const,
@@ -238,6 +239,14 @@ export function useEndpointsPaged(projectId: string | undefined, page: number, s
         queryFn: () => endpointsApi.listPaged(projectId!, page, size),
         enabled: !!projectId,
         placeholderData: keepPreviousData,
+    });
+}
+
+export function useEndpoint(projectId: string | undefined, endpointId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.endpoints.detail(projectId!, endpointId!),
+        queryFn: () => endpointsApi.get(projectId!, endpointId!),
+        enabled: !!projectId && !!endpointId,
     });
 }
 
@@ -629,6 +638,34 @@ export function useDeleteIncomingSource(projectId: string) {
         mutationFn: (id: string) => incomingSourcesApi.delete(projectId, id),
         onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-sources', projectId] }); },
     });
+}
+
+/** A project has a handful of sources; the connection map shows up to this many. */
+const INCOMING_MAP_LIMIT = 50;
+
+/**
+ * Every source with the destinations it forwards to: the incoming half of the connection map.
+ * One request per source, because the API lists destinations only under their source.
+ */
+export function useIncomingConnections(projectId: string | undefined) {
+    const sources = useIncomingSources(projectId, 0, INCOMING_MAP_LIMIT);
+    const list = sources.data?.content ?? [];
+    const destinations = useQueries({
+        queries: list.map((source) => ({
+            queryKey: queryKeys.incomingDestinations.list(projectId!, source.id, 0, INCOMING_MAP_LIMIT),
+            queryFn: () => incomingDestinationsApi.list(projectId!, source.id, 0, INCOMING_MAP_LIMIT),
+            enabled: !!projectId,
+        })),
+    });
+    return {
+        isLoading: sources.isLoading,
+        isError: sources.isError,
+        rows: list.map((source, i) => ({
+            source,
+            destinations: destinations[i]?.data?.content ?? [],
+            loading: destinations[i]?.isLoading ?? true,
+        })),
+    };
 }
 
 // ─── Incoming Destinations ────────────────────────────────────────
