@@ -13,7 +13,7 @@ By default Twilio waits 5 seconds to connect and 15 seconds for a response, and 
 So a status callback that arrives while your app is restarting is usually lost, and your records of which messages were delivered drift from Twilio's. With Railhook in front:
 
 - Twilio is answered as soon as the callback is stored.
-- Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed Forwards**.
+- Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed forwards**.
 - A callback carrying an `I-Twilio-Idempotency-Token` Railhook has already stored is answered with the stored copy and not forwarded again.
 
 <Aside type="caution" title="Not for webhooks that must answer with TwiML">
@@ -54,7 +54,7 @@ export PROJECT_ID=...
 
 3. **Give Twilio the URL.** Pass the `ingressUrl` exactly as the source shows it wherever Twilio takes a status callback URL, such as the `StatusCallback` parameter when you send a message. Keep the method `POST`: the ingress accepts nothing else.
 
-4. **Send a message.** Its status callbacks appear under **Incoming → Received**, with one forward per destination.
+4. **Send a message.** Its status callbacks appear under **Incoming → Incoming events**, with one forward per destination.
 
 </Steps>
 

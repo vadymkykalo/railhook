@@ -69,7 +69,7 @@ By default a new endpoint starts as `SKIPPED` and receives deliveries straight a
 | `payloadTemplate` | An inline template, used when no `transformationId` is set. |
 | `customHeaders` | Extra HTTP headers, as a JSON object in a string. |
 
-Leave `maxAttempts` and `retryDelays` out to get the default Outgoing retry ladder, see [Retries and failed messages](/docs/outgoing/retries/).
+Leave `maxAttempts` and `retryDelays` out to get the default Outgoing retry ladder, see [Retries and failed deliveries](/docs/outgoing/retries/).
 
 ### Event type patterns
 
@@ -200,6 +200,6 @@ To check that an endpoint answers before real traffic reaches it, use `POST /api
 
 <CardGrid>
   <LinkCard title="Verify signatures" href="/docs/outgoing/signatures/" description="Check that a delivery really came from Railhook." />
-  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="What happens when the endpoint does not answer 2xx." />
-  <LinkCard title="Rules" href="/docs/outgoing/rules/" description="Route, reshape or drop events by their content." />
+  <LinkCard title="Retries and failed deliveries" href="/docs/outgoing/retries/" description="What happens when the endpoint does not answer 2xx." />
+  <LinkCard title="Routing rules" href="/docs/outgoing/rules/" description="Route, reshape or drop events by their content." />
 </CardGrid>

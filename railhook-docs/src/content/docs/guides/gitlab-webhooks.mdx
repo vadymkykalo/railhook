@@ -13,7 +13,7 @@ GitLab disables a webhook that keeps failing. After four consecutive failures it
 A few bad deploys can therefore switch your integration off without anyone noticing. With Railhook in front:
 
 - GitLab's requests are answered as soon as they are stored, so they do not time out or fail because of your service.
-- Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed Forwards**.
+- Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed forwards**.
 - A duplicate carrying the same `webhook-id` or `Idempotency-Key` header is answered with the stored copy and not forwarded again.
 
 ## Connect GitLab
@@ -56,7 +56,7 @@ export PROJECT_ID=...
 
 4. **Register the webhook in GitLab.** In the project or group, open **Settings → Webhooks** and add a new webhook. Paste the `ingressUrl` as the **URL**, the same token as the **Secret token**, and select the triggers you want.
 
-5. **Send a test** with the webhook's **Test** button. It appears under **Incoming → Received**, with one forward per destination.
+5. **Send a test** with the webhook's **Test** button. It appears under **Incoming → Incoming events**, with one forward per destination.
 
 </Steps>
 

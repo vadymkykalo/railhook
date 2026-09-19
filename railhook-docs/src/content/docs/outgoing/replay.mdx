@@ -1,14 +1,14 @@
 ---
-title: Replay and Time Machine
+title: Replay
 description: Resend one delivery, or rebuild deliveries from stored events for a time range, and know which of the two you need.
 ---
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Two operations are easy to confuse. Resending a delivery puts the same delivery back on its retry ladder. A **replay** builds new deliveries from events Railhook already stored. The dashboard calls replay the **Time Machine**.
+Two operations are easy to confuse. Resending a delivery puts the same delivery back on its retry ladder. A **replay** builds new deliveries from events Railhook already stored. In the dashboard, replaying a time range is **Replay by time range**.
 
 ## Which one you want
 
-| | Resend a delivery | Replay (Time Machine) |
+| | Resend a delivery | Replay |
 |---|---|---|
 | Works on | One existing delivery | Stored events in a time range |
 | Delivery id | Kept | New |
@@ -30,9 +30,9 @@ Two query parameters change what it does:
 
 Use `fromAttempt` when 3 attempts are not enough, for example after a receiver was down for hours: `fromAttempt=1` gives back as many attempts as the whole ladder has.
 
-To resend many deliveries at once, use `POST /api/v1/deliveries/bulk-replay` with up to 1000 `deliveryIds`, or with a `projectId` plus `status` and `endpointId` filters and a `limit` of up to 5000. Without `status`, only deliveries that failed or were moved to Failed Messages are resent. A delivery that succeeded or has an attempt under way is always skipped. The response says how many were replayed, how many were skipped, and whether more matched.
+To resend many deliveries at once, use `POST /api/v1/deliveries/bulk-replay` with up to 1000 `deliveryIds`, or with a `projectId` plus `status` and `endpointId` filters and a `limit` of up to 5000. Without `status`, only deliveries that failed or were moved to Failed deliveries are resent. A delivery that succeeded or has an attempt under way is always skipped. The response says how many were replayed, how many were skipped, and whether more matched.
 
-To resend deliveries that were abandoned, you can also retry them from Failed Messages, see [Retries and failed messages](/docs/outgoing/retries/#failed-messages).
+To resend deliveries that were abandoned, you can also retry them from Failed deliveries, see [Retries and failed deliveries](/docs/outgoing/retries/#failed-deliveries).
 
 ## Replay a time range
 
@@ -78,7 +78,7 @@ Each replay creates new forwards that start again from attempt 1.
 ## Next steps
 
 <CardGrid>
-  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="The ladder a resent delivery walks again." />
+  <LinkCard title="Retries and failed deliveries" href="/docs/outgoing/retries/" description="The ladder a resent delivery walks again." />
   <LinkCard title="Ordering" href="/docs/outgoing/ordering/" description="Why a replay goes to the back of the sequence." />
   <LinkCard title="API reference" href="/docs/api-reference/" description="Full request and response shapes for replay." />
 </CardGrid>

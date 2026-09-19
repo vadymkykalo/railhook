@@ -37,7 +37,7 @@ A dash means Svix's pages we checked did not settle the point. It is not a claim
 ## When Railhook is the better choice
 
 - **You self-host and want every feature.** Svix's open-source server leaves out the App Portal and transformations. Railhook's MIT repository is the whole product: the embeddable customer portal, transformations, workflows, per-endpoint ordering, replay and PII masking run on your own server with no licence key.
-- **You both send and receive webhooks.** In Railhook, outgoing deliveries to your customers and incoming webhooks from Stripe, GitHub, Shopify and others share one attempt lifecycle, one dashboard and one list of failed messages. Svix offers the two directions as separate products.
+- **You both send and receive webhooks.** In Railhook, outgoing deliveries to your customers and incoming webhooks from Stripe, GitHub, Shopify and others share one attempt lifecycle, one dashboard and one place for failed deliveries and forwards. Svix offers the two directions as separate products.
 - **You want to develop against real webhooks locally.** `railhook listen 3000` opens a tunnel from a public URL to your machine, so a provider's test webhook reaches the code in your editor. See [CLI](/docs/tools/cli/).
 - **Your receivers already verify Svix signatures.** Railhook signs with the [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks) headers, the same scheme Svix libraries verify, so receivers keep working once they have the new secret.
 

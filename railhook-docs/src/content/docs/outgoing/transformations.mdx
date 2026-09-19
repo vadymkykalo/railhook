@@ -40,7 +40,7 @@ A template is not a script. It can read the payload and rearrange it; it cannot 
 |---|---|
 | Subscription, `transformationId` | A saved transformation applied to every delivery the subscription creates. |
 | Subscription, `payloadTemplate` | An inline template, used when no `transformationId` is set. |
-| Rule, `TRANSFORM` action | Overrides the subscription's transformation for the events the rule matches. When several matching rules transform, the last one wins. See [Rules](/docs/outgoing/rules/). |
+| Rule, `TRANSFORM` action | Overrides the subscription's transformation for the events the rule matches. When several matching rules transform, the last one wins. See [Routing rules](/docs/outgoing/rules/). |
 | Destination, `transformationId` | A saved transformation applied to forwarded incoming webhooks. |
 | Destination, `payloadTransform` | A single JSONPath expression, such as `$.data`, used when no `transformationId` is set. |
 | Workflow, `transform` node | Reshapes data inside a workflow. See [Workflows](/docs/outgoing/workflows/). |
@@ -83,7 +83,7 @@ Changing a transformation's template increments its version.
 ## Next steps
 
 <CardGrid>
-  <LinkCard title="Rules" href="/docs/outgoing/rules/" description="Apply a transformation only to events that match a condition." />
+  <LinkCard title="Routing rules" href="/docs/outgoing/rules/" description="Apply a transformation only to events that match a condition." />
   <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Transform incoming webhooks before they are forwarded." />
   <LinkCard title="PII masking" href="/docs/platform/pii-masking/" description="Hide personal data where people read payloads." />
 </CardGrid>

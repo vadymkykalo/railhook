@@ -23,7 +23,7 @@ summary; code, env vars, paths and HTTP stay untranslated.
 
 ```mdx
 ---
-title: Retries & failed messages
+title: Retries & failed deliveries
 description: One sentence, shown under the title and in search.
 ---
 import { Steps, Tabs, TabItem, Aside, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
