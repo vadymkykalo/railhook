@@ -8,7 +8,7 @@ import { docsUrl } from '../lib/docsUrl';
 import { hasMinRole, type Role } from '../auth/ProtectedRoute';
 import ProjectSwitcher from '../components/ProjectSwitcher';
 import OrganizationSwitcher from '../components/OrganizationSwitcher';
-import { PLATFORM_SECTION, PROJECT_SECTIONS, SETTINGS_SECTION, segmentOf, type NavSection } from './nav.config';
+import { PLATFORM_SECTION, PROJECT_SECTIONS, SETTINGS_SECTION, hintKeyOf, segmentOf, type NavSection } from './nav.config';
 import type { CurrentUserResponse } from '../types/api.types';
 
 interface SidebarProps {
@@ -31,16 +31,17 @@ function RailLink({
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const Icon = section.icon;
   const name = t(section.nameKey);
+  const hint = hintKeyOf(section);
 
   return (
     <Link
       to={section.path(projectId)}
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
-      title={collapsed ? name : undefined}
+      title={collapsed ? name : i18n.exists(hint) ? t(hint) : undefined}
       className={cn(
         'relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors',
         collapsed && 'justify-center px-2',

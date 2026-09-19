@@ -46,8 +46,9 @@ const source = (over: Partial<IncomingSourceResponse> = {}): IncomingSourceRespo
 
 const inputs = (
   status: Partial<OnboardingStatus> = {},
-  sources: IncomingSourceResponse[] = []
-): OnboardingInputs => ({ status: { ...NOTHING, ...status }, sources });
+  sources: IncomingSourceResponse[] = [],
+  hasConsumers = false
+): OnboardingInputs => ({ status: { ...NOTHING, ...status }, sources, hasConsumers });
 
 describe('trackFor', () => {
   it('honours the stored intent while the account is still empty', () => {
@@ -87,16 +88,16 @@ describe('trackFor', () => {
 });
 
 describe('stepsFor', () => {
-  it('offers four outgoing steps and three incoming ones', () => {
+  it('offers four outgoing steps, the optional portal, and three incoming ones', () => {
     expect(stepsFor('send', inputs()).map((s) => s.key))
-      .toEqual(['createConnection', 'createApiKey', 'sendEvent', 'seeDelivery']);
+      .toEqual(['createConnection', 'createApiKey', 'sendEvent', 'seeDelivery', 'offerPortal']);
     expect(stepsFor('receive', inputs()).map((s) => s.key))
       .toEqual(['createSource', 'verifySource', 'addDestination']);
   });
 
   it('offers both sets, outgoing first, for the both track', () => {
     expect(stepsFor('both', inputs()).map((s) => s.key)).toEqual([
-      'createConnection', 'createApiKey', 'sendEvent', 'seeDelivery',
+      'createConnection', 'createApiKey', 'sendEvent', 'seeDelivery', 'offerPortal',
       'createSource', 'verifySource', 'addDestination',
     ]);
   });
@@ -156,6 +157,7 @@ describe('stepsFor', () => {
         ]),
       },
       { key: 'addDestination', on: inputs({ hasIncomingDestinations: true }) },
+      { key: 'offerPortal', on: inputs({}, [], true) },
     ];
 
     for (const { key, on } of cases) {
@@ -164,6 +166,19 @@ describe('stepsFor', () => {
       expect(off.done, `${key} must start undone`).toBe(false);
       expect(lit.done, `${key} must tick on its own input`).toBe(true);
     }
+  });
+});
+
+describe('the portal step', () => {
+  it('is the only optional step', () => {
+    const optional = stepsFor('both', inputs()).filter((s) => s.optional).map((s) => s.key);
+    expect(optional).toEqual(['offerPortal']);
+  });
+
+  it('is not what stands between an account and "all done"', () => {
+    // Not every sender has users who manage their own endpoints; the checklist cannot demand it.
+    const sent = inputs({ hasEndpoints: true, hasSubscriptions: true, hasApiKeys: true, hasEvents: true, hasDeliveries: true });
+    expect(progressOf(stepsFor('send', sent))).toEqual({ done: 4, total: 4, allDone: true });
   });
 });
 

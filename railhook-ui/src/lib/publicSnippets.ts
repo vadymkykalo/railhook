@@ -12,12 +12,16 @@ import type { ProviderType } from '../types/api.types';
 export const CLI_LISTEN_EXAMPLE = 'railhook listen 3000';
 
 /**
- * The events endpoint of the API this dashboard itself talks to — the same origin `http.ts` sends
- * every request to. Not the site URL: that is what pages name about themselves (APP_BASE_URL), and
- * a stale one pointed the copied curl at a port nothing served.
+ * The API this dashboard itself talks to — the same origin `http.ts` sends every request to. Not
+ * the site URL: that is what pages name about themselves (APP_BASE_URL), and a stale one pointed
+ * the copied curl at a port nothing served.
  */
+export function apiBaseUrl(): string {
+  return (import.meta.env.VITE_API_URL || window.location.origin).replace(/\/+$/, '');
+}
+
 export function eventsEndpointUrl(): string {
-  return `${import.meta.env.VITE_API_URL || window.location.origin}/api/v1/events`;
+  return `${apiBaseUrl()}/api/v1/events`;
 }
 
 /** A `curl` that sends an event to this deployment. The key stays a placeholder. */

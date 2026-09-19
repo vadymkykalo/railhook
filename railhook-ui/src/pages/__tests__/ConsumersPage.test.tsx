@@ -69,6 +69,7 @@ describe('ConsumersPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
   });
 
@@ -80,6 +81,29 @@ describe('ConsumersPage', () => {
     vi.mocked(consumersApi.listPaged).mockResolvedValue(page([]));
     renderConsumers();
     expect(await screen.findByText(/no consumers yet/i)).toBeInTheDocument();
+  });
+
+  it('shows the backend code for the portal, prefilled with this project, when there are no consumers', async () => {
+    const user = userEvent.setup();
+    vi.mocked(consumersApi.listPaged).mockResolvedValue(page([]));
+    renderConsumers();
+
+    const section = await screen.findByRole('region', { name: /integrate the portal/i });
+    await user.click(within(section).getAllByRole('tab', { name: 'Node.js' })[0]);
+    const [backend, embed] = within(section).getAllByRole('tabpanel');
+    expect(backend).toHaveTextContent(`const PROJECT_ID = '${TEST_PROJECT_ID}'`);
+    expect(backend).toHaveTextContent('railhook.consumers.create(PROJECT_ID');
+    expect(backend).toHaveTextContent('railhook.portalSessions.create(PROJECT_ID, consumer.id');
+    expect(backend).toHaveTextContent('process.env.RAILHOOK_API_KEY');
+    expect(embed).toHaveTextContent('<iframe');
+  });
+
+  it('says what the portal is for, and keeps the code a click away once consumers exist', async () => {
+    vi.mocked(consumersApi.listPaged).mockResolvedValue(page([CONSUMER]));
+    renderConsumers();
+
+    expect(await screen.findByText(/a page you embed in your own product/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('tabpanel')[0]).toHaveTextContent(TEST_PROJECT_ID);
   });
 
   it('creates a consumer from its external id and name', async () => {
@@ -114,7 +138,7 @@ describe('ConsumersPage', () => {
     expect(await screen.findByText('https://acme.example.com/hooks')).toBeInTheDocument();
   });
 
-  it('opens the portal in a new tab through a fresh session', async () => {
+  it('previews the portal in a new tab through a fresh session', async () => {
     const user = userEvent.setup();
     const tab = { opener: {}, location: { href: '' }, close: vi.fn() };
     window.open = vi.fn(() => tab as unknown as Window);
@@ -122,7 +146,7 @@ describe('ConsumersPage', () => {
     vi.mocked(consumersApi.createPortalSession).mockResolvedValue(SESSION);
     renderConsumers();
 
-    await user.click(await screen.findByRole('button', { name: /open portal/i }));
+    await user.click(await screen.findByRole('button', { name: /preview portal/i }));
 
     await waitFor(() => expect(tab.location.href).toBe(SESSION.url));
     expect(consumersApi.createPortalSession).toHaveBeenCalledWith(TEST_PROJECT_ID, CONSUMER.id, undefined);
