@@ -43,6 +43,10 @@ const state = {
   mode: 'healthy', // healthy | slow | down
   slowLatencyMs: validLatency(configuredLatency) ? configuredLatency : 3000,
   failRemaining: 0,
+  // Which event type the forced failures are for; null means the next request whatever it is.
+  failType: null,
+  // Which receiver path the forced failures are for; null means the next request, whatever it is.
+  failPath: null,
   received: [], // { seq, receivedAtMs, sentAtMs, latencyMs, type, headers }
 };
 
@@ -68,7 +72,7 @@ function sendJson(res, status, body) {
   res.end(payload);
 }
 
-function handleWebhook(req, res, body) {
+function handleWebhook(req, res, body, requestPath) {
   const receivedAtMs = Date.now();
 
   let parsed = null;
@@ -88,6 +92,10 @@ function handleWebhook(req, res, body) {
   const sentAtMs = parsed && parsed.data && parsed.data.sentAtMs !== undefined ? parsed.data.sentAtMs : (parsed ? parsed.sentAtMs : undefined);
 
   const entry = {
+    // Which URL the delivery was sent to. A scenario subscribes its endpoint to a path of its
+    // own, and that — not the payload, which carries no event type — is what tells two
+    // scenarios' deliveries apart inside one receiver.
+    path: requestPath,
     seq,
     receivedAtMs,
     sentAtMs,
@@ -100,7 +108,12 @@ function handleWebhook(req, res, body) {
   };
   state.received.push(entry);
 
-  if (state.failRemaining > 0) {
+  // A forced failure belongs to the scenario that asked for it. Without the type guard the
+  // next request to arrive consumed it — including a retry still draining from the scenario
+  // before — and the probe that meant to induce one failure induced none, then passed.
+  if (state.failRemaining > 0
+      && (!state.failPath || state.failPath === entry.path)
+      && (!state.failType || state.failType === entry.type)) {
     state.failRemaining -= 1;
     entry.status = 500;
     sendJson(res, 500, { error: 'load-receiver: forced failure (fail-next)' });
@@ -121,17 +134,28 @@ function handleWebhook(req, res, body) {
   sendJson(res, 200, { ok: true });
 }
 
-function summarize() {
-  const seqs = state.received.map((r) => r.seq).filter((s) => typeof s === 'number');
+/**
+ * Counts over the received log, for one event type when asked.
+ *
+ * A run drives several scenarios through one receiver, and deliveries from the one before keep
+ * arriving after the next one resets — a retry ladder outlives the scenario that started it. Two
+ * unrelated streams interleaved look exactly like broken ordering, so a probe asks for its own
+ * path rather than for everything the receiver has seen.
+ */
+function summarize({ path, type } = {}) {
+  const received = state.received.filter(
+    (r) => (!path || r.path === path) && (!type || r.type === type),
+  );
+  const seqs = received.map((r) => r.seq).filter((s) => typeof s === 'number');
   let outOfOrder = 0;
   for (let i = 1; i < seqs.length; i++) {
     if (seqs[i] < seqs[i - 1]) outOfOrder++;
   }
-  const latencies = state.received.map((r) => r.latencyMs).filter((l) => typeof l === 'number').sort((a, b) => a - b);
+  const latencies = received.map((r) => r.latencyMs).filter((l) => typeof l === 'number').sort((a, b) => a - b);
   const p99 = latencies.length ? latencies[Math.min(latencies.length - 1, Math.floor(latencies.length * 0.99))] : null;
   const p50 = latencies.length ? latencies[Math.floor(latencies.length * 0.5)] : null;
   const okCountBySeq = new Map();
-  for (const r of state.received) {
+  for (const r of received) {
     if (typeof r.seq === 'number' && r.status >= 200 && r.status < 300) {
       okCountBySeq.set(r.seq, (okCountBySeq.get(r.seq) || 0) + 1);
     }
@@ -141,7 +165,7 @@ function summarize() {
     if (count > 1) duplicateDeliveries += count - 1;
   }
   return {
-    totalReceived: state.received.length,
+    totalReceived: received.length,
     distinctSeqs: new Set(seqs).size,
     seqsAnsweredOk: okCountBySeq.size,
     duplicateDeliveries,
@@ -182,32 +206,45 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/_control/fail-next') {
       const body = JSON.parse((await readBody(req)) || '{}');
       state.failRemaining = Number(body.count || 0);
-      console.log(`[load-receiver] will fail next ${state.failRemaining} request(s)`);
-      sendJson(res, 200, { failRemaining: state.failRemaining });
+      state.failPath = body.path || null;
+      state.failType = body.type || null;
+      console.log(`[load-receiver] will fail next ${state.failRemaining} request(s)`
+        + (state.failPath ? ` to ${state.failPath}` : '')
+        + (state.failType ? ` of type ${state.failType}` : ''));
+      sendJson(res, 200, { failRemaining: state.failRemaining, failPath: state.failPath, failType: state.failType });
       return;
     }
 
     if (req.method === 'POST' && url.pathname === '/_control/reset') {
       state.mode = 'healthy';
       state.failRemaining = 0;
+      state.failPath = null;
+      state.failType = null;
       state.received = [];
       sendJson(res, 200, { ok: true });
       return;
     }
 
     if (req.method === 'GET' && url.pathname === '/_control/received') {
-      sendJson(res, 200, state.received);
+      const path = url.searchParams.get('path');
+      const type = url.searchParams.get('type');
+      sendJson(res, 200, state.received.filter(
+        (r) => (!path || r.path === path) && (!type || r.type === type),
+      ));
       return;
     }
 
     if (req.method === 'GET' && url.pathname === '/_control/summary') {
-      sendJson(res, 200, summarize());
+      sendJson(res, 200, summarize({
+        path: url.searchParams.get('path'),
+        type: url.searchParams.get('type'),
+      }));
       return;
     }
 
     if (url.pathname.startsWith('/webhook')) {
       const body = await readBody(req);
-      handleWebhook(req, res, body);
+      handleWebhook(req, res, body, url.pathname);
       return;
     }
 

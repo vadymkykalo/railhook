@@ -62,6 +62,8 @@ k6 run -e FANOUT_N=100 -e EVENTS_TO_SEND=10 load/fanout.js
 k6 run load/failure-recovery.js
 k6 run -e PHASE_HEALTHY_SECONDS=60 -e PHASE_DOWN_SECONDS=120 load/failure-recovery.js
 
+node --test load/receiver/server.test.js   # the receiver's own control-plane tests
+
 k6 run load/ordering.js
 k6 run -e BURST_SIZE=50 -e RETRY_WAIT_SECONDS=90 load/ordering.js
 ```

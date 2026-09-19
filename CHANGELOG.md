@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The nightly ordering probe measured other scenarios' traffic.** One load-receiver serves every
+  scenario in a run and a retry ladder outlives the scenario that started it, so deliveries still
+  draining from the failure-recovery run were counted as the ordering burst — 135 "out-of-order
+  transitions" across sequence numbers the probe never sent. Each scenario now subscribes its own
+  receiver path and asks for a summary of that path alone, a forced failure is bound to the path
+  that asked for it, and a run in which nothing arrived fails instead of passing silently. FIFO
+  ordering itself was never broken: rerun locally against the same sequence, 0 out-of-order
+  transitions and 0 duplicates.
+
 ## [2.24.0] - 2026-09-19
 
 ### Added

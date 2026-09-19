@@ -31,6 +31,10 @@ import { bootstrapProject, createSubscribedEndpoint } from './lib/setup.js';
 const orderingViolations = new Counter('ordering_violations');
 
 const EVENT_TYPE = 'load.ordering_test';
+// A receiver path of this scenario's own. The delivered body carries the event's payload and no
+// event type, so the path is the only thing that tells these deliveries apart from the ones a
+// previous scenario is still retrying into the same receiver.
+const RECEIVER_PATH = '/webhook/ordering';
 const BURST_SIZE = Number(__ENV.BURST_SIZE || 20);
 // Must exceed the subscription's first retry delay (default retry ladder is
 // configured per-subscription via retryDelays — see SubscriptionRequest and
@@ -55,7 +59,7 @@ export const options = {
 
 export function setup() {
   const ctx = bootstrapProject('ordering');
-  createSubscribedEndpoint(ctx, EVENT_TYPE, { orderingEnabled: true });
+  createSubscribedEndpoint(ctx, EVENT_TYPE, { path: RECEIVER_PATH, orderingEnabled: true });
 
   const resetRes = http.post(`${RECEIVER_CONTROL_URL}/_control/reset`);
   if (resetRes.status !== 200) {
@@ -86,7 +90,9 @@ export default function (ctx) {
 
   // Force exactly one failure so the *next* delivery attempt (seq 1) fails
   // and goes to retry, opening the gap the rest of the burst arrives into.
-  http.post(`${RECEIVER_CONTROL_URL}/_control/fail-next`, JSON.stringify({ count: 1 }), {
+  // Bound to this scenario's event type: a retry still draining from the scenario before would
+  // otherwise swallow the forced failure, and the probe would prove nothing while passing.
+  http.post(`${RECEIVER_CONTROL_URL}/_control/fail-next`, JSON.stringify({ count: 1, path: RECEIVER_PATH }), {
     headers: { 'Content-Type': 'application/json' },
   });
 
@@ -104,13 +110,21 @@ export default function (ctx) {
 }
 
 export function teardown() {
-  const summaryRes = http.get(`${RECEIVER_CONTROL_URL}/_control/summary`);
+  // This scenario's own events only. Deliveries from the scenario before keep arriving after our
+  // reset — their retry ladder outlives them — and two interleaved streams read as broken ordering.
+  const summaryRes = http.get(`${RECEIVER_CONTROL_URL}/_control/summary?path=${RECEIVER_PATH}`);
   if (summaryRes.status !== 200) {
     console.warn('could not fetch load-receiver summary — cannot verify ordering');
     return;
   }
   const summary = summaryRes.json();
   console.log(`ordering result: ${JSON.stringify(summary)}`);
+  if (summary.totalReceived === 0) {
+    // Nothing arrived at all: the probe proves nothing, and a green run here would be a lie.
+    orderingViolations.add(1);
+    console.error(`NO DELIVERIES REACHED ${RECEIVER_PATH} — the ordering probe could not run (endpoint, worker or network)`);
+    return;
+  }
   if (!summary.inOrder) {
     orderingViolations.add(summary.outOfOrderTransitions);
     console.error(`ORDERING VIOLATED: ${summary.outOfOrderTransitions} out-of-order transition(s) across ${summary.distinctSeqs} sequence numbers — see GET ${RECEIVER_CONTROL_URL}/_control/received for the raw arrival log`);
