@@ -1665,7 +1665,8 @@
     "releases": "Releases",
     "signatureVerifier": "Signature verifier",
     "status": "Status",
-    "cli": "CLI"
+    "cli": "CLI",
+    "blog": "Blog"
   },
   "incidents": {
     "addNote": "Add Note",
@@ -2143,7 +2144,8 @@
       "devVerifier": "Signature verifier",
       "devVerifierBody": "Check a Stripe, GitHub or Standard Webhooks signature.",
       "devStatus": "Status",
-      "devStatusBody": "Live uptime of the site, the API and deliveries."
+      "devStatusBody": "Live uptime of the site, the API and deliveries.",
+      "blog": "Blog"
     },
     "product": {
       "analytics": {
@@ -2509,6 +2511,10 @@
     "signatureVerifier": {
       "title": "Webhook signature verifier — validate Stripe, GitHub, Shopify and Slack signatures | Railhook",
       "description": "Free online webhook signature validator. Check an HMAC-SHA256 signature from Stripe, GitHub, Shopify, Slack or Standard Webhooks against its payload and secret. Runs in your browser; nothing is sent."
+    },
+    "blog": {
+      "title": "Blog — Railhook",
+      "description": "Writing about webhooks: provider retry policies, delivery failures, signature verification and what a gateway in front of them changes."
     }
   },
   "mtls": {
@@ -4727,6 +4733,103 @@
       "body": "Point Stripe, GitHub, Shopify, Slack, GitLab or Twilio at a Railhook source. Every request is verified with the provider's own scheme before it is stored, and a forged one is refused.",
       "button": "Start free",
       "docs": "How verification works"
+    }
+  },
+  "blog": {
+    "eyebrow": "Blog",
+    "title": "The Railhook blog",
+    "lead": "Webhooks, delivery and the things that go wrong with them — written from the code that has to handle them.",
+    "postsHeading": "Posts",
+    "empty": "Nothing published here yet.",
+    "feed": "RSS feed",
+    "feedTitle": "Railhook blog",
+    "readingTime": "{{minutes}} min read",
+    "contents": "Contents",
+    "allPosts": "All posts",
+    "previous": "Older",
+    "next": "Newer",
+    "moreReading": "More reading",
+    "sourcesCheckedOn": "Every figure quoted from a provider was read from that provider's own documentation on {{date}}, and each one is linked. Providers change these without notice — check the link before you rely on a number.",
+    "notFound": {
+      "title": "No such post",
+      "lead": "This address does not match anything published. It may have been renamed.",
+      "back": "Back to the blog"
+    },
+    "cta": {
+      "title": "Stop losing webhooks",
+      "body": "Railhook takes the delivery, keeps it, retries it on its own schedule and lets you replay it. Free in the cloud, MIT-licensed on your own servers.",
+      "docs": "Read the docs",
+      "tester": "Try the webhook tester"
+    },
+    "figures": {
+      "providerRetries": {
+        "aria": "A timeline comparing how long three providers keep trying an endpoint that is down. Stripe backs off exponentially for up to three days. GitHub makes one attempt with a ten-second timeout and never retries on its own, leaving a three-day window in which you can redeliver by hand. Shopify makes up to eight calls inside four hours, and removes the webhook subscription after repeated failure within a day.",
+        "caption": "Three policies on one axis, log-scaled so the first minute is as visible as the third day. Every figure is sourced in the table below.",
+        "tick": {
+          "now": "0",
+          "oneMinute": "1m",
+          "fifteenMinutes": "15m",
+          "fourHours": "4h",
+          "oneDay": "24h",
+          "threeDays": "3d"
+        },
+        "stripe": {
+          "name": "Stripe",
+          "timeout": "no published timeout",
+          "body": "exponential back off",
+          "end": "stops after 3 days"
+        },
+        "github": {
+          "name": "GitHub",
+          "timeout": "10s timeout",
+          "body": "one attempt, no automatic retry",
+          "end": "redeliver by hand, 3 days"
+        },
+        "shopify": {
+          "name": "Shopify",
+          "timeout": "5s timeout",
+          "body": "up to 8 calls in 4 hours",
+          "end": "subscription removed"
+        }
+      },
+      "retryLadder": {
+        "aria": "A bar chart of the wait before each Railhook retry of an outgoing delivery: one minute, five minutes, fifteen minutes, one hour, six hours and twenty-four hours, drawn on a log scale.",
+        "caption": "Railhook's default ladder for outgoing deliveries: seven attempts, the last of them a day after the first. Incoming relays use a shorter one on purpose.",
+        "axis": "wait before the attempt (log scale)",
+        "attempt": "attempt {{number}}",
+        "total": "7 attempts, about 31 hours",
+        "wait": {
+          "0": "1m",
+          "1": "5m",
+          "2": "15m",
+          "3": "1h",
+          "4": "6h",
+          "5": "24h"
+        }
+      },
+      "gateway": {
+        "aria": "A pipeline: a provider sends once, on its own schedule, to a gateway that verifies the signature, drops duplicates and stores the event; the gateway then delivers to your app on its own retry ladder, and any stored event can be replayed for seven days.",
+        "caption": "The provider's schedule stops mattering at the first box. What reaches your app is on a ladder you own, from a copy you can replay.",
+        "provider": {
+          "title": "Provider",
+          "body": "sends once, on its schedule"
+        },
+        "gateway": {
+          "title": "Railhook",
+          "body": "one durable copy"
+        },
+        "app": {
+          "title": "Your app",
+          "body": "gets it when it is up"
+        },
+        "step": {
+          "verify": "verify the signature",
+          "dedup": "drop the duplicates",
+          "store": "store the event"
+        },
+        "loop": "its own retry ladder",
+        "replay": "replay, 7 days"
+      }
     }
   }
 }

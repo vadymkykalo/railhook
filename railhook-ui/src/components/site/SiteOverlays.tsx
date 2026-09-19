@@ -63,15 +63,17 @@ function CookieNotice({ onAnswer }: { onAnswer: () => void }) {
         <div>
           <h2 id="cookie-notice-title" className="text-[15px] font-semibold text-foreground">{t('site.cookie.title')}</h2>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            {t('site.cookie.body')}
+            {t('site.cookie.body')}{' '}
+            <Link to="/privacy" className="font-medium text-primary underline-offset-2 hover:underline">
+              {t('site.cookie.policy')}
+            </Link>
           </p>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/privacy">{t('site.cookie.policy')}</Link>
-        </Button>
-        <Button size="sm" onClick={dismiss}>{t('site.cookie.ok')}</Button>
+      {/* One button. The policy is a link in the sentence: as a second button its Ukrainian
+          label ("Політика конфіденційності") ran outside its own border on a phone. */}
+      <div className="mt-4 flex justify-end">
+        <Button size="sm" onClick={dismiss} className="max-sm:w-full">{t('site.cookie.ok')}</Button>
       </div>
     </section>
   );
@@ -90,6 +92,12 @@ function ContactWidget({ raised }: { raised: boolean }) {
     if (!open) return;
     setStarted(true);
     panel.current?.querySelector<HTMLInputElement>('input[type="email"]')?.focus();
+    // On a phone the panel is a full-screen sheet, so the page behind it must not scroll: with
+    // the keyboard up, a scrolled page took the close button off screen and the sheet could not
+    // be dismissed at all.
+    const phone = window.matchMedia('(max-width: 639px)').matches;
+    const previousOverflow = document.body.style.overflow;
+    if (phone) document.body.style.overflow = 'hidden';
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setOpen(false);
@@ -105,11 +113,14 @@ function ContactWidget({ raised }: { raised: boolean }) {
     return () => {
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('pointerdown', onPointer);
+      document.body.style.overflow = previousOverflow;
     };
   }, [open]);
 
   return (
-    <div className={cn('fixed right-4 z-40 transition-[bottom] duration-300 sm:right-6 sm:bottom-6', raised ? 'bottom-52' : 'bottom-4')}>
+    // Above the sticky header (z-50): as a phone-sized sheet it covers the page, and a header
+    // drawn over its top edge took the close button with it.
+    <div className={cn('fixed right-4 z-[60] transition-[bottom] duration-300 sm:right-6 sm:bottom-6', raised ? 'bottom-52' : 'bottom-4')}>
       <div
         ref={panel}
         role="dialog"
@@ -117,12 +128,21 @@ function ContactWidget({ raised }: { raised: boolean }) {
         aria-labelledby="contact-widget-title"
         hidden={!open}
         className={cn(
-          'absolute bottom-[calc(100%+0.75rem)] right-0 w-[calc(100vw-2rem)] max-w-[24rem] overflow-hidden',
-          'rounded-2xl border border-rail bg-card shadow-elevated-lg',
-          open && 'animate-scale-in origin-bottom-right motion-reduce:animate-none',
+          // A sheet on a phone — full height, its own scroll — and a popover from the launcher
+          // from sm up. The sheet is what makes the close button reachable with the keyboard up.
+          //
+          // Closed is `hidden` as a class, not only as the attribute: `display:flex` from a
+          // responsive class wins over `[hidden]`, and the sheet then covered the whole phone
+          // screen invisibly and swallowed every tap on the page behind it.
+          open
+            ? 'max-sm:fixed max-sm:inset-0 max-sm:flex max-sm:h-[100dvh] max-sm:w-full max-sm:max-w-none max-sm:flex-col max-sm:rounded-none'
+            : 'hidden',
+          'sm:absolute sm:bottom-[calc(100%+0.75rem)] sm:right-0 sm:h-auto sm:w-[calc(100vw-2rem)] sm:max-w-[24rem] sm:overflow-hidden sm:rounded-2xl',
+          'border border-rail bg-card shadow-elevated-lg max-sm:border-0',
+          open && 'sm:animate-scale-in sm:origin-bottom-right motion-reduce:animate-none',
         )}
       >
-        <div className="relative bg-primary px-5 pb-5 pt-4 text-primary-foreground">
+        <div className="relative flex-none bg-primary px-5 pb-5 pt-4 text-primary-foreground max-sm:pt-[max(1rem,env(safe-area-inset-top))]">
           <div className="flex items-center gap-2.5">
             <span aria-hidden="true" className="grid h-8 w-8 place-items-center rounded-lg bg-primary-foreground/15">
               <RailhookIcon className="h-4 w-4" />
@@ -143,12 +163,12 @@ function ContactWidget({ raised }: { raised: boolean }) {
               launcher.current?.focus();
             }}
             aria-label={t('site.contact.close')}
-            className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-md text-primary-foreground/80 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground"
+            className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-md text-primary-foreground/80 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground max-sm:top-[max(0.75rem,env(safe-area-inset-top))]"
           >
-            <X className="h-4 w-4" aria-hidden="true" />
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
-        <div className="max-h-[min(34rem,calc(100vh-12rem))] overflow-y-auto p-5">
+        <div className="overflow-y-auto p-5 max-sm:flex-1 max-sm:pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:max-h-[min(34rem,calc(100vh-12rem))]">
           {(open || started) && <ContactForm compact autoFocus={!started} />}
         </div>
       </div>
@@ -161,6 +181,9 @@ function ContactWidget({ raised }: { raised: boolean }) {
         onClick={() => setOpen((value) => !value)}
         className={cn(
           'group flex h-12 items-center gap-2 rounded-full bg-primary pl-3.5 pr-4 text-primary-foreground shadow-elevated-lg',
+          // While the sheet covers the screen the launcher is behind it; on a wide screen it
+          // stays put and turns into the close button.
+          open && 'max-sm:hidden',
           'transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
           'max-sm:w-12 max-sm:justify-center max-sm:p-0',

@@ -29,3 +29,17 @@ globalThis.DOMMatrixReadOnly ??= class {
   m22 = 1;
   constructor(_transform?: string) {}
 } as unknown as typeof DOMMatrixReadOnly;
+
+// jsdom has no matchMedia, and code that asks whether it is on a phone — the contact sheet locks
+// the page behind it there, and only there — would otherwise throw on mount instead of rendering.
+// Reports "not a phone", which is the viewport every page test assumes.
+globalThis.matchMedia ??= ((query: string) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  addListener: () => {},
+  removeListener: () => {},
+  dispatchEvent: () => false,
+})) as unknown as typeof matchMedia;

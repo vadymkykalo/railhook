@@ -1,9 +1,12 @@
 /// <reference types="vitest" />
-import { readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import pkg from './package.json' with { type: 'json' }
+import { parseFrontMatter } from './src/lib/frontMatter'
+import { renderFeed, type FeedItem } from './src/lib/blogFeed'
 
 /**
  * The repository's CHANGELOG.md as `virtual:changelog`, for the /changelog page.
@@ -27,8 +30,57 @@ function changelog(): Plugin {
   }
 }
 
+
+/**
+ * The blog's feed, written to `dist/blog/rss.xml` at build time.
+ *
+ * Read from the same directory and through the same front-matter parser `src/lib/blog.ts` uses,
+ * so a post that is on the site is in the feed. Not generated from the running app, because a
+ * feed a reader subscribes to has to be a file nginx can serve without JavaScript.
+ *
+ * What the XML says lives in `src/lib/blogFeed.ts`, which is where it can be tested; this reads
+ * the files and emits the asset.
+ *
+ * The origin is the placeholder every other published URL carries: the image is built once for
+ * every deployment, and nginx substitutes the container's RAILHOOK_SITE_URL when it serves the
+ * file (`location /` filters text/xml for exactly this).
+ */
+function blogRss(): Plugin {
+  const SITE = 'https://site-url.railhook.invalid'
+  const dir = fileURLToPath(new URL('./src/content/blog', import.meta.url))
+
+  function feed(): string {
+    if (!existsSync(dir)) return renderFeed(SITE, [])
+    const items = readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && existsSync(join(dir, entry.name, 'en.md')))
+      .map((entry) => ({
+        slug: entry.name,
+        ...parseFrontMatter(readFileSync(join(dir, entry.name, 'en.md'), 'utf8')).values,
+      }))
+      .filter((item): item is FeedItem => Boolean(item.title && item.date && item.description))
+      .sort((a, b) => b.date.localeCompare(a.date) || a.slug.localeCompare(b.slug))
+    return renderFeed(SITE, items)
+  }
+
+  return {
+    name: 'railhook-blog-rss',
+    // Dev serves it from the route the build writes to, so a broken feed is found under
+    // `npm run dev` rather than after a deploy.
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url?.split('?')[0] !== '/blog/rss.xml') return next()
+        res.setHeader('Content-Type', 'application/rss+xml; charset=utf-8')
+        res.end(feed())
+      })
+    },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'blog/rss.xml', source: feed() })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), changelog()],
+  plugins: [react(), changelog(), blogRss()],
   define: {
     // Which build an error came from. package.json's version is one of the seven places
     // `make version-set` writes and `make version-check` verifies, so this cannot drift from

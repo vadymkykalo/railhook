@@ -94,3 +94,20 @@ describe('message widget draft', () => {
     expect(screen.getByLabelText(en.site.contact.messageLabel)).toHaveValue('Half a thought');
   });
 });
+
+describe('the closed widget', () => {
+  it('covers nothing: it is display:none, not an invisible sheet over the page', async () => {
+    renderAt();
+    const panel = document.querySelector('[role="dialog"]') as HTMLElement;
+    expect(panel).toHaveAttribute('hidden');
+    // The attribute alone lost to a responsive display class, and the phone-sized sheet then
+    // swallowed every tap on the page behind it.
+    expect(panel.className).toContain('hidden');
+    expect(panel.className).not.toContain('max-sm:fixed');
+
+    await userEvent.click(screen.getByRole('button', { name: en.site.contact.launcher }));
+    const open = document.querySelector('[role="dialog"]') as HTMLElement;
+    expect(open).not.toHaveAttribute('hidden');
+    expect(open.className).toContain('max-sm:fixed');
+  });
+});
