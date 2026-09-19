@@ -150,7 +150,6 @@ describe('LandingPage', () => {
     renderLanding();
     expect(screen.getAllByRole('link', { name: en.landing.hero.startFree })[0]).toHaveAttribute('href', '/register');
     expect(screen.getByRole('link', { name: en.landing.hero.install })).toHaveAttribute('href', '#install');
-    expect(screen.getByText('Railhook Cloud is free right now — no card needed.')).toBeInTheDocument();
   });
 
   it('sends a signed-in reader to the dashboard instead of the signup', () => {

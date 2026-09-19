@@ -37,9 +37,9 @@ function useFigureText(key: string) {
  */
 function PollingVsPush() {
   const f = useFigureText('pollingVsPush');
-  const X1 = 700;
-  const pill = { width: 70, height: 20 };
-  const polls = Array.from({ length: 6 }, (_, index) => 176 + index * 88);
+  const X1 = 780;
+  const pill = { width: 90, height: 24 };
+  const polls = Array.from({ length: 6 }, (_, index) => 210 + index * 96);
   const found = 4;
   /** Just after the poll before ends, so the wait for the next one is nearly a whole interval. */
   const eventX = polls[found - 1] + pill.width + 4;
@@ -47,10 +47,10 @@ function PollingVsPush() {
   const pollY = 64;
   const pushY = 196;
   const axisY = 250;
-  const REQUEST = 'font-mono text-[9px]';
+  const REQUEST = 'font-mono text-[11px]';
 
   return (
-    <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 720 300">
+    <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 800 300">
       <defs>
         <Arrow id="wg-poll-arrow" />
         <Arrow id="wg-poll-arrow-brand" colour={SERIES.brand} />
@@ -101,14 +101,14 @@ function PollingVsPush() {
               y={pollY - pill.height / 2}
               width={pill.width}
               height={pill.height}
-              rx={10}
+              rx={12}
               fill={useful ? SERIES.brand : 'none'}
               stroke={colour}
               strokeWidth={1.25}
             />
             <text
               x={center(x)}
-              y={pollY + 3}
+              y={pollY + 4}
               textAnchor="middle"
               fill={useful ? CHROME.surface : CHROME.muted}
               className={cn(REQUEST, useful && 'font-semibold')}
@@ -142,7 +142,7 @@ function PollingVsPush() {
         fill="none"
         stroke={CHROME.ink}
       />
-      <text x={eventX + 4} y={pollY + 74} fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
+      <text x={center(polls[found])} y={pollY + 74} textAnchor="middle" fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
         {f('polling.lag')}
       </text>
 
@@ -150,37 +150,37 @@ function PollingVsPush() {
       <text x={eventX + 4} y={pushY - 16} fill={SERIES.brand} className={cn(MONO, 'font-semibold')}>
         {f('push.when')}
       </text>
-      <rect x={eventX} y={pushY - 10} width={44} height={20} rx={10} fill={SERIES.brand} />
-      <text x={eventX + 22} y={pushY + 3} textAnchor="middle" fill={CHROME.surface} className={cn(REQUEST, 'font-semibold')}>
+      <rect x={eventX} y={pushY - 12} width={54} height={24} rx={12} fill={SERIES.brand} />
+      <text x={eventX + 27} y={pushY + 4} textAnchor="middle" fill={CHROME.surface} className={cn(REQUEST, 'font-semibold')}>
         POST
       </text>
       <line
-        x1={eventX + 48}
+        x1={eventX + 58}
         y1={pushY}
-        x2={X1 - 94}
+        x2={X1 - 112}
         y2={pushY}
         stroke={SERIES.brand}
         strokeWidth={1.5}
         markerEnd="url(#wg-poll-arrow-brand)"
       />
-      <rect x={X1 - 88} y={pushY - 12} width={88} height={24} rx={6} fill="none" stroke={CHROME.rail} />
-      <text x={X1 - 44} y={pushY + 4} textAnchor="middle" fill={CHROME.ink} className={MONO}>
+      <rect x={X1 - 106} y={pushY - 12} width={106} height={24} rx={6} fill="none" stroke={CHROME.rail} />
+      <text x={X1 - 53} y={pushY + 4} textAnchor="middle" fill={CHROME.ink} className={MONO}>
         {f('push.endpoint')}
       </text>
 
       {/* Time runs left to right. */}
-      <line x1={176} y1={axisY} x2={X1} y2={axisY} {...AXIS} markerEnd="url(#wg-poll-arrow)" />
+      <line x1={210} y1={axisY} x2={X1} y2={axisY} {...AXIS} markerEnd="url(#wg-poll-arrow)" />
       <text x={X1} y={axisY + 14} textAnchor="end" fill={CHROME.muted} className={MONO}>
         {f('time')}
       </text>
 
       {/* Legend. */}
-      <rect x={176} y={axisY + 26} width={26} height={12} rx={6} fill="none" stroke={SERIES.idle} strokeWidth={1.25} />
-      <text x={208} y={axisY + 36} fill={CHROME.muted} className={MONO}>
+      <rect x={210} y={axisY + 26} width={26} height={12} rx={6} fill="none" stroke={SERIES.idle} strokeWidth={1.25} />
+      <text x={242} y={axisY + 36} fill={CHROME.muted} className={MONO}>
         {f('legend.wasted')}
       </text>
-      <rect x={376} y={axisY + 26} width={26} height={12} rx={6} fill={SERIES.brand} />
-      <text x={408} y={axisY + 36} fill={CHROME.muted} className={MONO}>
+      <rect x={416} y={axisY + 26} width={26} height={12} rx={6} fill={SERIES.brand} />
+      <text x={448} y={axisY + 36} fill={CHROME.muted} className={MONO}>
         {f('legend.useful')}
       </text>
     </Figure>

@@ -2094,7 +2094,6 @@
       "yourApp": "Your app"
     },
     "hero": {
-      "cloudNote": "Railhook Cloud is free right now — no card needed.",
       "install": "Install on your server",
       "lead": "Send webhooks to your customers and receive them from Stripe, GitHub or any other service — in our cloud or on your own servers, with every delivery on record.",
       "startFree": "Start free",

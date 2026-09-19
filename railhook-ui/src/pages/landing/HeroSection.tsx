@@ -48,7 +48,6 @@ export default function HeroSection() {
           </Button>
           <TryDemoButton size="lg" className="max-sm:h-12 max-sm:w-full" />
         </div>
-        {!isAuthenticated && <p className="mt-3 text-sm text-muted-foreground">{t('landing.hero.cloudNote')}</p>}
 
         <InstallCommand label id="install" className="mt-10" />
       </div>
