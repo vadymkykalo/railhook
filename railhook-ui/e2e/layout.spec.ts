@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { EVENT_ID, PLATFORM_ORG_ID, PROJECT_ID, mockApi, mockNewOrganization } from './fixtures';
+import { ENDPOINT_ID, EVENT_ID, PLATFORM_ORG_ID, PROJECT_ID, mockApi, mockNewOrganization } from './fixtures';
 
 /**
  * Every page fits its screen.
@@ -14,10 +14,14 @@ const PUBLIC = ['/', '/pricing', '/tester', '/tools/webhook-signature', '/securi
 const ADMIN = [
   '/admin/dashboard',
   '/admin/projects',
+  `/admin/projects/${PROJECT_ID}/connections`,
   `/admin/projects/${PROJECT_ID}/endpoints`,
+  `/admin/projects/${PROJECT_ID}/endpoints/${ENDPOINT_ID}`,
   `/admin/projects/${PROJECT_ID}/deliveries`,
   `/admin/projects/${PROJECT_ID}/events`,
   `/admin/projects/${PROJECT_ID}/events/${EVENT_ID}`,
+  `/admin/projects/${PROJECT_ID}/transformations`,
+  `/admin/projects/${PROJECT_ID}/project-settings`,
   `/admin/projects/${PROJECT_ID}/api-keys`,
   `/admin/projects/${PROJECT_ID}/incoming-sources`,
   '/admin/members',
@@ -233,7 +237,7 @@ test.describe('a brand-new organization', () => {
     await mockNewOrganization(page);
     await page.goto('/admin/projects');
 
-    await page.getByRole('navigation', { name: /navigation/i }).getByRole('link', { name: 'Events' }).click();
+    await page.getByRole('navigation', { name: /navigation/i }).getByRole('link', { name: 'Events', exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/start\/events$/);
     await expect(page.getByRole('main').getByRole('heading', { name: 'Events' })).toBeVisible();
 

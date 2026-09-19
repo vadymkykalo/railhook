@@ -822,7 +822,6 @@
     "columnEndpoint": "Endpoint",
     "columnRecent": "Recent deliveries",
     "columnSubscribedTo": "Subscribed to",
-    "description": "Every endpoint that receives this project's events, what it is subscribed to, and whether the last deliveries arrived.",
     "detailLadder": "Retry ladder",
     "detailMtls": "mTLS",
     "detailRateLimit": "Rate limit",
@@ -834,8 +833,6 @@
     "endpointDisabled": "Endpoint off",
     "endpoints": "{{count}} endpoints",
     "eventTypes": "{{count}} event types",
-    "expand": "Show details",
-    "expandFor": "Details for {{url}}",
     "health": {
       "halt": "Abandoned",
       "none": "No traffic yet",
@@ -847,7 +844,6 @@
     "noSubscriptions": "No subscriptions",
     "noSubscriptionsDesc": "Nothing is subscribed, so this endpoint receives no events.",
     "secretHidden": "The secret is stored hashed and is shown once, when it is created or rotated. Rotate it if it may have leaked — the old secret stops working immediately.",
-    "sendTest": "Send test event",
     "standardSecretHidden": "The whsec_… form a Standard Webhooks library expects is derived from the same secret, and is shown beside it whenever the secret itself is.",
     "subDisabled": "Sub off",
     "subscriptions": "{{count}} subscriptions",
@@ -855,7 +851,20 @@
     "title": "Connections",
     "toggleSubscription": "Enable {{eventType}}",
     "unsubscribed": "Unsubscribed Endpoints",
-    "unsubscribedDesc": "These endpoints have no active subscriptions and won't receive any events"
+    "unsubscribedDesc": "These endpoints have no active subscriptions and won't receive any events",
+    "descriptionMap": "Where this project's events go, and where the webhooks it receives are forwarded. Open a row to configure it.",
+    "outgoingDesc": "Each endpoint, what it is subscribed to, and whether its last deliveries arrived.",
+    "allEndpoints": "All endpoints",
+    "allSubscriptions": "All subscriptions",
+    "open": "Open",
+    "incomingDesc": "Each source, and the destinations its webhooks are forwarded to.",
+    "allSources": "All sources",
+    "incomingFailed": "Couldn't load the sources. The outgoing list above is unaffected.",
+    "noSources": "No source yet. A source gives a service such as Stripe or GitHub a URL to send its webhooks to, and forwards them to your destinations.",
+    "addSource": "Add a source",
+    "columnSource": "Source",
+    "columnForwardsTo": "Forwards to",
+    "noDestinations": "No destinations — webhooks are kept but not forwarded"
   },
   "contact": {
     "communityBody": "Open an issue on GitHub — self-hosted questions get answered there too.",
@@ -1369,7 +1378,7 @@
       "submit": "Rotate Secret",
       "title": "Rotate webhook secret?"
     },
-    "rotateSecret": "Rotate Secret",
+    "rotateSecret": "Rotate secret",
     "secretDialog": {
       "copy": "Copy secret",
       "description": "Save this secret securely. It won't be shown again.",
@@ -1615,31 +1624,12 @@
     "noEventsDesc": "Send your first webhook event to start processing deliveries",
     "noMatchDesc": "No event type matches this search. Try a shorter prefix, such as order.",
     "outgoingTitle": "Outgoing events",
-    "sendModal": {
-      "description": "Send a webhook event to trigger deliveries to subscribed endpoints",
-      "eventType": "Event Type",
-      "eventTypeHint": "Use dot notation (e.g., user.created, order.updated)",
-      "fixJsonBeforeSubmit": "Please fix JSON errors before submitting",
-      "invalidJson": "Invalid JSON format",
-      "matchInfo": "{{count}} subscription(s) will receive this event.",
-      "noMatchWarning": "No active subscriptions match this event type. The event will be saved but no deliveries will be created.",
-      "noteBody": "This event will create deliveries for all active subscriptions matching this event type. Check the Deliveries page to see processing results.",
-      "noteLabel": "Note:",
-      "payload": "Event Payload (JSON)",
-      "payloadHint": "Must be valid JSON. This data will be sent to webhook endpoints.",
-      "schemaWarnings": "Accepted, but the payload does not match the active schema ({{count}}): {{errors}}",
-      "send": "Send Event",
-      "sending": "Sending...",
-      "sentSuccess": "Event sent successfully! Created {{count}} deliveries.",
-      "title": "Send Test Event"
-    },
-    "sendTest": "Send Event",
+    "sendTest": "Send test event",
     "subtitle": "Webhook events for <strong>{{project}}</strong>",
     "title": "Events",
     "toast": {
       "idCopied": "Event ID copied to clipboard",
       "loadFailed": "Failed to load events",
-      "noSubscriptionMatch": "Event sent, but no active subscriptions match '{{eventType}}'. No deliveries were created.",
       "zeroDeliveries": "Event sent, but 0 deliveries were created. Check your subscriptions."
     },
     "viewDeliveries": "View deliveries for this event",
@@ -2629,13 +2619,17 @@
     "testConsole": "Test Console",
     "testEndpoints": "Test Endpoints",
     "toggleTheme": "Toggle theme",
-    "transformStudio": "Transform Studio",
     "transformations": "Transformations",
     "tunnels": "Tunnels",
-    "usage": "Usage",
+    "usage": "Plan limits",
     "workflows": "Workflows",
     "consumers": "Consumers & portal",
-    "outgoingEvents": "Outgoing events"
+    "outgoingEvents": "Outgoing events",
+    "send": "Send events",
+    "receive": "Receive webhooks",
+    "payloadRules": "Payload rules",
+    "projectSettings": "Project",
+    "breadcrumb": "Breadcrumb"
   },
   "notFound": {
     "backToDashboard": "Back to Dashboard",
@@ -3303,14 +3297,6 @@
     "eventTypeNameHint": "Use dot notation, e.g. order.created, user.updated",
     "eventTypes": "Event Types",
     "fingerprint": "Fingerprint",
-    "idempotency": {
-      "auto": "Auto",
-      "hint": "Control how idempotency keys are handled for event ingestion and outgoing webhooks",
-      "none": "None",
-      "required": "Required",
-      "saved": "Idempotency policy saved",
-      "title": "Idempotency Policy"
-    },
     "invalidJson": "Invalid JSON — please check your schema",
     "jsonSchema": "JSON Schema",
     "latestVersion": "Latest",
@@ -3356,7 +3342,9 @@
     "versionNote": "Version note",
     "versionNotePlaceholder": "What changed in this version?",
     "versionPromoted": "Schema version activated",
-    "versions": "Versions"
+    "versions": "Versions",
+    "idempotencyMoved": "What happens to an event sent twice is a project setting:",
+    "idempotencyMovedLink": "Idempotency policy"
   },
   "settings": {
     "noPassword": {
@@ -3619,7 +3607,7 @@
     "runVerify": "Verify signature",
     "schemaActive": "Active schema",
     "selectEndpoint": "Endpoint",
-    "sendEvent": "Send Event",
+    "sendEvent": "Send test event",
     "sendEventDesc": "Send a test event and watch deliveries in real time",
     "sending": "Sending…",
     "status": "Status",
@@ -3767,9 +3755,9 @@
     "run": "Run Preview",
     "runHint": "Nothing is sent and nothing is stored.",
     "running": "Running...",
-    "savedTransformation": "Saved Transformation",
+    "savedTransformation": "Saved transformation",
     "searchEvents": "Filter by event type...",
-    "subtitle": "Test payload transformations for incoming destinations",
+    "subtitle": "Try a transformation on a real event, or dry-run a whole delivery to an endpoint, before it goes live.",
     "title": "Transform Studio",
     "transformEyebrow": "Transform",
     "verdictChanged": "Changed",
@@ -3858,7 +3846,9 @@
       "templateRequired": "Template is required",
       "validJson": "Valid JSON"
     },
-    "version": "Version"
+    "version": "Version",
+    "openStudio": "Open the studio",
+    "tryOnEvent": "Try on an event"
   },
   "tunnels": {
     "active": "Active",
@@ -3965,7 +3955,7 @@
       "incoming": "Incoming events",
       "incomingHint": "Received from your sources"
     },
-    "title": "Usage",
+    "title": "Plan limits",
     "traffic": {
       "delivered": "Delivered",
       "desc": "Delivered and failed, one bar per day",
@@ -4207,13 +4197,15 @@
     "firstStep": "Create a project",
     "firstStepDesc": "A project holds your endpoints, API keys and events — one per product or environment.",
     "purpose": {
-      "connections": "Where your events go: endpoints, subscriptions, incoming sources and the rules between them.",
       "events": "Every event your application sends or receives, with its payload and the deliveries it made.",
       "deliveries": "Each attempt to deliver an event — retries, failures, and the failed deliveries you can replay.",
-      "workflows": "Automations that run a sequence of steps when an event arrives.",
-      "analytics": "How deliveries are going over time: success rate, latency, alerts and usage.",
-      "develop": "Tools for trying things out: send test events, shape payloads, and inspect what arrives.",
-      "apiKeys": "Keys for your backend: it needs one to send events and manage endpoints through the API. A key belongs to one project."
+      "analytics": "How deliveries are going over time: success rate, latency, alerts and your plan's limits.",
+      "develop": "Tools for trying things out: send test events, compare payloads and inspect what arrives.",
+      "apiKeys": "Keys for your backend: it needs one to send events and manage endpoints through the API. A key belongs to one project.",
+      "send": "Where your events go: endpoints, what each is subscribed to, the consumers they belong to and the schemas events are checked against.",
+      "receive": "Webhooks from services such as Stripe or GitHub: each source verifies what arrives and forwards it to your destinations.",
+      "payloadRules": "What changes an event on its way: transformations, routing rules, personal-data masking and workflows.",
+      "projectSettings": "The project's name, and what happens to an event your backend sends twice."
     }
   },
   "pricing": {
@@ -5373,7 +5365,7 @@
   },
   "navHints": {
     "overview": "Project health and the getting-started checklist",
-    "connections": "Where events go: endpoints, subscriptions, sources and what reshapes them",
+    "connections": "Every endpoint your events go to, what it is subscribed to, and whether it is working",
     "endpoints": "URLs that receive your events, and their signing secrets",
     "consumers": "Your users, and the portal you embed so they manage their own endpoints",
     "subscriptions": "Which event types each endpoint receives",
@@ -5388,20 +5380,66 @@
     "dlq": "Deliveries Railhook stopped retrying, ready to replay by hand",
     "incomingDlq": "Incoming webhooks that never reached their destination",
     "replay": "Replay the stored events of a time range, as new deliveries",
-    "workflows": "Automations triggered by events",
-    "analytics": "Delivery rates, latency, alerts and usage",
+    "workflows": "Steps that run when an event arrives",
+    "analytics": "Delivery rates, latency, alerts and plan limits",
     "metrics": "Success rate and latency over time",
     "alerts": "Get notified when delivery goes wrong",
     "incidents": "Group related failures and record what was done",
-    "usage": "What this project used, and what your plan allows",
+    "usage": "What this project used, against what your plan allows",
     "develop": "Tools for building and debugging an integration",
     "testConsole": "Send an event, ping an endpoint or check a signature",
-    "transformStudio": "Try a transformation for an incoming destination",
     "eventDiff": "Compare two events’ payloads side by side",
     "testEndpoints": "Temporary URLs that capture what is sent to them",
     "tunnels": "Forward deliveries to a server on your laptop",
     "apiKeys": "Keys your backend uses to call the API",
     "outgoingEvents": "Events your backend sent",
-    "incomingEvents": "Webhooks received from your sources"
+    "incomingEvents": "Webhooks received from your sources",
+    "send": "Where your events go, who receives them, and the schema each type is checked against",
+    "receive": "Webhooks from services such as Stripe and GitHub, and where each is forwarded",
+    "payloadRules": "Reshape, route, mask or automate an event on its way",
+    "projectSettings": "This project's name and how it treats an event sent twice"
+  },
+  "projectSettings": {
+    "title": "Project",
+    "subtitle": "This project's name, and how it treats an event your backend sends more than once.",
+    "details": "Details",
+    "detailsDesc": "How the project is named in the switcher, the API and the audit log.",
+    "name": "Project name",
+    "description": "Description",
+    "id": "Project ID",
+    "saved": "Project saved",
+    "saveFailed": "Couldn't save the project",
+    "idempotency": {
+      "title": "Idempotency policy",
+      "description": "An event sent with an Idempotency-Key that this project has already accepted is not stored again: the API answers with the first event, and nothing is delivered twice.",
+      "rowTitle": "Events without a key",
+      "choice": {
+        "NONE": "None",
+        "AUTO": "Auto",
+        "REQUIRED": "Required"
+      },
+      "explain": {
+        "NONE": "Accepted as they are. A key is honoured when your backend sends one.",
+        "AUTO": "Accepted, and given a key of their own, so every stored event carries one.",
+        "REQUIRED": "Refused with 400. Your backend has to send an Idempotency-Key header with every event."
+      },
+      "saved": "Idempotency policy saved",
+      "saveFailed": "Couldn't save the idempotency policy"
+    }
+  },
+  "endpointDetail": {
+    "overview": "Overview",
+    "sendTestRequest": "Send a test request",
+    "sendTestRequestHint": "Sends one test request to this URL now and shows what it answered. No event is stored.",
+    "allowedIps": "Allowed source IPs",
+    "created": "Created",
+    "skipReason": "Skipped from the endpoint page",
+    "subscriptionsDesc": "The event types this endpoint receives. Each one carries its own retry ladder and transformation.",
+    "recentDeliveries": "Recent deliveries",
+    "recentDeliveriesDesc": "The last {{count}} deliveries to this endpoint, newest first. Click one to see its attempts.",
+    "allDeliveries": "All deliveries to this endpoint",
+    "noDeliveries": "Nothing has been sent here yet",
+    "noDeliveriesDesc": "A delivery appears once your backend sends an event this endpoint is subscribed to.",
+    "deleteTitle": "Delete this endpoint"
   }
 }

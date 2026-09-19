@@ -88,10 +88,11 @@ export function CommandPalette() {
     });
 
     // A section with no tabs is itself the destination; a section with tabs is
-    // a group of them, and the section on its own is not a place you can be.
+    // a group of them, and the section on its own is not a place you can be. The
+    // entries it keeps out of its strip are still destinations, and belong here.
     const fromSection = (section: typeof SETTINGS_SECTION, keyPrefix: string): PaletteItem[] => {
       const name = t(section.nameKey);
-      const tabs = section.tabs.filter(allowed);
+      const tabs = [...section.tabs, ...(section.more ?? [])].filter(allowed);
       if (tabs.length === 0) {
         return allowed(section) ? [entryItem(section, name, keyPrefix)] : [];
       }

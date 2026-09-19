@@ -2,18 +2,19 @@ import {
   LayoutDashboard, Network, Radio, Send, GitBranch, BarChart3, Wrench,
   Webhook, Bell, ArrowDownToLine, Repeat2, FileJson2, Shield, Activity,
   AlertTriangle, History, GitCompare, Play, TestTube, Cable, Users, Key,
-  FileText, Building2, CreditCard, Settings, ShieldCheck,
+  FileText, Building2, CreditCard, Settings, ShieldCheck, Truck, Workflow, FolderCog,
 } from 'lucide-react';
 import type { Role } from '../auth/ProtectedRoute';
 
 /**
  * Two levels, and only two.
  *
- * The rail names the seven things a person comes here to do. Everything else
- * is a tab inside one of them, because it is a facet of that thing rather than
- * a separate destination: a Schema is a property of the connection it validates,
- * the DLQ is a status a delivery is in, Replay is something you do to deliveries
- * you have selected.
+ * The rail names the jobs a person comes here to do — send events, receive
+ * webhooks, change what a payload looks like, then watch what happened — rather
+ * than the records the platform keeps. Everything else is a tab inside one of
+ * them, because it is a facet of that job rather than a separate destination: a
+ * Schema is a property of the events you send, the DLQ is a status a delivery is
+ * in, Replay is something you do to deliveries you have selected.
  *
  * The previous sidebar listed all of it flat — 32 entries in 10 groups, needing
  * 1472px of column in a 731px viewport — and answered the overflow with a
@@ -33,6 +34,11 @@ export interface NavEntry {
 export interface NavSection extends NavEntry {
   /** Rendered as a tab strip under the header. One entry means no strip. */
   tabs: NavEntry[];
+  /**
+   * Destinations that belong to the section but are not in its strip: reached from a link on one
+   * of its pages, and from the command palette, so nobody who knew the old tab loses it.
+   */
+  more?: NavEntry[];
 }
 
 /**
@@ -68,21 +74,42 @@ export const PROJECT_SECTIONS: NavSection[] = [
     tabs: [],
   },
   {
-    // Everything that decides where an event goes and what it looks like on arrival.
-    nameKey: 'nav.connections',
+    // Everything that decides where the project's own events go. The endpoint and subscription
+    // tables are not tabs: Connections is the one list of them, and they are its facets.
+    nameKey: 'nav.send',
     path: (projectId) => p(projectId, 'connections'),
-    icon: Network,
-    owns: ['connections', 'connection-setup', 'endpoints', 'consumers', 'subscriptions', 'incoming-sources', 'transformations', 'rules', 'schemas', 'pii-rules'],
+    icon: Send,
+    owns: ['connections', 'connection-setup', 'endpoints', 'subscriptions', 'consumers', 'schemas'],
     tabs: [
-      tab('nav.connections', 'connections', Network),
-      tab('nav.endpoints', 'endpoints', Webhook),
+      { ...tab('nav.connections', 'connections', Network), owns: ['connections', 'connection-setup', 'endpoints', 'subscriptions'] },
       tab('nav.consumers', 'consumers', Users),
+      tab('nav.schemas', 'schemas', FileJson2),
+    ],
+    more: [
+      tab('nav.endpoints', 'endpoints', Webhook),
       tab('nav.subscriptions', 'subscriptions', Bell),
-      tab('nav.incomingSources', 'incoming-sources', ArrowDownToLine),
+    ],
+  },
+  {
+    // A source holds its own destinations, so receiving is one list and a page per source.
+    nameKey: 'nav.receive',
+    path: (projectId) => p(projectId, 'incoming-sources'),
+    icon: ArrowDownToLine,
+    owns: ['incoming-sources'],
+    tabs: [tab('nav.incomingSources', 'incoming-sources', ArrowDownToLine)],
+  },
+  {
+    // What changes an event on its way, in either direction. Workflows are here rather than on
+    // the rail: they are one more way of acting on a payload, not a job of their own.
+    nameKey: 'nav.payloadRules',
+    path: (projectId) => p(projectId, 'transformations'),
+    icon: Repeat2,
+    owns: ['transformations', 'transform-studio', 'rules', 'pii-rules', 'workflows'],
+    tabs: [
       tab('nav.transformations', 'transformations', Repeat2),
       tab('nav.rules', 'rules', GitBranch),
-      tab('nav.schemas', 'schemas', FileJson2),
       tab('nav.piiRules', 'pii-rules', Shield),
+      tab('nav.workflows', 'workflows', Workflow),
     ],
   },
   {
@@ -98,21 +125,14 @@ export const PROJECT_SECTIONS: NavSection[] = [
   {
     nameKey: 'nav.deliveries',
     path: (projectId) => p(projectId, 'deliveries'),
-    icon: Send,
+    icon: Truck,
     owns: ['deliveries', 'dlq', 'incoming-dlq', 'replay'],
     tabs: [
-      tab('nav.allDeliveries', 'deliveries', Send),
+      tab('nav.allDeliveries', 'deliveries', Truck),
       tab('nav.dlq', 'dlq', AlertTriangle),
       tab('nav.incomingDlq', 'incoming-dlq', ArrowDownToLine),
       tab('nav.replay', 'replay', History),
     ],
-  },
-  {
-    nameKey: 'nav.workflows',
-    path: (projectId) => p(projectId, 'workflows'),
-    icon: GitBranch,
-    owns: ['workflows'],
-    tabs: [],
   },
   {
     nameKey: 'nav.analytics',
@@ -131,10 +151,9 @@ export const PROJECT_SECTIONS: NavSection[] = [
     nameKey: 'nav.develop',
     path: (projectId) => p(projectId, 'test-console'),
     icon: Wrench,
-    owns: ['test-console', 'transform-studio', 'event-diff', 'test-endpoints', 'tunnels'],
+    owns: ['test-console', 'event-diff', 'test-endpoints', 'tunnels'],
     tabs: [
       tab('nav.testConsole', 'test-console', Play),
-      tab('nav.transformStudio', 'transform-studio', GitCompare),
       tab('nav.eventDiff', 'event-diff', GitCompare),
       tab('nav.testEndpoints', 'test-endpoints', TestTube),
       orgTab('nav.tunnels', '/admin/tunnels', Cable),
@@ -150,6 +169,13 @@ export const PROJECT_SECTIONS: NavSection[] = [
 export const API_KEYS_TAB: NavEntry = tab('nav.apiKeys', 'api-keys', Key);
 
 /**
+ * The project's own policies: its name, and what happens to an event sent twice. The idempotency
+ * policy used to sit on the Schemas page, where nobody asking why an event was dropped as a
+ * duplicate thought to look.
+ */
+export const PROJECT_SETTINGS_TAB: NavEntry = tab('nav.projectSettings', 'project-settings', FolderCog);
+
+/**
  * Settings, reached from the sidebar footer rather than the rail.
  *
  * Only some of it is org-level. `/admin/settings` is the person's own profile —
@@ -161,11 +187,12 @@ export const SETTINGS_SECTION: NavSection = {
   nameKey: 'nav.settings',
   path: () => '/admin/settings',
   icon: Settings,
-  owns: ['settings', 'org-settings', 'members', 'audit-log', 'billing', 'api-keys'],
+  owns: ['settings', 'org-settings', 'members', 'audit-log', 'billing', 'project-settings', 'api-keys'],
   tabs: [
     orgTab('nav.profile', '/admin/settings', Settings),
     orgTab('nav.orgSettings', '/admin/org-settings', Building2, 'OWNER'),
     orgTab('nav.members', '/admin/members', Users, 'OWNER'),
+    PROJECT_SETTINGS_TAB,
     API_KEYS_TAB,
     orgTab('nav.auditLog', '/admin/audit-log', FileText),
     orgTab('nav.billing', '/admin/billing', CreditCard, 'OWNER'),
@@ -239,7 +266,7 @@ export function sectionFor(pathname: string): NavSection | undefined {
  */
 const ROLE_BY_SEGMENT: ReadonlyMap<string, Role> = new Map(
   [
-    ...PROJECT_SECTIONS.flatMap((section) => [section as NavEntry, ...section.tabs]),
+    ...PROJECT_SECTIONS.flatMap((section) => [section as NavEntry, ...section.tabs, ...(section.more ?? [])]),
     SETTINGS_SECTION as NavEntry,
     ...SETTINGS_SECTION.tabs,
   ]
