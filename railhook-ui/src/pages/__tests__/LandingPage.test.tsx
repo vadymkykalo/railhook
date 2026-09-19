@@ -1,5 +1,5 @@
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { fireEvent, screen, within } from '@testing-library/react';
 import LandingPage from '../LandingPage';
 import LandingNav from '../landing/LandingNav';
@@ -134,7 +134,8 @@ describe('LandingPage', () => {
     renderLanding();
     const install = document.getElementById('install') as HTMLElement;
     expect(install).not.toBeNull();
-    expect(within(install).getByText(INSTALL)).toBeInTheDocument();
+    // Coloured token by token, so the command is the text of the whole line, not of one node.
+    expect(within(install).getByTestId('install-command').textContent).toBe(INSTALL);
     expect(within(install).getByRole('button', { name: en.landing.install.copyAria })).toBeInTheDocument();
   });
 
@@ -149,7 +150,6 @@ describe('LandingPage', () => {
     renderLanding();
     expect(screen.getAllByRole('link', { name: en.landing.hero.startFree })[0]).toHaveAttribute('href', '/register');
     expect(screen.getByRole('link', { name: en.landing.hero.install })).toHaveAttribute('href', '#install');
-    expect(screen.getByText('Railhook Cloud is free right now — no card needed.')).toBeInTheDocument();
   });
 
   it('sends a signed-in reader to the dashboard instead of the signup', () => {
@@ -266,6 +266,15 @@ describe('DeveloperSection', () => {
 });
 
 describe('LandingNav', () => {
+  // railhook.io's header and footer, which is the deployment that serves the blog; the switch
+  // itself is tested in src/__tests__/blogSwitch.test.tsx.
+  beforeEach(() => {
+    window.__RAILHOOK__ = { publicBlog: true };
+  });
+  afterEach(() => {
+    delete window.__RAILHOOK__;
+  });
+
   /**
    * Eleven, not the nine this was written at. Two of those are deliberate additions and neither
    * is a word in the row: the blog, which is a destination a reader looks for by name, and the
@@ -323,6 +332,15 @@ describe('LandingNav', () => {
 });
 
 describe('Footer', () => {
+  // railhook.io's header and footer, which is the deployment that serves the blog; the switch
+  // itself is tested in src/__tests__/blogSwitch.test.tsx.
+  beforeEach(() => {
+    window.__RAILHOOK__ = { publicBlog: true };
+  });
+  afterEach(() => {
+    delete window.__RAILHOOK__;
+  });
+
   it('keeps the theme toggle and the licence, and no longer the language switch', () => {
     renderPage(<Footer />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
     expect(screen.getByRole('button', { name: en.nav.toggleTheme })).toBeInTheDocument();

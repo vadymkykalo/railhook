@@ -14,12 +14,12 @@
 export const SIDEBAR_GROUPS = [
   {
     label: 'Get started',
-    uk: 'Початок',
+    uk: 'Початок роботи',
     slugs: ['start/quickstart', 'start/send-first-webhook', 'start/receive-first-webhook', 'start/concepts'],
   },
   {
     label: 'Self-hosting',
-    uk: 'Свій сервер',
+    uk: 'Власний сервер',
     slugs: [
       'self-hosting/overview',
       'self-hosting/requirements',
@@ -30,13 +30,14 @@ export const SIDEBAR_GROUPS = [
       'self-hosting/upgrade-backup',
       'self-hosting/monitoring',
       'self-hosting/platform-admin',
+      'self-hosting/live-demo',
       'self-hosting/troubleshooting',
       'self-hosting/kubernetes',
     ],
   },
   {
     label: 'Sending webhooks',
-    uk: 'Надсилання',
+    uk: 'Надсилання вебхуків',
     slugs: [
       'outgoing/endpoints-subscriptions',
       'outgoing/signatures',
@@ -53,12 +54,12 @@ export const SIDEBAR_GROUPS = [
   },
   {
     label: 'Receiving webhooks',
-    uk: 'Приймання',
+    uk: 'Приймання вебхуків',
     slugs: ['incoming/sources', 'incoming/destinations', 'incoming/verification'],
   },
   {
     label: 'Provider guides',
-    uk: 'Гайди провайдерів',
+    uk: 'Посібники для сервісів',
     slugs: [
       'guides/stripe-webhooks',
       'guides/github-webhooks',

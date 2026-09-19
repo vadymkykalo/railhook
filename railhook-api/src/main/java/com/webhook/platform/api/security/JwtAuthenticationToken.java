@@ -20,6 +20,8 @@ public class JwtAuthenticationToken extends AbstractAuthenticationToken {
      * lock existing sessions out on upgrade.
      */
     private final boolean emailVerified;
+    /** Minted by the public demo; see {@link DemoSessions}. */
+    private final boolean demo;
 
     public JwtAuthenticationToken(
             UUID userId,
@@ -27,12 +29,27 @@ public class JwtAuthenticationToken extends AbstractAuthenticationToken {
             MembershipRole role,
             boolean emailVerified,
             Collection<? extends GrantedAuthority> authorities) {
+        this(userId, organizationId, role, emailVerified, false, authorities);
+    }
+
+    public JwtAuthenticationToken(
+            UUID userId,
+            UUID organizationId,
+            MembershipRole role,
+            boolean emailVerified,
+            boolean demo,
+            Collection<? extends GrantedAuthority> authorities) {
         super(authorities);
         this.userId = userId;
         this.organizationId = organizationId;
         this.role = role;
         this.emailVerified = emailVerified;
+        this.demo = demo;
         setAuthenticated(true);
+    }
+
+    public boolean isDemo() {
+        return demo;
     }
 
     public boolean isEmailVerified() {

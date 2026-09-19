@@ -433,8 +433,8 @@ or Destination may override the delays and the attempt count, and nothing else m
 | | Outgoing | Incoming |
 |---|---|---|
 | Delays | 1m · 5m · 15m · 1h · 6h · 24h | 1m · 5m · 15m · 1h · 6h |
-| Attempts | 7 | 6 |
-| Reaches | ~24h after the last failure | ~6h after the last failure |
+| Attempts | 7 | 5 |
+| Waits used | all six, ~31h21m first to last | the first four, ~1h21m first to last; the 6h tier is reached only if a Destination raises its attempts |
 
 ```mermaid
 flowchart LR
@@ -442,9 +442,9 @@ flowchart LR
         direction LR
         O1["try 1<br/>now"] -->|"1m"| O2["try 2"] -->|"5m"| O3["try 3"] -->|"15m"| O4["try 4"] -->|"1h"| O5["try 5"] -->|"6h"| O6["try 6"] -->|"24h"| O7["try 7"] --> OD(["Failed Messages"])
     end
-    subgraph I["Incoming — 6 attempts, reaching ~6h"]
+    subgraph I["Incoming — 5 attempts, reaching ~1h"]
         direction LR
-        I1["try 1<br/>now"] -->|"1m"| I2["try 2"] -->|"5m"| I3["try 3"] -->|"15m"| I4["try 4"] -->|"1h"| I5["try 5"] -->|"6h"| I6["try 6"] --> ID(["Failed Messages"])
+        I1["try 1<br/>now"] -->|"1m"| I2["try 2"] -->|"5m"| I3["try 3"] -->|"15m"| I4["try 4"] -->|"1h"| I5["try 5"] --> ID(["Failed Messages"])
     end
 ```
 

@@ -77,6 +77,16 @@ export interface CurrentUserResponse {
    * admin request.
    */
   platformAdmin: boolean;
+  /**
+   * The public demo: a read-only session anyone can open. The dashboard shows a banner and greys
+   * out every action; the server refuses every change regardless.
+   */
+  demo?: boolean;
+}
+
+export interface DemoSessionResponse {
+  accessToken: string;
+  expiresAt: string;
 }
 
 export interface OrganizationResponse {

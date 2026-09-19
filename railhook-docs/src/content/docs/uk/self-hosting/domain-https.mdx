@@ -1,10 +1,10 @@
 ---
 title: Домен і HTTPS
-description: Обслуговуйте Railhook на власному домені із сертифікатом, що оновлюється сам, або за проксі, який у вас уже є.
+description: Запустіть Railhook на власному домені із сертифікатом, що оновлюється автоматично, або за проксі, який у вас уже працює.
 ---
 import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Перш ніж відкривати інстанс в інтернет, дайте йому домен і HTTPS. Інсталятор може зробити це за вас, або ж можна поставити Railhook за наявний зворотний проксі.
+Перш ніж відкривати інстанс в інтернет, налаштуйте для нього домен і HTTPS. Інсталятор може зробити це за вас, або ж Railhook можна поставити за зворотний проксі, який у вас уже працює.
 
 <Tabs syncKey="https">
   <TabItem label="Вбудований HTTPS">
@@ -12,7 +12,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
 
     1. **Спрямуйте домен на сервер**
 
-       Створіть для домену запис A з публічною IP-адресою сервера. Порти 80 і 443 мають бути вільні й відкриті в інтернет.
+       Створіть для домену запис A з публічною IP-адресою сервера. Порти 80 і 443 мають бути вільними й доступними з інтернету.
 
     2. **Встановіть із доменом**
 
@@ -28,15 +28,15 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
     |---|---|
     | TLS-термінатор | Caddy на портах 80 і 443 сам отримує й оновлює сертифікат Let's Encrypt |
     | nginx панелі | Переходить на `127.0.0.1:8080`, за Caddy |
-    | `APP_ENV` | `production`, тож платформа не запускається з небезпечною конфігурацією |
+    | `APP_ENV` | `production`, тож платформа відмовиться запускатися з небезпечною конфігурацією |
     | `APP_BASE_URL`, `CORS_ALLOWED_ORIGINS` | `https://<your domain>` |
     | Ingress-адреси джерел і адреси тунелів CLI | Беруться з `APP_BASE_URL`, тож провайдери отримують `https://<your domain>/ingress/…` |
     | `DB_SSL_MODE` | `require` |
     | `LOG_LEVEL` | `WARN` |
-    | `WEBHOOK_TRUSTED_PROXIES` | `172.16.0.0/12`, щоб до журналу аудиту й лімітів на IP потрапляли справжні IP клієнтів. За CDN, наприклад Cloudflare, додайте також опубліковані діапазони адрес CDN, інакше всіх відвідувачів, що прийшли через один edge, буде пораховано як цей edge |
+    | `WEBHOOK_TRUSTED_PROXIES` | `172.16.0.0/12`, щоб у журнал аудиту й ліміти запитів для кожної IP-адреси потрапляли справжні IP-адреси клієнтів. Якщо Railhook стоїть за CDN, наприклад Cloudflare, додайте також опубліковані діапазони адрес цього CDN, інакше всіх відвідувачів, що пройшли через один edge-вузол, буде пораховано як цей вузол |
 
     <Aside type="caution">
-    Сертифікати зберігаються в томі `caddy_data`. Якщо його втратити, сертифікат буде видано знову під час наступного запуску, а Let's Encrypt обмежує частоту видачі.
+    Сертифікати зберігаються в томі `caddy_data`. Якщо його втратити, сертифікат буде видано повторно під час наступного запуску, а Let's Encrypt обмежує кількість таких видач.
     </Aside>
   </TabItem>
   <TabItem label="Власний проксі">
@@ -52,7 +52,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
 
     2. **Проксуйте все на 127.0.0.1:8080**
 
-       Надсилайте всі шляхи домену на `http://127.0.0.1:8080`. nginx усередині вже маршрутизує панель, `/api/`, `/ingress/`, `/hook/`, `/tunnel/` і `/ws/tunnel`. Шлях `/ws/tunnel` — це WebSocket, відкритий упродовж усієї сесії CLI, тож передавайте заголовки upgrade і задайте довгий тайм-аут читання (вбудований Caddy використовує одну годину).
+       Спрямовуйте всі шляхи домену на `http://127.0.0.1:8080`. nginx усередині вже сам розводить запити до панелі, `/api/`, `/ingress/`, `/hook/`, `/tunnel/` і `/ws/tunnel`. Шлях `/ws/tunnel` — це WebSocket, який лишається відкритим упродовж усієї сесії CLI, тож передавайте заголовки upgrade і задайте довгий тайм-аут читання (вбудований Caddy ставить годину).
 
     </Steps>
   </TabItem>
@@ -60,9 +60,9 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
 
 ## У режимі production
 
-З `APP_ENV=production` API відмовляється запускатися, а не працює далі, якщо:
+З `APP_ENV=production` API відмовляється запускатися, замість того щоб працювати, якщо:
 
-- секрет досі містить заглушку або типове значення з постачання,
+- секрет досі містить заглушку або типове значення з дистрибутива,
 - `WEBHOOK_ALLOW_PRIVATE_IPS=true`,
 - `SWAGGER_ENABLED=true`,
 - `CORS_ALLOWED_ORIGINS` досі містить `localhost`.
@@ -73,5 +73,5 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
 
 <CardGrid>
   <LinkCard title="Конфігурація" description="Пошта, секрети та решта налаштувань." href="/docs/uk/self-hosting/configuration/" />
-  <LinkCard title="Оновлення й резервні копії" description="Тримайте інстанс актуальним і відновлюваним." href="/docs/uk/self-hosting/upgrade-backup/" />
+  <LinkCard title="Оновлення й резервні копії" description="Тримайте інстанс актуальним і готовим до відновлення." href="/docs/uk/self-hosting/upgrade-backup/" />
 </CardGrid>

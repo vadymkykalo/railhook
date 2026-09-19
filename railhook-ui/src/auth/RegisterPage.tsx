@@ -8,6 +8,7 @@ import GoogleSignInButton from './GoogleSignInButton';
 import { showApiError, showSuccess } from '../lib/toast';
 import { authApi } from '../api/auth.api';
 import { http } from '../api/http';
+import { useLeaveDemo } from './useLeaveDemo';
 import { useAuth } from './auth.store';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -33,6 +34,7 @@ export default function RegisterPage() {
   const [resending, setResending] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
+  useLeaveDemo();
   const [searchParams] = useSearchParams();
   // An invite or a CLI approval sent the visitor here to make an account first; they carry on
   // there once it exists. Only a path on this site counts.

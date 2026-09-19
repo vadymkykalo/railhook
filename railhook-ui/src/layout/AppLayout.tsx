@@ -14,6 +14,7 @@ import { CommandPalette } from '../components/CommandPalette';
 import { isDarkApplied, toggleTheme } from '../lib/theme';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import ChangeEmailForm from '../components/ChangeEmailForm';
+import DemoBanner from '../components/DemoBanner';
 import ProtectedRoute from '../auth/ProtectedRoute';
 import Sidebar from './Sidebar';
 import SectionTabs from './SectionTabs';
@@ -109,10 +110,23 @@ export default function AppLayout() {
     }
   };
 
+  const isDemo = user?.demo === true;
+
   const handleLogout = () => {
     logout();
+    if (isDemo) {
+      // A demo visitor has no account to sign back in to: back to the page they came from.
+      showSuccess(t('demo.exited'));
+      navigate('/');
+      return;
+    }
     showSuccess(t('nav.loggedOut'));
     navigate('/login');
+  };
+
+  const handleStartFree = () => {
+    logout();
+    navigate('/register');
   };
 
   if (!user) return null;
@@ -203,6 +217,8 @@ export default function AppLayout() {
           </header>
 
           <SectionTabs projectId={projectId} role={role} />
+
+          {isDemo && <DemoBanner onStartFree={handleStartFree} onExit={handleLogout} />}
 
           {needsVerification && (
             <div className="border-b border-retry/30 bg-retry-soft px-4 py-2.5 lg:px-6">

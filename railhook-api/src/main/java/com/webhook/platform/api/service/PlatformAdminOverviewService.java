@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.common.demo.DemoTenant;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
@@ -37,6 +38,10 @@ import java.util.UUID;
  * <p>Every figure is a count across all organizations, which is why the whole method runs in the
  * system scope. None of it names a customer except the recent sign-ups, and those only by the
  * address they registered with.
+ *
+ * <p>The public demo is not a tenant anybody signed up as, and its history is regenerated every
+ * hour: counted, it would be the busiest organization on a quiet deployment. Every figure leaves
+ * {@link DemoTenant} out.
  */
 @Service
 @RequiredArgsConstructor
@@ -65,17 +70,20 @@ public class PlatformAdminOverviewService {
         Instant dayAgo = now.minus(Duration.ofHours(24));
 
         return PlatformOverviewResponse.builder()
-                .organizations(organizationRepository.count())
-                .suspendedOrganizations(organizationRepository.countBySuspendedAtIsNotNull())
-                .users(userRepository.count())
+                .organizations(organizationRepository.countByIdNot(DemoTenant.ORGANIZATION_ID))
+                .suspendedOrganizations(organizationRepository.countBySuspendedAtIsNotNullAndIdNot(DemoTenant.ORGANIZATION_ID))
+                .users(userRepository.countByIdNot(DemoTenant.USER_ID))
                 .signupsToday(userRepository.countByCreatedAtGreaterThanEqual(startOfToday))
                 .signups7d(userRepository.countByCreatedAtGreaterThanEqual(now.minus(Duration.ofDays(7))))
                 .signups30d(userRepository.countByCreatedAtGreaterThanEqual(now.minus(Duration.ofDays(30))))
-                .eventsToday(eventRepository.countByCreatedAtGreaterThanEqual(startOfToday))
-                .events30d(eventRepository.countByCreatedAtGreaterThanEqual(now.minus(Duration.ofDays(30))))
-                .deliveriesSucceeded24h(deliveryRepository.countByStatusInAndCreatedAtGreaterThanEqual(
-                        List.of(DeliveryStatus.SUCCESS), dayAgo))
-                .deliveriesFailed24h(deliveryRepository.countByStatusInAndCreatedAtGreaterThanEqual(FAILED, dayAgo))
+                .eventsToday(eventRepository.countByCreatedAtGreaterThanEqualAndOrganizationIdNot(
+                        startOfToday, DemoTenant.ORGANIZATION_ID))
+                .events30d(eventRepository.countByCreatedAtGreaterThanEqualAndOrganizationIdNot(
+                        now.minus(Duration.ofDays(30)), DemoTenant.ORGANIZATION_ID))
+                .deliveriesSucceeded24h(deliveryRepository.countByStatusInAndCreatedAtGreaterThanEqualAndOrganizationIdNot(
+                        List.of(DeliveryStatus.SUCCESS), dayAgo, DemoTenant.ORGANIZATION_ID))
+                .deliveriesFailed24h(deliveryRepository.countByStatusInAndCreatedAtGreaterThanEqualAndOrganizationIdNot(
+                        FAILED, dayAgo, DemoTenant.ORGANIZATION_ID))
                 .activeTunnels(tunnelSessionRepository.countByStatus(TunnelStatus.ACTIVE))
                 .organizationsNearQuota(organizationsNearQuota(BillingPeriod.current(clock)))
                 .activation30d(activation(now.minus(Duration.ofDays(30))))
@@ -93,7 +101,7 @@ public class PlatformAdminOverviewService {
         LocalDate first = today.minusDays(DAILY_DAYS - 1);
         Instant since = first.atStartOfDay(ZoneOffset.UTC).toInstant();
         Map<LocalDate, Long> signups = perDay(userRepository.countPerDaySince(since));
-        Map<LocalDate, Long> events = perDay(eventRepository.countPerDaySince(since));
+        Map<LocalDate, Long> events = perDay(eventRepository.countPerDaySinceExcluding(since, DemoTenant.ORGANIZATION_ID));
         List<PlatformOverviewResponse.Day> days = new ArrayList<>(DAILY_DAYS);
         for (LocalDate day = first; !day.isAfter(today); day = day.plusDays(1)) {
             days.add(PlatformOverviewResponse.Day.builder()
@@ -126,7 +134,9 @@ public class PlatformAdminOverviewService {
     private long organizationsNearQuota(BillingPeriod period) {
         Map<UUID, Long> counts = new HashMap<>();
         for (Object[] row : eventRepository.countPerOrganizationBetween(period.start(), period.end())) {
-            counts.put((UUID) row[0], ((Number) row[1]).longValue());
+            if (!DemoTenant.isDemoOrganization((UUID) row[0])) {
+                counts.put((UUID) row[0], ((Number) row[1]).longValue());
+            }
         }
         if (counts.isEmpty()) {
             return 0;
@@ -142,7 +152,7 @@ public class PlatformAdminOverviewService {
     }
 
     private List<AdminSignupResponse> recentSignups() {
-        List<User> users = userRepository.findAll(
+        List<User> users = userRepository.findByIdNot(DemoTenant.USER_ID,
                 PageRequest.of(0, RECENT_SIGNUPS, Sort.by(Sort.Direction.DESC, "createdAt"))).getContent();
         List<UUID> ids = users.stream().map(User::getId).toList();
         Map<UUID, List<String>> methods = accountFacts.signInMethods(users);

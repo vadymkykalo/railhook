@@ -14,6 +14,7 @@ import org.springframework.stereotype.Repository;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,7 +23,9 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     Page<Delivery> findByEventId(UUID eventId, Pageable pageable);
     Page<Delivery> findByEventIdIn(List<UUID> eventIds, Pageable pageable);
 
-    long countByStatusInAndCreatedAtGreaterThanEqual(java.util.Collection<DeliveryStatus> statuses, Instant since);
+    /** Deliveries in those states since then, one organization's excepted: the overview leaves the public demo out. */
+    long countByStatusInAndCreatedAtGreaterThanEqualAndOrganizationIdNot(
+            Collection<DeliveryStatus> statuses, Instant since, UUID excludedOrganizationId);
 
     @Query("SELECT COUNT(d) FROM Delivery d WHERE d.event.projectId = :projectId AND d.createdAt BETWEEN :from AND :to")
     long countByProjectIdAndCreatedAtBetween(@Param("projectId") UUID projectId, @Param("from") Instant from, @Param("to") Instant to);

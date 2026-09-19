@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -208,5 +208,64 @@ describe('sign-in for the MCP server', () => {
     const wellKnown = location('^~ /.well-known/oauth-');
     expect(wellKnown, 'a ^~ prefix location, so the `~ /\\.` deny never sees it').toBeDefined();
     expect(wellKnown!.body).toMatch(/proxy_pass\s+http:\/\/\$api_backend;/);
+  });
+});
+
+/**
+ * The blog is railhook.io's own content, carried by the one image every install runs. Off —
+ * the default — nginx answers it 404 like any unknown address, and /sitemap.xml lists none of it.
+ * The files cannot be removed at runtime (the root filesystem is read-only), so nginx is the gate.
+ */
+describe('the blog switch', () => {
+  const blog = () => location('^~ /blog');
+  const isBlog = (path: string) => path === '/blog' || path.startsWith('/blog/');
+  const paths = (xml: string) =>
+    [...xml.matchAll(/<loc>https:\/\/site-url\.railhook\.invalid([^<]*)<\/loc>/g)].map((m) => m[1]);
+
+  it('defaults to off before the entrypoint snippet can turn it on', () => {
+    const off = conf.search(/^\s*set \$railhook_blog "off";/m);
+    expect(off).toBeGreaterThan(-1);
+    expect(conf.search(/^\s*include \/tmp\/railhook-site\.conf;/m)).toBeGreaterThan(off);
+  });
+
+  it('answers /blog, every post and the feed 404 when off, with the app shell as the body', () => {
+    // `^~` covers /blog, /blog/<slug>, /blog/<slug>.png and /blog/rss.xml, and keeps the
+    // static-file regex from serving a social card around the switch.
+    expect(blog(), 'a ^~ /blog location').toBeDefined();
+    expect(blog()!.body).toMatch(/if\s+\(\$railhook_blog\s+!=\s+"on"\)\s*\{\s*return\s+404;\s*\}/);
+    expect(blog()!.body).toMatch(/error_page\s+404\s+\/index\.html;/);
+  });
+
+  it('serves the blog as `location /` would when on: files, 404 for an unknown slug, the origin rewritten', () => {
+    const body = blog()!.body;
+    expect(body).toMatch(/try_files\s+\$uri\s+\$uri\/index\.html\s+=404;/);
+    expect(body).toMatch(/sub_filter\s+'https:\/\/site-url\.railhook\.invalid'\s+\$railhook_site_url;/);
+    expect(body).toMatch(/sub_filter_types\s+[^;]*text\/xml/);
+    expect(body).toMatch(/add_header\s+Cache-Control\s+"no-cache, must-revalidate"\s+always;/);
+  });
+
+  it('serves the blog-less sitemap as /sitemap.xml unless the blog is on', () => {
+    const map = conf.match(/map\s+\$railhook_blog\s+\$railhook_sitemap\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(map).toMatch(/^\s*on\s+\/sitemap\.xml;/m);
+    expect(map).toMatch(/^\s*default\s+\/sitemap-without-blog\.xml;/m);
+
+    const sitemap = location('= /sitemap.xml');
+    expect(sitemap, 'an exact-match location for /sitemap.xml').toBeDefined();
+    expect(sitemap!.body).toMatch(/try_files\s+\$railhook_sitemap\s+=404;/);
+    expect(sitemap!.body).toMatch(/sub_filter\s+'https:\/\/site-url\.railhook\.invalid'\s+\$railhook_site_url;/);
+    expect(sitemap!.body).toMatch(/sub_filter_types\s+[^;]*text\/xml/);
+  });
+
+  it('has a blog-less sitemap to serve: everything else, and nothing of the blog', () => {
+    const full = paths(read('railhook-ui/public/sitemap.xml'));
+    const without = paths(read('railhook-ui/public/sitemap-without-blog.xml'));
+    expect(full).toContain('/blog');
+    expect(without.length).toBeGreaterThan(0);
+    expect(without).toEqual(full.filter((path) => !isBlog(path)));
+  });
+
+  it('swallows no other file in the web root, since `^~ /blog` is a prefix', () => {
+    const strays = readdirSync(join(repoRoot, 'railhook-ui/public')).filter((f) => f.startsWith('blog') && f !== 'blog');
+    expect(strays).toEqual([]);
   });
 });

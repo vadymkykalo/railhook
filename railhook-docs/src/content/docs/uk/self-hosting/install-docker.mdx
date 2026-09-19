@@ -1,10 +1,10 @@
 ---
 title: Встановлення з Docker
-description: Встановіть Railhook інсталятором в один рядок або запустіть той самий файл Compose самостійно.
+description: Встановіть Railhook інсталятором в один рядок або запустіть той самий Compose-файл самостійно.
 ---
 import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Обидва способи запускають той самий `docker-compose.yml`. Інсталятор також генерує справжні секрети й перевіряє конфігурацію, перш ніж щось запустити, тож користуйтеся ним, якщо немає причин робити інакше.
+Обидва способи запускають той самий `docker-compose.yml`. Інсталятор також генерує справжні секрети й перевіряє конфігурацію, перш ніж щось запускати, тож користуйтеся ним, якщо немає вагомих причин робити інакше.
 
 <Tabs syncKey="install">
   <TabItem label="Інсталятор">
@@ -16,15 +16,15 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
        curl -fsSL https://railhook.io/install.sh | bash
        ```
 
-       Він перевіряє Docker, Compose, пам'ять, диск і порт. Потім записує `~/railhook`: `docker-compose.yml`, закріплений на останньому релізі, `.env` зі згенерованими секретами та допоміжний скрипт `railhook`. Наостанок запускає стек і чекає, доки API відповість. Перший запуск виконує міграції бази даних і створює топіки Kafka, тож може тривати кілька хвилин.
+       Він перевіряє Docker, Compose, пам'ять, диск і порт. Потім створює каталог `~/railhook` із `docker-compose.yml`, закріпленим на останньому релізі, `.env` зі згенерованими секретами та допоміжним скриптом `railhook`. Наостанок запускає стек і чекає, доки API почне відповідати. Під час першого запуску виконуються міграції бази даних і створюються топіки Kafka, тож він може тривати кілька хвилин.
 
     2. **Відкрийте панель керування**
 
-       Перейдіть на `http://localhost` (або `http://<server-ip>`; додайте `:<port>`, якщо встановлювали з `--port`) і зареєструйтеся. Поки поштовий сервер не налаштовано, обліковий запис активний одразу.
+       Перейдіть на `http://localhost` (або `http://<server-ip>`; додайте `:<port>`, якщо встановлювали з `--port`) і зареєструйтеся. Поштовий сервер не налаштовано, тож обліковий запис активний одразу.
 
     3. **Збережіть резервну копію `.env`**
 
-       `WEBHOOK_ENCRYPTION_KEY` і `WEBHOOK_ENCRYPTION_SALT` із цього файлу шифрують кожен секрет ендпоінта в базі даних. Резервна копія бази, відновлена без цього файлу, дасть рядки, які ніщо не зможе прочитати.
+       `WEBHOOK_ENCRYPTION_KEY` і `WEBHOOK_ENCRYPTION_SALT` із цього файлу шифрують кожен секрет ендпоінта в базі даних. Якщо відновити резервну копію бази без цього файлу, ви отримаєте рядки, які вже ніщо не прочитає.
 
     </Steps>
 
@@ -39,36 +39,36 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
     | Параметр | Дія |
     |---|---|
     | `--dir <path>` | Куди встановити. Типово `~/railhook` |
-    | `--version <tag>` | Реліз, на якому закріпитися, `v2.12.0` або новіший. Типово — останній |
+    | `--version <tag>` | Реліз, на якому закріпити встановлення, `v2.12.0` або новіший. Типово — останній реліз |
     | `--port <port>` | Єдиний опублікований порт. Типово `80`, або `8080` з `--behind-proxy` |
-    | `--domain <host>` | Обслуговувати на цьому домені через HTTPS. Див. [Домен і HTTPS](/docs/uk/self-hosting/domain-https/) |
-    | `--behind-proxy` | Разом із `--domain`: TLS завершує ваш власний зворотний проксі, а панель слухає для нього на `127.0.0.1` |
+    | `--domain <host>` | Працювати на цьому домені через HTTPS. Див. [Домен і HTTPS](/docs/uk/self-hosting/domain-https/) |
+    | `--behind-proxy` | Разом із `--domain`: TLS термінує ваш власний зворотний проксі, а панель приймає його запити на `127.0.0.1` |
     | `--email <address>` | Куди Let's Encrypt надсилатиме попередження про закінчення терміну сертифіката |
     | `--no-start` | Записати файли й нічого не запускати |
-    | `--yes` | Не питати перед використанням непорожнього каталогу |
+    | `--yes` | Не питати підтвердження, якщо каталог не порожній |
     | `--check` | Лише запустити перевірки системи та конфігурації |
     | `--uninstall` | Зупинити стек і видалити контейнери. Томи з даними лишаються |
     | `--purge` | Видалити встановлення разом із томами даних |
 
     ### Щоденні команди
 
-    Запускайте з каталогу встановлення:
+    Запускайте їх із каталогу встановлення:
 
     | Команда | Що робить |
     |---|---|
     | `./railhook status` | Показує контейнери та їхній стан |
-    | `./railhook logs [service]` | Стежить за журналами, наприклад `./railhook logs api` |
+    | `./railhook logs [service]` | Показує логи в реальному часі, наприклад `./railhook logs api` |
     | `./railhook start` / `stop` / `restart` | Запускає, зупиняє або перезапускає стек |
     | `./railhook upgrade [version]` | Робить резервну копію, потім оновлює. Див. [Оновлення й резервні копії](/docs/uk/self-hosting/upgrade-backup/) |
     | `./railhook backup` | Записує дамп бази даних у каталог |
-    | `./railhook doctor` | Повторно запускає всі перевірки на файлах із диска |
+    | `./railhook doctor` | Повторно виконує всі перевірки для файлів на диску |
 
-    Будь-який інший аргумент передається просто в Docker Compose, тож `./railhook ps` чи `./railhook up -d` працюють, як очікується.
+    Будь-який інший аргумент передається просто в Docker Compose, тож `./railhook ps` чи `./railhook up -d` працюють так, як ви очікуєте.
   </TabItem>
   <TabItem label="Docker Compose вручну">
     <Steps>
 
-    1. **Завантажте файл Compose і каталог налаштувань**
+    1. **Завантажте Compose-файл і перелік налаштувань**
 
        ```bash
        mkdir railhook && cd railhook
@@ -78,7 +78,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
 
     2. **Замініть публічні секрети**
 
-       Значення в `.env.dist` публічні. Згенеруйте власні для кожного з них:
+       Значення в `.env.dist` загальнодоступні. Згенеруйте власні для кожної з цих змінних:
 
        ```bash title=".env"
        WEBHOOK_ENCRYPTION_KEY=   # openssl rand -base64 32
@@ -89,7 +89,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
        REDIS_PASSWORD=
        ```
 
-       Задайте в `APP_BASE_URL` і `CORS_ALLOWED_ORIGINS` адресу, яку відкриватимуть користувачі. `RAILHOOK_PORT` у цьому файлі — `8080`.
+       Задайте в `APP_BASE_URL` і `CORS_ALLOWED_ORIGINS` URL, який відкриватимуть користувачі. `RAILHOOK_PORT` у цьому файлі — `8080`.
 
     3. **Запустіть із вбудованою базою даних**
 
@@ -97,7 +97,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
        COMPOSE_PROFILES=embedded-db docker compose up -d
        ```
 
-    4. **Перевірте**
+    4. **Перевірте, що все працює**
 
        ```bash
        curl -f http://localhost:8080/actuator/health/liveness
@@ -113,13 +113,13 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
 </Tabs>
 
 <Aside type="caution">
-Інсталятор закріплює теги образів у `.env` (`API_IMAGE_TAG`, `WORKER_IMAGE_TAG`, `UI_IMAGE_TAG`). У `.env`, створеному з `.env.dist`, стоїть `latest`, і цей тег змінюється без вашого відома. Закріпіть теги на релізі.
+Інсталятор закріплює теги образів у `.env` (`API_IMAGE_TAG`, `WORKER_IMAGE_TAG`, `UI_IMAGE_TAG`). У `.env`, створеному вручну з `.env.dist`, стоїть `latest`, а цей тег непомітно для вас переходить на нові версії. Закріпіть теги на конкретному релізі.
 </Aside>
 
 ## Що далі
 
 <CardGrid>
-  <LinkCard title="Домен і HTTPS" description="Розмістіть інстанс на домені із сертифікатом." href="/docs/uk/self-hosting/domain-https/" />
-  <LinkCard title="Конфігурація" description="Налаштування, які треба визначити до запуску в роботу." href="/docs/uk/self-hosting/configuration/" />
+  <LinkCard title="Домен і HTTPS" description="Підключіть до інстансу домен і сертифікат." href="/docs/uk/self-hosting/domain-https/" />
+  <LinkCard title="Конфігурація" description="Налаштування, які треба визначити до запуску в продакшн." href="/docs/uk/self-hosting/configuration/" />
   <LinkCard title="Швидкий старт" description="Надішліть першу подію." href="/docs/uk/start/quickstart/" />
 </CardGrid>

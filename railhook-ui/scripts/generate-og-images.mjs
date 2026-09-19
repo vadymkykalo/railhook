@@ -146,9 +146,11 @@ async function main() {
     args: ['--no-sandbox', '--disable-dev-shm-usage', '--lang=en'],
   });
   try {
-    const page = await browser.newPage();
-    await page.setViewport({ width: WIDTH, height: HEIGHT, deviceScaleFactor: 1 });
     for (const post of entries) {
+      // A fresh page per card: on one reused page, the second card's setContent timed out waiting
+      // for networkidle0, so a second post could never get a card.
+      const page = await browser.newPage();
+      await page.setViewport({ width: WIDTH, height: HEIGHT, deviceScaleFactor: 1 });
       const tags = (parseFrontMatter(readFileSync(join(CONTENT, post.slug, 'en.md'), 'utf8')).lists.tags ?? []).slice(0, 3);
       await page.setContent(
         card({
@@ -165,6 +167,7 @@ async function main() {
       const png = await page.screenshot({ type: 'png' });
       writeFileSync(join(OUT, `${post.slug}.png`), png);
       console.log(`  ${post.slug}.png  ${(png.length / 1024).toFixed(0)} KB`);
+      await page.close();
     }
   } finally {
     await browser.close();

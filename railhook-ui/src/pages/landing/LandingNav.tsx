@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Github,
   Menu,
+  PlayCircle,
   Radio,
   ShieldCheck,
   Terminal,
@@ -18,7 +19,7 @@ import { RailhookIcon } from '../../components/icons/RailhookIcon';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
 import { Button } from '../../components/ui/button';
 import { useAuth } from '../../auth/auth.store';
-import { publicTesterEnabled, statusPageUrl } from '../../lib/runtimeConfig';
+import { publicBlogEnabled, publicDemoEnabled, publicTesterEnabled, statusPageUrl } from '../../lib/runtimeConfig';
 import { cn } from '../../lib/utils';
 import { REPO_URL } from './plans';
 import { WRAP } from './primitives';
@@ -79,7 +80,8 @@ export default function LandingNav() {
   ];
   const developers = useDeveloperLinks();
   const reading = [
-    { to: '/blog', label: t('landing.nav.blog') },
+    // railhook.io's own articles: nowhere to link on a deployment that does not serve them.
+    ...(publicBlogEnabled() ? [{ to: '/blog', label: t('landing.nav.blog') }] : []),
     { to: '/about', label: t('landing.nav.about') },
   ];
   const linkClass = 'transition-colors hover:text-foreground';
@@ -222,6 +224,9 @@ function useDeveloperLinks(): DeveloperLinkData[] {
   const status = statusPageUrl();
   return [
     { href: '/docs/', icon: BookOpen, title: t('landing.nav.devDocs'), body: t('landing.nav.devDocsBody') },
+    ...(publicDemoEnabled()
+      ? [{ href: '/demo', route: true, icon: PlayCircle, title: t('landing.nav.devDemo'), body: t('landing.nav.devDemoBody') }]
+      : []),
     { href: '/docs/tools/cli/', icon: Terminal, title: t('landing.nav.devCli'), body: t('landing.nav.devCliBody') },
     { href: '/docs/tools/mcp/', icon: Bot, title: t('landing.nav.devMcp'), body: t('landing.nav.devMcpBody') },
     ...(publicTesterEnabled()

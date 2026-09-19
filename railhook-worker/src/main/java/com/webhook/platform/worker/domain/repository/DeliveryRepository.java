@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.domain.repository;
 
+import com.webhook.platform.common.demo.DemoTenant;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -160,12 +161,25 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
     @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'PROCESSING' AND d.createdAt > :since")
     long countProcessing(@Param("since") Instant since);
 
-    @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ' AND d.createdAt > :since")
-    long countDlq(@Param("since") Instant since);
+    @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ' AND d.createdAt > :since "
+            + "AND d.organizationId <> :excluded")
+    long countDlqExcluding(@Param("since") Instant since, @Param("excluded") UUID excludedOrganizationId);
 
-    /** The actionable DLQ backlog: rows not yet retried or purged. */
-    @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ'")
-    long countDlqTotal();
+    /**
+     * DLQ rows created since then. The public demo's seeded Failed Messages are not counted: they
+     * are there to be looked at, and {@code webhook_dlq_depth > 0} pages whoever runs the demo.
+     */
+    default long countDlq(Instant since) {
+        return countDlqExcluding(since, DemoTenant.ORGANIZATION_ID);
+    }
+
+    @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ' AND d.organizationId <> :excluded")
+    long countDlqTotalExcluding(@Param("excluded") UUID excludedOrganizationId);
+
+    /** The actionable DLQ backlog: rows not yet retried or purged, the demo's excepted. */
+    default long countDlqTotal() {
+        return countDlqTotalExcluding(DemoTenant.ORGANIZATION_ID);
+    }
 
     @Query("SELECT MIN(d.createdAt) FROM Delivery d WHERE d.status = 'PENDING'")
     Instant findOldestPendingCreatedAtGlobal();

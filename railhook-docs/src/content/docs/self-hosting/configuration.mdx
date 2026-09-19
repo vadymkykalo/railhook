@@ -39,6 +39,12 @@ Variables that start with `VITE_` are baked into the dashboard when its image is
 
 Leave it off on your own instance. Both mails are written in the first person by Railhook's author for Railhook Cloud, and your users did not sign up with him.
 
+## The blog
+
+`BLOG_ENABLED` serves `/blog`, its posts and its feed. The image carries them only because railhook.io runs the same image as your instance: they are Railhook's own articles, not your site's.
+
+It is off by default, and only railhook.io turns it on. Off, `/blog` and everything under it answer 404, the header and footer carry no Blog link, and `/sitemap.xml` lists no posts. The UI container reads it at startup, so changing it takes `docker compose up -d ui`, not a rebuild. On Kubernetes the setting is `ui.publicBlog`.
+
 ## All variables
 
 <EnvReference />

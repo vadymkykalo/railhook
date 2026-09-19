@@ -77,10 +77,12 @@ by key:
 :::figure provider-retries
 ```
 
-Registered today: `provider-retries`, `retry-ladder`, `gateway`. A post naming a key nobody drew
+Registered today: `provider-retries`, `retry-ladder`, `gateway`, and from
+`figures/outbox.tsx` `delivery-semantics`, `dual-write`, `outbox-pipeline`, `ordering-hold`. A post naming a key nobody drew
 renders nothing, and `src/lib/__tests__/blog.test.ts` fails on it.
 
-To add one: write the component in `figures.tsx`, register it in the `FIGURES` map, and give it
+To add one: write the component in `figures.tsx` (or, for a post's own set, in a file under
+`figures/` that exports a map spread into `FIGURES`), register it in the `FIGURES` map, and give it
 
 - a `role="img"` with a written-out `aria-label` making the same point the picture does, and a
   caption — the `Figure` wrapper takes both;

@@ -41,7 +41,9 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
     @Query("SELECT o FROM Organization o WHERE o.id = :id")
     Optional<Organization> lockById(@Param("id") UUID id);
 
-    long countBySuspendedAtIsNotNull();
+    long countByIdNot(UUID excludedId);
+
+    long countBySuspendedAtIsNotNullAndIdNot(UUID excludedId);
 
     long countByCreatedAtGreaterThanEqual(Instant since);
 

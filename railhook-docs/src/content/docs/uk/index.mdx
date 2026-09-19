@@ -6,24 +6,24 @@ description: Надійно надсилайте й приймайте вебх�
 import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
 import StartCards from '../../../components/StartCards.astro';
 
-Railhook доставляє вебхуки, які надсилає ваш продукт, і приймає ті, від яких він залежить: повторює те, що не вдалося, і зберігає запис кожної спроби. Користуйтеся ним у Railhook Cloud або запустіть на власному сервері.
+Railhook доставляє вебхуки, які надсилає ваш продукт, і приймає ті, на які він покладається: повторює невдалі спроби й зберігає історію кожної з них. Користуйтеся Railhook Cloud або встановіть його на власний сервер.
 
 <CardGrid>
 <Card title="Railhook Cloud — безкоштовна реєстрація">
 
-Railhook працює на railhook.io. Зареєструйтеся й почніть із безкоштовного плану; платні плани з вищими лімітами з'являться згодом.
+Railhook працює на railhook.io. Зареєструйтеся й почніть із безкоштовного плану; платні плани з підтримкою та вищими лімітами з'являться згодом.
 
 <LinkButton href="https://railhook.io/register" variant="primary">Зареєструватися безкоштовно</LinkButton>
 
 </Card>
-<Card title="Свій сервер — одна команда">
+<Card title="Власний сервер — одна команда">
 
-Інсталятор перевіряє машину, записує Compose-файл і `.env` зі згенерованими секретами, а потім запускає стек. Потрібно близько 4 ГіБ оперативної пам'яті.
+Інсталятор перевіряє сервер, створює Compose-файл і `.env` зі згенерованими секретами, а потім запускає стек. Знадобиться близько 4 ГіБ оперативної пам'яті.
 
 </Card>
 </CardGrid>
 
-```bash title="Встановлення на свій сервер"
+```bash title="Встановлення на власний сервер"
 curl -fsSL https://railhook.io/install.sh | bash
 ```
 
@@ -32,10 +32,10 @@ curl -fsSL https://railhook.io/install.sh | bash
 <StartCards
   cards={[
     { slug: 'start/quickstart', title: 'Швидкий старт', description: 'Від нуля до доставленого вебхука.' },
-    { slug: 'self-hosting/overview', title: 'Свій сервер', description: 'Що запускає інсталяція і що їй потрібно.' },
-    { slug: 'start/send-first-webhook', title: 'Надішліть перший вебхук', description: 'Створіть ендпоінт, підпишіть його й надішліть подію.' },
-    { slug: 'start/receive-first-webhook', title: 'Прийміть перший вебхук', description: 'Створіть джерело й пересилайте отримане в призначення.' },
-    { href: '/docs/uk/api-reference/', title: 'Довідник API', description: 'Кожен ендпоінт — із запитами, які можна надіслати на ваш інстанс.' },
+    { slug: 'self-hosting/overview', title: 'Власний сервер', description: 'Що запускає інсталяція і що їй потрібно.' },
+    { slug: 'start/send-first-webhook', title: 'Надішліть перший вебхук', description: 'Створіть ендпоінт, оформіть для нього підписку й надішліть подію.' },
+    { slug: 'start/receive-first-webhook', title: 'Прийміть перший вебхук', description: 'Створіть джерело й пересилайте отримані вебхуки в призначення.' },
+    { href: '/docs/uk/api-reference/', title: 'Довідник API', description: 'Усі ендпоінти API — із запитами, які можна надіслати на ваш інстанс.' },
     { slug: 'tools/cli', title: 'CLI', description: 'Вхід, тунель вебхуків на localhost і перемикання профілів.' },
   ]}
 />

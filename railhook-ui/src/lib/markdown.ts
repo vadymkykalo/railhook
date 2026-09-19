@@ -223,7 +223,12 @@ export function parseMarkdown(source: string): Document {
     if (heading) {
       flushParagraph();
       const level = heading[1].length === 2 ? 2 : 3;
-      const id = slugify(heading[2], headings.length);
+      // Two headings can reduce to the same slug, most easily in Ukrainian, where only the Latin
+      // words survive: "Скільки Railhook пробує?" and "Що Railhook гарантує?" are both "railhook".
+      // The second then numbers itself, or the contents would link twice to the first.
+      const slug = slugify(heading[2], headings.length);
+      let id = slug;
+      for (let n = 2; headings.some((h) => h.id === id); n++) id = `${slug}-${n}`;
       headings.push({ id, level, text: heading[2] });
       blocks.push({ type: 'heading', level, id, text: heading[2] });
       continue;

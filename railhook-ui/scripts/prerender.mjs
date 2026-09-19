@@ -91,6 +91,9 @@ const PRERENDER_CONFIG_JS = `window.__RAILHOOK__ = ${JSON.stringify({
   // The prerendered pages are the public site's, where the tester is on; a self-hosted install
   // re-renders from its own /config.js on load.
   publicTester: true,
+  // Likewise the blog: the pages are railhook.io's, where it is on. On a self-hosted install
+  // nginx answers 404 for /blog, and the Blog links disappear once the app renders.
+  publicBlog: true,
 })};\n`;
 
 /** The same SPA fallback nginx serves, so the browser sees production routing. */
