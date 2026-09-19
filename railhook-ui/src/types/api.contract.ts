@@ -66,6 +66,7 @@ export type EmailChangeResponseConforms = Assert<Conforms<'EmailChangeResponse',
 export type LoginRequestConforms = Assert<Conforms<'LoginRequest', Mirror.LoginRequest>>;
 export type UserResponseConforms = Assert<Conforms<'UserResponse', Mirror.UserResponse>>;
 export type CurrentUserResponseConforms = Assert<Conforms<'CurrentUserResponse', Mirror.CurrentUserResponse>>;
+export type DemoSessionResponseConforms = Assert<Conforms<'DemoSessionResponse', Mirror.DemoSessionResponse>>;
 export type OrganizationResponseConforms = Assert<Conforms<'OrganizationResponse', Mirror.OrganizationResponse>>;
 export type ProjectRequestConforms = Assert<Conforms<'ProjectRequest', Mirror.ProjectRequest>>;
 export type ProjectResponseConforms = Assert<Conforms<'ProjectResponse', Mirror.ProjectResponse>>;

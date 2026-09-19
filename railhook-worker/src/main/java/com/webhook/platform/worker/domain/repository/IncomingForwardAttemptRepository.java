@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.domain.repository;
 
+import com.webhook.platform.common.demo.DemoTenant;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -231,13 +232,23 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
         @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'PROCESSING' AND a.createdAt > :since")
         long countProcessing(@Param("since") Instant since);
 
-        @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'DLQ' AND a.createdAt > :since")
-        long countDlq(@Param("since") Instant since);
+        @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'DLQ' AND a.createdAt > :since "
+                        + "AND a.organizationId <> :excluded")
+        long countDlqExcluding(@Param("since") Instant since, @Param("excluded") UUID excludedOrganizationId);
+
+        /** As the outgoing twin: the public demo's seeded rows are not an operator's backlog. */
+        default long countDlq(Instant since) {
+                return countDlqExcluding(since, DemoTenant.ORGANIZATION_ID);
+        }
 
         /**
          * The actionable Incoming DLQ backlog. Not windowed, unlike {@link #countDlq(Instant)}:
          * a Forward abandoned a week ago still needs a human to decide about it.
          */
-        @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'DLQ'")
-        long countDlqTotal();
+        @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'DLQ' AND a.organizationId <> :excluded")
+        long countDlqTotalExcluding(@Param("excluded") UUID excludedOrganizationId);
+
+        default long countDlqTotal() {
+                return countDlqTotalExcluding(DemoTenant.ORGANIZATION_ID);
+        }
 }

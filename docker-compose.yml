@@ -352,6 +352,9 @@ services:
       # the default used to be http://api:8080, a name that exists only inside this network.
       TEST_ENDPOINT_BASE_URL: ${TEST_ENDPOINT_BASE_URL:-${APP_BASE_URL:-http://localhost}}
       PUBLIC_TESTER_ENABLED: ${PUBLIC_TESTER_ENABLED:-false}
+      DEMO_ENABLED: ${DEMO_ENABLED:-false}
+      DEMO_SESSION_TTL_MINUTES: ${DEMO_SESSION_TTL_MINUTES:-30}
+      DEMO_REFRESH_INTERVAL_MINUTES: ${DEMO_REFRESH_INTERVAL_MINUTES:-60}
       TEST_ENDPOINT_MAX_PER_PROJECT: ${TEST_ENDPOINT_MAX_PER_PROJECT:-10}
       TEST_ENDPOINT_MAX_TTL_HOURS: ${TEST_ENDPOINT_MAX_TTL_HOURS:-72}
       TEST_ENDPOINT_CLEANUP_INTERVAL_MS: ${TEST_ENDPOINT_CLEANUP_INTERVAL_MS:-3600000}
@@ -642,6 +645,10 @@ services:
       RAILHOOK_STATUS_PAGE_URL: ${STATUS_PAGE_URL:-}
       # The public webhook tester (/tester), the same switch the API reads.
       RAILHOOK_PUBLIC_TESTER: ${PUBLIC_TESTER_ENABLED:-false}
+      # The live demo's entry points, the same switch the API reads.
+      RAILHOOK_PUBLIC_DEMO: ${DEMO_ENABLED:-false}
+      # The blog (/blog): railhook.io's own content, off on a self-hosted install.
+      RAILHOOK_PUBLIC_BLOG: ${BLOG_ENABLED:-false}
     depends_on:
       - api
     logging:

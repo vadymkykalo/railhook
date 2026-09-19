@@ -1,10 +1,10 @@
 ---
 title: SDK
-description: Офіційні бібліотеки для Node.js, Python і PHP, щоб надсилати події, керувати ендпоінтами й перевіряти підписи.
+description: "Офіційні SDK для Node.js, Python і PHP: надсилання подій, керування ендпоінтами й перевірка підпису вебхуків."
 ---
 import { Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-SDK огортають ті частини API, які ви викликаєте з коду застосунку: події, ендпоінти, підписки, доставки, вхідні джерела й вхідні події, а також перевірку підпису. Для автентифікації достатньо API-ключа.
+SDK покривають ті частини API, які ви викликаєте з коду застосунку: події, ендпоінти, підписки, доставки, вхідні джерела й вхідні події, а також перевірку підпису. Для автентифікації їм достатньо самого API-ключа.
 
 | Мова | Пакет | Встановлення |
 |---|---|---|
@@ -12,9 +12,9 @@ SDK огортають ті частини API, які ви викликаєте
 | Python | [`railhook`](https://pypi.org/project/railhook/) | `pip install railhook` |
 | PHP 8.1+ | [`railhook/php`](https://packagist.org/packages/railhook/php) | `composer require railhook/php` |
 
-SDK для Node.js не має залежностей під час виконання. SDK для PHP потребує `ext-json` і `ext-curl`.
+SDK для Node.js не має залежностей під час виконання. SDK для PHP потрібні `ext-json` і `ext-curl`.
 
-## Надіслати подію
+## Надсилання події
 
 <Tabs syncKey="lang">
   <TabItem label="Node.js">
@@ -68,9 +68,9 @@ SDK для Node.js не має залежностей під час викона
   </TabItem>
 </Tabs>
 
-## Перевірити підпис
+## Перевірка підпису
 
-Передайте сире тіло запиту, заголовок `X-Signature` і секрет ендпоінта. Перевірка кидає виняток, якщо підпис не збігається або позначка часу застаріла.
+Передайте необроблене тіло запиту, заголовок `X-Signature` і секрет ендпоінта. Якщо підпис не збігається або мітка часу застаріла, перевірка викидає виняток.
 
 <Tabs syncKey="lang">
   <TabItem label="Node.js">
@@ -96,16 +96,16 @@ SDK для Node.js не має залежностей під час викона
   </TabItem>
 </Tabs>
 
-Кожен SDK також має `constructEvent` (`construct_event` у Python), що перевіряє й розбирає подію одним викликом. Якщо ваш ендпоінт використовує заголовки Standard Webhooks, застосовуйте `verifyStandardWebhook` (`verify_standard_webhook`) із секретом ендпоінта у форматі `whsec_`.
+Кожен SDK також має `constructEvent` (`construct_event` у Python), який перевіряє й розбирає подію одним викликом. Якщо ваш ендпоінт використовує заголовки Standard Webhooks, викликайте `verifyStandardWebhook` (`verify_standard_webhook`) із секретом ендпоінта `whsec_`.
 
 <Aside type="tip">
-SDK не охоплюють трансформації, правила, воркфлоу, схеми, DLQ, сповіщення й адміністрування проєктів. Для цього кожен SDK має загальний метод довільного запиту, а в [довіднику API](/docs/uk/api-reference/) є всі ендпоінти.
+SDK не охоплюють трансформацій, правил, воркфлоу, схем, DLQ, сповіщень і адміністрування проєктів. Для цього в кожному SDK є універсальний метод для довільного запиту, а всі ендпоінти API перелічено в [довіднику API](/docs/uk/api-reference/).
 </Aside>
 
 ## Що далі
 
 <CardGrid>
-  <LinkCard title="Надішліть перший вебхук" description="Ендпоінт, підписка, подія й підпис від початку до кінця." href="/docs/uk/start/send-first-webhook/" />
+  <LinkCard title="Надішліть перший вебхук" description="Ендпоінт, підписка, подія й підпис — від початку до кінця." href="/docs/uk/start/send-first-webhook/" />
   <LinkCard title="Підписи" description="Обидві схеми підпису й ротація секретів." href="/docs/uk/outgoing/signatures/" />
   <LinkCard title="MCP-сервер" description="Дайте ШІ-агенту працювати з тим самим проєктом через його API-ключ." href="/docs/uk/tools/mcp/" />
 </CardGrid>

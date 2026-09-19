@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowRight, BookOpen, Radio } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import Prose from '../components/blog/Prose';
+import { BYLINE, TagList } from '../components/blog/PostMeta';
 import { useAuth } from '../auth/auth.store';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useJsonLd } from '../hooks/useJsonLd';
@@ -194,27 +195,16 @@ export default function BlogPostPage() {
               {post.title}
             </h1>
             <p className="mt-4 text-[1.15rem] leading-relaxed text-muted-foreground">{post.lead}</p>
-            <div className="mono-label mt-5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div className={cn(BYLINE, 'mt-5')}>
               <span className="text-foreground">{post.author}</span>
               <span aria-hidden="true">·</span>
               <time dateTime={post.date}>{dates.format(blogDate(post.date))}</time>
               <span aria-hidden="true">·</span>
               <ReadingTime minutes={post.readingMinutes} />
             </div>
-            {post.tags.length > 0 && (
-              <ul className="mt-4 flex flex-wrap gap-2">
-                {post.tags.map((tag) => (
-                  <li
-                    key={tag}
-                    className="rounded-full bg-accent px-2.5 py-0.5 font-mono text-[11px] tracking-[0.04em] text-primary"
-                  >
-                    {tag}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <TagList tags={post.tags} className="mt-4" />
             {post.sourcesCheckedOn && (
-              <p className="mt-5 border-l-2 border-rail pl-4 text-[13px] leading-relaxed text-muted-foreground">
+              <p className="mt-5 border-l-2 border-rail pl-4 text-[15px] leading-[1.65] text-muted-foreground">
                 {t('blog.sourcesCheckedOn', { date: dates.format(blogDate(post.sourcesCheckedOn)) })}
               </p>
             )}

@@ -91,7 +91,7 @@ public class GlobalExceptionHandler {
             ForbiddenException ex, WebRequest request) {
         log.warn("Forbidden: {}", ex.getMessage());
         ErrorResponse error = new ErrorResponse(
-                "forbidden",
+                ex.getCode(),
                 ex.getMessage(),
                 HttpStatus.FORBIDDEN.value()
         );

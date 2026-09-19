@@ -10,7 +10,8 @@
 #   /tmp/railhook-config.js  window.__RAILHOOK__, which nginx serves as /config.js ahead of the app
 #                            and of the docs
 #   /tmp/railhook-site.conf  $railhook_site_url, which nginx substitutes for the placeholder
-#                            origin the build leaves in the HTML, sitemap and robots.txt
+#                            origin the build leaves in the HTML, sitemap and robots.txt; and
+#                            $railhook_blog, whether nginx serves the blog at all
 #
 # /tmp for the same reason as the resolver file: the chart runs this pod with a read-only
 # root filesystem and mounts /tmp writable.
@@ -90,12 +91,30 @@ if [ "$(trim "${RAILHOOK_PUBLIC_TESTER:-}")" = "true" ]; then
     public_tester=true
 fi
 
+# The live demo's entry points, on only for an exact "true" — the page's half of DEMO_ENABLED.
+public_demo=false
+if [ "$(trim "${RAILHOOK_PUBLIC_DEMO:-}")" = "true" ]; then
+    public_demo=true
+fi
+
+# The blog, on only for an exact "true" — BLOG_ENABLED. It is railhook.io's own content: the
+# image carries it for railhook.io, and a self-hosted install serves none of it. nginx does the
+# gating (the pages are files in the read-only web root, so they cannot be removed here); the
+# page's half only hides the links to it.
+public_blog=false
+blog_nginx=off
+if [ "$(trim "${RAILHOOK_PUBLIC_BLOG:-}")" = "true" ]; then
+    public_blog=true
+    blog_nginx=on
+fi
+
 cat > "$OUT" <<CONF
-window.__RAILHOOK__ = {"contactDomain": "${domain}", "siteUrl": "${site}", "captchaSiteKey": "${captcha_key}", "captchaScriptUrl": "${captcha_script}", "webAnalyticsToken": "${analytics_token}", "statusPageUrl": "${status_url}", "publicTester": ${public_tester}};
+window.__RAILHOOK__ = {"contactDomain": "${domain}", "siteUrl": "${site}", "captchaSiteKey": "${captcha_key}", "captchaScriptUrl": "${captcha_script}", "webAnalyticsToken": "${analytics_token}", "statusPageUrl": "${status_url}", "publicTester": ${public_tester}, "publicDemo": ${public_demo}, "publicBlog": ${public_blog}};
 CONF
 
 cat > "$SITE_CONF_OUT" <<CONF
 set \$railhook_site_url "${site}";
+set \$railhook_blog "${blog_nginx}";
 CONF
 
 if [ -n "$domain" ]; then
@@ -117,4 +136,9 @@ if [ -n "$analytics_token" ]; then
     echo "20-runtime-config: web analytics on"
 else
     echo "20-runtime-config: web analytics off"
+fi
+if [ "$public_blog" = true ]; then
+    echo "20-runtime-config: blog on"
+else
+    echo "20-runtime-config: blog off"
 fi

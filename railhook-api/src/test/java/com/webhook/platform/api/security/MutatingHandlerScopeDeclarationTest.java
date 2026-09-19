@@ -148,6 +148,9 @@ class MutatingHandlerScopeDeclarationTest {
             // The public site's contact form: anonymous by design, rate-limited per address and
             // behind the challenge; it only ever mails the deployment's own support address.
             "PublicContactController.send",
+            // The public site's live demo: anonymous by design, off unless DEMO_ENABLED; it opens a
+            // read-only session for a person, and an API key has no use for one.
+            "PublicDemoController.createSession",
             // The MCP server's OAuth endpoints, called by an app rather than a person: open
             // registration (RFC 7591), the token endpoint and revocation. Public in
             // McpSecurityConfig; the app's client credentials, code + PKCE verifier or refresh

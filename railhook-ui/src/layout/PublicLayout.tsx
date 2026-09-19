@@ -2,7 +2,7 @@ import { useId, useLayoutEffect, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Github, Mail, type LucideIcon } from 'lucide-react';
-import { contactDomain, publicTesterEnabled, statusPageUrl } from '../lib/runtimeConfig';
+import { contactDomain, publicBlogEnabled, publicTesterEnabled, statusPageUrl } from '../lib/runtimeConfig';
 import { RailhookIcon } from '../components/icons/RailhookIcon';
 import ThemeToggle from '../components/ThemeToggle';
 import LandingNav from '../pages/landing/LandingNav';
@@ -167,7 +167,7 @@ export function Footer() {
           </Column>
           <Column title={t('footer.company')}>
             <RouteLink to="/about">{t('footer.about')}</RouteLink>
-            <RouteLink to="/blog">{t('footer.blog')}</RouteLink>
+            {publicBlogEnabled() && <RouteLink to="/blog">{t('footer.blog')}</RouteLink>}
             <RouteLink to="/security">{t('footer.security')}</RouteLink>
             <RouteLink to="/changelog">{t('footer.changelog')}</RouteLink>
             {statusPageUrl() && <PageLink href={statusPageUrl()!} external>{t('footer.status')}</PageLink>}

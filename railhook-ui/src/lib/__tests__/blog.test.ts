@@ -125,6 +125,11 @@ describe('parseMarkdown', () => {
     expect(slugify('Чому саме так', 3)).toBe('section-4');
   });
 
+  it('numbers a heading whose anchor an earlier heading already took', () => {
+    const { headings } = parseMarkdown('## Що Railhook гарантує?\n## Скільки Railhook пробує?\n');
+    expect(headings.map((h) => h.id)).toEqual(['railhook', 'railhook-2']);
+  });
+
   it('reads a fenced block as code, not as prose', () => {
     const { blocks } = parseMarkdown('```bash\ncurl -X POST https://example.com\n```\n');
     expect(blocks).toEqual([{ type: 'code', language: 'bash', code: 'curl -X POST https://example.com' }]);

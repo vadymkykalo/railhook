@@ -1,10 +1,10 @@
 ---
 title: Вирішення проблем
-description: Проблеми, з якими справді стикаються власні встановлення, що їх спричиняє і як це виправити.
+description: "Проблеми, з якими справді стикаються інсталяції на власних серверах: що їх спричиняє і як їх виправити."
 ---
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Почніть звідси, з каталогу встановлення:
+Почніть із цих команд у каталозі встановлення:
 
 ```bash
 ./railhook doctor        # machine and configuration checks
@@ -18,42 +18,42 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 |---|---|---|
 | `Port 80 is already in use` | Порт зайнятий іншим сервісом | Зупиніть його або встановіть із `--port 8080`. З `--domain` мають бути вільні і 80, і 443. Якщо їх тримає ваш власний зворотний проксі, додайте `--behind-proxy` |
 | `Docker is installed but the daemon is not reachable` | Демон зупинено або ваш користувач не в групі `docker` | Запустіть Docker або виконайте `sudo usermod -aG docker $USER && newgrp docker` |
-| Інсталятор зупиняється через RAM | Менше ніж 2 ГіБ пам'яті | Візьміть більший хост. Комфортно — близько 4 ГіБ |
+| Інсталятор зупиняється через RAM | Менше ніж 2 ГіБ пам'яті | Потрібен хост із більшим обсягом пам'яті. Комфортно — близько 4 ГіБ |
 | `Could not reach the GitHub API` | Немає доступу до `api.github.com` | Вкажіть реліз явно: `--version v2.16.6` |
-| `exists and is not empty` | У цільовому каталозі є інші файли | Використайте `--dir` або `--yes`, щоб продовжити |
-| `It did not come up within 10 minutes` | Сервіс не запустився з першого разу | `./railhook logs` покаже, який саме |
+| `exists and is not empty` | У цільовому каталозі є інші файли | Вкажіть інший каталог через `--dir` або продовжте з `--yes` |
+| `It did not come up within 10 minutes` | Один із сервісів не зміг запуститися під час першого старту | `./railhook logs` покаже, який саме |
 
 ## Запуск
 
 | Симптом | Причина | Виправлення |
 |---|---|---|
-| API не може автентифікуватися в базі даних | `POSTGRES_PASSWORD` і `DB_PASSWORD` різні | Зробіть їх однаковими. `doctor` про це повідомляє |
+| API не може автентифікуватися в базі даних | `POSTGRES_PASSWORD` і `DB_PASSWORD` різні | Зробіть їх однаковими. `doctor` виявляє цю проблему |
 | Стек запускається, але не бачить бази даних | Не задано ні `COMPOSE_PROFILES=embedded-db`, ні `DB_HOST` | Увімкніть профіль або спрямуйте `DB_HOST` на свою базу |
-| API одразу завершується в production | Небезпечна конфігурація: заглушка в секреті, `WEBHOOK_ALLOW_PRIVATE_IPS=true`, `SWAGGER_ENABLED=true` або `localhost` у `CORS_ALLOWED_ORIGINS` | Виправте те, що називає журнал. `doctor` перевіряє всі чотири |
+| API одразу завершує роботу в продакшні | Небезпечна конфігурація: секрет-заглушка, `WEBHOOK_ALLOW_PRIVATE_IPS=true`, `SWAGGER_ENABLED=true` або `localhost` у `CORS_ALLOWED_ORIGINS` | Виправте те, що вказано в лозі. `doctor` перевіряє всі чотири пункти |
 
 ## Використання
 
 | Симптом | Причина | Виправлення |
 |---|---|---|
-| Вхід завершується помилкою «Invalid CORS request» | Адреси з браузера немає в `CORS_ALLOWED_ORIGINS` | Додайте її й виконайте `./railhook up -d` |
-| Посилання в листах ведуть на `localhost` | `APP_BASE_URL` не змінено | Задайте публічну адресу |
-| Ingress-адреси джерел або адреси тунелів показують `localhost` | `APP_BASE_URL` (або `TUNNEL_INGRESS_BASE_URL`) досі вказує на localhost | Задайте публічну адресу в `.env`, потім `./railhook start` |
+| Вхід завершується помилкою «Invalid CORS request» | URL, відкритого в браузері, немає в `CORS_ALLOWED_ORIGINS` | Додайте його й виконайте `./railhook up -d` |
+| Посилання в листах ведуть на `localhost` | `APP_BASE_URL` не змінено | Задайте в ній публічний URL |
+| Ingress-адреси джерел або адреси тунелів показують `localhost` | `APP_BASE_URL` (або `TUNNEL_INGRESS_BASE_URL`) досі вказує на localhost | Задайте публічний URL у `.env`, потім виконайте `./railhook start` |
 | Доставки на внутрішній сервіс не проходять | Приватні та внутрішні адреси типово заблоковано | Додайте назву хоста до `WEBHOOK_ALLOWED_HOSTS` |
-| «Too many failed sign-in attempts» | Обліковий запис заблоковано після кількох невдалих спроб | Зачекайте (60 секунд, щоразу вдвічі довше, до 15 хвилин) або скиньте пароль — це одразу знімає блокування |
-| `502` близько 20 секунд під час оновлення | Замінюється єдиний контейнер API | Задайте `API_REPLICAS=2` |
+| «Too many failed sign-in attempts» | Після повторних невдалих спроб обліковий запис заблоковано | Зачекайте (60 секунд; щоразу час подвоюється, аж до 15 хвилин) або скиньте пароль — це одразу знімає блокування |
+| `502` близько 20 секунд під час оновлення | Контейнер API замінюється новим | Задайте `API_REPLICAS=2` |
 | `docker logs webhook-api` нічого не знаходить | Починаючи з 2.16.0, API не має фіксованої назви контейнера | Використовуйте `docker compose logs api` |
 
 <Aside type="tip">
-В інстансі після відновлення серія повідомлень `delivery already claimed or not PENDING` у журналі воркера — очікувана річ. Так відхиляються застарілі повідомлення Kafka, і це нормальна поведінка.
+Після відновлення інстансу, а також поки він відновлюється, серія повідомлень `delivery already claimed or not PENDING` у логах воркера — очікувана річ. Воркер відхиляє застарілі повідомлення Kafka, і саме так і має бути.
 </Aside>
 
 ## Досі не працює
 
-Створіть issue на [github.com/vadymkykalo/railhook/issues](https://github.com/vadymkykalo/railhook/issues) з виводом `./railhook doctor` і відповідними рядками журналу. Спершу приберіть із них секрети.
+Створіть issue на [github.com/vadymkykalo/railhook/issues](https://github.com/vadymkykalo/railhook/issues) з виводом `./railhook doctor` і відповідними рядками логів. Спершу приберіть із них секрети.
 
 ## Що далі
 
 <CardGrid>
   <LinkCard title="Конфігурація" description="Що визначає кожне налаштування." href="/docs/uk/self-hosting/configuration/" />
-  <LinkCard title="Моніторинг" description="Помічайте проблеми раніше за користувачів." href="/docs/uk/self-hosting/monitoring/" />
+  <LinkCard title="Моніторинг" description="Помічайте проблеми раніше, ніж про них повідомлять користувачі." href="/docs/uk/self-hosting/monitoring/" />
 </CardGrid>

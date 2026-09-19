@@ -82,6 +82,10 @@ class MutatingHandlerAccessDeclarationTest {
             // The public site's contact form: anonymous by design, rate-limited per address and
             // behind the challenge; it only ever mails the deployment's own support address.
             "PublicContactController.send",
+            // The public site's live demo: anonymous by design (/api/v1/public/**), off unless
+            // DEMO_ENABLED, rate-limited per address and behind the challenge. It mints a Viewer
+            // token for the demo organization, which ScopeEnforcementInterceptor keeps read-only.
+            "PublicDemoController.createSession",
             // The MCP server's OAuth protocol endpoints: called by an app with its client
             // credentials, a code + PKCE verifier or a refresh token, never by a member, so there
             // is no role to require. Public paths in McpSecurityConfig, outside /api.

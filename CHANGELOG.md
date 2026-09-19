@@ -5,6 +5,87 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Blog: "What is a webhook? How webhooks work, and the six ways they break in production"** — a
+  beginner-to-intermediate guide: webhooks against API polling, a real signed Standard Webhooks
+  request, verification on the raw body in Node and Python, acknowledging fast, deduplicating and
+  ordering, then downtime, timeouts, duplicates, out-of-order delivery, signature and rotation
+  mistakes and silent drops, each with its fix. Seven new diagrams; Ukrainian translation
+  alongside.
+- **Blog: "The transactional outbox, or how Railhook never loses an event it has accepted"** —
+  at-most-once, at-least-once and exactly-once over HTTP; the dual write and how the outbox closes
+  it; how the publisher, the Claim and its fence, the Attempt Runner's invariants and the retry
+  ladders absorb every duplicate but the one a receiver dedupes on `webhook-id`; and what a polling
+  publisher leaves open compared with CDC. Four new diagrams, in English and Ukrainian.
+- **Article: "How to build software with an AI coding agent that you can actually trust"** —
+  lessons from building Railhook by directing an AI agent, each drawn from a real incident: where
+  the agent was confidently wrong, why written rules are not enough, and the checks that now refuse
+  each class of bug. Two figures, and a Ukrainian translation alongside.
+- **`BLOG_ENABLED` switches the blog on, and it is off by default.** The blog is railhook.io's own
+  content, carried by the one image every install runs. Off — the default for a self-hosted
+  install — nginx answers `/blog`, every post, their social cards and `/blog/rss.xml` with `404`,
+  the header and footer carry no Blog link, and `/sitemap.xml` is a variant that lists no blog
+  URLs. Set `BLOG_ENABLED=true` (Helm: `ui.publicBlog: true`) to serve it; the UI container reads
+  it at startup.
+
+- **A live demo, "Try the live demo"**, on the landing page's hero, on `/pricing` and in the
+  Developers menu: `/demo` opens the real dashboard signed in to a sample organization — project
+  "Acme Shop" with four endpoints, successful and retried deliveries with their attempts, a
+  Failed Messages entry, Stripe and GitHub sources with verified incoming events, and analytics
+  for the last 24 hours. Off unless `DEMO_ENABLED=true` (with `DEMO_SESSION_TTL_MINUTES` and
+  `DEMO_REFRESH_INTERVAL_MINUTES`); a self-hosted install creates no demo organization, shows no
+  entry point and answers `404` on `POST /api/v1/public/demo/session`.
+- **The demo is read-only on the server, not only in the dashboard.** A demo session is a
+  30-minute Viewer access token with no refresh token, accepted only under `/api/`, and every
+  request from it other than `GET`, `HEAD` or `OPTIONS` is refused with `403 demo_read_only` —
+  including the handlers no role guards (password, email change, members, device and MCP
+  approval, the portal) — as are exports. Any credential for the demo organization is treated
+  the same way. Ten sessions a minute per address, behind the registration CAPTCHA where one is
+  configured. An integration test walks every state-changing handler the running API has; a
+  ratchet freezes the four that a demo session may call.
+- The demo's data is regenerated every hour so it always ends at the present, on reserved
+  `.example` hosts, with every delivery already finished and its sources refusing webhooks, so
+  the worker never has anything of it to send. The platform admin overview and the worker's DLQ
+  gauges (and so the `webhook_dlq_depth` alert) leave it out.
+- Docs: **Self-hosting → Live demo**, how to turn it on and why it is off, in English and
+  Ukrainian.
+- **Syntax highlighting like an IDE on the public site.** Blog code blocks are coloured by kind
+  (keywords, strings, numbers and constants, comments, types and generics, Java `@Annotations`,
+  function calls, punctuation) in Java, JavaScript/TypeScript, Python, SQL, YAML, JSON, HTTP and
+  shell; an unknown language stays plain text. The install command and the tester's `curl` are
+  coloured too. It is the site's own scanner — no highlighting library, nothing compiled at
+  runtime, so the CSP is unchanged — about 1 kB gzipped more, only on the pages that show code.
+  The palette grows from the brand cobalt, avoids every status colour and clears WCAG AA in both
+  themes.
+
+### Changed
+
+- **Blog figures are easier to read**: every label and note is set 2px larger, secondary text is
+  a darker grey, and the figures that crowded were re-laid out. "Anatomy of a webhook request" is
+  set larger still, with its five callouts spaced apart and their descriptions wrapped.
+- **Blog byline, tags and the "sources checked" note are larger**, and a whole post card on
+  `/blog` is now the link, with a focus ring around the card.
+
+### Changed
+
+- **The Ukrainian text reads as if a Ukrainian developer wrote it.** The dashboard, the public
+  pages, the docs and the blog were edited string by string against the English, against a new
+  glossary (`railhook-ui/src/i18n/GLOSSARY.uk.md`) that fixes one rendering per term and the style
+  rules around it: a retry ladder is «розклад повторних спроб», not «драбина»; a replay is
+  «відтворення» and no longer shares a word with a retry; Failed Messages are «Недоставлені
+  повідомлення»; a payload is «вміст» or «тіло запиту». Calques, stray English and mixed forms
+  (ендпойнт/ендпоінт, акаунт/обліковий запис) are gone.
+
+### Fixed
+
+- `npm run blog:og` drew only the first post's social card: the second timed out on the reused
+  browser page. Each card now gets a page of its own.
+- Two blog headings that reduce to the same anchor (common in Ukrainian, where only Latin words
+  survive) no longer share one; the second is numbered, so the contents link to both.
+
 ## [2.25.0] - 2026-09-19
 
 ### Added

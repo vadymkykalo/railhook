@@ -1,12 +1,12 @@
 ---
 title: Спостережуваність
-description: Збирайте метрики Railhook, читайте числа, що показують його стан, і маршрутизуйте алерти Prometheus, які постачаються разом із ним.
+description: Збирайте метрики Railhook, стежте за показниками, які свідчать про його стан, і налаштуйте доставку готових сповіщень Prometheus.
 ---
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Railhook експортує метрики Prometheus, постачає правила алертів і дашборди Grafana та пише структуровані логи. Ця сторінка показує, звідки збирати метрики, за якими кількома числами стежити і що означає кожен алерт.
+Railhook експортує метрики Prometheus, містить готові правила сповіщень і дашборди Grafana та пише структуровані логи. На цій сторінці описано, звідки збирати метрики, за якими кількома показниками стежити і що означає кожне з готових сповіщень.
 
-## Де метрики
+## Де знайти метрики
 
 Prometheus збирає `/actuator/prometheus` з **порту керування**, окремого від порту застосунку:
 
@@ -15,114 +15,114 @@ Prometheus збирає `/actuator/prometheus` з **порту керуванн�
 | API | `8080` | `8082` |
 | Worker | немає | `8081` |
 
-<Aside type="caution" title="Збирайте з порту керування, а не з 8080">
-На порту застосунку `/actuator/**` вимагає JWT або API-ключ, а в Prometheus немає ні того, ні іншого. Збір із `8080` повертає `401`, і тоді кожне правило алертів спрацьовує через відсутність даних. Порт керування не опубліковано на хост; до нього дістаються лише контейнери в тій самій мережі.
+<Aside type="caution" title="Збирайте метрики з порту керування, а не з 8080">
+На порту застосунку `/actuator/**` вимагає JWT або API-ключ, а в Prometheus немає ні того, ні іншого. Запит на `8080` поверне `401`, і тоді всі правила сповіщень спрацюють через відсутність даних. Порт керування не відкрито на хості; до нього мають доступ лише контейнери в тій самій мережі.
 </Aside>
 
-У Kubernetes це налаштовує Helm-чарт: його `ServiceMonitor` збирає з порту з назвою `management`, а `PrometheusRule` містить правила алертів. Див. [Kubernetes](/docs/uk/self-hosting/kubernetes/).
+У Kubernetes усе це налаштовує Helm-чарт: його `ServiceMonitor` збирає метрики з порту з назвою `management`, а `PrometheusRule` містить правила сповіщень. Див. [Kubernetes](/docs/uk/self-hosting/kubernetes/).
 
-## Запустіть стек моніторингу через Docker Compose
+## Запуск стеку моніторингу через Docker Compose
 
 Каталог `monitoring/` у репозиторії містить Grafana, Prometheus, Alertmanager, Loki і Promtail, node-exporter, cAdvisor та blackbox-exporter, уже налаштовані для Railhook.
 
 <Steps>
-1. Додайте пароль Grafana до `.env`. Типового пароля немає, і без нього Grafana не стартує:
+1. Додайте пароль Grafana в `.env`. Типового пароля немає, і без нього Grafana не запуститься:
 
    ```bash
    echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
    ```
 
-2. Задайте отримувача алертів: `ALERTMANAGER_EMAIL_TO` (надсилається через ваш релей `SMTP_*`), `ALERTMANAGER_SLACK_WEBHOOK_URL`, `ALERTMANAGER_WEBHOOK_URL` або `ALERTMANAGER_TELEGRAM_BOT_TOKEN` і `ALERTMANAGER_TELEGRAM_CHAT_ID`. Якщо жодного не задано, алерти видно лише в Grafana.
-3. Запустіть стек: `./railhook monitoring up` на сервері, встановленому через install.sh, `make monitoring-up` у клоні.
+2. Вкажіть, куди надсилати сповіщення: `ALERTMANAGER_EMAIL_TO` (листи йдуть через ваш SMTP-релей `SMTP_*`), `ALERTMANAGER_SLACK_WEBHOOK_URL`, `ALERTMANAGER_WEBHOOK_URL` або `ALERTMANAGER_TELEGRAM_BOT_TOKEN` і `ALERTMANAGER_TELEGRAM_CHAT_ID`. Якщо жодну змінну не задано, сповіщення видно лише в Grafana.
+3. Запустіть стек: `./railhook monitoring up` на сервері, де Railhook встановлено через install.sh, або `make monitoring-up` у клоні репозиторію.
 </Steps>
 
 | Компонент | Адреса | Примітки |
 |---|---|---|
 | Grafana | `127.0.0.1:3001` (`GRAFANA_PORT`) | Overview, Alerts, Errors, Logs, Host, Containers, Uptime, Worker & Circuit Breaker, JVM & Micrometer, Kafka |
-| Prometheus | Лише всередині стека | Зберігає `PROMETHEUS_RETENTION`, за замовчуванням `15d` |
-| Alertmanager | Лише всередині стека | Алерти `CRITICAL` маршрутизуються швидше за попередження; критичний алерт, що спрацював, приглушує відповідне попередження |
-| Loki | Лише всередині стека | Зберігає логи протягом `LOKI_RETENTION_PERIOD`, за замовчуванням `168h` (7 днів) |
+| Prometheus | Лише всередині стеку | Зберігає дані протягом `PROMETHEUS_RETENTION`, типово `15d` |
+| Alertmanager | Лише всередині стеку | Сповіщення `CRITICAL` надходять швидше за попередження; критичне сповіщення, що спрацювало, приглушує відповідне попередження |
+| Loki | Лише всередині стеку | Зберігає логи протягом `LOKI_RETENTION_PERIOD`, типово `168h` (7 днів) |
 
-[Моніторинг](/docs/uk/self-hosting/monitoring/) описує, як віддати Grafana на власному домені, та сповіщення про хост, контейнери, доступність і журнали.
+На сторінці [Моніторинг](/docs/uk/self-hosting/monitoring/) описано, як відкрити Grafana на окремому домені, а також сповіщення про стан хоста, контейнерів, доступність і логи.
 
-## Числа, які мають значення
+## Показники, які справді важливі
 
-Railhook експортує набагато більше рядів, ніж варто відстежувати. Ці відповідають на важливі запитання.
+Railhook експортує набагато більше метрик, ніж варто відстежувати. Ось ті, що відповідають на важливі запитання.
 
-### Чи проходить робота?
+### Чи обробляються події?
 
 | Метрика | Як читати |
 |---|---|
-| `events_ingested_total` | Прийняті події з тегом `direction` (`outgoing` з `/api/v1/events`, `incoming` з `/ingress`) |
-| `deliveries_total` | Доставки, створені розгалуженням. Поділені на події — середня кількість підписок на подію. |
-| `webhook_delivery_attempts_total` | Спроби. Спроб набагато більше, ніж доставок, — отже, повтори виконують багато роботи. |
-| `webhook_delivery_latency_ms` | Скільки ендпоінт відповідав. Зростання p95 — проблема ендпоінта. |
-| `incoming_events_received_total`, `incoming_forward_attempts_total` | Та сама пара для вхідних вебхуків |
+| `events_ingested_total` | Прийняті події з міткою `direction` (`outgoing` — з `/api/v1/events`, `incoming` — з `/ingress`) |
+| `deliveries_total` | Доставки, створені розгалуженням. Якщо поділити на кількість подій, вийде середня кількість підписок на подію. |
+| `webhook_delivery_attempts_total` | Спроби. Якщо спроб набагато більше, ніж доставок, на повторні спроби припадає багато роботи. |
+| `webhook_delivery_latency_ms` | Скільки часу ендпоінт відповідав. Зростання p95 — проблема на боці ендпоінта. |
+| `incoming_events_received_total`, `incoming_forward_attempts_total` | Та сама пара метрик для вхідних вебхуків |
 
 ### Чи щось накопичується?
 
 | Метрика | Як читати |
 |---|---|
-| **`delivery_oldest_pending_age_seconds`** | **Найкращий окремий сигнал стану**: вік найстарішої нерозв'язаної доставки. Мертвий ендпоінт, збій брокера і завислий worker — усе видно тут. `forward_oldest_pending_age_seconds` — її вхідний двійник. |
-| `delivery_queue_depth`, `incoming_forward_queue_depth` | Робота, що чекає. Стабільно — нормально; постійне зростання — ні. |
-| `outbox_queue_depth`, `outbox_oldest_pending_age_seconds` | Події прийнято, але ще не передано в Kafka. Зростання віку означає, що Kafka недоступна: події в безпеці, але не рухаються. |
-| `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Невдалі повідомлення, що чекають на людину |
-| `delivery_escalated_to_dlq_total` | Доставки, переведені до невдалих повідомлень 96-годинним жорстким обмеженням, а не через вичерпані повтори. Ненульове значення означає, що щось було деградовано днями. |
+| **`delivery_oldest_pending_age_seconds`** | **Найкращий окремий показник стану**: вік найстарішої незавершеної доставки. Тут видно і ендпоінт, що не відповідає, і збій брокера, і завислий воркер. `forward_oldest_pending_age_seconds` — така сама метрика для вхідного напрямку. |
+| `delivery_queue_depth`, `incoming_forward_queue_depth` | Скільки роботи чекає. Стабільне значення — нормально; якщо воно постійно зростає — ні. |
+| `outbox_queue_depth`, `outbox_oldest_pending_age_seconds` | Події, які прийнято, але ще не передано в Kafka. Якщо вік зростає, Kafka недоступна: події не втрачено, але вони нікуди не рухаються. |
+| `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Недоставлені повідомлення, що чекають на рішення людини |
+| `delivery_escalated_to_dlq_total` | Доставки, що потрапили до недоставлених повідомлень через жорсткий ліміт у 96 годин, а не тому, що вичерпали повторні спроби. Ненульове значення означає, що щось працювало погано кілька днів. |
 
-### Чи заважає захист?
+### Чи не заважають механізми захисту?
 
-Коли лімітер чи запобіжник притримує доставку, нічого не надсилається й жоден повтор не витрачається. Висока частота тут — це платформа захищає ендпоінт, а не помилка.
+Коли ліміт або circuit breaker притримує доставку, нічого не надсилається і жодна повторна спроба не витрачається. Високі значення тут означають, що платформа захищає ендпоінт, а не що сталася помилка.
 
 | Метрика | Як читати |
 |---|---|
-| `circuit_breaker_rejected_total` | Спроби, які запобіжник притримав |
-| `circuit_breaker_state_transitions_total`, `circuit_breaker_slow_trips_total` | Як часто він спрацьовував і через що — невдачі чи повільність |
-| **`circuit_breaker_degraded_total`** | Redis був недоступний, і запобіжник пропускав виклики без захисту. Ненульове значення означає, що страхувальна сітка не працює. |
+| `circuit_breaker_rejected_total` | Спроби, які притримав circuit breaker |
+| `circuit_breaker_state_transitions_total`, `circuit_breaker_slow_trips_total` | Як часто він спрацьовував і через що — через помилки чи повільні відповіді |
+| **`circuit_breaker_degraded_total`** | Redis був недоступний, і circuit breaker пропускав виклики без захисту. Ненульове значення означає, що один із запобіжних механізмів не працює. |
 | `webhook_concurrency_rejected_total`, `webhook_rate_limit_exceeded_total`, `webhook_project_rate_limit_exceeded_total` | Який саме ліміт притримує доставки |
 
-### Чи справляються повтори та впорядкування?
+### Чи справляються повторні спроби й порядок доставки?
 
 | Метрика | Як читати |
 |---|---|
-| `retry_governor_effective_batch` | Розмір пакета планувальника повторів. Падіння до мінімуму означає, що він відступає від перевантаженої системи далі по ланцюгу. |
-| `webhook_ordering_buffered_total` | Доставки, що чекають на попередні доставки на той самий ендпоінт |
-| **`webhook_ordering_gap_timeout_total`** | Попередня доставка так і не розв'язалася, тож наступну пропустили, щоб ендпоінт не стояв. Порядок свідомо порушено. Рідко — очікувано; часто — ні. |
+| `retry_governor_effective_batch` | Розмір пакета планувальника повторних спроб. Якщо він падає до мінімуму, планувальник пригальмовує, бо наступна ланка не справляється. |
+| `webhook_ordering_buffered_total` | Доставки, що чекають, поки завершаться попередні доставки на той самий ендпоінт |
+| **`webhook_ordering_gap_timeout_total`** | Попередня доставка так і не завершилася, тож наступну пропустили, щоб ендпоінт не простоював. Порядок свідомо порушено. Зрідка це нормально, часто — ні. |
 | `transform_failed_total` | Трансформація завершилася помилкою |
-| `events_duplicate_total`, `events_fanout_limited_total` | Ключі ідемпотентності ловлять повтори; події, відхилені через надмірне розгалуження |
+| `events_duplicate_total`, `events_fanout_limited_total` | Повтори, відсіяні за ключем ідемпотентності; події, відхилені через надто широке розгалуження |
 
-## Якщо алертити лише на три речі
+## Якщо налаштовувати лише три сповіщення
 
-1. `delivery_oldest_pending_age_seconds` понад кілька годин. Ловить майже все.
-2. Зростання `circuit_breaker_degraded_total`. Ловить захисти, що перестали захищати.
-3. `outbox_oldest_pending_age_seconds` понад кілька хвилин. Ловить прийняті події, які так і не почали рухатися, чого не покаже жодна метрика доставок.
+1. `delivery_oldest_pending_age_seconds` понад кілька годин. Помічає майже все.
+2. `circuit_breaker_degraded_total` зростає. Помічає механізми захисту, які перестали захищати.
+3. `outbox_oldest_pending_age_seconds` понад кілька хвилин. Помічає прийняті події, які так і не почали рухатися, — цього не покаже жодна метрика доставок.
 
-## Алерти, що постачаються
+## Готові сповіщення
 
-Ті самі правила постачаються в `monitoring/prometheus/alerts.yml` для Compose і в `PrometheusRule` Helm-чарту для Kubernetes. Тест у збірці тримає їх ідентичними.
+Ті самі правила є в `monitoring/prometheus/alerts.yml` для Compose і в `PrometheusRule` Helm-чарта для Kubernetes. Тест у збірці стежить, щоб вони були однаковими.
 
-| Що означає | Алерти |
+| Що означає | Сповіщення |
 |---|---|
 | Події прийнято, але вони не рухаються | `OutboxOldestPendingAgeHigh`, `OutboxSendingStuck` |
-| Черга росте | `DeliveryPendingBacklogGrowing`, `DeliveryPendingBacklogHigh`, `DeliveryPendingBacklogCritical`, `IncomingForwardPendingBacklogHigh`, `OldestPendingDeliveryStale`, `OldestPendingDeliveryCritical`, `OldestPendingForwardStale` |
+| Черга зростає | `DeliveryPendingBacklogGrowing`, `DeliveryPendingBacklogHigh`, `DeliveryPendingBacklogCritical`, `IncomingForwardPendingBacklogHigh`, `OldestPendingDeliveryStale`, `OldestPendingDeliveryCritical`, `OldestPendingForwardStale` |
 | Доставки полишають | `DlqDepthGrowing`, `DlqRateHigh`, `IncomingForwardFailureRateHigh`, `DlqActionableBacklog`, `IncomingForwardDlqActionableBacklog` |
-| Захист спрацьовує або відмовив | `CircuitBreakerTripsHigh`, `CircuitBreakerRejectionsHigh`, `CircuitBreakerDegraded` |
-| Платформі важко | `RetryGovernorCooldown`, `RetryGovernorConsecutiveFailures`, `ApiErrorRateHigh` |
+| Механізм захисту спрацьовує або вийшов з ладу | `CircuitBreakerTripsHigh`, `CircuitBreakerRejectionsHigh`, `CircuitBreakerDegraded` |
+| Платформа не справляється | `RetryGovernorCooldown`, `RetryGovernorConsecutiveFailures`, `ApiErrorRateHigh` |
 | Процес не працює | `ApiDown`, `WorkerDown` |
 
-`DlqActionableBacklog` і `IncomingForwardDlqActionableBacklog` потребують людини: вони зникають, коли хтось повторює або очищає невдалі повідомлення. `CircuitBreakerDegraded` вирізняється серед алертів запобіжника: він означає, що запобіжник **не** працює.
+`DlqActionableBacklog` і `IncomingForwardDlqActionableBacklog` вимагають втручання людини: вони зникають, коли хтось повторює або очищає недоставлені повідомлення. `CircuitBreakerDegraded` відрізняється від інших сповіщень про circuit breaker: воно означає, що circuit breaker **не** працює.
 
 ## Логи
 
-У production API і worker пишуть однорядковий JSON, що містить ідентифікатор кореляції та, для автентифікованих запитів, ідентифікатор організації. Рядки логу доставок у worker називають ідентифікатор доставки — так можна перейти від панелі Grafana до доставки в панелі Railhook. Стек моніторингу Compose передає в Loki лише логи `api` і `worker`, з `level` як єдиною міткою. Фільтруйте за іншими ідентифікаторами через `| json` у Grafana; дашборд Logs має змінні для ідентифікатора кореляції та ідентифікатора організації.
+У продакшні API і воркер пишуть логи однорядковим JSON з ідентифікатором кореляції, а для автентифікованих запитів — і з ідентифікатором організації. У рядках логу доставок воркер вказує ідентифікатор доставки — за ним можна перейти від панелі Grafana до доставки в панелі керування Railhook. Стек моніторингу для Compose передає в Loki лише логи `api` і `worker`, а єдина мітка там — `level`. Фільтруйте за іншими ідентифікаторами через `| json` у Grafana; дашборд Logs має змінні для ідентифікатора кореляції та ідентифікатора організації.
 
 ## Трасування
 
-Його немає. Railhook не має експорту OpenTelemetry, тож повільну доставку не можна простежити від приймання через Kafka до спроби як одну трасу.
+Його немає. Railhook не експортує дані в OpenTelemetry, тож повільну доставку не вдасться простежити як один трейс — від приймання через Kafka до спроби.
 
 ## Що далі
 
 <CardGrid>
-  <LinkCard title="Моніторинг розгортання" href="/docs/uk/self-hosting/monitoring/" description="Перевірки стану й за чим стежити після встановлення." />
-  <LinkCard title="Алерти та інциденти" href="/docs/uk/platform/alerts/" description="Правила алертів для власників ендпоінтів." />
-  <LinkCard title="Усунення несправностей" href="/docs/uk/self-hosting/troubleshooting/" description="Що робити, коли число йде не так." />
+  <LinkCard title="Моніторинг розгортання" href="/docs/uk/self-hosting/monitoring/" description="Перевірки стану і за чим стежити після встановлення." />
+  <LinkCard title="Сповіщення та інциденти" href="/docs/uk/platform/alerts/" description="Правила сповіщень для власників ендпоінтів." />
+  <LinkCard title="Вирішення проблем" href="/docs/uk/self-hosting/troubleshooting/" description="Що робити, коли показник відхиляється від норми." />
 </CardGrid>

@@ -69,3 +69,14 @@ function blogRoutes() {
 export function publicRoutes() {
   return [...MARKETING, ...blogRoutes()];
 }
+
+/**
+ * Whether a path is the blog's: its index, a post, or anything else under /blog/.
+ *
+ * The blog is railhook.io's own content and off unless a deployment turns it on (BLOG_ENABLED),
+ * so the sitemap is written twice — with the blog and without it — and nginx serves the one
+ * that matches the container's setting.
+ */
+export function isBlogPath(path) {
+  return path === '/blog' || path.startsWith('/blog/');
+}

@@ -68,6 +68,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         // promise kept a quarter of an hour late, on the one screen where a user
                         // is acting because they believe a device is compromised.
                         log.debug("Token belongs to revoked session {}, rejecting", sessionId);
+                    } else if (isDemo(claims) && !request.getRequestURI().startsWith("/api/")) {
+                        // A demo token is handed to anyone who asks for one. It speaks for the
+                        // read-only demo on the API and nowhere else: not the actuator, not any
+                        // path a future filter chain might open to "any authenticated caller".
+                        log.debug("Demo token presented outside /api ({}), rejecting", request.getRequestURI());
                     } else {
                         UUID organizationId = UUID.fromString(claims.get("organizationId", String.class));
                         MembershipRole role = MembershipRole.valueOf(claims.get("role", String.class));
@@ -81,6 +86,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 organizationId,
                                 role,
                                 verifiedClaim == null || verifiedClaim,
+                                isDemo(claims),
                                 Collections.emptyList()
                         );
                         SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -101,6 +107,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             MDC.remove("projectId");
             JwtUtil.clearCache();
         }
+    }
+
+    private static boolean isDemo(Claims claims) {
+        return Boolean.TRUE.equals(claims.get(JwtUtil.CLAIM_DEMO, Boolean.class));
     }
 
     /**

@@ -1,15 +1,15 @@
 ---
 title: Kubernetes
-description: Встановіть Railhook у Kubernetes за допомогою Helm-чарта, спрямувавши його на власні PostgreSQL, Kafka та Redis.
+description: Встановіть Railhook у Kubernetes за допомогою Helm-чарта й підключіть його до власних PostgreSQL, Kafka та Redis.
 ---
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Helm-чарт запускає API, воркер і панель керування. Базу даних, брокер і кеш він не містить, тож їх треба надати самостійно.
+Helm-чарт запускає API, воркер і панель керування. Бази даних, брокера й кешу в ньому немає, тож їх ви надаєте самі.
 
 ## Що потрібно
 
 - Kubernetes 1.24+ і Helm 3.8+
-- PostgreSQL 16+, Kafka 3.7+ і Redis 7+, керовані або власні. Проєкт тестується з образами `postgres:16-alpine`, `apache/kafka:3.7.0` і `redis:7-alpine`.
+- PostgreSQL 16+, Kafka 3.7+ і Redis 7+ — керовані або розгорнуті вами. Проєкт тестується з образами `postgres:16-alpine`, `apache/kafka:3.7.0` і `redis:7-alpine`.
 
 ## Встановлення
 
@@ -32,9 +32,9 @@ Helm-чарт запускає API, воркер і панель керуван�
      --from-literal=password="$REDIS_PASSWORD"
    ```
 
-   Усі три ключі в `railhook-secrets` обов'язкові. Без них поди API й воркера перезапускаються по колу.
+   Усі три ключі в `railhook-secrets` обов'язкові. Без них поди API й воркера падають і перезапускаються по колу.
 
-2. **Напишіть файл values**
+2. **Створіть файл values**
 
    ```yaml title="values-mycompany.yaml"
    postgresql:
@@ -64,7 +64,7 @@ Helm-чарт запускає API, воркер і панель керуван�
                pathType: Prefix
    ```
 
-   Якщо лишити `app.baseUrl` порожнім, чарт виведе публічну адресу з першого хоста ingress. Задайте його, якщо Railhook відкривають за іншою назвою.
+   Якщо лишити `app.baseUrl` порожнім, чарт візьме публічну адресу з першого хоста ingress. Задайте його, якщо користувачі відкривають Railhook за іншим іменем.
 
 3. **Встановіть чарт**
 
@@ -75,7 +75,7 @@ Helm-чарт запускає API, воркер і панель керуван�
      --version <version> -n railhook -f values-mycompany.yaml
    ```
 
-4. **Перевірте**
+4. **Перевірте, що все працює**
 
    ```bash
    kubectl -n railhook get pods
@@ -85,12 +85,12 @@ Helm-чарт запускає API, воркер і панель керуван�
 </Steps>
 
 <Aside type="danger">
-Збережіть резервні копії `encryption-key` і `encryption-salt` і ніколи не змінюйте сіль на місці. Вона бере участь у виведенні ключа, тож зі зміненою сіллю кожен збережений секрет ендпоінта розшифровується в сміття.
+Зробіть резервні копії `encryption-key` і `encryption-salt` і ніколи не змінюйте сіль на робочому інстансі. Сіль бере участь у виведенні ключа, тож після її зміни кожен збережений секрет ендпоінта розшифровуватиметься в сміття.
 </Aside>
 
 ## Пошта
 
-`api.env.APP_ENV` типово дорівнює `production`. Без пошти облікові записи створюються вже підтвердженими, а запросити нікого не можна. Щоб увімкнути пошту:
+`api.env.APP_ENV` типово дорівнює `production`. Без пошти облікові записи створюються вже підтвердженими, а запросити нікого не можна. Щоб її увімкнути:
 
 ```yaml title="values-mycompany.yaml"
 email:
@@ -105,16 +105,16 @@ email:
     existingSecret: railhook-smtp-secret   # key: smtp-password
 ```
 
-Для типових production-значень (більше реплік, автомасштабування, бюджети переривань, мережеві політики, увімкнена пошта) клонуйте репозиторій і додайте `-f deploy/helm/railhook/values-production.yaml`.
+Щоб отримати значення для продакшну (більше реплік, автомасштабування, PodDisruptionBudget, мережеві політики, увімкнена пошта), клонуйте репозиторій і додайте `-f deploy/helm/railhook/values-production.yaml`.
 
 ## Як це працює
 
 | Тема | Поведінка |
 |---|---|
-| Міграції | Виконуються в поді API під час запуску. Репліки, що стартують разом, чекають на advisory lock PostgreSQL, тож кожна міграція застосовується один раз. Под воркера нового релізу чекає на них до 15 хвилин, перш ніж запуститися, і його startup probe дозволяє це очікування |
-| Топіки Kafka | Створюються hook-завданням після встановлення й оновлення. Налаштовуються через `kafka.topicPartitions` і `kafka.topicReplicationFactor` |
+| Міграції | Виконуються в поді API під час запуску. Репліки, що стартують разом, чекають на advisory lock PostgreSQL, тож кожна міграція застосовується один раз. Под воркера нового релізу чекає на них до 15 хвилин, перш ніж запуститися, і його startup probe розрахована на це очікування |
+| Топіки Kafka | Створюються hook-завданням (Job) після встановлення та оновлення. Налаштовуються через `kafka.topicPartitions` і `kafka.topicReplicationFactor` |
 | Резервні копії | `backup.enabled: true` додає CronJob, який записує файли `pg_dump` на PVC і видаляє старі |
-| Метрики | На названому порту `management` (8082 для API, 8081 для воркера), ніколи не публікуються за межі кластера |
+| Метрики | На іменованому порту `management` (8082 для API, 8081 для воркера); за межі кластера ніколи не публікуються |
 
 ## Оновлення
 
@@ -133,6 +133,6 @@ helm uninstall railhook -n railhook
 ## Що далі
 
 <CardGrid>
-  <LinkCard title="Конфігурація" description="Змінні середовища, що стоять за значеннями чарта." href="/docs/uk/self-hosting/configuration/" />
+  <LinkCard title="Конфігурація" description="Змінні середовища, які стоять за значеннями чарта." href="/docs/uk/self-hosting/configuration/" />
   <LinkCard title="Моніторинг" description="ServiceMonitor, правила сповіщень і дашборди." href="/docs/uk/self-hosting/monitoring/" />
 </CardGrid>

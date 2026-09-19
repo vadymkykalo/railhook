@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Rss } from 'lucide-react';
+import { BYLINE, TagList } from '../components/blog/PostMeta';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useJsonLd } from '../hooks/useJsonLd';
 import { blogPosts } from '../lib/blog';
@@ -102,30 +103,33 @@ export default function BlogPage() {
           <ul className="grid gap-5">
             {posts.map((post) => (
               <li key={post.slug}>
-                <article className={cn('h-full p-6 sm:p-7', panel(true))}>
-                  <div className="mono-label flex flex-wrap items-center gap-x-3 gap-y-1">
+                {/* The whole card is the link, by the stretched-link pattern: the title's link
+                    draws an `::after` over the card, so a click anywhere on it lands on the one
+                    real link. A screen reader still hears one link, named by the title, instead
+                    of a card-sized link reading out the lead and every tag. */}
+                <article
+                  className={cn(
+                    'group relative h-full cursor-pointer p-6 sm:p-7',
+                    panel(true),
+                    'has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-background',
+                  )}
+                >
+                  <div className={BYLINE}>
                     <time dateTime={post.date}>{dates.format(blogDate(post.date))}</time>
                     <span aria-hidden="true">·</span>
                     <ReadingTime minutes={post.readingMinutes} />
                   </div>
                   <h3 className="mt-3 font-display text-[1.45rem] font-bold leading-[1.15] tracking-[-0.025em] text-foreground [text-wrap:balance]">
-                    <Link to={`/blog/${post.slug}`} className="transition-colors hover:text-primary">
+                    <Link
+                      to={`/blog/${post.slug}`}
+                      data-stretched-link
+                      className="transition-colors after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none group-hover:text-primary"
+                    >
                       {post.title}
                     </Link>
                   </h3>
                   <p className="mt-2.5 max-w-2xl text-[1.0125rem] leading-relaxed text-muted-foreground">{post.lead}</p>
-                  {post.tags.length > 0 && (
-                    <ul className="mt-4 flex flex-wrap gap-2">
-                      {post.tags.map((tag) => (
-                        <li
-                          key={tag}
-                          className="rounded-full bg-accent px-2.5 py-0.5 font-mono text-[11px] tracking-[0.04em] text-primary"
-                        >
-                          {tag}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <TagList tags={post.tags} className="mt-4" />
                 </article>
               </li>
             ))}

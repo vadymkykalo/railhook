@@ -1,5 +1,6 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.security.RefusedInDemo;
 import com.webhook.platform.api.dto.GdprExportDto;
 import com.webhook.platform.api.dto.OrganizationResponse;
 import com.webhook.platform.api.dto.UpdateOrganizationRequest;
@@ -80,6 +81,7 @@ public class OrganizationController {
     // annotation its OWNER requirement lived only in the call below, while its sibling
     // deleteOrganization declared it.
     @RequireAccess(AccessLevel.OWNER)
+    @RefusedInDemo
     @GetMapping("/{orgId}/export")
     public ResponseEntity<GdprExportDto> exportOrganizationData(
             @PathVariable("orgId") UUID orgId,

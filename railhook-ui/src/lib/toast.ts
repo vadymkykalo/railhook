@@ -89,6 +89,10 @@ export function resolveErrorMessage(err: unknown, fallbackKey: string): string {
   const apiMsg = extractApiMessage(err);
   const status = extractHttpStatus(err);
 
+  // The server says it in English; the demo's refusal is the one every visitor meets.
+  if ((err as any)?.response?.data?.error === 'demo_read_only') {
+    return t('demo.readOnlyError');
+  }
   if (apiMsg) {
     return apiMsg;
   }
