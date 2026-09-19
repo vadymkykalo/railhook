@@ -81,6 +81,18 @@ describe('EventsPage', () => {
     expect(await screen.findByText(/no events yet/i)).toBeInTheDocument();
   });
 
+  it('sends a test event from the one place that does it: the test console', async () => {
+    // A modal here and a console under Develop both sent test events, differently; the console
+    // is the one that also shows what each endpoint answered.
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(eventsApi.listByProject).mockResolvedValue(populatedPage([EVENT]));
+    renderEvents();
+
+    expect(await screen.findByRole('link', { name: 'Send test event' }))
+      .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/test-console`);
+    expect(screen.queryByRole('button', { name: 'Send test event' })).not.toBeInTheDocument();
+  });
+
   it('renders populated rows when events exist', async () => {
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
     vi.mocked(eventsApi.listByProject).mockResolvedValue(populatedPage([EVENT]));

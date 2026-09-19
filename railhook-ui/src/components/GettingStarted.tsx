@@ -13,7 +13,6 @@ import { cn } from '../lib/utils';
 import { docsUrl } from '../lib/docsUrl';
 import IntentPicker from './IntentPicker';
 import ConnectionSetupDialog from './ConnectionSetupDialog';
-import SendTestEventModal from './SendTestEventModal';
 
 /**
  * The one onboarding surface.
@@ -36,14 +35,14 @@ import SendTestEventModal from './SendTestEventModal';
  */
 
 /** A step either builds something here, or honestly sends you where it lives. */
-type Launch = { kind: 'dialog'; dialog: 'connection' | 'testEvent' } | { kind: 'route'; segment: string };
+type Launch = { kind: 'dialog'; dialog: 'connection' } | { kind: 'route'; segment: string };
 
 const LAUNCH: Record<StepKey, Launch> = {
   createConnection: { kind: 'dialog', dialog: 'connection' },
   // The plaintext key is shown exactly once, on the page that owns that
   // ritual. Inlining it here would be a second place to get it wrong.
   createApiKey: { kind: 'route', segment: 'api-keys' },
-  sendEvent: { kind: 'dialog', dialog: 'testEvent' },
+  sendEvent: { kind: 'route', segment: 'test-console' },
   seeDelivery: { kind: 'route', segment: 'deliveries' },
   offerPortal: { kind: 'route', segment: 'consumers' },
   createSource: { kind: 'route', segment: 'incoming-sources' },
@@ -108,7 +107,7 @@ export default function GettingStarted({ projectId }: { projectId: string | unde
 
   const [intent, setIntent] = useState<Track | null>(() => readIntent());
   const [dismissed, setLocalDismissed] = useState(() => (projectId ? isDismissed(projectId) : false));
-  const [dialog, setDialog] = useState<'connection' | 'testEvent' | null>(null);
+  const [dialog, setDialog] = useState<'connection' | null>(null);
 
   const track = status ? trackFor(status, intent) : null;
   // One row is enough to know whether any Consumer exists, and only the outgoing track asks.
@@ -226,12 +225,6 @@ export default function GettingStarted({ projectId }: { projectId: string | unde
         projectId={projectId}
         open={dialog === 'connection'}
         onOpenChange={(open) => setDialog(open ? 'connection' : null)}
-      />
-
-      <SendTestEventModal
-        projectId={projectId}
-        open={dialog === 'testEvent'}
-        onClose={() => setDialog(null)}
       />
     </>
   );
