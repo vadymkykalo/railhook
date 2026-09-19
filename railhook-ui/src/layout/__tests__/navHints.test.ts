@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import en from '../../i18n/locales/en.json';
 import uk from '../../i18n/locales/uk.json';
-import { PROJECT_SECTIONS, PROJECT_SETTINGS_TABS, hintKeyOf, type NavEntry } from '../nav.config';
+import { API_KEYS_TAB, PROJECT_SECTIONS, hintKeyOf, type NavEntry } from '../nav.config';
 
 function lookup(messages: unknown, key: string): unknown {
   return key.split('.').reduce<unknown>(
@@ -17,7 +17,7 @@ function lookup(messages: unknown, key: string): unknown {
 describe('navigation hints', () => {
   const entries: NavEntry[] = [
     ...PROJECT_SECTIONS.flatMap((section) => [section as NavEntry, ...section.tabs]),
-    ...PROJECT_SETTINGS_TABS,
+    API_KEYS_TAB,
   ];
 
   it.each(entries.map((entry) => [entry.nameKey, entry] as const))('%s says what it is for, in both languages', (_, entry) => {

@@ -4212,7 +4212,8 @@
       "deliveries": "Each attempt to deliver an event — retries, failures, and the failed messages you can send again.",
       "workflows": "Automations that run a sequence of steps when an event arrives.",
       "analytics": "How deliveries are going over time: success rate, latency, alerts and usage.",
-      "develop": "Tools for trying things out: send test events, shape payloads, and inspect what arrives."
+      "develop": "Tools for trying things out: send test events, shape payloads, and inspect what arrives.",
+      "apiKeys": "Keys for your backend: it needs one to send events and manage endpoints through the API. A key belongs to one project."
     }
   },
   "pricing": {

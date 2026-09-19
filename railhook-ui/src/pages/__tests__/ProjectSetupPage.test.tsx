@@ -54,6 +54,13 @@ describe('ProjectSetupPage', () => {
     expect(screen.getByRole('button', { name: /create project/i })).toBeInTheDocument();
   });
 
+  it('names API keys, not the Settings section they are filed under, when that tab is opened first', async () => {
+    renderSetup('api-keys');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'API Keys' })).toBeInTheDocument();
+    expect(screen.getByText(/send events and manage endpoints/i)).toBeInTheDocument();
+  });
+
   it('creates the project and continues to the section that was clicked', async () => {
     const user = userEvent.setup();
     renderSetup('deliveries');
