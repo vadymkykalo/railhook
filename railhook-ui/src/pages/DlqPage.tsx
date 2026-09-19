@@ -148,13 +148,25 @@ export default function DlqPage() {
         eyebrow={t('nav.outgoing')}
         description={<Trans i18nKey="dlq.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={
-          <PermissionGate allowed={canManageDlq}>
-            <VerificationGate>
-              <Button variant="destructive" onClick={() => setShowPurgeDialog(true)} disabled={!stats?.totalItems}>
-                <Trash2 className="h-3.5 w-3.5" /> {t('dlq.purgeAll')}
-              </Button>
-            </VerificationGate>
-          </PermissionGate>
+          // Replaying what you ticked is what this page is for; wiping the whole queue is the
+          // rare, irreversible thing, so it is the quieter button and still asks first.
+          <>
+            <PermissionGate allowed={canManageDlq}>
+              <VerificationGate>
+                <Button onClick={handleReplaySelected} disabled={selectedCount === 0 || replaying}>
+                  {replaying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                  {t('dlq.replaySelected', { count: selectedCount })}
+                </Button>
+              </VerificationGate>
+            </PermissionGate>
+            <PermissionGate allowed={canManageDlq}>
+              <VerificationGate>
+                <Button variant="outline" onClick={() => setShowPurgeDialog(true)} disabled={!stats?.totalItems}>
+                  <Trash2 className="h-3.5 w-3.5" /> {t('dlq.purgeAll')}
+                </Button>
+              </VerificationGate>
+            </PermissionGate>
+          </>
         }
       />
 
@@ -189,14 +201,7 @@ export default function DlqPage() {
       ) : (
         <div className="animate-fade-in">
           <PermissionGate allowed={canManageDlq}>
-            <SelectionBar count={selectedCount} onClear={() => setSelectedIds(new Set())}>
-              <VerificationGate>
-                <Button size="sm" onClick={handleReplaySelected} disabled={replaying}>
-                  {replaying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                  {t('dlq.replaySelected', { count: selectedCount })}
-                </Button>
-              </VerificationGate>
-            </SelectionBar>
+            <SelectionBar count={selectedCount} onClear={() => setSelectedIds(new Set())}>{null}</SelectionBar>
           </PermissionGate>
 
           <div className="overflow-hidden rounded-lg border border-rail bg-card">

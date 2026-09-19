@@ -1261,7 +1261,7 @@
     "noItemsDesc": "All deliveries are being processed successfully",
     "pageTitle": "Failed Messages",
     "projectNotFound": "Project not found",
-    "purgeAll": "Purge All",
+    "purgeAll": "Clear all",
     "purgeDialog": {
       "description": "This will permanently delete all {{count}} failed messages. This action cannot be undone.",
       "impactIrreversible": "These items cannot be recovered or retried after purging",
