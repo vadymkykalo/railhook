@@ -235,7 +235,7 @@ export default function EndpointsPage() {
                   <TableHead>{t('endpoints.verification')}</TableHead>
                   <TableHead>{t('endpoints.status')}</TableHead>
                   <TableHead>{t('subscriptions.created')}</TableHead>
-                  <TableHead className="w-[36px]"><span className="sr-only">{t('connections.open')}</span></TableHead>
+                  <TableHead className="hidden w-[36px] sm:table-cell"><span className="sr-only">{t('connections.open')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -320,7 +320,7 @@ export default function EndpointsPage() {
                         {formatDate(endpoint.createdAt)}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <ChevronRight className="h-4 w-4 text-muted-foreground group-hover/row:text-foreground" aria-hidden />
                     </TableCell>
                   </TableRow>

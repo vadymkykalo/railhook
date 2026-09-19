@@ -193,7 +193,7 @@ export default function ConnectionsPage() {
                   <TableHead>{t('connections.columnRecent')}</TableHead>
                   <TableHead>{t('endpoints.verification')}</TableHead>
                   <TableHead>{t('endpoints.status')}</TableHead>
-                  <TableHead className="w-[36px]"><span className="sr-only">{t('connections.open')}</span></TableHead>
+                  <TableHead className="hidden w-[36px] sm:table-cell"><span className="sr-only">{t('connections.open')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -269,7 +269,7 @@ export default function ConnectionsPage() {
                       </div>
                     </TableCell>
                     <TableCell><EnabledBadge enabled={endpoint.enabled} /></TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <ChevronRight className="h-4 w-4 text-muted-foreground group-hover/row:text-foreground" aria-hidden />
                     </TableCell>
                   </TableRow>
@@ -313,7 +313,7 @@ export default function ConnectionsPage() {
                   <TableHead>{t('connections.columnSource')}</TableHead>
                   <TableHead>{t('connections.columnForwardsTo')}</TableHead>
                   <TableHead>{t('endpoints.status')}</TableHead>
-                  <TableHead className="w-[36px]"><span className="sr-only">{t('connections.open')}</span></TableHead>
+                  <TableHead className="hidden w-[36px] sm:table-cell"><span className="sr-only">{t('connections.open')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -350,7 +350,7 @@ export default function ConnectionsPage() {
                       )}
                     </TableCell>
                     <TableCell><EnabledBadge enabled={source.status === 'ACTIVE'} /></TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <ChevronRight className="h-4 w-4 text-muted-foreground group-hover/row:text-foreground" aria-hidden />
                     </TableCell>
                   </TableRow>

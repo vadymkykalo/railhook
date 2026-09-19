@@ -274,7 +274,7 @@ export default function EndpointDetailPage() {
         ) : undefined}
       />
 
-      <div className="mb-6 grid gap-4 md:grid-cols-2">
+      <div className="mb-6 grid items-start gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold">{t('endpointDetail.overview')}</CardTitle>
