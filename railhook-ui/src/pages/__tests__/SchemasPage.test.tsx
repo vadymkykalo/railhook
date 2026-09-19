@@ -134,20 +134,13 @@ describe('SchemasPage', () => {
     expect(vi.mocked(projectsApi.update).mock.calls[0][1]).not.toHaveProperty('idempotencyPolicy');
   });
 
-  it('changing the idempotency policy does not restate the validation settings', async () => {
-    // The API leaves a null field alone, so omitting them is how this stays a one-setting
-    // change. Sending a stale copy of them back is how one panel silently undoes the other.
+  it('leaves the idempotency policy to the project settings, and says where it went', async () => {
     renderSchemas();
-    const group = await waitFor(() => choiceGroup(/idempot|ідемпот/i));
+    await waitFor(() => choiceGroup(/validation|валідац/i));
 
-    const required = segments(group).find((b) => /required|обов/i.test(b.textContent ?? ''))!;
-    await userEvent.click(required);
-
-    await waitFor(() => expect(projectsApi.update).toHaveBeenCalled());
-    const body = vi.mocked(projectsApi.update).mock.calls[0][1] as unknown as Record<string, unknown>;
-    expect(body).toMatchObject({ idempotencyPolicy: 'REQUIRED' });
-    expect(body).not.toHaveProperty('schemaValidationEnabled');
-    expect(body).not.toHaveProperty('schemaValidationPolicy');
+    expect(screen.queryByRole('group', { name: /idempot|ідемпот/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /idempotency policy/i }))
+      .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/project-settings`);
   });
 
   it('shows an error state rather than an empty catalogue when the load fails', async () => {
