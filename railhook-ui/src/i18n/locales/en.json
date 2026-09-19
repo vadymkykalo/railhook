@@ -4770,23 +4770,29 @@
     },
     "figures": {
       "pollingVsPush": {
-        "aria": "Two timelines. Polling sends a request every interval; the ones before the order is created come back empty, and the order is noticed only at the next poll after it happens — seven requests, one useful. A webhook sends one request at the moment the order is created.",
+        "aria": "Two rows on one timeline. Polling: your code sends GET /orders on a timer, six times; the first four replies are \"nothing new\", the order is created just after the fourth, and only the fifth request finds it, up to one polling interval late — six requests, one useful. Webhook: at the instant the order is created, the sender makes one POST to your endpoint — one request, one useful.",
         "caption": "Polling pays for every empty answer and still hears about the order up to one interval late. A webhook costs one request and arrives when the event happens.",
         "event": "order created",
         "time": "time →",
         "polling": {
           "title": "Polling",
-          "body": "you ask every interval",
+          "body": "you ask on a timer",
+          "tally": "6 requests, 1 useful",
+          "interval": "one interval",
           "empty": "nothing new",
           "found": "found it",
-          "lag": "up to one interval late",
-          "tally": "7 requests, 1 useful"
+          "lag": "up to one polling interval late"
         },
         "push": {
           "title": "Webhook",
-          "body": "they tell you once",
-          "request": "POST, as it happens",
-          "tally": "1 request, 1 useful"
+          "body": "they tell you, once",
+          "tally": "1 request, 1 useful",
+          "when": "the moment it happens",
+          "endpoint": "your endpoint"
+        },
+        "legend": {
+          "wasted": "wasted request",
+          "useful": "useful request"
         }
       },
       "webhookAnatomy": {
