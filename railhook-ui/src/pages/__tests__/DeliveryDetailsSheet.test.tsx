@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import '../../i18n';
+import en from '../../i18n/locales/en.json';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { DeliveryResponse } from '../../types/api.types';
 
@@ -40,6 +41,15 @@ describe('DeliveryDetailsSheet auto-refresh', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('keeps Replay in reach: the actions are pinned to the bottom of the sheet', async () => {
+    vi.mocked(deliveriesApi.get).mockResolvedValue(PENDING);
+    renderSheet();
+    const actions = await screen.findByTestId('delivery-actions');
+    expect(actions.className).toContain('sticky');
+    expect(actions.className).toContain('bottom-0');
+    expect(within(actions).getByRole('button', { name: en.deliveryDetails.replayDelivery })).toBeInTheDocument();
   });
 
   it('keeps the delivery on screen while a background refresh is in flight', async () => {

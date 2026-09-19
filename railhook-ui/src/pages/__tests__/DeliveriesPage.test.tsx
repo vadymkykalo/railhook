@@ -103,6 +103,21 @@ describe('DeliveriesPage', () => {
     expect(await screen.findByText('https://example.com/webhook')).toBeInTheDocument();
   });
 
+  it('names the event type in the row, so a list of deliveries reads without opening each one', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(deliveriesApi.listByProject)
+      .mockResolvedValue(populatedPage([{ ...DELIVERY, eventType: 'order.created' }]));
+    renderDeliveries();
+    expect(await screen.findByText('order.created')).toBeInTheDocument();
+  });
+
+  it('falls back to the event id where the type is missing', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([DELIVERY]));
+    renderDeliveries();
+    expect(await screen.findByText(/event-1/)).toBeInTheDocument();
+  });
+
   it('has no detectable axe accessibility violations when populated', async () => {
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
     vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([DELIVERY]));

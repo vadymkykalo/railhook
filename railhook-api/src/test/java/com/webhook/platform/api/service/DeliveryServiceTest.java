@@ -41,6 +41,7 @@ import org.springframework.data.jpa.domain.Specification;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -201,6 +202,26 @@ class DeliveryServiceTest {
 
         assertThat(result.getContent()).isEmpty();
         verify(deliveryRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void listDeliveriesByProject_namesTheEventType_soTheListReadsWithoutOpeningEachRow() {
+        UUID otherEventId = UUID.randomUUID();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
+        when(deliveryRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(
+                        Delivery.builder().id(UUID.randomUUID()).eventId(eventId).build(),
+                        Delivery.builder().id(UUID.randomUUID()).eventId(otherEventId).build())));
+        when(eventRepository.findEventTypesByIds(Set.of(eventId, otherEventId)))
+                .thenReturn(List.of(new Object[]{eventId, "order.created"},
+                        new Object[]{otherEventId, "payment.succeeded"}));
+
+        Page<DeliveryResponse> result = deliveryService.listDeliveriesByProject(
+                projectId, null, null, null, null, null, null, PageRequest.of(0, 20));
+
+        assertThat(result.getContent()).extracting(DeliveryResponse::getEventType)
+                .containsExactly("order.created", "payment.succeeded");
     }
 
     // ─── replayDelivery ──────────────────────────────────────────────────

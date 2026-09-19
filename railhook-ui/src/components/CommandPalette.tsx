@@ -8,7 +8,7 @@ import { projectsApi } from '../api/projects.api';
 import { usePermissions } from '../auth/usePermissions';
 import { hasMinRole } from '../auth/ProtectedRoute';
 import {
-  PROJECT_SECTIONS, SETTINGS_SECTION, PROJECT_SETTINGS_TABS,
+  PROJECT_SECTIONS, SETTINGS_SECTION,
   type NavEntry,
 } from '../layout/nav.config';
 import type { ProjectResponse } from '../types/api.types';
@@ -100,12 +100,7 @@ export function CommandPalette() {
 
     const destinations = PROJECT_SECTIONS.flatMap((s, i) => fromSection(s, `s${i}`));
 
-    // API keys are per project, so they hang off the project rail rather than
-    // the org settings strip — but they are filed under Settings all the same.
-    const settings = [
-      ...fromSection(SETTINGS_SECTION, 'set'),
-      ...PROJECT_SETTINGS_TABS.filter(allowed).map((tab) => entryItem(tab, t(SETTINGS_SECTION.nameKey), 'pset')),
-    ];
+    const settings = fromSection(SETTINGS_SECTION, 'set');
 
     const projectItems: PaletteItem[] = projects.map((p) => ({
       id: `project:${p.id}`,

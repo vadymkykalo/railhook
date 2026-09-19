@@ -164,6 +164,8 @@ export interface EndpointResponse {
 export interface DeliveryResponse {
   id: string;
   eventId: string;
+  /** Absent on a single delivery; the list fills it. */
+  eventType?: string;
   endpointId: string;
   subscriptionId: string;
   status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'DLQ';

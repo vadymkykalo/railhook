@@ -17,6 +17,8 @@ import java.util.UUID;
 public class DeliveryResponse {
     private UUID id;
     private UUID eventId;
+    /** The event's type, so a list of deliveries reads without opening each row. */
+    private String eventType;
     private UUID endpointId;
     private UUID subscriptionId;
     /**
@@ -37,9 +39,14 @@ public class DeliveryResponse {
     private Instant createdAt;
 
     public static DeliveryResponse of(Delivery delivery) {
+        return of(delivery, null);
+    }
+
+    public static DeliveryResponse of(Delivery delivery, String eventType) {
         return DeliveryResponse.builder()
                 .id(delivery.getId())
                 .eventId(delivery.getEventId())
+                .eventType(eventType)
                 .endpointId(delivery.getEndpointId())
                 .subscriptionId(delivery.getSubscriptionId())
                 .status(delivery.getStatus())
