@@ -290,7 +290,9 @@ export default function SignatureVerifierPage() {
                 spellCheck={false}
                 rows={8}
                 aria-describedby={field('payload-hint')}
-                className="font-mono text-[13px] sm:text-[13px]"
+                // 16px on a phone: iOS Safari zooms into any focused field smaller than that,
+                // and a zoomed page is a page the reader then has to pan back.
+                className="font-mono text-base sm:text-[13px]"
               />
               <p id={field('payload-hint')} className="text-xs text-muted-foreground">{t('webhookSignature.payloadHint')}</p>
             </div>
