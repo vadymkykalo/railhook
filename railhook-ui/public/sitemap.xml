@@ -36,6 +36,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://site-url.railhook.invalid/blog</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://site-url.railhook.invalid/contact</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -49,5 +54,10 @@
     <loc>https://site-url.railhook.invalid/terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://site-url.railhook.invalid/blog/stripe-github-shopify-when-your-endpoint-is-down</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 </urlset>

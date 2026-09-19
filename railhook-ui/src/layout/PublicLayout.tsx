@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { Github, Mail, type LucideIcon } from 'lucide-react';
 import { contactDomain, publicTesterEnabled, statusPageUrl } from '../lib/runtimeConfig';
 import { RailhookIcon } from '../components/icons/RailhookIcon';
-import LanguageSwitcher from '../components/LanguageSwitcher';
 import ThemeToggle from '../components/ThemeToggle';
 import LandingNav from '../pages/landing/LandingNav';
 import SiteOverlays from '../components/site/SiteOverlays';
@@ -123,8 +122,10 @@ function ConnectWithUs() {
 }
 
 /**
- * The language and theme switches live here rather than in the header: they are set once, and
- * the header is kept to the places a reader goes.
+ * The theme toggle lives here rather than in the header: it is set once, and the header is kept
+ * to the places a reader goes. The language switch used to sit beside it and does not any more —
+ * a reader who cannot read the page should not have to scroll past all of it to say so, so it
+ * moved into the header (`LandingNav`).
  */
 export function Footer() {
   const { t } = useTranslation();
@@ -166,6 +167,7 @@ export function Footer() {
           </Column>
           <Column title={t('footer.company')}>
             <RouteLink to="/about">{t('footer.about')}</RouteLink>
+            <RouteLink to="/blog">{t('footer.blog')}</RouteLink>
             <RouteLink to="/security">{t('footer.security')}</RouteLink>
             <RouteLink to="/changelog">{t('footer.changelog')}</RouteLink>
             {statusPageUrl() && <PageLink href={statusPageUrl()!} external>{t('footer.status')}</PageLink>}
@@ -180,7 +182,6 @@ export function Footer() {
             <p className="font-mono text-xs text-muted-foreground">{t('footer.copyright', { year: new Date().getFullYear() })}</p>
           </div>
           <div className="flex items-center gap-2">
-            <LanguageSwitcher />
             <ThemeToggle className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:grid max-sm:h-10 max-sm:w-10 max-sm:place-items-center" />
           </div>
         </div>

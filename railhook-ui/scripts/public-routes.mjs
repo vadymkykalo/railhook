@@ -1,3 +1,7 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 /**
  * The app's public URL surface, derived once.
  *
@@ -24,13 +28,44 @@ const MARKETING = [
   { path: '/security', priority: '0.6', changefreq: 'monthly' },
   { path: '/about', priority: '0.5', changefreq: 'monthly' },
   { path: '/changelog', priority: '0.6', changefreq: 'weekly' },
+  // The blog index. The posts themselves are appended below, from the content directory.
+  { path: '/blog', priority: '0.7', changefreq: 'weekly' },
   { path: '/contact', priority: '0.5', changefreq: 'monthly' },
   // Linked from the registration form and from Google's consent screen, which requires both.
   { path: '/privacy', priority: '0.3', changefreq: 'yearly' },
   { path: '/terms', priority: '0.3', changefreq: 'yearly' },
 ];
 
+/**
+ * The posts, from the directories under `src/content/blog/`.
+ *
+ * Enumerated rather than listed by hand: a post is a directory with an `en.md` in it, and a
+ * slug that is in the app but not here would be a page no crawler is told about and no
+ * prerender renders — which is the failure this whole module exists to prevent. `src/lib/blog.ts`
+ * globs the same directory for the pages themselves.
+ *
+ * Newest first, by the `date` in the English file's front matter, so the sitemap lists them in
+ * the same order the index does. The front matter is read with the same parser the app uses.
+ */
+function blogRoutes() {
+  const dir = resolve(dirname(fileURLToPath(import.meta.url)), '../src/content/blog');
+  let entries = [];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((entry) => entry.isDirectory() && existsSync(join(dir, entry.name, 'en.md')))
+    .map((entry) => ({
+      slug: entry.name,
+      date: readFileSync(join(dir, entry.name, 'en.md'), 'utf8').match(/^date:\s*(\S+)\s*$/m)?.[1] ?? '',
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date) || a.slug.localeCompare(b.slug))
+    .map(({ slug }) => ({ path: `/blog/${slug}`, priority: '0.7', changefreq: 'monthly' }));
+}
+
 /** Every public route, in the order a sitemap should list them. */
 export function publicRoutes() {
-  return [...MARKETING];
+  return [...MARKETING, ...blogRoutes()];
 }

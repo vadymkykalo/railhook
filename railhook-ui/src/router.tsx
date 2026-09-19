@@ -26,6 +26,8 @@ const SignatureVerifierPage = lazy(() => import('./pages/SignatureVerifierPage')
 const SecurityPage = lazy(() => import('./pages/SecurityPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
+const BlogPage = lazy(() => import('./pages/BlogPage'));
+const BlogPostPage = lazy(() => import('./pages/BlogPostPage'));
 const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.PrivacyPage })));
 const TermsPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.TermsPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -122,6 +124,18 @@ export const router = createBrowserRouter([
           {
             path: '/changelog',
             element: <S><ChangelogPage /></S>,
+          },
+          {
+            path: '/blog',
+            element: <S><BlogPage /></S>,
+          },
+          /* One route for every post. The slugs are the directories under
+             src/content/blog/, which scripts/public-routes.mjs enumerates for the sitemap and
+             the prerender; an unknown slug renders the post's not-found state, and nginx has
+             already answered 404 for it. */
+          {
+            path: '/blog/:slug',
+            element: <S><BlogPostPage /></S>,
           },
           {
             path: '/contact',

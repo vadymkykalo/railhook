@@ -266,16 +266,41 @@ describe('DeveloperSection', () => {
 });
 
 describe('LandingNav', () => {
-  it('keeps the header to nine things to press', () => {
+  /**
+   * Eleven, not the nine this was written at. Two of those are deliberate additions and neither
+   * is a word in the row: the blog, which is a destination a reader looks for by name, and the
+   * language switch, which moved up from the footer — a reader who cannot read the page should
+   * not have to scroll past all of it to say so.
+   *
+   * The switch is a segmented track showing both choices, so it is one control even though it is
+   * two buttons, and it is counted that way here. If that ever stops being true the count is
+   * wrong and this should be the thing that says so.
+   */
+  it('keeps the header to eleven controls', () => {
     renderPage(<LandingNav />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
     const nav = screen.getByRole('navigation', { name: en.landing.nav.label });
-    const interactive = [...within(nav).queryAllByRole('link'), ...within(nav).queryAllByRole('button')];
-    expect(interactive.length).toBeLessThanOrEqual(9);
+    const language = within(nav).getByRole('group', { name: en.settings.language });
+    const interactive = [...within(nav).queryAllByRole('link'), ...within(nav).queryAllByRole('button')]
+      .filter((el) => !language.contains(el));
+    expect(interactive.length + 1).toBeLessThanOrEqual(11);
 
     const hrefs = within(nav).getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(expect.arrayContaining(['/#product', '/pricing', '/#run', '/about', '/register', '/login']));
+    expect(hrefs).toEqual(expect.arrayContaining(['/#product', '/pricing', '/#run', '/blog', '/about', '/register', '/login']));
     // Pricing covers both the cloud plan and self-hosting, so the header has no separate "Cloud".
     expect(within(nav).queryByRole('link', { name: 'Cloud' })).toBeNull();
+  });
+
+  it('carries the language switch the footer gave up, and offers it inside the menu on a phone', async () => {
+    renderPage(<LandingNav />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
+    const nav = screen.getByRole('navigation', { name: en.landing.nav.label });
+    const switcher = within(nav).getByRole('group', { name: en.settings.language });
+    expect(within(switcher).getByRole('button', { name: 'EN' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(switcher).getByRole('button', { name: 'UK' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: en.landing.nav.openMenu }));
+    const panel = document.getElementById('landing-mobile-nav') as HTMLElement;
+    expect(within(panel).getByRole('group', { name: en.settings.language })).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: en.landing.nav.blog })).toHaveAttribute('href', '/blog');
   });
 
   it('keeps docs, the CLI and the MCP server behind a Developers menu, each with a line on what it is', async () => {
@@ -298,10 +323,12 @@ describe('LandingNav', () => {
 });
 
 describe('Footer', () => {
-  it('carries the language and theme controls the header gave up, and the licence', () => {
+  it('keeps the theme toggle and the licence, and no longer the language switch', () => {
     renderPage(<Footer />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
-    expect(screen.getByRole('group', { name: en.settings.language })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: en.nav.toggleTheme })).toBeInTheDocument();
+    // The language switch moved into the header: a reader who cannot read the page should not
+    // have to reach the bottom of it to change that.
+    expect(screen.queryByRole('group', { name: en.settings.language })).toBeNull();
     expect(screen.getByText(`© ${new Date().getFullYear()} Railhook · MIT`)).toBeInTheDocument();
 
     const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
@@ -313,6 +340,7 @@ describe('Footer', () => {
       '/docs/tools/mcp/',
       '/tools/webhook-signature',
       '/about',
+      '/blog',
       '/security',
       '/changelog',
     ]));
@@ -322,7 +350,7 @@ describe('Footer', () => {
     renderPage(<Footer />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
     const company = screen.getByRole('heading', { name: en.footer.company }).parentElement as HTMLElement;
     expect(within(company).getAllByRole('link').map((a) => a.getAttribute('href')))
-      .toEqual(['/about', '/security', '/changelog', '/contact', '/privacy', '/terms']);
+      .toEqual(['/about', '/blog', '/security', '/changelog', '/contact', '/privacy', '/terms']);
   });
 
   describe('connect with us', () => {

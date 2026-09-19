@@ -12,6 +12,8 @@
     "types:generate": "openapi-typescript ../openapi.yaml -o src/types/api.generated.ts",
     "seo:sitemap": "node scripts/generate-sitemap.mjs",
     "seo:sitemap:check": "node scripts/generate-sitemap.mjs --check",
+    "blog:og": "node scripts/generate-og-images.mjs",
+    "blog:og:check": "node scripts/generate-og-images.mjs --check",
     "prerender": "node scripts/prerender.mjs",
     "test": "vitest",
     "test:ci": "vitest run --reporter=verbose",

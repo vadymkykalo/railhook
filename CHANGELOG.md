@@ -7,8 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
+- **A blog**, at `/blog` and `/blog/<slug>`: prerendered, indexed, in English and Ukrainian, with
+  an RSS feed at `/blog/rss.xml`. Posts are Markdown files under
+  `railhook-ui/src/content/blog/<slug>/`, one per language, with typed front matter; the route
+  list, the sitemap and the feed all enumerate that directory, so adding a post is adding a
+  directory. Each article carries a table of contents on a wide screen, hand-drawn SVG diagrams
+  that work on paper and on ink, a per-article social card under `public/blog/`, `Article` and
+  `BreadcrumbList` structured data, and the date its external claims were last checked.
+  `railhook-ui/src/content/blog/README.md` is the authoring contract.
+- **First article: "What Stripe, GitHub and Shopify actually do when your endpoint is down"** —
+  each provider's timeout, retry schedule and give-up behaviour, quoted from and linked to their
+  own documentation, with what a gateway in front of them changes. Ukrainian translation
+  alongside.
+
+### Changed
+
+- **The language switch moved from the footer into the header**, where a reader who cannot read
+  the page does not have to scroll past all of it to say so; on a phone it is inside the menu.
+  The theme toggle stays in the footer. The header also gains a Blog link.
+- `useDocumentMeta` now writes `og:image` and `twitter:image` on every page — a page with no card
+  of its own restores the site's, so an article's card no longer follows the reader to the next
+  page.
+
+### Fixed
 - **The message widget could not be closed on a phone.** It opened as a small panel pinned to the
   launcher, and with the keyboard up both its close button and the launcher were off screen. On a
   phone it is now a full-screen sheet above the header, with the close button always in view and

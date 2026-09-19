@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { RailhookIcon } from '../../components/icons/RailhookIcon';
+import LanguageSwitcher from '../../components/LanguageSwitcher';
 import { Button } from '../../components/ui/button';
 import { useAuth } from '../../auth/auth.store';
 import { publicTesterEnabled, statusPageUrl } from '../../lib/runtimeConfig';
@@ -23,11 +24,18 @@ import { REPO_URL } from './plans';
 import { WRAP } from './primitives';
 
 /**
- * Nine things to press, at most: the logo, five places to go, the repository, and the two ways
- * in. The header this replaced had eleven, including the language and theme switches — those
- * are set once and now live in the footer. What a developer reaches for — docs, the CLI, the MCP
- * server, the free tools, status — sits behind one "Developers" menu with a line on each, the way
- * the products people compare this with do it, rather than as five more words in a row.
+ * Eleven controls, at most: the logo, five places to go, the "Developers" menu, the language
+ * switch, the repository, and the two ways in. What a developer reaches for — docs, the CLI, the
+ * MCP server, the free tools, status — sits behind that one menu with a line on each, the way the
+ * products people compare this with do it, rather than as five more words in a row.
+ *
+ * The language switch is here rather than in the footer, where it used to sit: a reader who
+ * cannot read the page cannot be asked to scroll past all of it to say so, and on a long article
+ * the footer is a page away. It is one control, not two presses — a segmented track showing both
+ * choices — which is why the header's own count test treats it as one. The theme toggle stayed
+ * in the footer: it is genuinely set once, and it is not a barrier to reading anything.
+ * Below `lg` the header collapses to the menu button, and the switch travels into the panel with
+ * everything else.
  *
  * Pricing is the page people look for first, and it covers both the free cloud plan and
  * self-hosting, so it took the place of a "Cloud" link that pointed at the same section as
@@ -70,7 +78,10 @@ export default function LandingNav() {
     { to: '/#run', label: t('landing.nav.selfHost') },
   ];
   const developers = useDeveloperLinks();
-  const about = { to: '/about', label: t('landing.nav.about') };
+  const reading = [
+    { to: '/blog', label: t('landing.nav.blog') },
+    { to: '/about', label: t('landing.nav.about') },
+  ];
   const linkClass = 'transition-colors hover:text-foreground';
   const close = () => setOpen(false);
 
@@ -96,14 +107,17 @@ export default function LandingNav() {
             <li>
               <DevelopersMenu links={developers} />
             </li>
-            <li>
-              <Link to={about.to} className={linkClass}>
-                {about.label}
-              </Link>
-            </li>
+            {reading.map((r) => (
+              <li key={r.to}>
+                <Link to={r.to} className={linkClass}>
+                  {r.label}
+                </Link>
+              </li>
+            ))}
           </ul>
 
           <div className="ml-auto flex flex-none items-center gap-2 text-[14.5px] font-medium sm:gap-4">
+            <LanguageSwitcher className="hidden lg:inline-flex" />
             <a
               href={REPO_URL}
               target="_blank"
@@ -143,6 +157,12 @@ export default function LandingNav() {
       {open && (
         <div id="landing-mobile-nav" className="h-[calc(100dvh-4rem)] overflow-y-auto border-t border-rail bg-background lg:hidden">
           <ul className={`${WRAP} flex flex-col py-2 text-[15px] text-foreground`}>
+            {/* First, not last: the wide header's switch is hidden at this width, and a reader
+                who cannot read the page should meet it before the menu they cannot read. */}
+            <li className="flex items-center justify-between gap-4 border-b border-rail py-3">
+              <span className="mono-label">{t('settings.language')}</span>
+              <LanguageSwitcher />
+            </li>
             {sections.map((s) => (
               <li key={s.label}>
                 <Link to={s.to} onClick={close} className="block border-b border-rail py-3">
@@ -160,11 +180,13 @@ export default function LandingNav() {
                 ))}
               </ul>
             </li>
-            <li>
-              <Link to={about.to} onClick={close} className="block border-b border-rail py-3">
-                {about.label}
-              </Link>
-            </li>
+            {reading.map((r) => (
+              <li key={r.to}>
+                <Link to={r.to} onClick={close} className="block border-b border-rail py-3">
+                  {r.label}
+                </Link>
+              </li>
+            ))}
             <li>
               <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 border-b border-rail py-3">
                 <Github className="h-4 w-4" aria-hidden="true" />
@@ -173,7 +195,7 @@ export default function LandingNav() {
             </li>
             {!isAuthenticated && (
               <li>
-                <Link to="/login" onClick={close} className="block py-3">
+                <Link to="/login" onClick={close} className="block border-b border-rail py-3">
                   {t('landing.nav.signIn')}
                 </Link>
               </li>

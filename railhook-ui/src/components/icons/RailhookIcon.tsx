@@ -1,5 +1,9 @@
 import { type SVGProps } from 'react';
 
+import { RAILHOOK_MARK } from './railhookMark';
+
+export { RAILHOOK_MARK };
+
 /**
  * The Railhook mark: a hook whose tail turns up into a delivery arrow.
  *
@@ -10,21 +14,6 @@ import { type SVGProps } from 'react';
  * moved clear of the stem, so the two halves stay distinguishable when the
  * whole mark is 14 pixels across.
  */
-/**
- * The mark's geometry on its own 20-unit grid, exported because the hero
- * diagram draws the same mark inline in SVG. It used to hand-roll a rounded
- * hook of its own, which read as a different logo sitting next to the real one.
- */
-export const RAILHOOK_MARK = {
-  /** The hook: down the stem, round the bend, back up. */
-  hook: 'M5.25 3.5v6.75a4 4 0 0 0 8 0V8.5',
-  /** The flow: the tail leaving as an arrow. */
-  flow: 'M10.25 6.25l3-2.75 3 2.75',
-  /** The origin. */
-  origin: { cx: 5.25, cy: 3.5, r: 1.75 },
-  viewBox: 20,
-} as const;
-
 export function RailhookIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
