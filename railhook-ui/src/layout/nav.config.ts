@@ -159,6 +159,9 @@ export const SETTINGS_SECTION: NavSection = {
     orgTab('nav.profile', '/admin/settings', Settings),
     orgTab('nav.orgSettings', '/admin/org-settings', Building2, 'OWNER'),
     orgTab('nav.members', '/admin/members', Users, 'OWNER'),
+    // The one project-scoped tab here: a key is what the first event needs, and it was reachable
+    // only from the command palette.
+    tab('nav.apiKeys', 'api-keys', Key),
     orgTab('nav.auditLog', '/admin/audit-log', FileText),
     orgTab('nav.billing', '/admin/billing', CreditCard, 'OWNER'),
   ],
@@ -188,9 +191,6 @@ export const PLATFORM_SECTION: NavSection = {
     { nameKey: 'nav.platformUsers', path: () => '/admin/platform/users', icon: Users, owns: ['platform-users'] },
   ],
 };
-
-/** API keys live per project, so they hang off the project rail's settings tab. */
-export const PROJECT_SETTINGS_TABS: NavEntry[] = [tab('nav.apiKeys', 'api-keys', Key)];
 
 /** The route segment currently in view, from either URL shape. */
 export function segmentOf(pathname: string): string {
@@ -227,7 +227,6 @@ const ROLE_BY_SEGMENT: ReadonlyMap<string, Role> = new Map(
     ...PROJECT_SECTIONS.flatMap((section) => [section as NavEntry, ...section.tabs]),
     SETTINGS_SECTION as NavEntry,
     ...SETTINGS_SECTION.tabs,
-    ...PROJECT_SETTINGS_TABS,
   ]
     .filter((entry) => entry.requiredRole)
     .flatMap((entry) => entry.owns.map((segment) => [segment, entry.requiredRole!] as const))

@@ -372,10 +372,23 @@ export default function DeliveriesPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <CopyId
-                          value={delivery.eventId}
-                          to={`/admin/projects/${projectId}/events/${delivery.eventId}`}
-                        />
+                        {/* The type, not the id: "order.created" says what a row is, where an id
+                            said only that the rows differ. The id stays where the type is absent. */}
+                        {delivery.eventType ? (
+                          <Link
+                            to={`/admin/projects/${projectId}/events/${delivery.eventId}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="block max-w-[220px] truncate rounded font-mono text-[13px] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            title={delivery.eventType}
+                          >
+                            {delivery.eventType}
+                          </Link>
+                        ) : (
+                          <CopyId
+                            value={delivery.eventId}
+                            to={`/admin/projects/${projectId}/events/${delivery.eventId}`}
+                          />
+                        )}
                       </TableCell>
                       <TableCell>
                         <Link

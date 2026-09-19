@@ -747,7 +747,12 @@ export default function DeliveryDetailsSheet({
                 </Card>
               )}
 
-              <div className="flex gap-2 pt-4">
+              {/* Pinned to the bottom of the sheet's own scroll: replaying is why most people open
+                  it, and the buttons sat below the trace, the chart and every attempt. */}
+              <div
+                data-testid="delivery-actions"
+                className="sticky bottom-0 z-10 flex gap-2 border-t border-rail bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+              >
                 <Button
                   variant="outline"
                   onClick={handleDryRun}

@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +26,14 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     long countByCreatedAtGreaterThanEqualAndOrganizationIdNot(Instant since, UUID excludedOrganizationId);
 
     /** The distinct event types a project has sent since {@code since}: the portal's picker. */
+    /**
+     * The types of several events at once, as {@code [id, eventType]} rows: a delivery list names
+     * the type of each row's event, and loading the events themselves would drag every payload
+     * along with them.
+     */
+    @Query("SELECT e.id, e.eventType FROM Event e WHERE e.id IN :ids")
+    List<Object[]> findEventTypesByIds(@Param("ids") Collection<UUID> ids);
+
     @Query("SELECT DISTINCT e.eventType FROM Event e WHERE e.projectId = :projectId AND e.createdAt >= :since")
     List<String> findRecentEventTypes(@Param("projectId") UUID projectId, @Param("since") Instant since,
                                       Pageable pageable);

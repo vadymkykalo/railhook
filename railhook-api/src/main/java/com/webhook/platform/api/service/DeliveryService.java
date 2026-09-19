@@ -32,8 +32,13 @@ import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -156,7 +161,24 @@ public class DeliveryService {
 
         Page<Delivery> deliveries = deliveryRepository.findAll(spec, pageable);
 
-        return deliveries.map(DeliveryResponse::of);
+        Map<UUID, String> typesByEventId = eventTypesOf(deliveries.getContent());
+        return deliveries.map(delivery -> DeliveryResponse.of(delivery, typesByEventId.get(delivery.getEventId())));
+    }
+
+    /** One query for the page, rather than one per row. */
+    private Map<UUID, String> eventTypesOf(List<Delivery> deliveries) {
+        Set<UUID> eventIds = deliveries.stream()
+                .map(Delivery::getEventId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (eventIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> types = new HashMap<>();
+        for (Object[] row : eventRepository.findEventTypesByIds(eventIds)) {
+            types.put((UUID) row[0], (String) row[1]);
+        }
+        return types;
     }
 
     @Transactional

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **API keys are a tab in Settings.** A key is what a first event needs, and the page was reachable
+  only from the command palette.
+- **The deliveries list names the event type** (`order.created`) instead of the event's id, falling
+  back to the id where the type is missing. `DeliveryResponse` carries `eventType`, filled with one
+  query per page.
+- **Replay is pinned to the bottom of the delivery sheet**, instead of sitting below the trace, the
+  latency chart and every attempt.
+
 ## [2.27.1] - 2026-09-20
 
 ### Fixed
