@@ -1,0 +1,132 @@
+---
+title: Receive SendGrid Event Webhooks reliably
+description: SendGrid retries a failed batch for 24 hours and then drops it. Put Railhook in front — it verifies the signed Event Webhook with SendGrid's public key, answers at once, and forwards to your app with retries and replay.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This guide puts Railhook between SendGrid's Event Webhook and your application. SendGrid posts batches of delivery events — delivered, bounce, open, click — to a Railhook source, which verifies the signature, stores each batch as it arrived and forwards it to your service with retries.
+
+## Why SendGrid webhooks need a buffer
+
+SendGrid wants a `2xx`. If it does not get one, it retries at increasing intervals for up to 24 hours after the event, and then stops. ([SendGrid: Getting started with the Event Webhook](https://www.twilio.com/docs/sendgrid/for-developers/tracking-events/getting-started-event-webhook))
+
+Twenty-four hours is a lot until you remember what these events are for: bounce and spam-report handling, suppression lists, the numbers in your own dashboards. An event dropped after 24 hours is a suppression you never applied. With Railhook in front:
+
+- SendGrid is answered as soon as the batch is stored, so nothing enters its retry window because of your app.
+- Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed Forwards**.
+- Anything stored can be replayed, days after SendGrid would have given up.
+
+## Connect SendGrid
+
+You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Create the Railhook source** to get the URL SendGrid should post to:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"SendGrid","providerType":"SENDGRID","verificationMode":"NONE"}'
+   ```
+
+   Keep the `id` and the `ingressUrl` from the response.
+
+2. **Create the webhook in SendGrid.** Go to **Settings → Mail Settings → Event Webhooks** and create a new webhook. Put the `ingressUrl` in **Post URL**, and under **Actions to be posted** select the event types you want. ([SendGrid: Event Webhook security features](https://www.twilio.com/docs/sendgrid/for-developers/tracking-events/getting-started-event-webhook-security-features))
+
+3. **Enable the signature — then save.** In **Security features**, turn on **Enable Signed Event Webhook** and click **Save**. The key pair is generated on save, so testing before you save tests an unsigned webhook. Re-open the webhook and copy the **verification key** it now shows.
+
+4. **Give Railhook the key and turn verification on:**
+
+   ```bash
+   curl -X PUT "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"SendGrid","verificationMode":"PROVIDER","hmacSecret":"'"$SENDGRID_VERIFICATION_KEY"'"}'
+   ```
+
+   Paste it as SendGrid shows it, or wrapped in `-----BEGIN PUBLIC KEY-----` — both are read.
+
+5. **Add a destination**, the URL of your own service:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/sendgrid","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+6. **Test the integration** with SendGrid's **Test Your Integration** button, after saving. A sample batch appears under **Incoming → Received**, with one forward per destination.
+
+</Steps>
+
+<Aside type="tip" title="This is a public key, and that is the point">
+Every other provider in these guides hands you a shared secret that signs and verifies equally well, so leaking it lets anyone forge a webhook. SendGrid does not: it keeps the private key and gives you only the public half. Railhook still stores it encrypted, because it goes in the same field as every other source's secret, but nothing about holding it lets anyone forge a SendGrid event.
+</Aside>
+
+## How the signature is checked
+
+SendGrid signs the timestamp's bytes followed immediately by the raw body, with ECDSA over SHA-256, and sends:
+
+- `X-Twilio-Email-Event-Webhook-Signature` — base64 of the DER-encoded signature
+- `X-Twilio-Email-Event-Webhook-Timestamp` — seconds since the epoch
+
+Railhook verifies that against the public key. A batch that does not verify is answered `401` and is not stored.
+
+<Aside type="caution" title="No timestamp tolerance is enforced, on purpose">
+The timestamp is inside the signature, so it cannot be moved — but SendGrid publishes no maximum age for it, and the Event Webhook batches, so a batch can legitimately arrive well behind the moment the events happened. A five-minute window invented here would refuse real deliveries for a reason nobody chose. What bounds a replayed request is the replay window instead: a signature already seen inside it is refused. Raise `WEBHOOK_INGRESS_REPLAY_WINDOW_MINUTES` if you want a longer one. See [Verification](/docs/incoming/verification/#replayed-signatures).
+</Aside>
+
+## Deduplicate per event, not per request
+
+A SendGrid request is a JSON array of events, each with its own `sg_event_id`. There is no id for the batch, so Railhook records no provider event id for a SendGrid source and does not deduplicate its requests — keying a batch on its first event would drop the rest of it if SendGrid ever re-cut the batch on a retry.
+
+Deduplicate in your own handler instead, on `sg_event_id` per event. SendGrid documents that field as the one to use for exactly this.
+
+## What your service receives
+
+The body exactly as SendGrid sent it, byte for byte: the array, not one event per request. Your handler iterates it. The signature headers are not forwarded — your service authenticates Railhook through the destination's credentials. See [Destinations](/docs/incoming/destinations/#what-the-destination-receives).
+
+## Develop locally with the CLI
+
+<Steps>
+
+1. Install the CLI and log in, as in [CLI](/docs/tools/cli/), then open a tunnel to your app's port:
+
+   ```bash
+   railhook listen 3000
+   ```
+
+2. Add a second destination to the source with the printed public URL and your route appended, such as `https://<host>/tunnel/<slug>/webhooks/sendgrid`. It reaches `http://localhost:3000/webhooks/sendgrid`.
+
+3. Press **Test Your Integration** in SendGrid, or send yourself a real message, and the batch arrives in your local app. Disable that destination when you stop the tunnel.
+
+</Steps>
+
+## Replay after an outage
+
+Replay what arrived while your service was down. Each replayed batch goes to every destination of the source as a new forward:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
+```
+
+Replay reaches back as far as events are kept: 7 days on Railhook Cloud, and whatever you configure when self-hosting. Since nothing deduplicates a SendGrid request, a replay definitely re-sends events your handler has seen — which is the other reason to key it on `sg_event_id`. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
+  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Credentials, retries and transformations per destination." />
+  <LinkCard title="Configuration" href="/docs/self-hosting/configuration/" description="The replay window, and every other setting." />
+</CardGrid>
