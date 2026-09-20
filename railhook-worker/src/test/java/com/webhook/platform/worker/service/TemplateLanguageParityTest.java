@@ -1,6 +1,8 @@
 package com.webhook.platform.worker.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webhook.platform.common.transform.JavaScriptTransformEngine;
+import com.webhook.platform.common.transform.ScriptLimits;
 import com.webhook.platform.common.transform.TemplateLanguageConformance;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
@@ -28,8 +30,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class TemplateLanguageParityTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final PayloadTransformService service =
-            new PayloadTransformService(objectMapper, new SimpleMeterRegistry());
+    private final PayloadTransformService service = new PayloadTransformService(
+            objectMapper, new SimpleMeterRegistry(),
+            // The corpus is entirely template cases, so the engine is never touched — and it
+            // builds itself lazily, so this costs nothing.
+            new JavaScriptTransformEngine(objectMapper, ScriptLimits.defaults()));
 
     static List<TemplateLanguageConformance.Case> cases() {
         return TemplateLanguageConformance.cases();

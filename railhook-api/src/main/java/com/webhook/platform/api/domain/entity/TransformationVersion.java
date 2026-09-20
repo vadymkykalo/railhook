@@ -1,7 +1,10 @@
 package com.webhook.platform.api.domain.entity;
 
+import com.webhook.platform.common.transform.TransformationKind;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -58,6 +61,19 @@ public class TransformationVersion {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String template;
+
+    /**
+     * The language {@link #template} was published in, restored together with it.
+     *
+     * <p>Kept per version rather than read off the transformation, because the transformation's
+     * language is whatever it is <em>now</em>: a transformation rewritten from a template into a
+     * script still has template versions behind it, and restoring one has to put the language
+     * back too or the row ends up marked JAVASCRIPT with JSON in it.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    @Builder.Default
+    private TransformationKind kind = TransformationKind.TEMPLATE;
 
     @Column(name = "restored_from_version")
     private Integer restoredFromVersion;

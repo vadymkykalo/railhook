@@ -505,3 +505,12 @@ logging:
     root: ${LOG_LEVEL:INFO}
     com.webhook.platform: ${LOG_LEVEL:INFO}
     org.springframework.web: INFO
+
+# JavaScript transformations. The ceilings a script runs under; `.env.dist` explains each one.
+transform:
+  script:
+    timeout-ms: ${TRANSFORM_SCRIPT_TIMEOUT_MS:2000}
+    max-memory-mb: ${TRANSFORM_SCRIPT_MAX_MEMORY_MB:128}
+    max-output-bytes: ${TRANSFORM_SCRIPT_MAX_OUTPUT_BYTES:1048576}
+    max-console-lines: ${TRANSFORM_SCRIPT_MAX_CONSOLE_LINES:100}
+    max-chars: ${TRANSFORM_SCRIPT_MAX_CHARS:65536}

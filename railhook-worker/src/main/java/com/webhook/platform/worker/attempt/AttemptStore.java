@@ -24,19 +24,21 @@ public interface AttemptStore<C> {
     /**
      * Build the request for this Attempt: signing, auth, client selection, headers.
      *
-     * <p>Takes the already-transformed {@code body} so Outgoing's signature is computed over
-     * exactly the bytes that go out.
+     * <p>Takes the already-transformed body so Outgoing's signature is computed over exactly the
+     * bytes that go out, and so a transformation that set a header can have it applied here —
+     * over Railhook's own, under the target's configured custom headers.
      */
-    RequestSpec buildRequest(C claim, String body);
+    RequestSpec buildRequest(C claim, TransformedBody transformed);
 
     /**
      * The body to send, transformed. What to do when the transformation fails is the Runner's
-     * decision, not the adapter's.
+     * decision, not the adapter's — and so is what to do when it cancels, which is why a
+     * cancellation comes back in the return rather than as an exception.
      *
      * @throws com.webhook.platform.worker.service.PayloadTransformException when a configured
      *         transformation cannot be applied. Never return the untransformed payload.
      */
-    String buildBody(C claim);
+    TransformedBody buildBody(C claim);
 
     /**
      * The bytes that go on the wire for {@code body}, which is what {@link #buildBody} returned.

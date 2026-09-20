@@ -477,7 +477,7 @@ final class DemoHistory {
             "webhookTrigger", new WebhookTriggerExecutor(),
             "filter", new FilterNodeExecutor(JSON),
             "branch", new BranchNodeExecutor(JSON),
-            "transform", new TransformNodeExecutor(JSON, null, null));
+            "transform", new TransformNodeExecutor(JSON, null, null, null));
 
     private static final String NOT_TAKEN = "Parent nodes skipped or branch not taken";
 

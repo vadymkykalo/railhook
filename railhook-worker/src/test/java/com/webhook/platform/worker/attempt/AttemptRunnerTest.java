@@ -670,6 +670,72 @@ class AttemptRunnerTest {
         }
     }
 
+    // ── cancellation ───────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("a transformation that cancels ends the obligation without sending")
+    class TransformCancelled {
+
+        @Test
+        @DisplayName("nothing is sent, nothing is retried, and it is not counted as a failure")
+        void nothingIsSentAndNothingIsRetried() {
+            respond(200, "ok"); // would succeed if anything were sent
+            FakeStore store = new FakeStore(baseUrl);
+            store.transformedBody = TransformedBody.cancelled("test traffic");
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.TerminallyFailed.class, store.finalizations.get(0),
+                    "a cancellation is terminal: the next attempt would run the same script over "
+                            + "the same payload and reach the same answer");
+            assertEquals(0, metrics.successes, "nothing may be sent");
+            assertEquals(0, metrics.transformFailures, "a cancellation is not a failed transform");
+            assertEquals(1, metrics.transformCancellations);
+        }
+
+        @Test
+        @DisplayName("it is recorded, with the reason, so the Delivery is not silently empty")
+        void itIsRecordedWithTheReason() {
+            respond(200, "ok");
+            FakeStore store = new FakeStore(baseUrl);
+            store.transformedBody = TransformedBody.cancelled("test traffic");
+
+            runner.run(store, metrics);
+
+            assertEquals(1, store.records.size());
+            assertTrue(store.records.get(0).errorMessage().contains("CANCELLED_BY_TRANSFORMATION"));
+            assertTrue(store.records.get(0).errorMessage().contains("test traffic"));
+            assertNull(store.records.get(0).statusCode(), "nothing was asked, so there is no status");
+        }
+
+        @Test
+        @DisplayName("whatever the obligation held is released")
+        void whateverItHeldIsReleased() {
+            // A terminal outcome that does not release the ordering cursor stalls every later
+            // Delivery to that endpoint, silently. Same reason onTerminallyFailed exists at all.
+            respond(200, "ok");
+            FakeStore store = new FakeStore(baseUrl);
+            store.transformedBody = TransformedBody.cancelled(null);
+
+            runner.run(store, metrics);
+
+            assertEquals(1, store.terminallyFailedCalls);
+            assertEquals(0, store.abandonedCalls, "a cancellation is not for a human to look at");
+        }
+
+        @Test
+        @DisplayName("it still costs the rung the script already spent")
+        void itStillCostsTheRung() {
+            respond(200, "ok");
+            FakeStore store = new FakeStore(baseUrl);
+            store.transformedBody = TransformedBody.cancelled("test traffic");
+
+            runner.run(store, metrics);
+
+            assertEquals(1, store.attemptStartingCalls);
+        }
+    }
+
     // ── claim outcomes ─────────────────────────────────────────────────────────────
 
     @Nested
@@ -1003,6 +1069,7 @@ class AttemptRunnerTest {
         RuntimeException targetOutcomeFailure;
         String contentType;
         byte[] wireBytes;
+        TransformedBody transformedBody;
 
         final List<Finalization> finalizations = new ArrayList<>();
         final List<AttemptRecord> records = new ArrayList<>();
@@ -1027,7 +1094,7 @@ class AttemptRunnerTest {
         }
 
         @Override
-        public RequestSpec buildRequest(String claim, String body) {
+        public RequestSpec buildRequest(String claim, TransformedBody transformed) {
             return new RequestSpec(WebClient.builder().build(),
                     request -> {
                         request.header("X-Test", "1");
@@ -1043,11 +1110,12 @@ class AttemptRunnerTest {
         }
 
         @Override
-        public String buildBody(String claim) {
+        public TransformedBody buildBody(String claim) {
             if (bodyFailure != null) {
                 throw bodyFailure;
             }
-            return "{\"transformed\":true}";
+            return transformedBody != null ? transformedBody
+                    : TransformedBody.of("{\"transformed\":true}");
         }
 
         @Override
@@ -1101,6 +1169,7 @@ class AttemptRunnerTest {
         int failures;
         int errors;
         int transformFailures;
+        int transformCancellations;
 
         @Override
         public void success(int statusCode, int durationMs) {
@@ -1120,6 +1189,11 @@ class AttemptRunnerTest {
         @Override
         public void transformFailed() {
             transformFailures++;
+        }
+
+        @Override
+        public void transformCancelled() {
+            transformCancellations++;
         }
     }
 }

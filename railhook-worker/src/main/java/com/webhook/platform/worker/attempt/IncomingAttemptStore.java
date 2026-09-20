@@ -16,6 +16,8 @@ import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepos
 import com.webhook.platform.worker.service.PayloadTransformException;
 import com.webhook.platform.worker.service.PayloadTransformService;
 import com.webhook.platform.worker.service.TransformationCacheService;
+import com.webhook.platform.common.transform.TransformRequest;
+import com.webhook.platform.worker.service.TransformationCacheService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -278,7 +280,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     }
 
     @Override
-    public RequestSpec buildRequest(Claim claim, String body) {
+    public RequestSpec buildRequest(Claim claim, TransformedBody transformed) {
         String contentType = event.getContentType() != null ? event.getContentType() : "application/json";
         String idempotencyKey = event.getId() + "-" + destination.getId();
 
@@ -301,6 +303,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         }
         headers.put("X-Forward-Attempt", String.valueOf(claim.attemptNumber()));
         headers.put("Idempotency-Key", idempotencyKey);
+        // Whatever the transformation set, before the Destination's own credentials and custom
+        // headers: a script may add, not impersonate.
+        headers.putAll(transformed.headers());
         new DestinationAuthenticator(destination, encryptionKeyRegistry, objectMapper).authenticate(headers);
         AttemptSupport.collectCustomHeaders(headers, destination.getCustomHeadersJson(), objectMapper);
         // Last, so that everything Railhook set above — its own headers, the Destination's
@@ -372,6 +377,26 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return null;
     }
 
+    /**
+     * The best name there is for what arrived, for a script's {@code webhook.eventType}.
+     *
+     * <p>An Incoming Event has no type of its own: Railhook did not originate it and the
+     * provider decides where it says so. Several of them say it only in a header — GitHub's
+     * push and issue bodies cannot be told apart otherwise — so the same allowlist that is
+     * forwarded to the Destination is read here, first match wins. Null when the provider named
+     * nothing, which a script has to expect.
+     */
+    private String providerEventType() {
+        Map<String, String> arrived = arrivedHeaders();
+        for (String name : FORWARDED_PROVIDER_HEADERS) {
+            String value = headerIgnoringCase(arrived, name);
+            if (value != null && !value.isBlank() && !containsControlCharacter(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
     /** A header as the provider sent it, read back off the stored request, by name in any case. */
     private String arrivedHeader(String name) {
         return headerIgnoringCase(arrivedHeaders(), name);
@@ -412,32 +437,41 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
      * fails the Attempt, because transformations are how PII is stripped before relaying.
      */
     @Override
-    public String buildBody(Claim claim) {
+    public TransformedBody buildBody(Claim claim) {
         String body = event.getBodyRaw();
         if (body == null || body.isBlank()) {
-            return body;
+            return TransformedBody.of(body);
         }
 
         if (destination.getTransformationId() != null) {
-            String template = transformationCacheService.findEnabledTemplate(destination.getTransformationId());
-            if (template == null) {
+            TransformationCacheService.Resolved resolved =
+                    transformationCacheService.findEnabled(destination.getTransformationId());
+            if (resolved == null) {
                 throw new PayloadTransformException(
                         "Configured transformation " + destination.getTransformationId()
                                 + " not found or disabled for destination " + destination.getId());
             }
-            return payloadTransformService.transform(body, template);
+            return payloadTransformService.apply(resolved, body, TransformRequest.builder()
+                    .payload(body)
+                    .eventType(providerEventType())
+                    .eventId(event.getId().toString())
+                    .timestamp(event.getReceivedAt())
+                    .direction("INCOMING")
+                    .url(destination.getUrl())
+                    .headers(java.util.Map.of())
+                    .build());
         }
 
         String inline = destination.getPayloadTransform();
         if (inline == null || inline.isBlank()) {
-            return body;
+            return TransformedBody.of(body);
         }
         try {
             Object result = JsonPath.read(body, inline);
             if (result instanceof String s) {
-                return s;
+                return TransformedBody.of(s);
             }
-            return objectMapper.writeValueAsString(result);
+            return TransformedBody.of(objectMapper.writeValueAsString(result));
         } catch (Exception e) {
             throw new PayloadTransformException(
                     "Inline payload transform failed for destination " + destination.getId() + ": " + e.getMessage(), e);

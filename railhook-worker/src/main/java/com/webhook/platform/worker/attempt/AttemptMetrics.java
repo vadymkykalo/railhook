@@ -22,4 +22,15 @@ public interface AttemptMetrics {
 
     /** A configured transformation could not be applied, so nothing was sent. */
     void transformFailed();
+
+    /**
+     * A transformation asked for this one not to be sent. Distinct from
+     * {@link #transformFailed()} on purpose: one is an error rate and the other is a filter
+     * doing its job, and an alert that cannot tell them apart fires on working configuration.
+     *
+     * <p>Defaulted to nothing so a direction that has no script path yet does not have to
+     * register a counter it will never increment.
+     */
+    default void transformCancelled() {
+    }
 }

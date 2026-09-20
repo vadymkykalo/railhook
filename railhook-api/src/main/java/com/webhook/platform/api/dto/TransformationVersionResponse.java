@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.common.transform.TransformationKind;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,6 +26,10 @@ public class TransformationVersionResponse {
 
     @Schema(description = "The template itself. Omitted from the list of versions — fetch one version to read it.")
     private String template;
+
+    @Schema(description = "The language this version was published in. Restoring it puts the language back as well as the text, so a restore cannot leave a script in a row marked TEMPLATE or the other way round.",
+            example = "TEMPLATE")
+    private TransformationKind kind;
 
     @Schema(description = "Whether this is the version the transformation is currently using")
     private boolean current;

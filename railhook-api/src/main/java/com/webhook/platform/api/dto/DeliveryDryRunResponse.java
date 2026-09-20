@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.common.transform.TransformationKind;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
@@ -36,4 +37,19 @@ public class DeliveryDryRunResponse {
 
     @Schema(description = "Version of the transformation applied (if any)")
     private Integer transformationVersion;
+
+    @Schema(description = "The language that actually ran")
+    private TransformationKind transformationKind;
+
+    @Schema(description = "Everything the script logged, oldest first. Empty for a template.")
+    private List<TransformPreviewResponse.ConsoleLine> console;
+
+    @Schema(description = "True when the script asked for the delivery to be dropped. Nothing would be sent, and there is no body to sign.")
+    private boolean cancelled;
+
+    @Schema(description = "Why the script cancelled, as the script stated it")
+    private String cancelReason;
+
+    @Schema(description = "Wall clock spent inside the script, in milliseconds")
+    private long durationMs;
 }

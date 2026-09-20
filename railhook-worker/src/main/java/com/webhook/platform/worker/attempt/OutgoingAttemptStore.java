@@ -20,6 +20,7 @@ import com.webhook.platform.worker.service.OrderingBufferService;
 import com.webhook.platform.worker.service.PayloadTransformException;
 import com.webhook.platform.worker.service.PayloadTransformService;
 import com.webhook.platform.worker.service.TransformationCacheService;
+import com.webhook.platform.common.transform.TransformRequest;
 import io.micrometer.core.instrument.Counter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -298,10 +299,10 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     }
 
     @Override
-    public RequestSpec buildRequest(Claim claim, String body) {
+    public RequestSpec buildRequest(Claim claim, TransformedBody transformed) {
         Delivery delivery = claim.delivery();
-        DeliverySigner.Signatures signatures =
-                new DeliverySigner(endpoint, encryptionKeyRegistry, clock).sign(delivery.getId(), body);
+        DeliverySigner.Signatures signatures = new DeliverySigner(endpoint, encryptionKeyRegistry, clock)
+                .sign(delivery.getId(), transformed.body());
 
         String sequenceHeader = delivery.getSequenceNumber() != null
                 ? String.valueOf(delivery.getSequenceNumber())
@@ -344,6 +345,11 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         recorded.put("User-Agent", USER_AGENT);
 
         Map<String, String> custom = new LinkedHashMap<>();
+        // Whatever the transformation set comes first, so the Endpoint's own custom headers
+        // still win: a script belongs to whoever wrote the transformation, and the endpoint
+        // configuration belongs to whoever owns the endpoint. Signatures are computed above and
+        // are not in this map, so a script cannot overwrite one.
+        custom.putAll(transformed.headers());
         AttemptSupport.collectCustomHeaders(custom, delivery.getCustomHeaders(), objectMapper);
         recorded.putAll(HeaderSanitizer.sanitize(custom));
 
@@ -362,20 +368,32 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
      * transform": falling back would ship the data the transform exists to strip.
      */
     @Override
-    public String buildBody(Claim claim) {
+    public TransformedBody buildBody(Claim claim) {
         Delivery delivery = claim.delivery();
-        String template;
+        TransformationCacheService.Resolved resolved;
         if (delivery.getTransformationId() != null) {
-            template = transformationCacheService.findEnabledTemplate(delivery.getTransformationId());
-            if (template == null) {
+            resolved = transformationCacheService.findEnabled(delivery.getTransformationId());
+            if (resolved == null) {
                 throw new PayloadTransformException(
                         "Configured transformation " + delivery.getTransformationId()
                                 + " not found or disabled for delivery " + delivery.getId());
             }
         } else {
-            template = delivery.getPayloadTemplate();
+            // An inline template on the Delivery predates saved transformations and is always
+            // the template language: there is nowhere on a Delivery to say otherwise.
+            resolved = TransformationCacheService.Resolved.template(delivery.getPayloadTemplate());
         }
-        return payloadTransformService.transform(event.getDecompressedPayload(), template);
+
+        return payloadTransformService.apply(resolved, event.getDecompressedPayload(),
+                TransformRequest.builder()
+                        .payload(event.getDecompressedPayload())
+                        .eventType(event.getEventType())
+                        .eventId(event.getId().toString())
+                        .timestamp(event.getCreatedAt())
+                        .direction("OUTGOING")
+                        .url(endpoint.getUrl())
+                        .headers(Map.of())
+                        .build());
     }
 
     @Override

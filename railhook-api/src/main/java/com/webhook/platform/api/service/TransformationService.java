@@ -19,6 +19,9 @@ import com.webhook.platform.api.dto.TransformationVersionDiffResponse;
 import com.webhook.platform.api.dto.TransformationVersionResponse;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.common.transform.JavaScriptTransformEngine;
+import com.webhook.platform.common.transform.ScriptTransformException;
+import com.webhook.platform.common.transform.TransformationKind;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -46,6 +49,7 @@ public class TransformationService {
     private final UserRepository userRepository;
     private final JsonDiffCalculator jsonDiffCalculator;
     private final ObjectMapper objectMapper;
+    private final JavaScriptTransformEngine scriptEngine;
 
     /**
      * How many published templates one transformation keeps.
@@ -67,6 +71,7 @@ public class TransformationService {
                                  UserRepository userRepository,
                                  JsonDiffCalculator jsonDiffCalculator,
                                  ObjectMapper objectMapper,
+                                 JavaScriptTransformEngine scriptEngine,
                                  @Value("${transformations.version-history-limit:50}") int versionHistoryLimit) {
         this.transformationRepository = transformationRepository;
         this.transformationVersionRepository = transformationVersionRepository;
@@ -76,6 +81,7 @@ public class TransformationService {
         this.userRepository = userRepository;
         this.jsonDiffCalculator = jsonDiffCalculator;
         this.objectMapper = objectMapper;
+        this.scriptEngine = scriptEngine;
         // Floored at one: a zero or negative cap would trim the version the transformation is
         // currently using, and a misconfigured number must not be able to delete live data.
         this.versionHistoryLimit = Math.max(1, versionHistoryLimit);
@@ -94,6 +100,36 @@ public class TransformationService {
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
+    }
+
+    /**
+     * Refuses a transformation the author cannot have meant, at the one moment they are looking
+     * at it.
+     *
+     * <p>Both languages are checked here and for the same reason: whatever is wrong is wrong once
+     * per attempt, for every event, forever, and the author is the only person who can fix it. A
+     * script is compiled and its {@code handler} is looked for; its top level runs, inside the
+     * same sandbox and under the same limits a real Delivery gets, so a script that loops while
+     * defining itself is refused here rather than on a worker.
+     */
+    private void validateSource(TransformationKind kind, String source) {
+        if (kind == TransformationKind.JAVASCRIPT) {
+            validateScript(source);
+        } else {
+            validateTemplate(source);
+        }
+    }
+
+    private void validateScript(String script) {
+        if (script == null || script.isBlank()) {
+            throw new IllegalArgumentException("Invalid script: it is empty");
+        }
+        try {
+            scriptEngine.validate(script);
+        } catch (ScriptTransformException e) {
+            String where = e.line() > 0 ? " (line " + e.line() + ")" : "";
+            throw new IllegalArgumentException("Invalid script" + where + ": " + e.getMessage());
+        }
     }
 
     private void validateTemplate(String template) {
@@ -134,7 +170,9 @@ public class TransformationService {
     @Transactional
     public TransformationResponse create(UUID projectId, TransformationRequest request, UUID actorUserId) {
         validateProjectOwnership(projectId);
-        validateTemplate(request.getTemplate());
+        TransformationKind kind = request.getKind() == null
+                ? TransformationKind.TEMPLATE : request.getKind();
+        validateSource(kind, request.getTemplate());
 
         if (transformationRepository.existsByProjectIdAndName(projectId, request.getName())) {
             throw new IllegalArgumentException("Transformation with name '" + request.getName() + "' already exists in this project");
@@ -145,6 +183,7 @@ public class TransformationService {
                 .name(request.getName())
                 .description(request.getDescription())
                 .template(request.getTemplate())
+                .kind(kind)
                 .enabled(request.getEnabled() != null ? request.getEnabled() : true)
                 .version(1)
                 .build();
@@ -204,12 +243,22 @@ public class TransformationService {
         // whether or not it was touched: renaming a transformation and rewriting its mapping arrive
         // here as the same call. The counter used to go up for both, which — now that the counter
         // has a history behind it — would fill that history with identical entries nobody made.
-        boolean templateChanged = request.getTemplate() != null
+        //
+        // The language counts as part of the template for all of this. The same text validated
+        // as a script and as a template gives different answers, and an edit that only switches
+        // the language is as much a new published version as one that rewrites the text.
+        TransformationKind kind = request.getKind() != null
+                ? request.getKind() : transformation.getKind();
+        boolean templateChanged = (request.getTemplate() != null
                 && !request.getTemplate().isBlank()
-                && !request.getTemplate().equals(transformation.getTemplate());
+                && !request.getTemplate().equals(transformation.getTemplate()))
+                || kind != transformation.getKind();
         if (templateChanged) {
-            validateTemplate(request.getTemplate());
-            transformation.setTemplate(request.getTemplate());
+            String source = request.getTemplate() != null && !request.getTemplate().isBlank()
+                    ? request.getTemplate() : transformation.getTemplate();
+            validateSource(kind, source);
+            transformation.setTemplate(source);
+            transformation.setKind(kind);
             transformation.setVersion(transformation.getVersion() + 1);
         }
         if (request.getEnabled() != null) {
@@ -280,7 +329,15 @@ public class TransformationService {
                 .rightCreatedAt(rightVersion.getCreatedAt())
                 .leftTemplate(leftVersion.getTemplate())
                 .rightTemplate(rightVersion.getTemplate())
-                .diffs(jsonDiffCalculator.diff(leftVersion.getTemplate(), rightVersion.getTemplate()))
+                .leftKind(leftVersion.getKind())
+                .rightKind(rightVersion.getKind())
+                // A field-by-field diff is a thing you can do to two JSON documents and not to
+                // two scripts. Rather than hand back nonsense — every line of a script reads as
+                // one unparseable "field" — a script version carries no field diff and the UI
+                // diffs the two texts, which is what a person reading a script wants anyway.
+                .diffs(isScript(leftVersion) || isScript(rightVersion)
+                        ? List.of()
+                        : jsonDiffCalculator.diff(leftVersion.getTemplate(), rightVersion.getTemplate()))
                 .build();
     }
 
@@ -304,6 +361,10 @@ public class TransformationService {
         }
 
         transformation.setTemplate(source.getTemplate());
+        // The language goes back with the text. Without this, restoring a template published
+        // before the transformation was rewritten as a script would put JSON back into a row
+        // still marked JAVASCRIPT — and the next delivery would fail to compile it.
+        transformation.setKind(source.getKind());
         transformation.setVersion(transformation.getVersion() + 1);
         transformation = transformationRepository.saveAndFlush(transformation);
         publishVersion(transformation, version, actorUserId);
@@ -311,6 +372,10 @@ public class TransformationService {
         log.info("Restored transformation {} to the template of version {}, published as version {}",
                 id, version, transformation.getVersion());
         return mapToResponse(transformation);
+    }
+
+    private static boolean isScript(TransformationVersion version) {
+        return version.getKind() == TransformationKind.JAVASCRIPT;
     }
 
     private TransformationVersion requireVersion(UUID transformationId, int version) {
@@ -329,6 +394,7 @@ public class TransformationService {
                 .transformationId(transformation.getId())
                 .version(transformation.getVersion())
                 .template(transformation.getTemplate())
+                .kind(transformation.getKind())
                 .restoredFromVersion(restoredFromVersion)
                 .createdBy(actorUserId)
                 .build());
@@ -370,6 +436,7 @@ public class TransformationService {
                 // The list is an index: a project with fifty 64 KB templates in one history would
                 // otherwise be a 3 MB response nobody reads.
                 .template(includeTemplate ? version.getTemplate() : null)
+                .kind(version.getKind())
                 .current(Objects.equals(transformation.getVersion(), version.getVersion()))
                 .restoredFromVersion(version.getRestoredFromVersion())
                 .createdBy(version.getCreatedBy())
@@ -392,6 +459,7 @@ public class TransformationService {
                 .name(transformation.getName())
                 .description(transformation.getDescription())
                 .template(transformation.getTemplate())
+                .kind(transformation.getKind())
                 .version(transformation.getVersion())
                 .enabled(transformation.getEnabled())
                 .subscriptionCount(subscriptionCount)

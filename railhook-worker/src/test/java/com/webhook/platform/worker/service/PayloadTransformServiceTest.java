@@ -25,7 +25,7 @@ class PayloadTransformServiceTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        service = new PayloadTransformService(new ObjectMapper(), meterRegistry);
+        service = new PayloadTransformService(new ObjectMapper(), meterRegistry, scriptEngine());
     }
 
     @Test
@@ -132,5 +132,13 @@ class PayloadTransformServiceTest {
 
         assertTrue(result.contains("evt_1"), "the field that does exist still comes through");
         assertTrue(result.contains("\"maybe\""), "the optional field is present, just empty");
+    }
+
+    /**
+     * Built lazily inside itself, so a test that never runs a script never brings GraalJS up.
+     */
+    private static com.webhook.platform.common.transform.JavaScriptTransformEngine scriptEngine() {
+        return new com.webhook.platform.common.transform.JavaScriptTransformEngine(
+                new ObjectMapper(), com.webhook.platform.common.transform.ScriptLimits.defaults());
     }
 }

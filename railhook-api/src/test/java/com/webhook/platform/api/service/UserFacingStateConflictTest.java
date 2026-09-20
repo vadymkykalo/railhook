@@ -65,7 +65,7 @@ class UserFacingStateConflictTest {
         transformationService = new TransformationService(
                 transformationRepository, mock(TransformationVersionRepository.class), projectRepository,
                 subscriptionRepository, incomingDestinationRepository, userRepository,
-                new JsonDiffCalculator(objectMapper), objectMapper, 50);
+                new JsonDiffCalculator(objectMapper), objectMapper, scriptEngine(), 50);
     }
 
     @AfterEach
@@ -113,5 +113,14 @@ class UserFacingStateConflictTest {
         assertThatThrownBy(() -> transformationService.delete(projectId, id))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("referenced by 2 subscriptions");
+    }
+
+    /**
+     * The engine is built lazily inside itself, so a test that only ever validates templates
+     * never brings GraalJS up at all.
+     */
+    private static com.webhook.platform.common.transform.JavaScriptTransformEngine scriptEngine() {
+        return new com.webhook.platform.common.transform.JavaScriptTransformEngine(
+                new ObjectMapper(), com.webhook.platform.common.transform.ScriptLimits.defaults());
     }
 }

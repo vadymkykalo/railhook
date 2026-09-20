@@ -145,9 +145,26 @@ public class AttemptRunner {
             store.attemptStarting(claim);
 
             // Outgoing signs exactly these bytes, so the body comes before the request.
-            body = store.buildBody(claim);
+            TransformedBody transformed = store.buildBody(claim);
 
-            RequestSpec spec = store.buildRequest(claim, body);
+            if (transformed.cancelled()) {
+                // Deliberate, not a failure. Recorded so the Delivery shows why nothing went out
+                // — an Attempt row with no status is the only trace there would otherwise be —
+                // and terminal, because the next attempt would run the same script over the same
+                // payload and reach the same answer. Nothing touches the circuit breaker: the
+                // target was never asked.
+                String reason = "CANCELLED_BY_TRANSFORMATION: " + (transformed.cancelReason() == null
+                        ? "no reason given" : transformed.cancelReason());
+                log.info("{}: {}", ctx.description(), reason);
+                metrics.transformCancelled();
+                recordQuietly(store, claim, ctx, errorRecord(null, null, reason, elapsed(startedAt)));
+                terminallyFail(store, claim, reason);
+                return;
+            }
+
+            body = transformed.body();
+
+            RequestSpec spec = store.buildRequest(claim, transformed);
             requestHeaders = spec.recordedHeaders();
 
             Response response = send(spec, ctx, store.wireBody(claim, body));

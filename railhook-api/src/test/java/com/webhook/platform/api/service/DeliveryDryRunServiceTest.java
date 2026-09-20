@@ -1,6 +1,10 @@
 package com.webhook.platform.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webhook.platform.api.service.transform.TemplateTransformer;
+import com.webhook.platform.api.service.transform.TransformationRunner;
+import com.webhook.platform.common.transform.JavaScriptTransformEngine;
+import com.webhook.platform.common.transform.ScriptLimits;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Transformation;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
@@ -50,8 +54,11 @@ class DeliveryDryRunServiceTest {
         lenient().when(transformationRepository.findById(any(UUID.class)))
                 .thenReturn(Optional.<Transformation>empty());
 
+        ObjectMapper mapper = new ObjectMapper();
         service = new DeliveryDryRunService(
-                transformationRepository, endpointRepository, new ObjectMapper(), registry);
+                transformationRepository, endpointRepository, mapper, registry,
+                new TransformationRunner(new TemplateTransformer(mapper),
+                        new JavaScriptTransformEngine(mapper, ScriptLimits.defaults()), mapper));
     }
 
     private Endpoint endpointIn(UUID projectId) {
