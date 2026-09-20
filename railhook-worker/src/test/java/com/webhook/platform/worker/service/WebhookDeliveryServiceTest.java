@@ -1,5 +1,7 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.common.retry.RetryAfter;
+import com.webhook.platform.worker.attempt.TargetFailureRecorder;
 import com.webhook.platform.worker.attempt.AttemptRunner;
 import java.time.Clock;
 import com.webhook.platform.worker.attempt.DeliveryAttemptMetrics;
@@ -132,7 +134,7 @@ class WebhookDeliveryServiceTest {
                 activeProjects(),
                 transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
                 mtlsWebClientFactory, transformationCacheService, payloadTransformService,
-                new ObjectMapper(), webClient, registry, Clock.systemUTC(),
+                new ObjectMapper(), webClient, mock(TargetFailureRecorder.class), registry, Clock.systemUTC(),
                 ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
         return new WebhookDeliveryService(runner, storeFactory, new DeliveryAttemptMetrics(registry),
                 deliveryRepository, transactionTemplate);
@@ -160,7 +162,7 @@ class WebhookDeliveryServiceTest {
         // A real concurrency control, so the permit accounting this test is about is real.
         AttemptRunner runnerWithRealPermits = new AttemptRunner(
                 projectRateLimiterService, rateLimiterService, realConcurrencyControl,
-                circuitBreakerService, new ObjectMapper(), true, List.of());
+                circuitBreakerService, new ObjectMapper(), true, List.of(), RetryAfter.DEFAULT_MAX_SECONDS);
 
         WebhookDeliveryService localService = newService(
                 WebClient.builder().build(), new SimpleMeterRegistry(), runnerWithRealPermits);
@@ -280,7 +282,7 @@ class WebhookDeliveryServiceTest {
     private AttemptRunner newAttemptRunner() {
         return new AttemptRunner(
                 projectRateLimiterService, rateLimiterService, concurrencyControlService,
-                circuitBreakerService, new ObjectMapper(), true, List.of());
+                circuitBreakerService, new ObjectMapper(), true, List.of(), RetryAfter.DEFAULT_MAX_SECONDS);
     }
 
     private WebhookDeliveryService serviceWithMockWebClient(WebClient mockWebClient, MeterRegistry meterRegistry) {

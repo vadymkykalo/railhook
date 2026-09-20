@@ -66,6 +66,30 @@ public class Endpoint {
     @Column(name = "rate_limit_per_second")
     private Integer rateLimitPerSecond;
 
+    /**
+     * The current unbroken run of failed Attempts. The worker owns these two: it is the only
+     * thing that knows how an Attempt ended, and it writes them at the shared attempt seam
+     * ({@code AttemptStore#recordTargetOutcome}). The api reads them and decides.
+     */
+    @Column(name = "failing_since")
+    private Instant failingSince;
+
+    @Builder.Default
+    @Column(name = "consecutive_failures", nullable = false)
+    private Integer consecutiveFailures = 0;
+
+    /**
+     * Set when Railhook turned this endpoint off for continuous failure, and null when its
+     * owner did. The store reads it to decide what happens to Deliveries already queued: an
+     * endpoint its owner turned off fails them, an auto-disabled one hands them to the DLQ,
+     * where a person can retry them once the receiver is fixed.
+     */
+    @Column(name = "auto_disabled_at")
+    private Instant autoDisabledAt;
+
+    @Column(name = "auto_disabled_reason", columnDefinition = "TEXT")
+    private String autoDisabledReason;
+
     /** {@code BOTH} by default, so neither an old nor a new receiver has to know about the other. */
     @Enumerated(EnumType.STRING)
     @Column(name = "signature_scheme", nullable = false, length = 20)

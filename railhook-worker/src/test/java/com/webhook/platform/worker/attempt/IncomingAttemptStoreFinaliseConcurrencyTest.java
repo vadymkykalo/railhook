@@ -102,7 +102,8 @@ class IncomingAttemptStoreFinaliseConcurrencyTest {
         }).when(interleaved).findForwardAttempts(any(), any(), any());
 
         IncomingAttemptStore store = new IncomingAttemptStore(interleaved, null,
-                new TransactionTemplate(transactionManager), null, null, null, null, null, null, null, null, null);
+                new TransactionTemplate(transactionManager), null, null, null, null, null, null, null,
+                null, null, null);
         IncomingAttemptStore.Claim claim = new IncomingAttemptStore.Claim(eventId, destinationId, 1, fence, null);
 
         boolean applied = store.finalise(claim,

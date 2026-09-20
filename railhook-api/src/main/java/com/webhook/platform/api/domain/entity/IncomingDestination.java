@@ -1,6 +1,7 @@
 package com.webhook.platform.api.domain.entity;
 
 import com.webhook.platform.common.retry.RetryLadderDefaults;
+import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -64,6 +65,26 @@ public class IncomingDestination {
     @Column(name = "retry_delays", nullable = false, columnDefinition = "TEXT")
     @Builder.Default
     private String retryDelays = RetryLadderDefaults.INCOMING_DELAYS;
+
+    /** Which HTTP statuses are worth another Attempt; the default is what both directions used
+     * to hardcode. Unlike the ladder, this does not differ by direction. */
+    @Column(name = "retryable_statuses", nullable = false, columnDefinition = "TEXT")
+    @Builder.Default
+    private String retryableStatuses = RetryableStatuses.DEFAULT_SPEC;
+
+    /** @see Endpoint#getFailingSince() — the same four columns, kept by the same seam. */
+    @Column(name = "failing_since")
+    private Instant failingSince;
+
+    @Column(name = "consecutive_failures", nullable = false)
+    @Builder.Default
+    private Integer consecutiveFailures = 0;
+
+    @Column(name = "auto_disabled_at")
+    private Instant autoDisabledAt;
+
+    @Column(name = "auto_disabled_reason", columnDefinition = "TEXT")
+    private String autoDisabledReason;
 
     @Column(name = "encryption_key_version", nullable = false)
     @Builder.Default

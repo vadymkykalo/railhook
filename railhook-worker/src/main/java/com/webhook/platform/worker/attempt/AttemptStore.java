@@ -83,6 +83,27 @@ public interface AttemptStore<C> {
     void onSucceeded(C claim);
 
     /**
+     * What this Attempt says about the <em>target</em> — the Endpoint or the Destination —
+     * rather than about the obligation. Called once per Attempt that reached a verdict, and
+     * never for a {@link Finalization.Deferred}: a Deferral is not an Attempt, so the target
+     * said nothing, and counting our own throttling against it would disable a target for
+     * being busy.
+     *
+     * <p>Separate from the circuit breaker on purpose. The breaker forgets within a couple of
+     * minutes, which is what makes it safe to trip; auto-disabling a target that has answered
+     * nothing but failures for days needs a memory that outlives a worker, and that means a
+     * row. The store owns which row and how it is written.
+     *
+     * <p>Whatever this throws is swallowed by the Runner. Invariant 1 binds here as anywhere
+     * else: once a 2xx is in hand, nothing that goes wrong writing it down may reclassify it.
+     *
+     * @param succeeded true for a 2xx; false for any other answer, and for an Attempt that
+     *                  produced no answer at all
+     */
+    default void recordTargetOutcome(C claim, boolean succeeded) {
+    }
+
+    /**
      * Called once after a {@link Finalization.TerminallyFailed} that applied. Terminal is as
      * final as Succeeded and Abandoned, so whatever those release has to be released here too —
      * a held ordering cursor stalls every later Delivery to that endpoint, silently.
