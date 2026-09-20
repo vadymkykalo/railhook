@@ -37,7 +37,8 @@ class DemoDataRemovalIntegrationTest extends AbstractIntegrationTest {
     private static final List<String> DEMO_TABLES = List.of(
             "workflow_step_executions", "workflow_executions", "workflows",
             "incoming_forward_attempts", "incoming_events", "incoming_destinations", "incoming_sources",
-            "delivery_attempts", "deliveries", "events", "subscriptions", "endpoints", "projects", "memberships");
+            "delivery_attempts", "deliveries", "events", "subscriptions", "transformations", "endpoints",
+            "projects", "memberships");
 
     @Autowired
     private MockMvc mockMvc;
@@ -84,6 +85,7 @@ class DemoDataRemovalIntegrationTest extends AbstractIntegrationTest {
         assertThat(removed.deliveries()).isPositive();
         assertThat(removed.incomingEvents()).isPositive();
         assertThat(removed.workflowExecutions()).isPositive();
+        assertThat(removed.transformations()).isPositive();
         assertThat(rowsOf(DemoTenant.ORGANIZATION_ID)).isZero();
         assertThat(count("SELECT COUNT(*) FROM organizations WHERE id = ?", DemoTenant.ORGANIZATION_ID)).isZero();
         assertThat(count("SELECT COUNT(*) FROM users WHERE id = ?", DemoTenant.USER_ID)).isZero();
@@ -92,6 +94,30 @@ class DemoDataRemovalIntegrationTest extends AbstractIntegrationTest {
         assertThat(rowsOf(neighbourOrganization)).isEqualTo(neighbourRowsBefore);
         assertThat(count("SELECT COUNT(*) FROM organizations WHERE id = ?", neighbourOrganization)).isOne();
         assertThat(count("SELECT COUNT(*) FROM users WHERE email = ?", "demo-removal-neighbour@example.com")).isOne();
+    }
+
+    /**
+     * The demo's JavaScript Transformation, there and back again.
+     *
+     * <p>A Transformation is the first thing the seeder inserts that something else points at —
+     * a Subscription's {@code transformation_id} — and that foreign key is {@code ON DELETE SET
+     * NULL}, so a remover that forgot it would leave the row behind quietly rather than fail.
+     * Hence a case of its own: seeded, wired, gone.
+     */
+    @Test
+    void theJavaScriptTransformationIsSeededWiredAndThenRemoved() throws Exception {
+        registerNeighbourWithAnEvent();
+        new DemoDataSeeder(jdbc, transactionManager, encryptionKeyRegistry, Clock.systemUTC(), false).seed();
+
+        assertThat(count("SELECT COUNT(*) FROM transformations WHERE organization_id = ? AND kind = 'JAVASCRIPT'",
+                DemoTenant.ORGANIZATION_ID)).isOne();
+        assertThat(count("SELECT COUNT(*) FROM subscriptions s JOIN transformations t ON t.id = s.transformation_id "
+                + "WHERE s.organization_id = ?", DemoTenant.ORGANIZATION_ID)).isOne();
+
+        remover.removeIfPresent();
+
+        assertThat(count("SELECT COUNT(*) FROM transformations WHERE organization_id = ?",
+                DemoTenant.ORGANIZATION_ID)).isZero();
     }
 
     @Test

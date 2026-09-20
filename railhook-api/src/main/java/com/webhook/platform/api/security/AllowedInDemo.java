@@ -14,6 +14,12 @@ import java.lang.annotation.Target;
  * change nothing belonging to the demo: ending the demo session itself, opening a new one, and the
  * public site's anonymous forms, which a visitor still holding a demo token must be able to use.
  *
+ * <p>It also lifts {@link RequireAccess} for a demo caller on that same handler, and only for
+ * one. A demo session is a VIEWER, so any level above READ would refuse it and the annotation
+ * would say nothing; a handler that needs a write-level capability must therefore hand the demo
+ * a version of the answer that does not carry it, rather than the real one. The dry-run does
+ * exactly that with its signature.
+ *
  * <p>{@code DemoSessionAllowListTest} freezes the set, so adding one is a reviewed decision.
  */
 @Documented

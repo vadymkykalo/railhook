@@ -104,6 +104,9 @@ public abstract class AbstractIntegrationTest {
         when(authRateLimiterService.allowDevicePoll(anyString(), any())).thenReturn(true);
         // Creating a public tester URL without an account (allowPublicBin).
         when(authRateLimiterService.allowPublicBin(anyString())).thenReturn(true);
+        // Running a transformation from a demo session (allowDemoScriptRun): unstubbed it is
+        // false, and the Transform Studio's two handlers answer 429 for every demo caller.
+        when(authRateLimiterService.allowDemoScriptRun(anyString(), any())).thenReturn(true);
         // The MCP server's OAuth registration and token endpoints.
         when(authRateLimiterService.allowOAuthRegister(anyString())).thenReturn(true);
         when(authRateLimiterService.allowOAuthToken(anyString(), any())).thenReturn(true);

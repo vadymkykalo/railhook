@@ -51,6 +51,10 @@ export function kindOfDeliveryStatus(status: string): StatusKind {
     case 'DLQ':
     case 'ABANDONED':
       return 'halt';
+    // Deliberate and terminal: a transformation said not to send it. Not ok — nothing
+    // arrived; not halt — nothing went wrong.
+    case 'CANCELLED':
+      return 'idle';
     default:
       return 'idle';
   }

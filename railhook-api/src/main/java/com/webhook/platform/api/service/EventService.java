@@ -112,6 +112,7 @@ public class EventService {
                 case SUCCESS -> counts.setSuccess(n);
                 case FAILED -> counts.setFailed(n);
                 case DLQ -> counts.setDlq(n);
+                case CANCELLED -> counts.setCancelled(n);
             }
         }
         return byEvent;
@@ -121,7 +122,7 @@ public class EventService {
         DeliveryStatusCounts counts = byEvent.getOrDefault(response.getId(), new DeliveryStatusCounts());
         response.setDeliveryCounts(counts);
         response.setDeliveriesCreated(counts.getPending() + counts.getProcessing() + counts.getSuccess()
-                + counts.getFailed() + counts.getDlq());
+                + counts.getFailed() + counts.getDlq() + counts.getCancelled());
         return response;
     }
 

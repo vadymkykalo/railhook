@@ -3,6 +3,7 @@ package com.webhook.platform.api.security;
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.exception.DemoReadOnlyException;
+import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.common.demo.DemoTenant;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -34,6 +35,16 @@ class DemoReadOnlyGateTest {
 
         @RefusedInDemo
         public void export() {
+        }
+
+        /** The dry-run's shape: a write level, lifted for the demo because it is on the list. */
+        @AllowedInDemo(reason = "test")
+        @RequireAccess(AccessLevel.WRITE)
+        public void allowedButDeclaresWrite() {
+        }
+
+        @RequireAccess(AccessLevel.WRITE)
+        public void declaresWrite() {
         }
     }
 
@@ -97,6 +108,34 @@ class DemoReadOnlyGateTest {
         assertThrows(DemoReadOnlyException.class, () -> interceptor.enforceDemoReadOnly(request("POST"), write, ownerWithoutClaim));
         assertThrows(DemoReadOnlyException.class, () -> interceptor.enforceDemoReadOnly(request("POST"), write, apiKey));
         assertThrows(DemoReadOnlyException.class, () -> interceptor.enforceDemoReadOnly(request("POST"), write, portal));
+    }
+
+    // ── The access level, for a handler the demo may call ──────────
+    //
+    // A demo session is a VIEWER, so a handler declaring WRITE refuses it however carefully
+    // @AllowedInDemo was reviewed. The level is lifted for exactly that pair — demo caller, and
+    // a handler on the frozen list — so that "the demo may call this" means what it says. The
+    // capability the level was protecting is taken off the answer instead; for the one handler
+    // this applies to, that is DemoDryRunMask.
+
+    @Test
+    void anAllowedHandlerIsNotThenRefusedByItsOwnWriteLevel() throws Exception {
+        assertDoesNotThrow(() -> interceptor.enforceAccessLevel(handler("allowedButDeclaresWrite"), demoSession()));
+    }
+
+    @Test
+    void aWriteLevelStillRefusesTheDemoWhereTheHandlerIsNotOnTheList() throws Exception {
+        assertThrows(ForbiddenException.class,
+                () -> interceptor.enforceAccessLevel(handler("declaresWrite"), demoSession()));
+    }
+
+    @Test
+    void theListLiftsNothingForAnybodyButTheDemo() throws Exception {
+        JwtAuthenticationToken viewer = new JwtAuthenticationToken(UUID.randomUUID(), UUID.randomUUID(),
+                MembershipRole.VIEWER, true, Collections.emptyList());
+
+        assertThrows(ForbiddenException.class,
+                () -> interceptor.enforceAccessLevel(handler("allowedButDeclaresWrite"), viewer));
     }
 
     @Test

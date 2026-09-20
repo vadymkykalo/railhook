@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.webhook.platform.api.domain.entity.Transformation;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.service.transform.TemplateTransformer;
+import com.webhook.platform.api.service.transform.TransformationRunner;
+import com.webhook.platform.common.transform.TransformRequest;
+import com.webhook.platform.common.transform.TransformationKind;
 import com.webhook.platform.api.service.workflow.NodeExecutor;
 import com.webhook.platform.api.service.workflow.StepResult;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +52,7 @@ public class TransformNodeExecutor implements NodeExecutor {
     private final ObjectMapper objectMapper;
     private final TransformationRepository transformationRepository;
     private final TemplateTransformer templateTransformer;
+    private final TransformationRunner runner;
 
     @Override
     public String getType() {
@@ -84,7 +88,24 @@ public class TransformNodeExecutor implements NodeExecutor {
         }
 
         try {
-            return StepResult.success(templateTransformer.apply(transformation.getTemplate(), input));
+            // A workflow node has no Delivery behind it, so a script sees the step's input as
+            // its payload and nothing for the delivery context. A script that cancels stops the
+            // step rather than a delivery — there is no delivery here to stop.
+            TransformationRunner.Result result = runner.run(
+                    transformation.getKind(), transformation.getTemplate(),
+                    TransformRequest.builder()
+                            .payload(input == null ? "null" : input.toString())
+                            .eventType("workflow.step")
+                            .eventId(transformationId.toString())
+                            .timestamp(java.time.Instant.now())
+                            .direction("OUTGOING")
+                            .build());
+            if (result.cancelled()) {
+                return StepResult.failed("Transformation '" + transformation.getName()
+                        + "' cancelled the step: "
+                        + (result.cancelReason() == null ? "no reason given" : result.cancelReason()));
+            }
+            return StepResult.success(result.payload());
         } catch (Exception e) {
             log.error("Saved transformation {} failed: {}", transformationId, e.getMessage(), e);
             return StepResult.failed("Transformation '" + transformation.getName() + "' failed: " + e.getMessage());

@@ -395,7 +395,7 @@ class ProjectStatusAttemptIntegrationTest {
         KafkaTemplate<String, IncomingForwardMessage> kafka = mock(KafkaTemplate.class);
         IncomingAttemptStore store = new IncomingAttemptStore(forwardAttemptRepository, projectStatusLookup,
                 new TransactionTemplate(transactionManager), mock(TransformationCacheService.class),
-                new PayloadTransformService(new ObjectMapper(), new SimpleMeterRegistry()),
+                new PayloadTransformService(new ObjectMapper(), new SimpleMeterRegistry(), scriptEngine()),
                 encryptionKeyRegistry, new ObjectMapper(), WebClient.builder().build(), kafka,
                 mock(TargetFailureRecorder.class), message, event, destination);
         runner.run(store, new NoMetrics());
@@ -418,7 +418,7 @@ class ProjectStatusAttemptIntegrationTest {
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
                 projectStatusLookup, new TransactionTemplate(transactionManager), mock(OrderingBufferService.class), kafka,
                 encryptionKeyRegistry, null, mock(TransformationCacheService.class),
-                new PayloadTransformService(new ObjectMapper(), new SimpleMeterRegistry()),
+                new PayloadTransformService(new ObjectMapper(), new SimpleMeterRegistry(), scriptEngine()),
                 new ObjectMapper(), WebClient.builder().build(), mock(TargetFailureRecorder.class),
                 Counter.builder("test").register(new SimpleMeterRegistry()),
                 Clock.systemUTC(), 5, message, false);
@@ -442,5 +442,13 @@ class ProjectStatusAttemptIntegrationTest {
         @Override
         public void transformFailed() {
         }
+    }
+
+    /**
+     * Built lazily inside itself, so a test that never runs a script never brings GraalJS up.
+     */
+    private static com.webhook.platform.common.transform.JavaScriptTransformEngine scriptEngine() {
+        return new com.webhook.platform.common.transform.JavaScriptTransformEngine(
+                new ObjectMapper(), com.webhook.platform.common.transform.ScriptLimits.defaults());
     }
 }

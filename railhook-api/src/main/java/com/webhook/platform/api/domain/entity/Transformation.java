@@ -1,5 +1,6 @@
 package com.webhook.platform.api.domain.entity;
 
+import com.webhook.platform.common.transform.TransformationKind;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -36,8 +37,19 @@ public class Transformation {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    /**
+     * The template or the script, depending on {@link #kind}. One column on purpose: they are
+     * the same thing to everything that stores, caches or snapshots a transformation, and a
+     * second nullable column would only make "which one is set?" a question with three answers.
+     */
     @Column(nullable = false, columnDefinition = "TEXT")
     private String template;
+
+    /** What language {@link #template} is written in. Rows older than V083 are TEMPLATE. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    @Builder.Default
+    private TransformationKind kind = TransformationKind.TEMPLATE;
 
     @Column(nullable = false)
     @Builder.Default

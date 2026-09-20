@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.domain.entity;
 
+import com.webhook.platform.common.transform.TransformationKind;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -41,6 +42,11 @@ public class Transformation {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String template;
+
+    /** What language {@link #template} is written in. Rows older than V083 are TEMPLATE. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private TransformationKind kind;
 
     @Column(nullable = false)
     private Integer version;

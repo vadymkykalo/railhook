@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.common.transform.TransformationKind;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -24,10 +25,15 @@ public class TransformationRequest {
     @Size(max = 4096, message = "Description must be at most 4096 characters")
     private String description;
 
-    @Schema(description = "JSON template with ${$.jsonpath} expressions for field mapping", example = "{\"event_type\": \"${$.type}\", \"amount\": \"${$.data.amount}\"}")
+    @Schema(description = "The transformation itself: a JSON template with ${$.jsonpath} expressions when kind is TEMPLATE, or a JavaScript `function handler(webhook) { ... }` when kind is JAVASCRIPT",
+            example = "{\"event_type\": \"${$.type}\", \"amount\": \"${$.data.amount}\"}")
     @NotBlank(message = "Template is required")
     @Size(max = 65536, message = "Template must be at most 65536 characters")
     private String template;
+
+    @Schema(description = "The language the template is written in. Omitted means TEMPLATE, which is what every transformation was before JavaScript existed.",
+            example = "TEMPLATE")
+    private TransformationKind kind;
 
     @Schema(description = "Whether this transformation is active", example = "true")
     private Boolean enabled;

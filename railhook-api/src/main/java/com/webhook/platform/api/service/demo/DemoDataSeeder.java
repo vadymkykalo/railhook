@@ -4,6 +4,7 @@ import com.webhook.platform.api.service.demo.DemoCatalog.DemoDestination;
 import com.webhook.platform.api.service.demo.DemoCatalog.DemoEndpoint;
 import com.webhook.platform.api.service.demo.DemoCatalog.DemoSource;
 import com.webhook.platform.api.service.demo.DemoCatalog.DemoSubscription;
+import com.webhook.platform.api.service.demo.DemoCatalog.DemoTransformation;
 import com.webhook.platform.api.service.demo.DemoCatalog.DemoWorkflow;
 import com.webhook.platform.api.service.demo.DemoHistory.AttemptRow;
 import com.webhook.platform.api.service.demo.DemoHistory.DeliveryRow;
@@ -171,6 +172,38 @@ public class DemoDataSeeder {
                     subscription.id(), DemoTenant.ORGANIZATION_ID, DemoTenant.PROJECT_ID,
                     subscription.endpoint().id(), subscription.eventType(), subscription.maxAttempts(),
                     subscription.retryDelays(), PINNED_CREATED_AT, PINNED_CREATED_AT);
+        }
+        // Brought back in line with the catalog when it differs, like a workflow and for the same
+        // reason: it is published material — the script is what the Studio shows a visitor — and
+        // nobody can have edited it, so there is no change of anybody's to overwrite.
+        for (DemoTransformation transformation : DemoCatalog.TRANSFORMATIONS) {
+            jdbc.update("INSERT INTO transformations (id, organization_id, project_id, name, description, template, "
+                            + "kind, version, enabled, created_at, updated_at) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, 'JAVASCRIPT', 1, true, ?, ?) "
+                            + "ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, "
+                            + "description = EXCLUDED.description, template = EXCLUDED.template, "
+                            + "kind = 'JAVASCRIPT', enabled = true "
+                            + "WHERE (transformations.name, transformations.description, transformations.template, "
+                            + "transformations.kind, transformations.enabled) IS DISTINCT FROM (EXCLUDED.name, "
+                            + "EXCLUDED.description, EXCLUDED.template, 'JAVASCRIPT', true)",
+                    transformation.id(), DemoTenant.ORGANIZATION_ID, DemoTenant.PROJECT_ID, transformation.name(),
+                    transformation.description(), transformation.script(), PINNED_CREATED_AT, PINNED_CREATED_AT);
+            // Its own history, or the version number the list shows would link to an empty page
+            // — the one thing V083's backfill existed to prevent, reintroduced by a row inserted
+            // after it ran.
+            jdbc.update("INSERT INTO transformation_versions (organization_id, transformation_id, version, "
+                            + "template, kind, created_at) VALUES (?, ?, 1, ?, 'JAVASCRIPT', ?) "
+                            + "ON CONFLICT (transformation_id, version) DO UPDATE SET "
+                            + "template = EXCLUDED.template, kind = 'JAVASCRIPT' "
+                            + "WHERE (transformation_versions.template, transformation_versions.kind) "
+                            + "IS DISTINCT FROM (EXCLUDED.template, 'JAVASCRIPT')",
+                    DemoTenant.ORGANIZATION_ID, transformation.id(), transformation.script(), PINNED_CREATED_AT);
+            // Wired to a Subscription, so the Studio opens on it rather than on an empty editor,
+            // and so the Connection screen shows where a transformation is actually used.
+            jdbc.update("UPDATE subscriptions SET transformation_id = ? WHERE id = ? AND organization_id = ? "
+                            + "AND transformation_id IS DISTINCT FROM ?",
+                    transformation.id(), transformation.subscriptionId(), DemoTenant.ORGANIZATION_ID,
+                    transformation.id());
         }
         for (DemoSource source : DemoCatalog.SOURCES) {
             CryptoUtils.EncryptedData secret = encryptionKeyRegistry.encrypt(CryptoUtils.generateSecureToken(24));
