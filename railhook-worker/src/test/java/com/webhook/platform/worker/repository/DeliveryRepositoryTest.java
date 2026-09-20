@@ -353,6 +353,78 @@ class DeliveryRepositoryTest {
                 .build());
     }
 
+    /**
+     * What the ordering gate asks before it breaks the order: is anything still outstanding in
+     * the gap going to be attempted? A Delivery between the rungs of its ladder is, and its
+     * successors must keep waiting for it however long they have already waited — the gap
+     * timeout is for a gap that never closes.
+     */
+    @Test
+    void countGapClosingBefore_countsWhatIsInFlightOrDueAndNothingElse() {
+        createSharedEndpoint();
+        Instant now = Instant.now();
+
+        Delivery dueSoon = orderedDelivery(3L, Delivery.DeliveryStatus.PENDING, now.plusSeconds(20), now);
+        Delivery inFlight = orderedDelivery(4L, Delivery.DeliveryStatus.PROCESSING, null, now.minusSeconds(5));
+        // A later rung: nothing will touch this one for an hour.
+        orderedDelivery(5L, Delivery.DeliveryStatus.PENDING, now.plusSeconds(3600), now);
+        // Claimed, then abandoned by whoever held it: PROCESSING, but nobody is attempting it.
+        orderedDelivery(6L, Delivery.DeliveryStatus.PROCESSING, null, now.minusSeconds(600));
+        // Resolved, so not outstanding at all.
+        orderedDelivery(7L, Delivery.DeliveryStatus.SUCCESS, null, now);
+        // Due, but outside the gap being asked about.
+        orderedDelivery(20L, Delivery.DeliveryStatus.PENDING, now, now);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        long closing = deliveryRepository.countGapClosingBefore(sharedEndpointId, 3L, 7L,
+                now.minusSeconds(60), now.plusSeconds(60));
+
+        assertEquals(2, closing,
+                "only the Delivery due inside the window (" + dueSoon.getSequenceNumber()
+                        + ") and the one being attempted now (" + inFlight.getSequenceNumber() + ") count");
+    }
+
+    /**
+     * The converse, and the reason the gap timeout still exists: with nothing in the gap due and
+     * nothing being attempted, waiting is futile and the successors are let through.
+     */
+    @Test
+    void countGapClosingBefore_nothingDueOrInFlight_isZero() {
+        createSharedEndpoint();
+        Instant now = Instant.now();
+
+        orderedDelivery(3L, Delivery.DeliveryStatus.PENDING, now.plusSeconds(21600), now);
+        orderedDelivery(4L, Delivery.DeliveryStatus.PROCESSING, null, now.minusSeconds(3600));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        assertEquals(0, deliveryRepository.countGapClosingBefore(sharedEndpointId, 3L, 4L,
+                now.minusSeconds(60), now.plusSeconds(60)));
+    }
+
+    private Delivery orderedDelivery(long sequenceNumber, Delivery.DeliveryStatus status,
+            Instant nextRetryAt, Instant updatedAt) {
+        Delivery delivery = Delivery.builder()
+                .organizationId(FIXTURE_ORG)
+                .id(UUID.randomUUID())
+                .eventId(UUID.randomUUID())
+                .endpointId(sharedEndpointId)
+                .subscriptionId(UUID.randomUUID())
+                .status(status)
+                .attemptCount(1)
+                .maxAttempts(7)
+                .orderingEnabled(true)
+                .sequenceNumber(sequenceNumber)
+                .nextRetryAt(nextRetryAt)
+                .createdAt(Instant.now())
+                .updatedAt(updatedAt)
+                .build();
+        return entityManager.persist(delivery);
+    }
+
     private Delivery createAndPersistDelivery(Delivery.DeliveryStatus status, Instant nextRetryAt) {
         return createAndPersistDelivery(status, nextRetryAt, Instant.now());
     }

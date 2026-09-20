@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -38,6 +39,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -411,6 +413,134 @@ class WebhookDeliveryServiceTest {
     }
 
     /**
+     * A released Delivery is due now, before the message that releases it is published.
+     *
+     * <p>Parking stamps a {@code next_retry_at} a few seconds out so the fallback poll picks the
+     * Delivery up if this trigger never comes. The trigger fired, the dispatch message arrived —
+     * and the claim, which matches only a row that is due, could not take it, because the park's
+     * own timestamp was still in the future. The message was dropped and the Delivery waited for
+     * the retry poll instead: an ordered endpoint drained a whole burst one delivery per poll
+     * interval, however fast its receiver answered.
+     */
+    @Test
+    void orderingRelease_makesTheReleasedDeliveryDueBeforePublishingIt() throws Exception {
+        HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        httpServer.createContext("/hook", exchange -> {
+            exchange.sendResponseHeaders(200, 0);
+            exchange.getResponseBody().close();
+        });
+        httpServer.start();
+        try {
+            UUID endpointId = UUID.randomUUID();
+            UUID eventId = UUID.randomUUID();
+            UUID deliveryId = UUID.randomUUID();
+            UUID bufferedDeliveryId = UUID.randomUUID();
+
+            Endpoint endpoint = verifiedEndpoint(endpointId,
+                    "http://127.0.0.1:" + httpServer.getAddress().getPort() + "/hook");
+            when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+            Event event = stubEvent(eventId, endpoint.getProjectId());
+            when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+            stubHappyPathPrerequisites(endpoint);
+
+            Delivery delivery = Delivery.builder()
+                    .id(deliveryId).eventId(eventId).endpointId(endpointId)
+                    .status(Delivery.DeliveryStatus.PROCESSING)
+                    .attemptCount(0).maxAttempts(5).timeoutSeconds(5)
+                    .orderingEnabled(true).sequenceNumber(2L)
+                    .updatedAt(Instant.now())
+                    .build();
+            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+            // Parked a moment ago, so it is not due for another few seconds.
+            Delivery bufferedDelivery = Delivery.builder()
+                    .id(bufferedDeliveryId).eventId(eventId).endpointId(endpointId)
+                    .status(Delivery.DeliveryStatus.PENDING)
+                    .attemptCount(0).maxAttempts(5).sequenceNumber(3L)
+                    .orderingEnabled(true)
+                    .nextRetryAt(Instant.now().plusSeconds(5))
+                    .updatedAt(Instant.now())
+                    .build();
+            when(orderingBufferService.canDeliver(endpointId, 2L)).thenReturn(true);
+            when(orderingBufferService.getReadyDeliveries(endpointId)).thenReturn(List.of(bufferedDeliveryId));
+            when(deliveryRepository.findAllById(List.of(bufferedDeliveryId))).thenReturn(List.of(bufferedDelivery));
+            when(deliveryRepository.scheduleIfUnclaimed(eq(bufferedDeliveryId), any())).thenReturn(1);
+
+            DeliveryMessage message = DeliveryMessage.builder()
+                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+            service.processDelivery(message, true);
+
+            InOrder inOrder = inOrder(deliveryRepository, kafkaTemplate);
+            inOrder.verify(deliveryRepository).scheduleIfUnclaimed(eq(bufferedDeliveryId),
+                    argThat(dueAt -> !dueAt.isAfter(Instant.now())));
+            inOrder.verify(kafkaTemplate).send(eq(KafkaTopics.DELIVERIES_DISPATCH), anyString(),
+                    argThat(published -> bufferedDeliveryId.equals(published.getDeliveryId())));
+        } finally {
+            httpServer.stop(0);
+        }
+    }
+
+    /**
+     * The converse: the row is not ours to wake — another attempt claimed it between the cursor
+     * moving and this release — so nothing is published for it. The claim would refuse the
+     * message anyway; publishing one is a duplicate nobody can act on.
+     */
+    @Test
+    void orderingRelease_releasedDeliveryAlreadyClaimed_publishesNothingForIt() throws Exception {
+        HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        httpServer.createContext("/hook", exchange -> {
+            exchange.sendResponseHeaders(200, 0);
+            exchange.getResponseBody().close();
+        });
+        httpServer.start();
+        try {
+            UUID endpointId = UUID.randomUUID();
+            UUID eventId = UUID.randomUUID();
+            UUID deliveryId = UUID.randomUUID();
+            UUID bufferedDeliveryId = UUID.randomUUID();
+
+            Endpoint endpoint = verifiedEndpoint(endpointId,
+                    "http://127.0.0.1:" + httpServer.getAddress().getPort() + "/hook");
+            when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+            Event event = stubEvent(eventId, endpoint.getProjectId());
+            when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+            stubHappyPathPrerequisites(endpoint);
+
+            Delivery delivery = Delivery.builder()
+                    .id(deliveryId).eventId(eventId).endpointId(endpointId)
+                    .status(Delivery.DeliveryStatus.PROCESSING)
+                    .attemptCount(0).maxAttempts(5).timeoutSeconds(5)
+                    .orderingEnabled(true).sequenceNumber(2L)
+                    .updatedAt(Instant.now())
+                    .build();
+            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+            Delivery bufferedDelivery = Delivery.builder()
+                    .id(bufferedDeliveryId).eventId(eventId).endpointId(endpointId)
+                    .status(Delivery.DeliveryStatus.PROCESSING)
+                    .attemptCount(0).maxAttempts(5).sequenceNumber(3L)
+                    .orderingEnabled(true)
+                    .updatedAt(Instant.now())
+                    .build();
+            when(orderingBufferService.canDeliver(endpointId, 2L)).thenReturn(true);
+            when(orderingBufferService.getReadyDeliveries(endpointId)).thenReturn(List.of(bufferedDeliveryId));
+            when(deliveryRepository.findAllById(List.of(bufferedDeliveryId))).thenReturn(List.of(bufferedDelivery));
+            when(deliveryRepository.scheduleIfUnclaimed(eq(bufferedDeliveryId), any())).thenReturn(0);
+
+            DeliveryMessage message = DeliveryMessage.builder()
+                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+            service.processDelivery(message, true);
+
+            verify(kafkaTemplate, never()).send(eq(KafkaTopics.DELIVERIES_DISPATCH), anyString(),
+                    argThat(published -> bufferedDeliveryId.equals(published.getDeliveryId())));
+        } finally {
+            httpServer.stop(0);
+        }
+    }
+
+    /**
      * A Kafka send failure while releasing the ordering buffer after a successful delivery
      * must not roll back the SUCCESS write — the DB commit already happened in its own
      * transaction before the Kafka call runs.
@@ -454,6 +584,7 @@ class WebhookDeliveryServiceTest {
             when(orderingBufferService.canDeliver(endpointId, 2L)).thenReturn(true);
             when(orderingBufferService.getReadyDeliveries(endpointId)).thenReturn(List.of(bufferedDeliveryId));
             when(deliveryRepository.findAllById(List.of(bufferedDeliveryId))).thenReturn(List.of(bufferedDelivery));
+            when(deliveryRepository.scheduleIfUnclaimed(eq(bufferedDeliveryId), any())).thenReturn(1);
             when(kafkaTemplate.send(anyString(), anyString(), any()))
                     .thenThrow(new RuntimeException("producer buffer exhausted"));
 
@@ -1013,6 +1144,53 @@ class WebhookDeliveryServiceTest {
     }
 
     /**
+     * The load harness's ordering scenario, in one test: sequence 6 has been waiting on
+     * sequence 5 for longer than the gap timeout, and 5 is a Delivery whose first Attempt
+     * failed and whose next one is a moment away.
+     *
+     * <p>The default Outgoing ladder's first rung and the default gap timeout are both a
+     * minute, so the two fall due together — and the gap timeout used to win, letting 6 out
+     * in front of the very Attempt it was waiting for. That is FIFO disengaging on the first
+     * ordinary retry, which is the common case, not the never-closing gap the timeout is for.
+     * A gap with an Attempt still coming is a gap that is about to close: 6 stays buffered.
+     */
+    @Test
+    void canDeliverWithOrdering_gapStillClosing_staysBufferedRatherThanTimingOut() {
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+
+        Instant firstBufferedAt = Instant.now().minusSeconds(90);
+        Delivery delivery = orderedDelivery(deliveryId, eventId, endpointId, 6L, firstBufferedAt);
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+        when(orderingBufferService.canDeliver(endpointId, 6L)).thenReturn(false);
+        when(orderingBufferService.getLastDeliveredSequence(endpointId)).thenReturn(4L);
+        when(deliveryRepository.findOldestPendingCreatedAt(endpointId, 5L, 5L))
+                .thenReturn(Instant.now().minusSeconds(95));
+        when(orderingBufferService.isGapTimedOut(firstBufferedAt)).thenReturn(true);
+        when(orderingBufferService.gapTimeout()).thenReturn(Duration.ofSeconds(60));
+        // Sequence 5 is between the rungs of its ladder, with its next Attempt due inside the
+        // window — the gap is closing, however long 6 has been waiting.
+        when(deliveryRepository.countGapClosingBefore(eq(endpointId), eq(5L), eq(5L), any(), any()))
+                .thenReturn(1L);
+
+        DeliveryMessage message = DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+        service.processDelivery(message, true);
+
+        verifyNoInteractions(endpointRepository); // nothing was sent
+        verify(orderingBufferService).bufferDelivery(endpointId, deliveryId, 6L);
+        assertEquals(0.0, meterRegistry.counter("webhook_ordering_gap_timeout_total").count(),
+                "a gap that is about to close has not timed out");
+
+        ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryRepository).save(captor.capture());
+        assertEquals(Delivery.DeliveryStatus.PENDING, captor.getValue().getStatus());
+    }
+
+    /**
      * webhook_ordering_gap_timeout_total used to be incremented in both
      * OrderingBufferService.isGapTimedOut and WebhookDeliveryService.canDeliverWithOrdering.
      * With OrderingBufferService fully mocked here (its own increment can't fire), a count of
@@ -1048,6 +1226,11 @@ class WebhookDeliveryServiceTest {
             when(deliveryRepository.findOldestPendingCreatedAt(endpointId, 6L, 9L))
                     .thenReturn(Instant.now().minusSeconds(200)); // still "pending" in DB, but we've waited long enough
             when(orderingBufferService.isGapTimedOut(firstBufferedAt)).thenReturn(true);
+            when(orderingBufferService.gapTimeout()).thenReturn(Duration.ofSeconds(60));
+            // Nothing in [6, 9] is in flight or due inside the window: the gap has stopped
+            // closing, which is the one case the timeout exists for.
+            when(deliveryRepository.countGapClosingBefore(eq(endpointId), eq(6L), eq(9L), any(), any()))
+                    .thenReturn(0L);
             when(orderingBufferService.getReadyDeliveries(endpointId)).thenReturn(List.of());
 
             DeliveryMessage message = DeliveryMessage.builder()

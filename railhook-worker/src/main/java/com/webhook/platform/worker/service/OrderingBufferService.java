@@ -276,6 +276,14 @@ public class OrderingBufferService {
     }
 
     /**
+     * How long a Delivery waits on a gap before it may be let through out of order. Declared
+     * once, here: the gate measures the blocking Delivery's next Attempt against the same window.
+     */
+    public Duration gapTimeout() {
+        return gapTimeout;
+    }
+
+    /**
      * Has a delivery blocked on a missing predecessor waited longer than the gap timeout?
      *
      * <p>Measured from when it was first buffered, not from ingest: measuring from ingest made

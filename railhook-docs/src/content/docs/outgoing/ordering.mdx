@@ -31,7 +31,9 @@ A delivery goes out only when everything ahead of it for that endpoint has succe
 
 ## When a gap never closes
 
-A delivery that never resolves would otherwise hold up every later delivery to that endpoint for good. So after the gap timeout the waiting delivery is let through, out of order, and the event is counted.
+A delivery that never resolves would otherwise hold up every later delivery to that endpoint for good. So once a waiting delivery has waited out the gap timeout *and* nothing in the gap is still moving, it is let through, out of order, and the event is counted.
+
+Both halves matter. A delivery between the rungs of its retry ladder is a gap that is about to close, so its successors keep waiting for it however long they have already waited — otherwise the first ordinary retry would break the order, since the first rung and the gap timeout are both a minute. What the timeout lets through is a gap with nothing in flight and nothing due: a delivery whose next attempt is a rung away, or one nothing is attempting at all.
 
 | Setting | Default |
 |---|---|

@@ -860,7 +860,7 @@
           "name": "ORDERING_GAP_TIMEOUT_SECONDS",
           "default": "60",
           "example": null,
-          "description": "Gap timeout in seconds (proceed without previous sequence after this time)"
+          "description": "How long an ordered Delivery waits on the sequences ahead of it before it may be let through\nout of order (seconds). Waiting it out is not enough on its own: the order is only broken once\nnothing in the gap is being attempted, or due to be attempted inside the same window, so an\nordinary retry ahead of it does not disengage ordering."
         },
         {
           "name": "ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS",
