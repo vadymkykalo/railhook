@@ -1991,6 +1991,19 @@
     "noSources": "Вхідних джерел поки немає",
     "noSourcesDesc": "Створіть перше вхідне джерело, щоб почати отримувати вебхуки від зовнішніх провайдерів",
     "provider": "Провайдер",
+    "providerNames": {
+      "GENERIC": "Інший (generic)",
+      "GITHUB": "GitHub",
+      "GITLAB": "GitLab",
+      "STRIPE": "Stripe",
+      "SHOPIFY": "Shopify",
+      "SLACK": "Slack",
+      "TWILIO": "Twilio",
+      "SQUARE": "Square",
+      "ADYEN": "Adyen",
+      "SENDGRID": "SendGrid",
+      "HUBSPOT": "HubSpot"
+    },
     "rateLimit": "Ліміт запитів",
     "rateLimitHint": "Запитів на секунду (залиште порожнім, щоб не обмежувати)",
     "security": {

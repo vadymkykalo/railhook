@@ -338,7 +338,8 @@ export interface McpGrantResponse {
 
 // ─── Incoming Webhooks ──────────────────────────────────────────────
 
-export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO';
+export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO'
+  | 'SQUARE' | 'ADYEN' | 'SENDGRID' | 'HUBSPOT';
 export type IncomingSourceStatus = 'ACTIVE' | 'DISABLED';
 export type VerificationMode = 'NONE' | 'HMAC_GENERIC' | 'PROVIDER';
 export type IncomingAuthType = 'NONE' | 'BEARER' | 'BASIC' | 'CUSTOM_HEADER';

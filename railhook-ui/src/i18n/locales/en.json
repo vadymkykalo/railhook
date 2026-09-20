@@ -1991,6 +1991,19 @@
     "noSources": "No incoming sources yet",
     "noSourcesDesc": "Create your first incoming source to start receiving webhooks from external providers",
     "provider": "Provider",
+    "providerNames": {
+      "GENERIC": "Generic",
+      "GITHUB": "GitHub",
+      "GITLAB": "GitLab",
+      "STRIPE": "Stripe",
+      "SHOPIFY": "Shopify",
+      "SLACK": "Slack",
+      "TWILIO": "Twilio",
+      "SQUARE": "Square",
+      "ADYEN": "Adyen",
+      "SENDGRID": "SendGrid",
+      "HUBSPOT": "HubSpot"
+    },
     "rateLimit": "Rate Limit",
     "rateLimitHint": "Requests per second (leave empty for unlimited)",
     "security": {

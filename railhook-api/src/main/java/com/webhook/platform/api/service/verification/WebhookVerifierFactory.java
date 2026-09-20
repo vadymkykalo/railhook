@@ -79,6 +79,16 @@ public class WebhookVerifierFactory {
             case SLACK -> new SlackVerifier();
             case SHOPIFY -> new ShopifyVerifier();
             case TWILIO -> new TwilioVerifier(ingressBaseUrl);
+            // Like Twilio, Square signs the URL it was configured with, so this one needs the
+            // ingress base too rather than whatever Host the request arrives claiming.
+            case SQUARE -> new SquareVerifier(ingressBaseUrl);
+            case ADYEN -> new AdyenVerifier();
+            // Not an HMAC at all: the stored value is SendGrid's public verification key, and
+            // nothing about holding it lets anyone forge a webhook.
+            case SENDGRID -> new SendGridVerifier();
+            // HubSpot v3 signs the method and the full URL as well as the body, so this one also
+            // needs the ingress base rather than the request's own idea of its host.
+            case HUBSPOT -> new HubSpotVerifier(ingressBaseUrl);
             case GENERIC -> null;
         };
     }
