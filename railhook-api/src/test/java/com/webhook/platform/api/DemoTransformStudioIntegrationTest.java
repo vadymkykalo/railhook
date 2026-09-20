@@ -196,7 +196,9 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
                         post("/api/v1/projects/" + project + "/endpoints")
                                 .header("Authorization", "Bearer " + owner)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"url\":\"https://receiver.example/hook\",\"description\":\"Mine\"}"))
+                                .content(// A host that resolves: endpoint creation validates the address, and a reserved
+                                // .example TLD makes this case fail for a reason that has nothing to do with it.
+                                "{\"url\":\"https://example.com/hook\",\"description\":\"Mine\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString())
                 .get("id").asText();
 
