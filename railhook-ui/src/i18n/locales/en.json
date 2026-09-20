@@ -3991,6 +3991,7 @@
       "stepError": "Error",
       "stepInput": "Input",
       "stepOutput": "Output",
+      "tapToAdd": "Tap to add",
       "testRun": "Test Run",
       "testRunHint": "Provide a JSON payload to manually trigger this workflow",
       "unsaved": "Unsaved"

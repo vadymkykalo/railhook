@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { EVENT_ID, PLATFORM_ORG_ID, PROJECT_ID, mockApi, mockNewOrganization } from './fixtures';
+import { EVENT_ID, PLATFORM_ORG_ID, PROJECT_ID, WORKFLOW_ID, mockApi, mockNewOrganization } from './fixtures';
 
 /**
  * Every page fits its screen.
@@ -20,6 +20,7 @@ const ADMIN = [
   `/admin/projects/${PROJECT_ID}/events/${EVENT_ID}`,
   `/admin/projects/${PROJECT_ID}/api-keys`,
   `/admin/projects/${PROJECT_ID}/incoming-sources`,
+  `/admin/projects/${PROJECT_ID}/workflows/${WORKFLOW_ID}`,
   '/admin/members',
   '/admin/settings',
   '/admin/billing',
@@ -208,6 +209,67 @@ test.describe('dashboard pages fit the screen', () => {
         expect(checkboxCells, 'selection cells are a 40px target').toEqual([]);
       });
     }
+  });
+
+  /**
+   * Seen on a phone: the meta line ran straight through the back arrow, History / Test Run /
+   * Enabled / Save ran off the right edge, and a 192px palette column left the canvas a sliver.
+   * The palette was drag-only too, and a touch screen fires no dragstart — so on a phone nothing
+   * could be added to a workflow at all.
+   */
+  test.describe('the workflow builder on a phone', () => {
+    const BUILDER = `/admin/projects/${PROJECT_ID}/workflows/${WORKFLOW_ID}`;
+
+    test.beforeEach(async ({ page, isMobile }) => {
+      test.skip(!isMobile, 'phone-only checks');
+      await mockApi(page, { signedIn: true });
+      await page.goto(BUILDER);
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(600);
+    });
+
+    test('keeps Save on screen and leaves the canvas most of it', async ({ page }) => {
+      const { width: vw, height: vh } = page.viewportSize()!;
+
+      const save = page.getByRole('button', { name: /^save$/i });
+      await expect(save).toBeVisible();
+      const saveBox = (await save.boundingBox())!;
+      expect(saveBox.x + saveBox.width, 'Save sits inside the screen').toBeLessThanOrEqual(vw + 1);
+
+      // The palette is a strip above the canvas, not a column beside it.
+      const canvasBox = (await page.locator('.react-flow').boundingBox())!;
+      expect(Math.round(canvasBox.width), 'the canvas has the full width').toBe(vw);
+      expect(canvasBox.height, 'the canvas has most of the height').toBeGreaterThan(vh * 0.5);
+    });
+
+    test('adds a node when a palette entry is tapped', async ({ page }) => {
+      await expect(page.getByText(/6 nodes/)).toBeVisible();
+
+      await page.getByRole('button', { name: /delay/i }).tap();
+
+      await expect(page.getByText(/7 nodes/)).toBeVisible();
+    });
+
+    test('opens the workflow with every node inside the canvas', async ({ page }) => {
+      // The definition loads after the canvas mounts, so the nodes used to land wherever the
+      // default viewport happened to be — for a wide workflow, off the side of a phone.
+      const outside = await page.evaluate(() => {
+        const pane = document.querySelector('.react-flow')!.getBoundingClientRect();
+        return Array.from(document.querySelectorAll<HTMLElement>('.react-flow__node'))
+          .map((node) => node.getBoundingClientRect())
+          .filter((box) => box.left < pane.left - 1 || box.right > pane.right + 1
+            || box.top < pane.top - 1 || box.bottom > pane.bottom + 1)
+          .length;
+      });
+      expect(outside, 'every node of the loaded workflow is in view').toBe(0);
+    });
+
+    test('opens with nothing to save', async ({ page }) => {
+      // The canvas reports its own measurements as changes; counting them lit "Unsaved" and
+      // armed Save on a workflow nobody had touched.
+      await expect(page.getByRole('button', { name: /^save$/i })).toBeDisabled();
+      await expect(page.getByText(/unsaved/i)).toHaveCount(0);
+    });
   });
 
   test('the navigation opens as a drawer on a phone and fits it', async ({ page, isMobile }) => {

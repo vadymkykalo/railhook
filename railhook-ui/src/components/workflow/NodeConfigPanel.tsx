@@ -52,8 +52,10 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
   };
 
   return (
-    <div className="flex h-full w-80 flex-col overflow-y-auto border-l border-rail bg-card">
-      <div className="flex items-center justify-between border-b border-rail px-4 py-3">
+    // A 320px column beside a 375px canvas is the whole screen, so on a phone the panel comes up
+    // over the canvas as a sheet instead of taking the space the canvas needs.
+    <div className="fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col overflow-y-auto rounded-t-lg border-t border-rail bg-card shadow-elevated lg:static lg:h-full lg:max-h-none lg:w-80 lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-rail bg-card px-4 py-3">
         <h3 className="mono-label">{t('workflows.builder.configureNode')}</h3>
         <Button variant="ghost" size="icon-sm" onClick={onClose} title={t('common.close')} aria-label={t('common.close')}>
           <X className="h-4 w-4" />

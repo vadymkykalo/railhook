@@ -7,6 +7,7 @@ import type { Page, Route } from '@playwright/test';
  */
 export const PROJECT_ID = '00000000-0000-4000-8000-000000000001';
 export const EVENT_ID = '00000000-0000-4000-8000-000000000002';
+export const WORKFLOW_ID = '00000000-0000-4000-8000-000000000003';
 
 const USER = {
   user: {
@@ -70,6 +71,43 @@ const DELIVERIES = EVENTS.map((event, i) => ({
   createdAt: event.createdAt,
 }));
 
+/**
+ * A workflow wide enough that its canvas has to be fitted into the screen rather than shown at
+ * 1:1 — six nodes laid out left to right is what the builder looks like once somebody uses it.
+ */
+const WORKFLOW = {
+  id: WORKFLOW_ID,
+  projectId: PROJECT_ID,
+  name: 'Refund routing for EU orders and marketplace sellers',
+  description: 'Filter, reshape and fan out to the warehouse',
+  enabled: false,
+  definition: {
+    nodes: [
+      { id: 'n1', type: 'webhookTrigger', position: { x: 40, y: 160 }, data: { eventTypePattern: 'order.*' } },
+      { id: 'n2', type: 'filter', position: { x: 300, y: 160 }, data: { conditions: null } },
+      { id: 'n3', type: 'transform', position: { x: 560, y: 60 }, data: { template: '{}' } },
+      { id: 'n4', type: 'delay', position: { x: 560, y: 280 }, data: { delaySeconds: 5 } },
+      { id: 'n5', type: 'http', position: { x: 820, y: 60 }, data: { url: 'https://example.com/hook', method: 'POST', headers: {}, timeout: 30 } },
+      { id: 'n6', type: 'slack', position: { x: 820, y: 280 }, data: { webhookUrl: '', message: 'Refund routed', channel: '#ops' } },
+    ],
+    edges: [
+      { id: 'e1', source: 'n1', target: 'n2' },
+      { id: 'e2', source: 'n2', target: 'n3' },
+      { id: 'e3', source: 'n2', target: 'n4' },
+      { id: 'e4', source: 'n3', target: 'n5' },
+      { id: 'e5', source: 'n4', target: 'n6' },
+    ],
+  },
+  triggerType: 'WEBHOOK_EVENT',
+  triggerConfig: { eventTypePattern: 'order.*' },
+  version: 1,
+  createdAt: at(60 * 24),
+  updatedAt: at(30),
+  totalExecutions: 12,
+  successfulExecutions: 11,
+  failedExecutions: 1,
+};
+
 /** The platform admin panel, with the lengths a real deployment has: long names, long addresses. */
 const PLATFORM_ORGS = Array.from({ length: 6 }, (_, i) => ({
   id: i === 0 ? PLATFORM_ORG_ID : `00000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`,
@@ -111,6 +149,9 @@ function body(url: URL): unknown {
   if (p.endsWith('/endpoints')) return page0(ENDPOINTS);
   if (p.endsWith('/events')) return page0(EVENTS);
   if (p.endsWith('/deliveries') || p.endsWith(`/deliveries/projects/${PROJECT_ID}`)) return page0(DELIVERIES);
+  if (p.endsWith(`/workflows/${WORKFLOW_ID}`)) return WORKFLOW;
+  if (p.endsWith(`/workflows/${WORKFLOW_ID}/executions`)) return page0();
+  if (p.endsWith('/workflows')) return [WORKFLOW];
   if (p.endsWith('/auth/refresh')) return { accessToken: 'e2e-token', tokenType: 'Bearer', expiresIn: 3600 };
   if (p.endsWith('/auth/me')) return USER;
   if (p.endsWith('/auth/providers')) return { google: false };
