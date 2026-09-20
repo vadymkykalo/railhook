@@ -333,10 +333,15 @@ public class TransformationService {
                 .createdBy(actorUserId)
                 .build());
 
-        List<TransformationVersion> history =
-                transformationVersionRepository.findByTransformationIdOrderByVersionDesc(transformation.getId());
-        if (history.size() > versionHistoryLimit) {
-            List<TransformationVersion> expired = history.subList(versionHistoryLimit, history.size());
+        List<Integer> published =
+                transformationVersionRepository.findVersionNumbersDesc(transformation.getId());
+        if (published.size() > versionHistoryLimit) {
+            // The oldest version still kept. Expressed as a cut rather than as "drop the last
+            // one", because a cap lowered in configuration has to bring the history down to the
+            // new number on the next publish rather than one row per edit forever.
+            Integer oldestKept = published.get(versionHistoryLimit - 1);
+            List<TransformationVersion> expired = transformationVersionRepository
+                    .findByTransformationIdAndVersionLessThan(transformation.getId(), oldestKept);
             transformationVersionRepository.deleteAll(expired);
             log.debug("Trimmed {} expired version(s) from transformation {}", expired.size(), transformation.getId());
         }
