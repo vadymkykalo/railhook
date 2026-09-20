@@ -1,16 +1,23 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import {
-  Play, Copy, RotateCcw, Download, Zap, Send, Globe, Shield, Wand2, X,
+  Play, Copy, RotateCcw, Download, Zap, Send, Globe, Shield, Wand2, X, Save,
+  FileJson, FileOutput, GitCompare, Terminal, Code2, Ban, CheckCircle2,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { formatJson } from '../lib/json';
-import { useTransformPreview, useTransformations, useEvents, useEndpoints, useDeliveryDryRun } from '../api/queries';
+import {
+  useTransformPreview, useTransformations, useEvents, useEndpoints, useDeliveryDryRun,
+  useCreateTransformation, useUpdateTransformation,
+} from '../api/queries';
 import PageHeader from '../components/PageHeader';
 import { SkeletonRows } from '../components/PageSkeleton';
-import EmptyState, { ErrorState } from '../components/EmptyState';
+import { ErrorState } from '../components/EmptyState';
 import JsonEditor from '../components/JsonEditor';
+import ScriptEditor from '../components/editor/ScriptEditor';
+import DiffView from '../components/DiffView';
+import { Tabs, TabPanel } from '../components/ui/tabs';
 import {
   Workbench, WorkbenchPanel, RunControl, ResultFrame, ResultMetric,
   ResultPlaceholder, OutputBlock, ModeSwitch,
@@ -20,22 +27,79 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
-import type { DeliveryDryRunResponse } from '../api/transform.api';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '../components/ui/dialog';
+import type { DeliveryDryRunResponse, TransformPreviewResponse } from '../api/transform.api';
+import type { TransformationKind, TransformationResponse } from '../types/api.types';
+
+/**
+ * The Transform Studio.
+ *
+ * One loop, and it has to close without leaving the page: edit a script, run it
+ * against a real recent event, read the Output, the Diff and the Console side by
+ * side, and save it back into the transformation. Every part of that used to be
+ * somewhere else — the editor was a JSON box, there was no console because there
+ * was nothing to log, and saving meant going to a different page and pasting.
+ *
+ * What runs here is the engine the worker runs. The preview endpoint and the
+ * delivery dry-run both go through `JavaScriptTransformEngine` in
+ * `railhook-common`, under the same sandbox and the same limits, so a script
+ * that works here is a script that works on a real Delivery. That is the only
+ * reason a preview is worth anything.
+ */
 
 const SAMPLE_PAYLOAD = JSON.stringify({
-  event: 'order.completed',
-  data: {
-    orderId: 'ord_12345',
-    customer: { name: 'Jane Doe', email: 'jane@example.com' },
-    items: [
-      { sku: 'SKU-001', name: 'Widget', qty: 2, price: 19.99 },
-      { sku: 'SKU-002', name: 'Gadget', qty: 1, price: 49.99 },
-    ],
-    total: 89.97,
-    currency: 'USD',
-  },
-  metadata: { source: 'checkout-v2', region: 'us-east-1' },
+  id: 'ord_9001',
+  placed_at: '2026-09-20T14:05:09.123Z',
+  items: [
+    { sku: 'WIDGET', qty: 2, price: 19.99 },
+    { sku: 'GADGET', qty: 1, price: 61.5 },
+  ],
 }, null, 2);
+
+/**
+ * What a new script starts as: the three things the template language cannot do,
+ * in the order the documentation explains them. An empty editor is a worse
+ * starting point than a working example you delete.
+ */
+const STARTER_SCRIPT = `function handler(webhook) {
+  // Reshape an array — a template cannot loop.
+  var lines = webhook.payload.items.map(function (item) {
+    return { sku: item.sku, total: money(item.qty * item.price) };
+  });
+
+  var out = {
+    order: webhook.payload.id,
+    lines: lines,
+    value: money(lines.reduce(function (sum, line) { return sum + line.total; }, 0))
+  };
+
+  // Add a field conditionally — a template cannot branch.
+  if (out.value >= 100) {
+    out.review = 'manual';
+  }
+
+  // Format a date — a template cannot compute.
+  out.day = new Date(webhook.payload.placed_at).toISOString().slice(0, 10);
+
+  console.log('lines', lines.length, 'value', out.value);
+
+  return { payload: out, headers: { 'X-Order-Value': out.value.toFixed(2) } };
+}
+
+function money(amount) {
+  return Math.round(amount * 100) / 100;
+}
+`;
+
+const STARTER_TEMPLATE = `{
+  "order": "\${$.id}",
+  "placed_at": "\${$.placed_at}"
+}`;
+
+type StudioMode = 'preview' | 'dryRun';
+type StudioTab = 'input' | 'output' | 'diff' | 'console';
 
 const HINT_EXPRESSIONS = [
   { expr: '$.data', descKey: 'transform.hints.extractData' },
@@ -44,8 +108,6 @@ const HINT_EXPRESSIONS = [
   { expr: '$.metadata', descKey: 'transform.hints.extractMetadata' },
   { expr: '$', descKey: 'transform.hints.passThrough' },
 ];
-
-type StudioMode = 'preview' | 'dryRun';
 
 /** Two JSON documents are "the same" when they parse to the same value. */
 function isUnchanged(input: string, output: string): boolean {
@@ -59,25 +121,30 @@ function isUnchanged(input: string, output: string): boolean {
 export default function TransformStudioPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [mode, setMode] = useState<StudioMode>('preview');
+  const [tab, setTab] = useState<StudioTab>('input');
+  const [kind, setKind] = useState<TransformationKind>('JAVASCRIPT');
+  const [source, setSource] = useState(STARTER_SCRIPT);
   const [inputPayload, setInputPayload] = useState(SAMPLE_PAYLOAD);
-  const [transformExpr, setTransformExpr] = useState('');
   const [customHeaders, setCustomHeaders] = useState('');
-  const [outputPayload, setOutputPayload] = useState<string | null>(null);
-  const [outputHeaders, setOutputHeaders] = useState<string | null>(null);
-  const [errors, setErrors] = useState<string[]>([]);
-  const [ran, setRan] = useState(false);
   const [selectedTransformationId, setSelectedTransformationId] = useState('');
+  const [savedSource, setSavedSource] = useState<string | null>(null);
   const [showEventPicker, setShowEventPicker] = useState(false);
   const [eventSearch, setEventSearch] = useState('');
   const [eventPageSize, setEventPageSize] = useState(10);
   const [dryRunEndpointId, setDryRunEndpointId] = useState('');
-  const [dryRunEventType, setDryRunEventType] = useState('order.completed');
+  const [eventType, setEventType] = useState('order.completed');
+  const [preview, setPreview] = useState<TransformPreviewResponse | null>(null);
   const [dryRunResult, setDryRunResult] = useState<DeliveryDryRunResponse | null>(null);
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [saveAsName, setSaveAsName] = useState('');
 
-  const preview = useTransformPreview(projectId!);
-  const dryRun = useDeliveryDryRun(projectId!);
+  const previewMutation = useTransformPreview(projectId!);
+  const dryRunMutation = useDeliveryDryRun(projectId!);
+  const createTransformation = useCreateTransformation(projectId!);
+  const updateTransformation = useUpdateTransformation(projectId!);
   const { data: transformations = [] } = useTransformations(projectId!);
   const { data: endpoints = [] } = useEndpoints(projectId);
   const {
@@ -87,43 +154,154 @@ export default function TransformStudioPage() {
   const recentEvents = recentEventsData?.content ?? [];
   const hasMoreEvents = recentEventsData ? !recentEventsData.last : false;
 
-  const isJsonTemplate = () => transformExpr.trim().startsWith('{') || transformExpr.trim().startsWith('[');
+  const selected: TransformationResponse | undefined =
+    transformations.find((item) => item.id === selectedTransformationId);
 
-  const handleRun = async () => {
-    setErrors([]);
-    setOutputPayload(null);
-    setOutputHeaders(null);
-    try {
-      const result = await preview.mutateAsync({
-        inputPayload,
-        customHeaders: customHeaders || undefined,
-        transformationId: selectedTransformationId || undefined,
-        template: !selectedTransformationId && isJsonTemplate() ? transformExpr : undefined,
-        transformExpression: !selectedTransformationId && !isJsonTemplate() && transformExpr ? transformExpr : undefined,
-      });
-      setOutputPayload(result.outputPayload);
-      setOutputHeaders(result.outputHeaders);
-      setErrors(result.errors);
-      setRan(true);
-    } catch (err: any) {
-      showApiError(err, 'transform.previewFailed');
+  const loadTransformation = useCallback((transformation: TransformationResponse) => {
+    setSelectedTransformationId(transformation.id);
+    setKind(transformation.kind ?? 'TEMPLATE');
+    const text = transformation.kind === 'JAVASCRIPT'
+      ? transformation.template
+      : formatJson(transformation.template);
+    setSource(text);
+    setSavedSource(text);
+    setPreview(null);
+    setDryRunResult(null);
+  }, []);
+
+  // `?transformation=<id>` is how the Transformations page hands one over, so
+  // "edit this script" lands in the editor with the script already in it.
+  const appliedFromUrl = useRef<string | null>(null);
+  useEffect(() => {
+    const wanted = searchParams.get('transformation');
+    if (!wanted || wanted === appliedFromUrl.current) return;
+    const match = transformations.find((item) => item.id === wanted);
+    if (match) {
+      appliedFromUrl.current = wanted;
+      loadTransformation(match);
+    }
+  }, [searchParams, transformations, loadTransformation]);
+
+  const dirty = savedSource !== null && savedSource !== source;
+  const canSave = source.trim().length > 0;
+
+  const handleSelectTransformation = (id: string) => {
+    if (!id) {
+      setSelectedTransformationId('');
+      setSavedSource(null);
+      appliedFromUrl.current = null;
+      const next = new URLSearchParams(searchParams);
+      next.delete('transformation');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+    const match = transformations.find((item) => item.id === id);
+    if (match) {
+      loadTransformation(match);
+      const next = new URLSearchParams(searchParams);
+      next.set('transformation', id);
+      setSearchParams(next, { replace: true });
     }
   };
 
-  const handleDryRun = async () => {
+  const handleSwitchKind = (next: TransformationKind) => {
+    if (next === kind) return;
+    setKind(next);
+    // Only when the editor still holds the starter for the other language: a
+    // switch must never silently eat something somebody wrote.
+    if (source.trim() === '' || source === STARTER_SCRIPT || source === STARTER_TEMPLATE) {
+      setSource(next === 'JAVASCRIPT' ? STARTER_SCRIPT : STARTER_TEMPLATE);
+    }
+    setPreview(null);
+    setDryRunResult(null);
+  };
+
+  const handleRun = useCallback(async () => {
     setDryRunResult(null);
     try {
-      const result = await dryRun.mutateAsync({
-        payload: inputPayload,
+      const result = await previewMutation.mutateAsync({
+        inputPayload,
+        kind,
+        template: selectedTransformationId ? undefined : source,
         transformationId: selectedTransformationId || undefined,
-        payloadTemplate: !selectedTransformationId && isJsonTemplate() ? transformExpr : undefined,
+        customHeaders: customHeaders || undefined,
+        eventType,
+        url: endpoints.find((endpoint) => endpoint.id === dryRunEndpointId)?.url,
+      });
+      setPreview(result);
+      setTab(result.success ? 'output' : 'console');
+    } catch (err) {
+      showApiError(err, 'transform.previewFailed');
+    }
+  }, [previewMutation, inputPayload, kind, selectedTransformationId, source,
+    customHeaders, eventType, endpoints, dryRunEndpointId]);
+
+  const handleDryRun = useCallback(async () => {
+    setPreview(null);
+    try {
+      const result = await dryRunMutation.mutateAsync({
+        payload: inputPayload,
+        kind,
+        payloadTemplate: selectedTransformationId ? undefined : source,
+        transformationId: selectedTransformationId || undefined,
         customHeaders: customHeaders || undefined,
         endpointId: dryRunEndpointId || undefined,
-        eventType: dryRunEventType || undefined,
+        eventType: eventType || undefined,
       });
       setDryRunResult(result);
-    } catch (err: any) {
+      setTab(result.success ? 'output' : 'console');
+    } catch (err) {
       showApiError(err, 'transform.dryRunFailed');
+    }
+  }, [dryRunMutation, inputPayload, kind, selectedTransformationId, source,
+    customHeaders, dryRunEndpointId, eventType]);
+
+  const run = mode === 'preview' ? handleRun : handleDryRun;
+  const running = previewMutation.isPending || dryRunMutation.isPending;
+
+  const handleSave = useCallback(async () => {
+    if (!canSave) return;
+    if (!selected) {
+      setSaveAsName('');
+      setSaveAsOpen(true);
+      return;
+    }
+    try {
+      await updateTransformation.mutateAsync({
+        id: selected.id,
+        data: {
+          name: selected.name,
+          description: selected.description,
+          template: source,
+          kind,
+          enabled: selected.enabled,
+        },
+      });
+      setSavedSource(source);
+      showSuccess(t('transform.saved'));
+    } catch (err) {
+      showApiError(err, 'transform.saveFailed');
+    }
+  }, [canSave, selected, updateTransformation, source, kind, t]);
+
+  const handleSaveAs = async () => {
+    if (!saveAsName.trim()) return;
+    try {
+      const created = await createTransformation.mutateAsync({
+        name: saveAsName.trim(),
+        template: source,
+        kind,
+        enabled: true,
+      });
+      setSaveAsOpen(false);
+      setSelectedTransformationId(created.id);
+      setSavedSource(source);
+      const next = new URLSearchParams(searchParams);
+      next.set('transformation', created.id);
+      setSearchParams(next, { replace: true });
+      showSuccess(t('transform.saved'));
+    } catch (err) {
+      showApiError(err, 'transform.saveFailed');
     }
   };
 
@@ -132,58 +310,307 @@ export default function TransformStudioPage() {
     showSuccess(t('common.copied'));
   };
 
-  const handleReset = () => {
-    setInputPayload(SAMPLE_PAYLOAD);
-    setTransformExpr('');
-    setCustomHeaders('');
-    setOutputPayload(null);
-    setOutputHeaders(null);
-    setErrors([]);
-    setRan(false);
-    setDryRunResult(null);
-    setSelectedTransformationId('');
-  };
-
-  const handleLoadEvent = (payload: string) => {
+  const handleLoadEvent = (payload: string, type?: string) => {
     setInputPayload(formatJson(payload));
+    if (type) setEventType(type);
     setShowEventPicker(false);
+    setTab('input');
   };
 
-  const input = (
-    <div className="space-y-4">
-      <ModeSwitch<StudioMode>
-        value={mode}
-        onChange={setMode}
-        ariaLabel={t('transform.modeLabel')}
-        options={[
-          { value: 'preview', label: t('transform.modePreview'), icon: Wand2 },
-          { value: 'dryRun', label: t('transform.modeDryRun'), icon: Zap },
-        ]}
-      />
+  // ── what the last run said ──────────────────────────────────────────────
+  const outputPayload = mode === 'preview'
+    ? preview?.outputPayload ?? null
+    : dryRunResult?.transformedPayload ?? null;
+  const consoleLines = (mode === 'preview' ? preview?.console : dryRunResult?.console) ?? [];
+  const errors = (mode === 'preview' ? preview?.errors : dryRunResult?.errors) ?? [];
+  const cancelled = (mode === 'preview' ? preview?.cancelled : dryRunResult?.cancelled) ?? false;
+  const cancelReason = (mode === 'preview' ? preview?.cancelReason : dryRunResult?.cancelReason) ?? null;
+  const durationMs = (mode === 'preview' ? preview?.durationMs : dryRunResult?.durationMs) ?? 0;
+  const errorLine = preview?.errorLine ?? null;
+  const hasRun = preview !== null || dryRunResult !== null;
 
+  const outputHeaders = useMemo(() => {
+    if (mode === 'dryRun') return dryRunResult?.requestHeaders ?? null;
+    if (!preview?.outputHeaders) return null;
+    try {
+      return JSON.parse(preview.outputHeaders) as Record<string, string>;
+    } catch {
+      return null;
+    }
+  }, [mode, preview, dryRunResult]);
+
+  const verdict: { kind: StatusKind; label: string } = useMemo(() => {
+    if (!hasRun) return { kind: 'idle', label: t('transform.verdictNotRun') };
+    if (errors.length > 0) return { kind: 'halt', label: t('transform.verdictErrors') };
+    if (cancelled) return { kind: 'idle', label: t('transform.verdictCancelled') };
+    if (mode === 'dryRun') return { kind: 'ok', label: t('transform.verdictSimulated') };
+    if (outputPayload && isUnchanged(inputPayload, outputPayload)) {
+      return { kind: 'idle', label: t('transform.verdictUnchanged') };
+    }
+    return { kind: 'ok', label: t('transform.verdictChanged') };
+  }, [hasRun, errors.length, cancelled, mode, outputPayload, inputPayload, t]);
+
+  const isScript = kind === 'JAVASCRIPT';
+
+  // ── left column: the script ─────────────────────────────────────────────
+  const editorColumn = (
+    <div className="space-y-4">
       <WorkbenchPanel
-        eyebrow={t('transform.inputEyebrow')}
-        title={t('transform.inputPayload')}
+        eyebrow={t('transform.transformEyebrow')}
+        title={isScript ? t('transform.scriptTitle') : t('transform.templateTitle')}
         actions={
           <>
-            <Button variant="ghost" size="sm" onClick={() => setShowEventPicker(!showEventPicker)}>
-              <Download className="h-3.5 w-3.5" /> {t('transform.loadEvent')}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setInputPayload(formatJson(inputPayload))}>
-              {t('transform.format')}
-            </Button>
-            <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(inputPayload)} title={t('common.copy')} aria-label={t('common.copy')}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => handleCopy(source)}
+              title={t('common.copy')}
+              aria-label={t('common.copy')}
+            >
               <Copy className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setSource(isScript ? STARTER_SCRIPT : STARTER_TEMPLATE)}
+              title={t('transform.reset')}
+              aria-label={t('transform.reset')}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
             </Button>
           </>
         }
-        bodyClassName="space-y-3"
+        bodyClassName="space-y-3 p-4"
       >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="mono-label">{t('transform.savedTransformation')}</Label>
+            <Select
+              value={selectedTransformationId}
+              onChange={(e) => handleSelectTransformation(e.target.value)}
+              aria-label={t('transform.savedTransformation')}
+            >
+              <option value="">{t('transform.noSavedTransformation')}</option>
+              {transformations.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} · {item.kind === 'JAVASCRIPT' ? 'JS' : t('transform.kindTemplateShort')}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="mono-label">{t('transform.kindLabel')}</Label>
+            <ModeSwitch<TransformationKind>
+              value={kind}
+              onChange={handleSwitchKind}
+              ariaLabel={t('transform.kindLabel')}
+              options={[
+                { value: 'JAVASCRIPT', label: t('transform.kindJavascript'), icon: Code2 },
+                { value: 'TEMPLATE', label: t('transform.kindTemplate'), icon: Wand2 },
+              ]}
+            />
+          </div>
+        </div>
+
+        {isScript ? (
+          <ScriptEditor
+            value={source}
+            onChange={setSource}
+            onRun={run}
+            onSave={handleSave}
+            minHeight="340px"
+            maxHeight="min(56vh, 620px)"
+            errorLine={errorLine}
+            errorMessage={errors[0] ?? null}
+            aria-label={t('transform.scriptTitle')}
+          />
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-1.5">
+              {HINT_EXPRESSIONS.map((hint) => (
+                <button
+                  key={hint.expr}
+                  type="button"
+                  onClick={() => setSource(hint.expr)}
+                  title={t(hint.descKey)}
+                  className="rounded-md border border-rail bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {hint.expr}
+                </button>
+              ))}
+            </div>
+            <JsonEditor
+              value={source}
+              onChange={setSource}
+              minHeight="260px"
+              maxHeight="min(48vh, 520px)"
+              aria-label={t('transform.templateTitle')}
+            />
+          </>
+        )}
+
+        {isScript && (
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {t('transform.contractHint')}
+          </p>
+        )}
+      </WorkbenchPanel>
+
+      <WorkbenchPanel eyebrow={t('transform.runEyebrow')} title={t('transform.runAgainst')} bodyClassName="space-y-3 p-4">
+        <ModeSwitch<StudioMode>
+          value={mode}
+          onChange={(next) => { setMode(next); setPreview(null); setDryRunResult(null); }}
+          ariaLabel={t('transform.modeLabel')}
+          options={[
+            { value: 'preview', label: t('transform.modePreview'), icon: Wand2 },
+            { value: 'dryRun', label: t('transform.modeDryRun'), icon: Zap },
+          ]}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="mono-label">{t('transform.dryRunEndpoint')}</Label>
+            <Select
+              value={dryRunEndpointId}
+              onChange={(e) => setDryRunEndpointId(e.target.value)}
+              aria-label={t('transform.dryRunEndpoint')}
+            >
+              <option value="">{t('transform.dryRunNoEndpoint')}</option>
+              {endpoints.map((endpoint) => (
+                <option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="mono-label">{t('transform.dryRunEventType')}</Label>
+            <Input
+              className="h-9 font-mono text-xs"
+              value={eventType}
+              onChange={(e) => setEventType(e.target.value)}
+              aria-label={t('transform.dryRunEventType')}
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="mono-label">{t('transform.customHeaders')}</Label>
+          <Input
+            className="h-9 font-mono text-xs"
+            placeholder='{"X-Custom": "value"}'
+            value={customHeaders}
+            onChange={(e) => setCustomHeaders(e.target.value)}
+            aria-label={t('transform.customHeaders')}
+          />
+        </div>
+      </WorkbenchPanel>
+
+      <RunControl
+        label={mode === 'preview' ? t('transform.run') : t('transform.dryRunBtn')}
+        runningLabel={mode === 'preview' ? t('transform.running') : t('transform.dryRunRunning')}
+        running={running}
+        onClick={run}
+        icon={mode === 'preview' ? Play : Send}
+        hint={t('transform.runShortcutHint')}
+        secondary={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSave}
+            disabled={!canSave || updateTransformation.isPending || createTransformation.isPending}
+          >
+            <Save className="h-3.5 w-3.5" />
+            {selected ? t('transform.save') : t('transform.saveAs')}
+            {dirty && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />}
+          </Button>
+        }
+      />
+    </div>
+  );
+
+  // ── right column: four views of one run ─────────────────────────────────
+  const resultColumn = (
+    <ResultFrame
+      kind={verdict.kind}
+      statusLabel={verdict.label}
+      title={mode === 'preview' ? t('transform.resultTitle') : t('transform.dryRunResult')}
+      metrics={
+        <>
+          <ResultMetric
+            label={t('transform.metricDuration')}
+            value={hasRun ? durationMs : '—'}
+            unit={hasRun ? 'ms' : undefined}
+          />
+          <ResultMetric
+            label={t('transform.metricOutputSize')}
+            value={outputPayload ? new Blob([outputPayload]).size : '—'}
+            unit={outputPayload ? 'B' : undefined}
+          />
+          <ResultMetric
+            label={t('transform.metricConsole')}
+            value={hasRun ? consoleLines.length : '—'}
+          />
+        </>
+      }
+      actions={
+        outputPayload ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => handleCopy(outputPayload)}
+            title={t('common.copy')}
+            aria-label={t('common.copy')}
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </Button>
+        ) : undefined
+      }
+    >
+      <Tabs<StudioTab>
+        value={tab}
+        onChange={setTab}
+        ariaLabel={t('transform.tabsLabel')}
+        tabs={[
+          { value: 'input', label: t('transform.tabInput'), icon: FileJson },
+          { value: 'output', label: t('transform.tabOutput'), icon: FileOutput },
+          { value: 'diff', label: t('transform.tabDiff'), icon: GitCompare },
+          {
+            value: 'console',
+            label: t('transform.tabConsole'),
+            icon: Terminal,
+            badge: errors.length > 0 ? errors.length : (consoleLines.length || undefined),
+            badgeAlarming: errors.length > 0,
+          },
+        ]}
+      />
+
+      <TabPanel value="input" active={tab} className="space-y-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Button variant="ghost" size="sm" onClick={() => setShowEventPicker(!showEventPicker)}>
+            <Download className="h-3.5 w-3.5" /> {t('transform.loadEvent')}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setInputPayload(formatJson(inputPayload))}>
+            {t('transform.format')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => handleCopy(inputPayload)}
+            title={t('common.copy')}
+            aria-label={t('common.copy')}
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
         {showEventPicker && (
           <div className="space-y-2 rounded-lg border border-rail bg-muted/30 p-3">
             <div className="flex items-center justify-between">
               <p className="mono-label">{t('transform.recentEvents')}</p>
-              <Button variant="ghost" size="icon-sm" onClick={() => setShowEventPicker(false)} title={t('common.close')} aria-label={t('common.close')}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setShowEventPicker(false)}
+                title={t('common.close')}
+                aria-label={t('common.close')}
+              >
                 <X className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -192,44 +619,36 @@ export default function TransformStudioPage() {
               placeholder={t('transform.searchEvents')}
               value={eventSearch}
               onChange={(e) => { setEventSearch(e.target.value); setEventPageSize(10); }}
+              aria-label={t('transform.searchEvents')}
             />
             {eventsLoading ? (
               <SkeletonRows count={3} height="h-11" />
             ) : eventsFailed ? (
-              <ErrorState
-                error={eventsError}
-                onRetry={() => refetchEvents()}
-                retrying={eventsRefetching}
-                className="flex flex-col items-center justify-center py-6"
-              />
+              <ErrorState error={eventsError} onRetry={refetchEvents} retrying={eventsRefetching} />
             ) : recentEvents.length === 0 ? (
-              <EmptyState
-                icon={Send}
-                title={t('transform.noEvents')}
-                className="flex flex-col items-center justify-center py-6"
-              />
+              <p className="py-3 text-center text-xs text-muted-foreground">{t('transform.noEvents')}</p>
             ) : (
-              <div className="max-h-[220px] space-y-1 overflow-y-auto">
-                {recentEvents.map((evt) => (
+              <div className="max-h-56 space-y-1 overflow-auto">
+                {recentEvents.map((event) => (
                   <button
-                    key={evt.id}
+                    key={event.id}
                     type="button"
-                    className="w-full rounded-md border border-transparent px-2.5 py-2 text-left text-xs transition-colors hover:border-rail hover:bg-secondary"
-                    onClick={() => handleLoadEvent(evt.payload)}
+                    onClick={() => handleLoadEvent(event.payload, event.eventType)}
+                    className="flex w-full items-center justify-between gap-2 rounded-md border border-rail bg-card px-2.5 py-2 text-left transition-colors hover:border-primary/40"
                   >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="truncate font-mono font-medium">{evt.eventType}</span>
-                      <span className="flex-shrink-0 font-mono text-[10px] text-muted-foreground">
-                        {new Date(evt.createdAt).toLocaleString()}
-                      </span>
-                    </span>
-                    <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">
-                      {evt.payload?.substring(0, 100)}
+                    <span className="truncate font-mono text-[11px]">{event.eventType}</span>
+                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                      {new Date(event.createdAt).toLocaleString()}
                     </span>
                   </button>
                 ))}
                 {hasMoreEvents && (
-                  <Button variant="ghost" size="sm" className="w-full" onClick={() => setEventPageSize((s) => s + 10)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setEventPageSize((size) => size + 10)}
+                  >
                     {t('transform.loadMore')}
                   </Button>
                 )}
@@ -241,338 +660,179 @@ export default function TransformStudioPage() {
         <JsonEditor
           value={inputPayload}
           onChange={setInputPayload}
-          placeholder='{"key": "value"}'
-          minHeight="220px"
-          maxHeight="320px"
+          minHeight="300px"
+          maxHeight="min(48vh, 520px)"
+          aria-label={t('transform.inputPayload')}
         />
-      </WorkbenchPanel>
+      </TabPanel>
 
-      <WorkbenchPanel
-        eyebrow={t('transform.transformEyebrow')}
-        title={t('transform.expression')}
-        bodyClassName="space-y-3"
-      >
-        <div className="flex flex-wrap gap-1.5">
-          {HINT_EXPRESSIONS.map((h) => (
-            <button
-              key={h.expr}
-              type="button"
-              title={t(h.descKey)}
-              onClick={() => setTransformExpr(h.expr)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-rail px-2 py-1 text-[11px] transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <code className="font-mono text-primary">{h.expr}</code>
-              <span className="text-muted-foreground">{t(h.descKey)}</span>
-            </button>
-          ))}
-        </div>
-
-        {transformations.length > 0 && (
-          <div className="space-y-1.5">
-            <Label className="text-xs">{t('transform.savedTransformation')}</Label>
-            <Select
-              value={selectedTransformationId}
-              onChange={(e) => {
-                const id = e.target.value;
-                setSelectedTransformationId(id);
-                const tr = transformations.find((item) => item.id === id);
-                if (tr) setTransformExpr(formatJson(tr.template));
-              }}
-            >
-              <option value="">{t('transform.noSavedTransformation')}</option>
-              {transformations.filter((tr) => tr.enabled).map((tr) => (
-                <option key={tr.id} value={tr.id}>{`${tr.name} v${tr.version}`}</option>
-              ))}
-            </Select>
+      <TabPanel value="output" active={tab} className="space-y-3">
+        {!hasRun ? (
+          <ResultPlaceholder icon={Play} title={t('transform.emptyTitle')} hint={t('transform.noOutput')} />
+        ) : cancelled ? (
+          <div className="rounded-lg border border-rail bg-muted/30 p-5 text-center">
+            <Ban className="mx-auto mb-2 h-5 w-5 text-muted-foreground" aria-hidden="true" />
+            <p className="text-sm font-medium">{t('transform.cancelledTitle')}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {cancelReason || t('transform.cancelledNoReason')}
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">{t('transform.cancelledHint')}</p>
           </div>
+        ) : (
+          <>
+            {mode === 'dryRun' && dryRunResult?.endpointUrl && (
+              <div className="flex items-center gap-2 rounded-lg border border-rail bg-muted/30 px-3 py-2">
+                <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="truncate font-mono text-[11px]">{dryRunResult.endpointUrl}</span>
+              </div>
+            )}
+            <JsonEditor
+              value={outputPayload ?? ''}
+              readOnly
+              minHeight="260px"
+              maxHeight="min(44vh, 460px)"
+              aria-label={t('transform.outputPayload')}
+            />
+            {outputHeaders && Object.keys(outputHeaders).length > 0 && (
+              <OutputBlock label={mode === 'dryRun' ? t('transform.dryRunHeaders') : t('transform.outputHeaders')}>
+                <dl className="divide-y divide-rail">
+                  {Object.entries(outputHeaders).map(([name, value]) => (
+                    <div key={name} className="flex gap-3 px-2.5 py-1.5 font-mono text-[11px]">
+                      <dt className="shrink-0 text-muted-foreground">{name}</dt>
+                      <dd className="min-w-0 flex-1 truncate text-right">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </OutputBlock>
+            )}
+            {mode === 'dryRun' && dryRunResult?.signature && (
+              <OutputBlock
+                label={t('transform.dryRunSignature')}
+                actions={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => handleCopy(dryRunResult.signature!)}
+                    title={t('common.copy')}
+                    aria-label={t('common.copy')}
+                  >
+                    <Shield className="h-3.5 w-3.5" />
+                  </Button>
+                }
+              >
+                <pre className="overflow-x-auto px-2.5 py-2 font-mono text-[11px]">{dryRunResult.signature}</pre>
+              </OutputBlock>
+            )}
+          </>
         )}
+      </TabPanel>
 
-        <JsonEditor
-          value={transformExpr}
-          onChange={(val) => { setTransformExpr(val); if (selectedTransformationId) setSelectedTransformationId(''); }}
-          placeholder={'$.data'}
-          minHeight="90px"
-          maxHeight="200px"
-        />
-
-        <div className="space-y-1.5">
-          <Label htmlFor="ts-headers" className="text-xs">{t('transform.customHeaders')}</Label>
-          <Input
-            id="ts-headers"
-            className="font-mono text-sm"
-            value={customHeaders}
-            onChange={(e) => setCustomHeaders(e.target.value)}
-            placeholder='{"X-Custom": "value"}'
+      <TabPanel value="diff" active={tab}>
+        {!hasRun || !outputPayload ? (
+          <ResultPlaceholder icon={GitCompare} title={t('transform.emptyTitle')} hint={t('transform.diffHint')} />
+        ) : (
+          <DiffView
+            before={inputPayload}
+            after={outputPayload}
+            beforeLabel={t('transform.tabInput')}
+            afterLabel={t('transform.tabOutput')}
+            maxHeight="min(52vh, 520px)"
           />
-        </div>
+        )}
+      </TabPanel>
 
-        {mode === 'dryRun' && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t('transform.dryRunEndpoint')}</Label>
-              <Select value={dryRunEndpointId} onChange={(e) => setDryRunEndpointId(e.target.value)}>
-                <option value="">{t('transform.dryRunNoEndpoint')}</option>
-                {endpoints.filter((ep) => ep.enabled).map((ep) => (
-                  <option key={ep.id} value={ep.id}>{ep.url}</option>
-                ))}
-              </Select>
+      <TabPanel value="console" active={tab} className="space-y-3">
+        {errors.length > 0 && (
+          <div className="overflow-hidden rounded-lg border border-halt/40">
+            <div className="border-b border-halt/30 bg-halt/10 px-2.5 py-1.5">
+              <span className="mono-label text-halt">{t('transform.errors')}</span>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ts-dry-type" className="text-xs">{t('transform.dryRunEventType')}</Label>
-              <Input
-                id="ts-dry-type"
-                className="font-mono text-xs"
-                value={dryRunEventType}
-                onChange={(e) => setDryRunEventType(e.target.value)}
-                placeholder="order.created"
-              />
-            </div>
+            <ul className="divide-y divide-rail">
+              {errors.map((error, index) => (
+                <li key={index} className="px-2.5 py-2 font-mono text-[11px] leading-relaxed text-foreground">
+                  {errorLine && index === 0 && (
+                    <span className="mr-2 rounded bg-halt/15 px-1.5 py-0.5 text-[10px] font-semibold text-halt">
+                      {t('transform.atLine', { line: errorLine })}
+                    </span>
+                  )}
+                  {error}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
-      </WorkbenchPanel>
 
-      {mode === 'preview' ? (
-        <RunControl
-          label={t('transform.run')}
-          runningLabel={t('transform.running')}
-          running={preview.isPending}
-          disabled={!inputPayload}
-          onClick={handleRun}
-          hint={t('transform.runHint')}
-          secondary={
-            <Button variant="outline" size="lg" onClick={handleReset}>
-              <RotateCcw className="h-4 w-4" /> {t('transform.reset')}
-            </Button>
-          }
-        />
-      ) : (
-        <RunControl
-          icon={Send}
-          label={t('transform.dryRunBtn')}
-          runningLabel={t('transform.dryRunRunning')}
-          running={dryRun.isPending}
-          disabled={!inputPayload}
-          onClick={handleDryRun}
-          hint={t('transform.dryRunDesc')}
-          secondary={
-            <Button variant="outline" size="lg" onClick={handleReset}>
-              <RotateCcw className="h-4 w-4" /> {t('transform.reset')}
-            </Button>
-          }
-        />
-      )}
-    </div>
+        {consoleLines.length === 0 && errors.length === 0 ? (
+          <ResultPlaceholder
+            icon={Terminal}
+            title={hasRun ? t('transform.consoleEmptyTitle') : t('transform.emptyTitle')}
+            hint={t('transform.consoleHint')}
+          />
+        ) : (
+          consoleLines.length > 0 && (
+            <div className="overflow-hidden rounded-lg border border-rail">
+              <ul className="divide-y divide-rail font-mono text-[11px]">
+                {consoleLines.map((line, index) => (
+                  <li key={index} className="flex gap-2 px-2.5 py-1.5">
+                    <span
+                      className={`w-11 shrink-0 select-none uppercase ${
+                        line.level === 'error' ? 'text-halt'
+                          : line.level === 'warn' ? 'text-retry'
+                            : 'text-muted-foreground'
+                      }`}
+                    >
+                      {line.level}
+                    </span>
+                    <span className="min-w-0 flex-1 whitespace-pre-wrap break-all">{line.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        )}
+
+        {hasRun && errors.length === 0 && !cancelled && (
+          <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <CheckCircle2 className="h-3 w-3 text-ok" aria-hidden="true" />
+            {t('transform.consoleClean', { ms: durationMs })}
+          </p>
+        )}
+      </TabPanel>
+    </ResultFrame>
   );
 
   return (
     <div className="p-4 lg:p-6">
-      <PageHeader title={t('transform.title')} description={t('transform.subtitle')} />
-      <Workbench
-        input={input}
-        result={mode === 'preview'
-          ? <PreviewResult
-              ran={ran}
-              running={preview.isPending}
-              inputPayload={inputPayload}
-              outputPayload={outputPayload}
-              outputHeaders={outputHeaders}
-              errors={errors}
-              onCopy={handleCopy}
+      <PageHeader
+        title={t('transform.title')}
+        description={t('transform.subtitle')}
+      />
+      <Workbench input={editorColumn} result={resultColumn} />
+
+      <Dialog open={saveAsOpen} onOpenChange={setSaveAsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('transform.saveAsTitle')}</DialogTitle>
+            <DialogDescription>{t('transform.saveAsDesc')}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="transform-save-as-name">{t('transformations.name')}</Label>
+            <Input
+              id="transform-save-as-name"
+              value={saveAsName}
+              onChange={(e) => setSaveAsName(e.target.value)}
+              placeholder={t('transform.saveAsPlaceholder')}
+              autoFocus
             />
-          : <DryRunResult result={dryRunResult} running={dryRun.isPending} onCopy={handleCopy} />}
-      />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveAsOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleSaveAs} disabled={!saveAsName.trim() || createTransformation.isPending}>
+              {t('common.save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-  );
-}
-
-// ── Preview result ─────────────────────────────────────────────────
-
-function PreviewResult({
-  ran, running, inputPayload, outputPayload, outputHeaders, errors, onCopy,
-}: {
-  ran: boolean;
-  running: boolean;
-  inputPayload: string;
-  outputPayload: string | null;
-  outputHeaders: string | null;
-  errors: string[];
-  onCopy: (text: string) => void;
-}) {
-  const { t } = useTranslation();
-
-  if (!ran || running) {
-    return (
-      <ResultPlaceholder
-        icon={Play}
-        title={t('transform.emptyTitle')}
-        hint={running ? t('transform.running') : t('transform.noOutput')}
-      />
-    );
-  }
-
-  const unchanged = !!outputPayload && isUnchanged(inputPayload, outputPayload);
-  // A transform that ran clean but changed nothing is not a success worth a
-  // green badge — nothing happened. That is `idle`.
-  const kind: StatusKind = errors.length > 0 ? 'halt' : unchanged ? 'idle' : 'ok';
-  const statusLabel = errors.length > 0
-    ? t('transform.verdictErrors')
-    : unchanged ? t('transform.verdictUnchanged') : t('transform.verdictChanged');
-
-  const headerCount = (() => {
-    if (!outputHeaders) return 0;
-    try { return Object.keys(JSON.parse(outputHeaders)).length; } catch { return 0; }
-  })();
-
-  return (
-    <ResultFrame
-      kind={kind}
-      statusLabel={statusLabel}
-      title={t('transform.outputPayload')}
-      actions={outputPayload ? (
-        <Button variant="ghost" size="icon-sm" onClick={() => onCopy(outputPayload)} title={t('common.copy')} aria-label={t('common.copy')}>
-          <Copy className="h-3.5 w-3.5" />
-        </Button>
-      ) : undefined}
-      metrics={
-        <>
-          <ResultMetric label={t('transform.metricOutputSize')} value={outputPayload?.length ?? 0} unit="B" />
-          <ResultMetric label={t('transform.metricHeaders')} value={headerCount} />
-          <ResultMetric label={t('transform.metricErrors')} value={errors.length} />
-        </>
-      }
-    >
-      {outputPayload && (
-        <JsonEditor value={outputPayload} readOnly minHeight="260px" maxHeight="380px" />
-      )}
-
-      {outputHeaders && (
-        <OutputBlock label={t('transform.outputHeaders')}>
-          <pre className="max-h-40 overflow-auto whitespace-pre-wrap p-2.5 font-mono text-[11px]">{outputHeaders}</pre>
-        </OutputBlock>
-      )}
-
-      {errors.length > 0 && (
-        <div className="rounded-lg border border-halt/30 bg-halt-soft p-3">
-          <p className="mono-label mb-1.5">{t('transform.errors')}</p>
-          <ul className="space-y-1">
-            {errors.map((err, i) => (
-              <li key={i} className="text-xs text-halt">{err}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </ResultFrame>
-  );
-}
-
-// ── Dry-run result ─────────────────────────────────────────────────
-
-function DryRunResult({
-  result, running, onCopy,
-}: {
-  result: DeliveryDryRunResponse | null;
-  running: boolean;
-  onCopy: (text: string) => void;
-}) {
-  const { t } = useTranslation();
-
-  if (!result || running) {
-    return (
-      <ResultPlaceholder
-        icon={Zap}
-        title={t('transform.dryRunEmptyTitle')}
-        hint={running ? t('transform.dryRunRunning') : t('transform.dryRunEmptyDesc')}
-      />
-    );
-  }
-
-  const headerCount = result.requestHeaders ? Object.keys(result.requestHeaders).length : 0;
-  const errorCount = result.errors?.length ?? 0;
-
-  return (
-    <ResultFrame
-      kind={result.success ? 'ok' : 'halt'}
-      statusLabel={result.success ? t('transform.verdictSimulated') : t('transform.verdictErrors')}
-      title={t('transform.dryRunResult')}
-      metrics={
-        <>
-          <ResultMetric
-            label={t('transform.metricSigned')}
-            value={result.signature ? t('common.yes') : t('common.no')}
-          />
-          <ResultMetric label={t('transform.metricHeaders')} value={headerCount} />
-          <ResultMetric label={t('transform.metricErrors')} value={errorCount} />
-        </>
-      }
-    >
-      {result.endpointUrl && (
-        <div className="flex items-center gap-2 text-xs">
-          <Globe className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-          <span className="mono-label">POST</span>
-          <code className="min-w-0 flex-1 truncate rounded bg-muted px-1.5 py-0.5 font-mono text-primary">{result.endpointUrl}</code>
-        </div>
-      )}
-
-      {result.transformationName && (
-        <div className="flex items-center gap-2 text-xs">
-          <Wand2 className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-          <span className="mono-label">{t('transform.dryRunTransformation')}</span>
-          <span className="font-mono">{`${result.transformationName} v${result.transformationVersion}`}</span>
-        </div>
-      )}
-
-      {result.signature && (
-        <OutputBlock
-          label={
-            <span className="inline-flex items-center gap-1.5">
-              <Shield className="h-3 w-3" aria-hidden />
-              {t('transform.dryRunSignature')}
-            </span>
-          }
-          actions={
-            <Button variant="ghost" size="icon-sm" onClick={() => onCopy(result.signature!)} title={t('common.copy')} aria-label={t('common.copy')}>
-              <Copy className="h-3.5 w-3.5" />
-            </Button>
-          }
-        >
-          <code className="block break-all p-2.5 font-mono text-[10px] text-muted-foreground">{result.signature}</code>
-        </OutputBlock>
-      )}
-
-      {headerCount > 0 && result.requestHeaders && (
-        <OutputBlock label={t('transform.dryRunHeaders')}>
-          <div className="max-h-[200px] space-y-0.5 overflow-y-auto p-2.5">
-            {Object.entries(result.requestHeaders).map(([key, val]) => (
-              <div key={key} className="flex gap-2 font-mono text-[11px]">
-                <span className="flex-shrink-0 font-medium text-primary">{key}</span>
-                <span className="break-all text-muted-foreground">{val}</span>
-              </div>
-            ))}
-          </div>
-        </OutputBlock>
-      )}
-
-      {result.transformedPayload && (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <p className="mono-label">{t('transform.dryRunBody')}</p>
-            <Button variant="ghost" size="icon-sm" onClick={() => onCopy(result.transformedPayload!)} title={t('common.copy')} aria-label={t('common.copy')}>
-              <Copy className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-          <JsonEditor value={result.transformedPayload} readOnly minHeight="140px" maxHeight="260px" />
-        </div>
-      )}
-
-      {errorCount > 0 && (
-        <div className="rounded-lg border border-halt/30 bg-halt-soft p-3">
-          <ul className="space-y-1">
-            {result.errors.map((err, i) => (
-              <li key={i} className="text-xs text-halt">{err}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </ResultFrame>
   );
 }

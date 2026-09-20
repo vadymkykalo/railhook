@@ -506,10 +506,17 @@ export interface IncomingBulkReplayRequest {
 
 // ─── Transformations ─────────────────────────────────────────────────
 
+/**
+ * Which language a transformation's `template` column holds. Omitted on a request
+ * means TEMPLATE, which is what every transformation was before JavaScript existed.
+ */
+export type TransformationKind = 'TEMPLATE' | 'JAVASCRIPT';
+
 export interface TransformationRequest {
   name: string;
   description?: string;
   template: string;
+  kind?: TransformationKind;
   enabled?: boolean;
 }
 
@@ -519,6 +526,7 @@ export interface TransformationResponse {
   name: string;
   description?: string;
   template: string;
+  kind: TransformationKind;
   version: number;
   enabled: boolean;
   subscriptionCount: number;

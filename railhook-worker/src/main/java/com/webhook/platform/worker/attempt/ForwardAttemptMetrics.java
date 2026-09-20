@@ -15,6 +15,7 @@ public class ForwardAttemptMetrics implements AttemptMetrics {
     private final Counter failureCounter;
     private final Counter errorCounter;
     private final Counter transformFailedCounter;
+    private final Counter transformCancelledCounter;
     private final Timer latency;
 
     public ForwardAttemptMetrics(MeterRegistry registry) {
@@ -25,6 +26,11 @@ public class ForwardAttemptMetrics implements AttemptMetrics {
         this.errorCounter = Counter.builder("incoming_forward_attempts_total")
                 .tag("result", "error").register(registry);
         this.transformFailedCounter = Counter.builder("transform_failed_total")
+                .tag("component", "incoming_forward").register(registry);
+        // A separate family from transform_failed_total, not a tag on it: one is an
+        // error rate somebody is paged for and the other is a filter doing its job, and
+        // an alert that cannot tell them apart fires on working configuration.
+        this.transformCancelledCounter = Counter.builder("transform_cancelled_total")
                 .tag("component", "incoming_forward").register(registry);
         this.latency = Timer.builder("incoming_forward_latency_ms").register(registry);
     }
@@ -49,5 +55,10 @@ public class ForwardAttemptMetrics implements AttemptMetrics {
     @Override
     public void transformFailed() {
         transformFailedCounter.increment();
+    }
+
+    @Override
+    public void transformCancelled() {
+        transformCancelledCounter.increment();
     }
 }

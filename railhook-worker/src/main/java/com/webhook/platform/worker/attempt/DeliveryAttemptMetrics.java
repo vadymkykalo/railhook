@@ -18,6 +18,7 @@ public class DeliveryAttemptMetrics implements AttemptMetrics {
     private final Counter failureCounter;
     private final Counter errorCounter;
     private final Counter transformFailedCounter;
+    private final Counter transformCancelledCounter;
     private final Timer latency2xx;
     private final Timer latency4xx;
     private final Timer latency5xx;
@@ -30,6 +31,11 @@ public class DeliveryAttemptMetrics implements AttemptMetrics {
         this.errorCounter = Counter.builder("webhook_delivery_attempts_total")
                 .tag("result", "error").tag("status_class", "none").register(registry);
         this.transformFailedCounter = Counter.builder("transform_failed_total")
+                .tag("component", "outgoing_delivery").register(registry);
+        // A separate family from transform_failed_total, not a tag on it: one is an
+        // error rate somebody is paged for and the other is a filter doing its job, and
+        // an alert that cannot tell them apart fires on working configuration.
+        this.transformCancelledCounter = Counter.builder("transform_cancelled_total")
                 .tag("component", "outgoing_delivery").register(registry);
         this.latency2xx = Timer.builder("webhook_delivery_latency_ms")
                 .tag("status_class", "2xx").register(registry);
@@ -59,6 +65,11 @@ public class DeliveryAttemptMetrics implements AttemptMetrics {
     @Override
     public void transformFailed() {
         transformFailedCounter.increment();
+    }
+
+    @Override
+    public void transformCancelled() {
+        transformCancelledCounter.increment();
     }
 
     private Timer timerFor(int statusCode) {
