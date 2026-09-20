@@ -425,10 +425,24 @@ Three transitions carry the whole design:
   and kept for a person to decide about — the UI calls it **Failed Messages** on purpose,
   because "DLQ" is vocabulary you have to already know.
 
+`PENDING → DLQ` has a third cause now: an Endpoint or Destination that has answered nothing but
+failures for a whole window is turned off, and everything already made out to it is abandoned
+rather than failed. The distinction is who decided. A target its owner turned off ends its
+queued obligations `FAILED` — nobody can make them succeed, because nobody asked for them to.
+A target *Railhook* turned off ends them in the DLQ, because fixing the receiver and re-enabling
+it is exactly the human decision the DLQ exists for. The worker keeps the run of failures on the
+target's row at the shared seam (`AttemptStore#recordTargetOutcome`); the api's
+`EndpointAutoDisableService` reads it and decides.
+
 ### The two ladders
 
 Declared once, in `RetryLadderDefaults`. There is no fallback ladder anywhere — a Subscription
-or Destination may override the delays and the attempt count, and nothing else may.
+or Destination may override the delays, the attempt count and which statuses are worth another
+Attempt (`RetryableStatuses`, default `408,429,500-599`), and nothing else.
+
+A receiver answering 429 or 503 may also push one Attempt later with `Retry-After`. It is
+honoured on those two statuses only, may never pull an Attempt in front of the Ladder, and is
+clamped by `WEBHOOK_RETRY_AFTER_MAX_SECONDS` (6h — the largest tier both ladders share).
 
 | | Outgoing | Incoming |
 |---|---|---|

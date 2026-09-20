@@ -68,9 +68,8 @@ class EndpointAutoDisableServiceTest {
                 .thenReturn(List.of());
         lenient().when(destinationRepository.findAutoDisableCandidates(any(), anyInt(), any()))
                 .thenReturn(List.of());
-        lenient().when(endpointRepository.save(any(Endpoint.class))).thenAnswer(i -> i.getArgument(0));
-        lenient().when(destinationRepository.save(any(IncomingDestination.class)))
-                .thenAnswer(i -> i.getArgument(0));
+        lenient().when(endpointRepository.autoDisable(any(), any(), any())).thenReturn(1);
+        lenient().when(destinationRepository.autoDisable(any(), any(), any())).thenReturn(1);
 
         service = newService(true, WINDOW, MIN_FAILURES);
     }
@@ -112,7 +111,7 @@ class EndpointAutoDisableServiceTest {
             assertTrue(endpoint.getAutoDisabledReason().contains("72"),
                     "the reason has to name the window, or its owner cannot tell why now: "
                             + endpoint.getAutoDisabledReason());
-            verify(endpointRepository).save(endpoint);
+            verify(endpointRepository).autoDisable(eq(endpoint.getId()), eq(NOW), any(String.class));
         }
 
         @Test
@@ -160,7 +159,7 @@ class EndpointAutoDisableServiceTest {
 
             assertFalse(destination.getEnabled());
             assertEquals(NOW, destination.getAutoDisabledAt());
-            verify(destinationRepository).save(destination);
+            verify(destinationRepository).autoDisable(eq(destination.getId()), eq(NOW), any(String.class));
         }
     }
 
@@ -195,7 +194,7 @@ class EndpointAutoDisableServiceTest {
 
             assertFalse(endpoint.getEnabled(),
                     "the endpoint is dead either way; failing to say so does not make it alive");
-            verify(endpointRepository).save(endpoint);
+            verify(endpointRepository).autoDisable(eq(endpoint.getId()), any(), any());
         }
 
         @Test
@@ -205,11 +204,12 @@ class EndpointAutoDisableServiceTest {
             Endpoint good = failingEndpoint(NOW.minus(Duration.ofHours(80)), 400);
             when(endpointRepository.findAutoDisableCandidates(any(), anyInt(), any()))
                     .thenReturn(List.of(bad, good));
-            when(endpointRepository.save(bad)).thenThrow(new IllegalStateException("row is locked"));
+            when(endpointRepository.autoDisable(eq(bad.getId()), any(), any()))
+                    .thenThrow(new IllegalStateException("row is locked"));
 
             service.sweep();
 
-            verify(endpointRepository).save(good);
+            verify(endpointRepository).autoDisable(eq(good.getId()), any(), any());
             verify(notifier).endpointDisabled(good);
             verify(notifier, never()).endpointDisabled(bad);
         }
@@ -262,9 +262,26 @@ class EndpointAutoDisableServiceTest {
             service.sweep();
 
             verify(notifier, never()).endpointDisabled(any());
-            verify(endpointRepository, never()).save(any(Endpoint.class));
+            verify(endpointRepository, never()).autoDisable(any(), any(), any());
             assertEquals(NOW.minus(Duration.ofHours(1)), endpoint.getAutoDisabledAt(),
                     "the time it was disabled is when it happened, not when the sweep last ran");
+        }
+
+        @Test
+        @DisplayName("an endpoint re-enabled between the query and the write is not disabled again")
+        void losesTheRaceAndSaysNothing() {
+            // The sweep reads, then writes. An owner clicking Enable in between is exactly the
+            // window a full save() would have overwritten — and they would have watched their
+            // endpoint switch itself back off with no explanation.
+            Endpoint endpoint = failingEndpoint(NOW.minus(Duration.ofHours(80)), 400);
+            when(endpointRepository.findAutoDisableCandidates(any(), anyInt(), any()))
+                    .thenReturn(List.of(endpoint));
+            when(endpointRepository.autoDisable(any(), any(), any())).thenReturn(0);
+
+            service.sweep();
+
+            verify(notifier, never()).endpointDisabled(any());
+            assertTrue(endpoint.getEnabled(), "the write did not apply, so nothing was decided");
         }
 
         @Test
@@ -272,7 +289,7 @@ class EndpointAutoDisableServiceTest {
         void emptySweepWritesNothing() {
             service.sweep();
 
-            verify(endpointRepository, never()).save(any(Endpoint.class));
+            verify(endpointRepository, never()).autoDisable(any(), any(), any());
             verify(notifier, never()).endpointDisabled(any());
         }
 

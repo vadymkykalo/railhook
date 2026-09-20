@@ -117,25 +117,34 @@ public class EndpointAutoDisableService {
     private void disableEndpoints(Instant cutoff) {
         List<Endpoint> candidates = endpointRepository.findAutoDisableCandidates(cutoff, minFailures, batch);
         for (Endpoint endpoint : candidates) {
-            // The query asks for enabled = true, so this is a row that changed under the sweep —
-            // or one already auto-disabled that somebody turned back on without clearing the run.
+            // Already auto-disabled, from a row the query read before another pass turned it off.
             if (endpoint.getAutoDisabledAt() != null) {
                 continue;
             }
+            Instant at = clock.instant();
+            String reason = reason(endpoint.getFailingSince(), endpoint.getConsecutiveFailures());
+            int applied;
             try {
-                endpoint.setEnabled(false);
-                endpoint.setAutoDisabledAt(clock.instant());
-                endpoint.setAutoDisabledReason(reason(endpoint.getFailingSince(),
-                        endpoint.getConsecutiveFailures()));
-                endpointRepository.save(endpoint);
-                log.warn("Endpoint {} ({}) auto-disabled: failing since {}, {} consecutive failures",
-                        endpoint.getId(), endpoint.getUrl(), endpoint.getFailingSince(),
-                        endpoint.getConsecutiveFailures());
+                applied = endpointRepository.autoDisable(endpoint.getId(), at, reason);
             } catch (Exception e) {
                 // One row another transaction holds must not cost the rest of the sweep.
                 log.warn("Endpoint {} could not be auto-disabled: {}", endpoint.getId(), e.toString());
                 continue;
             }
+            if (applied == 0) {
+                // Turned back on, or turned off, between the query and here. Either way it is
+                // not this sweep's to announce.
+                log.debug("Endpoint {} changed under the sweep; not disabling it", endpoint.getId());
+                continue;
+            }
+            log.warn("Endpoint {} ({}) auto-disabled: failing since {}, {} consecutive failures",
+                    endpoint.getId(), endpoint.getUrl(), endpoint.getFailingSince(),
+                    endpoint.getConsecutiveFailures());
+            // The row is written; these make the in-memory copy say the same thing, because it
+            // is what the notification is composed from.
+            endpoint.setEnabled(false);
+            endpoint.setAutoDisabledAt(at);
+            endpoint.setAutoDisabledReason(reason);
             announce(() -> notifier.endpointDisabled(endpoint), "endpoint", endpoint.getId());
         }
     }
@@ -147,20 +156,26 @@ public class EndpointAutoDisableService {
             if (destination.getAutoDisabledAt() != null) {
                 continue;
             }
+            Instant at = clock.instant();
+            String reason = reason(destination.getFailingSince(), destination.getConsecutiveFailures());
+            int applied;
             try {
-                destination.setEnabled(false);
-                destination.setAutoDisabledAt(clock.instant());
-                destination.setAutoDisabledReason(reason(destination.getFailingSince(),
-                        destination.getConsecutiveFailures()));
-                destinationRepository.save(destination);
-                log.warn("Destination {} ({}) auto-disabled: failing since {}, {} consecutive failures",
-                        destination.getId(), destination.getUrl(), destination.getFailingSince(),
-                        destination.getConsecutiveFailures());
+                applied = destinationRepository.autoDisable(destination.getId(), at, reason);
             } catch (Exception e) {
                 log.warn("Destination {} could not be auto-disabled: {}",
                         destination.getId(), e.toString());
                 continue;
             }
+            if (applied == 0) {
+                log.debug("Destination {} changed under the sweep; not disabling it", destination.getId());
+                continue;
+            }
+            log.warn("Destination {} ({}) auto-disabled: failing since {}, {} consecutive failures",
+                    destination.getId(), destination.getUrl(), destination.getFailingSince(),
+                    destination.getConsecutiveFailures());
+            destination.setEnabled(false);
+            destination.setAutoDisabledAt(at);
+            destination.setAutoDisabledReason(reason);
             // An alert hangs off a Project, and a Destination reaches one only through its Source.
             UUID projectId = sourceRepository.findById(destination.getIncomingSourceId())
                     .map(IncomingSource::getProjectId)

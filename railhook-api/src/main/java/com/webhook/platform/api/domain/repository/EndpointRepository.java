@@ -1,5 +1,7 @@
 package com.webhook.platform.api.domain.repository;
 
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.jpa.repository.Modifying;
 import java.time.Instant;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import java.util.List;
@@ -60,4 +62,23 @@ public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
             + "AND e.consecutiveFailures >= :minFailures ORDER BY e.failingSince ASC")
     List<Endpoint> findAutoDisableCandidates(@Param("cutoff") Instant cutoff,
             @Param("minFailures") int minFailures, Pageable pageable);
+
+    /**
+     * Turns one endpoint off for continuous failure, and reports whether it was this call that
+     * did it.
+     *
+     * <p>A conditional UPDATE rather than saving the entity the sweep read. Two reasons, and the
+     * second is a bug the first would have hidden: saving writes every column, so a merge would
+     * put back the {@code consecutive_failures} the worker has incremented since the read — and,
+     * worse, would re-disable an endpoint its owner re-enabled in the meantime. The {@code WHERE}
+     * clause is what makes "somebody got there first" a zero rather than a silent overwrite.
+     *
+     * <p>The run of failures is deliberately left alone: "failing since" is what the owner is
+     * told, and re-enabling is what clears it.
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Endpoint e SET e.enabled = false, e.autoDisabledAt = :at, e.autoDisabledReason = :reason "
+            + "WHERE e.id = :id AND e.enabled = true AND e.autoDisabledAt IS NULL")
+    int autoDisable(@Param("id") UUID id, @Param("at") Instant at, @Param("reason") String reason);
 }

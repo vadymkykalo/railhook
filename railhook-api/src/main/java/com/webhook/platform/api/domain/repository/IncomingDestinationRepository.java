@@ -1,5 +1,7 @@
 package com.webhook.platform.api.domain.repository;
 
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.jpa.repository.Modifying;
 import java.time.Instant;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
 import org.springframework.data.domain.Page;
@@ -45,4 +47,12 @@ public interface IncomingDestinationRepository extends JpaRepository<IncomingDes
             + "AND d.consecutiveFailures >= :minFailures ORDER BY d.failingSince ASC")
     List<IncomingDestination> findAutoDisableCandidates(@Param("cutoff") Instant cutoff,
             @Param("minFailures") int minFailures, Pageable pageable);
+
+    /** @see EndpointRepository#autoDisable — the same conditional update on the other target. */
+    @Modifying
+    @Transactional
+    @Query("UPDATE IncomingDestination d SET d.enabled = false, d.autoDisabledAt = :at, "
+            + "d.autoDisabledReason = :reason "
+            + "WHERE d.id = :id AND d.enabled = true AND d.autoDisabledAt IS NULL")
+    int autoDisable(@Param("id") UUID id, @Param("at") Instant at, @Param("reason") String reason);
 }
