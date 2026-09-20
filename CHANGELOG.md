@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.29.0] - 2026-09-20
+
+### Added
+
+- **Four more incoming providers, verified natively**: Square, Adyen, SendGrid and HubSpot, each with
+  its real scheme — Square signs the notification URL together with the body, Adyen signs per
+  notification item (and over the body on its management webhooks), SendGrid signs with ECDSA against a
+  public key, HubSpot v3 signs method, URI, body and timestamp. Guides for each, EN and UK. PayPal is
+  deliberately absent: verifying it needs an outbound call or a fetched certificate on the ingress path,
+  which is a design decision, not a preset.
+- **Transformation version history.** Every published template is kept, with who changed it and when.
+  You can read a version, compare two, and restore one — a restore publishes a new version rather than
+  rewriting history, and is recorded in the audit log. The version number the UI always showed now means
+  something.
+- **An endpoint that answers nothing but failures is turned off.** After a configurable window
+  (72 hours and at least 10 failed attempts by default) Railhook disables it, records why and when,
+  raises an alert and mails the organization's owners. Queued deliveries end in Failed Messages, where
+  a person can replay them after fixing the receiver — not in FAILED, which is what a *human* disabling
+  a target means. Re-enabling clears the state; a deployment can turn the whole thing off.
+- **`Retry-After` is honoured** on 429 and 503, clamped to six hours, and only ever later than the
+  ladder already said. **Which status codes count as retryable is now per subscription**; the previous
+  408/429/5xx remains the default, and the set is copied onto a delivery at creation, so editing it
+  never changes the rules an in-flight delivery is judged by.
+
+### Changed
+
+- Both incoming Destinations and outgoing Endpoints share the new health tracking and the retryable-status
+  spec: the change lives in the shared attempt lifecycle, not in one direction.
+- Provider names moved out of the UI's hardcoded maps into the translations, with a test that fails when
+  a provider is added to the backend without a label in both languages.
+- Documentation: Transform Studio and Event diff are finally written up, honestly, including what each
+  cannot do. 125 pages, EN and UK.
+
 ## [2.28.2] - 2026-09-20
 
 ### Fixed
