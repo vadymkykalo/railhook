@@ -166,7 +166,7 @@ class OutgoingRequestHeadersTest {
                 activeProjects(),
                 transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
                 mtlsWebClientFactory, transformationCacheService, payloadTransformService,
-                objectMapper, WebClient.builder().build(),
+                objectMapper, WebClient.builder().build(), null,
                 Counter.builder("test").register(new SimpleMeterRegistry()),
                 Clock.systemUTC(), 5,
                 DeliveryMessage.builder().deliveryId(delivery.getId()).build(), false);

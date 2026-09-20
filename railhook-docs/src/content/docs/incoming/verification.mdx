@@ -26,11 +26,23 @@ A request that fails verification is answered `401` and is not stored.
 | `SHOPIFY` | `X-Shopify-Hmac-SHA256` | Base64 HMAC-SHA256 of the raw body. |
 | `SLACK` | `X-Slack-Signature`, `X-Slack-Request-Timestamp` | `v0=` followed by the hex HMAC-SHA256 of `v0:<timestamp>:<raw body>`. The timestamp must be within 300 seconds of now. |
 | `TWILIO` | `X-Twilio-Signature` | Base64 HMAC-SHA1 with the auth token. For form-encoded requests it covers the URL followed by every parameter sorted by name; for other requests it covers the URL, and the `bodySHA256` query parameter must match the body. |
+| `SQUARE` | `x-square-hmacsha256-signature` | Base64 HMAC-SHA256 of the notification URL followed immediately by the raw body, with no separator. |
+| `ADYEN` | `hmacsignature`, or none | Base64 HMAC-SHA256 keyed with the **decoded bytes** of the hex HMAC key. A standard payments webhook carries no header: each notification item signs eight of its own fields, joined with colons, into `additionalData.hmacSignature`. Management and Balance Platform webhooks sign the raw body and put the result in the header. Both are accepted, so one source handles either. |
+| `SENDGRID` | `X-Twilio-Email-Event-Webhook-Signature`, `X-Twilio-Email-Event-Webhook-Timestamp` | ECDSA over SHA-256 of the timestamp followed by the raw body, verified with SendGrid's public key. Not an HMAC. |
+| `HUBSPOT` | `X-HubSpot-Signature-v3`, `X-HubSpot-Request-Timestamp` | Base64 HMAC-SHA256 of the request method, the full URL, the raw body and the timestamp, in that order, with the app's client secret. The timestamp must be within 300 seconds of now. Only v3; v1 and v2 bind a request to no moment at all. |
 
-For every provider the secret goes in the source's `hmacSecret`: the webhook signing secret, the GitLab secret token, or the Twilio auth token.
+For every provider the secret goes in the source's `hmacSecret`: the webhook signing secret, the GitLab secret token, the Twilio auth token, the Square signature key, the Adyen HMAC key as the hexadecimal string the Customer Area shows, or the HubSpot app's client secret.
 
-<Aside type="caution" title="Twilio signs the URL">
-Twilio's signature covers the URL it was configured with. Railhook rebuilds that URL from `WEBHOOK_INGRESS_BASE_URL`, not from the incoming request, so it survives a reverse proxy. Set `WEBHOOK_INGRESS_BASE_URL` to the public address, and paste exactly the ingress URL the source shows into the Twilio console.
+<Aside type="tip" title="SendGrid's is a public key, not a secret">
+SendGrid keeps the private half of the pair and signs with it. What goes into `hmacSecret` is the public verification key its Event Webhook settings display, so holding it forges nothing. Railhook still stores it encrypted, because it is the same field. Paste it as SendGrid shows it, or as PEM — both are read.
+</Aside>
+
+<Aside type="caution" title="Twilio, Square and HubSpot sign the URL">
+All three include the URL they were configured with in what they sign, so `http` for `https`, a trailing slash or a different host all break verification. Railhook rebuilds that URL from `WEBHOOK_INGRESS_BASE_URL`, not from the incoming request, so it survives a reverse proxy. Set `WEBHOOK_INGRESS_BASE_URL` to the public address, and paste exactly the ingress URL the source shows into the provider's console.
+</Aside>
+
+<Aside type="caution" title="Two providers cannot be deduplicated on a provider event id">
+SendGrid and HubSpot post a batch of events in one request and identify each event inside it rather than the request. There is no id for the request to key on, and keying on the first event in a batch would silently drop the rest if the provider ever re-cut the batch on a retry. So no `providerEventId` is recorded for those two, and their protection against a repeated request is the signed timestamp each carries plus the replay window below. Deduplicate per event — `sg_event_id`, `eventId` — in your own handler. Adyen names no event id either; a notification carrying exactly one item is keyed on `pspReference:eventCode`, the pair Adyen says two copies of one event share.
 </Aside>
 
 ## Set up a provider

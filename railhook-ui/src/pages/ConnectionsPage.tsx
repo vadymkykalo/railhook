@@ -10,10 +10,11 @@ import { showApiError, showError, showSuccess } from '../lib/toast';
 import { endpointsApi } from '../api/endpoints.api';
 import type { SubscriptionResponse } from '../api/subscriptions.api';
 import {
-  queryKeys, useDeliveries, useEndpoints, usePatchSubscription, useProject,
+  queryKeys, useDeliveries, useEnableEndpoint, useEndpoints, usePatchSubscription, useProject,
   useRotateSecret, useSubscriptions, useUpdateEndpoint, useVerifyEndpoint,
 } from '../api/queries';
 import type { DeliveryResponse, EndpointResponse, SignatureScheme } from '../types/api.types';
+import { formatRelativeTime } from '../lib/date';
 import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
@@ -121,6 +122,7 @@ export default function ConnectionsPage() {
   const { data: deliveryPage } = useDeliveries(projectId, { size: HEALTH_WINDOW, sort: 'createdAt,desc' });
 
   const updateEndpoint = useUpdateEndpoint(projectId!);
+  const enableEndpoint = useEnableEndpoint(projectId!);
   const rotateSecret = useRotateSecret(projectId!);
   const verifyEndpoint = useVerifyEndpoint(projectId!);
   const patchSubscription = usePatchSubscription(projectId!);
@@ -163,15 +165,19 @@ export default function ConnectionsPage() {
 
   const handleToggleEndpoint = async (endpoint: EndpointResponse) => {
     try {
-      await updateEndpoint.mutateAsync({
-        id: endpoint.id,
-        data: {
-          url: endpoint.url,
-          description: endpoint.description,
-          enabled: !endpoint.enabled,
-          rateLimitPerSecond: endpoint.rateLimitPerSecond,
-        },
-      });
+      if (endpoint.enabled) {
+        await updateEndpoint.mutateAsync({
+          id: endpoint.id,
+          data: {
+            url: endpoint.url,
+            description: endpoint.description,
+            enabled: false,
+            rateLimitPerSecond: endpoint.rateLimitPerSecond,
+          },
+        });
+      } else {
+        await enableEndpoint.mutateAsync(endpoint.id);
+      }
       showSuccess(endpoint.enabled ? t('endpoints.toast.disabled') : t('endpoints.toast.enabled'));
     } catch (err) {
       showApiError(err, 'endpoints.toast.toggleFailed');
@@ -381,7 +387,17 @@ export default function ConnectionsPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <EnabledBadge enabled={endpoint.enabled} />
+                      <EnabledBadge
+                        enabled={endpoint.enabled}
+                        autoDisabled={Boolean(endpoint.autoDisabledAt)}
+                      />
+                      {endpoint.autoDisabledAt && (
+                        <p className="mt-1 text-[11px] leading-snug text-halt">
+                          {t('endpoints.autoDisabledSince', {
+                            since: formatRelativeTime(endpoint.failingSince ?? endpoint.autoDisabledAt),
+                          })}
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">

@@ -2620,6 +2620,44 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/projects/{projectId}/transformations/{id}/versions/{version}/restore:
+    post:
+      tags:
+      - Transformations
+      summary: Restore a transformation version
+      description: "Publishes an earlier template again as a new version. The versions\
+        \ published after it are kept: a restore moves the transformation forward\
+        \ rather than rewinding its history."
+      operationId: restoreTransformationVersion
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TransformationResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/projects/{projectId}/transform-preview:
     post:
       tags:
@@ -4027,6 +4065,37 @@ paths:
       summary: Disable mTLS
       description: Disables mutual TLS for the endpoint
       operationId: disableMtls
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EndpointResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/endpoints/{id}/enable:
+    post:
+      tags:
+      - Endpoints
+      summary: Enable an endpoint
+      description: "Turns the endpoint back on and clears an auto-disable: the recorded\
+        \ reason, the time it was disabled, and the run of failures that led to it."
+      operationId: enableEndpoint
       parameters:
       - name: projectId
         in: path
@@ -6071,6 +6140,119 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/UsageStatsResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/transformations/{id}/versions:
+    get:
+      tags:
+      - Transformations
+      summary: List transformation versions
+      description: "Returns every published version of this transformation's template,\
+        \ newest first, with who published it and when. The templates themselves are\
+        \ omitted — fetch one version to read it."
+      operationId: listTransformationVersions
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TransformationVersionResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/transformations/{id}/versions/{version}:
+    get:
+      tags:
+      - Transformations
+      summary: Get one transformation version
+      description: "Returns one published version, including the template it published"
+      operationId: getTransformationVersion
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TransformationVersionResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/transformations/{id}/versions/diff:
+    get:
+      tags:
+      - Transformations
+      summary: Compare two transformation versions
+      description: "Returns both templates whole and the list of places they differ,\
+        \ each named by its JSONPath"
+      operationId: diffTransformationVersions
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: left
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: right
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TransformationVersionDiffResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -8455,6 +8637,10 @@ components:
           minimum: 1
         retryDelays:
           type: string
+        retryableStatuses:
+          type: string
+          maxLength: 255
+          minLength: 0
         payloadTemplate:
           type: string
         customHeaders:
@@ -8490,6 +8676,8 @@ components:
           type: integer
           format: int32
         retryDelays:
+          type: string
+        retryableStatuses:
           type: string
         payloadTemplate:
           type: string
@@ -8829,6 +9017,15 @@ components:
           example: "60,300,900,3600,21600"
           maxLength: 255
           minLength: 0
+        retryableStatuses:
+          type: string
+          description: "Which HTTP statuses are worth another attempt. Comma-separated\
+            \ terms: an exact status, a range (500-599), a 5xx shorthand, or a comparison\
+            \ (>=500). Prefix a term with ! to exclude it; exclusions win wherever\
+            \ they are written."
+          example: "408,429,500-599"
+          maxLength: 255
+          minLength: 0
         payloadTransform:
           type: string
           description: JSONPath expression to transform payload before forwarding
@@ -8876,12 +9073,22 @@ components:
           format: int32
         retryDelays:
           type: string
+        retryableStatuses:
+          type: string
         payloadTransform:
           type: string
         transformationId:
           type: string
           format: uuid
         transformationName:
+          type: string
+        failingSince:
+          type: string
+          format: date-time
+        autoDisabledAt:
+          type: string
+          format: date-time
+        autoDisabledReason:
           type: string
         createdAt:
           type: string
@@ -8917,6 +9124,10 @@ components:
           - SHOPIFY
           - SLACK
           - TWILIO
+          - SQUARE
+          - ADYEN
+          - SENDGRID
+          - HUBSPOT
           example: GITHUB
         status:
           type: string
@@ -8980,6 +9191,10 @@ components:
           - SHOPIFY
           - SLACK
           - TWILIO
+          - SQUARE
+          - ADYEN
+          - SENDGRID
+          - HUBSPOT
         status:
           type: string
           enum:
@@ -9158,6 +9373,17 @@ components:
           type: string
           format: date-time
         verificationSkipReason:
+          type: string
+        failingSince:
+          type: string
+          format: date-time
+        consecutiveFailures:
+          type: integer
+          format: int32
+        autoDisabledAt:
+          type: string
+          format: date-time
+        autoDisabledReason:
           type: string
         createdAt:
           type: string
@@ -11150,6 +11376,90 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DailyUsage"
+    TransformationVersionResponse:
+      type: object
+      description: One published version of a transformation's template
+      properties:
+        id:
+          type: string
+          format: uuid
+        transformationId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          format: int32
+          description: The version number this template was published as
+          example: 3
+        template:
+          type: string
+          description: The template itself. Omitted from the list of versions — fetch
+            one version to read it.
+        current:
+          type: boolean
+          description: Whether this is the version the transformation is currently
+            using
+        restoredFromVersion:
+          type: integer
+          format: int32
+          description: "Set when this version was published by restoring an earlier\
+            \ one, naming that earlier version"
+          example: 1
+        createdBy:
+          type: string
+          format: uuid
+          description: "The user who published it. Null when it was published with\
+            \ an API key, or the user has since been erased."
+        createdByEmail:
+          type: string
+          description: "Email of the user who published it, resolved at read time\
+            \ so an erasure takes the name and leaves the change"
+        createdAt:
+          type: string
+          format: date-time
+    JsonDiffEntry:
+      type: object
+      properties:
+        path:
+          type: string
+        type:
+          type: string
+          enum:
+          - ADDED
+          - REMOVED
+          - CHANGED
+        leftValue: {}
+        rightValue: {}
+    TransformationVersionDiffResponse:
+      type: object
+      description: "Two versions of a transformation's template, and what changed\
+        \ between them"
+      properties:
+        transformationId:
+          type: string
+          format: uuid
+        leftVersion:
+          type: integer
+          format: int32
+        rightVersion:
+          type: integer
+          format: int32
+        leftCreatedAt:
+          type: string
+          format: date-time
+        rightCreatedAt:
+          type: string
+          format: date-time
+        leftTemplate:
+          type: string
+          description: "The whole left-hand template, so the caller can render both\
+            \ sides as well as the changes"
+        rightTemplate:
+          type: string
+        diffs:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonDiffEntry"
     CapturedRequestResponse:
       type: object
       properties:
@@ -11674,19 +11984,6 @@ components:
           type: boolean
         empty:
           type: boolean
-    DiffEntry:
-      type: object
-      properties:
-        path:
-          type: string
-        type:
-          type: string
-          enum:
-          - ADDED
-          - REMOVED
-          - CHANGED
-        leftValue: {}
-        rightValue: {}
     EventDiffResponse:
       type: object
       properties:
@@ -11711,7 +12008,7 @@ components:
         diffs:
           type: array
           items:
-            $ref: "#/components/schemas/DiffEntry"
+            $ref: "#/components/schemas/JsonDiffEntry"
     PageEndpointResponse:
       type: object
       properties:
@@ -11883,6 +12180,9 @@ components:
           type: string
           format: uuid
         projectId:
+          type: string
+          format: uuid
+        endpointId:
           type: string
           format: uuid
         severity:

@@ -77,6 +77,8 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE
 | `customHeadersJson` | Extra HTTP headers, as a JSON object in a string. |
 | `maxAttempts` | Attempts before the forward is abandoned. Default `5`. |
 | `retryDelays` | Comma-separated waits in seconds. Default `60,300,900,3600,21600`. |
+| `retryableStatuses` | Which HTTP statuses are worth another attempt. Default `408,429,500-599`. See [Which statuses are worth retrying](/docs/outgoing/retries/#which-statuses-are-worth-retrying). |
+| `autoDisabledAt` | Read-only. Set when Railhook turned this destination off after a window of nothing but failures. See [When Railhook turns an endpoint off](/docs/outgoing/endpoints-subscriptions/#when-railhook-turns-an-endpoint-off) — a destination is turned off on the same terms. |
 | `timeoutSeconds` | How long one attempt waits for a response. Default `30`. |
 | `transformationId` | A saved transformation applied before forwarding. |
 | `payloadTransform` | A JSONPath expression, such as `$.data`, used when no `transformationId` is set. |

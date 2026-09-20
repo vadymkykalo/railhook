@@ -61,6 +61,10 @@ const ENUM_BACKED: Array<[namespace: string, schema: string, property: string, u
   // drifts separately.
   ['dashboard.inFlight.status', 'DeliveryResponse', 'status'],
   ['analytics.endpointStatus', 'EndpointPerformance', 'status'],
+  // The provider picker and the source header both render this. A provider added to the backend
+  // enum without a label here used to reach the screen as the raw SCREAMING_CASE value, which is
+  // what the picker showed for every provider before the labels existed.
+  ['incomingSources.providerNames', 'IncomingSourceResponse', 'providerType'],
 ];
 
 function labelsUnder(locale: object, namespace: string): Record<string, unknown> {

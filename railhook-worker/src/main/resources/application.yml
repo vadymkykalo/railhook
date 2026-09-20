@@ -141,6 +141,11 @@ webhook:
     max-connections: ${WEBHOOK_POOL_MAX_CONNECTIONS:200}
     pending-acquire-timeout-seconds: ${WEBHOOK_POOL_PENDING_ACQUIRE_TIMEOUT_SECONDS:10}
     max-idle-time-seconds: ${WEBHOOK_POOL_MAX_IDLE_TIME_SECONDS:60}
+  retry-after:
+    # Longest a receiver's Retry-After may push a retry back. 6h is the largest tier both
+    # ladders share, so honouring the header never parks an obligation longer than the Ladder
+    # itself already can. 0 turns the feature off and leaves the Ladder in sole charge.
+    max-seconds: ${WEBHOOK_RETRY_AFTER_MAX_SECONDS:21600}
 
 retry:
   scheduler:
@@ -172,6 +177,13 @@ ordering:
   # How often webhook_ordering_buffer_size is resynced against Redis (ms). A SCAN over
   # seq:buffer:* keys, not a per-call increment -- see OrderingBufferService#resyncBufferSizeGauge.
   buffer-gauge-resync-ms: ${ORDERING_BUFFER_GAUGE_RESYNC_MS:30000}
+
+# The worker's half of auto-disable: it keeps the run of failures on the target's row. The api
+# reads it and decides. Off here means the counters are not written at all, so the api's sweep
+# finds nothing — which is why the flag has to have the same value in both services.
+endpoint:
+  auto-disable:
+    enabled: ${ENDPOINT_AUTO_DISABLE_ENABLED:true}
 
 circuit-breaker:
   failure-rate-threshold: ${CIRCUIT_BREAKER_FAILURE_RATE_THRESHOLD:50}

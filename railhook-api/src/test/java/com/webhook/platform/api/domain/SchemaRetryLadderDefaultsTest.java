@@ -2,6 +2,7 @@ package com.webhook.platform.api.domain;
 
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
+import com.webhook.platform.common.retry.RetryableStatuses;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,10 @@ class SchemaRetryLadderDefaultsTest {
     /** {@code max_attempts INTEGER [NOT NULL] DEFAULT 7} */
     private static final Pattern MAX_ATTEMPTS_DEFAULT = Pattern.compile(
             "max_attempts\\s+INTEGER\\s+(?:NOT\\s+NULL\\s+)?DEFAULT\\s+(\\d+)", Pattern.CASE_INSENSITIVE);
+
+    /** {@code retryable_statuses TEXT [NOT NULL] DEFAULT '408,429,500-599'} */
+    private static final Pattern RETRYABLE_STATUSES_DEFAULT = Pattern.compile(
+            "retryable_statuses\\s+TEXT\\s+(?:NOT\\s+NULL\\s+)?DEFAULT\\s+'([^']+)'", Pattern.CASE_INSENSITIVE);
 
     private static final Path MIGRATIONS = Paths.get("src/main/resources/db/migration");
 
@@ -116,6 +121,42 @@ class SchemaRetryLadderDefaultsTest {
                 "A migration introduced a retry ladder default that matches neither direction's "
                         + "declared default. Add it to RetryLadderDefaults or align it:\n  "
                         + String.join("\n  ", offenders));
+    }
+
+    /**
+     * The retryable-status spec has the same two homes for the same reason, and one extra hazard:
+     * it is the only value in the product whose default has to be <em>identical</em> across three
+     * tables, because a Subscription's copy lands on its Deliveries and a Destination's is read
+     * directly. A drift here would give one direction a different idea of what is worth retrying.
+     */
+    @Test
+    @DisplayName("every retryable_statuses default in the schema matches RetryableStatuses.DEFAULT_SPEC")
+    void retryableStatusDefaultsMatchTheConstant() throws IOException {
+        List<String> offenders = new ArrayList<>();
+        int found = 0;
+        try (Stream<Path> files = Files.list(MIGRATIONS)) {
+            for (Path file : files.sorted().toList()) {
+                String sql = Files.readString(file, StandardCharsets.UTF_8);
+                for (String spec : allMatches(RETRYABLE_STATUSES_DEFAULT, sql)) {
+                    found++;
+                    if (!spec.equals(RetryableStatuses.DEFAULT_SPEC)) {
+                        offenders.add(file.getFileName() + " sets retryable_statuses default to '"
+                                + spec + "'");
+                    }
+                }
+            }
+        }
+        assertTrue(found > 0, "no migration declares a retryable_statuses default — did the column move?");
+        assertTrue(offenders.isEmpty(),
+                "A migration's retryable_statuses default has drifted from "
+                        + "RetryableStatuses.DEFAULT_SPEC (\"" + RetryableStatuses.DEFAULT_SPEC
+                        + "\"). Change both, or neither:\n  " + String.join("\n  ", offenders));
+    }
+
+    @Test
+    @DisplayName("the declared retryable-status default is itself a valid spec")
+    void declaredRetryableStatusDefaultParses() {
+        assertDoesNotThrow(() -> RetryableStatuses.parse(RetryableStatuses.DEFAULT_SPEC));
     }
 
     @Test

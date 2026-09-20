@@ -10,6 +10,7 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.SubscriptionRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
+import com.webhook.platform.api.domain.repository.TransformationVersionRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.tenancy.TenantContext;
@@ -60,9 +61,11 @@ class UserFacingStateConflictTest {
         membershipService = new MembershipService(
                 userRepository, membershipRepository, emailService, tokenBlacklistService,
                 new BCryptPasswordEncoder(4), mock(TunnelService.class));
+        ObjectMapper objectMapper = new ObjectMapper();
         transformationService = new TransformationService(
-                transformationRepository, projectRepository, subscriptionRepository,
-                incomingDestinationRepository, new ObjectMapper());
+                transformationRepository, mock(TransformationVersionRepository.class), projectRepository,
+                subscriptionRepository, incomingDestinationRepository, userRepository,
+                new JsonDiffCalculator(objectMapper), objectMapper, 50);
     }
 
     @AfterEach

@@ -256,7 +256,7 @@ class DeliveryRepositoryTest {
 
         OutgoingAttemptStore store = new OutgoingAttemptStore(deliveryRepository, null, null, null, null,
                 new TransactionTemplate(transactionManager), null, null, null, null, null, null, null, null,
-                null, null, 0, null, true);
+                null, null, null, 0, null, true);
         store.attemptStarting(new OutgoingAttemptStore.Claim(delivery.getId(), sweptFence, delivery));
         entityManager.clear();
 

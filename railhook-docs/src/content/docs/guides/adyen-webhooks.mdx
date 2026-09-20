@@ -1,0 +1,142 @@
+---
+title: Receive Adyen webhooks reliably
+description: Adyen retries a failed webhook for 30 days and queues everything behind it. Put Railhook in front — it verifies the HMAC signature, answers inside Adyen's 10 seconds, and forwards to your app with retries and replay.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This guide puts Railhook between Adyen and your application. Adyen sends its webhooks to a Railhook source, which verifies the HMAC, stores each one as it arrived and forwards it to your service with retries. Adyen only ever talks to Railhook, which answers immediately, so your payment handler stops being the thing standing between Adyen and an acknowledgement.
+
+## Why Adyen webhooks need a buffer
+
+Adyen wants a `2xx` within 10 seconds. If it does not get one, it tries again at 9, 18 and 27 seconds, then moves the item into a retry queue — 2 minutes, 5, 10, 15, 30, an hour, two, four, eight, and on at widening intervals for up to 30 days. ([Adyen: Troubleshoot webhooks](https://docs.adyen.com/development-resources/webhooks/troubleshoot))
+
+Thirty days sounds generous until you notice the queue is per endpoint: a webhook stuck on its ladder is a webhook your reconciliation is waiting on. With Railhook in front:
+
+- Adyen is answered as soon as the webhook is stored, well inside the 10 seconds, so nothing enters Adyen's retry queue because of your app.
+- Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed Forwards**.
+- A duplicate — the same `pspReference` and `eventCode` — is answered with the stored copy and not forwarded twice.
+- Anything stored can be replayed, on your schedule rather than Adyen's.
+
+## Connect Adyen
+
+You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Create the webhook in Adyen.** In the **Customer Area**, go to **Developers → Webhooks** and click **Create new webhook**. For ordinary payment events pick the **Standard notification** type. You need the Merchant Technical Integrator or Merchant Admin role to do this. ([Adyen: Configure and manage webhooks](https://docs.adyen.com/development-resources/webhooks/configure-and-manage))
+
+2. **Create the Railhook source** to get the URL Adyen should post to:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Adyen","providerType":"ADYEN","verificationMode":"NONE"}'
+   ```
+
+   Keep the `id` and the `ingressUrl`, and paste the `ingressUrl` into the webhook's **Server configuration → URL** in Adyen.
+
+3. **Generate the HMAC key.** In the **Security** section of the same webhook screen, click **Generate new HMAC key** and copy it at once — Adyen shows it in full only that one time. Afterwards only its key check value stays visible.
+
+4. **Give Railhook the key and turn verification on:**
+
+   ```bash
+   curl -X PUT "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Adyen","verificationMode":"PROVIDER","hmacSecret":"'"$ADYEN_HMAC_KEY"'"}'
+   ```
+
+   Paste the key exactly as Adyen printed it: a long hexadecimal string. Railhook decodes it to bytes before it keys the HMAC, which is what Adyen's own libraries do.
+
+5. **Add a destination**, the URL of your own service:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/adyen","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+6. **Test it from the Customer Area.** Open the saved webhook, use **Test configuration**, pick an event, and Adyen sends sample notifications and reports the result inline. They appear under **Incoming → Received**, with one forward per destination.
+
+</Steps>
+
+<Aside type="caution" title="Copy the key when it is shown">
+Adyen reveals the HMAC key once. If you close that screen without copying it, generate a new one and update the source's `hmacSecret` — there is no way to read the old key back, from Adyen or from Railhook, which stores it encrypted and never returns it.
+</Aside>
+
+## How the signature is checked
+
+Adyen signs in two different shapes, and one Railhook source verifies either, because the request itself says which is in play.
+
+**Standard payments webhooks carry no signature header at all.** Each `notificationItems[].NotificationRequestItem` signs eight of its own fields, joined with colons:
+
+```text
+pspReference:originalReference:merchantAccountCode:merchantReference:value:currency:eventCode:success
+```
+
+An absent field is written as an empty string, and nothing is escaped. The base64 HMAC-SHA256 of that string lands in the item's `additionalData.hmacSignature`. Railhook checks **every** item in the request: a notification is accepted or refused whole, so one forged item cannot travel with a genuine one. ([Adyen: Verify HMAC signatures](https://docs.adyen.com/development-resources/webhooks/secure-webhooks/verify-hmac-signatures))
+
+**Management, Banking and Balance Platform webhooks** put a base64 HMAC-SHA256 of the entire raw body into an `hmacsignature` header, keyed with the same hex key.
+
+A request that does not verify is answered `401` and is not stored.
+
+<Aside type="caution" title="The signature covers eight fields, not the body">
+On a standard payments webhook, everything outside those eight fields — the payment method, the reason, the event date, the whole of `additionalData` — is not covered by the signature. That is Adyen's scheme, not a gap in this verifier. Treat `pspReference`, `merchantReference`, the amount and `success` as the trustworthy part, and look anything else up through the Adyen API if a decision turns on it.
+</Aside>
+
+Adyen documents no timestamp and no tolerance window, so nothing binds a signature to a moment. What bounds a repeat is the replay window, and ahead of it the `pspReference` and `eventCode` pair — which is what Adyen says two copies of one event share. A notification carrying exactly one item is deduplicated on that pair; one carrying several is not, because a key taken from the first item would answer a later request with an earlier one and drop the items it did not name.
+
+## What your service receives
+
+The body exactly as Adyen sent it, byte for byte, `notificationItems` and all. Your service still has to answer Railhook, not Adyen, so it does not need to return Adyen's acknowledgement — Railhook has already sent that. See [Destinations](/docs/incoming/destinations/#what-the-destination-receives).
+
+If your handler would rather receive one item than an envelope, set the destination's `payloadTransform` to `$.notificationItems[0].NotificationRequestItem`, which forwards the item itself. Only do that where you know Adyen sends one item per request — the expression keeps the first and discards the rest. See [Transformations](/docs/outgoing/transformations/#where-a-transformation-attaches).
+
+## Develop locally with the CLI
+
+<Steps>
+
+1. Install the CLI and log in, as in [CLI](/docs/tools/cli/), then open a tunnel to your app's port:
+
+   ```bash
+   railhook listen 3000
+   ```
+
+2. Add a second destination to the source with the printed public URL and your route appended, such as `https://<host>/tunnel/<slug>/webhooks/adyen`. It reaches `http://localhost:3000/webhooks/adyen`.
+
+3. Use **Test configuration** in the Customer Area, and the sample notifications arrive in your local app. Disable that destination when you stop the tunnel.
+
+</Steps>
+
+<Aside type="tip" title="Test and live are two sources">
+Adyen's test and live Customer Areas hold separate webhooks with separate HMAC keys. Give each its own Railhook source, so a test key can never verify a live notification.
+</Aside>
+
+## Replay after an outage
+
+Replay what arrived while your service was down. Each replayed notification goes to every destination of the source as a new forward:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
+```
+
+Replay reaches back as far as events are kept: 7 days on Railhook Cloud, and whatever you configure when self-hosting. Keep your handler idempotent on `pspReference` and `eventCode`, since a replay can send notifications your service already processed. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
+  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Credentials, retries and transformations per destination." />
+  <LinkCard title="Transformations" href="/docs/outgoing/transformations/" description="Unwrap the notification envelope before your service sees it." />
+</CardGrid>

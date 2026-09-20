@@ -237,6 +237,34 @@ public class AlertService {
         return eventRepository.resolveAllByProjectId(projectId, Instant.now());
     }
 
+    /**
+     * Records an alert nobody wrote a rule for.
+     *
+     * <p>Every other alert is a rule its owner created firing; this is Railhook reporting a
+     * decision it made about their installation, and there is no rule to hang it on. The event
+     * therefore carries a null {@code alertRuleId} — the alternative, a hidden rule per
+     * organization, would put a row in the alert-rules list that nobody could explain or delete.
+     *
+     * <p>It creates no Incident and dispatches to no channel: a rule's channel is the rule's,
+     * and the caller owns telling anybody. The in-app list is what this writes.
+     *
+     * @param endpointId the Endpoint the event is about, or null when it is not about one
+     */
+    @Transactional
+    public AlertEvent raiseSystemAlert(UUID projectId, UUID endpointId, AlertSeverity severity,
+            String title, String message) {
+        AlertEvent event = eventRepository.save(AlertEvent.builder()
+                .alertRuleId(null)
+                .projectId(projectId)
+                .endpointId(endpointId)
+                .severity(severity)
+                .title(title)
+                .message(message)
+                .build());
+        log.warn("System alert raised: project={}, endpoint={}, title='{}'", projectId, endpointId, title);
+        return event;
+    }
+
     // ─── Fire alert (called by evaluator) ───────────────────────────────
 
     @Transactional
@@ -327,6 +355,7 @@ public class AlertService {
                 .id(event.getId())
                 .alertRuleId(event.getAlertRuleId())
                 .projectId(event.getProjectId())
+                .endpointId(event.getEndpointId())
                 .severity(event.getSeverity())
                 .title(event.getTitle())
                 .message(event.getMessage())

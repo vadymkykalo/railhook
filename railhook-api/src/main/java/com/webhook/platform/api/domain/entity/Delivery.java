@@ -2,6 +2,7 @@ package com.webhook.platform.api.domain.entity;
 
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
+import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.api.domain.enums.DeliveryOrigin;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import jakarta.persistence.*;
@@ -104,6 +105,15 @@ public class Delivery {
     @Column(name = "retry_delays", columnDefinition = "TEXT")
     @Builder.Default
     private String retryDelays = RetryLadderDefaults.OUTGOING_DELAYS;
+
+    /**
+     * Which HTTP statuses are worth another Attempt, copied from the Subscription when this
+     * Delivery was created — as the ladder is, and for the same reason: an edit mid-ladder must
+     * not change the rules an obligation already in flight is judged by.
+     */
+    @Column(name = "retryable_statuses", nullable = false, columnDefinition = "TEXT")
+    @Builder.Default
+    private String retryableStatuses = RetryableStatuses.DEFAULT_SPEC;
 
     @Column(name = "payload_template", columnDefinition = "TEXT")
     private String payloadTemplate;

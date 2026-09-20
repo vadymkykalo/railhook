@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
-import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, Search, ArrowDown, Link2 } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
+import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, Search, ArrowDown, Link2, History } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -253,7 +253,17 @@ export default function TransformationsPage() {
                       {item.description || '—'}
                     </span>
                   </TableCell>
-                  <TableCell><span className="font-mono text-xs">v{item.version}</span></TableCell>
+                  <TableCell>
+                    {/* The version number is a link because it is a claim about the past:
+                        every template this transformation has published is behind it. */}
+                    <Link
+                      to={`/projects/${projectId}/transformations/${item.id}/history`}
+                      className="font-mono text-xs underline-offset-2 hover:underline"
+                      title={t('transformations.history')}
+                    >
+                      v{item.version}
+                    </Link>
+                  </TableCell>
                   <TableCell><EnabledBadge enabled={item.enabled} /></TableCell>
                   <TableCell>
                     {(item.subscriptionCount > 0 || item.destinationCount > 0) ? (
@@ -278,6 +288,11 @@ export default function TransformationsPage() {
                         </Button>
                         <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicate(item)} title={t('transformations.duplicate')} aria-label={t('transformations.duplicate')}>
                           <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button asChild variant="ghost" size="icon-sm" title={t('transformations.history')} aria-label={t('transformations.history')}>
+                          <Link to={`/projects/${projectId}/transformations/${item.id}/history`}>
+                            <History className="h-3.5 w-3.5" />
+                          </Link>
                         </Button>
                         <Button
                           variant="ghost"

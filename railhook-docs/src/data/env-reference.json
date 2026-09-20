@@ -979,6 +979,12 @@
           "default": "10000",
           "example": null,
           "description": "Poll interval in milliseconds. This is the baseline the adaptive governor scales\nfrom, not a fixed period: it polls at this rate under light load, backs off to 3x\nwhen the retry queue is empty, and tightens to 1/2x and 1/5x as the backlog grows."
+        },
+        {
+          "name": "WEBHOOK_RETRY_AFTER_MAX_SECONDS",
+          "default": "21600",
+          "example": null,
+          "description": "Longest a receiver's own Retry-After header may push the next attempt back (seconds). Honoured\non 429 and 503 only - the two statuses where it means \"I am over capacity, wait\" - and it can\nonly ever push an attempt LATER than the ladder said, never sooner. Default 21600 (6h): the\nlargest tier both default ladders share, so honouring the header never parks an obligation for\nlonger than the ladder itself already can, and seven outgoing attempts at the maximum still fit\ninside DELIVERY_ESCALATION_HARD_CAP_HOURS. Hookdeck allows 7 days; we do not, because a\nweek-long wait would be cut short by that hard cap rather than honoured. Set it to 0 to ignore\nthe header entirely and leave the ladder in sole charge."
         }
       ]
     },
@@ -1025,6 +1031,41 @@
           "default": "60000",
           "example": null,
           "description": "Check interval in milliseconds"
+        }
+      ]
+    },
+    {
+      "title": "Auto-disable a persistently failing target",
+      "variables": [
+        {
+          "name": "ENDPOINT_AUTO_DISABLE_ENABLED",
+          "default": "true",
+          "example": null,
+          "description": "A dead receiver used to burn its retry budget forever: every new event started a fresh retry\nladder, the circuit breaker deferred a few attempts and then forgot within two minutes, and\nnothing anywhere said \"this endpoint has been dead since Tuesday\". This turns the endpoint (or\nthe incoming destination) off after a whole window of nothing but failures, tells its owners,\nand records why.\n\nThe worker keeps the run of failures on the target's row; the api sweeps and decides. Both\nservices read this flag and it has to say the same thing in both, or one half runs without the\nother. Set it to false and nothing is counted and nothing is ever disabled automatically."
+        },
+        {
+          "name": "ENDPOINT_AUTO_DISABLE_AFTER_HOURS",
+          "default": "72",
+          "example": null,
+          "description": "How long a target must have been failing without a single success before it is turned off\n(hours). Default 72h - three days. Shorter than DELIVERY_ESCALATION_HARD_CAP_HOURS on purpose,\nso the bleeding stops before the first cohort of deliveries reaches Failed Messages, and long\nenough that a weekend of downtime is caught while a six-hour blip is not. A value below 1 is\nrefused at startup; use ENDPOINT_AUTO_DISABLE_ENABLED=false to turn the feature off."
+        },
+        {
+          "name": "ENDPOINT_AUTO_DISABLE_MIN_FAILURES",
+          "default": "10",
+          "example": null,
+          "description": "...and how many failed attempts that run has to contain. Without this, an endpoint that gets\none event a week and failed the last one would be disabled purely for being idle. Both\nconditions have to hold."
+        },
+        {
+          "name": "ENDPOINT_AUTO_DISABLE_INTERVAL_MS",
+          "default": "300000",
+          "example": null,
+          "description": "How often the api looks for targets to turn off (ms), and how many it takes per pass. The\nwindow is measured in days, so the sweep's own cadence changes nothing anyone would notice."
+        },
+        {
+          "name": "ENDPOINT_AUTO_DISABLE_BATCH_SIZE",
+          "default": "200",
+          "example": null,
+          "description": "How often the api looks for targets to turn off (ms), and how many it takes per pass. The\nwindow is measured in days, so the sweep's own cadence changes nothing anyone would notice."
         }
       ]
     },
@@ -1175,6 +1216,17 @@
           "default": "7",
           "example": null,
           "description": "Retention for rule execution logs (days, default 7)"
+        }
+      ]
+    },
+    {
+      "title": "Transformations",
+      "variables": [
+        {
+          "name": "TRANSFORMATION_HISTORY_LIMIT",
+          "default": "50",
+          "example": null,
+          "description": "How many published templates each transformation keeps in its history. Every edit to a\ntemplate publishes one, and any of them can be viewed, compared and restored. When a\ntransformation has more than this, the oldest fall off; the version currently in use never\ndoes. Raise it if you need to reach further back, at roughly 64 KB per version in the worst\ncase. (default 50)"
         }
       ]
     },

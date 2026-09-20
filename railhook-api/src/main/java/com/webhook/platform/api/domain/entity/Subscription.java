@@ -1,6 +1,7 @@
 package com.webhook.platform.api.domain.entity;
 
 import com.webhook.platform.common.retry.RetryLadderDefaults;
+import com.webhook.platform.common.retry.RetryableStatuses;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -56,6 +57,15 @@ public class Subscription {
     @Column(name = "retry_delays", columnDefinition = "TEXT")
     @Builder.Default
     private String retryDelays = RetryLadderDefaults.OUTGOING_DELAYS;
+
+    /**
+     * Which HTTP statuses are worth another Attempt. Copied onto each Delivery at creation, as
+     * the ladder is, so editing a Subscription does not change the rules an obligation already
+     * in flight is judged by.
+     */
+    @Column(name = "retryable_statuses", nullable = false, columnDefinition = "TEXT")
+    @Builder.Default
+    private String retryableStatuses = RetryableStatuses.DEFAULT_SPEC;
 
     @Column(name = "payload_template", columnDefinition = "TEXT")
     private String payloadTemplate;

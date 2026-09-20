@@ -21,5 +21,9 @@ public enum ProviderType {
     STRIPE,
     SHOPIFY,
     SLACK,
-    TWILIO
+    TWILIO,
+    SQUARE,
+    ADYEN,
+    SENDGRID,
+    HUBSPOT
 }

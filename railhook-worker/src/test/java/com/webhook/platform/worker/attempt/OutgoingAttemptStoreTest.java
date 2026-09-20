@@ -45,7 +45,7 @@ class OutgoingAttemptStoreTest {
 
         store = new OutgoingAttemptStore(
                 deliveryRepository, null, null, null, null, transactionTemplate,
-                null, null, null, null, null, null, null, null, null, Clock.systemUTC(), 5,
+                null, null, null, null, null, null, null, null, null, null, Clock.systemUTC(), 5,
                 DeliveryMessage.builder().deliveryId(DELIVERY_ID).build(), false);
     }
 

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.common.retry.RetryableStatuses;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
@@ -111,6 +112,12 @@ public class SubscriptionService {
                 request.getRetryDelays() != null ? request.getRetryDelays() : RetryLadderDefaults.OUTGOING_DELAYS,
                 "retryDelays",
                 request.getMaxAttempts(), "maxAttempts");
+        // Same reason, same place: the worker refuses to guess at a spec it cannot parse, so the
+        // mistake has to be refused where it is made.
+        RetryableStatuses.validate(
+                request.getRetryableStatuses() != null
+                        ? request.getRetryableStatuses() : RetryableStatuses.DEFAULT_SPEC,
+                "retryableStatuses");
 
         Subscription subscription = Subscription.builder()
                 .projectId(projectId)
@@ -123,6 +130,8 @@ public class SubscriptionService {
                 .timeoutSeconds(request.getTimeoutSeconds() != null ? request.getTimeoutSeconds() : 30)
                 .retryDelays(request.getRetryDelays() != null ? request.getRetryDelays()
                         : RetryLadderDefaults.OUTGOING_DELAYS)
+                .retryableStatuses(request.getRetryableStatuses() != null
+                        ? request.getRetryableStatuses() : RetryableStatuses.DEFAULT_SPEC)
                 .payloadTemplate(request.getPayloadTemplate())
                 .customHeaders(request.getCustomHeaders())
                 .transformationId(request.getTransformationId())
@@ -185,6 +194,10 @@ public class SubscriptionService {
             RetryLadder.validate(request.getRetryDelays(), "retryDelays");
             subscription.setRetryDelays(request.getRetryDelays());
         }
+        if (request.getRetryableStatuses() != null) {
+            RetryableStatuses.validate(request.getRetryableStatuses(), "retryableStatuses");
+            subscription.setRetryableStatuses(request.getRetryableStatuses());
+        }
         if (request.getPayloadTemplate() != null) {
             validatePayloadTemplate(request.getPayloadTemplate());
             subscription.setPayloadTemplate(request.getPayloadTemplate());
@@ -242,6 +255,7 @@ public class SubscriptionService {
                 .maxAttempts(subscription.getMaxAttempts())
                 .timeoutSeconds(subscription.getTimeoutSeconds())
                 .retryDelays(subscription.getRetryDelays())
+                .retryableStatuses(subscription.getRetryableStatuses())
                 .payloadTemplate(subscription.getPayloadTemplate())
                 .customHeaders(subscription.getCustomHeaders())
                 .transformationId(subscription.getTransformationId())

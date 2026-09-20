@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### An endpoint that has failed for days is now turned off, and says so
+
+Nothing to do on upgrade; the migration is additive and every existing row keeps the behaviour
+it had. Two things change for an installation that leaves the defaults alone:
+
+- An **Endpoint or incoming Destination that has not accepted anything for 72 hours**, across at
+  least 10 failed attempts, is disabled. Its owners get an in-app alert and — where
+  `EMAIL_ENABLED=true` — one mail. Deliveries already queued to it go to **Failed Messages**
+  rather than ending `FAILED`, so they can be retried once the receiver is fixed. Re-enabling
+  clears the record of failure. `ENDPOINT_AUTO_DISABLE_ENABLED=false` turns the whole thing off;
+  set it in **both** the api and the worker, which is how `docker-compose.yml` already passes it.
+- A receiver's **`Retry-After`** is honoured on 429 and 503, clamped to
+  `WEBHOOK_RETRY_AFTER_MAX_SECONDS` (6h). It can only push an attempt later than the ladder
+  already said. Set it to `0` to ignore the header.
+
+A Subscription and a Destination can now also say **which statuses are worth another attempt**
+(`retryableStatuses`). The column default is `408,429,500-599` — exactly what the worker
+hardcoded before — so nothing changes for a row that does not set it.
+
 ## v2.17.2
 
 ### `./railhook settings` — change `.env` without editing it

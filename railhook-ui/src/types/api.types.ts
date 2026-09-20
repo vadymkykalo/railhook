@@ -150,6 +150,18 @@ export interface EndpointResponse {
   verificationAttemptedAt?: string;
   verificationCompletedAt?: string;
   verificationSkipReason?: string;
+  /** Start of the current unbroken run of failed deliveries; absent once one succeeds. */
+  failingSince?: string;
+  /** Attempts in that run. */
+  consecutiveFailures?: number;
+  /**
+   * When Railhook turned this endpoint off for continuous failure. Absent while it is on, and
+   * absent when its owner turned it off - the two are different states, and only this one is
+   * cleared by re-enabling.
+   */
+  autoDisabledAt?: string;
+  /** Why, in words meant for the endpoint's owner. */
+  autoDisabledReason?: string;
   createdAt: string;
   updatedAt: string;
   secret?: string;
@@ -294,6 +306,11 @@ export interface SubscriptionResponse {
   endpointId: string;
   eventType: string;
   enabled: boolean;
+  /**
+   * Which HTTP statuses are worth another attempt, as a spec: `408,429,500-599`, `>=500`,
+   * `5xx,!501`. The default reproduces what used to be hardcoded.
+   */
+  retryableStatuses?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -338,7 +355,8 @@ export interface McpGrantResponse {
 
 // ─── Incoming Webhooks ──────────────────────────────────────────────
 
-export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO';
+export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO'
+  | 'SQUARE' | 'ADYEN' | 'SENDGRID' | 'HUBSPOT';
 export type IncomingSourceStatus = 'ACTIVE' | 'DISABLED';
 export type VerificationMode = 'NONE' | 'HMAC_GENERIC' | 'PROVIDER';
 export type IncomingAuthType = 'NONE' | 'BEARER' | 'BASIC' | 'CUSTOM_HEADER';
@@ -507,6 +525,42 @@ export interface TransformationResponse {
   destinationCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * One published template. `template` is only populated by the single-version endpoint — the
+ * list of versions is an index and leaves it out.
+ */
+export interface TransformationVersionResponse {
+  id: string;
+  transformationId: string;
+  version: number;
+  template?: string;
+  current: boolean;
+  /** Present only when this version was published by restoring an earlier one. */
+  restoredFromVersion?: number;
+  createdBy?: string;
+  /** Null for an API key, for a version backfilled from before the history existed, and for an erased user. */
+  createdByEmail?: string;
+  createdAt: string;
+}
+
+export interface TransformationVersionDiffResponse {
+  transformationId: string;
+  leftVersion: number;
+  rightVersion: number;
+  leftCreatedAt: string;
+  rightCreatedAt: string;
+  leftTemplate: string;
+  rightTemplate: string;
+  diffs: JsonDiffEntry[];
+}
+
+export interface JsonDiffEntry {
+  path: string;
+  type: 'ADDED' | 'REMOVED' | 'CHANGED';
+  leftValue?: unknown;
+  rightValue?: unknown;
 }
 
 export interface IncomingBulkReplayResponse {

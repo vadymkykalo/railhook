@@ -16,7 +16,7 @@ import RetryJitterNote from '../components/RetryJitterNote';
 import { ladderTicks } from './ConnectionSetupPage';
 import { PROVIDER_SIGNATURE_HEADERS } from '../lib/publicSnippets';
 import type {
-  IncomingDestinationResponse, IncomingDestinationRequest, IncomingAuthType, IncomingSourceResponse, ProviderType,
+  IncomingDestinationResponse, IncomingDestinationRequest, IncomingAuthType, IncomingSourceResponse,
 } from '../types/api.types';
 import { transformApi } from '../api/transform.api';
 import {
@@ -52,10 +52,6 @@ import ConfirmDialog from '../components/ConfirmDialog';
  */
 
 const AUTH_TYPES: IncomingAuthType[] = ['NONE', 'BEARER', 'BASIC', 'CUSTOM_HEADER'];
-
-const PROVIDER_NAMES: Record<ProviderType, string> = {
-  GENERIC: 'Generic', GITHUB: 'GitHub', GITLAB: 'GitLab', STRIPE: 'Stripe', SHOPIFY: 'Shopify', SLACK: 'Slack', TWILIO: 'Twilio',
-};
 
 /**
  * The header a request to this source has to be signed in. A provider-verified source is checked
@@ -304,7 +300,7 @@ export default function IncomingSourceDetailPage() {
   return (
     <div className="p-4 lg:p-6">
       <PageHeader
-        eyebrow={`${PROVIDER_NAMES[source.providerType] ?? source.providerType} · ${source.slug}`}
+        eyebrow={`${t(`incomingSources.providerNames.${source.providerType}`)} · ${source.slug}`}
         title={source.name}
         description={t('incomingSources.detailDescription', 'Webhooks arriving at this URL are verified, then forwarded to every destination below.')}
         actions={newDestinationButton}
@@ -334,7 +330,7 @@ export default function IncomingSourceDetailPage() {
                 // An unsigned cURL to a provider-verified source only ever produces a 401.
                 <p className="rounded-md border border-rail bg-secondary/40 p-3 text-xs text-muted-foreground">
                   {t('incomingSources.howToSend.signedByProvider', {
-                    provider: PROVIDER_NAMES[source.providerType],
+                    provider: t(`incomingSources.providerNames.${source.providerType}`),
                     header: signatureHeaderOf(source),
                   })}
                 </p>

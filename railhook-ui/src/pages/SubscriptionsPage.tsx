@@ -149,6 +149,7 @@ export default function SubscriptionsPage() {
           maxAttempts: sub.maxAttempts,
           timeoutSeconds: sub.timeoutSeconds,
           retryDelays: sub.retryDelays,
+          retryableStatuses: sub.retryableStatuses,
           payloadTemplate: sub.payloadTemplate || undefined,
           customHeaders: sub.customHeaders || undefined,
           transformationId: sub.transformationId,

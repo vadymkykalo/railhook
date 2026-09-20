@@ -27,6 +27,7 @@ public class IncomingAttemptStoreFactory {
     private final ObjectMapper objectMapper;
     private final WebClient incomingForwardWebClient;
     private final KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
+    private final TargetFailureRecorder targetFailureRecorder;
 
     public IncomingAttemptStoreFactory(
             IncomingForwardAttemptRepository attemptRepository,
@@ -38,7 +39,8 @@ public class IncomingAttemptStoreFactory {
             ObjectMapper objectMapper,
             @Qualifier("incomingForwardWebClient") WebClient incomingForwardWebClient,
             @Qualifier("incomingForwardKafkaTemplate")
-            KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate) {
+            KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate,
+            TargetFailureRecorder targetFailureRecorder) {
         this.attemptRepository = attemptRepository;
         this.projectStatusLookup = projectStatusLookup;
         this.transactionTemplate = transactionTemplate;
@@ -48,6 +50,7 @@ public class IncomingAttemptStoreFactory {
         this.objectMapper = objectMapper;
         this.incomingForwardWebClient = incomingForwardWebClient;
         this.kafkaTemplate = kafkaTemplate;
+        this.targetFailureRecorder = targetFailureRecorder;
     }
 
     public IncomingAttemptStore create(IncomingForwardMessage message, IncomingEvent event,
@@ -55,6 +58,7 @@ public class IncomingAttemptStoreFactory {
         return new IncomingAttemptStore(
                 attemptRepository, projectStatusLookup, transactionTemplate, transformationCacheService,
                 payloadTransformService, encryptionKeyRegistry, objectMapper,
-                incomingForwardWebClient, kafkaTemplate, message, event, destination);
+                incomingForwardWebClient, kafkaTemplate, targetFailureRecorder,
+                message, event, destination);
     }
 }

@@ -1,5 +1,8 @@
 package com.webhook.platform.api.domain.repository;
 
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.jpa.repository.Modifying;
+import java.time.Instant;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -45,4 +48,37 @@ public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
            "WHERE p.organization_id = :orgId AND e.deleted_at IS NULL AND p.deleted_at IS NULL " +
            "GROUP BY e.project_id) sub", nativeQuery = true)
     long maxEndpointsPerProjectInOrg(@Param("orgId") UUID organizationId);
+
+    /**
+     * Endpoints the auto-disable sweep should look at: live, still on, and in an unbroken run of
+     * failures that both started before {@code cutoff} and is at least {@code minFailures} long.
+     *
+     * <p>Both conditions are the query's, not a filter applied to its results: a near-idle
+     * endpoint that failed once three days ago has a {@code failing_since} as old as a dead one's,
+     * and the count is the only thing that tells them apart.
+     */
+    @Query("SELECT e FROM Endpoint e WHERE e.enabled = true AND e.deletedAt IS NULL "
+            + "AND e.failingSince IS NOT NULL AND e.failingSince < :cutoff "
+            + "AND e.consecutiveFailures >= :minFailures ORDER BY e.failingSince ASC")
+    List<Endpoint> findAutoDisableCandidates(@Param("cutoff") Instant cutoff,
+            @Param("minFailures") int minFailures, Pageable pageable);
+
+    /**
+     * Turns one endpoint off for continuous failure, and reports whether it was this call that
+     * did it.
+     *
+     * <p>A conditional UPDATE rather than saving the entity the sweep read. Two reasons, and the
+     * second is a bug the first would have hidden: saving writes every column, so a merge would
+     * put back the {@code consecutive_failures} the worker has incremented since the read — and,
+     * worse, would re-disable an endpoint its owner re-enabled in the meantime. The {@code WHERE}
+     * clause is what makes "somebody got there first" a zero rather than a silent overwrite.
+     *
+     * <p>The run of failures is deliberately left alone: "failing since" is what the owner is
+     * told, and re-enabling is what clears it.
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Endpoint e SET e.enabled = false, e.autoDisabledAt = :at, e.autoDisabledReason = :reason "
+            + "WHERE e.id = :id AND e.enabled = true AND e.autoDisabledAt IS NULL")
+    int autoDisable(@Param("id") UUID id, @Param("at") Instant at, @Param("reason") String reason);
 }

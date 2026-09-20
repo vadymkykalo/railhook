@@ -824,6 +824,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/transformations/{id}/versions/{version}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore a transformation version
+         * @description Publishes an earlier template again as a new version. The versions published after it are kept: a restore moves the transformation forward rather than rewinding its history.
+         */
+        post: operations["restoreTransformationVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/transform-preview": {
         parameters: {
             query?: never;
@@ -1491,6 +1511,26 @@ export interface paths {
          * @description Disables mutual TLS for the endpoint
          */
         delete: operations["disableMtls"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/endpoints/{id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable an endpoint
+         * @description Turns the endpoint back on and clears an auto-disable: the recorded reason, the time it was disabled, and the run of failures that led to it.
+         */
+        post: operations["enableEndpoint"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2718,6 +2758,66 @@ export interface paths {
          * @description Returns live usage counts and daily history for the project
          */
         get: operations["getProjectUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/transformations/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List transformation versions
+         * @description Returns every published version of this transformation's template, newest first, with who published it and when. The templates themselves are omitted — fetch one version to read it.
+         */
+        get: operations["listTransformationVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/transformations/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one transformation version
+         * @description Returns one published version, including the template it published
+         */
+        get: operations["getTransformationVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/transformations/{id}/versions/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare two transformation versions
+         * @description Returns both templates whole and the list of places they differ, each named by its JSONPath
+         */
+        get: operations["diffTransformationVersions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4093,6 +4193,7 @@ export interface components {
             /** Format: int32 */
             timeoutSeconds?: number;
             retryDelays?: string;
+            retryableStatuses?: string;
             payloadTemplate?: string;
             customHeaders?: string;
             /** Format: uuid */
@@ -4113,6 +4214,7 @@ export interface components {
             /** Format: int32 */
             timeoutSeconds?: number;
             retryDelays?: string;
+            retryableStatuses?: string;
             payloadTemplate?: string;
             customHeaders?: string;
             /** Format: uuid */
@@ -4292,6 +4394,11 @@ export interface components {
              */
             retryDelays?: string;
             /**
+             * @description Which HTTP statuses are worth another attempt. Comma-separated terms: an exact status, a range (500-599), a 5xx shorthand, or a comparison (>=500). Prefix a term with ! to exclude it; exclusions win wherever they are written.
+             * @example 408,429,500-599
+             */
+            retryableStatuses?: string;
+            /**
              * @description JSONPath expression to transform payload before forwarding (null = forward as-is)
              * @example $.data
              */
@@ -4318,10 +4425,16 @@ export interface components {
             /** Format: int32 */
             timeoutSeconds?: number;
             retryDelays?: string;
+            retryableStatuses?: string;
             payloadTransform?: string;
             /** Format: uuid */
             transformationId?: string;
             transformationName?: string;
+            /** Format: date-time */
+            failingSince?: string;
+            /** Format: date-time */
+            autoDisabledAt?: string;
+            autoDisabledReason?: string;
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
@@ -4344,7 +4457,7 @@ export interface components {
              * @example GITHUB
              * @enum {string}
              */
-            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO";
+            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO" | "SQUARE" | "ADYEN" | "SENDGRID" | "HUBSPOT";
             /**
              * @description Source status
              * @enum {string}
@@ -4382,7 +4495,7 @@ export interface components {
             name?: string;
             slug?: string;
             /** @enum {string} */
-            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO";
+            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO" | "SQUARE" | "ADYEN" | "SENDGRID" | "HUBSPOT";
             /** @enum {string} */
             status?: "ACTIVE" | "DISABLED";
             ingressPathToken?: string;
@@ -4478,6 +4591,13 @@ export interface components {
             /** Format: date-time */
             verificationCompletedAt?: string;
             verificationSkipReason?: string;
+            /** Format: date-time */
+            failingSince?: string;
+            /** Format: int32 */
+            consecutiveFailures?: number;
+            /** Format: date-time */
+            autoDisabledAt?: string;
+            autoDisabledReason?: string;
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
@@ -5579,6 +5699,62 @@ export interface components {
             current?: components["schemas"]["LiveUsage"];
             history?: components["schemas"]["DailyUsage"][];
         };
+        /** @description One published version of a transformation's template */
+        TransformationVersionResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            transformationId?: string;
+            /**
+             * Format: int32
+             * @description The version number this template was published as
+             * @example 3
+             */
+            version?: number;
+            /** @description The template itself. Omitted from the list of versions — fetch one version to read it. */
+            template?: string;
+            /** @description Whether this is the version the transformation is currently using */
+            current?: boolean;
+            /**
+             * Format: int32
+             * @description Set when this version was published by restoring an earlier one, naming that earlier version
+             * @example 1
+             */
+            restoredFromVersion?: number;
+            /**
+             * Format: uuid
+             * @description The user who published it. Null when it was published with an API key, or the user has since been erased.
+             */
+            createdBy?: string;
+            /** @description Email of the user who published it, resolved at read time so an erasure takes the name and leaves the change */
+            createdByEmail?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        JsonDiffEntry: {
+            path?: string;
+            /** @enum {string} */
+            type?: "ADDED" | "REMOVED" | "CHANGED";
+            leftValue?: unknown;
+            rightValue?: unknown;
+        };
+        /** @description Two versions of a transformation's template, and what changed between them */
+        TransformationVersionDiffResponse: {
+            /** Format: uuid */
+            transformationId?: string;
+            /** Format: int32 */
+            leftVersion?: number;
+            /** Format: int32 */
+            rightVersion?: number;
+            /** Format: date-time */
+            leftCreatedAt?: string;
+            /** Format: date-time */
+            rightCreatedAt?: string;
+            /** @description The whole left-hand template, so the caller can render both sides as well as the changes */
+            leftTemplate?: string;
+            rightTemplate?: string;
+            diffs?: components["schemas"]["JsonDiffEntry"][];
+        };
         CapturedRequestResponse: {
             id?: string;
             testEndpointId?: string;
@@ -5888,13 +6064,6 @@ export interface components {
             last?: boolean;
             empty?: boolean;
         };
-        DiffEntry: {
-            path?: string;
-            /** @enum {string} */
-            type?: "ADDED" | "REMOVED" | "CHANGED";
-            leftValue?: unknown;
-            rightValue?: unknown;
-        };
         EventDiffResponse: {
             /** Format: uuid */
             leftEventId?: string;
@@ -5907,7 +6076,7 @@ export interface components {
             rightCreatedAt?: string;
             leftPayload?: string;
             rightPayload?: string;
-            diffs?: components["schemas"]["DiffEntry"][];
+            diffs?: components["schemas"]["JsonDiffEntry"][];
         };
         PageEndpointResponse: {
             /** Format: int32 */
@@ -6009,6 +6178,8 @@ export interface components {
             alertRuleId?: string;
             /** Format: uuid */
             projectId?: string;
+            /** Format: uuid */
+            endpointId?: string;
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "CRITICAL";
             title?: string;
@@ -9138,6 +9309,30 @@ export interface operations {
             };
         };
     };
+    restoreTransformationVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransformationResponse"];
+                };
+            };
+        };
+    };
     preview: {
         parameters: {
             query?: never;
@@ -10237,6 +10432,29 @@ export interface operations {
         };
     };
     disableMtls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EndpointResponse"];
+                };
+            };
+        };
+    };
+    enableEndpoint: {
         parameters: {
             query?: never;
             header?: never;
@@ -12269,6 +12487,79 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["UsageStatsResponse"];
+                };
+            };
+        };
+    };
+    listTransformationVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransformationVersionResponse"][];
+                };
+            };
+        };
+    };
+    getTransformationVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransformationVersionResponse"];
+                };
+            };
+        };
+    };
+    diffTransformationVersions: {
+        parameters: {
+            query: {
+                left: number;
+                right: number;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransformationVersionDiffResponse"];
                 };
             };
         };

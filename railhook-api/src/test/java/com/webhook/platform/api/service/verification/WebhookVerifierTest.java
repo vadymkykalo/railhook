@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service.verification;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
@@ -12,6 +14,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.spec.ECGenParameterSpec;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -483,6 +490,423 @@ class WebhookVerifierTest {
         assertThat(factory.getVerifier(source)).isInstanceOf(TwilioVerifier.class);
     }
 
+    // ======================== SquareVerifier ========================
+
+    private static final String SQUARE_URL = "https://hooks.example.com";
+    private static final String SQUARE_PATH = "/ingress/tok_square";
+    /** A payment.updated notification in the shape Square documents, event_id and all. */
+    private static final String SQUARE_BODY = "{\"merchant_id\":\"MLEFBHHSJGVHD\",\"type\":\"payment.updated\","
+            + "\"event_id\":\"6a8f5f28-54a1-4eb0-a98a-3111513fd4fc\",\"created_at\":\"2026-02-14T15:51:37.226Z\","
+            + "\"data\":{\"type\":\"payment\",\"id\":\"hYy9pRFVxpDsO1FB05SunFWUe9JZY\","
+            + "\"object\":{\"payment\":{\"id\":\"hYy9pRFVxpDsO1FB05SunFWUe9JZY\",\"status\":\"COMPLETED\","
+            + "\"amount_money\":{\"amount\":100,\"currency\":\"USD\"}}}}}";
+
+    @Test
+    void square_success() {
+        // Square signs the notification URL followed immediately by the raw body, no separator.
+        String signature = hmacSha256Base64(SECRET, SQUARE_URL + SQUARE_PATH + SQUARE_BODY);
+        when(request.getHeader("x-square-hmacsha256-signature")).thenReturn(signature);
+        when(request.getRequestURI()).thenReturn(SQUARE_PATH);
+        when(request.getQueryString()).thenReturn(null);
+
+        var result = new SquareVerifier(SQUARE_URL)
+                .verify(SECRET, SQUARE_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.error()).isNull();
+        assertThat(result.verified()).isTrue();
+        assertThat(result.replayKey()).isEqualTo(signature);
+    }
+
+    /**
+     * The notification URL is signed, so http for https, a trailing slash or another host all
+     * change the digest. Square documents that as the first thing to check when a genuine
+     * notification will not verify, and it is why the URL is rebuilt from the configured ingress
+     * base rather than from what the request claims its Host is.
+     */
+    @Test
+    void square_signedForADifferentNotificationUrlFails() {
+        String signature = hmacSha256Base64(SECRET, "http://hooks.example.com" + SQUARE_PATH + SQUARE_BODY);
+        when(request.getHeader("x-square-hmacsha256-signature")).thenReturn(signature);
+        when(request.getRequestURI()).thenReturn(SQUARE_PATH);
+        when(request.getQueryString()).thenReturn(null);
+
+        var result = new SquareVerifier(SQUARE_URL)
+                .verify(SECRET, SQUARE_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("mismatch");
+    }
+
+    @Test
+    void square_tamperedBodyFails() {
+        String signature = hmacSha256Base64(SECRET, SQUARE_URL + SQUARE_PATH + SQUARE_BODY);
+        when(request.getHeader("x-square-hmacsha256-signature")).thenReturn(signature);
+        when(request.getRequestURI()).thenReturn(SQUARE_PATH);
+        when(request.getQueryString()).thenReturn(null);
+
+        byte[] tampered = SQUARE_BODY.replace("\"amount\":100", "\"amount\":1").getBytes(StandardCharsets.UTF_8);
+        var result = new SquareVerifier(SQUARE_URL).verify(SECRET, tampered, request);
+
+        assertThat(result.verified()).isFalse();
+    }
+
+    @Test
+    void square_missingHeader() {
+        when(request.getHeader("x-square-hmacsha256-signature")).thenReturn(null);
+
+        var result = new SquareVerifier(SQUARE_URL)
+                .verify(SECRET, SQUARE_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("x-square-hmacsha256-signature");
+    }
+
+    @Test
+    void factory_returnsSquareForProvider() {
+        var factory = new WebhookVerifierFactory(TWILIO_URL);
+        var source = buildSource(VerificationMode.PROVIDER, ProviderType.SQUARE);
+
+        assertThat(factory.getVerifier(source)).isInstanceOf(SquareVerifier.class);
+    }
+
+    // ======================== AdyenVerifier ========================
+
+    /** Hex, because Adyen's key is generated as hex and hex-decoded before it is used. */
+    private static final String ADYEN_KEY = "44782DEF547AAA06C910C43932B1EB0C71FC68D9D0C057550C48EC2ACF6BA0B3";
+
+    /** The AUTHORISATION notification Adyen's own HMAC page walks through, signature aside. */
+    private static String adyenStandardBody(String signature) {
+        return "{\"live\":\"false\",\"notificationItems\":[{\"NotificationRequestItem\":{"
+                + "\"additionalData\":{\"hmacSignature\":\"" + signature + "\"},"
+                + "\"amount\":{\"currency\":\"EUR\",\"value\":1130},"
+                + "\"eventCode\":\"AUTHORISATION\",\"eventDate\":\"2026-09-18T10:00:00+02:00\","
+                + "\"merchantAccountCode\":\"TestMerchant\","
+                + "\"merchantReference\":\"TestPayment-1407325143704\","
+                + "\"originalReference\":\"\",\"paymentMethod\":\"visa\","
+                + "\"pspReference\":\"7914073381342284\",\"reason\":\"\",\"success\":\"true\""
+                + "}}]}";
+    }
+
+    /**
+     * The concatenation is the whole of Adyen's scheme, so it is pinned against the literal
+     * string Adyen's documentation prints for this notification rather than against a value this
+     * test computed the same way the code does.
+     */
+    @Test
+    void adyen_buildsTheDataToSignAdyenDocuments() {
+        assertThat(AdyenVerifier.dataToSign(adyenItem(adyenStandardBody("sig"))))
+                .isEqualTo("7914073381342284::TestMerchant:TestPayment-1407325143704:1130:EUR:AUTHORISATION:true");
+    }
+
+    @Test
+    void adyen_standardWebhook_success() {
+        String signature = hmacSha256Base64OfHexKey(ADYEN_KEY,
+                "7914073381342284::TestMerchant:TestPayment-1407325143704:1130:EUR:AUTHORISATION:true");
+        String body = adyenStandardBody(signature);
+
+        var result = new AdyenVerifier().verify(ADYEN_KEY, body.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.error()).isNull();
+        assertThat(result.verified()).isTrue();
+        assertThat(result.replayKey()).isEqualTo(signature);
+    }
+
+    /** The amount is in the signed fields, so moving it invalidates the notification. */
+    @Test
+    void adyen_standardWebhook_tamperedAmountFails() {
+        String signature = hmacSha256Base64OfHexKey(ADYEN_KEY,
+                "7914073381342284::TestMerchant:TestPayment-1407325143704:1130:EUR:AUTHORISATION:true");
+        String body = adyenStandardBody(signature).replace("\"value\":1130", "\"value\":1");
+
+        var result = new AdyenVerifier().verify(ADYEN_KEY, body.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("mismatch");
+    }
+
+    @Test
+    void adyen_standardWebhook_missingSignatureField() {
+        String body = "{\"live\":\"false\",\"notificationItems\":[{\"NotificationRequestItem\":{"
+                + "\"eventCode\":\"AUTHORISATION\",\"success\":\"true\"}}]}";
+
+        var result = new AdyenVerifier().verify(ADYEN_KEY, body.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("hmacSignature");
+    }
+
+    /**
+     * Adyen's Management, Banking and Platforms webhooks sign the whole body and put the
+     * signature in a header instead. Same key, same base64 HMAC-SHA256, different input.
+     */
+    @Test
+    void adyen_headerScheme_signsTheWholeBody() {
+        String body = "{\"type\":\"balancePlatform.accountHolder.updated\",\"data\":{\"id\":\"AH00000000000000000000001\"}}";
+        String signature = hmacSha256Base64OfHexKey(ADYEN_KEY, body);
+        when(request.getHeader("hmacsignature")).thenReturn(signature);
+
+        var result = new AdyenVerifier().verify(ADYEN_KEY, body.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.error()).isNull();
+        assertThat(result.verified()).isTrue();
+        assertThat(result.replayKey()).isEqualTo(signature);
+    }
+
+    @Test
+    void adyen_headerScheme_tamperedBodyFails() {
+        String signature = hmacSha256Base64OfHexKey(ADYEN_KEY, "{\"type\":\"a\"}");
+        when(request.getHeader("hmacsignature")).thenReturn(signature);
+
+        var result = new AdyenVerifier().verify(ADYEN_KEY, "{\"type\":\"b\"}".getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+    }
+
+    /** The key is stored as the hex string Adyen shows; anything else is a configuration error. */
+    @Test
+    void adyen_nonHexKeyIsRefusedWithAReasonRatherThanAMismatch() {
+        String body = adyenStandardBody("whatever");
+
+        var result = new AdyenVerifier().verify("not-hex!", body.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("hexadecimal");
+    }
+
+    @Test
+    void factory_returnsAdyenForProvider() {
+        var factory = new WebhookVerifierFactory(TWILIO_URL);
+        var source = buildSource(VerificationMode.PROVIDER, ProviderType.ADYEN);
+
+        assertThat(factory.getVerifier(source)).isInstanceOf(AdyenVerifier.class);
+    }
+
+    // ======================== SendGridVerifier ========================
+
+    /** One delivered event, in the shape the Event Webhook posts them: a JSON array. */
+    private static final String SENDGRID_BODY = "[{\"email\":\"jane@example.com\",\"timestamp\":1771075200,"
+            + "\"event\":\"delivered\",\"sg_event_id\":\"ZGVsaXZlcmVkLTAtMTIzNDU2\","
+            + "\"sg_message_id\":\"Ces4dCpFQ-K5_9Fq8ZjFTw.filterdrecv-1\",\"smtp-id\":\"<14c5d75ce93.dfd.64b469@ismtpd-555>\"}]";
+
+    @Test
+    void sendGrid_success() throws Exception {
+        KeyPair keyPair = generateEcKeyPair();
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+        String signature = signEcdsa(keyPair.getPrivate(), timestamp, SENDGRID_BODY);
+        String publicKey = Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded());
+
+        when(request.getHeader("X-Twilio-Email-Event-Webhook-Signature")).thenReturn(signature);
+        when(request.getHeader("X-Twilio-Email-Event-Webhook-Timestamp")).thenReturn(timestamp);
+
+        var result = new SendGridVerifier()
+                .verify(publicKey, SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.error()).isNull();
+        assertThat(result.verified()).isTrue();
+        assertThat(result.replayKey()).isEqualTo(signature + "|" + timestamp);
+    }
+
+    /** The timestamp is prepended to the body before signing, so replaying one under another fails. */
+    @Test
+    void sendGrid_signatureFromAnotherTimestampFails() throws Exception {
+        KeyPair keyPair = generateEcKeyPair();
+        String signature = signEcdsa(keyPair.getPrivate(), "1771075200", SENDGRID_BODY);
+
+        when(request.getHeader("X-Twilio-Email-Event-Webhook-Signature")).thenReturn(signature);
+        when(request.getHeader("X-Twilio-Email-Event-Webhook-Timestamp")).thenReturn("1771075999");
+
+        var result = new SendGridVerifier().verify(
+                Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded()),
+                SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("mismatch");
+    }
+
+    @Test
+    void sendGrid_signatureFromAnotherKeyFails() throws Exception {
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+        String signature = signEcdsa(generateEcKeyPair().getPrivate(), timestamp, SENDGRID_BODY);
+
+        when(request.getHeader("X-Twilio-Email-Event-Webhook-Signature")).thenReturn(signature);
+        when(request.getHeader("X-Twilio-Email-Event-Webhook-Timestamp")).thenReturn(timestamp);
+
+        var result = new SendGridVerifier().verify(
+                Base64.getEncoder().encodeToString(generateEcKeyPair().getPublic().getEncoded()),
+                SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+    }
+
+    /** SendGrid shows the key as bare base64; a person who pastes the PEM around it still works. */
+    @Test
+    void sendGrid_acceptsAPemWrappedVerificationKey() throws Exception {
+        KeyPair keyPair = generateEcKeyPair();
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+        String signature = signEcdsa(keyPair.getPrivate(), timestamp, SENDGRID_BODY);
+        String pem = "-----BEGIN PUBLIC KEY-----\n"
+                + Base64.getMimeEncoder().encodeToString(keyPair.getPublic().getEncoded())
+                + "\n-----END PUBLIC KEY-----\n";
+
+        when(request.getHeader("X-Twilio-Email-Event-Webhook-Signature")).thenReturn(signature);
+        when(request.getHeader("X-Twilio-Email-Event-Webhook-Timestamp")).thenReturn(timestamp);
+
+        assertThat(new SendGridVerifier().verify(pem, SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request)
+                .verified()).isTrue();
+    }
+
+    @Test
+    void sendGrid_missingTimestampHeader() throws Exception {
+        when(request.getHeader("X-Twilio-Email-Event-Webhook-Signature")).thenReturn("sig");
+        when(request.getHeader("X-Twilio-Email-Event-Webhook-Timestamp")).thenReturn(null);
+
+        var result = new SendGridVerifier().verify(
+                Base64.getEncoder().encodeToString(generateEcKeyPair().getPublic().getEncoded()),
+                SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("X-Twilio-Email-Event-Webhook-Timestamp");
+    }
+
+    /** The source holds a verification key, not a shared secret: an HMAC secret cannot parse. */
+    @Test
+    void sendGrid_secretThatIsNotAPublicKeyIsRefusedWithAReason() {
+        when(request.getHeader("X-Twilio-Email-Event-Webhook-Signature")).thenReturn("sig");
+        when(request.getHeader("X-Twilio-Email-Event-Webhook-Timestamp")).thenReturn("1771075200");
+
+        var result = new SendGridVerifier()
+                .verify("whsec_not_a_key", SENDGRID_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("verification key");
+    }
+
+    @Test
+    void factory_returnsSendGridForProvider() {
+        var factory = new WebhookVerifierFactory(TWILIO_URL);
+        var source = buildSource(VerificationMode.PROVIDER, ProviderType.SENDGRID);
+
+        assertThat(factory.getVerifier(source)).isInstanceOf(SendGridVerifier.class);
+    }
+
+    // ======================== HubSpotVerifier ========================
+
+    private static final String HUBSPOT_PATH = "/ingress/tok_hubspot";
+    /** HubSpot batches its CRM events into an array. */
+    private static final String HUBSPOT_BODY = "[{\"eventId\":531833541,\"subscriptionId\":3923621,"
+            + "\"portalId\":48807704,\"appId\":16111050,\"occurredAt\":1771075200000,"
+            + "\"subscriptionType\":\"contact.creation\",\"attemptNumber\":0,"
+            + "\"objectId\":1246965,\"changeFlag\":\"CREATED\",\"changeSource\":\"CRM_UI\"}]";
+
+    private static String hubSpotSignature(String secret, String method, String uri, String body, String timestamp) {
+        return hmacSha256Base64(secret, method + uri + body + timestamp);
+    }
+
+    @Test
+    void hubSpot_success() {
+        String timestamp = String.valueOf(Instant.now().toEpochMilli());
+        String signature = hubSpotSignature(SECRET, "POST", SQUARE_URL + HUBSPOT_PATH, HUBSPOT_BODY, timestamp);
+
+        when(request.getHeader("X-HubSpot-Signature-v3")).thenReturn(signature);
+        when(request.getHeader("X-HubSpot-Request-Timestamp")).thenReturn(timestamp);
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn(HUBSPOT_PATH);
+        when(request.getQueryString()).thenReturn(null);
+
+        var result = new HubSpotVerifier(SQUARE_URL)
+                .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.error()).isNull();
+        assertThat(result.verified()).isTrue();
+        assertThat(result.replayKey()).isEqualTo(signature + "|" + timestamp);
+    }
+
+    /** HubSpot's own instruction: refuse anything whose timestamp is more than five minutes old. */
+    @Test
+    void hubSpot_timestampOlderThanFiveMinutesIsRefused() {
+        String timestamp = String.valueOf(Instant.now().toEpochMilli() - 301_000L);
+        String signature = hubSpotSignature(SECRET, "POST", SQUARE_URL + HUBSPOT_PATH, HUBSPOT_BODY, timestamp);
+
+        when(request.getHeader("X-HubSpot-Signature-v3")).thenReturn(signature);
+        when(request.getHeader("X-HubSpot-Request-Timestamp")).thenReturn(timestamp);
+
+        var result = new HubSpotVerifier(SQUARE_URL)
+                .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("tolerance");
+    }
+
+    /** The method and the URL are inside the signed string, so neither can be swapped. */
+    @Test
+    void hubSpot_signatureBoundToAnotherMethodFails() {
+        String timestamp = String.valueOf(Instant.now().toEpochMilli());
+        String signature = hubSpotSignature(SECRET, "PUT", SQUARE_URL + HUBSPOT_PATH, HUBSPOT_BODY, timestamp);
+
+        when(request.getHeader("X-HubSpot-Signature-v3")).thenReturn(signature);
+        when(request.getHeader("X-HubSpot-Request-Timestamp")).thenReturn(timestamp);
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn(HUBSPOT_PATH);
+        when(request.getQueryString()).thenReturn(null);
+
+        var result = new HubSpotVerifier(SQUARE_URL)
+                .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("mismatch");
+    }
+
+    /**
+     * HubSpot decodes a fixed dozen escapes in the query string before signing, and leaves the
+     * path alone. A source whose ingress URL carries a query would otherwise never verify.
+     */
+    @Test
+    void hubSpot_decodesTheEscapesHubSpotDecodesInTheQueryString() {
+        String timestamp = String.valueOf(Instant.now().toEpochMilli());
+        String uri = SQUARE_URL + HUBSPOT_PATH + "?to=a@b.com&at=12:30";
+        String signature = hubSpotSignature(SECRET, "POST", uri, HUBSPOT_BODY, timestamp);
+
+        when(request.getHeader("X-HubSpot-Signature-v3")).thenReturn(signature);
+        when(request.getHeader("X-HubSpot-Request-Timestamp")).thenReturn(timestamp);
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn(HUBSPOT_PATH);
+        when(request.getQueryString()).thenReturn("to=a%40b.com&at=12%3A30");
+
+        assertThat(new HubSpotVerifier(SQUARE_URL)
+                .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request).verified()).isTrue();
+    }
+
+    @Test
+    void hubSpot_missingSignatureHeader() {
+        when(request.getHeader("X-HubSpot-Signature-v3")).thenReturn(null);
+
+        var result = new HubSpotVerifier(SQUARE_URL)
+                .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("X-HubSpot-Signature-v3");
+    }
+
+    @Test
+    void hubSpot_missingTimestampHeader() {
+        when(request.getHeader("X-HubSpot-Signature-v3")).thenReturn("sig");
+        when(request.getHeader("X-HubSpot-Request-Timestamp")).thenReturn(null);
+
+        var result = new HubSpotVerifier(SQUARE_URL)
+                .verify(SECRET, HUBSPOT_BODY.getBytes(StandardCharsets.UTF_8), request);
+
+        assertThat(result.verified()).isFalse();
+        assertThat(result.error()).contains("X-HubSpot-Request-Timestamp");
+    }
+
+    @Test
+    void factory_returnsHubSpotForProvider() {
+        var factory = new WebhookVerifierFactory(TWILIO_URL);
+        var source = buildSource(VerificationMode.PROVIDER, ProviderType.HUBSPOT);
+
+        assertThat(factory.getVerifier(source)).isInstanceOf(HubSpotVerifier.class);
+    }
+
     // ======================== helpers ========================
 
     private IncomingSource buildSource(VerificationMode mode, ProviderType providerType) {
@@ -524,6 +948,41 @@ class WebhookVerifierTest {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /** Adyen's key is hex and is decoded to bytes before it keys the HMAC. */
+    private static String hmacSha256Base64OfHexKey(String hexKey, String data) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(HexFormat.of().parseHex(hexKey), "HmacSHA256"));
+            return Base64.getEncoder().encodeToString(mac.doFinal(data.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /** The single NotificationRequestItem of an Adyen standard webhook body. */
+    private static JsonNode adyenItem(String body) {
+        try {
+            return new ObjectMapper().readTree(body).get("notificationItems").get(0).get("NotificationRequestItem");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static KeyPair generateEcKeyPair() throws Exception {
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
+        generator.initialize(new ECGenParameterSpec("secp256r1"));
+        return generator.generateKeyPair();
+    }
+
+    /** What SendGrid does with its private key: sign the timestamp followed by the raw body. */
+    private static String signEcdsa(PrivateKey privateKey, String timestamp, String body) throws Exception {
+        Signature signature = Signature.getInstance("SHA256withECDSA");
+        signature.initSign(privateKey);
+        signature.update(timestamp.getBytes(StandardCharsets.UTF_8));
+        signature.update(body.getBytes(StandardCharsets.UTF_8));
+        return Base64.getEncoder().encodeToString(signature.sign());
     }
 
     private static String hmacSha256Base64(String secret, String data) {

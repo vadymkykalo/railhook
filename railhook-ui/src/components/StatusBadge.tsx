@@ -72,9 +72,29 @@ export default function StatusBadge({
   );
 }
 
-/** A disabled/enabled pill, which is a configuration state rather than a status. */
-export function EnabledBadge({ enabled }: { enabled: boolean }) {
+/**
+ * A disabled/enabled pill, which is a configuration state rather than a status.
+ *
+ * With `autoDisabled`, a third state: Railhook turned this target off because it answered
+ * nothing but failures. It reads `halt` rather than `idle` on purpose - an owner who switched
+ * something off knows they did, and one whose endpoint was switched off for them needs to
+ * notice.
+ */
+export function EnabledBadge({
+  enabled, autoDisabled = false,
+}: {
+  enabled: boolean;
+  autoDisabled?: boolean;
+}) {
   const { t } = useTranslation();
+  if (!enabled && autoDisabled) {
+    return (
+      <Badge variant="halt">
+        <XCircle className="h-3 w-3" aria-hidden />
+        {t('endpoints.autoDisabled')}
+      </Badge>
+    );
+  }
   return (
     <Badge variant={enabled ? 'ok' : 'idle'}>
       {enabled ? (
