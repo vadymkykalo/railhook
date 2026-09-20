@@ -77,9 +77,10 @@ jobs:
             load/failure-recovery.js
 
       - name: Run load/ordering.js (fails the job if FIFO ordering breaks under backlog)
-        # 90s, not 60: the burst's last deliveries land around the minute mark on a loaded
-        # runner, and a probe that reads half its burst proves less than one that reads all of it.
-        run: k6 run -e BURST_SIZE=15 -e RETRY_WAIT_SECONDS=90 load/ordering.js
+        # 150s, not 90: the induced retry is due on the ladder's first rung jittered to 50–150%
+        # of a minute, and only once it lands does the backlog behind it drain. A probe that
+        # reads half its burst proves less than one that reads all of it — and now says so.
+        run: k6 run -e BURST_SIZE=15 -e RETRY_WAIT_SECONDS=150 load/ordering.js
 
       - name: Run a short slice of load/soak.js
         if: ${{ inputs.run_soak_smoke == true }}

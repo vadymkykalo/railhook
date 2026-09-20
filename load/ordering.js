@@ -36,12 +36,13 @@ const EVENT_TYPE = 'load.ordering_test';
 // previous scenario is still retrying into the same receiver.
 const RECEIVER_PATH = '/webhook/ordering';
 const BURST_SIZE = Number(__ENV.BURST_SIZE || 20);
-// Must exceed the subscription's first retry delay (default retry ladder is
-// configured per-subscription via retryDelays — see SubscriptionRequest and
-// RetrySchedulerService; 90s is a safe default covering typical
-// seconds-to-low-minutes first-retry backoffs). Bump this if your
-// subscription uses a longer ladder.
-const RETRY_WAIT_SECONDS = Number(__ENV.RETRY_WAIT_SECONDS || 90);
+// Must outlast the *worst case* of the subscription's first retry delay, not its nominal
+// value: RetryLadder.nextRetryAt jitters every rung to 50–150% of it, so the default Outgoing
+// first rung of 60s lands anywhere up to 90s out, and RetrySchedulerService then picks it up on
+// its next poll (retry.scheduler.poll-interval-ms, 10s). 90s covered the rung and not the
+// jitter, so the probe regularly stopped watching before the retry it induced had happened and
+// reported on two of its fifteen sequences. Bump this if your subscription uses a longer ladder.
+const RETRY_WAIT_SECONDS = Number(__ENV.RETRY_WAIT_SECONDS || 150);
 
 export const options = {
   scenarios: {
@@ -123,6 +124,15 @@ export function teardown() {
     // Nothing arrived at all: the probe proves nothing, and a green run here would be a lie.
     orderingViolations.add(1);
     console.error(`NO DELIVERIES REACHED ${RECEIVER_PATH} — the ordering probe could not run (endpoint, worker or network)`);
+    return;
+  }
+  if (summary.distinctSeqs < BURST_SIZE) {
+    // The same lie, one step along: the events still buffered behind the retry are exactly the
+    // ones that would have overtaken it, so an in-order verdict over a partial burst says
+    // nothing about the thing this probe exists to catch. Either the wait is too short for the
+    // ladder (see RETRY_WAIT_SECONDS) or the backlog never drained.
+    orderingViolations.add(1);
+    console.error(`ONLY ${summary.distinctSeqs} OF ${BURST_SIZE} SEQUENCES REACHED ${RECEIVER_PATH} in ${RETRY_WAIT_SECONDS}s — the ordering probe did not see its own burst`);
     return;
   }
   if (!summary.inOrder) {
