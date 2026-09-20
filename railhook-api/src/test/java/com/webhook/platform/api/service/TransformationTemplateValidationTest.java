@@ -6,6 +6,8 @@ import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.SubscriptionRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
+import com.webhook.platform.api.domain.repository.TransformationVersionRepository;
+import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.TransformationRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,6 +47,8 @@ class TransformationTemplateValidationTest {
     @Mock private ProjectRepository projectRepository;
     @Mock private SubscriptionRepository subscriptionRepository;
     @Mock private IncomingDestinationRepository incomingDestinationRepository;
+    @Mock private TransformationVersionRepository transformationVersionRepository;
+    @Mock private UserRepository userRepository;
 
     private TransformationService service;
 
@@ -52,8 +56,10 @@ class TransformationTemplateValidationTest {
 
     @BeforeEach
     void setUp() {
-        service = new TransformationService(transformationRepository, projectRepository,
-                subscriptionRepository, incomingDestinationRepository, new ObjectMapper());
+        ObjectMapper objectMapper = new ObjectMapper();
+        service = new TransformationService(transformationRepository, transformationVersionRepository,
+                projectRepository, subscriptionRepository, incomingDestinationRepository,
+                userRepository, new JsonDiffCalculator(objectMapper), objectMapper, 50);
 
         when(projectRepository.findById(projectId))
                 .thenReturn(Optional.of(Project.builder().id(projectId).name("p").build()));
@@ -64,7 +70,7 @@ class TransformationTemplateValidationTest {
     @Test
     @DisplayName("a path that starts with $ but does not parse is rejected on save")
     void malformedPathRejectedAtSaveTime() {
-        assertThatThrownBy(() -> service.create(projectId, request("{\"id\":\"${$.[[nope}\"}")))
+        assertThatThrownBy(() -> service.create(projectId, request("{\"id\":\"${$.[[nope}\"}"), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("not a valid JSONPath");
     }
@@ -73,7 +79,7 @@ class TransformationTemplateValidationTest {
     @DisplayName("an ordinary template still saves")
     void validTemplateIsAccepted() {
         assertThatCode(() -> service.create(projectId,
-                request("{\"id\":\"${$.id}\",\"email\":\"${$.data.customer.email}\"}")))
+                request("{\"id\":\"${$.id}\",\"email\":\"${$.data.customer.email}\"}"), null))
                 .doesNotThrowAnyException();
     }
 
@@ -83,7 +89,7 @@ class TransformationTemplateValidationTest {
         /* The prefix check would have passed this and so must the compiler: rejecting real
            JSONPath to catch typos would be a worse trade than the bug being fixed. */
         assertThatCode(() -> service.create(projectId,
-                request("{\"first\":\"${$.items[?(@.active == true)].name}\"}")))
+                request("{\"first\":\"${$.items[?(@.active == true)].name}\"}"), null))
                 .doesNotThrowAnyException();
     }
 
@@ -96,7 +102,7 @@ class TransformationTemplateValidationTest {
         String template = "{\"a\":\"" + "${{".repeat(60_000) + "\"}";
         org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
             try {
-                service.create(projectId, request(template));
+                service.create(projectId, request(template), null);
             } catch (IllegalArgumentException expected) {
                 // rejected or accepted is not the point; finishing promptly is
             }

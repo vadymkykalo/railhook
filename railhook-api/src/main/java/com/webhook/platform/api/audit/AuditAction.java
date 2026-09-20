@@ -44,6 +44,14 @@ public enum AuditAction {
     DLQ_RETRY,
     DLQ_PURGE,
 
+    /*
+     * Putting a stored earlier version of something back in place — today, a Transformation's
+     * template. Distinct from UPDATE although its effect is one: a restore is the change nobody
+     * typed, so "the mapping went back to what it was in March and none of us edited it" needs an
+     * entry that says so rather than an edit that looks like every other edit.
+     */
+    RESTORE,
+
     // Operator actions. Not a tenant's own doing, which is exactly why they are worth a row:
     // the audit log is where a customer's "why did this stop working" gets answered.
     ORGANIZATION_SUSPENDED,

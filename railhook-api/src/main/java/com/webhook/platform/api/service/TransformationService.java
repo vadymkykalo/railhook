@@ -4,23 +4,30 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
-import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.Transformation;
+import com.webhook.platform.api.domain.entity.TransformationVersion;
+import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.SubscriptionRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
+import com.webhook.platform.api.domain.repository.TransformationVersionRepository;
+import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.TransformationRequest;
 import com.webhook.platform.api.dto.TransformationResponse;
+import com.webhook.platform.api.dto.TransformationVersionDiffResponse;
+import com.webhook.platform.api.dto.TransformationVersionResponse;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.NotFoundException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -29,14 +36,50 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class TransformationService {
 
     private final TransformationRepository transformationRepository;
+    private final TransformationVersionRepository transformationVersionRepository;
     private final ProjectRepository projectRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final IncomingDestinationRepository incomingDestinationRepository;
+    private final UserRepository userRepository;
+    private final JsonDiffCalculator jsonDiffCalculator;
     private final ObjectMapper objectMapper;
+
+    /**
+     * How many published templates one transformation keeps.
+     *
+     * <p>Capped rather than unbounded: a template is up to 64 KB, an edit is one click, and a
+     * person tuning a mapping makes dozens of them in an afternoon — history that only ever grows
+     * is a slow leak in a table nothing else prunes. Capped at fifty rather than at five because
+     * the cap has to be past the point where anyone would still scroll: what a rollback reaches
+     * for is one of the last few, and fifty of them is under 3 MB in the worst case. The oldest
+     * fall off first, and the current version can never be among them.
+     */
+    private final int versionHistoryLimit;
+
+    public TransformationService(TransformationRepository transformationRepository,
+                                 TransformationVersionRepository transformationVersionRepository,
+                                 ProjectRepository projectRepository,
+                                 SubscriptionRepository subscriptionRepository,
+                                 IncomingDestinationRepository incomingDestinationRepository,
+                                 UserRepository userRepository,
+                                 JsonDiffCalculator jsonDiffCalculator,
+                                 ObjectMapper objectMapper,
+                                 @Value("${transformations.version-history-limit:50}") int versionHistoryLimit) {
+        this.transformationRepository = transformationRepository;
+        this.transformationVersionRepository = transformationVersionRepository;
+        this.projectRepository = projectRepository;
+        this.subscriptionRepository = subscriptionRepository;
+        this.incomingDestinationRepository = incomingDestinationRepository;
+        this.userRepository = userRepository;
+        this.jsonDiffCalculator = jsonDiffCalculator;
+        this.objectMapper = objectMapper;
+        // Floored at one: a zero or negative cap would trim the version the transformation is
+        // currently using, and a misconfigured number must not be able to delete live data.
+        this.versionHistoryLimit = Math.max(1, versionHistoryLimit);
+    }
 
     // `[^{}]` rather than `[^}]`: with no closing brace, the old class rescanned to the end of the
     // template from every `${`, which is quadratic on a template of repeated "${{" (CodeQL
@@ -89,7 +132,7 @@ public class TransformationService {
 
     @Auditable(action = AuditAction.CREATE, resourceType = "Transformation")
     @Transactional
-    public TransformationResponse create(UUID projectId, TransformationRequest request) {
+    public TransformationResponse create(UUID projectId, TransformationRequest request, UUID actorUserId) {
         validateProjectOwnership(projectId);
         validateTemplate(request.getTemplate());
 
@@ -107,6 +150,7 @@ public class TransformationService {
                 .build();
 
         transformation = transformationRepository.saveAndFlush(transformation);
+        publishVersion(transformation, null, actorUserId);
         log.info("Created transformation: id={}, project={}", transformation.getId(), projectId);
         return mapToResponse(transformation);
     }
@@ -143,7 +187,7 @@ public class TransformationService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Transformation")
     @Transactional
-    public TransformationResponse update(UUID projectId, UUID id, TransformationRequest request) {
+    public TransformationResponse update(UUID projectId, UUID id, TransformationRequest request, UUID actorUserId) {
         Transformation transformation = requireTransformation(projectId, id);
 
         if (request.getName() != null && !request.getName().isBlank()) {
@@ -156,7 +200,14 @@ public class TransformationService {
         if (request.getDescription() != null) {
             transformation.setDescription(request.getDescription());
         }
-        if (request.getTemplate() != null && !request.getTemplate().isBlank()) {
+        // The template is required by the request DTO, so the edit form sends the whole thing back
+        // whether or not it was touched: renaming a transformation and rewriting its mapping arrive
+        // here as the same call. The counter used to go up for both, which — now that the counter
+        // has a history behind it — would fill that history with identical entries nobody made.
+        boolean templateChanged = request.getTemplate() != null
+                && !request.getTemplate().isBlank()
+                && !request.getTemplate().equals(transformation.getTemplate());
+        if (templateChanged) {
             validateTemplate(request.getTemplate());
             transformation.setTemplate(request.getTemplate());
             transformation.setVersion(transformation.getVersion() + 1);
@@ -166,6 +217,9 @@ public class TransformationService {
         }
 
         transformation = transformationRepository.saveAndFlush(transformation);
+        if (templateChanged) {
+            publishVersion(transformation, null, actorUserId);
+        }
         log.info("Updated transformation: id={}, version={}", id, transformation.getVersion());
         return mapToResponse(transformation);
     }
@@ -178,14 +232,145 @@ public class TransformationService {
         long subCount = subscriptionRepository.countByTransformationId(id);
         long destCount = incomingDestinationRepository.countByTransformationId(id);
         if (subCount + destCount > 0) {
-            List<String> refs = new java.util.ArrayList<>();
+            List<String> refs = new ArrayList<>();
             if (subCount > 0) refs.add(subCount + " subscription" + (subCount > 1 ? "s" : ""));
             if (destCount > 0) refs.add(destCount + " destination" + (destCount > 1 ? "s" : ""));
             throw new ConflictException("Cannot delete transformation: it is referenced by " + String.join(" and ", refs));
         }
 
+        // The history goes with it: transformation_versions cascades from transformations.
         transformationRepository.delete(transformation);
         log.info("Deleted transformation: id={}", id);
+    }
+
+    // ── Version history ──────────────────────────────────────────────
+
+    /** Every template this transformation has published, newest first. */
+    @Transactional(readOnly = true)
+    public List<TransformationVersionResponse> listVersions(UUID projectId, UUID id) {
+        Transformation transformation = requireTransformation(projectId, id);
+        List<TransformationVersion> versions =
+                transformationVersionRepository.findByTransformationIdOrderByVersionDesc(id);
+        Map<UUID, String> emails = resolveAuthorEmails(versions);
+        return versions.stream()
+                .map(v -> mapVersion(v, transformation, emails, false))
+                .collect(Collectors.toList());
+    }
+
+    /** One published template, whole. */
+    @Transactional(readOnly = true)
+    public TransformationVersionResponse getVersion(UUID projectId, UUID id, int version) {
+        Transformation transformation = requireTransformation(projectId, id);
+        TransformationVersion stored = requireVersion(id, version);
+        return mapVersion(stored, transformation, resolveAuthorEmails(List.of(stored)), true);
+    }
+
+    /** What changed between two published templates. */
+    @Transactional(readOnly = true)
+    public TransformationVersionDiffResponse diffVersions(UUID projectId, UUID id, int left, int right) {
+        requireTransformation(projectId, id);
+        TransformationVersion leftVersion = requireVersion(id, left);
+        TransformationVersion rightVersion = requireVersion(id, right);
+
+        return TransformationVersionDiffResponse.builder()
+                .transformationId(id)
+                .leftVersion(leftVersion.getVersion())
+                .rightVersion(rightVersion.getVersion())
+                .leftCreatedAt(leftVersion.getCreatedAt())
+                .rightCreatedAt(rightVersion.getCreatedAt())
+                .leftTemplate(leftVersion.getTemplate())
+                .rightTemplate(rightVersion.getTemplate())
+                .diffs(jsonDiffCalculator.diff(leftVersion.getTemplate(), rightVersion.getTemplate()))
+                .build();
+    }
+
+    /**
+     * Puts an earlier template back by publishing it again.
+     *
+     * <p>The history is not rewound: the versions published after the one being restored stay
+     * exactly where they are, and the restored template becomes the next version, marked with the
+     * one it came from. Rewinding — deleting the versions after it — would make the record of what
+     * was live at any past moment disagree with what actually was.
+     */
+    @Auditable(action = AuditAction.RESTORE, resourceType = "Transformation")
+    @Transactional
+    public TransformationResponse restoreVersion(UUID projectId, UUID id, int version, UUID actorUserId) {
+        Transformation transformation = requireTransformation(projectId, id);
+        TransformationVersion source = requireVersion(id, version);
+
+        if (Objects.equals(transformation.getVersion(), version)) {
+            throw new IllegalArgumentException(
+                    "Version " + version + " is already the current version of this transformation");
+        }
+
+        transformation.setTemplate(source.getTemplate());
+        transformation.setVersion(transformation.getVersion() + 1);
+        transformation = transformationRepository.saveAndFlush(transformation);
+        publishVersion(transformation, version, actorUserId);
+
+        log.info("Restored transformation {} to the template of version {}, published as version {}",
+                id, version, transformation.getVersion());
+        return mapToResponse(transformation);
+    }
+
+    private TransformationVersion requireVersion(UUID transformationId, int version) {
+        return transformationVersionRepository.findByTransformationIdAndVersion(transformationId, version)
+                .orElseThrow(() -> new NotFoundException(
+                        "Version " + version + " not found for this transformation"));
+    }
+
+    /**
+     * Writes the transformation's current template into its history, then trims the history back
+     * to {@link #versionHistoryLimit}. Called only where the template actually changed, so a row
+     * here always stands for an edit somebody made.
+     */
+    private void publishVersion(Transformation transformation, Integer restoredFromVersion, UUID actorUserId) {
+        transformationVersionRepository.saveAndFlush(TransformationVersion.builder()
+                .transformationId(transformation.getId())
+                .version(transformation.getVersion())
+                .template(transformation.getTemplate())
+                .restoredFromVersion(restoredFromVersion)
+                .createdBy(actorUserId)
+                .build());
+
+        List<TransformationVersion> history =
+                transformationVersionRepository.findByTransformationIdOrderByVersionDesc(transformation.getId());
+        if (history.size() > versionHistoryLimit) {
+            List<TransformationVersion> expired = history.subList(versionHistoryLimit, history.size());
+            transformationVersionRepository.deleteAll(expired);
+            log.debug("Trimmed {} expired version(s) from transformation {}", expired.size(), transformation.getId());
+        }
+    }
+
+    private Map<UUID, String> resolveAuthorEmails(List<TransformationVersion> versions) {
+        Set<UUID> userIds = versions.stream()
+                .map(TransformationVersion::getCreatedBy)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+        return userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getEmail));
+    }
+
+    private TransformationVersionResponse mapVersion(TransformationVersion version,
+                                                     Transformation transformation,
+                                                     Map<UUID, String> emails,
+                                                     boolean includeTemplate) {
+        return TransformationVersionResponse.builder()
+                .id(version.getId())
+                .transformationId(version.getTransformationId())
+                .version(version.getVersion())
+                // The list is an index: a project with fifty 64 KB templates in one history would
+                // otherwise be a 3 MB response nobody reads.
+                .template(includeTemplate ? version.getTemplate() : null)
+                .current(Objects.equals(transformation.getVersion(), version.getVersion()))
+                .restoredFromVersion(version.getRestoredFromVersion())
+                .createdBy(version.getCreatedBy())
+                .createdByEmail(version.getCreatedBy() == null ? null : emails.get(version.getCreatedBy()))
+                .createdAt(version.getCreatedAt())
+                .build();
     }
 
     private TransformationResponse mapToResponse(Transformation transformation) {
