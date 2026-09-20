@@ -1,0 +1,131 @@
+---
+title: Як надійно отримувати вебхуки HubSpot
+description: HubSpot дає вебхуку 10 повторних спроб за добу й ніколи не повторює після 400, 403 чи 404. Поставте попереду Railhook — він перевіряє підпис X-HubSpot-Signature-v3, відповідає одразу й пересилає події у ваш застосунок із повторними спробами та відтворенням.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+У цьому посібнику Railhook стоїть між HubSpot і вашим застосунком. HubSpot надсилає на джерело Railhook пакети подій CRM, а воно перевіряє підпис версії 3, зберігає кожен пакет таким, яким той надійшов, і пересилає його у ваш сервіс із повторними спробами.
+
+## Чому вебхукам HubSpot потрібен буфер
+
+HubSpot повторює невдалу доставку до 10 разів протягом доби, з експоненційною затримкою й випадковим розкидом, щоб після масового збою всі повтори не пішли одночасно. Він повторює після збою з'єднання, тайм-ауту й більшості помилкових статусів — але **не** після `400`, `403` і `404`, які вважає остаточними. ([HubSpot: Updated webhook retry logic](https://developers.hubspot.com/changelog/2018-12-10-updated-webhook-retry-logic))
+
+Саме цей виняток і є гострим краєм. Маршрут, якого на мить немає під час деплою, відповідає `404` — і HubSpot списує подію з першої ж спроби. Коли попереду стоїть Railhook:
+
+- HubSpot завжди звертається до адреси, яка існує й відповідає одразу, тож `404` від вашого застосунку ніколи не стає відповіддю для HubSpot.
+- Ваш сервіс отримує до 5 спроб на кожне пересилання з інтервалами від 1 хвилини до 1 години, а те, що так і не вдалося доставити, потрапляє в **«Недоставлені пересилання»**.
+- Будь-що збережене можна відтворити, коли ви полагодите маршрут, — а саме це правило `404` у HubSpot і відбирає.
+
+## Підключення HubSpot
+
+Знадобляться проєкт Railhook і API-ключ. Усе описане нижче можна зробити й у панелі керування, у розділі **«Вхідні»**.
+
+```bash
+export RAILHOOK_URL=https://railhook.io   # or your own instance
+export RAILHOOK_API_KEY=...
+export PROJECT_ID=...
+```
+
+<Steps>
+
+1. **Створіть джерело Railhook**, щоб отримати адресу, на яку HubSpot має надсилати запити:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"HubSpot","providerType":"HUBSPOT","verificationMode":"NONE"}'
+   ```
+
+   Збережіть `id` та `ingressUrl` з відповіді.
+
+2. **Спрямуйте вебхуки застосунку на неї.** У застосунку, зібраному через projects, вебхуки — це конфігурація в коді, а не форма: додайте каталог `webhooks` під `src/app/` з файлом `*-hsmeta.json`, де `settings.targetUrl` дорівнює `ingressUrl`, і перелічіть потрібне в `subscriptions`. Адреси без HTTPS відхиляються. ([HubSpot: Configure webhooks](https://developers.hubspot.com/docs/apps/developer-platform/add-features/configure-webhooks))
+
+3. **Знайдіть client secret.** HubSpot підписує саме ним, а не окремим ключем для вебхука. У вашому акаунті розробника він лежить у **Development → Projects → ваш проєкт**, на вкладці **Auth** застосунку, у секції **Client credentials**. ([HubSpot: Manage apps in HubSpot](https://developers.hubspot.com/docs/apps/developer-platform/build-apps/manage-apps-in-hubspot))
+
+4. **Передайте секрет Railhook і ввімкніть перевірку:**
+
+   ```bash
+   curl -X PUT "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"HubSpot","verificationMode":"PROVIDER","hmacSecret":"'"$HUBSPOT_CLIENT_SECRET"'"}'
+   ```
+
+5. **Додайте призначення** — адресу вашого сервісу:
+
+   ```bash
+   curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
+     -H "X-API-Key: $RAILHOOK_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"url":"https://api.example.com/webhooks/hubspot","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
+   ```
+
+6. **Зробіть те, на що підписалися** — створіть контакт, змініть властивість — у порталі, де встановлено застосунок. Подія з'явиться в розділі **«Вхідні → Отримані»**, з одним пересиланням на кожне призначення.
+
+</Steps>
+
+<Aside type="caution" title="Client secret підписує все, що робить ваш застосунок">
+Це не окремий ключ вебхука, який можна ротувати сам по собі: це облікові дані, на яких тримається OAuth вашого застосунку. Якщо ви тримаєте конфігурацію вебхуків окремо від облікових даних застосунку, заведіть для джерела окремий проєкт. Ротуйте `hmacSecret` джерела тієї ж миті, що й секрет у HubSpot: вони мають змінюватися разом, бо перехідного періоду схема HubSpot не передбачає.
+</Aside>
+
+## Як перевіряється підпис
+
+HubSpot v3 надсилає `X-HubSpot-Signature-v3`: HMAC-SHA256 у Base64 від методу запиту, повної адреси, необробленого тіла й мітки часу, з'єднаних саме в такому порядку й без роздільників; ключ — client secret. Заголовок `X-HubSpot-Request-Timestamp` несе цю мітку в мілісекундах, і власна вказівка HubSpot — відхиляти все, старше за п'ять хвилин. Railhook так і робить. ([HubSpot: Validate requests](https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/request-validation))
+
+Запит, який не пройшов перевірку або прийшов із запізненням понад п'ять хвилин, отримує `401` і не зберігається.
+
+<Aside type="caution" title="URL — частина підпису">
+`http` там, де в HubSpot `https`, зайва скісна риска в кінці, інший хост — будь-що з цього змінює хеш. Railhook складає адресу зі своєї налаштованої публічної адреси, а не з вхідного запиту, тож зворотний проксі її не зіпсує. На власному сервері це `APP_BASE_URL`, який інсталятор бере з `--domain`, або `TUNNEL_INGRESS_BASE_URL`, якщо вебхуки приходять на інший хост. Дайте HubSpot саме ту ingress-адресу, яку показує джерело.
+</Aside>
+
+<Aside type="tip" title="Лише v3">
+Старіші підписи HubSpot v1 і v2 — це звичайний SHA-256 від секрету й тіла, без мітки часу, а отже без жодного обмеження на те, скільки перехоплений запит лишається дійсним. Railhook свідомо підтримує тільки v3. Якщо застаріла інтеграція надсилає лише v1, перевіряйте її як загальний HMAC — і розумійте, що саме ви приймаєте. Див. [Перевірку вхідних вебхуків](/docs/uk/incoming/verification/#загальний-hmac).
+</Aside>
+
+## Дедуплікуйте за подією, а не за запитом
+
+Запит HubSpot — це JSON-масив подій, і кожна має власний `eventId` та `attemptNumber`, який зростає з кожною повторною спробою. Ідентифікатора самого пакета немає, тож для джерела HubSpot Railhook не записує `providerEventId` і запити не дедуплікує: ключ за першою подією пакета втратив би решту, якби HubSpot під час повторної спроби перезібрав пакет інакше.
+
+Дедуплікуйте у власному обробнику — за `eventId` разом із `portalId`. Підписане п'ятихвилинне вікно й кеш повторів зупиняють перехоплений запит на порозі Railhook, але ідемпотентного обробника вони не заміняють.
+
+## Що отримує ваш сервіс
+
+Тіло точно таким, яким його надіслав HubSpot, байт у байт: масив, а не одна подія на запит. Заголовки з підписом не пересилаються — ваш сервіс автентифікує Railhook обліковими даними призначення, та й підпис v3 усе одно не зійшовся б із вашою адресою, бо ваша адреса входить у те, що він покриває. Див. [Призначення](/docs/uk/incoming/destinations/#що-отримує-призначення).
+
+## Локальна розробка з CLI
+
+<Steps>
+
+1. Встановіть CLI й увійдіть, як описано в розділі [CLI](/docs/uk/tools/cli/), а потім відкрийте тунель до порту застосунку:
+
+   ```bash
+   railhook listen 3000
+   ```
+
+2. Додайте джерелу друге призначення з надрукованою публічною адресою й вашим маршрутом у кінці, наприклад `https://<host>/tunnel/<slug>/webhooks/hubspot`. Вона веде на `http://localhost:3000/webhooks/hubspot`.
+
+3. Змініть контакт у тестовому порталі — і пакет прийде у ваш локальний застосунок. Вимкніть це призначення, коли закриєте тунель.
+
+</Steps>
+
+## Відтворення після збою
+
+Відтворіть те, що прийшло, поки ваш сервіс лежав. Кожен відтворений пакет іде на всі призначення джерела як нове пересилання:
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
+```
+
+Відтворити можна все, що ще зберігається: 7 днів у Railhook Cloud і скільки налаштуєте на власному сервері. Це і є відповідь на те, що HubSpot списує подію після `404`: до логіки повторів HubSpot вона не дійшла, бо відповів Railhook, і пакет досі тут. Див. [Відтворення](/docs/uk/outgoing/replay/#відтворення-вхідних-вебхуків).
+
+## Що далі
+
+<CardGrid>
+  <LinkCard title="Перевірка вхідних вебхуків" href="/docs/uk/incoming/verification/" description="Схема підпису кожного провайдера й захист від повторного використання підписів." />
+  <LinkCard title="Призначення" href="/docs/uk/incoming/destinations/" description="Облікові дані, повторні спроби й трансформації для кожного призначення." />
+  <LinkCard title="Конфігурація" href="/docs/uk/self-hosting/configuration/" description="Задайте публічну адресу, яку підписує HubSpot." />
+</CardGrid>

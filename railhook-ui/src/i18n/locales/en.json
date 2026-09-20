@@ -1991,6 +1991,19 @@
     "noSources": "No incoming sources yet",
     "noSourcesDesc": "Create your first incoming source to start receiving webhooks from external providers",
     "provider": "Provider",
+    "providerNames": {
+      "GENERIC": "Generic",
+      "GITHUB": "GitHub",
+      "GITLAB": "GitLab",
+      "STRIPE": "Stripe",
+      "SHOPIFY": "Shopify",
+      "SLACK": "Slack",
+      "TWILIO": "Twilio",
+      "SQUARE": "Square",
+      "ADYEN": "Adyen",
+      "SENDGRID": "SendGrid",
+      "HUBSPOT": "HubSpot"
+    },
     "rateLimit": "Rate Limit",
     "rateLimitHint": "Requests per second (leave empty for unlimited)",
     "security": {
@@ -4564,7 +4577,7 @@
       },
       "incoming": {
         "title": "Incoming webhooks are verified",
-        "body": "Stripe, GitHub, GitLab, Shopify, Slack and Twilio requests are checked with each provider's own scheme before anything is stored. A request that fails is answered 401 and not stored, and a replayed signature is refused."
+        "body": "Stripe, GitHub, GitLab, Shopify, Slack, Twilio, Square, Adyen, SendGrid and HubSpot requests are checked with each provider's own scheme before anything is stored. A request that fails is answered 401 and not stored, and a replayed signature is refused."
       },
       "network": {
         "title": "No requests into private networks",
@@ -4738,7 +4751,7 @@
     },
     "cta": {
       "title": "Railhook checks these for you on every incoming webhook",
-      "body": "Point Stripe, GitHub, Shopify, Slack, GitLab or Twilio at a Railhook source. Every request is verified with the provider's own scheme before it is stored, and a forged one is refused.",
+      "body": "Point Stripe, GitHub, GitLab, Shopify, Slack, Twilio, Square, Adyen, SendGrid or HubSpot at a Railhook source. Every request is verified with the provider's own scheme before it is stored, and a forged one is refused.",
       "button": "Start free",
       "docs": "How verification works"
     }

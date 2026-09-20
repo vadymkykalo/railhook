@@ -8917,6 +8917,10 @@ components:
           - SHOPIFY
           - SLACK
           - TWILIO
+          - SQUARE
+          - ADYEN
+          - SENDGRID
+          - HUBSPOT
           example: GITHUB
         status:
           type: string
@@ -8980,6 +8984,10 @@ components:
           - SHOPIFY
           - SLACK
           - TWILIO
+          - SQUARE
+          - ADYEN
+          - SENDGRID
+          - HUBSPOT
         status:
           type: string
           enum:

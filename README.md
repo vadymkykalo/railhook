@@ -59,7 +59,7 @@ a month, 3 projects, 7 days of history). Paid plans with support and higher limi
 
 **Incoming** — a provider posts to a URL you own; Railhook checks it and forwards it on.
 
-- Stripe, GitHub, GitLab, Shopify, Slack and Twilio are verified out of the box; generic HMAC covers the rest.
+- Stripe, GitHub, GitLab, Shopify, Slack, Twilio, Square, Adyen, SendGrid and HubSpot are verified out of the box; generic HMAC covers the rest.
 - Each incoming event is kept as it arrived; a provider's repeat of the same event is not forwarded twice.
 - Forwards reach your destinations with their own retries and Failed Messages.
 

@@ -4344,7 +4344,7 @@ export interface components {
              * @example GITHUB
              * @enum {string}
              */
-            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO";
+            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO" | "SQUARE" | "ADYEN" | "SENDGRID" | "HUBSPOT";
             /**
              * @description Source status
              * @enum {string}
@@ -4382,7 +4382,7 @@ export interface components {
             name?: string;
             slug?: string;
             /** @enum {string} */
-            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO";
+            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO" | "SQUARE" | "ADYEN" | "SENDGRID" | "HUBSPOT";
             /** @enum {string} */
             status?: "ACTIVE" | "DISABLED";
             ingressPathToken?: string;

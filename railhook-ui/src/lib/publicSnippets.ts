@@ -60,4 +60,12 @@ export const PROVIDER_SIGNATURE_HEADERS: Partial<Record<ProviderType, string>> =
   SLACK: 'X-Slack-Signature',
   GITLAB: 'X-Gitlab-Token',
   TWILIO: 'X-Twilio-Signature',
+  SQUARE: 'x-square-hmacsha256-signature',
+  SENDGRID: 'X-Twilio-Email-Event-Webhook-Signature',
+  HUBSPOT: 'X-HubSpot-Signature-v3',
+  // Adyen is the one with no entry on purpose: its standard payments webhook carries the
+  // signature inside the body, in each notification item's additionalData.hmacSignature, and
+  // naming a header here would tell a person to look for one that never arrives. Its
+  // Management and Balance Platform webhooks do sign in an `hmacsignature` header, so the
+  // source accepts either — which is a sentence for the docs, not a cell in a lookup table.
 };

@@ -65,6 +65,72 @@ class ProviderEventIdExtractorTest {
     }
 
     @Test
+    void aSquareNotificationIsKeyedByTheEventIdInItsBody() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/ingress/token");
+        request.addHeader("x-square-hmacsha256-signature", "sig");
+
+        assertThat(ProviderEventIdExtractor.extract(request,
+                "{\"merchant_id\":\"MLEFBHHSJGVHD\",\"type\":\"payment.updated\","
+                        + "\"event_id\":\"6a8f5f28-54a1-4eb0-a98a-3111513fd4fc\"}"))
+                .isEqualTo("6a8f5f28-54a1-4eb0-a98a-3111513fd4fc");
+    }
+
+    /**
+     * Adyen names no event id. What two copies of one event share is the pspReference and the
+     * eventCode together, so that pair is the key — and only for a notification carrying exactly
+     * one item, because a key built from the first of several would answer a later request with
+     * an earlier one and quietly drop the items it did not name.
+     */
+    @Test
+    void anAdyenNotificationIsKeyedByItsPspReferenceAndEventCode() {
+        assertThat(ProviderEventIdExtractor.extract(adyenRequest(), adyenBody(
+                "{\"pspReference\":\"7914073381342284\",\"eventCode\":\"AUTHORISATION\",\"success\":\"true\"}")))
+                .isEqualTo("7914073381342284:AUTHORISATION");
+    }
+
+    @Test
+    void anAdyenNotificationCarryingSeveralItemsIsNotDeduplicated() {
+        assertThat(ProviderEventIdExtractor.extract(adyenRequest(), adyenBody(
+                "{\"pspReference\":\"one\",\"eventCode\":\"AUTHORISATION\"}",
+                "{\"pspReference\":\"two\",\"eventCode\":\"CAPTURE\"}")))
+                .isNull();
+    }
+
+    @Test
+    void anAdyenNotificationMissingEitherHalfOfThePairIsNotDeduplicated() {
+        assertThat(ProviderEventIdExtractor.extract(adyenRequest(),
+                adyenBody("{\"eventCode\":\"AUTHORISATION\"}"))).isNull();
+        assertThat(ProviderEventIdExtractor.extract(adyenRequest(),
+                adyenBody("{\"pspReference\":\"7914073381342284\"}"))).isNull();
+        assertThat(ProviderEventIdExtractor.extract(adyenRequest(), "not json")).isNull();
+    }
+
+    /** Adyen's header-signed webhooks are a different body shape with no pspReference at all. */
+    @Test
+    void anAdyenHeaderSignedWebhookIsNotDeduplicated() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/ingress/token");
+        request.addHeader("hmacsignature", "sig");
+
+        assertThat(ProviderEventIdExtractor.extract(request,
+                "{\"type\":\"balancePlatform.accountHolder.updated\"}")).isNull();
+    }
+
+    private static MockHttpServletRequest adyenRequest() {
+        return new MockHttpServletRequest("POST", "/ingress/token");
+    }
+
+    private static String adyenBody(String... items) {
+        StringBuilder body = new StringBuilder("{\"live\":\"false\",\"notificationItems\":[");
+        for (int i = 0; i < items.length; i++) {
+            if (i > 0) {
+                body.append(",");
+            }
+            body.append("{\"NotificationRequestItem\":").append(items[i]).append("}");
+        }
+        return body.append("]}").toString();
+    }
+
+    @Test
     void aSlackEventIsStillKeyedByItsBodyEventId() {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/ingress/token");
         request.addHeader("X-Slack-Signature", "v0=sig");

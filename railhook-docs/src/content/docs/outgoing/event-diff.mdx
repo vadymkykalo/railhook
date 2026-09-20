@@ -1,0 +1,53 @@
+---
+title: Event diff
+description: Compare two stored events field by field to see what actually changed between the one that worked and the one that did not.
+---
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Two events of the same type, one handled cleanly and one that broke a receiver. The payloads are long, they are 95% identical, and the difference is one field. Event diff finds it: it reads both stored payloads and reports every path that was added, removed or changed.
+
+It is **Develop → Event Diff** in the dashboard, and `GET /api/v1/projects/{projectId}/events/diff` under the API. See [API reference](/docs/api-reference/).
+
+## Compare two events
+
+<Steps>
+
+1. **Pick the two events.** Search the project's events by type or id and choose one for each side. Comparing an event with itself is allowed and reports nothing, which is the honest answer.
+
+2. **Decide about masking.** **Mask PII before comparing** is on by default: your [PII masking rules](/docs/platform/pii-masking/) are applied to both payloads before they are compared, so a masked field reads the same on both sides and drops out of the result. Turn it off when the field you are chasing is one of the masked ones.
+
+3. **Read the result.** Each difference is a path into the payload — `$.customer.email`, `$.items[2].sku` — with what each side holds there and one of three verdicts:
+
+   | Verdict | Means |
+   |---|---|
+   | `ADDED` | The path exists on the right and not on the left. |
+   | `REMOVED` | The path exists on the left and not on the right. |
+   | `CHANGED` | Both sides have it and the values differ. |
+
+</Steps>
+
+The comparison changes nothing. Both events keep their stored payloads exactly as they arrived, and running a diff is a read.
+
+## Sharing one
+
+The dashboard puts both event ids in the page's address, so a link to a comparison is a link that opens already compared. That is usually the fastest thing to paste into an incident thread — the reader sees the same two payloads and the same verdicts, without being told which field to look at.
+
+## What it cannot do
+
+- **It compares two stored events, and nothing else.** Not a delivery body, not the payload a transformation produced, not two pasted JSON documents, and not incoming webhooks — those are Incoming Events, a different record. If you want to compare what a template does to a payload, that is [Transform Studio](/docs/outgoing/transform-studio/).
+- **Both events have to be in the same project.** An id from another project is reported as not found.
+- **Arrays are compared by position.** `$.items[0]` is compared with `$.items[0]`. Insert an element at the front of a list and every later position is reported as changed, which is accurate and rarely what you wanted to read. Object fields have no such problem: they are matched by name, so key order does not matter.
+- **A payload that is not JSON is compared whole.** If either side cannot be parsed, the result is a single `$` entry holding both documents, rather than a path-by-path report.
+- **Nothing requires the two to be the same type.** You can compare a `order.created` with a `user.updated` and get a large and truthful list of differences. The result names the left event's type.
+
+<Aside type="tip" title="Keep the masking setting in mind when you share">
+A comparison link carries the two event ids, not the masking toggle's state. A reader whose own view has masking on sees masked values where you saw real ones. Say which you were looking at.
+</Aside>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Transform Studio" href="/docs/outgoing/transform-studio/" description="Run a template against a payload and see what a delivery would carry." />
+  <LinkCard title="Replay" href="/docs/outgoing/replay/" description="Build fresh deliveries from events already stored." />
+  <LinkCard title="PII masking" href="/docs/platform/pii-masking/" description="The rules the diff applies before comparing." />
+</CardGrid>

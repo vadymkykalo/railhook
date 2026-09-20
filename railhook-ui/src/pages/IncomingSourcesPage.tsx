@@ -42,7 +42,9 @@ import ConfirmDialog from '../components/ConfirmDialog';
  * connection: open a source to see where its incoming events are forwarded.
  */
 
-const PROVIDER_TYPES: ProviderType[] = ['GENERIC', 'GITHUB', 'GITLAB', 'STRIPE', 'SHOPIFY', 'SLACK', 'TWILIO'];
+const PROVIDER_TYPES: ProviderType[] = [
+  'GENERIC', 'GITHUB', 'GITLAB', 'STRIPE', 'SHOPIFY', 'SLACK', 'TWILIO', 'SQUARE', 'ADYEN', 'SENDGRID', 'HUBSPOT',
+];
 const VERIFICATION_MODES: VerificationMode[] = ['NONE', 'HMAC_GENERIC', 'PROVIDER'];
 
 /**
@@ -55,7 +57,9 @@ const VERIFICATION_MODES: VerificationMode[] = ['NONE', 'HMAC_GENERIC', 'PROVIDE
  * the provider was already sending. Narrowing the list here means the choice that fails cannot
  * be made; the server check stays the authority.
  */
-const VERIFIABLE_PROVIDERS: ProviderType[] = ['STRIPE', 'GITHUB', 'GITLAB', 'SLACK', 'SHOPIFY', 'TWILIO'];
+const VERIFIABLE_PROVIDERS: ProviderType[] = [
+  'STRIPE', 'GITHUB', 'GITLAB', 'SLACK', 'SHOPIFY', 'TWILIO', 'SQUARE', 'ADYEN', 'SENDGRID', 'HUBSPOT',
+];
 
 export default function IncomingSourcesPage() {
   const { t } = useTranslation();
@@ -356,7 +360,9 @@ export default function IncomingSourcesPage() {
                     onChange={(e) => setFormProvider(e.target.value as ProviderType)} disabled={saving}
                   >
                     {(formVerification === 'PROVIDER' ? VERIFIABLE_PROVIDERS : PROVIDER_TYPES)
-                      .map((p) => <option key={p} value={p}>{p}</option>)}
+                      .map((p) => (
+                        <option key={p} value={p}>{t(`incomingSources.providerNames.${p}`)}</option>
+                      ))}
                   </Select>
                   {formVerification === 'PROVIDER' && (
                     <p className="text-xs text-muted-foreground">
