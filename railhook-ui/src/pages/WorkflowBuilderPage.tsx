@@ -127,10 +127,15 @@ function WorkflowBuilderInner() {
     setSelectedNode(null);
   }, []);
 
+  // The canvas reports its own measurements and what it has selected as changes too, and neither
+  // is an edit: counting them lit "Unsaved" and armed Save the moment the page opened, on a
+  // workflow nobody had touched.
+  const isEdit = (type: string) => type !== 'dimensions' && type !== 'select';
+
   const handleNodesChange: typeof onNodesChange = useCallback(
     (changes) => {
       onNodesChange(changes);
-      setHasUnsaved(true);
+      if (changes.some((change) => isEdit(change.type))) setHasUnsaved(true);
     },
     [onNodesChange],
   );
@@ -138,7 +143,7 @@ function WorkflowBuilderInner() {
   const handleEdgesChange: typeof onEdgesChange = useCallback(
     (changes) => {
       onEdgesChange(changes);
-      setHasUnsaved(true);
+      if (changes.some((change) => isEdit(change.type))) setHasUnsaved(true);
     },
     [onEdgesChange],
   );

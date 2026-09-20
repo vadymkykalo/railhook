@@ -140,6 +140,17 @@ describe('WorkflowBuilderPage', () => {
     expect(screen.getByText(/unsaved/i)).toBeInTheDocument();
   });
 
+  // React Flow reports its own measurement of the canvas as a node change. Counting that as an
+  // edit lit "Unsaved" and armed Save on a workflow nobody had touched, which is the one state
+  // that must mean something here.
+  it('opens a workflow with nothing to save', async () => {
+    renderBuilder();
+    await screen.findByText('Route payments');
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /^save|^зберегти/i })).toBeDisabled());
+    expect(screen.queryByText(/unsaved|не збережено/i)).not.toBeInTheDocument();
+  });
+
   it('saves nothing, enables nothing and runs nothing by being opened', async () => {
     renderBuilder();
     await screen.findByText('Route payments');

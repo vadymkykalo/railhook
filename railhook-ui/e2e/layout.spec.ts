@@ -264,6 +264,12 @@ test.describe('dashboard pages fit the screen', () => {
       expect(outside, 'every node of the loaded workflow is in view').toBe(0);
     });
 
+    test('opens with nothing to save', async ({ page }) => {
+      // The canvas reports its own measurements as changes; counting them lit "Unsaved" and
+      // armed Save on a workflow nobody had touched.
+      await expect(page.getByRole('button', { name: /^save$/i })).toBeDisabled();
+      await expect(page.getByText(/unsaved/i)).toHaveCount(0);
+    });
   });
 
   test('the navigation opens as a drawer on a phone and fits it', async ({ page, isMobile }) => {
