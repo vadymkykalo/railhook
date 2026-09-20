@@ -158,7 +158,7 @@ public class AttemptRunner {
                 log.info("{}: {}", ctx.description(), reason);
                 metrics.transformCancelled();
                 recordQuietly(store, claim, ctx, errorRecord(null, null, reason, elapsed(startedAt)));
-                terminallyFail(store, claim, reason);
+                cancel(store, claim, ctx, reason);
                 return;
             }
 
@@ -244,6 +244,24 @@ public class AttemptRunner {
     private void releaseBothPermits(AttemptContext ctx) {
         concurrencyControl.releaseForTarget(ctx.targetKey());
         concurrencyControl.releaseForTenant(ctx.tenantKey());
+    }
+
+    /**
+     * Ends the obligation because a Transformation said not to send it — under invariant 2, as a
+     * successor is: the release runs only if this Attempt's own finalisation applied.
+     *
+     * <p>Not {@link #terminallyFail}, and the difference is not cosmetic. It lands on the
+     * obligation as CANCELLED rather than FAILED, so the analytics that count SUCCESS against
+     * FAILED and DLQ count it as neither — which is right, because nothing reached the target and
+     * nothing went wrong.
+     */
+    private <C> void cancel(AttemptStore<C> store, C claim, AttemptContext ctx, String reason) {
+        if (store.finalise(claim, new Finalization.Cancelled(reason))) {
+            store.onCancelled(claim);
+        } else {
+            log.warn("{}: the cancellation did not apply — the obligation is owned by another "
+                    + "attempt now, so nothing was released: {}", ctx.description(), reason);
+        }
     }
 
     /** Ends the obligation for good, releasing what it held — under invariant 2, as a successor is. */

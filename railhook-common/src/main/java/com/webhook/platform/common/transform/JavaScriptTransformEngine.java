@@ -13,6 +13,8 @@ import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.SourceSection;
 import org.graalvm.polyglot.Value;
 
+import com.sun.management.ThreadMXBean;
+
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
@@ -22,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
@@ -49,9 +52,19 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * <p>The argument carries the Event — {@code payload}, {@code eventType}, {@code eventId},
  * {@code timestamp} — and the delivery context — {@code direction}, {@code url},
- * {@code headers}. The return is an envelope: {@code payload} is the body to send,
- * {@code headers} is merged over the computed ones, and {@code cancel: true} drops the
+ * {@code headers}, {@code attemptNumber}. The return is an envelope: {@code payload} is the body
+ * to send, {@code headers} is merged over the computed ones, and {@code cancel: true} drops the
  * delivery instead. {@code payload} is required unless {@code cancel} is.
+ *
+ * <p>Two things a script deliberately cannot do. It cannot change the <b>URL</b> or the
+ * <b>method</b>: the Runner validates the address against the SSRF rules before it ever gets
+ * here, and a script that could rewrite it afterwards would be standing on the other side of
+ * that check. And it has no <b>secrets</b> of its own — a script that needs to authenticate to
+ * a receiver uses the Endpoint's or the Destination's own configured credentials, which are
+ * encrypted at rest and applied after the script runs, so it cannot read or overwrite them. A
+ * per-project secret store for scripts would be a new thing to encrypt, rotate and audit; the
+ * seam for it is one field on {@link TransformRequest} and one line in {@code inputJson}, and it
+ * is left unbuilt rather than half-built.
  *
  * <p>The script runs in strict mode. There are no modules, no {@code require}, no
  * {@code module.exports} and no top-level {@code await}: one file, one function, synchronous.
@@ -139,7 +152,7 @@ public class JavaScriptTransformEngine implements AutoCloseable {
     private final ScriptLimits limits;
     private final ScheduledExecutorService watchdog;
     private final ExecutorService cancellers;
-    private final com.sun.management.ThreadMXBean allocationCounter;
+    private final ThreadMXBean allocationCounter;
 
     private volatile Engine engine;
     private volatile boolean closed;
@@ -259,6 +272,7 @@ public class JavaScriptTransformEngine implements AutoCloseable {
             input.put("direction", request.direction());
             input.put("url", request.url());
             input.put("headers", request.headers());
+            input.put("attemptNumber", request.attemptNumber());
             return objectMapper.writeValueAsString(input);
         } catch (Exception e) {
             throw new ScriptTransformException(ScriptTransformException.Reason.RUNTIME,
@@ -562,7 +576,7 @@ public class JavaScriptTransformEngine implements AutoCloseable {
             // watchdog thread: one stuck script would stop every other script being watched.
             try {
                 cancellers.execute(() -> closeQuietly(context));
-            } catch (java.util.concurrent.RejectedExecutionException e) {
+            } catch (RejectedExecutionException e) {
                 closeQuietly(context);
             }
         }
@@ -595,9 +609,11 @@ public class JavaScriptTransformEngine implements AutoCloseable {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
-    private static com.sun.management.ThreadMXBean resolveAllocationCounter() {
+    private static ThreadMXBean resolveAllocationCounter() {
+        // The JDK's own ThreadMXBean shares this simple name, so one of the two has to be
+        // written out; it is the one used once, here.
         java.lang.management.ThreadMXBean bean = ManagementFactory.getThreadMXBean();
-        if (bean instanceof com.sun.management.ThreadMXBean sun && sun.isThreadAllocatedMemorySupported()) {
+        if (bean instanceof ThreadMXBean sun && sun.isThreadAllocatedMemorySupported()) {
             sun.setThreadAllocatedMemoryEnabled(true);
             return sun;
         }

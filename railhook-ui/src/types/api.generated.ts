@@ -4149,13 +4149,19 @@ export interface components {
              */
             description?: string;
             /**
-             * @description JSON template with ${$.jsonpath} expressions for field mapping
+             * @description The transformation itself: a JSON template with ${$.jsonpath} expressions when kind is TEMPLATE, or a JavaScript `function handler(webhook) { ... }` when kind is JAVASCRIPT
              * @example {
              *       "event_type": "${$.type}",
              *       "amount": "${$.data.amount}"
              *     }
              */
             template: string;
+            /**
+             * @description The language the template is written in. Omitted means TEMPLATE, which is what every transformation was before JavaScript existed.
+             * @example TEMPLATE
+             * @enum {string}
+             */
+            kind?: "TEMPLATE" | "JAVASCRIPT";
             /**
              * @description Whether this transformation is active
              * @example true
@@ -4170,6 +4176,8 @@ export interface components {
             name?: string;
             description?: string;
             template?: string;
+            /** @enum {string} */
+            kind?: "TEMPLATE" | "JAVASCRIPT";
             /** Format: int32 */
             version?: number;
             enabled?: boolean;
@@ -4877,19 +4885,85 @@ export interface components {
             durationMs?: number;
             steps?: components["schemas"]["StepExecutionResponse"][];
         };
+        /** @description Run a transformation against a sample payload without saving or sending anything */
         TransformPreviewRequest: {
+            /** @description The event payload to transform */
             inputPayload: string;
+            /** @description A bare JSONPath to extract, for the simplest case. Ignored when a template, script or transformation is given. */
             transformExpression?: string;
+            /** @description An unsaved template or script to run. This is what the Transform Studio sends while you are still editing. */
             template?: string;
-            /** Format: uuid */
+            /**
+             * @description The language `template` is written in. Omitted means TEMPLATE.
+             * @enum {string}
+             */
+            kind?: "TEMPLATE" | "JAVASCRIPT";
+            /**
+             * Format: uuid
+             * @description A saved transformation to run instead. Takes priority over `template`, and brings its own kind.
+             */
             transformationId?: string;
+            /** @description Headers to merge, as a JSON object. A script sees these as `webhook.headers` and may override them. */
             customHeaders?: string;
+            /**
+             * @description The event type a script sees as `webhook.eventType`
+             * @example order.completed
+             */
+            eventType?: string;
+            /** @description The event id a script sees as `webhook.eventId` */
+            eventId?: string;
+            /** @description The destination URL a script sees as `webhook.url`. Read-only to the script; a transformation cannot redirect a delivery. */
+            url?: string;
         };
+        /** @description One console.* call a script made */
+        ConsoleLine: {
+            /**
+             * @description log, info, warn, error or debug
+             * @example log
+             */
+            level?: string;
+            /** @description The arguments, already formatted */
+            message?: string;
+        };
+        /** @description What the transformation produced, and what it said while producing it */
         TransformPreviewResponse: {
+            /** @description The body that would be sent, pretty-printed. Null when the run failed or the script cancelled the delivery. */
             outputPayload?: string;
+            /** @description The headers that would be sent, as a JSON object: the ones you supplied, with anything the script set merged over them */
             outputHeaders?: string;
+            /** @description Whether the run produced a payload */
             success?: boolean;
+            /** @description What went wrong, in the order it went wrong */
             errors?: string[];
+            /**
+             * @description The language that actually ran
+             * @enum {string}
+             */
+            kind?: "TEMPLATE" | "JAVASCRIPT";
+            /** @description Everything the script logged, oldest first. Always empty for a template, which has no console. */
+            console?: components["schemas"]["ConsoleLine"][];
+            /** @description True when the script logged more lines than the deployment keeps */
+            consoleTruncated?: boolean;
+            /** @description True when the script asked for the delivery to be dropped */
+            cancelled?: boolean;
+            /** @description Why the script cancelled, as the script stated it */
+            cancelReason?: string;
+            /**
+             * Format: int64
+             * @description Wall clock spent inside the script, in milliseconds
+             */
+            durationMs?: number;
+            /**
+             * Format: int32
+             * @description The line in the script the failure came from, 1-based, or null when the failure has no location
+             */
+            errorLine?: number;
+            /**
+             * @description Why the run produced nothing, as a value rather than as prose: SYNTAX, CONTRACT, RUNTIME, TIMEOUT, MEMORY, OUTPUT_TOO_LARGE, SOURCE_TOO_LARGE or UNAVAILABLE. Null when the run succeeded. A client shows its own wording for these; `errors` carries the engine's, in English.
+             * @example TIMEOUT
+             * @enum {string}
+             */
+            errorReason?: "SYNTAX" | "CONTRACT" | "RUNTIME" | "TIMEOUT" | "MEMORY" | "OUTPUT_TOO_LARGE" | "SOURCE_TOO_LARGE" | "UNAVAILABLE";
         };
         /** @description Request to dry-run a delivery: shows what the endpoint would receive without actually sending */
         DeliveryDryRunRequest: {
@@ -4908,8 +4982,13 @@ export interface components {
              * @description ID of a saved Transformation to apply (highest priority)
              */
             transformationId?: string;
-            /** @description Inline JSON template with ${$.path} expressions */
+            /** @description An unsaved template or script to apply. What the Transform Studio sends while you are still editing. */
             payloadTemplate?: string;
+            /**
+             * @description The language `payloadTemplate` is written in. Omitted means TEMPLATE. A saved transformation brings its own and ignores this.
+             * @enum {string}
+             */
+            kind?: "TEMPLATE" | "JAVASCRIPT";
             /**
              * @description Custom headers JSON to merge
              * @example {
@@ -4951,6 +5030,33 @@ export interface components {
              * @description Version of the transformation applied (if any)
              */
             transformationVersion?: number;
+            /**
+             * @description The language that actually ran
+             * @enum {string}
+             */
+            transformationKind?: "TEMPLATE" | "JAVASCRIPT";
+            /** @description Everything the script logged, oldest first. Empty for a template. */
+            console?: components["schemas"]["ConsoleLine"][];
+            /** @description True when the script asked for the delivery to be dropped. Nothing would be sent, and there is no body to sign. */
+            cancelled?: boolean;
+            /** @description Why the script cancelled, as the script stated it */
+            cancelReason?: string;
+            /**
+             * Format: int64
+             * @description Wall clock spent inside the script, in milliseconds
+             */
+            durationMs?: number;
+            /**
+             * Format: int32
+             * @description The line in the script the failure came from, 1-based, or null when the failure has no location
+             */
+            errorLine?: number;
+            /**
+             * @description Why the script produced nothing, as a value rather than as prose. Same set as the transform preview's.
+             * @example RUNTIME
+             * @enum {string}
+             */
+            errorReason?: "SYNTAX" | "CONTRACT" | "RUNTIME" | "TIMEOUT" | "MEMORY" | "OUTPUT_TOO_LARGE" | "SOURCE_TOO_LARGE" | "UNAVAILABLE";
         };
         TestEndpointRequest: {
             name?: string;
@@ -5008,7 +5114,7 @@ export interface components {
             /** Format: uuid */
             endpointId?: string;
             /** @enum {string} */
-            sourceStatus?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
+            sourceStatus?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ" | "CANCELLED";
         };
         ReplaySessionResponse: {
             /** Format: uuid */
@@ -5027,7 +5133,7 @@ export interface components {
             /** Format: uuid */
             endpointId?: string;
             /** @enum {string} */
-            sourceStatus?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
+            sourceStatus?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ" | "CANCELLED";
             /** Format: int32 */
             totalEvents?: number;
             /** Format: int32 */
@@ -5186,6 +5292,8 @@ export interface components {
             failed?: number;
             /** Format: int32 */
             dlq?: number;
+            /** Format: int32 */
+            cancelled?: number;
         };
         EventResponse: {
             /** Format: uuid */
@@ -5340,7 +5448,7 @@ export interface components {
         BulkReplayRequest: {
             deliveryIds?: string[];
             /** @enum {string} */
-            status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
+            status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ" | "CANCELLED";
             /** Format: uuid */
             endpointId?: string;
             /** Format: uuid */
@@ -5713,6 +5821,12 @@ export interface components {
             version?: number;
             /** @description The template itself. Omitted from the list of versions — fetch one version to read it. */
             template?: string;
+            /**
+             * @description The language this version was published in. Restoring it puts the language back as well as the text, so a restore cannot leave a script in a row marked TEMPLATE or the other way round.
+             * @example TEMPLATE
+             * @enum {string}
+             */
+            kind?: "TEMPLATE" | "JAVASCRIPT";
             /** @description Whether this is the version the transformation is currently using */
             current?: boolean;
             /**
@@ -5752,7 +5866,21 @@ export interface components {
             rightCreatedAt?: string;
             /** @description The whole left-hand template, so the caller can render both sides as well as the changes */
             leftTemplate?: string;
+            /** @description The whole right-hand template */
             rightTemplate?: string;
+            /**
+             * @description The language the left-hand version was published in
+             * @example TEMPLATE
+             * @enum {string}
+             */
+            leftKind?: "TEMPLATE" | "JAVASCRIPT";
+            /**
+             * @description The language the right-hand version was published in
+             * @example JAVASCRIPT
+             * @enum {string}
+             */
+            rightKind?: "TEMPLATE" | "JAVASCRIPT";
+            /** @description Field-by-field changes between the two templates. Empty when either side is a JAVASCRIPT version: a script has no fields to compare, so the two texts are diffed line by line instead. */
             diffs?: components["schemas"]["JsonDiffEntry"][];
         };
         CapturedRequestResponse: {
@@ -5926,7 +6054,7 @@ export interface components {
             /** Format: int32 */
             attemptNumber?: number;
             /** @enum {string} */
-            status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
+            status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ" | "CANCELLED";
             /** Format: date-time */
             startedAt?: string;
             /** Format: date-time */
@@ -6249,7 +6377,7 @@ export interface components {
             /** Format: uuid */
             endpointId?: string;
             /** @enum {string} */
-            status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
+            status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ" | "CANCELLED";
             /** Format: int32 */
             attemptCount?: number;
             /** Format: int32 */
@@ -6426,7 +6554,7 @@ export interface components {
             /** Format: uuid */
             subscriptionId?: string;
             /** @enum {string} */
-            status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
+            status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ" | "CANCELLED";
             /** Format: int32 */
             attemptCount?: number;
             /** Format: int32 */
@@ -13279,7 +13407,7 @@ export interface operations {
         parameters: {
             query?: {
                 endpointId?: string;
-                status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
+                status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ" | "CANCELLED";
                 /** @description Zero-based page index (0..N) */
                 page?: number;
                 /** @description The size of the page to be returned */
@@ -13483,7 +13611,7 @@ export interface operations {
     listDeliveriesByProject: {
         parameters: {
             query?: {
-                status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
+                status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ" | "CANCELLED";
                 endpointId?: string;
                 eventId?: string;
                 eventType?: string;

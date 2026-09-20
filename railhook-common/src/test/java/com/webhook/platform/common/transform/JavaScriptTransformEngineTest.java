@@ -57,6 +57,7 @@ class JavaScriptTransformEngineTest {
                 .direction("OUTGOING")
                 .url("https://example.test/hook")
                 .headers(Map.of("X-Existing", "1"))
+                .attemptNumber(2)
                 .build();
     }
 
@@ -92,7 +93,8 @@ class JavaScriptTransformEngineTest {
                         at: webhook.timestamp,
                         dir: webhook.direction,
                         url: webhook.url,
-                        hdr: webhook.headers['X-Existing']
+                        hdr: webhook.headers['X-Existing'],
+                        attempt: webhook.attemptNumber
                       } };
                     }
                     """, "{}");
@@ -103,7 +105,8 @@ class JavaScriptTransformEngineTest {
                     .contains("\"at\":\"2026-09-20T10:00:00Z\"")
                     .contains("\"dir\":\"OUTGOING\"")
                     .contains("\"url\":\"https://example.test/hook\"")
-                    .contains("\"hdr\":\"1\"");
+                    .contains("\"hdr\":\"1\"")
+                    .contains("\"attempt\":2");
         }
 
         @Test

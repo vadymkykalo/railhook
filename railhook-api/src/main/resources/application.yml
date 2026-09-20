@@ -314,6 +314,10 @@ demo:
   enabled: ${DEMO_ENABLED:false}
   session-ttl-minutes: ${DEMO_SESSION_TTL_MINUTES:30}
   refresh-interval-minutes: ${DEMO_REFRESH_INTERVAL_MINUTES:60}
+  # How much JavaScript an anonymous visitor may run; `.env.dist` explains the arithmetic.
+  script-runs:
+    per-session-per-minute: ${DEMO_SCRIPT_RUNS_PER_SESSION_PER_MINUTE:20}
+    per-ip-per-minute: ${DEMO_SCRIPT_RUNS_PER_IP_PER_MINUTE:60}
 
 test-endpoint:
   base-url: ${TEST_ENDPOINT_BASE_URL:http://localhost:8080}

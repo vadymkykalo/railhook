@@ -964,6 +964,7 @@
       "empty": "Nothing in flight",
       "rail": "Attempt {{count}} of {{total}}",
       "status": {
+        "CANCELLED": "Cancelled",
         "DLQ": "Abandoned",
         "FAILED": "Failed",
         "PENDING": "Pending",
@@ -1114,6 +1115,7 @@
     "replayedSomeSkipped": "Queued {{replayed}} for replay, skipped {{skipped}} that were not replayable",
     "replaying": "Replaying...",
     "status": {
+      "CANCELLED": "Cancelled",
       "DLQ": "DLQ",
       "FAILED": "Failed",
       "PENDING": "Pending",
@@ -1121,6 +1123,7 @@
       "SUCCESS": "Success"
     },
     "statusExplain": {
+      "CANCELLED": "A transformation said not to send this one",
       "DLQ": "Moved to dead letter queue after {{count}} attempts",
       "FAILED": "Delivery failed permanently",
       "PENDING_NEW": "Queued for first attempt",
@@ -3718,6 +3721,7 @@
     "consoleHint": "console.log, info, warn, error and debug are captured here. They never reach your endpoint.",
     "contractHint": "One function handler(webhook) returning { payload }, optional { headers }, or { cancel: true }. It runs in a sandbox with no filesystem, no network and a two-second clock.",
     "customHeaders": "Custom Headers (JSON object)",
+    "deliveryEffect": "On a real delivery this attempt would fail and be retried. The untransformed payload is never sent in its place.",
     "diff": {
       "identicalTitle": "Nothing changed",
       "identicalHint": "The body the transformation returns is identical to the event it was given. That is a valid outcome for a script that only sets a header.",
@@ -3742,6 +3746,18 @@
     "dryRunTransformation": "Transformation",
     "editScript": "Edit script",
     "emptyTitle": "Nothing to show yet",
+    "errorDetail": "What the engine said",
+    "errorReason": {
+      "SYNTAX": "The script would not compile.",
+      "CONTRACT": "The script did not return what a transformation has to return.",
+      "RUNTIME": "The script threw, or reached for something the sandbox does not have.",
+      "TIMEOUT": "The script was still running when its time ran out, and was stopped.",
+      "MEMORY": "The script allocated more than it is allowed to, and was stopped.",
+      "OUTPUT_TOO_LARGE": "The script returned a body larger than this deployment allows.",
+      "SOURCE_TOO_LARGE": "The script is longer than this deployment will compile.",
+      "UNAVAILABLE": "JavaScript transformations are not available on this deployment.",
+      "UNKNOWN": "The script produced no payload."
+    },
     "errors": "Validation Errors",
     "expression": "Transform Expression (JSONPath-like)",
     "format": "Format",

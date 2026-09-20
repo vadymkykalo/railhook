@@ -39,6 +39,7 @@ const TRANSFORMATION: TransformationResponse = {
   id: TRANSFORMATION_ID,
   projectId: TEST_PROJECT_ID,
   name: 'Stripe → CRM',
+  kind: 'TEMPLATE',
   template: '{"a":"${$.three}"}',
   version: 3,
   enabled: true,

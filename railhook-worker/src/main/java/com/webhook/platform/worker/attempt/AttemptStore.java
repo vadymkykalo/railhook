@@ -112,4 +112,13 @@ public interface AttemptStore<C> {
      */
     default void onTerminallyFailed(C claim) {
     }
+
+    /**
+     * Called once after a {@link Finalization.Cancelled} that applied. Terminal is terminal: a
+     * cancellation releases exactly what a terminal failure releases, and a held ordering cursor
+     * stalls every later Delivery to that endpoint whatever the reason it was held.
+     */
+    default void onCancelled(C claim) {
+        onTerminallyFailed(claim);
+    }
 }

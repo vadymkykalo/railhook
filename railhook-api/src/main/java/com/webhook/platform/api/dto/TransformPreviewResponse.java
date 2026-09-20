@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.common.transform.ScriptTransformException;
 import com.webhook.platform.common.transform.TransformationKind;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -46,6 +47,10 @@ public class TransformPreviewResponse {
 
     @Schema(description = "The line in the script the failure came from, 1-based, or null when the failure has no location")
     private Integer errorLine;
+
+    @Schema(description = "Why the run produced nothing, as a value rather than as prose: SYNTAX, CONTRACT, RUNTIME, TIMEOUT, MEMORY, OUTPUT_TOO_LARGE, SOURCE_TOO_LARGE or UNAVAILABLE. Null when the run succeeded. A client shows its own wording for these; `errors` carries the engine's, in English.",
+            example = "TIMEOUT")
+    private ScriptTransformException.Reason errorReason;
 
     /** One {@code console.*} call. Mirrors {@code ScriptConsoleLine} so the wire shape is ours. */
     @Getter

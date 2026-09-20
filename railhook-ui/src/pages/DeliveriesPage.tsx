@@ -36,7 +36,7 @@ import { useDebounced } from '../hooks/useDebounced';
 import Callout from '../components/Callout';
 import { cn } from '../lib/utils';
 
-const STATUS_VALUES = ['', 'SUCCESS', 'FAILED', 'DLQ', 'PENDING', 'PROCESSING'] as const;
+const STATUS_VALUES = ['', 'SUCCESS', 'FAILED', 'DLQ', 'CANCELLED', 'PENDING', 'PROCESSING'] as const;
 const DATE_RANGE_VALUES = ['24h', '7d', '30d'] as const;
 
 function statusOptions(t: (key: string) => string) {
@@ -78,11 +78,15 @@ function explainOf(delivery: DeliveryResponse): { key: string; values?: Record<s
   if (delivery.status === 'PROCESSING') return { key: 'deliveries.statusExplain.PROCESSING' };
   if (delivery.status === 'DLQ') return { key: 'deliveries.statusExplain.DLQ', values: { count: delivery.attemptCount } };
   if (delivery.status === 'FAILED') return { key: 'deliveries.statusExplain.FAILED' };
+  if (delivery.status === 'CANCELLED') return { key: 'deliveries.statusExplain.CANCELLED' };
   return null;
 }
 
-/** A delivered obligation has nothing left to replay. */
-const isReplayable = (d: DeliveryResponse) => d.status !== 'SUCCESS';
+/**
+ * A delivered obligation has nothing left to replay, and neither has a cancelled one: the
+ * transformation would run again over the same payload and reach the same answer.
+ */
+const isReplayable = (d: DeliveryResponse) => d.status !== 'SUCCESS' && d.status !== 'CANCELLED';
 
 export default function DeliveriesPage() {
   const { t } = useTranslation();

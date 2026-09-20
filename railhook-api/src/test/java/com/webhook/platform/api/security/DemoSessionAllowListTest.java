@@ -11,10 +11,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -40,7 +42,17 @@ class DemoSessionAllowListTest {
             "PublicDemoController.createSession",
             // The public site's anonymous forms, usable by a visitor who still holds a demo token.
             "PublicContactController.send",
-            "PublicBinController.create");
+            "PublicBinController.create",
+            // The Transform Studio's Run button. A POST because a script and its input do not fit
+            // in a query string, not because anything is stored: it runs the script in the
+            // sandbox and returns what came out. Nothing of the demo's changes, and a Studio a
+            // visitor cannot run is a screenshot.
+            "TransformPreviewController.preview",
+            // The same Run button with an Endpoint named, so the visitor sees the body, the URL
+            // and the headers a real Delivery would carry. It declares WRITE because it normally
+            // returns a working X-Signature — the demo's copy does not, DemoDryRunMask replaces
+            // it, which is the whole reason this handler can be on this list at all.
+            "TransformPreviewController.deliveryDryRun");
 
     @Test
     @DisplayName("the handlers a demo session may write through are exactly the reviewed ones")
@@ -56,6 +68,45 @@ class DemoSessionAllowListTest {
         assertEquals(new TreeSet<>(ALLOWED), found,
                 "@AllowedInDemo lets anyone on the internet call a handler with the demo's identity. "
                         + "Adding one is a review decision: update this list with the reason, or remove the annotation.");
+    }
+
+    /**
+     * The Transform Studio is the one screen whose value is a button that executes something, so
+     * it is the one place the demo runs code. These two cases name the handlers rather than
+     * leaving them to the set above, because what must stay true is asymmetric: running a script
+     * is allowed, and saving one — or creating, editing or deleting the Transformation it would
+     * be saved into — is not. A refactor that moved the annotation one method down would keep
+     * {@link #allowListIsFrozen} green and hand a stranger the transformation store.
+     */
+    @Test
+    @DisplayName("the demo may run a transformation, in both places the product runs one")
+    void theDemoMayRunATransformation() {
+        assertTrue(isAllowedInDemo("TransformPreviewController", "preview"),
+                "the Transform Studio's preview is how the demo shows what a script does");
+        assertTrue(isAllowedInDemo("TransformPreviewController", "deliveryDryRun"),
+                "the dry-run shows the bytes a real Delivery would carry; the demo's copy is masked");
+    }
+
+    @Test
+    @DisplayName("the demo may not create, change or delete a transformation")
+    void theDemoMayNotKeepATransformation() {
+        for (String handler : new String[]{"create", "update", "delete"}) {
+            assertFalse(isAllowedInDemo("TransformationController", handler),
+                    "TransformationController." + handler + " writes to the demo organization's "
+                            + "transformation store; running a script is not saving one");
+        }
+    }
+
+    private static boolean isAllowedInDemo(String controller, String handler) {
+        List<Method> matches = controllers().stream()
+                .filter(type -> type.getSimpleName().equals(controller))
+                .flatMap(type -> Arrays.stream(type.getDeclaredMethods()))
+                .filter(method -> method.getName().equals(handler))
+                .toList();
+        assertEquals(1, matches.size(),
+                "expected exactly one " + controller + "." + handler + ", found " + matches.size()
+                        + " — the handler this case pins was renamed or overloaded");
+        return matches.get(0).isAnnotationPresent(AllowedInDemo.class);
     }
 
     @Test

@@ -181,6 +181,19 @@ public class Delivery {
     }
 
     /** No number of retries would help — a refused URL, a deleted endpoint, an unusable ladder. */
+    /**
+     * Ends the obligation because a Transformation said not to send it.
+     *
+     * <p>{@code failedAt} is set, like every other terminal end, so the row carries when it
+     * stopped being in flight — the status is what says it was not a failure.
+     */
+    public void cancel() {
+        Instant now = Instant.now();
+        this.status = DeliveryStatus.CANCELLED;
+        this.failedAt = now;
+        this.updatedAt = now;
+    }
+
     public void failTerminally() {
         Instant now = Instant.now();
         this.status = DeliveryStatus.FAILED;
@@ -189,7 +202,9 @@ public class Delivery {
     }
 
     public enum DeliveryStatus {
-        PENDING, PROCESSING, SUCCESS, FAILED, DLQ
+        PENDING, PROCESSING, SUCCESS, FAILED, DLQ,
+        /** A Transformation said not to send this one. Terminal, deliberate, not a failure. */
+        CANCELLED
     }
 
     public enum DeliveryOrigin {

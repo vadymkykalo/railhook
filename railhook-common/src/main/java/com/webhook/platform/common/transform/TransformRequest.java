@@ -23,6 +23,9 @@ import java.util.Map;
  *                  writable: letting a script choose the address would put it past the SSRF
  *                  checks the Runner makes before it ever gets here.
  * @param headers   the request headers computed so far, signature excluded
+ * @param attemptNumber which try this is, 1 for the first. A script that adds an idempotency
+ *                  hint, or logs differently on a retry, needs it and cannot work it out. Null
+ *                  in a preview, where there is no Attempt.
  */
 @Builder
 public record TransformRequest(
@@ -32,7 +35,8 @@ public record TransformRequest(
         Instant timestamp,
         String direction,
         String url,
-        Map<String, String> headers) {
+        Map<String, String> headers,
+        Integer attemptNumber) {
 
     public TransformRequest {
         payload = payload == null || payload.isBlank() ? "null" : payload;

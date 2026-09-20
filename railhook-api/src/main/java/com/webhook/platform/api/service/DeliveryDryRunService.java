@@ -77,6 +77,8 @@ public class DeliveryDryRunService {
         String signature = null;
         String endpointUrl = null;
         long durationMs = 0;
+        Integer errorLine = null;
+        ScriptTransformException.Reason errorReason = null;
         List<ScriptConsoleLine> console = List.of();
         Map<String, String> requestHeaders = new LinkedHashMap<>();
         Map<String, String> scriptHeaders = new LinkedHashMap<>();
@@ -178,6 +180,8 @@ public class DeliveryDryRunService {
                 String where = e.line() > 0 ? " (line " + e.line() + ")" : "";
                 errors.add(e.reason() + where + ": " + e.getMessage());
                 console = e.console();
+                errorLine = e.line() > 0 ? e.line() : null;
+                errorReason = e.reason();
             }
         } else {
             try {
@@ -258,6 +262,8 @@ public class DeliveryDryRunService {
                 .console(consoleDto(console))
                 .cancelled(false)
                 .durationMs(durationMs)
+                .errorLine(errorLine)
+                .errorReason(errorReason)
                 .build();
     }
 

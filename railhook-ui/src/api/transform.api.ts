@@ -1,6 +1,14 @@
 import { http } from './http';
 import type { TransformationKind } from '../types/api.types';
 
+/**
+ * Why a script produced nothing, as a value rather than as prose, so the UI can say it in the
+ * reader's own language. The server's English sentence still arrives in `errors`.
+ */
+export type ScriptFailureReason =
+  | 'SYNTAX' | 'CONTRACT' | 'RUNTIME' | 'TIMEOUT' | 'MEMORY'
+  | 'OUTPUT_TOO_LARGE' | 'SOURCE_TOO_LARGE' | 'UNAVAILABLE';
+
 /** One `console.*` call a script made, as the server captured it. */
 export interface TransformConsoleLine {
   level: string;
@@ -34,6 +42,7 @@ export interface TransformPreviewResponse {
   durationMs?: number;
   /** 1-based line in the author's own script, already corrected for the sandbox wrapper. */
   errorLine?: number | null;
+  errorReason?: ScriptFailureReason | null;
 }
 
 export interface DeliveryDryRunRequest {
@@ -60,6 +69,8 @@ export interface DeliveryDryRunResponse {
   cancelled?: boolean;
   cancelReason?: string | null;
   durationMs?: number;
+  errorLine?: number | null;
+  errorReason?: ScriptFailureReason | null;
 }
 
 export const transformApi = {

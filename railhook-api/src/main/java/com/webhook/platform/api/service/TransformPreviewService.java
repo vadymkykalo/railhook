@@ -124,6 +124,7 @@ public class TransformPreviewService {
                     .kind(kind)
                     .console(console(e.console()))
                     .errorLine(e.line() > 0 ? e.line() : null)
+                    .errorReason(e.reason())
                     .build();
         }
     }

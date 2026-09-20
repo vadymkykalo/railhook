@@ -1,5 +1,7 @@
 package com.webhook.platform.common.transform;
 
+import java.util.Locale;
+
 /**
  * The language a Transformation is written in.
  *
@@ -21,7 +23,7 @@ public enum TransformationKind {
             return TEMPLATE;
         }
         try {
-            return valueOf(value.trim().toUpperCase(java.util.Locale.ROOT));
+            return valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             return TEMPLATE;
         }

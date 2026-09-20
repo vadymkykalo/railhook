@@ -19,4 +19,7 @@ public class DeliveryStatusCounts {
     private int success;
     private int failed;
     private int dlq;
+
+    /** Deliveries a Transformation said not to send. Neither delivered nor failed. */
+    private int cancelled;
 }

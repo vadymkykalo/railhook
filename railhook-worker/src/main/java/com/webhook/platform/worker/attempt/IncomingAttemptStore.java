@@ -458,7 +458,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                     .timestamp(event.getReceivedAt())
                     .direction("INCOMING")
                     .url(destination.getUrl())
-                    .headers(java.util.Map.of())
+                    .headers(Map.of())
+                    .attemptNumber(claim.attemptNumber())
                     .build());
         }
 
@@ -639,6 +640,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         }
         if (outcome instanceof Finalization.Abandoned) {
             return ForwardAttemptStatus.DLQ;
+        }
+        if (outcome instanceof Finalization.Cancelled) {
+            return ForwardAttemptStatus.CANCELLED;
         }
         return ForwardAttemptStatus.FAILED;
     }

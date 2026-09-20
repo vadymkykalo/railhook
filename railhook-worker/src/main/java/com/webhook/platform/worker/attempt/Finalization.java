@@ -15,6 +15,8 @@ import java.time.Instant;
  *   <li>{@link Abandoned} means the Ladder is exhausted — DLQ.</li>
  *   <li>{@link TerminallyFailed} means another Attempt could not possibly help: an
  *       unresolvable URL, a disabled or deleted target, an unusable Ladder.</li>
+ *   <li>{@link Cancelled} means a Transformation said not to send it. Also terminal, and
+ *       deliberately not the same as TerminallyFailed: nothing went wrong.</li>
  * </ul>
  */
 public sealed interface Finalization {
@@ -41,5 +43,15 @@ public sealed interface Finalization {
 
     /** Retrying cannot help. */
     record TerminallyFailed(String reason) implements Finalization {
+    }
+
+    /**
+     * A Transformation returned {@code { cancel: true }}. Nothing was sent, nothing is owed, and
+     * the next Attempt would run the same script over the same payload and reach the same answer.
+     *
+     * <p>Separate from {@link TerminallyFailed} because the two are different things to everyone
+     * downstream: an error rate somebody is paged for, and a filter doing its job.
+     */
+    record Cancelled(String reason) implements Finalization {
     }
 }

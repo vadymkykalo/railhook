@@ -393,6 +393,9 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                         .direction("OUTGOING")
                         .url(endpoint.getUrl())
                         .headers(Map.of())
+                        // attemptStarting has already spent the rung, so this is the number of
+                        // the attempt the script is being run for, not the last one.
+                        .attemptNumber(delivery.getAttemptCount())
                         .build());
     }
 
@@ -465,6 +468,9 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             } else if (outcome instanceof Finalization.TerminallyFailed failed) {
                 fresh.failTerminally();
                 log.error("Delivery {} failed: {}", fresh.getId(), failed.reason());
+            } else if (outcome instanceof Finalization.Cancelled cancelled) {
+                fresh.cancel();
+                log.info("Delivery {} cancelled: {}", fresh.getId(), cancelled.reason());
             }
             deliveryRepository.save(fresh);
             return true;

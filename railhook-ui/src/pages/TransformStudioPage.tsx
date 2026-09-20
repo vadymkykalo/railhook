@@ -30,7 +30,9 @@ import { Select } from '../components/ui/select';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
-import type { DeliveryDryRunResponse, TransformPreviewResponse } from '../api/transform.api';
+import type {
+  DeliveryDryRunResponse, TransformPreviewResponse, ScriptFailureReason,
+} from '../api/transform.api';
 import type { TransformationKind, TransformationResponse } from '../types/api.types';
 
 /**
@@ -326,8 +328,20 @@ export default function TransformStudioPage() {
   const cancelled = (mode === 'preview' ? preview?.cancelled : dryRunResult?.cancelled) ?? false;
   const cancelReason = (mode === 'preview' ? preview?.cancelReason : dryRunResult?.cancelReason) ?? null;
   const durationMs = (mode === 'preview' ? preview?.durationMs : dryRunResult?.durationMs) ?? 0;
-  const errorLine = preview?.errorLine ?? null;
+  const errorLine = (mode === 'preview' ? preview?.errorLine : dryRunResult?.errorLine) ?? null;
+  const errorReason = (mode === 'preview' ? preview?.errorReason : dryRunResult?.errorReason) ?? null;
   const hasRun = preview !== null || dryRunResult !== null;
+
+  /**
+   * The engine speaks English and this UI does not, necessarily. The reason comes back as a
+   * value precisely so the sentence can be ours; the engine's own message is kept underneath
+   * it, verbatim, because that is where the line number and the thrown message live.
+   */
+  const failureHeadline = errors.length === 0
+    ? null
+    : t(`transform.errorReason.${(errorReason ?? 'UNKNOWN') as ScriptFailureReason | 'UNKNOWN'}`, {
+      defaultValue: t('transform.errorReason.UNKNOWN'),
+    });
 
   const outputHeaders = useMemo(() => {
     if (mode === 'dryRun') return dryRunResult?.requestHeaders ?? null;
@@ -421,7 +435,7 @@ export default function TransformStudioPage() {
             minHeight="340px"
             maxHeight="min(56vh, 620px)"
             errorLine={errorLine}
-            errorMessage={errors[0] ?? null}
+            errorMessage={failureHeadline}
             aria-label={t('transform.scriptTitle')}
           />
         ) : (
@@ -744,17 +758,23 @@ export default function TransformStudioPage() {
       <TabPanel value="console" active={tab} className="space-y-3">
         {errors.length > 0 && (
           <div className="overflow-hidden rounded-lg border border-halt/40">
-            <div className="border-b border-halt/30 bg-halt/10 px-2.5 py-1.5">
-              <span className="mono-label text-halt">{t('transform.errors')}</span>
+            <div className="border-b border-halt/30 bg-halt/10 px-2.5 py-2">
+              <p className="text-[13px] font-medium text-foreground">
+                {errorLine && (
+                  <span className="mr-2 rounded bg-halt/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-halt">
+                    {t('transform.atLine', { line: errorLine })}
+                  </span>
+                )}
+                {failureHeadline}
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('transform.deliveryEffect')}</p>
             </div>
-            <ul className="divide-y divide-rail">
+            <div className="px-2.5 py-1.5">
+              <span className="mono-label">{t('transform.errorDetail')}</span>
+            </div>
+            <ul className="divide-y divide-rail border-t border-rail">
               {errors.map((error, index) => (
                 <li key={index} className="px-2.5 py-2 font-mono text-[11px] leading-relaxed text-foreground">
-                  {errorLine && index === 0 && (
-                    <span className="mr-2 rounded bg-halt/15 px-1.5 py-0.5 text-[10px] font-semibold text-halt">
-                      {t('transform.atLine', { line: errorLine })}
-                    </span>
-                  )}
                   {error}
                 </li>
               ))}

@@ -63,6 +63,67 @@ final class DemoCatalog {
             new DemoSubscription(id(0x29), ALERTS, "payment.failed", 7, OUTGOING_DELAYS),
             new DemoSubscription(id(0x2a), ALERTS, "order.cancelled", 7, OUTGOING_DELAYS));
 
+    /**
+     * A Transformation written in JavaScript, and the Subscription it is wired to. The demo has
+     * exactly one, and it exists to answer the question the Transform Studio raises the moment a
+     * visitor opens it: what is this for, when a template already exists? So the script does the
+     * three things a template cannot — loop over an array, branch, and compute — against the very
+     * events the demo's Deliveries were built from.
+     */
+    record DemoTransformation(UUID id, UUID subscriptionId, String name, String description, String script) {
+    }
+
+    /**
+     * Wired to {@code order.created} on the order service, which is the busiest event in the
+     * demo's history, so the Studio opens on a script and a recent real Event to run it against
+     * rather than an empty editor.
+     */
+    static final DemoTransformation ORDER_LINES = new DemoTransformation(id(0x50), id(0x20),
+            "Order lines (JavaScript)",
+            "Turns an order into the line summary the order service wants: one row per item with its "
+                    + "line total, the order's value, a review flag on anything over $100, and the day it "
+                    + "was placed. Three things the template language cannot do.",
+            """
+            function handler(webhook) {
+              var order = webhook.payload.data;
+
+              // 1. Reshape an array. A template has no loop, so it cannot turn N items into N lines.
+              var lines = order.items.map(function (item) {
+                return {
+                  sku: item.sku,
+                  quantity: item.quantity,
+                  total: money(item.quantity * Number(item.unit_price))
+                };
+              });
+
+              var out = {
+                order_id: order.id,
+                customer: order.customer.email,
+                currency: order.currency,
+                lines: lines,
+                value: money(lines.reduce(function (sum, line) { return sum + line.total; }, 0))
+              };
+
+              // 2. Add a field only when it applies. A template has no branch, so the receiver
+              //    would get "review": "" on every order instead.
+              if (out.value >= 100) {
+                out.review = 'manual';
+              }
+
+              // 3. Work something out. A template can copy occurred_at across; it cannot cut a
+              //    date out of it.
+              out.placed_on = new Date(webhook.payload.occurred_at).toISOString().slice(0, 10);
+
+              return { payload: out, headers: { 'X-Order-Value': out.value.toFixed(2) } };
+            }
+
+            function money(amount) {
+              return Math.round(amount * 100) / 100;
+            }
+            """);
+
+    static final List<DemoTransformation> TRANSFORMATIONS = List.of(ORDER_LINES);
+
     static final DemoSource STRIPE = new DemoSource(id(0x30), "Stripe payments", "stripe", "STRIPE",
             "Stripe-Signature", "");
     static final DemoSource GITHUB = new DemoSource(id(0x31), "GitHub (acme/shop)", "github", "GITHUB",

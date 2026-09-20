@@ -685,9 +685,10 @@ class AttemptRunnerTest {
 
             runner.run(store, metrics);
 
-            assertInstanceOf(Finalization.TerminallyFailed.class, store.finalizations.get(0),
-                    "a cancellation is terminal: the next attempt would run the same script over "
-                            + "the same payload and reach the same answer");
+            assertInstanceOf(Finalization.Cancelled.class, store.finalizations.get(0),
+                    "a cancellation is terminal but is not a failure: the next attempt would run "
+                            + "the same script over the same payload and reach the same answer, "
+                            + "and nothing went wrong");
             assertEquals(0, metrics.successes, "nothing may be sent");
             assertEquals(0, metrics.transformFailures, "a cancellation is not a failed transform");
             assertEquals(1, metrics.transformCancellations);
@@ -719,8 +720,9 @@ class AttemptRunnerTest {
 
             runner.run(store, metrics);
 
-            assertEquals(1, store.terminallyFailedCalls);
+            assertEquals(1, store.cancelledCalls);
             assertEquals(0, store.abandonedCalls, "a cancellation is not for a human to look at");
+            assertEquals(0, store.terminallyFailedCalls, "and it is not a terminal failure either");
         }
 
         @Test
@@ -1078,6 +1080,7 @@ class AttemptRunnerTest {
         int abandonedCalls;
         int succeededCalls;
         int terminallyFailedCalls;
+        int cancelledCalls;
 
         FakeStore(String url) {
             this.url = url;
@@ -1156,6 +1159,11 @@ class AttemptRunnerTest {
             if (targetOutcomeFailure != null) {
                 throw targetOutcomeFailure;
             }
+        }
+
+        @Override
+        public void onCancelled(String claim) {
+            cancelledCalls++;
         }
 
         @Override
