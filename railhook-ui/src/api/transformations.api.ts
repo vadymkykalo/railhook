@@ -1,5 +1,10 @@
 import { http } from './http';
-import type { TransformationRequest, TransformationResponse } from '../types/api.types';
+import type {
+  TransformationRequest,
+  TransformationResponse,
+  TransformationVersionDiffResponse,
+  TransformationVersionResponse,
+} from '../types/api.types';
 
 export const transformationsApi = {
   list: (projectId: string): Promise<TransformationResponse[]> =>
@@ -16,4 +21,19 @@ export const transformationsApi = {
 
   delete: (projectId: string, id: string): Promise<void> =>
     http.delete<void>(`/api/v1/projects/${projectId}/transformations/${id}`),
+
+  /** Newest first, without the templates — fetch one version to read it. */
+  listVersions: (projectId: string, id: string): Promise<TransformationVersionResponse[]> =>
+    http.get<TransformationVersionResponse[]>(`/api/v1/projects/${projectId}/transformations/${id}/versions`),
+
+  getVersion: (projectId: string, id: string, version: number): Promise<TransformationVersionResponse> =>
+    http.get<TransformationVersionResponse>(`/api/v1/projects/${projectId}/transformations/${id}/versions/${version}`),
+
+  diffVersions: (projectId: string, id: string, left: number, right: number): Promise<TransformationVersionDiffResponse> =>
+    http.get<TransformationVersionDiffResponse>(
+      `/api/v1/projects/${projectId}/transformations/${id}/versions/diff?left=${left}&right=${right}`,
+    ),
+
+  restoreVersion: (projectId: string, id: string, version: number): Promise<TransformationResponse> =>
+    http.post<TransformationResponse>(`/api/v1/projects/${projectId}/transformations/${id}/versions/${version}/restore`),
 };

@@ -3775,7 +3775,7 @@
     "destinationCount": "Destinations: {{count}}",
     "disabledHint": "Disabled — won't be available for new subscriptions",
     "duplicate": "Duplicate",
-    "editDesc": "Update the transformation template. Changing the template auto-increments the version.",
+    "editDesc": "Update the transformation template. A changed template is published as a new version you can come back to.",
     "editTitle": "Edit Transformation",
     "empty": "No transformations yet",
     "emptyDesc": "Create reusable transformations to normalize payloads across subscriptions and incoming destinations.",
@@ -3788,6 +3788,7 @@
     "expressionTimestamp": "Timestamp",
     "expressionsAvailable": "Available expressions:",
     "format": "Format",
+    "history": "History",
     "howItWorks": {
       "deliveredPayload": "Delivered Payload",
       "deliveredPayloadDesc": "What your endpoint receives",
@@ -3840,6 +3841,35 @@
       "validJson": "Valid JSON"
     },
     "version": "Version"
+  },
+  "transformationHistory": {
+    "authorNotAPerson": "API key",
+    "authorRemoved": "Deleted user",
+    "backToList": "All transformations",
+    "clearComparison": "Clear",
+    "compareOne": "Compare version {{version}}",
+    "comparison": "Comparison",
+    "comparisonHint": "Tick two versions above to see what changed between them.",
+    "current": "Current",
+    "empty": "No versions recorded yet",
+    "emptyDesc": "This transformation predates version history and has not been edited since. The next template you publish will appear here.",
+    "restore": "Restore",
+    "restoreDialog": {
+      "description": "The template from v{{version}} will be published again as v{{next}}, and the transformation will start using it immediately. Everything published since stays in the history.",
+      "title": "Restore v{{version}}?"
+    },
+    "restoredFrom": "Restored from v{{version}}",
+    "sideLabel": "v{{version}} · {{when}}",
+    "subtitle": "Every template this transformation has published, newest first. Restoring one publishes it again as a new version — nothing published since is removed.",
+    "title": "Version history",
+    "toast": {
+      "restoreFailed": "Failed to restore this version",
+      "restored": "v{{from}} restored as v{{to}}"
+    },
+    "view": "View",
+    "viewDesc": "Published {{when}} by {{author}}",
+    "viewLoading": "Loading the template…",
+    "viewTitle": "Version {{version}}"
   },
   "tunnels": {
     "active": "Active",

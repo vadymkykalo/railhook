@@ -509,6 +509,42 @@ export interface TransformationResponse {
   updatedAt: string;
 }
 
+/**
+ * One published template. `template` is only populated by the single-version endpoint — the
+ * list of versions is an index and leaves it out.
+ */
+export interface TransformationVersionResponse {
+  id: string;
+  transformationId: string;
+  version: number;
+  template?: string;
+  current: boolean;
+  /** Present only when this version was published by restoring an earlier one. */
+  restoredFromVersion?: number;
+  createdBy?: string;
+  /** Null for an API key, for a version backfilled from before the history existed, and for an erased user. */
+  createdByEmail?: string;
+  createdAt: string;
+}
+
+export interface TransformationVersionDiffResponse {
+  transformationId: string;
+  leftVersion: number;
+  rightVersion: number;
+  leftCreatedAt: string;
+  rightCreatedAt: string;
+  leftTemplate: string;
+  rightTemplate: string;
+  diffs: JsonDiffEntry[];
+}
+
+export interface JsonDiffEntry {
+  path: string;
+  type: 'ADDED' | 'REMOVED' | 'CHANGED';
+  leftValue?: unknown;
+  rightValue?: unknown;
+}
+
 export interface IncomingBulkReplayResponse {
   status: string;
   sourceId: string;

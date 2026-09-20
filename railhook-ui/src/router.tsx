@@ -67,6 +67,7 @@ const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
 const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
 const RulesPage = lazy(() => import('./pages/RulesPage'));
 const TransformationsPage = lazy(() => import('./pages/TransformationsPage'));
+const TransformationHistoryPage = lazy(() => import('./pages/TransformationHistoryPage'));
 const TransformStudioPage = lazy(() => import('./pages/TransformStudioPage'));
 const ConnectionSetupPage = lazy(() => import('./pages/ConnectionSetupPage'));
 const ConnectionsPage = lazy(() => import('./pages/ConnectionsPage'));
@@ -349,6 +350,10 @@ export const router = createBrowserRouter([
           {
             path: 'projects/:projectId/transformations',
             element: <S><TransformationsPage /></S>,
+          },
+          {
+            path: 'projects/:projectId/transformations/:transformationId/history',
+            element: <S><TransformationHistoryPage /></S>,
           },
           {
             path: 'projects/:projectId/transform-studio',
