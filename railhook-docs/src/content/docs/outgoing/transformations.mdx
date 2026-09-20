@@ -26,7 +26,7 @@ A transformation is a JSON document whose string values can contain JSONPath exp
 |---|---|
 | A string that is exactly one expression, `"${$.amount}"` | The referenced value with its type: a number stays a number, an object stays an object. |
 | An expression inside other text, `"Order ${$.orderId} from Railhook"` | A string, with the value substituted in. |
-| A path that matches nothing | `null` for a whole-value expression, an empty string inside text. Not an error. |
+| A path that matches nothing | `null` for a whole-value expression, and the text `null` inside a longer string. Not an error. |
 
 <Aside type="caution" title="A typo in a path is silent">
 A path that matches nothing does not fail the template, so an optional field stays optional. The same rule means a misspelled path produces `null` without complaint. Preview a template against a real payload before you attach it.
@@ -78,7 +78,24 @@ If a configured transformation cannot be applied, or a `transformationId` points
 
 In the dashboard, **Transform Studio** shows the payload and the result side by side and updates as you type.
 
-Changing a transformation's template increments its version.
+## Version history
+
+Saving a template that differs from the one stored publishes a new version and increments the version number. Saving without touching the template — renaming a transformation, editing its description, turning it off — does not.
+
+Every published version is kept, with the template it published, who published it and when. In the dashboard, the version number in the transformations list opens the history, where you can read any version, tick two of them to see what changed between them, and put one back. The API exposes the same four things under the transformation; see the [API reference](/docs/api-reference/).
+
+Restoring is not an undo. It publishes the old template again as the next version and leaves everything published since exactly where it is, so the record of which template was live at a past moment stays true. The new version is marked with the version it was restored from, and the restore is written to the audit log as a `RESTORE`.
+
+```bash
+curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/transformations/$TRANSFORMATION_ID/versions/2/restore" \
+  -H "X-API-Key: $API_KEY"
+```
+
+<Aside type="caution" title="History is capped">
+Each transformation keeps its most recent `TRANSFORMATION_HISTORY_LIMIT` versions — 50 by default. Beyond that the oldest fall off; the version in use never does. Raise it in your `.env` if you need to reach further back, at up to 65536 characters per version.
+</Aside>
+
+Transformations that existed before this was added start with one version: the template they hold now.
 
 ## Next steps
 
