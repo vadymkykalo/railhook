@@ -1179,6 +1179,17 @@
       ]
     },
     {
+      "title": "Transformations",
+      "variables": [
+        {
+          "name": "TRANSFORMATION_HISTORY_LIMIT",
+          "default": "50",
+          "example": null,
+          "description": "How many published templates each transformation keeps in its history. Every edit to a\ntemplate publishes one, and any of them can be viewed, compared and restored. When a\ntransformation has more than this, the oldest fall off; the version currently in use never\ndoes. Raise it if you need to reach further back, at roughly 64 KB per version in the worst\ncase. (default 50)"
+        }
+      ]
+    },
+    {
       "title": "Workflow engine",
       "variables": [
         {

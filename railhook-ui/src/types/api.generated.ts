@@ -824,6 +824,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/transformations/{id}/versions/{version}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore a transformation version
+         * @description Publishes an earlier template again as a new version. The versions published after it are kept: a restore moves the transformation forward rather than rewinding its history.
+         */
+        post: operations["restoreTransformationVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/transform-preview": {
         parameters: {
             query?: never;
@@ -2718,6 +2738,66 @@ export interface paths {
          * @description Returns live usage counts and daily history for the project
          */
         get: operations["getProjectUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/transformations/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List transformation versions
+         * @description Returns every published version of this transformation's template, newest first, with who published it and when. The templates themselves are omitted — fetch one version to read it.
+         */
+        get: operations["listTransformationVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/transformations/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one transformation version
+         * @description Returns one published version, including the template it published
+         */
+        get: operations["getTransformationVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/transformations/{id}/versions/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare two transformation versions
+         * @description Returns both templates whole and the list of places they differ, each named by its JSONPath
+         */
+        get: operations["diffTransformationVersions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5579,6 +5659,62 @@ export interface components {
             current?: components["schemas"]["LiveUsage"];
             history?: components["schemas"]["DailyUsage"][];
         };
+        /** @description One published version of a transformation's template */
+        TransformationVersionResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            transformationId?: string;
+            /**
+             * Format: int32
+             * @description The version number this template was published as
+             * @example 3
+             */
+            version?: number;
+            /** @description The template itself. Omitted from the list of versions — fetch one version to read it. */
+            template?: string;
+            /** @description Whether this is the version the transformation is currently using */
+            current?: boolean;
+            /**
+             * Format: int32
+             * @description Set when this version was published by restoring an earlier one, naming that earlier version
+             * @example 1
+             */
+            restoredFromVersion?: number;
+            /**
+             * Format: uuid
+             * @description The user who published it. Null when it was published with an API key, or the user has since been erased.
+             */
+            createdBy?: string;
+            /** @description Email of the user who published it, resolved at read time so an erasure takes the name and leaves the change */
+            createdByEmail?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        JsonDiffEntry: {
+            path?: string;
+            /** @enum {string} */
+            type?: "ADDED" | "REMOVED" | "CHANGED";
+            leftValue?: unknown;
+            rightValue?: unknown;
+        };
+        /** @description Two versions of a transformation's template, and what changed between them */
+        TransformationVersionDiffResponse: {
+            /** Format: uuid */
+            transformationId?: string;
+            /** Format: int32 */
+            leftVersion?: number;
+            /** Format: int32 */
+            rightVersion?: number;
+            /** Format: date-time */
+            leftCreatedAt?: string;
+            /** Format: date-time */
+            rightCreatedAt?: string;
+            /** @description The whole left-hand template, so the caller can render both sides as well as the changes */
+            leftTemplate?: string;
+            rightTemplate?: string;
+            diffs?: components["schemas"]["JsonDiffEntry"][];
+        };
         CapturedRequestResponse: {
             id?: string;
             testEndpointId?: string;
@@ -5888,13 +6024,6 @@ export interface components {
             last?: boolean;
             empty?: boolean;
         };
-        DiffEntry: {
-            path?: string;
-            /** @enum {string} */
-            type?: "ADDED" | "REMOVED" | "CHANGED";
-            leftValue?: unknown;
-            rightValue?: unknown;
-        };
         EventDiffResponse: {
             /** Format: uuid */
             leftEventId?: string;
@@ -5907,7 +6036,7 @@ export interface components {
             rightCreatedAt?: string;
             leftPayload?: string;
             rightPayload?: string;
-            diffs?: components["schemas"]["DiffEntry"][];
+            diffs?: components["schemas"]["JsonDiffEntry"][];
         };
         PageEndpointResponse: {
             /** Format: int32 */
@@ -9138,6 +9267,30 @@ export interface operations {
             };
         };
     };
+    restoreTransformationVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransformationResponse"];
+                };
+            };
+        };
+    };
     preview: {
         parameters: {
             query?: never;
@@ -12269,6 +12422,79 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["UsageStatsResponse"];
+                };
+            };
+        };
+    };
+    listTransformationVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransformationVersionResponse"][];
+                };
+            };
+        };
+    };
+    getTransformationVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransformationVersionResponse"];
+                };
+            };
+        };
+    };
+    diffTransformationVersions: {
+        parameters: {
+            query: {
+                left: number;
+                right: number;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransformationVersionDiffResponse"];
                 };
             };
         };

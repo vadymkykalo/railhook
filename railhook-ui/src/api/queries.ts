@@ -138,6 +138,11 @@ export const queryKeys = {
     transformations: {
         list: (projectId: string) => ['transformations', projectId] as const,
         detail: (projectId: string, id: string) => ['transformations', projectId, id] as const,
+        versions: (projectId: string, id: string) => ['transformations', projectId, id, 'versions'] as const,
+        version: (projectId: string, id: string, version: number) =>
+            ['transformations', projectId, id, 'versions', version] as const,
+        versionDiff: (projectId: string, id: string, left: number, right: number) =>
+            ['transformations', projectId, id, 'versions', 'diff', left, right] as const,
     },
     rules: {
         list: (projectId: string) => ['rules', projectId] as const,
@@ -967,6 +972,56 @@ export function useDeleteTransformation(projectId: string) {
     return useMutation({
         mutationFn: (id: string) => transformationsApi.delete(projectId, id),
         onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.transformations.list(projectId) }); },
+    });
+}
+
+export function useTransformation(projectId: string, id: string) {
+    return useQuery({
+        queryKey: queryKeys.transformations.detail(projectId, id),
+        queryFn: () => transformationsApi.get(projectId, id),
+        enabled: !!projectId && !!id,
+    });
+}
+
+export function useTransformationVersions(projectId: string, id: string) {
+    return useQuery({
+        queryKey: queryKeys.transformations.versions(projectId, id),
+        queryFn: () => transformationsApi.listVersions(projectId, id),
+        enabled: !!projectId && !!id,
+    });
+}
+
+export function useTransformationVersion(projectId: string, id: string, version: number | null) {
+    return useQuery({
+        queryKey: queryKeys.transformations.version(projectId, id, version ?? 0),
+        queryFn: () => transformationsApi.getVersion(projectId, id, version!),
+        enabled: !!projectId && !!id && version !== null,
+    });
+}
+
+export function useTransformationVersionDiff(
+    projectId: string,
+    id: string,
+    left: number | null,
+    right: number | null,
+) {
+    return useQuery({
+        queryKey: queryKeys.transformations.versionDiff(projectId, id, left ?? 0, right ?? 0),
+        queryFn: () => transformationsApi.diffVersions(projectId, id, left!, right!),
+        enabled: !!projectId && !!id && left !== null && right !== null && left !== right,
+    });
+}
+
+/** A restore publishes a new version, so the transformation itself and its history both move. */
+export function useRestoreTransformationVersion(projectId: string, id: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (version: number) => transformationsApi.restoreVersion(projectId, id, version),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: queryKeys.transformations.list(projectId) });
+            qc.invalidateQueries({ queryKey: queryKeys.transformations.detail(projectId, id) });
+            qc.invalidateQueries({ queryKey: queryKeys.transformations.versions(projectId, id) });
+        },
     });
 }
 

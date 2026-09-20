@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import com.webhook.platform.api.domain.enums.DiffType;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -23,16 +21,6 @@ public class EventDiffResponse {
     private Instant rightCreatedAt;
     private String leftPayload;
     private String rightPayload;
-    private List<DiffEntry> diffs;
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class DiffEntry {
-        private String path;
-        private DiffType type;
-        private Object leftValue;
-        private Object rightValue;
-    }
+    /** Was a nested {@code DiffEntry}; the wire shape is unchanged. */
+    private List<JsonDiffEntry> diffs;
 }

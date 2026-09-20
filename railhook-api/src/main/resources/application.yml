@@ -354,6 +354,11 @@ rules:
   cache-refresh-ms: ${RULES_CACHE_REFRESH_MS:30000}
   execution-log-retention-days: ${RULES_EXECUTION_LOG_RETENTION_DAYS:7}
 
+# How many published templates one transformation keeps. The oldest fall off first; the version
+# in use can never fall off.
+transformations:
+  version-history-limit: ${TRANSFORMATION_HISTORY_LIMIT:50}
+
 # Failures the dashboard could not recover from, reported by the browser and written to this
 # installation's own logs. Nothing is sent anywhere else.
 client-errors:
