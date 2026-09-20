@@ -1,5 +1,7 @@
 package com.webhook.platform.worker.attempt;
 
+import com.webhook.platform.common.retry.RetryableStatuses;
+import com.webhook.platform.common.retry.RetryAfter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import com.webhook.platform.common.dto.DeliveryMessage;
@@ -147,7 +149,7 @@ class ProjectStatusAttemptIntegrationTest {
         lenient().when(concurrency.tryAcquireForTarget(any(UUID.class))).thenReturn(true);
         lenient().when(circuitBreaker.isCallPermitted(any(UUID.class))).thenReturn(true);
         runner = new AttemptRunner(tenantRateLimiter, targetRateLimiter, concurrency, circuitBreaker,
-                new ObjectMapper(), true, List.of());
+                new ObjectMapper(), true, List.of(), RetryAfter.DEFAULT_MAX_SECONDS);
 
         // Uncached, so a status changed mid-test is what the next Attempt reads.
         projectStatusLookup = new ProjectStatusLookup(jdbc, Duration.ZERO);
@@ -330,6 +332,7 @@ class ProjectStatusAttemptIntegrationTest {
                 .orderingEnabled(false)
                 .timeoutSeconds(5)
                 .retryDelays("60,300")
+                .retryableStatuses(RetryableStatuses.DEFAULT_SPEC)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build());
@@ -364,6 +367,7 @@ class ProjectStatusAttemptIntegrationTest {
                 .enabled(true)
                 .maxAttempts(RetryLadderDefaults.INCOMING_MAX_ATTEMPTS)
                 .retryDelays(RetryLadderDefaults.INCOMING_DELAYS)
+                .retryableStatuses(RetryableStatuses.DEFAULT_SPEC)
                 .timeoutSeconds(5)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
@@ -393,7 +397,7 @@ class ProjectStatusAttemptIntegrationTest {
                 new TransactionTemplate(transactionManager), mock(TransformationCacheService.class),
                 new PayloadTransformService(new ObjectMapper(), new SimpleMeterRegistry()),
                 encryptionKeyRegistry, new ObjectMapper(), WebClient.builder().build(), kafka,
-                message, event, destination);
+                mock(TargetFailureRecorder.class), message, event, destination);
         runner.run(store, new NoMetrics());
         return forwardAttemptRepository.findById(attemptId).orElseThrow();
     }
@@ -415,7 +419,7 @@ class ProjectStatusAttemptIntegrationTest {
                 projectStatusLookup, new TransactionTemplate(transactionManager), mock(OrderingBufferService.class), kafka,
                 encryptionKeyRegistry, null, mock(TransformationCacheService.class),
                 new PayloadTransformService(new ObjectMapper(), new SimpleMeterRegistry()),
-                new ObjectMapper(), WebClient.builder().build(),
+                new ObjectMapper(), WebClient.builder().build(), mock(TargetFailureRecorder.class),
                 Counter.builder("test").register(new SimpleMeterRegistry()),
                 Clock.systemUTC(), 5, message, false);
         runner.run(store, new NoMetrics());

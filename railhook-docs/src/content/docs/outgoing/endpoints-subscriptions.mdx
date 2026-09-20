@@ -45,10 +45,50 @@ The examples below use `$RAILHOOK_URL` for the address of your Railhook API, `$P
 | `url` | Required. Where deliveries are sent. Checked against private address ranges, see [Endpoint security](/docs/outgoing/endpoint-security/). |
 | `description` | Free text, up to 500 characters. |
 | `enabled` | Whether the endpoint receives deliveries. |
+| `autoDisabledAt` | Read-only. Set when Railhook turned the endpoint off itself, see [When Railhook turns an endpoint off](#when-railhook-turns-an-endpoint-off). Absent when you turned it off. |
+| `autoDisabledReason` | Read-only. Why, in words. |
+| `failingSince` | Read-only. Start of the current unbroken run of failed deliveries; absent once one succeeds. |
 | `signatureScheme` | `BOTH` (default), `LEGACY` or `STANDARD`: which signature headers are sent. See [Verify signatures](/docs/outgoing/signatures/). |
 | `rateLimitPerSecond` | Per-endpoint delivery throttle, 0 to 10000. `0` removes the limit. |
 | `secret` | Optional. Supply your own signing secret instead of a generated one. |
 | `allowedSourceIps` | A note field. It restricts nothing, see [Endpoint security](/docs/outgoing/endpoint-security/#allowed-source-ips). |
+
+## When Railhook turns an endpoint off
+
+A receiver that has been dead for days used to keep its full retry budget: every new event started a fresh ladder, and nothing said the endpoint itself was the problem. Railhook now turns such an endpoint off and tells you.
+
+The rule is two conditions, both of which have to hold:
+
+| Condition | Default | Variable |
+|---|---|---|
+| Nothing has succeeded for this long | 72 hours | `ENDPOINT_AUTO_DISABLE_AFTER_HOURS` |
+| …and the run contains at least this many failed attempts | 10 | `ENDPOINT_AUTO_DISABLE_MIN_FAILURES` |
+
+The second exists so that an endpoint receiving one event a week is not turned off for being idle. One success at any point clears the run and the count.
+
+The endpoint's list and its row in Connections both show **Auto-disabled** and say since when. The API returns `autoDisabledAt`, `autoDisabledReason` and `failingSince` on the endpoint.
+
+### What happens to deliveries already queued
+
+They are **not** dropped and they do not silently fail. Everything already made out to the endpoint goes to Failed Messages, with the reason recorded — so once the receiver works again you can retry all of it. See [Retries and failed messages](/docs/outgoing/retries/).
+
+This is deliberately different from an endpoint *you* turn off, where queued deliveries end as `FAILED`. Turning an endpoint off is a statement that you no longer want it delivered to; Railhook turning it off is a statement that it could not be.
+
+### Turning it back on
+
+Re-enabling clears the auto-disable and the run of failures with it, so the sweep does not turn it straight off again. Use the power button on the endpoint, or `POST /api/v1/projects/{projectId}/endpoints/{id}/enable`. Fix the receiver first: an endpoint enabled while it is still failing simply starts a new run.
+
+### Who gets told
+
+An alert appears on the project's Alerts page, and — where the deployment has mail configured (`EMAIL_ENABLED=true`) — one message goes to the organization's owners naming the endpoint, since when it has been failing, and how to turn it back on. No alert rule is needed; this is Railhook reporting its own decision.
+
+### Incoming destinations
+
+A destination that has been failing as long is turned off on exactly the same terms, and its queued forwards go to Failed Forwards the same way.
+
+### Turning the feature off
+
+`ENDPOINT_AUTO_DISABLE_ENABLED=false` in both the api and the worker. With it off nothing is counted and nothing is ever disabled automatically.
 
 <Aside type="caution" title="New endpoints and verification">
 By default a new endpoint starts as `SKIPPED` and receives deliveries straight away. When the operator sets `WEBHOOK_ENDPOINT_VERIFICATION_REQUIRED=true`, a new endpoint starts as `PENDING` and every delivery to it fails until it passes the ownership check. See [Endpoint security](/docs/outgoing/endpoint-security/#prove-you-own-the-endpoint).
@@ -63,6 +103,7 @@ By default a new endpoint starts as `SKIPPED` and receives deliveries straight a
 | `enabled` | Whether the subscription creates deliveries. |
 | `orderingEnabled` | Deliver this endpoint's events in order. Off by default, see [Ordering](/docs/outgoing/ordering/). |
 | `maxAttempts` | 1 to 20. How many attempts before the delivery is abandoned. |
+| `retryableStatuses` | Which HTTP statuses are worth another attempt, e.g. `408,429,500-599` or `5xx,!501`. See [Which statuses are worth retrying](/docs/outgoing/retries/#which-statuses-are-worth-retrying). |
 | `retryDelays` | Comma-separated waits in seconds between attempts, for example `60,300,900`. |
 | `timeoutSeconds` | 1 to 60, default 30. How long one attempt waits for a response. |
 | `transformationId` | A saved transformation to apply, see [Transformations](/docs/outgoing/transformations/). |

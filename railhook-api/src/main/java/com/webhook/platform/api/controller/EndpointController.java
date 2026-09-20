@@ -206,6 +206,21 @@ public class EndpointController {
         ));
     }
 
+    @Operation(summary = "Enable an endpoint",
+            description = "Turns the endpoint back on and clears an auto-disable: the recorded "
+                    + "reason, the time it was disabled, and the run of failures that led to it.")
+    @RequireScope(ApiKeyScope.READ_WRITE)
+    @RequireAccess(AccessLevel.WRITE)
+    @PostMapping("/{id}/enable")
+    public ResponseEntity<EndpointResponse> enableEndpoint(
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("id") UUID id,
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
+        return ResponseEntity.ok(endpointService.enableEndpoint(projectId, id));
+    }
+
     @Operation(summary = "Skip verification", description = "Skips verification for trusted endpoints (admin only)")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)

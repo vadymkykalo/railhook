@@ -4088,6 +4088,37 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/projects/{projectId}/endpoints/{id}/enable:
+    post:
+      tags:
+      - Endpoints
+      summary: Enable an endpoint
+      description: "Turns the endpoint back on and clears an auto-disable: the recorded\
+        \ reason, the time it was disabled, and the run of failures that led to it."
+      operationId: enableEndpoint
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EndpointResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/projects/{projectId}/dlq/{deliveryId}/retry:
     post:
       tags:
@@ -8606,6 +8637,10 @@ components:
           minimum: 1
         retryDelays:
           type: string
+        retryableStatuses:
+          type: string
+          maxLength: 255
+          minLength: 0
         payloadTemplate:
           type: string
         customHeaders:
@@ -8641,6 +8676,8 @@ components:
           type: integer
           format: int32
         retryDelays:
+          type: string
+        retryableStatuses:
           type: string
         payloadTemplate:
           type: string
@@ -8980,6 +9017,15 @@ components:
           example: "60,300,900,3600,21600"
           maxLength: 255
           minLength: 0
+        retryableStatuses:
+          type: string
+          description: "Which HTTP statuses are worth another attempt. Comma-separated\
+            \ terms: an exact status, a range (500-599), a 5xx shorthand, or a comparison\
+            \ (>=500). Prefix a term with ! to exclude it; exclusions win wherever\
+            \ they are written."
+          example: "408,429,500-599"
+          maxLength: 255
+          minLength: 0
         payloadTransform:
           type: string
           description: JSONPath expression to transform payload before forwarding
@@ -9027,12 +9073,22 @@ components:
           format: int32
         retryDelays:
           type: string
+        retryableStatuses:
+          type: string
         payloadTransform:
           type: string
         transformationId:
           type: string
           format: uuid
         transformationName:
+          type: string
+        failingSince:
+          type: string
+          format: date-time
+        autoDisabledAt:
+          type: string
+          format: date-time
+        autoDisabledReason:
           type: string
         createdAt:
           type: string
@@ -9317,6 +9373,17 @@ components:
           type: string
           format: date-time
         verificationSkipReason:
+          type: string
+        failingSince:
+          type: string
+          format: date-time
+        consecutiveFailures:
+          type: integer
+          format: int32
+        autoDisabledAt:
+          type: string
+          format: date-time
+        autoDisabledReason:
           type: string
         createdAt:
           type: string
@@ -12113,6 +12180,9 @@ components:
           type: string
           format: uuid
         projectId:
+          type: string
+          format: uuid
+        endpointId:
           type: string
           format: uuid
         severity:

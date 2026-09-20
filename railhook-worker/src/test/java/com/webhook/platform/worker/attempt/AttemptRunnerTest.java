@@ -2,6 +2,7 @@ package com.webhook.platform.worker.attempt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.retry.RetryLadder;
+import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.worker.service.CircuitBreakerService;
 import com.webhook.platform.worker.service.PayloadTransformException;
 import com.webhook.platform.worker.service.ProjectRateLimiterService;
@@ -19,6 +20,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +54,9 @@ import static org.mockito.Mockito.verify;
  */
 class AttemptRunnerTest {
 
+    /** The clamp these tests build the Runner with; short enough to assert against. */
+    private static final long RETRY_AFTER_MAX_SECONDS = 3600;
+
     private HttpServer server;
     private String baseUrl;
 
@@ -82,7 +87,7 @@ class AttemptRunnerTest {
         metrics = new RecordingMetrics();
         // allowPrivateIps = true: the fake server is on loopback.
         runner = new AttemptRunner(tenantRateLimiter, targetRateLimiter, concurrency,
-                circuitBreaker, new ObjectMapper(), true, List.of());
+                circuitBreaker, new ObjectMapper(), true, List.of(), RETRY_AFTER_MAX_SECONDS);
     }
 
     @AfterEach
@@ -114,6 +119,18 @@ class AttemptRunnerTest {
     private void respond(int status, String body) {
         server.createContext("/hook", exchange -> {
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, bytes.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(bytes);
+            }
+        });
+    }
+
+    /** As {@link #respond}, plus one response header — which is how a receiver says Retry-After. */
+    private void respondWith(int status, String body, String headerName, String headerValue) {
+        server.createContext("/hook", exchange -> {
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add(headerName, headerValue);
             exchange.sendResponseHeaders(status, bytes.length);
             try (OutputStream out = exchange.getResponseBody()) {
                 out.write(bytes);
@@ -685,6 +702,232 @@ class AttemptRunnerTest {
         }
     }
 
+    // ── which statuses are worth another attempt ───────────────────────────────────
+
+    /**
+     * The set used to be three literals in {@code RetryPolicy.isRetryable}. It is now whatever
+     * the obligation carries, and the obligation carries it because the Subscription or the
+     * Destination said so. The Runner reads it off the context and nothing else — which is what
+     * keeps the two directions from growing separate answers.
+     */
+    @Nested
+    @DisplayName("the retryable statuses the obligation carries")
+    class RetryableStatusSpec {
+
+        @Test
+        @DisplayName("a status the spec excludes goes to DLQ instead of burning the ladder")
+        void excludedStatusIsNotRetried() {
+            respond(503, "unavailable");
+            FakeStore store = new FakeStore(baseUrl);
+            store.retryableStatuses = RetryableStatuses.parse("500-599,!503");
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.Abandoned.class, store.finalizations.get(0));
+            assertEquals(1, store.abandonedCalls);
+        }
+
+        @Test
+        @DisplayName("a status the spec includes is retried even though the old set did not")
+        void includedStatusIsRetried() {
+            respond(409, "conflict");
+            FakeStore store = new FakeStore(baseUrl);
+            store.retryableStatuses = RetryableStatuses.parse("408,409,429,5xx");
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.Retry.class, store.finalizations.get(0));
+            assertEquals(0, store.abandonedCalls);
+        }
+
+        @Test
+        @DisplayName("the default spec still behaves exactly as the hardcoded set did")
+        void defaultSpecIsUnchangedBehaviour() {
+            respond(500, "boom");
+            FakeStore store = new FakeStore(baseUrl);
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.Retry.class, store.finalizations.get(0));
+        }
+    }
+
+    // ── what a receiver may ask for ────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("Retry-After")
+    class RetryAfterHeader {
+
+        /** A ladder whose first tier is a minute, so an honoured header is unmistakable. */
+        private FakeStore storeWithMinuteLadder() {
+            FakeStore store = new FakeStore(baseUrl);
+            store.ladder = RetryLadder.parse("60,300", 5);
+            store.attemptNumber = 1;
+            return store;
+        }
+
+        private Instant retryAt(FakeStore store) {
+            return ((Finalization.Retry) store.finalizations.get(0)).at();
+        }
+
+        @Test
+        @DisplayName("a 429 asking for an hour is retried in about an hour, not in a minute")
+        void honouredOn429() {
+            respondWith(429, "slow down", "Retry-After", "3600");
+            FakeStore store = storeWithMinuteLadder();
+
+            runner.run(store, metrics);
+
+            Instant at = retryAt(store);
+            assertTrue(at.isAfter(Instant.now().plusSeconds(3000)),
+                    "the receiver asked for an hour and got the ladder's minute instead: " + at);
+        }
+
+        @Test
+        @DisplayName("a 503 asking for an hour is honoured too")
+        void honouredOn503() {
+            respondWith(503, "maintenance", "Retry-After", "3600");
+            FakeStore store = storeWithMinuteLadder();
+
+            runner.run(store, metrics);
+
+            assertTrue(retryAt(store).isAfter(Instant.now().plusSeconds(3000)));
+        }
+
+        @Test
+        @DisplayName("a 500 carrying the header keeps the ladder — the header means something else there")
+        void ignoredOn500() {
+            respondWith(500, "boom", "Retry-After", "3600");
+            FakeStore store = storeWithMinuteLadder();
+
+            runner.run(store, metrics);
+
+            assertTrue(retryAt(store).isBefore(Instant.now().plusSeconds(200)),
+                    "a 500 is not a rate limit, so its Retry-After is not ours to honour");
+        }
+
+        @Test
+        @DisplayName("a header shorter than the ladder does not shorten it")
+        void neverShortensTheLadder() {
+            respondWith(429, "slow down", "Retry-After", "1");
+            FakeStore store = storeWithMinuteLadder();
+
+            runner.run(store, metrics);
+
+            assertTrue(retryAt(store).isAfter(Instant.now().plusSeconds(25)),
+                    "a receiver may ask us to wait longer, never to retry harder than configured");
+        }
+
+        @Test
+        @DisplayName("a header beyond the clamp is cut to the clamp")
+        void clamped() {
+            respondWith(429, "slow down", "Retry-After", String.valueOf(Duration.ofDays(7).toSeconds()));
+            FakeStore store = storeWithMinuteLadder();
+
+            runner.run(store, metrics);
+
+            assertTrue(retryAt(store).isBefore(Instant.now().plusSeconds(RETRY_AFTER_MAX_SECONDS + 60)),
+                    "one line of a misconfigured response must not park an obligation for a week");
+        }
+
+        @Test
+        @DisplayName("a 429 on the last rung still goes to DLQ — the header is not an extra attempt")
+        void doesNotExtendTheLadder() {
+            respondWith(429, "slow down", "Retry-After", "3600");
+            FakeStore store = new FakeStore(baseUrl);
+            store.attemptNumber = 3;
+            store.ladder = RetryLadder.parse("60", 3);
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.Abandoned.class, store.finalizations.get(0));
+        }
+    }
+
+    // ── what the attempt says about the target itself ──────────────────────────────
+
+    /**
+     * The circuit breaker forgets within minutes, which is what it is for. Auto-disabling a
+     * target that has answered nothing but failures for days needs a memory that outlives a
+     * worker, so the Runner tells the store the outcome and the store writes it down. Both
+     * directions get it or neither does.
+     */
+    @Nested
+    @DisplayName("the outcome, as it bears on the target")
+    class TargetOutcome {
+
+        @Test
+        @DisplayName("a 2xx reports the target healthy")
+        void successReportsHealthy() {
+            respond(200, "ok");
+            FakeStore store = new FakeStore(baseUrl);
+
+            runner.run(store, metrics);
+
+            assertEquals(List.of(true), store.targetOutcomes);
+        }
+
+        @Test
+        @DisplayName("a retryable failure reports the target failing")
+        void retryableFailureReportsFailing() {
+            respond(503, "unavailable");
+            FakeStore store = new FakeStore(baseUrl);
+
+            runner.run(store, metrics);
+
+            assertEquals(List.of(false), store.targetOutcomes);
+        }
+
+        @Test
+        @DisplayName("a non-retryable status reports the target failing too — it answered, and badly")
+        void nonRetryableFailureReportsFailing() {
+            respond(404, "not found");
+            FakeStore store = new FakeStore(baseUrl);
+
+            runner.run(store, metrics);
+
+            assertEquals(List.of(false), store.targetOutcomes);
+        }
+
+        @Test
+        @DisplayName("a request that never produced a response reports the target failing")
+        void transportFailureReportsFailing() {
+            FakeStore store = new FakeStore("http://127.0.0.1:1/hook");
+
+            runner.run(store, metrics);
+
+            assertEquals(List.of(false), store.targetOutcomes);
+        }
+
+        @Test
+        @DisplayName("a Deferral reports nothing — nothing was tried, so the target said nothing")
+        void deferralReportsNothing() {
+            when(circuitBreaker.isCallPermitted(any(UUID.class))).thenReturn(false);
+            FakeStore store = new FakeStore(baseUrl);
+
+            runner.run(store, metrics);
+
+            assertTrue(store.targetOutcomes.isEmpty(),
+                    "an open breaker means we sent nothing; counting it would disable a target "
+                            + "for our own throttling");
+        }
+
+        @Test
+        @DisplayName("a store that cannot write the outcome down does not turn a 2xx into a retry")
+        void unwritableOutcomeDoesNotReclassifyASuccess() {
+            respond(200, "ok");
+            FakeStore store = new FakeStore(baseUrl);
+            store.targetOutcomeFailure = new IllegalStateException("connection pool exhausted");
+
+            assertDoesNotThrow(() -> runner.run(store, metrics));
+
+            assertInstanceOf(Finalization.Succeeded.class, store.finalizations.get(0),
+                    "invariant 1: once a 2xx is in hand nothing that goes wrong writing it down "
+                            + "may reclassify it");
+            assertEquals(1, store.succeededCalls);
+        }
+    }
+
     // ── the fake ───────────────────────────────────────────────────────────────────
 
     /**
@@ -750,17 +993,20 @@ class AttemptRunnerTest {
         UUID tenantKey = UUID.randomUUID();
         UUID targetKey = UUID.randomUUID();
         RetryLadder ladder = RetryLadder.parse("60,300", 5);
+        RetryableStatuses retryableStatuses = RetryableStatuses.parse(RetryableStatuses.DEFAULT_SPEC);
         int attemptNumber = 1;
         boolean finaliseApplies = true;
         PayloadTransformException bodyFailure;
         int timeoutSeconds = 5;
         RuntimeException recordAttemptFailure;
         RuntimeException finaliseFailure;
+        RuntimeException targetOutcomeFailure;
         String contentType;
         byte[] wireBytes;
 
         final List<Finalization> finalizations = new ArrayList<>();
         final List<AttemptRecord> records = new ArrayList<>();
+        final List<Boolean> targetOutcomes = new ArrayList<>();
         int attemptStartingCalls;
         int abandonedCalls;
         int succeededCalls;
@@ -777,7 +1023,7 @@ class AttemptRunnerTest {
             }
             return new ClaimResult.Claimed<>("claim-1", new AttemptContext(
                     "fake attempt", tenantKey, targetKey, null,
-                    attemptNumber, ladder, url, timeoutSeconds));
+                    attemptNumber, ladder, retryableStatuses, url, timeoutSeconds));
         }
 
         @Override
@@ -834,6 +1080,14 @@ class AttemptRunnerTest {
         @Override
         public void onSucceeded(String claim) {
             succeededCalls++;
+        }
+
+        @Override
+        public void recordTargetOutcome(String claim, boolean succeeded) {
+            targetOutcomes.add(succeeded);
+            if (targetOutcomeFailure != null) {
+                throw targetOutcomeFailure;
+            }
         }
 
         @Override

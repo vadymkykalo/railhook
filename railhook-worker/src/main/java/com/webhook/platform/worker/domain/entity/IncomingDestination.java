@@ -62,6 +62,27 @@ public class IncomingDestination {
     @Column(name = "retry_delays", nullable = false, columnDefinition = "TEXT")
     private String retryDelays;
 
+    /** Which HTTP statuses are worth another Attempt. Read at claim time, parsed, and handed
+     * to the Runner on the {@code AttemptContext}. */
+    @Column(name = "retryable_statuses", nullable = false, columnDefinition = "TEXT")
+    private String retryableStatuses;
+
+    /** The current unbroken run of failed Attempts; the worker writes both at the shared seam. */
+    @Column(name = "failing_since")
+    private Instant failingSince;
+
+    @Builder.Default
+    @Column(name = "consecutive_failures", nullable = false)
+    private Integer consecutiveFailures = 0;
+
+    /** Set when Railhook turned this destination off, null when its owner did — the store tells
+     * the two apart to decide what happens to Forwards already queued. */
+    @Column(name = "auto_disabled_at")
+    private Instant autoDisabledAt;
+
+    @Column(name = "auto_disabled_reason", columnDefinition = "TEXT")
+    private String autoDisabledReason;
+
     @Column(name = "encryption_key_version", nullable = false)
     @Builder.Default
     private Integer encryptionKeyVersion = 1;

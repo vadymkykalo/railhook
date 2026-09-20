@@ -46,6 +46,10 @@ public class IncomingDestinationRequest {
     @Size(max = 255, message = "Retry delays must be at most 255 characters")
     private String retryDelays;
 
+    @Schema(description = "Which HTTP statuses are worth another attempt. Comma-separated terms: an exact status, a range (500-599), a 5xx shorthand, or a comparison (>=500). Prefix a term with ! to exclude it; exclusions win wherever they are written.", example = "408,429,500-599")
+    @Size(max = 255, message = "Retryable statuses must be at most 255 characters")
+    private String retryableStatuses;
+
     @Schema(description = "JSONPath expression to transform payload before forwarding (null = forward as-is)", example = "$.data")
     @Size(max = 4096, message = "Payload transform expression must be at most 4096 characters")
     private String payloadTransform;

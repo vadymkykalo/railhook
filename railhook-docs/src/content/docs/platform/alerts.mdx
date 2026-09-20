@@ -71,7 +71,7 @@ An incident groups what happened into a record with a timeline. A `CRITICAL` rul
 
 - **No PagerDuty or Opsgenie channel.** Both accept an HTTP request, so the `WEBHOOK` channel reaches them with a small adapter on your side.
 - **No alert on silence.** A rule fires on what happened, not on a project that stopped sending traffic when it should not have.
-- **No automatic disabling** of an endpoint that keeps failing. An alert tells you; a person turns the endpoint off.
+- **No alert rule for an endpoint Railhook disabled.** It raises an alert of its own, which appears in this list without a rule behind it — see [When Railhook turns an endpoint off](/docs/outgoing/endpoints-subscriptions/#when-railhook-turns-an-endpoint-off). You cannot change its severity or route it to a channel.
 
 ## Next steps
 

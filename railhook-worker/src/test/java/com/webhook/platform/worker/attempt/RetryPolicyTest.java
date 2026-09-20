@@ -1,39 +1,18 @@
 package com.webhook.platform.worker.attempt;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Covers what is left in RetryPolicy once the retry ladder moved out: which HTTP statuses
- * are worth another attempt, and the deferral backoff used when an attempt is turned away
- * by a rate limit, a concurrency cap or an open circuit breaker.
+ * Covers the one thing left in RetryPolicy: the deferral backoff, used when an Attempt is
+ * turned away by a rate limit, a concurrency cap or an open circuit breaker.
  *
- * <p>The ladder's own arithmetic — parsing, tier clamping, jitter, exhaustion, hard-cap fit
- * — is covered by {@code RetryLadderTest} in the common module. Those cases are not
- * duplicated here: they used to assert that a malformed ladder falls back to a hardcoded
- * default, which is the behaviour {@code RetryLadder} exists to remove.
+ * <p>The ladder's arithmetic is {@code RetryLadderTest}'s, and which statuses are worth another
+ * Attempt is {@code RetryableStatusesTest}'s — both in the common module, because both are now
+ * carried by the obligation rather than decided here.
  */
 class RetryPolicyTest {
-
-    // --- isRetryable -----------------------------------------------------------------
-
-    @ParameterizedTest
-    @ValueSource(ints = { 408, 429, 500, 502, 503, 504, 599 })
-    void isRetryable_trueForTimeoutRateLimitAnd5xx(int status) {
-        assertTrue(RetryPolicy.isRetryable(status));
-    }
-
-    @ParameterizedTest
-    @ValueSource(ints = { 200, 201, 301, 400, 401, 403, 404, 409, 422, 600, 999 })
-    void isRetryable_falseForEverythingElse(int status) {
-        assertFalse(RetryPolicy.isRetryable(status));
-    }
-
-    // --- backoffWithJitter --------------------------------------------------------------
 
     @Test
     void backoffWithJitter_staysWithinComputedJitterBounds_acrossManyRuns() {

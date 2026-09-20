@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.domain.entity;
 
 import com.webhook.platform.common.retry.RetryLadderDefaults;
+import com.webhook.platform.common.retry.RetryableStatuses;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -91,6 +92,16 @@ public class Delivery {
     @Builder.Default
     @Column(name = "retry_delays", columnDefinition = "TEXT")
     private String retryDelays = RetryLadderDefaults.OUTGOING_DELAYS;
+
+    /**
+     * Which HTTP statuses are worth another Attempt, copied from the Subscription when this
+     * Delivery was created. On the row rather than read through the Subscription for the same
+     * reason the ladder is: the store never loads the Subscription, and an edit mid-ladder must
+     * not change the rules an obligation already in flight is judged by.
+     */
+    @Builder.Default
+    @Column(name = "retryable_statuses", nullable = false, columnDefinition = "TEXT")
+    private String retryableStatuses = RetryableStatuses.DEFAULT_SPEC;
 
     @Column(name = "payload_template", columnDefinition = "TEXT")
     private String payloadTemplate;

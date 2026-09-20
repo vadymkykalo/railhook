@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.attempt;
 
+import com.webhook.platform.common.retry.RetryableStatuses;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
@@ -57,7 +58,7 @@ class IncomingAttemptStoreTest {
 
         store = new IncomingAttemptStore(
                 attemptRepository, activeProjects(), transactionTemplate,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
     }
 
     @Test
@@ -364,7 +365,7 @@ class IncomingAttemptStoreTest {
     private IncomingAttemptStore storeFor(IncomingDestination destination, IncomingForwardMessage message,
             IncomingEvent event) {
         return new IncomingAttemptStore(attemptRepository, activeProjects(), transactionTemplate, null, null, null,
-                new ObjectMapper(), null, null, message, event, destination);
+                new ObjectMapper(), null, null, null, message, event, destination);
     }
 
     // ── Fixtures ─────────────────────────────────────────────────────────────────────
@@ -378,7 +379,7 @@ class IncomingAttemptStoreTest {
                 .bodyRaw("{}")
                 .build();
         return new IncomingAttemptStore(attemptRepository, activeProjects(), transactionTemplate, null, null, null,
-                new ObjectMapper(), null, null, message, event, destination);
+                new ObjectMapper(), null, null, null, message, event, destination);
     }
 
     private IncomingDestination destination(boolean enabled) {
@@ -391,6 +392,7 @@ class IncomingAttemptStoreTest {
                 .maxAttempts(5)
                 .timeoutSeconds(30)
                 .retryDelays(RetryLadderDefaults.INCOMING_DELAYS)
+                .retryableStatuses(RetryableStatuses.DEFAULT_SPEC)
                 .build();
     }
 

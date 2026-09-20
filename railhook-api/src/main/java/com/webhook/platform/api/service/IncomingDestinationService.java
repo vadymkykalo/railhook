@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.api.audit.AuditAction;
@@ -131,6 +132,10 @@ public class IncomingDestinationService {
                 request.getRetryDelays() != null ? request.getRetryDelays() : RetryLadderDefaults.INCOMING_DELAYS,
                 "retryDelays",
                 request.getMaxAttempts(), "maxAttempts");
+        RetryableStatuses.validate(
+                request.getRetryableStatuses() != null
+                        ? request.getRetryableStatuses() : RetryableStatuses.DEFAULT_SPEC,
+                "retryableStatuses");
 
         IncomingDestination destination = IncomingDestination.builder()
                 .incomingSourceId(sourceId)
@@ -143,6 +148,8 @@ public class IncomingDestinationService {
                 .timeoutSeconds(request.getTimeoutSeconds() != null ? request.getTimeoutSeconds() : 30)
                 .retryDelays(request.getRetryDelays() != null ? request.getRetryDelays()
                         : RetryLadderDefaults.INCOMING_DELAYS)
+                .retryableStatuses(request.getRetryableStatuses() != null
+                        ? request.getRetryableStatuses() : RetryableStatuses.DEFAULT_SPEC)
                 .payloadTransform(request.getPayloadTransform())
                 .transformationId(transformationId)
                 .build();
@@ -219,6 +226,10 @@ public class IncomingDestinationService {
             RetryLadder.validate(request.getRetryDelays(), "retryDelays");
             destination.setRetryDelays(request.getRetryDelays());
         }
+        if (request.getRetryableStatuses() != null) {
+            RetryableStatuses.validate(request.getRetryableStatuses(), "retryableStatuses");
+            destination.setRetryableStatuses(request.getRetryableStatuses());
+        }
         if (request.getPayloadTransform() != null) {
             destination.setPayloadTransform(request.getPayloadTransform().isBlank() ? null : request.getPayloadTransform());
         }
@@ -270,7 +281,11 @@ public class IncomingDestinationService {
                 .maxAttempts(destination.getMaxAttempts())
                 .timeoutSeconds(destination.getTimeoutSeconds())
                 .retryDelays(destination.getRetryDelays())
+                .retryableStatuses(destination.getRetryableStatuses())
                 .payloadTransform(destination.getPayloadTransform())
+                .failingSince(destination.getFailingSince())
+                .autoDisabledAt(destination.getAutoDisabledAt())
+                .autoDisabledReason(destination.getAutoDisabledReason())
                 .transformationId(destination.getTransformationId())
                 .transformationName(transformationName)
                 .createdAt(destination.getCreatedAt())

@@ -269,6 +269,19 @@ export function useUpdateEndpoint(projectId: string) {
     });
 }
 
+/**
+ * Turns an endpoint back on. Separate from `useUpdateEndpoint` because it is a different act:
+ * an update resends the whole endpoint, and both pages that toggled through it rebuilt only the
+ * four fields they happened to render. This sends nothing and clears the auto-disable server-side.
+ */
+export function useEnableEndpoint(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => endpointsApi.enable(projectId, id),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['endpoints', projectId] }); },
+    });
+}
+
 export function useRotateSecret(projectId: string) {
     const qc = useQueryClient();
     return useMutation({

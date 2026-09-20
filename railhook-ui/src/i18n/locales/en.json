@@ -896,6 +896,8 @@
       "payloadTemplateHint": "JSONPath: ${$.path}. Empty means the original payload is sent unchanged.",
       "retryDelays": "Retry Delays",
       "retryDelaysHint": "Seconds between retries",
+      "retryableStatuses": "Retryable statuses",
+      "retryableStatusesHint": "Which responses are worth another attempt — e.g. 408,429,500-599 or >=500,!501",
       "selectEndpoint": "Select an endpoint...",
       "selected": "Selected",
       "timeout": "Timeout (sec)",
@@ -929,6 +931,7 @@
       "invalidJson": "Invalid JSON — check syntax",
       "maxAttempts": "Must be between 1 and 20 attempts",
       "retryDelays": "Must be comma-separated numbers (seconds), e.g. 60,300,900",
+      "retryableStatuses": "Use statuses, ranges or comparisons, e.g. 408,429,500-599 or 5xx,!501",
       "timeout": "Must be between 1 and 60 seconds"
     }
   },
@@ -1325,6 +1328,8 @@
   "endpoints": {
     "actions": "Actions",
     "active": "Active",
+    "autoDisabled": "Auto-disabled",
+    "autoDisabledSince": "Railhook stopped sending: nothing has succeeded since {{since}}. Fix the receiver, then enable it again.",
     "configureMtls": "Configure mTLS",
     "createDialog": {
       "allowedIps": "Allowed Source IPs (optional)",

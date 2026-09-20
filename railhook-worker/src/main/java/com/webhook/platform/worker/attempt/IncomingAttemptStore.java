@@ -6,6 +6,7 @@ import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.retry.RetryLadder;
+import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.HeaderSanitizer;
 import com.webhook.platform.worker.domain.entity.IncomingDestination;
@@ -87,6 +88,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     private final ObjectMapper objectMapper;
     private final WebClient webClient;
     private final KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
+    private final TargetFailureRecorder targetFailureRecorder;
 
     private final IncomingForwardMessage message;
     private final IncomingEvent event;
@@ -102,6 +104,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             ObjectMapper objectMapper,
             WebClient webClient,
             KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate,
+            TargetFailureRecorder targetFailureRecorder,
             IncomingForwardMessage message,
             IncomingEvent event,
             IncomingDestination destination) {
@@ -114,6 +117,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         this.objectMapper = objectMapper;
         this.webClient = webClient;
         this.kafkaTemplate = kafkaTemplate;
+        this.targetFailureRecorder = targetFailureRecorder;
         this.message = message;
         this.event = event;
         this.destination = destination;
@@ -178,6 +182,13 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 message.getReplaySessionId());
 
         if (!Boolean.TRUE.equals(destination.getEnabled())) {
+            // The same distinction the Outgoing store makes, for the same reason: a Destination
+            // its owner turned off fails what is queued, a Destination Railhook gave up on hands
+            // it to the DLQ, where a person can retry it once the receiver works again.
+            if (destination.getAutoDisabledAt() != null) {
+                return abandoned(claim, "Destination auto-disabled: "
+                        + reasonOrDefault(destination.getAutoDisabledReason()));
+            }
             return terminal(claim, "Destination is disabled");
         }
         // Deleting a Project or suspending an Organization touches no Source or Destination under
@@ -201,6 +212,15 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             return terminal(claim, "INVALID_RETRY_LADDER: " + e.getMessage());
         }
 
+        RetryableStatuses retryableStatuses;
+        try {
+            retryableStatuses = RetryableStatuses.parse(destination.getRetryableStatuses());
+        } catch (IllegalArgumentException e) {
+            log.error("Destination {} carries an unusable retryable-status spec: {}",
+                    destination.getId(), e.getMessage());
+            return terminal(claim, "INVALID_RETRYABLE_STATUSES: " + e.getMessage());
+        }
+
         AttemptContext context = new AttemptContext(
                 "forward eventId=" + event.getId() + " destId=" + destination.getId()
                         + " attempt=" + attemptNumber + "/" + destination.getMaxAttempts(),
@@ -209,6 +229,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 null, // Destinations carry no per-target rate limit of their own
                 attemptNumber,
                 ladder,
+                retryableStatuses,
                 destination.getUrl(),
                 AttemptSupport.clampTimeout(destination.getTimeoutSeconds()));
         return new ClaimResult.Claimed<>(claim, context);
@@ -224,6 +245,24 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 claim.eventId(), claim.destinationId(), until, reason);
         finalise(claim, new Finalization.Deferred(until, reason));
         return new ClaimResult.Deferred<>(until, reason);
+    }
+
+    /**
+     * Hands the Forward to the DLQ under its fencing token and reports that there is nothing to
+     * attempt. Like {@link #terminal} it never reaches {@link AttemptRunner}, so it owes the
+     * side effect itself — and only if its own finalisation applied.
+     */
+    private ClaimResult<Claim> abandoned(Claim claim, String reason) {
+        log.warn("Forward eventId={}, destId={} will not be attempted and goes to Failed Messages: {}",
+                claim.eventId(), claim.destinationId(), reason);
+        if (finalise(claim, new Finalization.Abandoned(reason))) {
+            onAbandoned(claim);
+        }
+        return new ClaimResult.NotClaimed<>(reason);
+    }
+
+    private static String reasonOrDefault(String reason) {
+        return reason != null && !reason.isBlank() ? reason : "continuous failure";
     }
 
     /** Fails the Forward under its fencing token and reports that there is nothing to attempt. */
@@ -530,6 +569,12 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     /** Incoming enforces no ordering, so nothing has to be released on success. */
     @Override
     public void onSucceeded(Claim claim) {
+    }
+
+    /** Incoming's target is the Destination the Forward was made out to. */
+    @Override
+    public void recordTargetOutcome(Claim claim, boolean succeeded) {
+        targetFailureRecorder.destinationAttempt(claim.destinationId(), succeeded);
     }
 
     private void applyRecord(IncomingForwardAttempt attempt) {

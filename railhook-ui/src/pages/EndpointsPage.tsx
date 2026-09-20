@@ -6,7 +6,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { showApiError, showError, showSuccess, showCriticalSuccess } from '../lib/toast';
-import { formatDate } from '../lib/date';
+import { formatDate, formatRelativeTime } from '../lib/date';
 import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
@@ -14,6 +14,7 @@ import StatusBadge, { EnabledBadge, type StatusKind } from '../components/Status
 import { endpointsApi, type EndpointTestResponse } from '../api/endpoints.api';
 import {
   useProject, useEndpointsPaged, useCreateEndpoint, useDeleteEndpoint, useUpdateEndpoint,
+  useEnableEndpoint,
   useRotateSecret, useVerifyEndpoint, useSkipVerification,
 } from '../api/queries';
 import type { EndpointResponse, SignatureScheme } from '../types/api.types';
@@ -114,6 +115,7 @@ export default function EndpointsPage() {
   const createEndpoint = useCreateEndpoint(projectId!);
   const deleteEndpoint = useDeleteEndpoint(projectId!);
   const updateEndpoint = useUpdateEndpoint(projectId!);
+  const enableEndpoint = useEnableEndpoint(projectId!);
   const rotateSecret = useRotateSecret(projectId!);
   const verifyEndpoint = useVerifyEndpoint(projectId!);
   const skipVerification = useSkipVerification(projectId!);
@@ -165,15 +167,21 @@ export default function EndpointsPage() {
     const endpoint = displayEndpoints.find((e) => e.id === toggleId);
     if (!endpoint) return;
     try {
-      await updateEndpoint.mutateAsync({
-        id: endpoint.id,
-        data: {
-          url: endpoint.url,
-          description: endpoint.description,
-          enabled: !endpoint.enabled,
-          rateLimitPerSecond: endpoint.rateLimitPerSecond,
-        },
-      });
+      if (endpoint.enabled) {
+        await updateEndpoint.mutateAsync({
+          id: endpoint.id,
+          data: {
+            url: endpoint.url,
+            description: endpoint.description,
+            enabled: false,
+            rateLimitPerSecond: endpoint.rateLimitPerSecond,
+          },
+        });
+      } else {
+        // Turning it back on says only that, and clears an auto-disable with it. Going through
+        // the update would resend an endpoint rebuilt from the four fields this page renders.
+        await enableEndpoint.mutateAsync(endpoint.id);
+      }
       showSuccess(endpoint.enabled ? t('endpoints.toast.disabled') : t('endpoints.toast.enabled'));
       setToggleId(null);
     } catch (err) {
@@ -361,7 +369,19 @@ export default function EndpointsPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell><EnabledBadge enabled={endpoint.enabled} /></TableCell>
+                    <TableCell>
+                      <EnabledBadge
+                        enabled={endpoint.enabled}
+                        autoDisabled={Boolean(endpoint.autoDisabledAt)}
+                      />
+                      {endpoint.autoDisabledAt && (
+                        <p className="mt-1 text-[11px] leading-snug text-halt">
+                          {t('endpoints.autoDisabledSince', {
+                            since: formatRelativeTime(endpoint.failingSince ?? endpoint.autoDisabledAt),
+                          })}
+                        </p>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <span className="font-mono text-[11px] text-muted-foreground">
                         {formatDate(endpoint.createdAt)}

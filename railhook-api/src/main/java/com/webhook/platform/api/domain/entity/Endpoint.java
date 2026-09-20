@@ -71,6 +71,30 @@ public class Endpoint {
     private Integer rateLimitPerSecond;
 
     /**
+     * Start of the current unbroken run of failed Attempts; null once one succeeds. The worker
+     * maintains it at the shared attempt seam, and {@code EndpointAutoDisableService} is what
+     * reads it.
+     */
+    @Column(name = "failing_since")
+    private Instant failingSince;
+
+    /** Attempts in that run. A long run on a near-idle endpoint is not enough on its own. */
+    @Column(name = "consecutive_failures", nullable = false)
+    @Builder.Default
+    private Integer consecutiveFailures = 0;
+
+    /**
+     * When Railhook turned this endpoint off for continuous failure. Null when it is on, and
+     * null when its <em>owner</em> turned it off — the two are deliberately told apart, because
+     * they mean different things for Deliveries already queued.
+     */
+    @Column(name = "auto_disabled_at")
+    private Instant autoDisabledAt;
+
+    @Column(name = "auto_disabled_reason", columnDefinition = "TEXT")
+    private String autoDisabledReason;
+
+    /**
      * Which signature headers this endpoint receives (V062).
      *
      * <p>{@code BOTH} by default: an existing receiver goes on verifying {@code X-Signature}

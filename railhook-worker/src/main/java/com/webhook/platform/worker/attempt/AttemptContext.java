@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.attempt;
 
 import com.webhook.platform.common.retry.RetryLadder;
+import com.webhook.platform.common.retry.RetryableStatuses;
 
 import java.util.UUID;
 
@@ -20,6 +21,8 @@ import java.util.UUID;
  * @param targetRateLimitPerSecond per-target rate limit, or null when the target sets none
  * @param attemptNumber     1-indexed number of the attempt about to be made
  * @param ladder            the Retry Ladder this obligation carries
+ * @param retryableStatuses which HTTP statuses are worth another Attempt for this obligation,
+ *                          as its Subscription or its Destination spelled it
  * @param url               where to send it, validated before admission
  * @param timeoutSeconds    already clamped to whatever the direction considers sane
  */
@@ -30,6 +33,7 @@ public record AttemptContext(
         Integer targetRateLimitPerSecond,
         int attemptNumber,
         RetryLadder ladder,
+        RetryableStatuses retryableStatuses,
         String url,
         int timeoutSeconds) {
 }

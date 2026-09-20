@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -37,6 +38,10 @@ public class SubscriptionRequest {
     private Integer timeoutSeconds;
 
     private String retryDelays;
+
+    /** Which HTTP statuses are worth another attempt. Comma-separated terms: an exact status, a range (500-599), a 5xx shorthand, or a comparison (>=500). Prefix a term with ! to exclude it; exclusions win wherever they are written. */
+    @Size(max = 255, message = "retryableStatuses must be at most 255 characters")
+    private String retryableStatuses;
 
     private String payloadTemplate;
 

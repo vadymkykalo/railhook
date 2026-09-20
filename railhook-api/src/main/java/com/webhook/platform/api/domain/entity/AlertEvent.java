@@ -27,11 +27,21 @@ public class AlertEvent {
     private UUID organizationId;
 
 
-    @Column(name = "alert_rule_id", nullable = false)
+    /**
+     * The rule that fired — or null for an event Railhook raised on its own, which today means
+     * an endpoint auto-disabled for continuous failure. Nullable rather than hung off a hidden
+     * per-organization rule, which would put a row in the alert-rules list that nobody can
+     * explain or delete.
+     */
+    @Column(name = "alert_rule_id")
     private UUID alertRuleId;
 
     @Column(name = "project_id", nullable = false)
     private UUID projectId;
+
+    /** The Endpoint this event is about, when it is about one. */
+    @Column(name = "endpoint_id")
+    private UUID endpointId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

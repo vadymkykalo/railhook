@@ -28,6 +28,26 @@ public class EndpointResponse {
     private Instant verificationAttemptedAt;
     private Instant verificationCompletedAt;
     private String verificationSkipReason;
+    /**
+     * Start of the current unbroken run of failed deliveries to this endpoint; null when the
+     * last one succeeded, or when none has been attempted. This is what the auto-disable window
+     * is measured from, so it is also the answer to "since when".
+     */
+    private Instant failingSince;
+
+    /** Attempts in that run. Zero whenever {@link #failingSince} is null. */
+    private Integer consecutiveFailures;
+
+    /**
+     * When Railhook turned this endpoint off for continuous failure. Null when the endpoint is
+     * on, and null when its owner turned it off — the two are different states: re-enabling
+     * clears this and the run of failures with it.
+     */
+    private Instant autoDisabledAt;
+
+    /** Why, in words meant for the endpoint's owner. Null unless {@link #autoDisabledAt} is set. */
+    private String autoDisabledReason;
+
     private Instant createdAt;
     private Instant updatedAt;
     private String secret;

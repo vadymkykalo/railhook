@@ -3,17 +3,18 @@ package com.webhook.platform.worker.attempt;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Attempt-level policy that is not the retry ladder: which HTTP statuses are worth another
- * attempt, and how long to wait when an attempt is deferred rather than made. The ladder itself
- * lives in {@link com.webhook.platform.common.retry.RetryLadder}.
+ * How long to wait when an Attempt is <em>deferred</em> rather than made — and nothing else.
+ *
+ * <p>It used to also answer "is this status worth another Attempt", as three literals. That
+ * answer is the obligation's own now and travels on {@link AttemptContext#retryableStatuses()};
+ * see {@link com.webhook.platform.common.retry.RetryableStatuses}. The Ladder — when the next
+ * Attempt is due — lives in {@link com.webhook.platform.common.retry.RetryLadder}. Three
+ * different questions, three homes, and conflating any two of them is how a deferred delivery
+ * ends up consuming its Ladder.
  */
 public final class RetryPolicy {
 
     private RetryPolicy() {
-    }
-
-    public static boolean isRetryable(int statusCode) {
-        return statusCode == 408 || statusCode == 429 || (statusCode >= 500 && statusCode < 600);
     }
 
     /**

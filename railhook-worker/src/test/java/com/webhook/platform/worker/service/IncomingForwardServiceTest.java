@@ -1,5 +1,8 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.common.retry.RetryableStatuses;
+import com.webhook.platform.common.retry.RetryAfter;
+import com.webhook.platform.worker.attempt.TargetFailureRecorder;
 import com.webhook.platform.common.constants.KafkaTopics;
 import org.springframework.kafka.core.KafkaTemplate;
 import com.webhook.platform.worker.attempt.AttemptRunner;
@@ -153,7 +156,7 @@ class IncomingForwardServiceTest {
         IncomingAttemptStoreFactory storeFactory = new IncomingAttemptStoreFactory(
                 attemptRepository, activeProjects(), transactionTemplate, transformationCacheService,
                 payloadTransformService, encryptionKeyRegistry, new ObjectMapper(),
-                webClient, kafkaTemplate);
+                webClient, kafkaTemplate, mock(TargetFailureRecorder.class));
         return new IncomingForwardService(eventRepository, destinationRepository, attemptRepository,
                 transactionTemplate, runner, storeFactory, new ForwardAttemptMetrics(registry));
     }
@@ -167,7 +170,7 @@ class IncomingForwardServiceTest {
     private AttemptRunner newAttemptRunner(boolean allowPrivateIps) {
         return new AttemptRunner(
                 projectRateLimiterService, redisRateLimiterService, concurrencyControlService,
-                circuitBreakerService, new ObjectMapper(), allowPrivateIps, List.of());
+                circuitBreakerService, new ObjectMapper(), allowPrivateIps, List.of(), RetryAfter.DEFAULT_MAX_SECONDS);
     }
 
     private IncomingEvent buildEvent() {
@@ -186,6 +189,7 @@ class IncomingForwardServiceTest {
                 .authType(IncomingAuthType.NONE)
                 .enabled(true).maxAttempts(5).timeoutSeconds(30)
                 .retryDelays("60,300")
+                .retryableStatuses(RetryableStatuses.DEFAULT_SPEC)
                 .build();
     }
 

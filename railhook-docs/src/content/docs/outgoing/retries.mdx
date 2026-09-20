@@ -21,7 +21,7 @@ A delivery is an obligation to get one event to one endpoint. Railhook keeps try
 | Result of the attempt | What happens |
 |---|---|
 | `2xx` | `SUCCESS`. |
-| `408`, `429`, any `5xx` | Retried on the ladder. |
+| `408`, `429`, any `5xx` | Retried on the ladder. This set is the default; a subscription or an incoming destination can change it — see [Which statuses are worth retrying](#which-statuses-are-worth-retrying). |
 | A connection error, a timeout, or a host that does not resolve | Retried on the ladder. |
 | The transformation failed to apply | Retried on the ladder. The raw payload is never sent instead. |
 | Any other `4xx`, or a `3xx` | `DLQ` on the first attempt, without the rest of the ladder. A `401`, a `404` or a redirect will not change on its own, but you can change it: fix the credentials or the URL, then retry from Failed Messages. Redirects are not followed. |
@@ -49,6 +49,49 @@ Some work is turned away before any request is made: a tenant or per-endpoint ra
 ## Timeouts
 
 One attempt waits 30 seconds for a response unless the subscription sets `timeoutSeconds`, which must be between 1 and 60. A timeout counts as a failed attempt and is retried like any other failure.
+
+## Which statuses are worth retrying
+
+By default a delivery is retried on `408`, `429` and every `5xx`, and nothing else. A subscription can say otherwise with `retryableStatuses`, and an incoming destination has the same field.
+
+The value is a comma-separated list of terms:
+
+| Term | Matches |
+|---|---|
+| `429` | Exactly that status. |
+| `500-599` | An inclusive range. |
+| `5xx` | Shorthand for `500-599`. Also `4xx`, `3xx`, `2xx`, `1xx`. |
+| `>=500`, `>500`, `<=408`, `<400` | Open at one end. |
+| `!501` | Excluded. Any term can be prefixed with `!`. |
+
+Exclusions win wherever they are written, so `5xx,!501` and `!501,5xx` mean the same thing. A few worth knowing:
+
+```text title="Examples"
+408,429,500-599    the default — what Railhook did before this was configurable
+5xx,!501           retry every server error except "not implemented"
+>=500,408,429,409  a receiver that answers 409 while it is still catching up
+408,429            a receiver whose 5xx means the payload was rejected for good
+```
+
+The API rejects a list it cannot read, with a message naming the term at fault. A status the list does not cover is treated the way a `4xx` is: the delivery goes to Failed Messages on the first attempt, without the rest of the ladder, and you can retry it from there.
+
+<Aside title="A subscription's list is copied onto its deliveries">
+Like the ladder, it is stamped on each delivery as that delivery is created. Editing the subscription changes what happens to new deliveries, not to ones already partway through their ladder — a delivery is judged by the rules it started under.
+</Aside>
+
+## Retry-After
+
+A receiver answering `429` or `503` can say when to come back, with a `Retry-After` header. Railhook honours it in both forms the HTTP spec allows: a number of seconds, or an HTTP date.
+
+Three rules bound it:
+
+- **Only on `429` and `503`.** Those are the two statuses where the header means "I am over capacity, wait". On a `500` it is at best a guess and at worst a header a proxy left on.
+- **It can only push an attempt later.** A receiver asking to be called back sooner than the ladder says is asking Railhook to retry harder than its owner configured, which is not the receiver's decision.
+- **It is clamped**, by `WEBHOOK_RETRY_AFTER_MAX_SECONDS` (default `21600`, six hours). One line of a misconfigured response would otherwise park a delivery for a year.
+
+Six hours is the largest tier both default ladders share, so honouring the header never holds a delivery longer than the ladder itself already can, and seven attempts at the maximum still fit inside the 96-hour age cap. Hookdeck allows seven days; Railhook does not, because a week-long wait would be cut short by that cap rather than honoured. Set the variable to `0` to ignore the header entirely.
+
+An honoured `Retry-After` does not buy an extra attempt. A `429` on the last rung goes to Failed Messages like any other failure, however politely it asked.
 
 ## The age cap
 

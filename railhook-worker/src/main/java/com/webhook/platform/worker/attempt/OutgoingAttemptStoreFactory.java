@@ -46,6 +46,7 @@ public class OutgoingAttemptStoreFactory {
     private final PayloadTransformService payloadTransformService;
     private final ObjectMapper objectMapper;
     private final WebClient outgoingWebClient;
+    private final TargetFailureRecorder targetFailureRecorder;
     private final Counter orderingGapTimeoutCounter;
     private final Clock clock;
 
@@ -72,6 +73,7 @@ public class OutgoingAttemptStoreFactory {
             PayloadTransformService payloadTransformService,
             ObjectMapper objectMapper,
             @Qualifier("outgoingWebClient") WebClient outgoingWebClient,
+            TargetFailureRecorder targetFailureRecorder,
             MeterRegistry meterRegistry,
             Clock clock,
             @Value("${ordering.buffer-reschedule-delay-seconds:5}") int orderingBufferRescheduleDelaySeconds) {
@@ -89,6 +91,7 @@ public class OutgoingAttemptStoreFactory {
         this.payloadTransformService = payloadTransformService;
         this.objectMapper = objectMapper;
         this.outgoingWebClient = outgoingWebClient;
+        this.targetFailureRecorder = targetFailureRecorder;
         this.orderingGapTimeoutCounter = Counter.builder("webhook_ordering_gap_timeout_total")
                 .register(meterRegistry);
         this.clock = clock;
@@ -100,7 +103,7 @@ public class OutgoingAttemptStoreFactory {
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
                 projectStatusLookup, transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
                 mtlsWebClientFactory, transformationCacheService, payloadTransformService,
-                objectMapper, outgoingWebClient, orderingGapTimeoutCounter, clock,
+                objectMapper, outgoingWebClient, targetFailureRecorder, orderingGapTimeoutCounter, clock,
                 orderingBufferRescheduleDelaySeconds, message, isRetry);
     }
 }

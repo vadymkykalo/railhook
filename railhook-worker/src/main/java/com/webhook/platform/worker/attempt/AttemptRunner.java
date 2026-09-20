@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.attempt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webhook.platform.common.retry.RetryAfter;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.util.HeaderSanitizer;
 import com.webhook.platform.worker.service.CircuitBreakerService;
@@ -57,6 +58,7 @@ public class AttemptRunner {
     private final ObjectMapper objectMapper;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
+    private final Duration retryAfterMax;
 
     public AttemptRunner(
             ProjectRateLimiterService tenantRateLimiter,
@@ -65,7 +67,8 @@ public class AttemptRunner {
             CircuitBreakerService circuitBreaker,
             ObjectMapper objectMapper,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
+            @Value("${webhook.retry-after.max-seconds:21600}") long retryAfterMaxSeconds) {
         this.tenantRateLimiter = tenantRateLimiter;
         this.targetRateLimiter = targetRateLimiter;
         this.concurrencyControl = concurrencyControl;
@@ -73,6 +76,7 @@ public class AttemptRunner {
         this.objectMapper = objectMapper;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
+        this.retryAfterMax = Duration.ofSeconds(Math.max(0, retryAfterMaxSeconds));
     }
 
     /**
@@ -297,18 +301,23 @@ public class AttemptRunner {
         // the status is stashed the moment the response head lands, and read back out here.
         AtomicInteger statusSeen = new AtomicInteger(-1);
         AtomicReference<String> headersSeen = new AtomicReference<>("{}");
+        AtomicReference<String> retryAfterSeen = new AtomicReference<>();
 
         // Invariant 1: the mono produces the raw HTTP outcome and nothing else.
         Mono<Response> exchange = request.bodyValue(body != null ? body : new byte[0])
                 .exchangeToMono(response -> {
                     int status = response.statusCode().value();
-                    String headers = serialiseHeaders(response.headers().asHttpHeaders());
+                    HttpHeaders responseHeaders = response.headers().asHttpHeaders();
+                    String headers = serialiseHeaders(responseHeaders);
+                    String retryAfter = responseHeaders.getFirst(HttpHeaders.RETRY_AFTER);
                     statusSeen.set(status);
                     headersSeen.set(headers);
+                    retryAfterSeen.set(retryAfter);
                     return response.bodyToMono(String.class)
                             .defaultIfEmpty("")
-                            .map(responseBody -> new Response(status, responseBody, headers))
-                            .onErrorResume(e -> Mono.just(unreadableBody(status, headers, e.getMessage())));
+                            .map(responseBody -> new Response(status, responseBody, headers, retryAfter))
+                            .onErrorResume(e -> Mono.just(
+                                    unreadableBody(status, headers, retryAfter, e.getMessage())));
                 })
                 .timeout(Duration.ofSeconds(ctx.timeoutSeconds()));
 
@@ -324,12 +333,12 @@ public class AttemptRunner {
             // whole ladder — one delivery, seven arrivals. The status is the outcome.
             log.warn("{}: HTTP {} received, but the response body did not: {}",
                     ctx.description(), status, e.getMessage());
-            return unreadableBody(status, headersSeen.get(), e.getMessage());
+            return unreadableBody(status, headersSeen.get(), retryAfterSeen.get(), e.getMessage());
         }
     }
 
-    private Response unreadableBody(int status, String headers, String why) {
-        return new Response(status, "[response body unreadable: " + why + "]", headers);
+    private Response unreadableBody(int status, String headers, String retryAfter, String why) {
+        return new Response(status, "[response body unreadable: " + why + "]", headers, retryAfter);
     }
 
     private <C> void classify(AttemptStore<C> store, AttemptMetrics metrics, C claim,
@@ -341,6 +350,7 @@ public class AttemptRunner {
         if (status >= 200 && status < 300) {
             metrics.success(status, durationMs);
             circuitBreaker.recordSuccess(ctx.targetKey(), durationMs);
+            recordTargetOutcome(store, claim, ctx, true);
             // Both writes used to sit inside the caller's catch-all, so a database that blinked
             // while writing down a delivered webhook sent it again. The receiver has it; from
             // here on the only question is how much of that we manage to write down.
@@ -358,10 +368,15 @@ public class AttemptRunner {
 
         metrics.failure(status, durationMs);
         recordQuietly(store, claim, ctx, record);
+        recordTargetOutcome(store, claim, ctx, false);
 
-        if (RetryPolicy.isRetryable(status)) {
+        // Which statuses are worth another Attempt is the obligation's own, carried over from
+        // its Subscription or its Destination. It used to be three literals here, which gave
+        // the same ladder to a gateway that answers 500 while it reloads and to an application
+        // that answers 500 because it has rejected the payload for good.
+        if (ctx.retryableStatuses().isRetryable(status)) {
             circuitBreaker.recordFailure(ctx.targetKey(), new RuntimeException("HTTP " + status));
-            retryOrAbandon(store, claim, ctx, "Retryable HTTP " + status);
+            retryOrAbandon(store, claim, ctx, "Retryable HTTP " + status, response.retryAfter(), status);
         } else {
             // Abandoned, not terminally failed. A 3xx or a 4xx is an answer no further attempt
             // changes, so the rest of the ladder is skipped — but a person can change it: a token
@@ -379,10 +394,34 @@ public class AttemptRunner {
         metrics.error(durationMs);
         circuitBreaker.recordFailure(ctx.targetKey(), new RuntimeException(String.valueOf(errorMessage)));
         recordQuietly(store, claim, ctx, errorRecord(requestHeaders, body, errorMessage, durationMs));
-        retryOrAbandon(store, claim, ctx, errorMessage);
+        // An Attempt that produced no answer at all is still an Attempt the target failed.
+        recordTargetOutcome(store, claim, ctx, false);
+        retryOrAbandon(store, claim, ctx, errorMessage, null, -1);
     }
 
-    private <C> void retryOrAbandon(AttemptStore<C> store, C claim, AttemptContext ctx, String reason) {
+    /**
+     * Writes down what this Attempt said about the target, and treats not managing to as what
+     * it is: invariant 1 binds here too, so a 2xx already on the wire is not reclassified
+     * because a counter would not increment.
+     */
+    private <C> void recordTargetOutcome(AttemptStore<C> store, C claim, AttemptContext ctx,
+            boolean succeeded) {
+        try {
+            store.recordTargetOutcome(claim, succeeded);
+        } catch (Exception e) {
+            log.error("{}: the target's outcome could not be recorded: {}",
+                    ctx.description(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * @param retryAfterHeader the receiver's {@code Retry-After}, or null when it sent none or
+     *                         there was no response to read one from
+     * @param statusCode       the status it arrived with, or -1 when there was no response;
+     *                         {@link RetryAfter} honours the header on 429 and 503 only
+     */
+    private <C> void retryOrAbandon(AttemptStore<C> store, C claim, AttemptContext ctx, String reason,
+            String retryAfterHeader, int statusCode) {
         if (ctx.ladder().isExhausted(ctx.attemptNumber())) {
             log.warn("{}: ladder exhausted after {} attempts, abandoning: {}",
                     ctx.description(), ctx.attemptNumber(), reason);
@@ -390,7 +429,11 @@ public class AttemptRunner {
             return;
         }
 
-        Instant next = ctx.ladder().nextRetryAt(ctx.attemptNumber());
+        // The Ladder decides first; the receiver may only push the result later, never sooner,
+        // and never past the clamp. Being asked to stay away is not an extra Attempt, so this
+        // runs after isExhausted rather than before it.
+        Instant next = RetryAfter.nextRetryAt(ctx.ladder().nextRetryAt(ctx.attemptNumber()),
+                retryAfterHeader, statusCode, Instant.now(), retryAfterMax);
         // Invariant 2: only the Attempt that actually finalised may queue a successor.
         if (finaliseOrLeaveToSweep(store, claim, ctx, new Finalization.Retry(next, reason))) {
             log.info("{}: attempt {} failed ({}), next at {}",
@@ -441,6 +484,11 @@ public class AttemptRunner {
         }
     }
 
-    private record Response(int status, String body, String headers) {
+    /**
+     * @param retryAfter the raw {@code Retry-After} value, kept apart from {@code headers}
+     *                   because that field is a sanitised JSON blob for the dashboard and this
+     *                   one has to be parsed
+     */
+    private record Response(int status, String body, String headers, String retryAfter) {
     }
 }

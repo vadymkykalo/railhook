@@ -1,5 +1,8 @@
 package com.webhook.platform.worker.repository;
 
+import com.webhook.platform.common.retry.RetryableStatuses;
+import com.webhook.platform.common.retry.RetryAfter;
+import com.webhook.platform.worker.attempt.TargetFailureRecorder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
@@ -122,7 +125,7 @@ class IncomingForwardAttemptRecordingRepositoryTest {
         lenient().when(circuitBreaker.isCallPermitted(any(UUID.class))).thenReturn(true);
         // allowPrivateIps: the receiver is on loopback.
         runner = new AttemptRunner(tenantRateLimiter, targetRateLimiter, concurrency, circuitBreaker,
-                new ObjectMapper(), true, List.of());
+                new ObjectMapper(), true, List.of(), RetryAfter.DEFAULT_MAX_SECONDS);
     }
 
     @AfterEach
@@ -180,6 +183,7 @@ class IncomingForwardAttemptRecordingRepositoryTest {
                 .enabled(true)
                 .maxAttempts(RetryLadderDefaults.INCOMING_MAX_ATTEMPTS)
                 .retryDelays(RetryLadderDefaults.INCOMING_DELAYS)
+                .retryableStatuses(RetryableStatuses.DEFAULT_SPEC)
                 .timeoutSeconds(5)
                 .payloadTransform(payloadTransform)
                 .build();
@@ -188,7 +192,8 @@ class IncomingForwardAttemptRecordingRepositoryTest {
 
         IncomingAttemptStore store = new IncomingAttemptStore(attemptRepository, activeProjects(),
                 new TransactionTemplate(transactionManager), null, null, null, new ObjectMapper(),
-                WebClient.builder().build(), null, message, event, destination);
+                WebClient.builder().build(), null, mock(TargetFailureRecorder.class),
+                message, event, destination);
 
         runner.run(store, new NoMetrics());
 

@@ -86,7 +86,7 @@ class OutgoingRetryClaimTest {
                 activeProjects(),
                 transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
                 mtlsWebClientFactory, transformationCacheService, payloadTransformService,
-                new ObjectMapper(), WebClient.builder().build(),
+                new ObjectMapper(), WebClient.builder().build(), null,
                 Counter.builder("test").register(new SimpleMeterRegistry()),
                 Clock.systemUTC(), 5, message, true);
     }

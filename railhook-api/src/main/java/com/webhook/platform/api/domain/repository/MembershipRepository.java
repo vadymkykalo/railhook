@@ -67,4 +67,17 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     @Query(value = "SELECT m FROM Membership m JOIN FETCH m.user",
             countQuery = "SELECT COUNT(m) FROM Membership m")
     Page<Membership> findAllWithUser(Pageable pageable);
+
+    /**
+     * The verified addresses of the organization's active owners, oldest membership first —
+     * who to tell when Railhook makes a decision about their installation rather than reporting
+     * a rule they wrote. Verified only, for the reason alert recipients are: an unverified
+     * address is somebody's typo until proven otherwise.
+     */
+    @Query("SELECT u.email FROM Membership m JOIN User u ON m.userId = u.id "
+            + "WHERE m.organizationId = :organizationId "
+            + "AND m.role = com.webhook.platform.api.domain.enums.MembershipRole.OWNER "
+            + "AND m.status = com.webhook.platform.api.domain.enums.MembershipStatus.ACTIVE "
+            + "AND u.emailVerified = true ORDER BY m.createdAt ASC")
+    List<String> findOwnerEmails(@Param("organizationId") UUID organizationId);
 }

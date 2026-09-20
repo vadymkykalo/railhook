@@ -3,6 +3,7 @@ package com.webhook.platform.worker.attempt;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.retry.RetryLadder;
+import com.webhook.platform.common.retry.RetryableStatuses;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.HeaderSanitizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,6 +66,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     private final PayloadTransformService payloadTransformService;
     private final ObjectMapper objectMapper;
     private final WebClient defaultWebClient;
+    private final TargetFailureRecorder targetFailureRecorder;
     private final Clock clock;
 
     private final DeliveryMessage message;
@@ -89,6 +91,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             PayloadTransformService payloadTransformService,
             ObjectMapper objectMapper,
             WebClient defaultWebClient,
+            TargetFailureRecorder targetFailureRecorder,
             Counter orderingGapTimeoutCounter,
             Clock clock,
             int orderingRescheduleDelaySeconds,
@@ -109,6 +112,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         this.payloadTransformService = payloadTransformService;
         this.objectMapper = objectMapper;
         this.defaultWebClient = defaultWebClient;
+        this.targetFailureRecorder = targetFailureRecorder;
         this.clock = clock;
         this.message = message;
         this.isRetry = isRetry;
@@ -194,6 +198,16 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             return deferred(claim, "Organization is suspended");
         }
         if (!endpoint.getEnabled()) {
+            // Who turned it off decides what happens to Deliveries already queued. Its owner
+            // turning it off means "stop sending to this", and that is FAILED, as it always
+            // was. Railhook turning it off for continuous failure means "we gave up on this
+            // receiver" — an obligation a person can still make succeed, by fixing the
+            // receiver and retrying it. That is the DLQ, which is where Railhook keeps what it
+            // abandoned for a human to decide about.
+            if (endpoint.getAutoDisabledAt() != null) {
+                return abandoned(claim, "Endpoint auto-disabled: "
+                        + reasonOrDefault(endpoint.getAutoDisabledReason()));
+            }
             return terminal(claim, "Endpoint is disabled");
         }
         if (endpoint.getVerificationStatus() != Endpoint.VerificationStatus.VERIFIED
@@ -217,6 +231,18 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             return terminal(claim, reason);
         }
 
+        RetryableStatuses retryableStatuses;
+        try {
+            retryableStatuses = RetryableStatuses.parse(delivery.getRetryableStatuses());
+        } catch (IllegalArgumentException e) {
+            // As with the ladder: the api rejects a malformed spec on write, so reaching this
+            // means the column was written outside the api, and retrying cannot fix it.
+            String reason = "INVALID_RETRYABLE_STATUSES: " + e.getMessage();
+            log.error("Delivery {} carries an unusable retryable-status spec: {}",
+                    delivery.getId(), e.getMessage());
+            return terminal(claim, reason);
+        }
+
         AttemptContext context = new AttemptContext(
                 "delivery " + delivery.getId() + " attempt " + (delivery.getAttemptCount() + 1)
                         + "/" + delivery.getMaxAttempts(),
@@ -225,6 +251,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                 endpoint.getRateLimitPerSecond(),
                 delivery.getAttemptCount() + 1,
                 ladder,
+                retryableStatuses,
                 endpoint.getUrl(),
                 AttemptSupport.clampTimeout(delivery.getTimeoutSeconds()));
         return new ClaimResult.Claimed<>(claim, context);
@@ -239,6 +266,24 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         log.info("Delivery {} will not be attempted before {}: {}", claim.deliveryId(), until, reason);
         finalise(claim, new Finalization.Deferred(until, reason));
         return new ClaimResult.Deferred<>(until, reason);
+    }
+
+    /**
+     * Hands the Delivery to the DLQ under its fencing token and reports that there is nothing
+     * to attempt. Like {@link #terminal}, it never reaches {@link AttemptRunner}, so it owes
+     * the side effect itself — and only if its own finalisation applied.
+     */
+    private ClaimResult<Claim> abandoned(Claim claim, String reason) {
+        log.warn("Delivery {} will not be attempted and goes to Failed Messages: {}",
+                claim.deliveryId(), reason);
+        if (finalise(claim, new Finalization.Abandoned(reason))) {
+            onAbandoned(claim);
+        }
+        return new ClaimResult.NotClaimed<>(reason);
+    }
+
+    private static String reasonOrDefault(String reason) {
+        return reason != null && !reason.isBlank() ? reason : "continuous failure";
     }
 
     /** Fails the Delivery under its fencing token and reports that there is nothing to attempt. */
@@ -435,6 +480,12 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     @Override
     public void onSucceeded(Claim claim) {
         orderingGate.release(claim.delivery(), false);
+    }
+
+    /** Outgoing's target is the Endpoint the Delivery was made out to. */
+    @Override
+    public void recordTargetOutcome(Claim claim, boolean succeeded) {
+        targetFailureRecorder.endpointAttempt(claim.delivery().getEndpointId(), succeeded);
     }
 
     /**
