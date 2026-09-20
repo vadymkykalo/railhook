@@ -102,7 +102,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         this.transactionTemplate = transactionTemplate;
         this.kafkaTemplate = kafkaTemplate;
         this.orderingGate = new OrderingGate(orderingBufferService, deliveryRepository, kafkaTemplate,
-                orderingGapTimeoutCounter, orderingRescheduleDelaySeconds);
+                transactionTemplate, orderingGapTimeoutCounter, orderingRescheduleDelaySeconds);
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.mtlsWebClientFactory = mtlsWebClientFactory;
         this.transformationCacheService = transformationCacheService;
