@@ -127,6 +127,19 @@ describe('WorkflowBuilderPage', () => {
     }
   });
 
+  // A touch screen fires no dragstart, so on a phone the palette was decoration: the canvas
+  // could be panned and nothing could be put on it. A tap adds the node the drag would have.
+  it('adds a node when a palette entry is tapped', async () => {
+    renderBuilder();
+    await screen.findByText('Route payments');
+    await waitFor(() => expect(document.body.textContent).toMatch(/1 nodes/));
+
+    await userEvent.click(screen.getByRole('button', { name: /delay|затримк/i }));
+
+    await waitFor(() => expect(document.body.textContent).toMatch(/2 nodes/));
+    expect(screen.getByText(/unsaved/i)).toBeInTheDocument();
+  });
+
   it('saves nothing, enables nothing and runs nothing by being opened', async () => {
     renderBuilder();
     await screen.findByText('Route payments');

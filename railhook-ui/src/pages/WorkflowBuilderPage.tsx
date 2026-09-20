@@ -11,6 +11,8 @@ import {
   addEdge,
   useNodesState,
   useEdgesState,
+  useNodesInitialized,
+  useReactFlow,
   type Connection,
   type Edge,
   type Node,
@@ -31,6 +33,15 @@ import NodeConfigPanel from '../components/workflow/NodeConfigPanel';
 import StatusBadge, { type StatusKind } from '../components/StatusBadge';
 import JsonBlock from '../components/JsonBlock';
 
+/**
+ * How the canvas frames a workflow it has just opened. The zoom floor is well under React Flow's
+ * default 0.5, because a six-node workflow laid out left to right is around a thousand pixels
+ * wide and 0.5 of that does not fit a phone — the fit silently clamped and half the workflow sat
+ * off the side of the screen.
+ */
+const FIT_VIEW_OPTIONS = { padding: 0.2 };
+const MIN_ZOOM = 0.2;
+
 let nodeIdCounter = 0;
 function getNextNodeId() {
   return `node_${Date.now()}_${nodeIdCounter++}`;
@@ -42,6 +53,9 @@ function WorkflowBuilderInner() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const { screenToFlowPosition, fitView } = useReactFlow();
+  const nodesInitialized = useNodesInitialized();
+  const fitted = useRef(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -88,6 +102,15 @@ function WorkflowBuilderInner() {
     }
   }, [workflow, setNodes, setEdges]);
 
+  // The definition arrives after the canvas has mounted, so React Flow's own `fitView` runs while
+  // there is nothing on it and the loaded nodes then land wherever the default viewport sits —
+  // on a phone, mostly off the side of it. Fit once, as soon as those nodes have been measured.
+  useEffect(() => {
+    if (fitted.current || !nodesInitialized || nodes.length === 0) return;
+    fitted.current = true;
+    fitView(FIT_VIEW_OPTIONS);
+  }, [nodesInitialized, nodes.length, fitView]);
+
   const onConnect: OnConnect = useCallback(
     (params: Connection) => {
       setEdges((eds) => addEdge(params, eds));
@@ -132,7 +155,27 @@ function WorkflowBuilderInner() {
     [setNodes],
   );
 
-  // Drag & drop from sidebar
+  // Both ways of adding a node land here, so a tap puts down exactly what a drag does. The
+  // canvas converts the screen point itself, which keeps the node under the pointer however far
+  // the canvas has been panned or zoomed — subtracting the wrapper's offset by hand did not.
+  const addNode = useCallback(
+    (template: NodeTemplate, screenPoint: { x: number; y: number }) => {
+      const dropped = screenToFlowPosition(screenPoint);
+      const newNode: Node = {
+        id: getNextNodeId(),
+        type: template.type,
+        // Half a node up and left, so the node sits around the point rather than hanging off it.
+        position: { x: dropped.x - 90, y: dropped.y - 20 },
+        data: { ...template.defaultData },
+      };
+
+      setNodes((nds: Node[]) => [...nds, newNode]);
+      setHasUnsaved(true);
+    },
+    [screenToFlowPosition, setNodes],
+  );
+
+  // Drag & drop from the palette
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -144,26 +187,20 @@ function WorkflowBuilderInner() {
       const templateJson = event.dataTransfer.getData('application/workflow-node');
       if (!templateJson) return;
 
-      const template: NodeTemplate = JSON.parse(templateJson);
-      const wrapperBounds = reactFlowWrapper.current?.getBoundingClientRect();
-      if (!wrapperBounds) return;
-
-      const position = {
-        x: event.clientX - wrapperBounds.left - 90,
-        y: event.clientY - wrapperBounds.top - 20,
-      };
-
-      const newNode: Node = {
-        id: getNextNodeId(),
-        type: template.type,
-        position,
-        data: { ...template.defaultData },
-      };
-
-      setNodes((nds: Node[]) => [...nds, newNode]);
-      setHasUnsaved(true);
+      addNode(JSON.parse(templateJson) as NodeTemplate, { x: event.clientX, y: event.clientY });
     },
-    [setNodes],
+    [addNode],
+  );
+
+  // A touch screen fires no dragstart, so the palette is a row of buttons as well: a tap has no
+  // pointer to drop under, and drops the node in the middle of what the canvas is showing.
+  const addNodeToView = useCallback(
+    (template: NodeTemplate) => {
+      const bounds = reactFlowWrapper.current?.getBoundingClientRect();
+      if (!bounds) return;
+      addNode(template, { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 });
+    },
+    [addNode],
   );
 
   // Delete selected node
@@ -276,92 +313,104 @@ function WorkflowBuilderInner() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)]">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 border-b border-rail bg-card px-4 py-2">
-        <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/workflows`)} title={t('workflows.builder.back')} aria-label={t('workflows.builder.back')}>
+      {/* Toolbar. The name and the controls need the whole width of a phone between them, so the
+          meta line sits under both instead of competing with the back arrow for the same row,
+          and every control but Save shows only its icon until there is room for a label. */}
+      <div className="border-b border-rail bg-card px-3 py-2 sm:px-4">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
+          <Button variant="ghost" size="icon-sm" className="flex-shrink-0" onClick={() => navigate(`/admin/projects/${projectId}/workflows`)} title={t('workflows.builder.back')} aria-label={t('workflows.builder.back')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-medium">{workflow.name}</h2>
-            <p className="font-mono text-[10px] text-muted-foreground">
-              {[
-                t('workflows.version', { version: workflow.version }),
-                t('workflows.builder.nodesCount', { count: nodes.length }),
-                t('workflows.builder.edgesCount', { count: edges.length }),
-              ].join(' · ')}
-              {hasUnsaved && <span className="ml-1 text-retry">{`● ${t('workflows.builder.unsaved')}`}</span>}
-            </p>
+          <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{workflow.name}</h2>
+          <div className="flex flex-shrink-0 items-center gap-0.5 sm:gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 px-2 text-xs sm:px-3"
+              onClick={() => setShowHistory(!showHistory)}
+              title={t('workflows.builder.history')}
+              aria-label={t('workflows.builder.history')}
+            >
+              <History className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('workflows.builder.history')}</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 px-2 text-xs sm:px-3"
+              onClick={() => setShowTriggerDialog(true)}
+              title={t('workflows.builder.testRun')}
+              aria-label={t('workflows.builder.testRun')}
+            >
+              <Play className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('workflows.builder.testRun')}</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 px-2 text-xs sm:px-3"
+              onClick={() => toggleMutation.mutate(!workflow.enabled)}
+              title={workflow.enabled ? t('workflows.builder.enabled') : t('workflows.builder.disabled')}
+              aria-label={workflow.enabled ? t('workflows.builder.enabled') : t('workflows.builder.disabled')}
+            >
+              {workflow.enabled ? <ToggleRight className="h-4 w-4 text-ok" aria-hidden /> : <ToggleLeft className="h-4 w-4" aria-hidden />}
+              <span className="hidden sm:inline">{workflow.enabled ? t('workflows.builder.enabled') : t('workflows.builder.disabled')}</span>
+            </Button>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={() => saveMutation.mutate()}
+              disabled={!hasUnsaved || saveMutation.isPending}
+            >
+              {saveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              {t('workflows.builder.save')}
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => setShowHistory(!showHistory)}
-          >
-            <History className="h-4 w-4" />
-            {t('workflows.builder.history')}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => setShowTriggerDialog(true)}
-          >
-            <Play className="h-4 w-4" />
-            {t('workflows.builder.testRun')}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => toggleMutation.mutate(!workflow.enabled)}
-          >
-            {workflow.enabled ? <ToggleRight className="h-4 w-4 text-ok" aria-hidden /> : <ToggleLeft className="h-4 w-4" aria-hidden />}
-            {workflow.enabled ? t('workflows.builder.enabled') : t('workflows.builder.disabled')}
-          </Button>
-          <Button
-            size="sm"
-            className="gap-1.5"
-            onClick={() => saveMutation.mutate()}
-            disabled={!hasUnsaved || saveMutation.isPending}
-          >
-            {saveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            {t('workflows.builder.save')}
-          </Button>
-        </div>
+        <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
+          {[
+            t('workflows.version', { version: workflow.version }),
+            t('workflows.builder.nodesCount', { count: nodes.length }),
+            t('workflows.builder.edgesCount', { count: edges.length }),
+          ].join(' · ')}
+          {hasUnsaved && <span className="ml-1 text-retry">{`● ${t('workflows.builder.unsaved')}`}</span>}
+        </p>
       </div>
 
       {/* Main area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Node palette sidebar */}
-        <div className="w-48 flex-shrink-0 space-y-2 overflow-y-auto border-r border-rail bg-card p-3">
-          <p className="mono-label px-1">
-            {t('workflows.builder.dragToAdd')}
+      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
+        {/* Node palette: a column beside the canvas where there is room for one, and a strip
+            above it on a phone, where a 192px column left the canvas a sliver. */}
+        <div className="flex-shrink-0 border-b border-rail bg-card lg:flex lg:w-48 lg:flex-col lg:overflow-y-auto lg:border-b-0 lg:border-r">
+          <p className="mono-label px-3 pt-2 lg:px-4 lg:pt-3">
+            <span className="lg:hidden">{t('workflows.builder.tapToAdd')}</span>
+            <span className="hidden lg:inline">{t('workflows.builder.dragToAdd')}</span>
           </p>
-          {nodeTemplates.map((template) => (
-            <div
-              key={template.type}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('application/workflow-node', JSON.stringify(template));
-                e.dataTransfer.effectAllowed = 'move';
-              }}
-              className="flex cursor-grab items-center gap-2 rounded-md border border-rail bg-card px-2.5 py-2 transition-colors hover:border-primary/40 hover:bg-secondary/50 active:cursor-grabbing"
-            >
-              <span className="text-sm">{template.icon}</span>
-              <div className="min-w-0">
-                <div className="text-xs font-medium truncate">{t(`workflows.nodeTypes.${template.type}.label`)}</div>
-                <div className="truncate text-[11px] text-muted-foreground">{t(`workflows.nodeTypes.${template.type}.description`)}</div>
-              </div>
-            </div>
-          ))}
+          <div className="flex gap-2 overflow-x-auto px-3 pb-2 pt-1.5 lg:flex-col lg:overflow-x-visible lg:pb-3 lg:pt-2">
+            {nodeTemplates.map((template) => (
+              <button
+                type="button"
+                key={template.type}
+                draggable
+                onClick={() => addNodeToView(template)}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/workflow-node', JSON.stringify(template));
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                className="flex flex-shrink-0 cursor-grab items-center gap-2 rounded-md border border-rail bg-card px-2.5 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50 active:cursor-grabbing lg:w-full"
+              >
+                <span className="text-sm">{template.icon}</span>
+                <div className="min-w-0">
+                  <div className="text-xs font-medium truncate">{t(`workflows.nodeTypes.${template.type}.label`)}</div>
+                  <div className="hidden truncate text-[11px] text-muted-foreground lg:block">{t(`workflows.nodeTypes.${template.type}.description`)}</div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Canvas */}
-        <div className="flex-1" ref={reactFlowWrapper}>
+        <div className="min-h-0 flex-1" ref={reactFlowWrapper}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -374,7 +423,8 @@ function WorkflowBuilderInner() {
             onDrop={onDrop}
             nodeTypes={nodeTypes}
             fitView
-            fitViewOptions={{ padding: 0.3 }}
+            fitViewOptions={FIT_VIEW_OPTIONS}
+            minZoom={MIN_ZOOM}
             deleteKeyCode={null}
             defaultEdgeOptions={{ animated: true, style: { stroke: 'hsl(var(--rail))', strokeWidth: 2 } }}
             proOptions={{ hideAttribution: true }}
@@ -382,7 +432,9 @@ function WorkflowBuilderInner() {
             <Controls position="bottom-left" />
             <MiniMap
               position="bottom-right"
-              className="!rounded-lg !border !border-rail !bg-card"
+              /* A map of the canvas is worth less than the canvas itself on a phone, where it
+                 covers a quarter of it. */
+              className="!hidden !rounded-lg !border !border-rail !bg-card sm:!block"
               maskColor="hsl(var(--muted) / 0.6)"
               nodeColor="hsl(var(--muted-foreground))"
               nodeStrokeColor="hsl(var(--rail))"
@@ -427,7 +479,7 @@ function WorkflowBuilderInner() {
             const execs = executions?.content ?? [];
             const avgMs = execs.length > 0 ? Math.round(execs.reduce((s, e) => s + (e.durationMs ?? 0), 0) / execs.length) : 0;
             return (
-              <div className="grid grid-cols-5 gap-3 border-b border-rail bg-secondary/40 px-4 py-2.5">
+              <div className="grid grid-cols-2 gap-3 border-b border-rail bg-secondary/40 px-4 py-2.5 sm:grid-cols-3 lg:grid-cols-5">
                 <div className="flex items-center gap-1.5">
                   <Activity className="h-3 w-3 text-muted-foreground" aria-hidden />
                   <div>
@@ -549,14 +601,14 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
   return (
     <div>
       <div
-        className="flex cursor-pointer items-center gap-3 px-4 py-2 text-xs transition-colors hover:bg-secondary/50"
+        className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-xs transition-colors hover:bg-secondary/50"
         onClick={() => setExpanded(!expanded)}
       >
         {statusIcon}
         <span className="font-medium">{t(`workflows.execStatus.${exec.status}`)}</span>
         <span className="font-mono text-muted-foreground">{exec.startedAt ? formatDateTime(exec.startedAt) : ''}</span>
         {exec.durationMs != null && <span className="font-mono text-muted-foreground">{exec.durationMs}ms</span>}
-        {exec.errorMessage && <span className="flex-1 truncate text-halt">{exec.errorMessage}</span>}
+        {exec.errorMessage && <span className="min-w-0 flex-1 truncate text-halt">{exec.errorMessage}</span>}
         {expanded ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
       </div>
       {expanded && (
@@ -566,7 +618,7 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
               {steps.map((step, i) => (
                 <div key={step.id} className="rounded-md border border-rail bg-secondary/30">
                   <div
-                    className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-[11px] transition-colors hover:bg-secondary/60"
+                    className="flex cursor-pointer flex-wrap items-center gap-x-2 gap-y-1 px-2.5 py-1.5 text-[11px] transition-colors hover:bg-secondary/60"
                     onClick={(e) => { e.stopPropagation(); setExpandedStep(expandedStep === step.id ? null : step.id); }}
                   >
                     <span className="text-muted-foreground w-4 text-center font-mono">{i + 1}</span>
@@ -578,7 +630,7 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
                       icon={false}
                     />
                     {step.durationMs != null && <span className="font-mono text-[11px] text-muted-foreground">{step.durationMs}ms</span>}
-                    {step.errorMessage && <span className="flex-1 truncate text-halt">{step.errorMessage}</span>}
+                    {step.errorMessage && <span className="min-w-0 flex-1 truncate text-halt">{step.errorMessage}</span>}
                     <ChevronDown className={`h-2.5 w-2.5 ml-auto text-muted-foreground transition-transform ${expandedStep === step.id ? 'rotate-180' : ''}`} />
                   </div>
                   {expandedStep === step.id && (
