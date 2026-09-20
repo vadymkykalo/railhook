@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.28.2] - 2026-09-20
+
+### Fixed
+
+- **The workflow builder was unusable on a phone.** The header ran off the edge with the meta line
+  overlapping it, the node palette took most of the screen, and the page scrolled sideways. The header
+  now stacks, the palette is a horizontal strip below `lg`, every palette entry can be **tapped** to add
+  its node, and the node's settings open as a bottom sheet.
+- **A freshly opened workflow claimed unsaved changes.** React Flow reports its own measurement and
+  selection events as node changes, which lit "Unsaved" and armed Save the moment the page loaded.
+- **A loaded workflow could sit off-screen.** The canvas fitted itself before the definition arrived,
+  and the zoom floor clamped a six-node workflow off the side of a phone. It now fits once the nodes are
+  measured. A dropped or tapped node also lands under the pointer when the canvas is panned or zoomed.
+
 ## [2.28.1] - 2026-09-20
 
 ### Fixed
