@@ -77,6 +77,8 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE
 | `customHeadersJson` | Додаткові HTTP-заголовки як JSON-об'єкт у рядку. |
 | `maxAttempts` | Скільки спроб Railhook зробить, перш ніж полишити пересилання. Типово `5`. |
 | `retryDelays` | Інтервали між спробами в секундах, через кому. Типово `60,300,900,3600,21600`. |
+| `retryableStatuses` | Які HTTP-статуси варті ще однієї спроби. Типово `408,429,500-599`. Див. [Які статуси варті повтору](/docs/uk/outgoing/retries/#які-статуси-варті-повтору). |
+| `autoDisabledAt` | Лише для читання. Проставляється, коли Railhook вимкнув це призначення після цілого вікна суцільних невдач. Див. [Коли Railhook вимикає ендпоінт](/docs/uk/outgoing/endpoints-subscriptions/#коли-railhook-вимикає-ендпоінт) — призначення вимикається на тих самих умовах. |
 | `timeoutSeconds` | Скільки одна спроба чекає на відповідь. Типово `30`. |
 | `transformationId` | Збережена трансформація, яку Railhook застосовує перед пересиланням. |
 | `payloadTransform` | Вираз JSONPath, наприклад `$.data`; діє, коли `transformationId` не задано. |
