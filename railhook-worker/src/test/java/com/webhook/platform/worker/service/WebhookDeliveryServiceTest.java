@@ -14,6 +14,7 @@ import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.util.PayloadCompressionUtil;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import com.webhook.platform.worker.attempt.TransformedBody;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.entity.Endpoint;
 import com.webhook.platform.worker.domain.entity.Event;
@@ -269,7 +270,8 @@ class WebhookDeliveryServiceTest {
         when(concurrencyControlService.tryAcquireForTenant(any(UUID.class))).thenReturn(true);
         when(concurrencyControlService.tryAcquireForTarget(any())).thenReturn(true);
         when(encryptionKeyRegistry.decryptWithFallback(anyString(), anyString(), anyInt())).thenReturn("secret");
-        when(payloadTransformService.transform(anyString(), any())).thenReturn("{}");
+        when(payloadTransformService.apply(any(), anyString(), any()))
+                .thenAnswer(invocation -> TransformedBody.of(invocation.getArgument(1)));
     }
 
 
@@ -720,7 +722,7 @@ class WebhookDeliveryServiceTest {
                 .updatedAt(Instant.now())
                 .build();
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
-        when(payloadTransformService.transform(anyString(), anyString()))
+        when(payloadTransformService.apply(any(), anyString(), any()))
                 .thenThrow(new PayloadTransformException("Payload transformation failed: broken JSON"));
 
         DeliveryMessage message = DeliveryMessage.builder()
@@ -1290,7 +1292,7 @@ class WebhookDeliveryServiceTest {
                 .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build(), true);
 
         ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
-        verify(payloadTransformService).transform(payloadCaptor.capture(), any());
+        verify(payloadTransformService).apply(any(), payloadCaptor.capture(), any());
         assertEquals(realJson, payloadCaptor.getValue(),
                 "the transform (and therefore the body and the signature) must see real JSON");
     }
