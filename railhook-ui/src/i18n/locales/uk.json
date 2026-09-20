@@ -312,6 +312,7 @@
       "PASSWORD_RESET_REQUESTED": "Запит скидання пароля",
       "REGISTER": "Реєстрація",
       "RESOLVE_INCIDENT": "Вирішення інциденту",
+      "RESTORE": "Відновлення",
       "REVOKE": "Відкликання",
       "ROTATE_SECRET": "Ротація секрету",
       "TEST_WEBHOOK": "Тест вебхука",

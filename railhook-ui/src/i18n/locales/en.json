@@ -312,6 +312,7 @@
       "PASSWORD_RESET_REQUESTED": "Password Reset Requested",
       "REGISTER": "Register",
       "RESOLVE_INCIDENT": "Resolve Incident",
+      "RESTORE": "Restore",
       "REVOKE": "Revoke",
       "ROTATE_SECRET": "Rotate Secret",
       "TEST_WEBHOOK": "Test Webhook",
