@@ -65,7 +65,7 @@ k6 run -e PHASE_HEALTHY_SECONDS=60 -e PHASE_DOWN_SECONDS=120 load/failure-recove
 node --test load/receiver/server.test.js   # the receiver's own control-plane tests
 
 k6 run load/ordering.js
-k6 run -e BURST_SIZE=50 -e RETRY_WAIT_SECONDS=90 load/ordering.js
+k6 run -e BURST_SIZE=50 -e RETRY_WAIT_SECONDS=150 load/ordering.js
 ```
 
 Every script is self-contained: `setup()` registers its own throwaway
@@ -89,7 +89,12 @@ and the comment block at the top of each scenario file.
 - **Ordering**: `load/ordering.js`'s own threshold (`ordering_violations ==
   0`) fails the `k6 run` (non-zero exit) if the receiver saw sequence numbers
   arrive out of order — see `load/ordering.js`'s header comment for exactly
-  how it reproduces the backlog condition.
+  how it reproduces the backlog condition. It also fails when fewer than
+  `BURST_SIZE` sequences arrived at all: the ones still buffered behind the
+  induced retry are precisely the ones that would have overtaken it, so an
+  in-order verdict over part of the burst proves nothing. Give
+  `RETRY_WAIT_SECONDS` room for the ladder's first rung at the top of its
+  jitter range (50–150%) plus one retry poll.
 
 ## Soak run
 

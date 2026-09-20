@@ -155,6 +155,31 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
             @Param("rangeEnd") long rangeEnd
     );
 
+    /**
+     * How much of what is outstanding in the gap is still moving: an Attempt in flight now, or
+     * one the Ladder has already scheduled for before {@code dueBy}. Zero means waiting is futile.
+     *
+     * <p>The gap timeout exists for a gap that never closes. A Delivery between the rungs of its
+     * Ladder is a gap that is about to close, and letting its successors past it there turned
+     * every ordinary first retry into a broken order: the default Outgoing first rung and the
+     * default gap timeout are both a minute, so they fall due together and whichever the poll
+     * reached first won.
+     *
+     * <p>{@code inFlightSince} is what stops a PROCESSING row nobody is working on — one whose
+     * worker died, before the stuck sweep reaches it — from holding the gap open for ever.
+     */
+    @Query("SELECT COUNT(d) FROM Delivery d WHERE d.endpointId = :endpointId "
+            + "AND d.sequenceNumber BETWEEN :rangeStart AND :rangeEnd "
+            + "AND ((d.status = 'PROCESSING' AND d.updatedAt > :inFlightSince) "
+            + "OR (d.status = 'PENDING' AND (d.nextRetryAt IS NULL OR d.nextRetryAt <= :dueBy)))")
+    long countGapClosingBefore(
+            @Param("endpointId") UUID endpointId,
+            @Param("rangeStart") long rangeStart,
+            @Param("rangeEnd") long rangeEnd,
+            @Param("inFlightSince") Instant inFlightSince,
+            @Param("dueBy") Instant dueBy
+    );
+
     @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'PENDING' AND d.createdAt > :since")
     long countPending(@Param("since") Instant since);
 
