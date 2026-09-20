@@ -3713,7 +3713,7 @@
   },
   "transform": {
     "atLine": "line {{line}}",
-    "cancelledHint": "Nothing would be sent and nothing would be retried. The delivery ends terminally, and it does not appear in Failed Messages.",
+    "cancelledHint": "Nothing would be sent and nothing would be retried. The delivery ends as Cancelled, and it does not appear in Failed Messages.",
     "cancelledNoReason": "The script gave no reason.",
     "cancelledTitle": "The script cancelled this delivery",
     "consoleClean": "Finished in {{ms}} ms with no errors.",

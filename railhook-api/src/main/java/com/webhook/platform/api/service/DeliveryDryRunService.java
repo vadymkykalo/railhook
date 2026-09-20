@@ -151,7 +151,12 @@ public class DeliveryDryRunService {
                         .timestamp(Instant.now())
                         .direction("OUTGOING")
                         .url(endpointUrl)
-                        .headers(Map.of())
+                        // The caller's own custom headers, which is what the preview shows a
+                        // script too. A dry-run names an Endpoint but no Subscription, and
+                        // outgoing custom headers are the Subscription's — so there is nothing
+                        // else configured to show, and an empty map would make the dry-run the
+                        // one of the three paths that disagreed.
+                        .headers(callerHeaders(request.getCustomHeaders()))
                         .build());
 
                 durationMs = result.durationMs();
@@ -265,6 +270,23 @@ public class DeliveryDryRunService {
                 .errorLine(errorLine)
                 .errorReason(errorReason)
                 .build();
+    }
+
+    private Map<String, String> callerHeaders(String customHeadersJson) {
+        Map<String, String> headers = new LinkedHashMap<>();
+        if (customHeadersJson == null || customHeadersJson.isBlank()) {
+            return headers;
+        }
+        try {
+            JsonNode parsed = objectMapper.readTree(customHeadersJson);
+            if (parsed.isObject()) {
+                parsed.properties().forEach(entry -> headers.put(entry.getKey(), entry.getValue().asText()));
+            }
+        } catch (Exception e) {
+            // Reported to the caller further down, where the headers are merged for real.
+            log.debug("Custom headers are not JSON, so the script sees none: {}", e.getMessage());
+        }
+        return headers;
     }
 
     private List<TransformPreviewResponse.ConsoleLine> consoleDto(List<ScriptConsoleLine> lines) {

@@ -458,7 +458,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                     .timestamp(event.getReceivedAt())
                     .direction("INCOMING")
                     .url(destination.getUrl())
-                    .headers(Map.of())
+                    // The Destination's own configured headers. Its credentials are applied by
+                    // DestinationAuthenticator afterwards and are not shown here.
+                    .headers(configuredHeaders())
                     .attemptNumber(claim.attemptNumber())
                     .build());
         }
@@ -477,6 +479,12 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             throw new PayloadTransformException(
                     "Inline payload transform failed for destination " + destination.getId() + ": " + e.getMessage(), e);
         }
+    }
+
+    private Map<String, String> configuredHeaders() {
+        Map<String, String> configured = new LinkedHashMap<>();
+        AttemptSupport.collectCustomHeaders(configured, destination.getCustomHeadersJson(), objectMapper);
+        return configured;
     }
 
     /** The attempt row already carries its own number; nothing to consume. */

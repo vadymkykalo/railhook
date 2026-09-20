@@ -392,11 +392,21 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                         .timestamp(event.getCreatedAt())
                         .direction("OUTGOING")
                         .url(endpoint.getUrl())
-                        .headers(Map.of())
+                        // The Endpoint's own configured headers. Railhook's — the signature, the
+                        // ids, the sequence number — are computed in buildRequest, after this,
+                        // and are deliberately not shown: a script that could read a signature is
+                        // a script that could leak one.
+                        .headers(configuredHeaders(delivery.getCustomHeaders()))
                         // attemptStarting has already spent the rung, so this is the number of
                         // the attempt the script is being run for, not the last one.
                         .attemptNumber(delivery.getAttemptCount())
                         .build());
+    }
+
+    private Map<String, String> configuredHeaders(String customHeadersJson) {
+        Map<String, String> configured = new LinkedHashMap<>();
+        AttemptSupport.collectCustomHeaders(configured, customHeadersJson, objectMapper);
+        return configured;
     }
 
     @Override
