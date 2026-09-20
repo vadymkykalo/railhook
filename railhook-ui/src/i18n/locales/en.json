@@ -1485,6 +1485,14 @@
       "fix": "Your endpoint took too long to respond. Increase the timeout on your server or optimize the webhook handler to respond within 30 seconds.",
       "label": "Connection Timeout"
     },
+    "transformCancelled": {
+      "label": "A transformation cancelled it",
+      "fix": "Nothing was sent and nothing is owed. The transformation returned { cancel: true } for this event, and its reason is on the attempt. This is a filter doing its job, not a failure."
+    },
+    "transformFailed": {
+      "label": "The transformation failed",
+      "fix": "The endpoint was never asked. Open the transformation in the Transform Studio and run it against this event — the attempt's error names the reason and, for a script, the line. Until it is fixed the attempt keeps retrying, and the untransformed payload is never sent instead."
+    },
     "unknown": {
       "fix": "An unexpected error occurred. Check the error message and response body for details.",
       "label": "Unknown Error"

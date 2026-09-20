@@ -11,6 +11,8 @@ export type ErrorCategory =
   | 'CLIENT_ERROR'
   | 'ENDPOINT_NOT_FOUND'
   | 'PAYLOAD_TOO_LARGE'
+  | 'TRANSFORM_FAILED'
+  | 'TRANSFORM_CANCELLED'
   | 'UNKNOWN';
 
 export interface ErrorClassification {
@@ -26,6 +28,27 @@ export interface ErrorClassification {
 export function classifyError(attempt: DeliveryAttemptResponse): ErrorClassification {
   const msg = (attempt.errorMessage || '').toLowerCase();
   const status = attempt.httpStatusCode;
+
+  // Before anything about the network: these two never reached it. A transformation that
+  // failed or cancelled is the most specific thing an attempt can say about itself, and
+  // landing in UNKNOWN — "something went wrong, check the endpoint" — sends the reader to
+  // look at a receiver that was never asked.
+  if (msg.includes('cancelled_by_transformation')) {
+    return {
+      category: 'TRANSFORM_CANCELLED',
+      labelKey: 'errorClass.transformCancelled.label',
+      fixKey: 'errorClass.transformCancelled.fix',
+      severity: 'info',
+    };
+  }
+  if (msg.includes('transform_failed') || msg.includes('script transformation failed')) {
+    return {
+      category: 'TRANSFORM_FAILED',
+      labelKey: 'errorClass.transformFailed.label',
+      fixKey: 'errorClass.transformFailed.fix',
+      severity: 'error',
+    };
+  }
 
   // Connection-level errors (no HTTP status)
   if (!status || status === 0) {

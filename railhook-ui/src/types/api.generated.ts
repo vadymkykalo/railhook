@@ -4168,22 +4168,46 @@ export interface components {
              */
             enabled?: boolean;
         };
+        /** @description A reusable transformation: one mapping, pointed at by any number of subscriptions and destinations */
         TransformationResponse: {
             /** Format: uuid */
             id?: string;
             /** Format: uuid */
             projectId?: string;
+            /**
+             * @description Unique within the project
+             * @example Stripe v2 → CRM v1
+             */
             name?: string;
+            /** @description What it does and when to use it */
             description?: string;
+            /** @description The transformation itself: a JSON document with ${$.jsonpath} expressions when `kind` is TEMPLATE, or a JavaScript `function handler(webhook)` when it is JAVASCRIPT */
             template?: string;
-            /** @enum {string} */
+            /**
+             * @description The language `template` is written in. Every transformation created before JavaScript existed is TEMPLATE, and none were migrated.
+             * @example TEMPLATE
+             * @enum {string}
+             */
             kind?: "TEMPLATE" | "JAVASCRIPT";
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description Incremented every time the template or the language changes. Each value is a row in the version history, and can be read back and restored.
+             * @example 3
+             */
             version?: number;
+            /** @description A disabled transformation cannot be assigned, and a delivery already pointed at one fails rather than sending the untransformed payload */
             enabled?: boolean;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description How many subscriptions point at this transformation
+             * @example 2
+             */
             subscriptionCount?: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description How many incoming destinations point at this transformation
+             * @example 0
+             */
             destinationCount?: number;
             /** Format: date-time */
             createdAt?: string;

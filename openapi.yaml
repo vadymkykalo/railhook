@@ -8593,6 +8593,8 @@ components:
       - template
     TransformationResponse:
       type: object
+      description: "A reusable transformation: one mapping, pointed at by any number\
+        \ of subscriptions and destinations"
       properties:
         id:
           type: string
@@ -8602,26 +8604,45 @@ components:
           format: uuid
         name:
           type: string
+          description: Unique within the project
+          example: Stripe v2 → CRM v1
         description:
           type: string
+          description: What it does and when to use it
         template:
           type: string
+          description: "The transformation itself: a JSON document with ${$.jsonpath}\
+            \ expressions when `kind` is TEMPLATE, or a JavaScript `function handler(webhook)`\
+            \ when it is JAVASCRIPT"
         kind:
           type: string
+          description: "The language `template` is written in. Every transformation\
+            \ created before JavaScript existed is TEMPLATE, and none were migrated."
           enum:
           - TEMPLATE
           - JAVASCRIPT
+          example: TEMPLATE
         version:
           type: integer
           format: int32
+          description: "Incremented every time the template or the language changes.\
+            \ Each value is a row in the version history, and can be read back and\
+            \ restored."
+          example: 3
         enabled:
           type: boolean
+          description: "A disabled transformation cannot be assigned, and a delivery\
+            \ already pointed at one fails rather than sending the untransformed payload"
         subscriptionCount:
           type: integer
           format: int64
+          description: How many subscriptions point at this transformation
+          example: 2
         destinationCount:
           type: integer
           format: int64
+          description: How many incoming destinations point at this transformation
+          example: 0
         createdAt:
           type: string
           format: date-time

@@ -131,6 +131,14 @@ export default function TransformationsPage() {
   };
 
   const handleDuplicate = (item: TransformationResponse) => {
+    // A script cannot be duplicated through this dialog: its guard requires valid JSON, so the
+    // Save button would simply never enable and the reader would be left wondering. The Studio
+    // is where a script is copied — it opens holding this one, and "Save as" asks for the new
+    // name, which is what duplicating is.
+    if (item.kind === 'JAVASCRIPT') {
+      openInStudio(item);
+      return;
+    }
     setEditing(null);
     setFormName(t('transformations.copyOfName', { name: item.name }));
     setFormDescription(item.description || '');
