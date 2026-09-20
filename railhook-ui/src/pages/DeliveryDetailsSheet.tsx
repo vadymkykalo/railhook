@@ -202,7 +202,11 @@ export default function DeliveryDetailsSheet({
 
 
   const getDiagnosisPanel = () => {
-    if (!delivery || (delivery.status !== 'FAILED' && delivery.status !== 'DLQ')) return null;
+    // CANCELLED belongs here even though nothing went wrong: "why did this never reach my
+    // endpoint" is the same question, and the answer — a transformation said not to send it,
+    // and its reason — is the same panel.
+    if (!delivery || (delivery.status !== 'FAILED' && delivery.status !== 'DLQ'
+        && delivery.status !== 'CANCELLED')) return null;
     const failedAttempts = attempts.filter(a => a.errorMessage || (a.httpStatusCode && a.httpStatusCode >= 400));
     const lastFailed = failedAttempts[failedAttempts.length - 1];
     if (!lastFailed) return null;

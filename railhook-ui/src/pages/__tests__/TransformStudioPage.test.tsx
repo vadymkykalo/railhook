@@ -171,6 +171,24 @@ describe('TransformStudioPage', { timeout: 20_000 }, () => {
     expect(body.template).toBe(SCRIPT_TRANSFORMATION.template);
   });
 
+  /**
+   * The loop is only worth having if it shows you the thing you are looking at. Sending the
+   * saved transformation's id while the editor holds something else runs the old script and
+   * reports it as this one's output.
+   */
+  it('runs the saved transformation by id only while the editor still matches it', async () => {
+    vi.mocked(transformApi.preview).mockResolvedValue(previewOf({ outputPayload: '{}' }));
+
+    open(`/projects/${TEST_PROJECT_ID}/transform-studio?transformation=tr-js`);
+    await screen.findByRole('button', { name: /^save script$/i });
+
+    fireEvent.click(runButton());
+    await waitFor(() => expect(transformApi.preview).toHaveBeenCalled());
+    const [, untouched] = vi.mocked(transformApi.preview).mock.calls[0];
+    expect(untouched.transformationId).toBe('tr-js');
+    expect(untouched.template).toBeUndefined();
+  });
+
   it('asks for a name when there is no transformation to save into', async () => {
     open();
 
