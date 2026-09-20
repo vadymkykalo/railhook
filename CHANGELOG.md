@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.28.1] - 2026-09-20
+
+### Fixed
+
+- **FIFO ordering survived a retry only by luck.** The ordering gap timeout and the first retry rung
+  are both 60s, and every rung is jittered to 50–150%, so about half the time the successors' patience
+  ran out before the retried delivery was due: the gate stepped over it and the rest of the burst
+  arrived out of order. The gate now breaks the order only when the timeout has elapsed **and** nothing
+  in the gap is being attempted or due before the next window — a dead worker still cannot wedge an
+  endpoint. Found by the nightly ordering probe, reproduced locally with 5 out-of-order transitions in
+  one run.
+- **An ordered endpoint drained one delivery per poll.** Releasing a buffered Delivery republished it
+  while it still carried the `next_retry_at` its park had stamped, so the dispatch claimed nothing and
+  the row waited for the retry sweep — 6 of 15 events in 90 seconds. The release now makes the delivery
+  due before publishing it, and only publishes what it actually claimed: the same backlog drains in
+  about a second.
+
+### Changed
+
+- The ordering probe (`load/ordering.js`) waits 150s instead of 90s, because the first retry rung's
+  jitter can put the retry beyond 90s, and it now counts a violation when fewer sequences arrive than
+  were sent — a burst still buffered behind the retry is exactly what would have overtaken it.
+
 ## [2.28.0] - 2026-09-20
 
 ### Changed
