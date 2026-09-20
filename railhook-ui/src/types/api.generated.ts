@@ -1496,6 +1496,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/endpoints/{id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable an endpoint
+         * @description Turns the endpoint back on and clears an auto-disable: the recorded reason, the time it was disabled, and the run of failures that led to it.
+         */
+        post: operations["enableEndpoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/dlq/{deliveryId}/retry": {
         parameters: {
             query?: never;
@@ -4093,6 +4113,7 @@ export interface components {
             /** Format: int32 */
             timeoutSeconds?: number;
             retryDelays?: string;
+            retryableStatuses?: string;
             payloadTemplate?: string;
             customHeaders?: string;
             /** Format: uuid */
@@ -4113,6 +4134,7 @@ export interface components {
             /** Format: int32 */
             timeoutSeconds?: number;
             retryDelays?: string;
+            retryableStatuses?: string;
             payloadTemplate?: string;
             customHeaders?: string;
             /** Format: uuid */
@@ -4292,6 +4314,11 @@ export interface components {
              */
             retryDelays?: string;
             /**
+             * @description Which HTTP statuses are worth another attempt. Comma-separated terms: an exact status, a range (500-599), a 5xx shorthand, or a comparison (>=500). Prefix a term with ! to exclude it; exclusions win wherever they are written.
+             * @example 408,429,500-599
+             */
+            retryableStatuses?: string;
+            /**
              * @description JSONPath expression to transform payload before forwarding (null = forward as-is)
              * @example $.data
              */
@@ -4318,10 +4345,16 @@ export interface components {
             /** Format: int32 */
             timeoutSeconds?: number;
             retryDelays?: string;
+            retryableStatuses?: string;
             payloadTransform?: string;
             /** Format: uuid */
             transformationId?: string;
             transformationName?: string;
+            /** Format: date-time */
+            failingSince?: string;
+            /** Format: date-time */
+            autoDisabledAt?: string;
+            autoDisabledReason?: string;
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
@@ -4478,6 +4511,13 @@ export interface components {
             /** Format: date-time */
             verificationCompletedAt?: string;
             verificationSkipReason?: string;
+            /** Format: date-time */
+            failingSince?: string;
+            /** Format: int32 */
+            consecutiveFailures?: number;
+            /** Format: date-time */
+            autoDisabledAt?: string;
+            autoDisabledReason?: string;
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
@@ -6009,6 +6049,8 @@ export interface components {
             alertRuleId?: string;
             /** Format: uuid */
             projectId?: string;
+            /** Format: uuid */
+            endpointId?: string;
             /** @enum {string} */
             severity?: "INFO" | "WARNING" | "CRITICAL";
             title?: string;
@@ -10237,6 +10279,29 @@ export interface operations {
         };
     };
     disableMtls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["EndpointResponse"];
+                };
+            };
+        };
+    };
+    enableEndpoint: {
         parameters: {
             query?: never;
             header?: never;

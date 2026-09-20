@@ -36,6 +36,15 @@ export const endpointsApi = {
     return http.delete<void>(`/api/v1/projects/${projectId}/endpoints/${id}`);
   },
 
+  /**
+   * Turns the endpoint back on and clears an auto-disable. Its own call rather than a PUT with
+   * `enabled: true`, because the update request requires a URL - every caller that has toggled
+   * through it has quietly dropped a field it did not rebuild.
+   */
+  enable: (projectId: string, id: string): Promise<EndpointResponse> => {
+    return http.post<EndpointResponse>(`/api/v1/projects/${projectId}/endpoints/${id}/enable`);
+  },
+
   rotateSecret: (projectId: string, id: string): Promise<EndpointResponse> => {
     return http.post<EndpointResponse>(`/api/v1/projects/${projectId}/endpoints/${id}/rotate-secret`);
   },

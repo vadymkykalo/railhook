@@ -233,8 +233,14 @@ public class EndpointService {
         
         if (request.getEnabled() != null) {
             endpoint.setEnabled(request.getEnabled());
+            if (Boolean.TRUE.equals(request.getEnabled())) {
+                // Turning an auto-disabled endpoint back on is a statement that the receiver has
+                // been fixed. Leaving the run of failures behind would have the sweep turn it
+                // straight off again on its next pass, since failing_since would still be days old.
+                clearAutoDisable(endpoint);
+            }
         }
-        
+
         if (request.getRateLimitPerSecond() != null) {
             endpoint.setRateLimitPerSecond(zeroToNull(request.getRateLimitPerSecond()));
         }
@@ -263,6 +269,36 @@ public class EndpointService {
     /** The empty value for the rate limit: 0 is "no limit", which the column stores as null. */
     private static Integer zeroToNull(Integer value) {
         return value == null || value == 0 ? null : value;
+    }
+
+    /**
+     * Turns an endpoint back on and forgets that it was ever failing.
+     *
+     * <p>Its own operation rather than a {@code PUT} with {@code enabled: true}, because the
+     * update request requires a URL: re-enabling through it means resending the whole endpoint,
+     * and every caller that has tried has quietly dropped a field it did not know about. Here
+     * the only thing being said is "this receiver works now".
+     */
+    @Auditable(action = AuditAction.UPDATE, resourceType = "Endpoint")
+    @Transactional
+    public EndpointResponse enableEndpoint(UUID projectId, UUID id) {
+        Endpoint endpoint = requireEndpoint(projectId, id);
+        endpoint.setEnabled(true);
+        clearAutoDisable(endpoint);
+        return mapToResponse(endpointRepository.save(endpoint));
+    }
+
+    /**
+     * Forgets the run of failures along with the auto-disable itself. The two have to go
+     * together: the sweep decides on {@code failingSince}, so an endpoint turned back on with a
+     * three-day-old run still on its row would be turned off again on the next pass, and the
+     * owner would have no way to tell that from the feature simply not working.
+     */
+    private static void clearAutoDisable(Endpoint endpoint) {
+        endpoint.setAutoDisabledAt(null);
+        endpoint.setAutoDisabledReason(null);
+        endpoint.setFailingSince(null);
+        endpoint.setConsecutiveFailures(0);
     }
 
     @Auditable(action = AuditAction.DELETE, resourceType = "Endpoint")
@@ -446,6 +482,10 @@ public class EndpointService {
                 .verificationAttemptedAt(endpoint.getVerificationAttemptedAt())
                 .verificationCompletedAt(endpoint.getVerificationCompletedAt())
                 .verificationSkipReason(endpoint.getVerificationSkipReason())
+                .failingSince(endpoint.getFailingSince())
+                .consecutiveFailures(endpoint.getConsecutiveFailures())
+                .autoDisabledAt(endpoint.getAutoDisabledAt())
+                .autoDisabledReason(endpoint.getAutoDisabledReason())
                 .createdAt(endpoint.getCreatedAt())
                 .updatedAt(endpoint.getUpdatedAt())
                 .secret(secret)

@@ -70,6 +70,7 @@ const SUBSCRIPTION: SubscriptionResponse = {
   orderingEnabled: false,
   maxAttempts: 3,
   timeoutSeconds: 30,
+  retryableStatuses: '408,429,500-599',
   retryDelays: '60,300',
   payloadTemplate: null,
   customHeaders: null,

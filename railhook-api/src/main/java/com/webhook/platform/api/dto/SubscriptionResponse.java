@@ -22,6 +22,7 @@ public class SubscriptionResponse {
     private Integer maxAttempts;
     private Integer timeoutSeconds;
     private String retryDelays;
+    private String retryableStatuses;
     private String payloadTemplate;
     private String customHeaders;
     private UUID transformationId;

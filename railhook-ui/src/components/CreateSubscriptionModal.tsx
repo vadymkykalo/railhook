@@ -21,6 +21,36 @@ import {
   DialogTitle,
 } from './ui/dialog';
 
+/**
+ * Whether a retryable-status spec is one the API will accept. The grammar is
+ * `RetryableStatuses`' in railhook-common: comma-separated terms, each an exact status, an
+ * inclusive range, a `5xx` shorthand or a comparison, optionally prefixed with `!` to exclude.
+ *
+ * Duplicated here rather than shared, because the alternative is a round trip per keystroke -
+ * and a spec the server rejects arrives as one toast with no field attached to it.
+ */
+export function isRetryableStatusSpec(spec: string): boolean {
+  const trimmed = spec.trim();
+  if (!trimmed) return false;
+  const terms = trimmed.split(',');
+  if (terms.length > 32) return false;
+  const inRange = (n: number) => n >= 100 && n <= 599;
+  return terms.every((rawTerm) => {
+    const term = rawTerm.trim().toUpperCase().replace(/^!/, '').trim();
+    if (!term) return false;
+    const comparison = /^(>=|<=|>|<)\s*(\d{3})$/.exec(term);
+    if (comparison) return inRange(Number(comparison[2]));
+    if (/^[1-5]XX$/.test(term)) return true;
+    const range = /^(\d{3})-(\d{3})$/.exec(term);
+    if (range) {
+      const from = Number(range[1]);
+      const to = Number(range[2]);
+      return inRange(from) && inRange(to) && from <= to;
+    }
+    return /^\d{3}$/.test(term) && inRange(Number(term));
+  });
+}
+
 interface CreateSubscriptionModalProps {
   projectId: string;
   endpoints: EndpointResponse[];
@@ -49,6 +79,7 @@ export default function CreateSubscriptionModal({
   const [maxAttempts, setMaxAttempts] = useState(7);
   const [timeoutSeconds, setTimeoutSeconds] = useState(30);
   const [retryDelays, setRetryDelays] = useState('60,300,900,3600,21600,86400');
+  const [retryableStatuses, setRetryableStatuses] = useState('408,429,500-599');
   const [payloadTemplate, setPayloadTemplate] = useState('');
   const [customHeaders, setCustomHeaders] = useState('');
   const [transformationId, setTransformationId] = useState('');
@@ -66,6 +97,7 @@ export default function CreateSubscriptionModal({
       setMaxAttempts(subscription.maxAttempts || 7);
       setTimeoutSeconds(subscription.timeoutSeconds || 30);
       setRetryDelays(subscription.retryDelays || '60,300,900,3600,21600,86400');
+      setRetryableStatuses(subscription.retryableStatuses || '408,429,500-599');
       setPayloadTemplate(subscription.payloadTemplate || '');
       setCustomHeaders(subscription.customHeaders || '');
       setTransformationId(subscription.transformationId || '');
@@ -77,6 +109,7 @@ export default function CreateSubscriptionModal({
       setMaxAttempts(7);
       setTimeoutSeconds(30);
       setRetryDelays('60,300,900,3600,21600,86400');
+      setRetryableStatuses('408,429,500-599');
       setPayloadTemplate('');
       setCustomHeaders('');
       setTransformationId('');
@@ -104,6 +137,11 @@ export default function CreateSubscriptionModal({
     }
     if (retryDelays.trim() && !/^\d+(,\d+)*$/.test(retryDelays.trim())) {
       newErrors.retryDelays = t('createSubscription.validation.retryDelays');
+    }
+    // Mirrors RetryableStatuses' grammar, which the API also enforces: a rejection there is one
+    // red toast, and this is the field where the mistake was made.
+    if (!isRetryableStatusSpec(retryableStatuses)) {
+      newErrors.retryableStatuses = t('createSubscription.validation.retryableStatuses');
     }
     if (payloadTemplate.trim()) {
       try { JSON.parse(payloadTemplate); } catch {
@@ -144,6 +182,7 @@ export default function CreateSubscriptionModal({
         maxAttempts,
         timeoutSeconds,
         retryDelays,
+        retryableStatuses: retryableStatuses.trim(),
         payloadTemplate: payloadTemplate || undefined,
         customHeaders: customHeaders || undefined,
         transformationId: transformationId || null,
@@ -364,6 +403,25 @@ export default function CreateSubscriptionModal({
                         </p>
                       )}
                       <RetryJitterNote />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="retryableStatuses" className="text-xs">
+                        {t('createSubscription.fields.retryableStatuses')}
+                      </Label>
+                      <Input
+                        id="retryableStatuses"
+                        placeholder="''' + DEFAULT_SPEC + '''"
+                        value={retryableStatuses}
+                        onChange={(e) => setRetryableStatuses(e.target.value)}
+                        disabled={saving}
+                      />
+                      {errors.retryableStatuses ? (
+                        <p className="text-[11px] text-halt">{errors.retryableStatuses}</p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">
+                          {t('createSubscription.fields.retryableStatusesHint')}
+                        </p>
+                      )}
                     </div>
                   </div>
 

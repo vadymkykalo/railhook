@@ -150,6 +150,18 @@ export interface EndpointResponse {
   verificationAttemptedAt?: string;
   verificationCompletedAt?: string;
   verificationSkipReason?: string;
+  /** Start of the current unbroken run of failed deliveries; absent once one succeeds. */
+  failingSince?: string;
+  /** Attempts in that run. */
+  consecutiveFailures?: number;
+  /**
+   * When Railhook turned this endpoint off for continuous failure. Absent while it is on, and
+   * absent when its owner turned it off - the two are different states, and only this one is
+   * cleared by re-enabling.
+   */
+  autoDisabledAt?: string;
+  /** Why, in words meant for the endpoint's owner. */
+  autoDisabledReason?: string;
   createdAt: string;
   updatedAt: string;
   secret?: string;
@@ -294,6 +306,11 @@ export interface SubscriptionResponse {
   endpointId: string;
   eventType: string;
   enabled: boolean;
+  /**
+   * Which HTTP statuses are worth another attempt, as a spec: `408,429,500-599`, `>=500`,
+   * `5xx,!501`. The default reproduces what used to be hardcoded.
+   */
+  retryableStatuses?: string;
   createdAt: string;
   updatedAt: string;
 }

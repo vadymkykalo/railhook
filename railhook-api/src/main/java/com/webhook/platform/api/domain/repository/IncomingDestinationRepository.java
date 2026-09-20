@@ -1,5 +1,6 @@
 package com.webhook.platform.api.domain.repository;
 
+import java.time.Instant;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -37,4 +38,11 @@ public interface IncomingDestinationRepository extends JpaRepository<IncomingDes
     @Query("SELECT d.transformationId, COUNT(d) FROM IncomingDestination d "
             + "WHERE d.transformationId IN :transformationIds GROUP BY d.transformationId")
     List<Object[]> countByTransformationIds(@Param("transformationIds") Collection<UUID> transformationIds);
+
+    /** @see EndpointRepository#findAutoDisableCandidates — the same sweep, the other target. */
+    @Query("SELECT d FROM IncomingDestination d WHERE d.enabled = true "
+            + "AND d.failingSince IS NOT NULL AND d.failingSince < :cutoff "
+            + "AND d.consecutiveFailures >= :minFailures ORDER BY d.failingSince ASC")
+    List<IncomingDestination> findAutoDisableCandidates(@Param("cutoff") Instant cutoff,
+            @Param("minFailures") int minFailures, Pageable pageable);
 }

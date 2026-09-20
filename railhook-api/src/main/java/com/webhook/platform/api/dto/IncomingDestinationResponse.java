@@ -24,9 +24,18 @@ public class IncomingDestinationResponse {
     private int maxAttempts;
     private int timeoutSeconds;
     private String retryDelays;
+    private String retryableStatuses;
     private String payloadTransform;
     private UUID transformationId;
     private String transformationName;
+    /** Start of the current unbroken run of failed forwards; null when the last one succeeded. */
+    private Instant failingSince;
+
+    /** When Railhook turned this destination off for continuous failure; null when its owner did. */
+    private Instant autoDisabledAt;
+
+    private String autoDisabledReason;
+
     private Instant createdAt;
     private Instant updatedAt;
 }

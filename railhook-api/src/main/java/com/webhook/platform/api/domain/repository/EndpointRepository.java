@@ -1,5 +1,6 @@
 package com.webhook.platform.api.domain.repository;
 
+import java.time.Instant;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -45,4 +46,18 @@ public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
            "WHERE p.organization_id = :orgId AND e.deleted_at IS NULL AND p.deleted_at IS NULL " +
            "GROUP BY e.project_id) sub", nativeQuery = true)
     long maxEndpointsPerProjectInOrg(@Param("orgId") UUID organizationId);
+
+    /**
+     * Endpoints the auto-disable sweep should look at: live, still on, and in an unbroken run of
+     * failures that both started before {@code cutoff} and is at least {@code minFailures} long.
+     *
+     * <p>Both conditions are the query's, not a filter applied to its results: a near-idle
+     * endpoint that failed once three days ago has a {@code failing_since} as old as a dead one's,
+     * and the count is the only thing that tells them apart.
+     */
+    @Query("SELECT e FROM Endpoint e WHERE e.enabled = true AND e.deletedAt IS NULL "
+            + "AND e.failingSince IS NOT NULL AND e.failingSince < :cutoff "
+            + "AND e.consecutiveFailures >= :minFailures ORDER BY e.failingSince ASC")
+    List<Endpoint> findAutoDisableCandidates(@Param("cutoff") Instant cutoff,
+            @Param("minFailures") int minFailures, Pageable pageable);
 }

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service.workflow.executors;
 
+import com.webhook.platform.common.retry.RetryableStatuses;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -141,6 +142,7 @@ public class DeliveryNodeExecutor implements NodeExecutor {
                         .orderingEnabled(false)
                         .timeoutSeconds(30)
                         .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS)
+                        .retryableStatuses(RetryableStatuses.DEFAULT_SPEC)
                         .build());
                 deliveryDispatch.announce(created, endpoint.getProjectId(),
                         DeliveryDispatch.Reason.WORKFLOW_CREATED);

@@ -420,6 +420,17 @@ forward:
   escalation:
     hard-cap-hours: ${FORWARD_ESCALATION_HARD_CAP_HOURS:24}
 
+# Turning off an Endpoint or a Destination that has answered nothing but failures for a whole
+# window. The worker keeps the run of failures; this decides. `enabled` must match the worker's,
+# or one half of the feature runs without the other.
+endpoint:
+  auto-disable:
+    enabled: ${ENDPOINT_AUTO_DISABLE_ENABLED:true}
+    after-hours: ${ENDPOINT_AUTO_DISABLE_AFTER_HOURS:72}
+    min-failures: ${ENDPOINT_AUTO_DISABLE_MIN_FAILURES:10}
+    interval-ms: ${ENDPOINT_AUTO_DISABLE_INTERVAL_MS:300000}
+    batch-size: ${ENDPOINT_AUTO_DISABLE_BATCH_SIZE:200}
+
 ordering:
   # How far back SequenceReconciliationService looks for "recently active" ordering-enabled
   # endpoints when comparing the Redis sequence counter against the durable high-water mark.

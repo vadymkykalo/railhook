@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.common.retry.RetryableStatuses;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Delivery;
@@ -130,13 +131,18 @@ public class EventIntake {
                         .timeoutSeconds(subscription.getTimeoutSeconds() != null ? subscription.getTimeoutSeconds() : 30)
                         .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays()
                                 : RetryLadderDefaults.OUTGOING_DELAYS)
+                        .retryableStatuses(subscription.getRetryableStatuses() != null
+                                ? subscription.getRetryableStatuses() : RetryableStatuses.DEFAULT_SPEC)
                         .payloadTemplate(subscription.getPayloadTemplate())
                         .customHeaders(subscription.getCustomHeaders());
             } else {
+                // A Delivery a Rule routed has no Subscription to take a policy from, so it
+                // gets the declared defaults — including which statuses are worth retrying.
                 builder.deliveryOrigin(DeliveryOrigin.RULE)
                         .maxAttempts(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS)
                         .timeoutSeconds(30)
-                        .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS);
+                        .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS)
+                        .retryableStatuses(RetryableStatuses.DEFAULT_SPEC);
             }
 
             return builder.build();
