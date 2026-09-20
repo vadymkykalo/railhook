@@ -238,7 +238,10 @@ export default function ScriptEditor({
       });
     }
     view.dispatch(setDiagnostics(view.state, diagnostics));
-  }, [errorLine, errorMessage, value]);
+    // `isDark` is in here because the theme effect above rebuilds the whole EditorState, which
+    // throws the diagnostics away with it. Without this, switching theme quietly erased the
+    // marker on the line that failed — the one thing on this screen you were looking at.
+  }, [errorLine, errorMessage, value, isDark]);
 
   return <div ref={containerRef} className={`script-editor ${className}`} />;
 }

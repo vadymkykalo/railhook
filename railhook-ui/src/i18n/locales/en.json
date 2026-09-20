@@ -3820,7 +3820,7 @@
     "savedTransformation": "Saved Transformation",
     "scriptTitle": "Script",
     "searchEvents": "Filter by event type...",
-    "subtitle": "Test payload transformations for incoming destinations",
+    "subtitle": "Write a transformation, run it against a real event, and see exactly what the endpoint would receive",
     "tabConsole": "Console",
     "tabDiff": "Diff",
     "tabInput": "Input",

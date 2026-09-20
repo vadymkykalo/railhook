@@ -187,6 +187,16 @@ export default function TransformStudioPage() {
   const dirty = savedSource !== null && savedSource !== source;
   const canSave = source.trim().length > 0;
 
+  /**
+   * What to run: the editor, unless the editor is exactly what is saved.
+   *
+   * Running a saved transformation *by id* is the honest thing to do while you have not touched
+   * it — the server resolves it the way a Delivery would, version and all. The moment you edit,
+   * it stops being honest: the run would be of the saved script and the editor would be showing
+   * you something else, which is the one thing a debug loop must never do.
+   */
+  const runsSavedById = Boolean(selectedTransformationId) && !dirty;
+
   const handleSelectTransformation = (id: string) => {
     if (!id) {
       setSelectedTransformationId('');
@@ -224,8 +234,8 @@ export default function TransformStudioPage() {
       const result = await previewMutation.mutateAsync({
         inputPayload,
         kind,
-        template: selectedTransformationId ? undefined : source,
-        transformationId: selectedTransformationId || undefined,
+        template: runsSavedById ? undefined : source,
+        transformationId: runsSavedById ? selectedTransformationId : undefined,
         customHeaders: customHeaders || undefined,
         eventType,
         url: endpoints.find((endpoint) => endpoint.id === dryRunEndpointId)?.url,
@@ -235,7 +245,7 @@ export default function TransformStudioPage() {
     } catch (err) {
       showApiError(err, 'transform.previewFailed');
     }
-  }, [previewMutation, inputPayload, kind, selectedTransformationId, source,
+  }, [previewMutation, inputPayload, kind, runsSavedById, selectedTransformationId, source,
     customHeaders, eventType, endpoints, dryRunEndpointId]);
 
   const handleDryRun = useCallback(async () => {
@@ -244,8 +254,8 @@ export default function TransformStudioPage() {
       const result = await dryRunMutation.mutateAsync({
         payload: inputPayload,
         kind,
-        payloadTemplate: selectedTransformationId ? undefined : source,
-        transformationId: selectedTransformationId || undefined,
+        payloadTemplate: runsSavedById ? undefined : source,
+        transformationId: runsSavedById ? selectedTransformationId : undefined,
         customHeaders: customHeaders || undefined,
         endpointId: dryRunEndpointId || undefined,
         eventType: eventType || undefined,
@@ -255,7 +265,7 @@ export default function TransformStudioPage() {
     } catch (err) {
       showApiError(err, 'transform.dryRunFailed');
     }
-  }, [dryRunMutation, inputPayload, kind, selectedTransformationId, source,
+  }, [dryRunMutation, inputPayload, kind, runsSavedById, selectedTransformationId, source,
     customHeaders, dryRunEndpointId, eventType]);
 
   const run = mode === 'preview' ? handleRun : handleDryRun;
@@ -407,7 +417,8 @@ export default function TransformStudioPage() {
               <option value="">{t('transform.noSavedTransformation')}</option>
               {transformations.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.name} · {item.kind === 'JAVASCRIPT' ? 'JS' : t('transform.kindTemplateShort')}
+                  {`${item.name} · ${item.kind === 'JAVASCRIPT'
+                    ? t('transform.kindJavascript') : t('transform.kindTemplateShort')}`}
                 </option>
               ))}
             </Select>

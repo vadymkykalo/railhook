@@ -116,9 +116,12 @@ export function editorTheme({ minHeight, maxHeight, readOnly, isDark }: EditorSk
       // The failure line. A script that throws names a line, and that line is the
       // one thing the author needs to find — so it is marked in the document, not
       // only described in a panel that has scrolled away.
+      // Stronger in dark: the same 18% tint that reads clearly on paper disappears
+      // against a dark editor, and the failing line is the one thing on this screen
+      // that must not be easy to miss.
       '.cm-lintRange-error': {
         backgroundImage: 'none',
-        backgroundColor: 'hsl(var(--halt) / 0.18)',
+        backgroundColor: isDark ? 'hsl(var(--halt) / 0.32)' : 'hsl(var(--halt) / 0.18)',
         borderBottom: '2px solid hsl(var(--halt))',
       },
       '.cm-tooltip': {
