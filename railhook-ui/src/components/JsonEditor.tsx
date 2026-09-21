@@ -4,10 +4,10 @@ import { EditorView, keymap, placeholder as cmPlaceholder, lineNumbers, highligh
 import { EditorState } from '@codemirror/state';
 import { json } from '@codemirror/lang-json';
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
-import { syntaxHighlighting, HighlightStyle, bracketMatching, foldGutter } from '@codemirror/language';
-import { tags } from '@lezer/highlight';
+import { syntaxHighlighting, bracketMatching, foldGutter } from '@codemirror/language';
 import { lintGutter } from '@codemirror/lint';
 import { closeBrackets } from '@codemirror/autocomplete';
+import { editorTheme, tokenHighlight } from './editor/theme';
 
 /**
  * The JSON surface the whole workbench is written on.
@@ -21,28 +21,10 @@ import { closeBrackets } from '@codemirror/autocomplete';
  * root element's class so CodeMirror's own dark-mode behaviour (selection,
  * caret, matching brackets) flips at the same moment.
  *
- * The syntax palette is deliberately two-tone. The four status hues are
- * reserved for statuses, so a JSON string is not allowed to be "ok green";
- * keys carry the brand accent, values carry ink, and the rest is separated by
- * weight and italics rather than by inventing colours.
+ * The skin itself now lives in `editor/theme.ts`, shared with the script
+ * editor. Two editors in the same workbench drifting apart would be the same
+ * bug this product exists to prevent, one layer up.
  */
-
-/**
- * CodeMirror injects these rules into a real stylesheet, so `hsl(var(--token))`
- * resolves against the live token set — one highlight style serves both themes.
- */
-const tokenHighlight = HighlightStyle.define([
-  { tag: tags.propertyName, color: 'hsl(var(--primary))', fontWeight: '500' },
-  { tag: tags.string, color: 'hsl(var(--foreground))' },
-  { tag: tags.number, color: 'hsl(var(--foreground))', fontVariantNumeric: 'tabular-nums' },
-  { tag: tags.bool, color: 'hsl(var(--muted-foreground))', fontStyle: 'italic' },
-  { tag: tags.null, color: 'hsl(var(--muted-foreground))', fontStyle: 'italic' },
-  { tag: tags.punctuation, color: 'hsl(var(--muted-foreground))' },
-  { tag: tags.separator, color: 'hsl(var(--muted-foreground))' },
-  { tag: tags.brace, color: 'hsl(var(--muted-foreground))' },
-  { tag: tags.squareBracket, color: 'hsl(var(--muted-foreground))' },
-  { tag: tags.invalid, color: 'hsl(var(--halt))' },
-]);
 
 interface JsonEditorProps {
   value: string;
@@ -54,6 +36,7 @@ interface JsonEditorProps {
   className?: string;
   /** Forces a theme; omit to follow the app. */
   darkMode?: boolean;
+  'aria-label'?: string;
 }
 
 export default function JsonEditor({
@@ -65,6 +48,7 @@ export default function JsonEditor({
   maxHeight = '400px',
   className = '',
   darkMode,
+  'aria-label': ariaLabel,
 }: JsonEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -87,67 +71,8 @@ export default function JsonEditor({
       syntaxHighlighting(tokenHighlight, { fallback: true }),
       keymap.of([...defaultKeymap, indentWithTab]),
       EditorView.lineWrapping,
-      EditorView.theme(
-        {
-          '&': {
-            minHeight,
-            maxHeight,
-            fontSize: '12px',
-            color: 'hsl(var(--foreground))',
-            border: '1px solid hsl(var(--rail))',
-            borderRadius: 'calc(var(--radius) - 2px)',
-            backgroundColor: readOnly ? 'hsl(var(--muted) / 0.4)' : 'hsl(var(--card))',
-          },
-          '.cm-scroller': {
-            overflow: 'auto',
-            maxHeight,
-            fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
-            lineHeight: '1.6',
-          },
-          '.cm-content': {
-            padding: '8px 0',
-            caretColor: 'hsl(var(--foreground))',
-          },
-          '.cm-cursor, .cm-dropCursor': {
-            borderLeftColor: 'hsl(var(--foreground))',
-          },
-          '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
-            backgroundColor: 'hsl(var(--accent))',
-          },
-          '.cm-gutters': {
-            backgroundColor: 'hsl(var(--muted) / 0.6)',
-            color: 'hsl(var(--muted-foreground))',
-            border: 'none',
-            borderRight: '1px solid hsl(var(--rail))',
-          },
-          '.cm-activeLine': {
-            backgroundColor: 'hsl(var(--accent) / 0.35)',
-          },
-          '.cm-activeLineGutter': {
-            backgroundColor: 'hsl(var(--accent) / 0.35)',
-            color: 'hsl(var(--foreground))',
-          },
-          '.cm-foldPlaceholder': {
-            backgroundColor: 'hsl(var(--secondary))',
-            color: 'hsl(var(--muted-foreground))',
-            border: '1px solid hsl(var(--rail))',
-          },
-          '&.cm-focused': {
-            outline: '2px solid hsl(var(--ring))',
-            outlineOffset: '-1px',
-          },
-          '.cm-matchingBracket, &.cm-focused .cm-matchingBracket': {
-            backgroundColor: 'hsl(var(--accent))',
-            color: 'inherit',
-            outline: 'none',
-          },
-          '.cm-placeholder': {
-            color: 'hsl(var(--muted-foreground))',
-            fontStyle: 'italic',
-          },
-        },
-        { dark: isDark },
-      ),
+      editorTheme({ minHeight, maxHeight, readOnly, isDark }),
+      EditorView.contentAttributes.of(ariaLabel ? { 'aria-label': ariaLabel } : {}),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
           onChangeRef.current?.(update.state.doc.toString());
@@ -164,7 +89,7 @@ export default function JsonEditor({
     }
 
     return EditorState.create({ doc, extensions });
-  }, [minHeight, maxHeight, placeholder, readOnly, isDark]);
+  }, [minHeight, maxHeight, placeholder, readOnly, isDark, ariaLabel]);
 
   // Initialize editor
   useEffect(() => {

@@ -43,6 +43,8 @@ public class AuthRateLimiterService {
     private static final String DEMO_SESSION_KEY_PREFIX = "rate_limiter:demo_session:ip:";
     /** Demo sessions one address may open in a minute: a visitor needs one, a room behind one NAT a few. */
     static final int DEMO_SESSION_PER_IP_PER_MINUTE = 10;
+    private static final String DEMO_SCRIPT_SESSION_KEY_PREFIX = "rate_limiter:demo_script:session:";
+    private static final String DEMO_SCRIPT_IP_KEY_PREFIX = "rate_limiter:demo_script:ip:";
     private static final String OAUTH_REGISTER_KEY_PREFIX = "rate_limiter:oauth:register:ip:";
     /**
      * Not the sign-up bucket's 5: a hosted app registers from its own servers, so every person who
@@ -61,6 +63,8 @@ public class AuthRateLimiterService {
     private final int registerRateLimit;
     private final int refreshPerTokenRateLimit;
     private final int refreshPerIpRateLimit;
+    private final int demoScriptPerSessionRateLimit;
+    private final int demoScriptPerIpRateLimit;
     private final Counter authRateLimitFallback;
 
     /**
@@ -77,12 +81,16 @@ public class AuthRateLimiterService {
             @Value("${auth.rate-limit.login-per-minute:10}") int loginRateLimit,
             @Value("${auth.rate-limit.register-per-minute:5}") int registerRateLimit,
             @Value("${auth.rate-limit.refresh-per-token-per-minute:30}") int refreshPerTokenRateLimit,
-            @Value("${auth.rate-limit.refresh-per-ip-per-minute:600}") int refreshPerIpRateLimit) {
+            @Value("${auth.rate-limit.refresh-per-ip-per-minute:600}") int refreshPerIpRateLimit,
+            @Value("${demo.script-runs.per-session-per-minute:20}") int demoScriptPerSessionRateLimit,
+            @Value("${demo.script-runs.per-ip-per-minute:60}") int demoScriptPerIpRateLimit) {
         this.redissonClient = redissonClient;
         this.loginRateLimit = loginRateLimit;
         this.registerRateLimit = registerRateLimit;
         this.refreshPerTokenRateLimit = refreshPerTokenRateLimit;
         this.refreshPerIpRateLimit = refreshPerIpRateLimit;
+        this.demoScriptPerSessionRateLimit = demoScriptPerSessionRateLimit;
+        this.demoScriptPerIpRateLimit = demoScriptPerIpRateLimit;
 
         this.localFallbackBuckets = Caffeine.newBuilder()
                 .maximumSize(10_000)
@@ -121,6 +129,40 @@ public class AuthRateLimiterService {
     /** Opening a public demo session, which needs no account and mints a token. */
     public boolean allowDemoSession(String ip) {
         return tryAcquire(DEMO_SESSION_KEY_PREFIX + ip, DEMO_SESSION_PER_IP_PER_MINUTE);
+    }
+
+    /**
+     * Running a JavaScript Transformation from a demo session — the Transform Studio's preview
+     * and the delivery dry-run, the only two handlers a demo session can execute code through.
+     *
+     * <p>The sandbox already bounds one run: {@code TRANSFORM_SCRIPT_TIMEOUT_MS} (2000 ms by
+     * default) and an allocation ceiling. What it does not bound is how many runs a stranger may
+     * start, and a script runs on the request thread that called it — so a loop of scripts that
+     * each burn the whole time budget is a way to hold Tomcat's request threads, not merely a way
+     * to spend CPU.
+     *
+     * <p>That is what the two numbers are sized against, and why they are stated as runs a
+     * minute. At the default 2 s timeout, the per-address ceiling of 60 is at most 120 seconds of
+     * script time per minute — two request threads held continuously by one address, out of
+     * Tomcat's 200. The per-session 20 is the human bound underneath it: a person editing code in
+     * the Studio presses Run every few seconds, so twenty a minute is comfortable for them and
+     * makes one session worth a third of a thread.
+     *
+     * <p>Per address first, then per session, because a session costs nothing to mint — ten a
+     * minute per address, and the address is the scarce part. The session is identified by the
+     * bearer token it presented, hashed like every other token bucketed here: a demo token is
+     * minted with a {@code jti} of its own, so two tabs are two budgets and a refresh is a new
+     * one, which is the same allowance a second visitor would get.
+     */
+    public boolean allowDemoScriptRun(String ip, String sessionToken) {
+        if (!tryAcquire(DEMO_SCRIPT_IP_KEY_PREFIX + ip, demoScriptPerIpRateLimit)) {
+            return false;
+        }
+        if (sessionToken != null && !sessionToken.isBlank()) {
+            return tryAcquire(DEMO_SCRIPT_SESSION_KEY_PREFIX + CryptoUtils.hashApiKey(sessionToken),
+                    demoScriptPerSessionRateLimit);
+        }
+        return true;
     }
 
     public boolean allowRegister(String ip) {

@@ -1,0 +1,52 @@
+{
+  "_comment": [
+    "The published example of the JavaScript transformation contract: one script, one input,",
+    "one expected result. It ships in railhook-common's jar rather than in either module's test",
+    "resources because it is the one fixture both call sites are checked against —",
+    "TransformParityTest in railhook-api runs it through the preview path and the one in",
+    "railhook-worker runs it through the delivery path, and they assert the same bytes.",
+    "Divergence between the two is exactly what the template language did for a year, and this",
+    "is what makes it go red instead of quiet.",
+    "The same script is the worked example on the transformations docs page, in both languages."
+  ],
+  "script": "function handler(webhook) {\n  // 1. Reshape an array — a template cannot loop.\n  var lines = webhook.payload.items.map(function (item) {\n    return { sku: item.sku, total: money(item.qty * item.price) };\n  });\n\n  var out = {\n    order: webhook.payload.id,\n    lines: lines,\n    value: money(lines.reduce(function (sum, line) { return sum + line.total; }, 0))\n  };\n\n  // 2. Add a field conditionally — a template cannot branch.\n  if (out.value >= 100) {\n    out.review = 'manual';\n  }\n\n  // 3. Format a date — a template cannot compute.\n  out.day = new Date(webhook.payload.placed_at).toISOString().slice(0, 10);\n\n  return { payload: out, headers: { 'X-Order-Value': out.value.toFixed(2) } };\n}\n\nfunction money(amount) {\n  return Math.round(amount * 100) / 100;\n}\n",
+  "input": {
+    "id": "ord_9001",
+    "placed_at": "2026-09-20T14:05:09.123Z",
+    "items": [
+      {
+        "sku": "WIDGET",
+        "qty": 2,
+        "price": 19.99
+      },
+      {
+        "sku": "GADGET",
+        "qty": 1,
+        "price": 61.5
+      }
+    ]
+  },
+  "eventType": "order.completed",
+  "eventId": "evt_parity",
+  "timestamp": "2026-09-20T14:05:10Z",
+  "url": "https://example.com/webhooks/orders",
+  "expectedPayload": {
+    "order": "ord_9001",
+    "lines": [
+      {
+        "sku": "WIDGET",
+        "total": 39.98
+      },
+      {
+        "sku": "GADGET",
+        "total": 61.5
+      }
+    ],
+    "value": 101.48,
+    "review": "manual",
+    "day": "2026-09-20"
+  },
+  "expectedHeaders": {
+    "X-Order-Value": "101.48"
+  }
+}

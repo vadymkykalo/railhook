@@ -59,7 +59,8 @@ class TransformationTemplateValidationTest {
         ObjectMapper objectMapper = new ObjectMapper();
         service = new TransformationService(transformationRepository, transformationVersionRepository,
                 projectRepository, subscriptionRepository, incomingDestinationRepository,
-                userRepository, new JsonDiffCalculator(objectMapper), objectMapper, 50);
+                userRepository, new JsonDiffCalculator(objectMapper), objectMapper,
+                scriptEngine(), 50);
 
         when(projectRepository.findById(projectId))
                 .thenReturn(Optional.of(Project.builder().id(projectId).name("p").build()));
@@ -114,5 +115,14 @@ class TransformationTemplateValidationTest {
         r.setName("t");
         r.setTemplate(template);
         return r;
+    }
+
+    /**
+     * The engine is built lazily inside itself, so a test that only ever validates templates
+     * never brings GraalJS up at all.
+     */
+    private static com.webhook.platform.common.transform.JavaScriptTransformEngine scriptEngine() {
+        return new com.webhook.platform.common.transform.JavaScriptTransformEngine(
+                new ObjectMapper(), com.webhook.platform.common.transform.ScriptLimits.defaults());
     }
 }

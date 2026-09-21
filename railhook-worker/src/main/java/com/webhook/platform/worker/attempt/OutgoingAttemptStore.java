@@ -20,6 +20,7 @@ import com.webhook.platform.worker.service.OrderingBufferService;
 import com.webhook.platform.worker.service.PayloadTransformException;
 import com.webhook.platform.worker.service.PayloadTransformService;
 import com.webhook.platform.worker.service.TransformationCacheService;
+import com.webhook.platform.common.transform.TransformRequest;
 import io.micrometer.core.instrument.Counter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -298,10 +299,10 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     }
 
     @Override
-    public RequestSpec buildRequest(Claim claim, String body) {
+    public RequestSpec buildRequest(Claim claim, TransformedBody transformed) {
         Delivery delivery = claim.delivery();
-        DeliverySigner.Signatures signatures =
-                new DeliverySigner(endpoint, encryptionKeyRegistry, clock).sign(delivery.getId(), body);
+        DeliverySigner.Signatures signatures = new DeliverySigner(endpoint, encryptionKeyRegistry, clock)
+                .sign(delivery.getId(), transformed.body());
 
         String sequenceHeader = delivery.getSequenceNumber() != null
                 ? String.valueOf(delivery.getSequenceNumber())
@@ -344,6 +345,11 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         recorded.put("User-Agent", USER_AGENT);
 
         Map<String, String> custom = new LinkedHashMap<>();
+        // Whatever the transformation set comes first, so the Endpoint's own custom headers
+        // still win: a script belongs to whoever wrote the transformation, and the endpoint
+        // configuration belongs to whoever owns the endpoint. Signatures are computed above and
+        // are not in this map, so a script cannot overwrite one.
+        custom.putAll(transformed.headers());
         AttemptSupport.collectCustomHeaders(custom, delivery.getCustomHeaders(), objectMapper);
         recorded.putAll(HeaderSanitizer.sanitize(custom));
 
@@ -362,20 +368,45 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
      * transform": falling back would ship the data the transform exists to strip.
      */
     @Override
-    public String buildBody(Claim claim) {
+    public TransformedBody buildBody(Claim claim) {
         Delivery delivery = claim.delivery();
-        String template;
+        TransformationCacheService.Resolved resolved;
         if (delivery.getTransformationId() != null) {
-            template = transformationCacheService.findEnabledTemplate(delivery.getTransformationId());
-            if (template == null) {
+            resolved = transformationCacheService.findEnabled(delivery.getTransformationId());
+            if (resolved == null) {
                 throw new PayloadTransformException(
                         "Configured transformation " + delivery.getTransformationId()
                                 + " not found or disabled for delivery " + delivery.getId());
             }
         } else {
-            template = delivery.getPayloadTemplate();
+            // An inline template on the Delivery predates saved transformations and is always
+            // the template language: there is nowhere on a Delivery to say otherwise.
+            resolved = TransformationCacheService.Resolved.template(delivery.getPayloadTemplate());
         }
-        return payloadTransformService.transform(event.getDecompressedPayload(), template);
+
+        return payloadTransformService.apply(resolved, event.getDecompressedPayload(),
+                TransformRequest.builder()
+                        .payload(event.getDecompressedPayload())
+                        .eventType(event.getEventType())
+                        .eventId(event.getId().toString())
+                        .timestamp(event.getCreatedAt())
+                        .direction("OUTGOING")
+                        .url(endpoint.getUrl())
+                        // The Endpoint's own configured headers. Railhook's — the signature, the
+                        // ids, the sequence number — are computed in buildRequest, after this,
+                        // and are deliberately not shown: a script that could read a signature is
+                        // a script that could leak one.
+                        .headers(configuredHeaders(delivery.getCustomHeaders()))
+                        // attemptStarting has already spent the rung, so this is the number of
+                        // the attempt the script is being run for, not the last one.
+                        .attemptNumber(delivery.getAttemptCount())
+                        .build());
+    }
+
+    private Map<String, String> configuredHeaders(String customHeadersJson) {
+        Map<String, String> configured = new LinkedHashMap<>();
+        AttemptSupport.collectCustomHeaders(configured, customHeadersJson, objectMapper);
+        return configured;
     }
 
     @Override
@@ -447,6 +478,9 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             } else if (outcome instanceof Finalization.TerminallyFailed failed) {
                 fresh.failTerminally();
                 log.error("Delivery {} failed: {}", fresh.getId(), failed.reason());
+            } else if (outcome instanceof Finalization.Cancelled cancelled) {
+                fresh.cancel();
+                log.info("Delivery {} cancelled: {}", fresh.getId(), cancelled.reason());
             }
             deliveryRepository.save(fresh);
             return true;

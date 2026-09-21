@@ -9,6 +9,12 @@ import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.spi.json.JacksonJsonNodeJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+import com.webhook.platform.common.transform.JavaScriptTransformEngine;
+import com.webhook.platform.common.transform.ScriptTransformException;
+import com.webhook.platform.common.transform.TransformOutcome;
+import com.webhook.platform.common.transform.TransformRequest;
+import com.webhook.platform.common.transform.TransformationKind;
+import com.webhook.platform.worker.attempt.TransformedBody;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +30,7 @@ import java.util.regex.Pattern;
 public class PayloadTransformService {
 
     private final ObjectMapper objectMapper;
+    private final JavaScriptTransformEngine scriptEngine;
     private final Counter transformFailedCounter;
 
     private static final Pattern JSONPATH_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
@@ -34,11 +41,61 @@ public class PayloadTransformService {
             .options(Option.SUPPRESS_EXCEPTIONS)
             .build();
 
-    public PayloadTransformService(ObjectMapper objectMapper, MeterRegistry meterRegistry) {
+    public PayloadTransformService(ObjectMapper objectMapper, MeterRegistry meterRegistry,
+            JavaScriptTransformEngine scriptEngine) {
         this.objectMapper = objectMapper;
+        this.scriptEngine = scriptEngine;
         this.transformFailedCounter = Counter.builder("transform_failed_total")
                 .tag("component", "payload_transform_service")
                 .register(meterRegistry);
+    }
+
+    /**
+     * Applies a transformation of either language to one Attempt's body.
+     *
+     * <p>The JavaScript half is {@link JavaScriptTransformEngine} — the same instance, with the
+     * same limits and the same sandbox, that the api runs a preview through. There is one
+     * implementation on purpose: a preview that disagreed with the delivery would be worse than
+     * no preview at all.
+     *
+     * <p>Every way a script can fail becomes a {@link PayloadTransformException}, which is what
+     * a failed template already is: retryable, and never a reason to send the raw payload
+     * instead. A script that <em>cancelled</em> is not a failure and does not throw — it comes
+     * back as {@link TransformedBody#cancelled()}, and the Runner ends the obligation.
+     *
+     * @param resolved what to apply, or a {@code Resolved} carrying no source at all, in which
+     *                 case the body goes out unchanged
+     * @param body     the body as it stands now
+     * @param context  the Event and delivery context a script sees. A template ignores it: it
+     *                 has no way to reach anything but the payload.
+     */
+    public TransformedBody apply(TransformationCacheService.Resolved resolved, String body,
+            TransformRequest context) {
+        if (resolved == null || !resolved.isConfigured()) {
+            return TransformedBody.of(body);
+        }
+        if (resolved.kind() != TransformationKind.JAVASCRIPT) {
+            return TransformedBody.of(transform(body, resolved.source()));
+        }
+
+        try {
+            TransformOutcome outcome = scriptEngine.run(resolved.source(), context);
+            if (log.isDebugEnabled() && !outcome.console().isEmpty()) {
+                outcome.console().forEach(line ->
+                        log.debug("transformation console [{}] {}", line.level(), line.message()));
+            }
+            if (outcome.cancelled()) {
+                return TransformedBody.cancelled(outcome.cancelReason());
+            }
+            return new TransformedBody(outcome.payload(), outcome.headers(), false, null);
+        } catch (ScriptTransformException e) {
+            transformFailedCounter.increment();
+            String where = e.line() > 0 ? " at line " + e.line() : "";
+            log.error("Configured script transformation failed ({}{}); refusing to fall back to "
+                    + "the raw payload: {}", e.reason(), where, e.getMessage());
+            throw new PayloadTransformException(
+                    "Script transformation failed (" + e.reason() + where + "): " + e.getMessage(), e);
+        }
     }
 
     /**

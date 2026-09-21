@@ -57,7 +57,24 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
      * old pass-through covered was platform-admin tokens aimed at tenant handlers, safe only
      * because every annotated handler happens to take an {@code AuthContext}.
      */
-    private void enforceAccessLevel(HandlerMethod handlerMethod, Authentication authentication) {
+    void enforceAccessLevel(HandlerMethod handlerMethod, Authentication authentication) {
+        if (DemoSessions.isDemo(authentication) && handlerMethod.hasMethodAnnotation(AllowedInDemo.class)) {
+            // The demo is a VIEWER by construction — the seeder reasserts that role on every run —
+            // so any level above READ refuses it, and a handler on the allow list would be
+            // unreachable however carefully it was reviewed. The list is the decision: a handler
+            // carries {@link AllowedInDemo} only because somebody argued, in writing, that a
+            // stranger holding the demo's identity may call it. Letting the level refuse it
+            // afterwards would mean the argument was never actually made.
+            //
+            // The one handler this matters to today is TransformPreviewController.deliveryDryRun,
+            // whose WRITE level exists to keep a working X-Signature away from a reader. That
+            // capability is taken off the demo's copy of the answer instead — see DemoDryRunMask —
+            // so nothing the level was protecting is handed over here.
+            //
+            // Narrow on purpose: only a method-level annotation, only for a demo caller, and
+            // DemoSessionAllowListTest freezes the set it can apply to.
+            return;
+        }
         RequireAccess required = handlerMethod.getMethodAnnotation(RequireAccess.class);
         if (required == null) {
             required = handlerMethod.getBeanType().getAnnotation(RequireAccess.class);

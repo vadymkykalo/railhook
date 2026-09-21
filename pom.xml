@@ -6,7 +6,7 @@
 
     <groupId>com.webhook.platform</groupId>
     <artifactId>railhook</artifactId>
-    <version>2.29.0</version>
+    <version>2.30.0</version>
     <packaging>pom</packaging>
 
     <name>Webhook Platform</name>
@@ -79,6 +79,15 @@
           Imported only for the MCP server starter in railhook-api.
         -->
         <spring-ai.version>2.0.1</spring-ai.version>
+        <!--
+          GraalJS, the sandbox JavaScript transformations run in. Declared once here and used by
+          railhook-common (provided), railhook-api and railhook-worker (compile).
+
+          Pinned to the 24.1.x line and staying there while this project compiles to Java 17:
+          from 24.2 the polyglot embedding requires JDK 21. Moving it is a JDK decision, not a
+          dependency bump.
+        -->
+        <graaljs.version>24.1.2</graaljs.version>
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
         <jacoco.version>0.8.12</jacoco.version>
         <!--

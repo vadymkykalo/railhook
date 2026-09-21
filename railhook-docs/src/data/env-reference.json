@@ -763,6 +763,36 @@
           "description": "How much of a receiver's response body to buffer, in bytes. Anything past this is dropped\nand the Attempt is decided by the status code alone — a receiver that accepts the webhook\nand answers 2xx with a huge body is a successful delivery, not a failed one. Only the first\n10 KiB is ever stored, so raising this buys nothing but memory per in-flight attempt."
         },
         {
+          "name": "TRANSFORM_SCRIPT_TIMEOUT_MS",
+          "default": "2000",
+          "example": null,
+          "description": "Wall clock for one run, in milliseconds. This is per Attempt, on a worker thread that is not\ndoing anything else meanwhile, so it is a throughput setting as much as a safety one: at the\ndefault, a runaway script costs one delivery slot for two seconds and nothing else."
+        },
+        {
+          "name": "TRANSFORM_SCRIPT_MAX_MEMORY_MB",
+          "default": "128",
+          "example": null,
+          "description": "How much one run may allocate before it is stopped, in MB. Measured as the running thread's\nallocation counter, not as live heap — a script that churns a gigabyte through the collector\nis as expensive to a worker as one that holds it. Raise it only alongside the JVM heap; the\nceiling is not a reservation, it is the point at which a script is presumed to be looping."
+        },
+        {
+          "name": "TRANSFORM_SCRIPT_MAX_OUTPUT_BYTES",
+          "default": "1048576",
+          "example": null,
+          "description": "The largest body a script may return, in bytes. A transformation that produces more than this\nfails rather than sends: the receiver would have rejected it anyway, and finding out here names\nthe script instead of the endpoint."
+        },
+        {
+          "name": "TRANSFORM_SCRIPT_MAX_CONSOLE_LINES",
+          "default": "100",
+          "example": null,
+          "description": "How many console.* lines are kept per run and shown in the Transform Studio. Past this the\nrun keeps going and the extra lines are dropped, with the outcome saying so."
+        },
+        {
+          "name": "TRANSFORM_SCRIPT_MAX_CHARS",
+          "default": "65536",
+          "example": null,
+          "description": "The largest script the engine will compile, in characters. The API refuses a longer one at\nsave time, so this is the second line rather than the first."
+        },
+        {
           "name": "WEBHOOK_POOL_MAX_CONNECTIONS",
           "default": "200",
           "example": null,
@@ -1555,6 +1585,18 @@
           "default": null,
           "example": "60",
           "description": "\"Try the live demo\" on the public site: anyone, without an account, opens the real dashboard\nsigned in to a seeded demo organization (\"Acme Shop\") and can look at everything in it. It is\nhow railhook.io shows the product before a sign-up.\n\nOff by default, so a self-hosted install opens nothing anonymous: no demo organization is\ncreated, the entry points are hidden and the API answers 404. When on, the API seeds the demo\norganization at startup and rewrites its history every DEMO_REFRESH_INTERVAL_MINUTES so it\nalways shows the last day. A demo session is read-only on the server — every change is refused\n— and lasts DEMO_SESSION_TTL_MINUTES with no way to extend it. Ten sessions a minute per\naddress, behind the registration CAPTCHA when one is configured. The demo's URLs are on\nreserved .example hosts and nothing is ever delivered to them.\n\nTurning it off again also removes the demo: on its next start the API deletes the demo\norganization and everything in it. Nothing outside the demo is touched.\n\nRead by the UI container too (its entry points), so set it for both and restart both."
+        },
+        {
+          "name": "DEMO_SCRIPT_RUNS_PER_SESSION_PER_MINUTE",
+          "default": null,
+          "example": "20",
+          "description": "How many JavaScript transformations a demo session may run in a minute. The demo can reach two\nhandlers that execute code — the Transform Studio's preview and the delivery dry-run — and both\nrun the script on the request thread that called them. TRANSFORM_SCRIPT_TIMEOUT_MS bounds one\nrun; these bound how many, which is the part that decides whether a stranger can hold request\nthreads by firing runaway scripts in a loop.\n\nThe arithmetic, at the default 2000 ms timeout: 60 runs a minute is at most 120 seconds of\nscript time per minute, so one address can hold two of Tomcat's 200 request threads and no\nmore. The per-session 20 is the human bound underneath it — pressing Run every three seconds is\ncomfortable editing — and stops one tab spending the whole address's allowance. Raise the\nper-address number only alongside the thread pool; lower the timeout instead if the demo is\nbeing used as a free compute service.\n\nPer session means per demo token: a second tab or a re-opened session gets its own allowance,\nwhich is the same allowance a second visitor would have. Only demo sessions are counted here;\na signed-in caller's runs are attributable to an account already."
+        },
+        {
+          "name": "DEMO_SCRIPT_RUNS_PER_IP_PER_MINUTE",
+          "default": null,
+          "example": "60",
+          "description": "How many JavaScript transformations a demo session may run in a minute. The demo can reach two\nhandlers that execute code — the Transform Studio's preview and the delivery dry-run — and both\nrun the script on the request thread that called them. TRANSFORM_SCRIPT_TIMEOUT_MS bounds one\nrun; these bound how many, which is the part that decides whether a stranger can hold request\nthreads by firing runaway scripts in a loop.\n\nThe arithmetic, at the default 2000 ms timeout: 60 runs a minute is at most 120 seconds of\nscript time per minute, so one address can hold two of Tomcat's 200 request threads and no\nmore. The per-session 20 is the human bound underneath it — pressing Run every three seconds is\ncomfortable editing — and stops one tab spending the whole address's allowance. Raise the\nper-address number only alongside the thread pool; lower the timeout instead if the demo is\nbeing used as a free compute service.\n\nPer session means per demo token: a second tab or a re-opened session gets its own allowance,\nwhich is the same allowance a second visitor would have. Only demo sessions are counted here;\na signed-in caller's runs are attributable to an account already."
         }
       ]
     },

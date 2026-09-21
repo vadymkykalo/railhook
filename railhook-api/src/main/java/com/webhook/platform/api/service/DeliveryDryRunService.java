@@ -2,28 +2,39 @@ package com.webhook.platform.api.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.jayway.jsonpath.Configuration;
-import com.jayway.jsonpath.JsonPath;
-import com.jayway.jsonpath.Option;
-import com.jayway.jsonpath.spi.json.JacksonJsonNodeJsonProvider;
-import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Transformation;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.dto.DeliveryDryRunRequest;
 import com.webhook.platform.api.dto.DeliveryDryRunResponse;
+import com.webhook.platform.api.dto.TransformPreviewResponse;
+import com.webhook.platform.api.service.transform.TransformationRunner;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import com.webhook.platform.common.transform.ScriptConsoleLine;
+import com.webhook.platform.common.transform.ScriptTransformException;
+import com.webhook.platform.common.transform.TransformRequest;
+import com.webhook.platform.common.transform.TransformationKind;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
+/**
+ * Builds the exact request a real Delivery would make — body, headers and signature — and does
+ * not send it.
+ *
+ * <p>The transformation half goes through {@link TransformationRunner}, which is the same engine
+ * the worker runs. This endpoint's whole value is that the bytes it shows are the bytes that
+ * would go out; a second implementation here would be a lie with a green tick on it.
+ */
 @Service
 @Slf4j
 public class DeliveryDryRunService {
@@ -32,24 +43,19 @@ public class DeliveryDryRunService {
     private final EndpointRepository endpointRepository;
     private final ObjectMapper objectMapper;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
-
-    private static final Pattern JSONPATH_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
-
-    private final Configuration jsonPathConfig = Configuration.builder()
-            .jsonProvider(new JacksonJsonNodeJsonProvider())
-            .mappingProvider(new JacksonMappingProvider())
-            .options(Option.SUPPRESS_EXCEPTIONS)
-            .build();
+    private final TransformationRunner runner;
 
     public DeliveryDryRunService(
             TransformationRepository transformationRepository,
             EndpointRepository endpointRepository,
             ObjectMapper objectMapper,
-            EncryptionKeyRegistry encryptionKeyRegistry) {
+            EncryptionKeyRegistry encryptionKeyRegistry,
+            TransformationRunner runner) {
         this.transformationRepository = transformationRepository;
         this.endpointRepository = endpointRepository;
         this.objectMapper = objectMapper;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
+        this.runner = runner;
     }
 
     /**
@@ -70,7 +76,12 @@ public class DeliveryDryRunService {
         Integer transformationVersion = null;
         String signature = null;
         String endpointUrl = null;
+        long durationMs = 0;
+        Integer errorLine = null;
+        ScriptTransformException.Reason errorReason = null;
+        List<ScriptConsoleLine> console = List.of();
         Map<String, String> requestHeaders = new LinkedHashMap<>();
+        Map<String, String> scriptHeaders = new LinkedHashMap<>();
 
         // 1. Parse input payload
         JsonNode sourceNode;
@@ -81,11 +92,14 @@ public class DeliveryDryRunService {
             return DeliveryDryRunResponse.builder()
                     .success(false)
                     .errors(errors)
+                    .console(List.of())
                     .build();
         }
 
-        // 2. Resolve template: transformationId > payloadTemplate > passthrough
-        String resolvedTemplate = null;
+        // 2. Resolve the transformation. A saved one wins, and brings its own language with it.
+        String source = null;
+        TransformationKind kind = request.getKind() == null
+                ? TransformationKind.TEMPLATE : request.getKind();
 
         if (request.getTransformationId() != null) {
             Optional<Transformation> transformOpt =
@@ -97,29 +111,87 @@ public class DeliveryDryRunService {
                 if (!t.getEnabled()) {
                     errors.add("Transformation is disabled: " + t.getName());
                 } else {
-                    resolvedTemplate = t.getTemplate();
+                    source = t.getTemplate();
+                    kind = t.getKind();
                     transformationName = t.getName();
                     transformationVersion = t.getVersion();
                 }
             }
         } else if (request.getPayloadTemplate() != null && !request.getPayloadTemplate().isBlank()) {
-            resolvedTemplate = request.getPayloadTemplate();
+            source = request.getPayloadTemplate();
         }
 
-        // 3. Transform payload
-        if (resolvedTemplate != null) {
+        // The endpoint is resolved before the transform because a script is shown the URL it is
+        // being run for. Read-only: a transformation that could choose the address would be past
+        // the SSRF checks a real attempt makes before it gets anywhere near here.
+        Endpoint endpoint = null;
+        if (request.getEndpointId() != null) {
+            endpoint = endpointRepository.findById(request.getEndpointId())
+                    // Deliberately folded into "not found": that is the answer @TenantId already
+                    // gives for another organization's row, and distinguishing the two here would
+                    // make the dry-run a way to enumerate endpoint ids.
+                    .filter(e -> projectId.equals(e.getProjectId()))
+                    .orElse(null);
+            if (endpoint == null) {
+                errors.add("Endpoint not found: " + request.getEndpointId());
+            } else {
+                endpointUrl = endpoint.getUrl();
+            }
+        }
+
+        // 3. Transform. A failure here fails the dry-run rather than falling back to the raw
+        //    payload: this endpoint exists to show the bytes that would go out, and the fallback
+        //    is the one AttemptRunner's invariant 4 forbids on a real Delivery.
+        if (source != null) {
             try {
-                JsonNode templateNode = objectMapper.readTree(resolvedTemplate);
-                JsonNode resultNode = processNode(templateNode, sourceNode);
-                transformedPayload = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(resultNode);
-            } catch (Exception e) {
-                errors.add("Template transform error: " + e.getMessage());
-                transformedPayload = request.getPayload();
+                TransformationRunner.Result result = runner.run(kind, source, TransformRequest.builder()
+                        .payload(request.getPayload())
+                        .eventType(request.getEventType())
+                        .eventId("evt_dryrun")
+                        .timestamp(Instant.now())
+                        .direction("OUTGOING")
+                        .url(endpointUrl)
+                        // The caller's own custom headers, which is what the preview shows a
+                        // script too. A dry-run names an Endpoint but no Subscription, and
+                        // outgoing custom headers are the Subscription's — so there is nothing
+                        // else configured to show, and an empty map would make the dry-run the
+                        // one of the three paths that disagreed.
+                        .headers(callerHeaders(request.getCustomHeaders()))
+                        .build());
+
+                durationMs = result.durationMs();
+                console = result.console();
+
+                if (result.cancelled()) {
+                    // Nothing would be sent, so there is no body to sign and no headers to show.
+                    return DeliveryDryRunResponse.builder()
+                            .success(errors.isEmpty())
+                            .errors(errors)
+                            .cancelled(true)
+                            .cancelReason(result.cancelReason())
+                            .durationMs(durationMs)
+                            .console(consoleDto(console))
+                            .transformationKind(kind)
+                            .transformationName(transformationName)
+                            .transformationVersion(transformationVersion)
+                            .endpointUrl(endpointUrl)
+                            .build();
+                }
+
+                scriptHeaders.putAll(result.headers());
+                transformedPayload = pretty(result.payload());
+
+            } catch (ScriptTransformException e) {
+                String where = e.line() > 0 ? " (line " + e.line() + ")" : "";
+                errors.add(e.reason() + where + ": " + e.getMessage());
+                console = e.console();
+                errorLine = e.line() > 0 ? e.line() : null;
+                errorReason = e.reason();
             }
         } else {
-            // Passthrough
             try {
-                transformedPayload = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(sourceNode);
+                transformedPayload = objectMapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(sourceNode);
             } catch (Exception e) {
                 transformedPayload = request.getPayload();
             }
@@ -135,42 +207,35 @@ public class DeliveryDryRunService {
             requestHeaders.put("X-Event-Type", request.getEventType());
         }
 
-        // 5. Compute HMAC signature if endpoint provided
-        if (request.getEndpointId() != null) {
-            Optional<Endpoint> endpointOpt = endpointRepository.findById(request.getEndpointId())
-                    // Deliberately folded into "not found": that is the answer @TenantId already
-                    // gives for another organization's row, and distinguishing the two here would
-                    // make the dry-run a way to enumerate endpoint ids.
-                    .filter(e -> projectId.equals(e.getProjectId()));
-            if (endpointOpt.isEmpty()) {
-                errors.add("Endpoint not found: " + request.getEndpointId());
-            } else {
-                Endpoint endpoint = endpointOpt.get();
-                endpointUrl = endpoint.getUrl();
-                try {
-                    // Go through the registry, not CryptoUtils directly: the dry-run must
-                    // resolve the endpoint's own key version and fall back across a rotation
-                    // exactly as real delivery does. Reading a single raw key here made the
-                    // dry-run report "Failed to compute signature" for any endpoint still
-                    // encrypted under a previous version while delivery kept working.
-                    String secret = encryptionKeyRegistry.decryptWithFallback(
-                            endpoint.getSecretEncrypted(),
-                            endpoint.getSecretIv(),
-                            endpoint.getEncryptionKeyVersion());
-                    String body = transformedPayload != null ? transformedPayload : request.getPayload();
-                    signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
-                    requestHeaders.put("X-Signature", signature);
-                } catch (Exception e) {
-                    errors.add("Failed to compute signature: " + e.getMessage());
-                }
+        // 5. Compute HMAC signature if an endpoint was named
+        if (endpoint != null) {
+            try {
+                // Go through the registry, not CryptoUtils directly: the dry-run must
+                // resolve the endpoint's own key version and fall back across a rotation
+                // exactly as real delivery does. Reading a single raw key here made the
+                // dry-run report "Failed to compute signature" for any endpoint still
+                // encrypted under a previous version while delivery kept working.
+                String secret = encryptionKeyRegistry.decryptWithFallback(
+                        endpoint.getSecretEncrypted(),
+                        endpoint.getSecretIv(),
+                        endpoint.getEncryptionKeyVersion());
+                String body = transformedPayload != null ? transformedPayload : request.getPayload();
+                signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
+                requestHeaders.put("X-Signature", signature);
+            } catch (Exception e) {
+                errors.add("Failed to compute signature: " + e.getMessage());
+            }
 
-                if (!endpoint.getEnabled()) {
-                    errors.add("Warning: Endpoint is currently disabled");
-                }
+            if (!endpoint.getEnabled()) {
+                errors.add("Warning: Endpoint is currently disabled");
             }
         }
 
-        // 6. Merge custom headers
+        // 6. Whatever the script set, over the computed headers and under the caller's own —
+        //    which stay the last word here exactly as they are on a real Delivery.
+        requestHeaders.putAll(scriptHeaders);
+
+        // 7. Merge custom headers
         if (request.getCustomHeaders() != null && !request.getCustomHeaders().isBlank()) {
             try {
                 @SuppressWarnings("unchecked")
@@ -198,76 +263,46 @@ public class DeliveryDryRunService {
                 .errors(errors)
                 .transformationName(transformationName)
                 .transformationVersion(transformationVersion)
+                .transformationKind(kind)
+                .console(consoleDto(console))
+                .cancelled(false)
+                .durationMs(durationMs)
+                .errorLine(errorLine)
+                .errorReason(errorReason)
                 .build();
     }
 
-    // ── Template processing (mirrors PayloadTransformService in worker) ──
-
-    private JsonNode processNode(JsonNode templateNode, JsonNode sourceNode) {
-        if (templateNode.isObject()) {
-            return processObject((ObjectNode) templateNode, sourceNode);
-        } else if (templateNode.isArray()) {
-            return processArray((ArrayNode) templateNode, sourceNode);
-        } else if (templateNode.isTextual()) {
-            return processTextValue(templateNode.asText(), sourceNode);
-        } else {
-            return templateNode.deepCopy();
+    private Map<String, String> callerHeaders(String customHeadersJson) {
+        Map<String, String> headers = new LinkedHashMap<>();
+        if (customHeadersJson == null || customHeadersJson.isBlank()) {
+            return headers;
         }
-    }
-
-    private ObjectNode processObject(ObjectNode templateObject, JsonNode sourceNode) {
-        ObjectNode result = objectMapper.createObjectNode();
-        var fields = templateObject.fields();
-        while (fields.hasNext()) {
-            var field = fields.next();
-            result.set(field.getKey(), processNode(field.getValue(), sourceNode));
-        }
-        return result;
-    }
-
-    private ArrayNode processArray(ArrayNode templateArray, JsonNode sourceNode) {
-        ArrayNode result = objectMapper.createArrayNode();
-        for (JsonNode element : templateArray) {
-            result.add(processNode(element, sourceNode));
-        }
-        return result;
-    }
-
-    private JsonNode processTextValue(String text, JsonNode sourceNode) {
-        Matcher matcher = JSONPATH_PATTERN.matcher(text);
-        if (matcher.matches()) {
-            String jsonPath = matcher.group(1);
-            return evaluateJsonPath(jsonPath, sourceNode);
-        } else if (matcher.find()) {
-            matcher.reset();
-            StringBuffer sb = new StringBuffer();
-            while (matcher.find()) {
-                String jsonPath = matcher.group(1);
-                JsonNode value = evaluateJsonPath(jsonPath, sourceNode);
-                String replacement = value != null
-                        ? (value.isTextual() ? value.asText() : value.toString()) : "";
-                matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
-            }
-            matcher.appendTail(sb);
-            return objectMapper.getNodeFactory().textNode(sb.toString());
-        } else {
-            return objectMapper.getNodeFactory().textNode(text);
-        }
-    }
-
-    private JsonNode evaluateJsonPath(String jsonPath, JsonNode sourceNode) {
         try {
-            Object result = JsonPath.using(jsonPathConfig).parse(sourceNode).read(jsonPath);
-            if (result == null) {
-                return objectMapper.getNodeFactory().nullNode();
+            JsonNode parsed = objectMapper.readTree(customHeadersJson);
+            if (parsed.isObject()) {
+                parsed.properties().forEach(entry -> headers.put(entry.getKey(), entry.getValue().asText()));
             }
-            if (result instanceof JsonNode) {
-                return (JsonNode) result;
-            }
-            return objectMapper.valueToTree(result);
         } catch (Exception e) {
-            log.debug("JSONPath evaluation failed for '{}': {}", jsonPath, e.getMessage());
-            return objectMapper.getNodeFactory().nullNode();
+            // Reported to the caller further down, where the headers are merged for real.
+            log.debug("Custom headers are not JSON, so the script sees none: {}", e.getMessage());
+        }
+        return headers;
+    }
+
+    private List<TransformPreviewResponse.ConsoleLine> consoleDto(List<ScriptConsoleLine> lines) {
+        return lines.stream()
+                .map(line -> TransformPreviewResponse.ConsoleLine.builder()
+                        .level(line.level())
+                        .message(line.message())
+                        .build())
+                .toList();
+    }
+
+    private String pretty(JsonNode node) {
+        try {
+            return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(node);
+        } catch (Exception e) {
+            return node == null ? null : node.toString();
         }
     }
 }

@@ -6,6 +6,9 @@ import com.webhook.platform.api.domain.entity.Transformation;
 import com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.service.transform.TemplateTransformer;
+import com.webhook.platform.api.service.transform.TransformationRunner;
+import com.webhook.platform.common.transform.JavaScriptTransformEngine;
+import com.webhook.platform.common.transform.ScriptLimits;
 import com.webhook.platform.api.service.workflow.StepResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +32,10 @@ class TransformNodeExecutorTest {
     @BeforeEach
     void setUp() {
         transformationRepository = mock(TransformationRepository.class);
-        executor = new TransformNodeExecutor(mapper, transformationRepository, new TemplateTransformer(mapper));
+        TemplateTransformer templateTransformer = new TemplateTransformer(mapper);
+        executor = new TransformNodeExecutor(mapper, transformationRepository, templateTransformer,
+                new TransformationRunner(templateTransformer,
+                        new JavaScriptTransformEngine(mapper, ScriptLimits.defaults()), mapper));
     }
 
     private Transformation saved(String template, boolean enabled) {

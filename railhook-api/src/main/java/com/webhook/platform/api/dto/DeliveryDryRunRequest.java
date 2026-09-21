@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.common.transform.TransformationKind;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
@@ -20,8 +21,11 @@ public class DeliveryDryRunRequest {
     @Schema(description = "ID of a saved Transformation to apply (highest priority)")
     private UUID transformationId;
 
-    @Schema(description = "Inline JSON template with ${$.path} expressions")
+    @Schema(description = "An unsaved template or script to apply. What the Transform Studio sends while you are still editing.")
     private String payloadTemplate;
+
+    @Schema(description = "The language `payloadTemplate` is written in. Omitted means TEMPLATE. A saved transformation brings its own and ignores this.")
+    private TransformationKind kind;
 
     @Schema(description = "Custom headers JSON to merge", example = "{\"X-Custom\": \"value\"}")
     private String customHeaders;

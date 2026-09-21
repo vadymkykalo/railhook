@@ -124,7 +124,7 @@ describe('EventsPage', () => {
 
   it('shows each row on page two what became of its own deliveries, however busy the project', async () => {
     const counts = (c: Partial<DeliveryStatusCounts>): DeliveryStatusCounts =>
-      ({ pending: 0, processing: 0, success: 0, failed: 0, dlq: 0, ...c });
+      ({ pending: 0, processing: 0, success: 0, failed: 0, dlq: 0, cancelled: 0, ...c });
     const event = (id: string, eventType: string, deliveryCounts: DeliveryStatusCounts, deliveriesCreated: number): EventResponse =>
       ({ ...EVENT, id, eventType, deliveryCounts, deliveriesCreated });
     const firstPage = { content: [EVENT], totalElements: 24, totalPages: 2, size: 20, number: 0 } as any;
@@ -164,8 +164,8 @@ describe('EventsPage', () => {
   it('keeps checking while a row still owes deliveries, so it turns delivered without a reload', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
-      const owed = { ...EVENT, deliveryCounts: { pending: 1, processing: 1, success: 0, failed: 0, dlq: 0 } };
-      const done = { ...EVENT, deliveryCounts: { pending: 0, processing: 0, success: 2, failed: 0, dlq: 0 } };
+      const owed = { ...EVENT, deliveryCounts: { pending: 1, processing: 1, success: 0, failed: 0, dlq: 0, cancelled: 0 } };
+      const done = { ...EVENT, deliveryCounts: { pending: 0, processing: 0, success: 2, failed: 0, dlq: 0, cancelled: 0 } };
       vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
       vi.mocked(eventsApi.listByProject)
         .mockResolvedValueOnce(populatedPage([owed]))

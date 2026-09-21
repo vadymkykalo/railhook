@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.30.0] - 2026-09-21
+
+### Added
+
+- **A transformation can be written in JavaScript.** `handler(webhook)` receives the payload, the event
+  type and id, the timestamp, the direction, the endpoint's URL and headers and the attempt number, and
+  returns the payload to send and optionally headers — or cancels the delivery. Everything the template
+  language could not do: loops, conditionals, arithmetic, date formatting. Templates keep working
+  untouched; a transformation now carries its language, and version history, compare and restore cover a
+  script exactly as they cover a template.
+- **The Transform Studio is a real editor**: JavaScript with completion for the eight things a script can
+  see, Input / Output / Diff / Console tabs with `console.log` captured, run on a real recent event
+  against a real endpoint (⌘/Ctrl+Enter), save without leaving (⌘/Ctrl+S), and the failing line marked
+  from the server's own error.
+- **The Studio runs in the public demo.** Preview and dry run are allowed in a read-only session and
+  rate limited per IP and per session; saving stays refused, and the dry run's signature is masked. The
+  demo ships a JavaScript transformation so a visitor sees real code on a real event.
+- **`CANCELLED` is a delivery outcome of its own**, not a silent drop: terminal, with a reason, absent
+  from both the success and the failure columns, counted separately, and it releases the ordering cursor.
+
+### Changed
+
+- A failed or cancelled transformation is explained in the delivery's diagnosis instead of landing in
+  "unknown". Script failures are typed — syntax, contract, runtime, timeout, memory, output too large —
+  so the UI names them in the reader's language with the engine's own message underneath.
+- The engine runs inside a sandbox with no network, filesystem, threads or host classes; time, memory,
+  output size, console lines and source size are all capped (`TRANSFORM_SCRIPT_*` in `.env.dist`). One
+  implementation serves both the preview in the API and the delivery in the worker, pinned by a test
+  that runs the same script through both.
+
 ## [2.29.0] - 2026-09-20
 
 ### Added

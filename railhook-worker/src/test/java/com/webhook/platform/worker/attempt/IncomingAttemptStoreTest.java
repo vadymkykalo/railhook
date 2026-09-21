@@ -175,7 +175,7 @@ class IncomingAttemptStoreTest {
         destination.setCustomHeadersJson("{\"Authorization\":\"Bearer super-secret\",\"X-Trace\":\"t-1\"}");
         IncomingAttemptStore store = storeFor(destination, firstDispatch());
 
-        String recorded = store.buildRequest(claim(FENCE), "{}").recordedHeaders();
+        String recorded = store.buildRequest(claim(FENCE), TransformedBody.of("{}")).recordedHeaders();
 
         assertThat(recorded).contains("\"X-Trace\":\"t-1\"")
                 .contains("***MASKED***")
@@ -223,7 +223,7 @@ class IncomingAttemptStoreTest {
         IncomingEvent event = event("application/octet-stream", "{���}", arrived, null);
         IncomingAttemptStore store = storeFor(destination(true), firstDispatch(), event);
 
-        String body = store.buildBody(claim(FENCE));
+        String body = store.buildBody(claim(FENCE)).body();
 
         org.junit.jupiter.api.Assertions.assertArrayEquals(arrived, store.wireBody(claim(FENCE), body),
                 "the destination gets what the provider sent, not the decoded copy shown in the dashboard");
@@ -236,7 +236,7 @@ class IncomingAttemptStoreTest {
         IncomingEvent event = event("application/json", "{\"data\":{\"name\":\"Zoë\"}}", null, null);
         IncomingAttemptStore store = storeFor(destination, firstDispatch(), event);
 
-        String body = store.buildBody(claim(FENCE));
+        String body = store.buildBody(claim(FENCE)).body();
 
         org.junit.jupiter.api.Assertions.assertArrayEquals(
                 "{\"name\":\"Zoë\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8),

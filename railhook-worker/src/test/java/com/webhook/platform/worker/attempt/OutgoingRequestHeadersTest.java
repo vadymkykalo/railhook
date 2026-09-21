@@ -175,7 +175,7 @@ class OutgoingRequestHeadersTest {
         assertThat(result).isInstanceOf(ClaimResult.Claimed.class);
         OutgoingAttemptStore.Claim claim = ((ClaimResult.Claimed<OutgoingAttemptStore.Claim>) result).claim();
 
-        RequestSpec spec = store.buildRequest(claim, BODY);
+        RequestSpec spec = store.buildRequest(claim, TransformedBody.of(BODY));
 
         Map<String, String> headers = new LinkedHashMap<>();
         WebClient.RequestBodySpec request = mock(WebClient.RequestBodySpec.class, RETURNS_SELF);

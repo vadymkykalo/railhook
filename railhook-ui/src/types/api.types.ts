@@ -180,7 +180,7 @@ export interface DeliveryResponse {
   eventType?: string;
   endpointId: string;
   subscriptionId: string;
-  status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'DLQ';
+  status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'DLQ' | 'CANCELLED';
   attemptCount: number;
   maxAttempts: number;
   nextRetryAt?: string;
@@ -269,7 +269,7 @@ export interface PortalDeliveryResponse {
   eventId: string;
   eventType?: string;
   endpointId: string;
-  status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'DLQ';
+  status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'DLQ' | 'CANCELLED';
   attemptCount: number;
   maxAttempts: number;
   nextRetryAt?: string;
@@ -298,6 +298,8 @@ export interface DeliveryStatusCounts {
   success: number;
   failed: number;
   dlq: number;
+  /** Deliveries a transformation said not to send. Neither delivered nor failed. */
+  cancelled: number;
 }
 
 export interface SubscriptionResponse {
@@ -506,10 +508,17 @@ export interface IncomingBulkReplayRequest {
 
 // ─── Transformations ─────────────────────────────────────────────────
 
+/**
+ * Which language a transformation's `template` column holds. Omitted on a request
+ * means TEMPLATE, which is what every transformation was before JavaScript existed.
+ */
+export type TransformationKind = 'TEMPLATE' | 'JAVASCRIPT';
+
 export interface TransformationRequest {
   name: string;
   description?: string;
   template: string;
+  kind?: TransformationKind;
   enabled?: boolean;
 }
 
@@ -519,6 +528,7 @@ export interface TransformationResponse {
   name: string;
   description?: string;
   template: string;
+  kind: TransformationKind;
   version: number;
   enabled: boolean;
   subscriptionCount: number;

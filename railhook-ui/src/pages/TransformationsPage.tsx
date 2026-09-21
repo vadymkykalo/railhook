@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, Search, ArrowDown, Link2, History } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, Search, ArrowDown, Link2, History, Code2, FlaskConical } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -45,6 +45,7 @@ const SAMPLE_INPUT = {
 
 export default function TransformationsPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageSubscriptions: canManage } = usePermissions();
   const {
@@ -119,7 +120,25 @@ export default function TransformationsPage() {
     setShowDialog(true);
   };
 
+  /**
+   * A JavaScript transformation is not editable in a dialog with a JSON box in
+   * it, and pretending otherwise is how somebody saves a script they have never
+   * run. Both the edit button and the flask send it to the Studio, which loads
+   * it by id, runs it against a real event and saves it back.
+   */
+  const openInStudio = (item: TransformationResponse) => {
+    navigate(`/admin/projects/${projectId}/transform-studio?transformation=${item.id}`);
+  };
+
   const handleDuplicate = (item: TransformationResponse) => {
+    // A script cannot be duplicated through this dialog: its guard requires valid JSON, so the
+    // Save button would simply never enable and the reader would be left wondering. The Studio
+    // is where a script is copied — it opens holding this one, and "Save as" asks for the new
+    // name, which is what duplicating is.
+    if (item.kind === 'JAVASCRIPT') {
+      openInStudio(item);
+      return;
+    }
     setEditing(null);
     setFormName(t('transformations.copyOfName', { name: item.name }));
     setFormDescription(item.description || '');
@@ -237,6 +256,7 @@ export default function TransformationsPage() {
               <TableRow>
                 <TableHead>{t('transformations.name')}</TableHead>
                 <TableHead>{t('transformations.description')}</TableHead>
+                <TableHead>{t('transformations.kind')}</TableHead>
                 <TableHead>{t('transformations.version')}</TableHead>
                 <TableHead>{t('transformations.status')}</TableHead>
                 <TableHead>{t('transformations.usedBy')}</TableHead>
@@ -252,6 +272,19 @@ export default function TransformationsPage() {
                     <span className="block max-w-[250px] truncate text-[13px] text-muted-foreground">
                       {item.description || '—'}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {item.kind === 'JAVASCRIPT' ? (
+                      <span className="inline-flex items-center gap-1 rounded-md border border-rail bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-medium">
+                        <Code2 className="h-3 w-3" aria-hidden="true" />
+                        {t('transformations.kindJavascript')}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-md border border-rail px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                        <Wand2 className="h-3 w-3" aria-hidden="true" />
+                        {t('transformations.kindTemplate')}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {/* The version number is a link because it is a claim about the past:
@@ -283,7 +316,22 @@ export default function TransformationsPage() {
                   {canManage && (
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEdit(item)} title={t('common.edit')} aria-label={t('common.edit')}>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => openInStudio(item)}
+                          title={t('transformations.openInStudio')}
+                          aria-label={t('transformations.openInStudio')}
+                        >
+                          <FlaskConical className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => (item.kind === 'JAVASCRIPT' ? openInStudio(item) : openEdit(item))}
+                          title={t('common.edit')}
+                          aria-label={t('common.edit')}
+                        >
                           <Settings className="h-3.5 w-3.5" />
                         </Button>
                         <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicate(item)} title={t('transformations.duplicate')} aria-label={t('transformations.duplicate')}>
