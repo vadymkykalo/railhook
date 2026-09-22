@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.30.2] - 2026-09-22
+
+### Fixed
+
+- **An MCP method the server does not implement is answered as a JSON-RPC error**, not an HTTP 500.
+  claude.ai probes `server/discover`; each probe was a 500 and counted towards the API's error-rate
+  alert.
+- **`ApiErrorRateHigh` wants at least five 5xx in five minutes** as well as the 0.5% ratio, so two or
+  three errors on a quiet deployment no longer page as a 1% outage. Both the Compose rules and the Helm
+  `PrometheusRule` carry it.
+- **A tunnel opens reliably again.** Its public slug was base64 with `-` and `_` stripped and the rest
+  cut to twelve characters, which throws when five of the sixteen were stripped; `railhook listen`
+  answered 500 about once in a million opens. The slug is now drawn from its own alphabet.
+
 ## [2.30.1] - 2026-09-22
 
 ### Added

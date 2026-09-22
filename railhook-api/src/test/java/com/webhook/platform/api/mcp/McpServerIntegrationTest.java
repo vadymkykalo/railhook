@@ -100,6 +100,20 @@ class McpServerIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isMethodNotAllowed());
     }
 
+    /**
+     * A method this server does not implement is the client's question, not the server's failure:
+     * a JSON-RPC error on a 200, never an HTTP 500. Clients probe methods newer than the SDK
+     * (claude.ai sends {@code server/discover}), and each 500 counted towards the API's 5xx alert.
+     */
+    @Test
+    void answersAnUnknownMethodWithAJsonRpcErrorNotA500() throws Exception {
+        JsonNode response = rpc(withBearer(readOnlyKeyA), "server/discover", Map.of());
+
+        assertThat(response.has("result")).isFalse();
+        assertThat(response.get("error").get("code").asInt()).isEqualTo(-32601);
+        assertThat(response.get("id").asInt()).isPositive();
+    }
+
     @Test
     void listsTheToolsWithReadOnlyHintsOnTheReads() throws Exception {
         JsonNode result = rpc(withKey(readOnlyKeyA), "tools/list", Map.of()).get("result");

@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 
 @Slf4j
@@ -46,6 +47,10 @@ public class TunnelService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
+    /** A slug goes in a URL and is read aloud, so: lower case, no punctuation. */
+    private static final String SLUG_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+    private static final int SLUG_LENGTH = 12;
+
     @Transactional
     public TunnelSession createSession(UUID userId, UUID projectId,
                                        int localPort, String clientInfo) {
@@ -60,7 +65,7 @@ public class TunnelService {
         enforceActiveTunnelLimit(organizationId);
 
         String tunnelToken = generateSecureToken();
-        String publicSlug = generateSlug();
+        String publicSlug = slug(SECURE_RANDOM);
 
         TunnelSession session = TunnelSession.builder()
                 .userId(userId)
@@ -279,10 +284,18 @@ public class TunnelService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    private String generateSlug() {
-        byte[] bytes = new byte[12];
-        SECURE_RANDOM.nextBytes(bytes);
-        return "tun-" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-                .toLowerCase().replace("_", "").replace("-", "").substring(0, 12);
+    /**
+     * A slug is drawn character by character from the alphabet it is allowed to use.
+     *
+     * <p>It used to be base64 with {@code -} and {@code _} stripped out and the rest cut to
+     * twelve, which throws whenever the encoding happens to contain five of them — a tunnel that
+     * refused to open for a reason nobody could act on.
+     */
+    static String slug(Random random) {
+        StringBuilder slug = new StringBuilder("tun-");
+        for (int i = 0; i < SLUG_LENGTH; i++) {
+            slug.append(SLUG_ALPHABET.charAt(random.nextInt(SLUG_ALPHABET.length())));
+        }
+        return slug.toString();
     }
 }

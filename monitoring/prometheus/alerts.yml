@@ -294,11 +294,13 @@ groups:
     rules:
       # Tunnel traffic is left out: a tunnel relays what the customer's own machine answers, and
       # answers 503 while nobody is connected. Their dev server failing is not the API failing.
+      # The floor of five errors keeps a quiet deployment's two or three from paging as 1%.
       - alert: ApiErrorRateHigh
         expr: |
           (sum(rate(http_server_requests_seconds_count{status=~"5..", uri!~"/tunnel/.*"}[5m])) or vector(0)) /
           sum(rate(http_server_requests_seconds_count{uri!~"/tunnel/.*"}[5m]))
           > 0.005
+          and sum(increase(http_server_requests_seconds_count{status=~"5..", uri!~"/tunnel/.*"}[5m])) >= 5
         for: 5m
         labels:
           severity: critical
