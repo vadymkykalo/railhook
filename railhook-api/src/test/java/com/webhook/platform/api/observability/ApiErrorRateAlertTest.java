@@ -34,10 +34,27 @@ class ApiErrorRateAlertTest {
     void tunnelTrafficIsLeftOut() throws IOException {
         for (Path file : RULE_FILES) {
             String expr = exprOf(Files.readString(file), "ApiErrorRateHigh");
-            assertThat(countOf(expr, "http_server_requests_seconds_count"))
-                    .as(file + ": numerator and denominator").isEqualTo(2);
+            int series = countOf(expr, "http_server_requests_seconds_count");
+            assertThat(series).as(file + ": numerator, denominator and error floor").isEqualTo(3);
             assertThat(countOf(expr, "uri!~\"/tunnel/.*\""))
-                    .as(file + ": both sides of the ratio must leave tunnel traffic out").isEqualTo(2);
+                    .as(file + ": every series in the rule must leave tunnel traffic out").isEqualTo(series);
+        }
+    }
+
+    /**
+     * It paged again on 2026-09-21 and 2026-09-22 for two or three requests: an MCP client's
+     * probe answered 500, at about 220 requests in fifteen minutes. A ratio alone cannot tell a
+     * quiet deployment's two failures from an outage, so the rule also wants a floor of errors.
+     */
+    @Test
+    @DisplayName("two or three errors on a quiet deployment do not page")
+    void aFewErrorsDoNotPage() throws IOException {
+        Pattern floor = Pattern.compile(
+                "and\\s+sum\\(increase\\(http_server_requests_seconds_count\\{status=~\"5\\.\\.\"[^}]*}\\[5m]\\)\\)\\s*>=\\s*(\\d+)");
+        for (Path file : RULE_FILES) {
+            Matcher m = floor.matcher(exprOf(Files.readString(file), "ApiErrorRateHigh"));
+            assertThat(m.find()).as(file + ": the rule needs a minimum count of 5xx in the window").isTrue();
+            assertThat(Integer.parseInt(m.group(1))).as(file + ": the floor").isGreaterThanOrEqualTo(5);
         }
     }
 

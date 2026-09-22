@@ -3,11 +3,13 @@ package com.webhook.platform.api.mcp;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
+import io.modelcontextprotocol.spec.McpStatelessServerTransport;
 import org.springframework.ai.mcp.server.webmvc.transport.WebMvcStatelessServerTransport;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import tools.jackson.databind.json.JsonMapper;
@@ -48,5 +50,15 @@ public class McpServerConfig {
                     return McpTransportContext.EMPTY;
                 })
                 .build();
+    }
+
+    /**
+     * What the MCP server is built on: the transport above, with protocol errors answered as
+     * JSON-RPC rather than HTTP 500. The router still comes from the WebMVC transport itself.
+     */
+    @Bean
+    @Primary
+    public McpStatelessServerTransport mcpStatelessServerTransport(WebMvcStatelessServerTransport transport) {
+        return new JsonRpcErrorAnsweringTransport(transport);
     }
 }
