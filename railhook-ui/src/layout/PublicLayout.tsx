@@ -181,7 +181,16 @@ export function Footer() {
             <ConnectWithUs />
             <p className="font-mono text-xs text-muted-foreground">{t('footer.copyright', { year: new Date().getFullYear() })}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <a
+              href="https://www.saashub.com/railhook?utm_source=badge&utm_campaign=badge&utm_content=railhook&badge_variant=color&badge_kind=approved"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="opacity-80 transition-opacity hover:opacity-100"
+            >
+              <img src="/badges/saashub-approved-color.png" alt="Railhook on SaaSHub" width={150} height={50} className="dark:hidden" />
+              <img src="/badges/saashub-approved-dark.png" alt="Railhook on SaaSHub" width={150} height={50} className="hidden dark:block" />
+            </a>
             <ThemeToggle className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:grid max-sm:h-10 max-sm:w-10 max-sm:place-items-center" />
           </div>
         </div>
