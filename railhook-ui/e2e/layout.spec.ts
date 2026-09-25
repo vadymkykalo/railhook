@@ -3,7 +3,7 @@ import { EVENT_ID, PLATFORM_ORG_ID, PROJECT_ID, WORKFLOW_ID, mockApi, mockNewOrg
 
 /** iOS Safari zooms into focused fields under 16px; jsdom sees neither that nor overflow. */
 
-const PUBLIC = ['/', '/pricing', '/tester', '/tools/webhook-signature', '/security', '/about', '/contact', '/login', '/register', '/forgot-password', '/reset-password?token=e2e', '/verify-email?token=e2e', '/no-such-page'];
+const PUBLIC = ['/', '/pricing', '/tester', '/tools/webhook-signature', '/login', '/register', '/forgot-password', '/reset-password?token=e2e', '/verify-email?token=e2e', '/no-such-page'];
 const ADMIN = [
   '/admin/dashboard',
   '/admin/projects',

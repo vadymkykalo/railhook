@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { contactDomain } from '../lib/runtimeConfig';
 import { useTranslation } from 'react-i18next';
 import { Check, ExternalLink, Loader2, Minus, ShieldCheck } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
@@ -375,7 +375,7 @@ export default function BillingPage() {
                         <div className="mt-3">
                           {isCustom ? (
                             <Button asChild size="sm" variant="outline" className="w-full">
-                              <Link to="/contact">{t('billing.contactSales')}</Link>
+                              <a href={`mailto:sales@${contactDomain() ?? 'railhook.io'}`}>{t('billing.contactSales')}</a>
                             </Button>
                           ) : (
                             <Button

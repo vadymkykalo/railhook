@@ -62,7 +62,7 @@ describe('the footer', () => {
   it('does not when the blog is off', () => {
     renderPage(<PublicLayout nav={false} />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
     expect(footerBlog()).toBeNull();
-    expect(within(screen.getByRole('contentinfo')).getByRole('link', { name: en.footer.about })).toBeInTheDocument();
+    expect(within(screen.getByRole('contentinfo')).getByRole('link', { name: en.footer.privacy })).toBeInTheDocument();
   });
 });
 

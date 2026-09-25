@@ -17,7 +17,7 @@ function renderAt(entry: string) {
     <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route element={<PublicLayout nav={false} />}>
-          <Route path="/contact" element={<p>Contact</p>} />
+          <Route path="/pricing" element={<p>Pricing</p>} />
           <Route path="/" element={<p>Home</p>} />
         </Route>
       </Routes>
@@ -27,7 +27,7 @@ function renderAt(entry: string) {
 
 describe('public pages start at their top', () => {
   it('scrolls to the top on a plain navigation', () => {
-    renderAt('/contact');
+    renderAt('/pricing');
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' });
   });
 

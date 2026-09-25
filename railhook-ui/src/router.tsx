@@ -19,13 +19,10 @@ const AcceptInvitePage = lazy(() => import('./auth/AcceptInvitePage'));
 const DeviceApprovePage = lazy(() => import('./auth/DeviceApprovePage'));
 const OAuthConsentPage = lazy(() => import('./auth/OAuthConsentPage'));
 const AuthCallbackPage = lazy(() => import('./auth/AuthCallbackPage'));
-const ContactPage = lazy(() => import('./pages/ContactPage'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
 const TesterPage = lazy(() => import('./pages/TesterPage'));
 const DemoPage = lazy(() => import('./pages/DemoPage'));
 const SignatureVerifierPage = lazy(() => import('./pages/SignatureVerifierPage'));
-const SecurityPage = lazy(() => import('./pages/SecurityPage'));
-const AboutPage = lazy(() => import('./pages/AboutPage'));
 const BlogPage = lazy(() => import('./pages/BlogPage'));
 const BlogPostPage = lazy(() => import('./pages/BlogPostPage'));
 const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.PrivacyPage })));
@@ -125,14 +122,6 @@ export const router = createBrowserRouter([
             element: <S><SignatureVerifierPage /></S>,
           },
           {
-            path: '/security',
-            element: <S><SecurityPage /></S>,
-          },
-          {
-            path: '/about',
-            element: <S><AboutPage /></S>,
-          },
-          {
             path: '/blog',
             element: <S><BlogOnly><BlogPage /></BlogOnly></S>,
           },
@@ -140,10 +129,6 @@ export const router = createBrowserRouter([
           {
             path: '/blog/:slug',
             element: <S><BlogOnly><BlogPostPage /></BlogOnly></S>,
-          },
-          {
-            path: '/contact',
-            element: <S><ContactPage /></S>,
           },
           {
             path: '/privacy',

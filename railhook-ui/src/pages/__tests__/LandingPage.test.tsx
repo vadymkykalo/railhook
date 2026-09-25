@@ -247,22 +247,20 @@ describe('Footer', () => {
     expect(hrefs).toEqual(expect.arrayContaining([
       'https://github.com/vadymkykalo/railhook/issues',
       'https://github.com/vadymkykalo/railhook/releases',
-      '/contact',
       '/pricing',
       '/docs/tools/mcp/',
       '/tools/webhook-signature',
-      '/about',
       '/blog',
-      '/security',
     ]));
     expect(hrefs).not.toContain('/changelog');
+    for (const gone of ['/about', '/security', '/contact']) expect(hrefs).not.toContain(gone);
   });
 
   it('lists the company pages under their own heading', () => {
     renderPage(<Footer />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
     const company = screen.getByRole('heading', { name: en.footer.company }).parentElement as HTMLElement;
     expect(within(company).getAllByRole('link').map((a) => a.getAttribute('href')))
-      .toEqual(['/about', '/blog', '/security', '/contact', '/privacy', '/terms']);
+      .toEqual(['/blog', '/privacy', '/terms']);
   });
 
   describe('connect with us', () => {

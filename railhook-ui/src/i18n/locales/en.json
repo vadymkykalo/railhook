@@ -853,21 +853,6 @@
     "unsubscribed": "Unsubscribed Endpoints",
     "unsubscribedDesc": "These endpoints have no active subscriptions and won't receive any events"
   },
-  "contact": {
-    "communityBody": "Open an issue on GitHub — self-hosted questions get answered there too.",
-    "communityCta": "Open an issue",
-    "communityTitle": "Bugs and feature requests",
-    "docsBody": "Most integration questions are answered in the guides.",
-    "docsCta": "Go to the docs",
-    "docsTitle": "Read first",
-    "responseNote": "We answer on working days, usually within one.",
-    "salesBody": "Need higher limits, a hand with setup or help with self-hosting? Tell us what you need.",
-    "salesTitle": "Plans and support",
-    "subtitle": "Railhook Cloud, self-hosting, limits and support, or a question the docs did not answer.",
-    "supportBody": "Something is wrong with a delivery, an account or a bill.",
-    "supportTitle": "Support",
-    "title": "Talk to us"
-  },
   "createSubscription": {
     "descriptionCreate": "A subscription connects an event type to an endpoint. When a matching event is received, it will be delivered to the endpoint.",
     "descriptionEdit": "Update how events are routed to this endpoint",
@@ -1666,17 +1651,14 @@
     "privacy": "Privacy Policy",
     "product": "Product",
     "quickstart": "Quickstart",
-    "security": "Security",
     "selfHost": "Self-host",
     "selfHosting": "Self-hosting guide",
     "signIn": "Sign in",
     "tagline": "Open-source webhook gateway. MIT licence.",
-    "talkToUs": "Talk to us",
     "terms": "Terms of Service",
     "pricing": "Pricing",
     "tester": "Webhook tester",
     "mcp": "MCP server",
-    "about": "About",
     "company": "Company",
     "releases": "Releases",
     "signatureVerifier": "Signature verifier",
@@ -2441,10 +2423,6 @@
     "you": "You"
   },
   "meta": {
-    "contact": {
-      "description": "Talk to us about Railhook Cloud, self-hosting or paid support.",
-      "title": "Contact — Railhook"
-    },
     "docs": {
       "description": "How to send events, receive webhooks, verify signatures, and read what happened — guides and the full API reference.",
       "title": "Documentation — Railhook",
@@ -2469,14 +2447,6 @@
     "tester": {
       "title": "Webhook tester — inspect webhook requests online, free | Railhook",
       "description": "Get a free URL, send it a webhook from Stripe, GitHub or curl, and see the method, headers and body that arrived. No account needed, kept for 24 hours."
-    },
-    "security": {
-      "title": "Security — Railhook",
-      "description": "How Railhook protects your data: EU hosting, encrypted signing secrets, hashed API keys, isolation between organizations, and signed, verified webhooks."
-    },
-    "about": {
-      "title": "About — Railhook",
-      "description": "Railhook is an open-source, MIT-licensed webhook gateway built by Vadym Kykalo: send and receive webhooks, with every delivery on record."
     },
     "signatureVerifier": {
       "title": "Webhook signature verifier — validate Stripe, GitHub, Shopify and Slack signatures | Railhook",
@@ -4523,8 +4493,6 @@
       "widgetLead": "Ask about Railhook, the cloud or self-hosting. The reply comes to your email.",
       "team": "Railhook team",
       "close": "Close",
-      "formTitle": "Send us a message",
-      "formLead": "It goes straight to the team, and the reply comes to your email.",
       "topicLabel": "What is it about?",
       "topics": {
         "other": "Question",
@@ -4548,186 +4516,6 @@
         "invalid": "Check the email address and the message.",
         "generic": "The message was not sent. Try again, or write to support by email.",
         "busy": "We have had a lot of messages today. Please write to us by email instead."
-      }
-    }
-  },
-  "security": {
-    "eyebrow": "Security",
-    "title": "How Railhook protects your data",
-    "lead": "What the code does today, stated plainly. Railhook is open source, so you can check every claim on this page against the repository.",
-    "sourceCta": "Read the source",
-    "hosting": {
-      "title": "Where Railhook Cloud runs",
-      "lead": "Railhook Cloud is the hosted service at railhook.io. A copy you run yourself sends us nothing.",
-      "hetzner": {
-        "title": "Hosted in the EU",
-        "body": "The servers run at Hetzner in Helsinki, Finland."
-      },
-      "cloudflare": {
-        "title": "Cloudflare in front",
-        "body": "Traffic reaches the servers through Cloudflare, which provides the CDN, DNS and the Turnstile check at sign-up."
-      },
-      "resend": {
-        "title": "Mail through Resend",
-        "body": "Transactional email, such as address verification and password resets, is sent through Resend."
-      },
-      "selfHosted": {
-        "title": "Or on your own servers",
-        "body": "Self-hosted Railhook runs entirely on your infrastructure. Your events, secrets and accounts never reach us."
-      }
-    },
-    "secrets": {
-      "title": "How credentials are stored",
-      "lead": "Nothing that grants access is kept in a form someone could use after reading the database.",
-      "signing": {
-        "title": "Signing secrets are encrypted",
-        "body": "Endpoint and source signing secrets and mTLS client keys are encrypted with AES-256-GCM. Encryption keys are versioned, and an operator can re-encrypt every secret under a new one."
-      },
-      "apiKeys": {
-        "title": "API keys are hashed",
-        "body": "A project API key is shown once, when it is created. Railhook keeps only its SHA-256 hash. A key can be rotated with a grace period, or revoked."
-      },
-      "passwords": {
-        "title": "Passwords are hashed with bcrypt",
-        "body": "Passwords are stored as bcrypt hashes. An account that signs in with Google has no password at all."
-      },
-      "sessions": {
-        "title": "Sessions you control",
-        "body": "Access tokens last 15 minutes. The refresh token sits in an HttpOnly cookie and is replaced on every use; if a used one is presented again, every session of that user ends. You can see your sessions and end any of them."
-      }
-    },
-    "access": {
-      "title": "Isolation and access",
-      "tenancy": {
-        "title": "Organizations are isolated",
-        "body": "Every database query is scoped to the caller's organization by the data layer itself, lookups by id included, so no feature depends on remembering the check. Another organization's resource answers 404."
-      },
-      "roles": {
-        "title": "Roles and scoped keys",
-        "body": "People are Owners, Developers or Viewers. An API key belongs to one project and can be read-only."
-      },
-      "audit": {
-        "title": "Audit log",
-        "body": "Sign-ins, member and role changes, rotated secrets, replays and purges are recorded in the organization's audit log."
-      },
-      "abuse": {
-        "title": "Limits on abuse",
-        "body": "Sign-in and registration are rate-limited, repeated failed sign-ins lock the account for a growing interval, and registration on Railhook Cloud passes a Cloudflare Turnstile check."
-      }
-    },
-    "webhooks": {
-      "title": "Webhooks, in both directions",
-      "signed": {
-        "title": "Every delivery is signed",
-        "body": "HMAC-SHA256 over the payload, in Railhook's own header and in the Standard Webhooks format. After a secret is rotated, deliveries are signed with both secrets for 24 hours, so receivers switch without downtime."
-      },
-      "incoming": {
-        "title": "Incoming webhooks are verified",
-        "body": "Stripe, GitHub, GitLab, Shopify, Slack, Twilio, Square, Adyen, SendGrid and HubSpot requests are checked with each provider's own scheme before anything is stored. A request that fails is answered 401 and not stored, and a replayed signature is refused."
-      },
-      "network": {
-        "title": "No requests into private networks",
-        "body": "Endpoint URLs are checked when they are saved and again before every attempt. Loopback, link-local and private addresses are refused, so a webhook cannot be aimed at internal services."
-      },
-      "mtls": {
-        "title": "Client certificates and ownership checks",
-        "body": "An endpoint can require Railhook to present a client certificate (mTLS), and a deployment can require every endpoint to prove it owns its URL before it receives anything."
-      },
-      "pii": {
-        "title": "Personal data masked on screen",
-        "body": "Masking rules hide emails, phone numbers, card numbers and fields you name, in the dashboard and in shared debug links."
-      }
-    },
-    "data": {
-      "title": "Your data",
-      "retention": {
-        "title": "Kept only as long as the plan says",
-        "body": "On the Railhook Cloud free plan, webhook events are kept for {{days}} days and then deleted."
-      },
-      "export": {
-        "title": "Export and delete",
-        "body": "An owner can export an organization's data and delete the organization. Anyone can delete their own account in the product."
-      },
-      "noSale": {
-        "title": "Not sold, not tracked",
-        "body": "We do not sell data and do not use advertising trackers."
-      },
-      "privacyCta": "Read the privacy policy"
-    },
-    "report": {
-      "title": "Report a vulnerability",
-      "body": "Please do not open a public issue. Report it privately through GitHub, as the security policy describes, and it will be fixed on the latest release line.",
-      "advisory": "Report privately on GitHub",
-      "policy": "Read the security policy",
-      "email": "Or write to"
-    }
-  },
-  "about": {
-    "eyebrow": "About",
-    "title": "An open-source webhook gateway, built in the open",
-    "lead": "Railhook sends webhooks to your customers and receives them from other services, with every delivery on record. It is released under the MIT licence, and all of its code is on GitHub.",
-    "why": {
-      "title": "Why it exists",
-      "both": {
-        "title": "Both directions in one tool",
-        "body": "Sending webhooks and receiving them usually means two systems. Railhook does both: signed, retried deliveries to your customers, and verified webhooks from Stripe, GitHub and other services, in one place."
-      },
-      "open": {
-        "title": "Everything in the open-source version",
-        "body": "There is no enterprise edition and no licence key. Every feature is in the code you can run on your own servers, free, under the MIT licence."
-      },
-      "record": {
-        "title": "Every delivery on record",
-        "body": "Each attempt is kept with the response it got, so when a customer asks what happened, the answer is on screen rather than in a log search."
-      }
-    },
-    "who": {
-      "title": "Who builds it",
-      "body": "Railhook is built by Vadym Kykalo, the project's maintainer, who also runs Railhook Cloud at railhook.io. The work happens in the public repository: issues, changes and releases are all there.",
-      "github": "Vadym Kykalo on GitHub",
-      "repo": "The Railhook repository"
-    },
-    "stack": {
-      "title": "What it is built on",
-      "lead": "Well-understood parts you can run yourself.",
-      "java": {
-        "title": "Java and Spring Boot",
-        "body": "The API, and the worker that makes the deliveries."
-      },
-      "postgres": {
-        "title": "PostgreSQL",
-        "body": "An event and its outbox record are written in one transaction before the API replies, so an accepted event is not lost."
-      },
-      "kafka": {
-        "title": "Kafka",
-        "body": "Carries events from the API to the worker."
-      },
-      "redis": {
-        "title": "Redis",
-        "body": "Rate limits and delivery ordering."
-      },
-      "react": {
-        "title": "React and TypeScript",
-        "body": "The dashboard, the customer portal and this site."
-      }
-    },
-    "links": {
-      "title": "Find out more",
-      "github": {
-        "title": "Source code",
-        "body": "The repository, its issues and its releases."
-      },
-      "docs": {
-        "title": "Documentation",
-        "body": "Guides for sending, receiving and self-hosting, and the API reference."
-      },
-      "changelog": {
-        "title": "Changelog",
-        "body": "Every release and what changed in it, in CHANGELOG.md on GitHub."
-      },
-      "contact": {
-        "title": "Contact",
-        "body": "Questions about Railhook Cloud or running it yourself."
       }
     }
   },
@@ -5178,113 +4966,6 @@
           "rule": "receiver keys on webhook-id",
           "cell0": "processed once",
           "cell1": "processed once"
-        }
-      },
-      "aiHarnessLoop": {
-        "aria": "A loop of eight steps. Top row, left to right: a task file the person writes, the rules and skill the agent loads, a failing test, the implementation. Bottom row, right to left: local checks, CI, release and a deploy a named person approves, and a verification from outside. Local checks and CI can refuse a change and send it back to the agent. Anything that still gets through becomes an incident, and each incident becomes a new rule, skill or ratchet that feeds back into the rules the agent loads.",
-        "caption": "The engineering loop around the agent. The agent owns three steps of eight; the person owns the task and the deploy; machine checks own the rest. The arrow along the right-hand side is the one that makes it improve.",
-        "owner": {
-          "human": "the person decides",
-          "agent": "the agent does",
-          "machine": "a machine check"
-        },
-        "box": {
-          "task": {
-            "title": "Written task",
-            "line1": "one per branch",
-            "line2": "the only go-ahead"
-          },
-          "rules": {
-            "title": "Rules + skill",
-            "line1": "instructions file",
-            "line2": "glossary, procedures"
-          },
-          "test": {
-            "title": "Failing test",
-            "line1": "states the result",
-            "line2": "before the code"
-          },
-          "code": {
-            "title": "Implementation",
-            "line1": "written by the agent",
-            "line2": "reviewed by a person"
-          },
-          "local": {
-            "title": "Local checks",
-            "line1": "ratchets, types",
-            "line2": "docs, unit tests"
-          },
-          "ci": {
-            "title": "CI",
-            "line1": "same gates, every PR",
-            "line2": "e2e at phone width"
-          },
-          "deploy": {
-            "title": "Release + deploy",
-            "line1": "manual, approved",
-            "line2": "by a named person"
-          },
-          "verify": {
-            "title": "Verify from outside",
-            "line1": "which version is live",
-            "line2": "nightly load probe"
-          }
-        },
-        "refused": "refused: back to the agent",
-        "incident": "Incident → new rule, skill or ratchet",
-        "feedback": "feeds the rules"
-      },
-      "aiBugGuardrail": {
-        "aria": "Six bugs and the guardrail each became. Large events sent as a compressed blob, found in a review, now refused by a check that both services agree with the database. An incoming pipeline copied from the outgoing one, found in a review, now one shared implementation. A raw SQL insert failing every night, found during tenancy work, now a check on every raw query. Squash merges into main, noticed at the next release merge, now blocked by a branch setting. A worker started before migrations, seen in the restart count, now an upgrade-order test. A field that zoomed on an iPhone, seen in production, now a browser test at phone and desktop widths.",
-        "caption": "Bug, how it was noticed, and what now refuses it. Each guardrail has the shape of the bug that created it.",
-        "head": {
-          "bug": "bug",
-          "caught": "noticed in",
-          "guard": "guardrail now"
-        },
-        "row": {
-          "compressed": {
-            "bug": "Large events sent as a gzip blob",
-            "detail": "one service never read a column",
-            "caught": "a review",
-            "guard": "schema check across",
-            "guard2": "both services"
-          },
-          "copied": {
-            "bug": "Incoming pipeline was a copy",
-            "detail": "fixes never carried across",
-            "caught": "a review",
-            "guard": "one shared",
-            "guard2": "implementation"
-          },
-          "native": {
-            "bug": "A raw SQL insert failed nightly",
-            "detail": "swallowed by a catch",
-            "caught": "tenancy work",
-            "guard": "every raw query",
-            "guard2": "declares its tenant"
-          },
-          "squash": {
-            "bug": "Squash merges into main, twice",
-            "detail": "conflicts on identical files",
-            "caught": "next release merge",
-            "guard": "branch setting",
-            "guard2": "refuses squash"
-          },
-          "upgrade": {
-            "bug": "Worker started before migrations",
-            "detail": "the comment said otherwise",
-            "caught": "restart count",
-            "guard": "upgrade-order",
-            "guard2": "test"
-          },
-          "zoom": {
-            "bug": "A field zoomed in on an iPhone",
-            "detail": "registration form cut off",
-            "caught": "production",
-            "guard": "browser test at",
-            "guard2": "phone and desktop width"
-          }
         }
       },
       "lostAck": {
