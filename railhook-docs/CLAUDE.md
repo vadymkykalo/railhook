@@ -36,7 +36,11 @@ import { Steps, Tabs, TabItem, Aside, Card, CardGrid, LinkCard } from '@astrojs/
 - Internal links are absolute, with the base and a trailing slash: `/docs/outgoing/retries/`,
   `/docs/uk/outgoing/retries/`. The build's links validator fails on anything else, and on a
   link to a page that does not exist.
-- End with a "Next steps" `<CardGrid>` of two or three `<LinkCard>`s.
+- No "Next steps" card grid, no closing summary, no "in this guide you will learn": the sidebar
+  and the previous/next links already do that. Link a related page inline, where the reader
+  needs it.
+- Plain and short: no marketing words, no em-dashes, no emoji. Keep every command, value and
+  table, and keep the *why* where it prevents a mistake.
 - Terms come from the root `CONTEXT.md`; respect its `_Avoid_` lines.
 
 ## Never hand-write a reference
@@ -66,7 +70,11 @@ repository — `.env.dist`, `application.yml`, `install.sh`, `openapi.yaml`, the
 
 ## Theme
 
-`src/styles/theme.css` maps the Railhook tokens onto Starlight's variables for both themes.
-Manrope is for the page title and site title only; body is Onest; code is JetBrains Mono on a
-dark surface in both themes. Status hues (ok / retry / halt) are for statuses only — caution and
-danger asides — never for chrome, and the accent never stands for a status.
+`src/styles/theme.css` maps the Railhook tokens onto Starlight's variables for both themes: white
+ground, black ink, `#333`/`#555` body text, `#E5E7EB` hairlines, `#F4F4F4` soft band; near-black
+with white ink in dark mode. Geist 400/500 for text, JetBrains Mono for code and for the small
+uppercase labels (sidebar groups, table heads, aside titles). No border radius, no shadows.
+Code sits on `#111` in both themes. One accent, cyan `#7FE7FF`, only as a fill behind black text
+(the active sidebar item, a hovered link, a selection), never as text or a thin line. Status hues
+are for caution and danger asides only. The logo is the hook mark in ink on a transparent
+ground, `src/assets/railhook-mark.svg` and its white twin for dark mode.

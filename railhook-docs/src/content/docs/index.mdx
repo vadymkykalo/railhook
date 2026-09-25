@@ -1,41 +1,17 @@
 ---
 title: Railhook documentation
-description: Send and receive webhooks reliably, on Railhook Cloud or on your own server.
+tableOfContents: false
+description: Send and receive webhooks with retries and a record of every attempt, on Railhook Cloud or on your own server.
 ---
 
-import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
-import StartCards from '../../components/StartCards.astro';
+Railhook sends your product's webhooks and receives the ones it depends on, retries what fails and records every attempt.
 
-Railhook delivers the webhooks your product sends and receives the ones it depends on, retrying what fails and keeping a record of every attempt. Use it on Railhook Cloud, or run it on your own server.
+- [Quickstart](/docs/start/quickstart/): from nothing to a delivered webhook.
+- [Self-hosting](/docs/self-hosting/overview/): what an installation runs and what it needs.
+- [API reference](/docs/api-reference/): every endpoint, with requests you can send to your instance.
 
-<CardGrid>
-<Card title="Railhook Cloud — sign up free">
-
-Railhook runs at railhook.io. Sign up and start on the free plan; paid plans with support and higher limits will come later.
-
-<LinkButton href="https://railhook.io/register" variant="primary">Sign up free</LinkButton>
-
-</Card>
-<Card title="Self-host — one command">
-
-The installer checks the machine, writes a Compose file and a `.env` with generated secrets, then starts the stack. It needs about 4 GiB of RAM.
-
-</Card>
-</CardGrid>
+Railhook Cloud runs at [railhook.io](https://railhook.io/register), free to start. To run it on your own server (about 4 GiB of RAM):
 
 ```bash title="Install on your server"
 curl -fsSL https://railhook.io/install.sh | bash
 ```
-
-## Start here
-
-<StartCards
-  cards={[
-    { slug: 'start/quickstart', title: 'Quickstart', description: 'From nothing to a delivered webhook.' },
-    { slug: 'self-hosting/overview', title: 'Self-hosting', description: 'What an installation runs and what it needs.' },
-    { slug: 'start/send-first-webhook', title: 'Send your first webhook', description: 'Create an endpoint, subscribe it and send an event.' },
-    { slug: 'start/receive-first-webhook', title: 'Receive your first webhook', description: 'Create a source and forward what arrives to a destination.' },
-    { href: '/docs/api-reference/', title: 'API reference', description: 'Every endpoint, with requests you can send to your instance.' },
-    { slug: 'tools/cli', title: 'CLI', description: 'Log in, tunnel webhooks to localhost and switch between profiles.' },
-  ]}
-/>
