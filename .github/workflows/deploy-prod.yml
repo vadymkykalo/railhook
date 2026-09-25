@@ -155,7 +155,8 @@ jobs:
           # ever read as an argument by railhook-deploy. Its stdin is not: railhook-deploy
           # runs `./railhook upgrade`, which applies these settings to .env before anything
           # else, and refuses the whole upgrade if one of them is not allowed. It takes a
-          # backup before it migrates, and refuses to continue if that backup fails.
+          # backup before it migrates, and refuses to continue if that backup fails. Then it
+          # refreshes the monitoring stack for the same tag (deploy/prod/railhook-deploy).
           ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes \
               "root@${HOST}" "deploy ${VERSION}" < "$SETTINGS_FILE"
 

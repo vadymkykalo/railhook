@@ -280,6 +280,12 @@ Alertmanager, which routes `monitoring/prometheus/alerts.yml` (the platform) and
 email/Slack/webhook/Telegram via the `ALERTMANAGER_*` env vars (`.env.dist`). Only
 Grafana is published, on loopback. See `monitoring/README.md`.
 
+On railhook.io the deploy key runs `deploy/prod/railhook-deploy`, installed as
+`/usr/local/bin/railhook-deploy`. After `./railhook upgrade` it downloads `monitoring/` for the
+same tag and recreates the monitoring stack, so alert rules and dashboards follow each release.
+After changing the script, copy it to the host:
+`scp deploy/prod/railhook-deploy root@<host>:/usr/local/bin/railhook-deploy`.
+
 **Kubernetes (closed):** the chart sets `MANAGEMENT_PORT` on both deployments
 (8082 for the API, 8081 for the worker), exposes it as a named `management`
 port on the container and the Service, points the `ServiceMonitor` and the API's
