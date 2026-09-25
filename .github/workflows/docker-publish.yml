@@ -1,12 +1,5 @@
 name: Docker Publish
 
-# Publishes the images the Helm chart and docker-compose.yml
-# reference by default. Runs only on version tags — every push/PR still goes
-# through ci.yml's `docker-build` job (:test tag, never pushed), which is what
-# catches Dockerfile breakage day to day. This workflow is the one that makes
-# `helm install` and `docker compose up` actually
-# work against something real.
-
 on:
   push:
     tags:

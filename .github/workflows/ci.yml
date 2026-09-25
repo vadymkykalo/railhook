@@ -19,9 +19,7 @@ jobs:
     name: Version drift check
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # No SNAPSHOT-suffix skip here: pom.xml is intentionally allowed to run a
-    # -SNAPSHOT ahead of the Chart/UI/SDK versions between releases (see
-    # scripts/check-version-drift.sh) but every real value still has to agree.
+    # pom.xml may run a -SNAPSHOT ahead of the other versions between releases.
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -29,12 +27,6 @@ jobs:
       - name: Check pom / Chart / UI / SDK versions agree
         run: scripts/check-version-drift.sh
 
-  # `helm lint` used to live only in docker-publish.yml, which runs
-  # `on: push: tags` — so the chart was first checked *after* it had been
-  # tagged and released. That is how the 2.6.0 chart shipped declaring
-  # containerPort 80 for an image whose nginx listens on 5173: readiness could
-  # never pass, and `helm install` produced a UI that never came up. The chart
-  # is a documented installation path, so it gets checked on the way in.
   helm-lint:
     name: Helm Chart Lint & Render
     runs-on: ubuntu-latest
@@ -51,9 +43,7 @@ jobs:
       - name: helm lint
         run: helm lint deploy/helm/railhook
 
-      # Both values files, because values-production.yaml overrides enough
-      # (external database, replica counts, resources) to render templates the
-      # default values never reach.
+      # Both values files: values-production.yaml reaches templates the defaults never render.
       - name: helm template
         run: |
           set -euo pipefail
@@ -64,8 +54,7 @@ jobs:
             -f deploy/helm/railhook/values-production.yaml \
             > rendered/production.yaml
           wc -l rendered/*.yaml
-          # Tunnel and incoming-source URLs must follow the public address, never the API's
-          # localhost default.
+          # Tunnel and incoming-source URLs must follow the public address, never the API's localhost default.
           for f in rendered/*.yaml; do
             grep -q 'WEBHOOK_INGRESS_BASE_URL: "http' "$f" \
               || { echo "::error::$f sets no WEBHOOK_INGRESS_BASE_URL"; exit 1; }
@@ -79,27 +68,18 @@ jobs:
       - name: Validate rendered manifests against the Kubernetes schema
         run: |
           set -euo pipefail
-          # Downloaded to a file rather than piped into tar: a retry cannot
-          # rescue a pipe, because tar has already read a truncated stream by
-          # the time curl starts over. This step failed exactly that way on
-          # 2026-09-04 ("Recv failure: Connection reset by peer").
+          # Downloaded to a file, not piped into tar: a retry cannot rescue a half-read pipe.
           curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors \
             -o kubeconform.tar.gz \
             https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
           tar xzf kubeconform.tar.gz kubeconform
-          # -strict rejects unknown fields, which is what catches a typo'd key
-          # that Helm renders happily and Kubernetes silently ignores.
-          # ServiceMonitor/PrometheusRule are CRDs, hence the extra schema
-          # source; -ignore-missing-schemas would hide real errors instead.
+          # -strict catches typo'd keys Kubernetes silently ignores; the extra schema source covers the CRDs.
           ./kubeconform -strict -summary \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             rendered/default.yaml rendered/production.yaml
 
-      # The port the UI container listens on lives in three files that nothing
-      # otherwise ties together: nginx.conf, the Deployment and the probes.
-      # This asserts they still agree, so the 2.6.0 bug cannot come back
-      # quietly.
+      # The UI port lives in nginx.conf, the Deployment and the probes, and nothing else ties them together.
       - name: UI container port matches nginx.conf
         run: |
           set -euo pipefail
@@ -129,15 +109,7 @@ jobs:
           print(f"UI Deployment and probes all target {expected}.")
           EOF
 
-  # helm-lint above renders the chart and checks the manifests against the
-  # Kubernetes schema. Nothing applied them, and four defects lived in that gap
-  # for releases: WEBHOOK_ENCRYPTION_SALT was never supplied to either app
-  # (both require it with no default, so every api and worker pod CrashLooped),
-  # the PodDisruptionBudget template the values and the README both advertised
-  # did not exist, MANAGEMENT_PORT was never set so every metrics scrape hit the
-  # authenticated chain and got a 401, and APP_BASE_URL was left at the app's
-  # own http://localhost:5173 so verification and invite links pointed at
-  # nobody's machine. A render is not an install; this job installs.
+  # A render is not an install: missing env vars and templates once crash-looped every pod.
   helm-kind-smoke:
     name: Helm Chart Install Smoke Test
     runs-on: ubuntu-latest
@@ -182,9 +154,7 @@ jobs:
         with:
           version: v3.16.3
 
-      # Verbatim from the chart README's "Create secrets" step, including
-      # encryption-salt. If that snippet ever stops producing a Secret the chart
-      # can install against, this is where it shows.
+      # Verbatim from the chart README's "Create secrets" step.
       - name: Create secrets, the way the chart README says to
         run: |
           set -e
@@ -202,12 +172,7 @@ jobs:
           set -e
           kubectl apply -f deploy/ci/kind-dependencies.yaml
 
-          # Waited for one at a time, each with its own deadline. A single wait over
-          # all three shares one clock, so the first slow one eats it and the others
-          # are reported as having timed out when they are Running and Ready — which
-          # is exactly what happened the first time this job ran: Kafka crash-looped
-          # and the log blamed Redis too. On failure, dump the culprit's own logs;
-          # `kubectl describe` shows a probe failing and never says why.
+          # One deadline each: a shared clock blames the healthy ones for the slow one's time.
           for d in postgres kafka redis; do
             if ! kubectl wait --for=condition=available --timeout=4m "deployment/$d"; then
               echo "::error::$d never became available"
@@ -216,9 +181,7 @@ jobs:
             fi
           done
 
-      # One replica of each and no HPA — a kind node on a CI runner cannot fit
-      # the production replica counts, and neither has anything to do with what
-      # this job checks. The PDBs are switched on precisely because they are new.
+      # One replica, no HPA: a kind node cannot fit the production counts.
       - name: helm install
         run: |
           set -e
@@ -283,28 +246,18 @@ jobs:
             [ "$code" = "$2" ] || { echo "::error::$1 returned $code, expected $2"; exit 1; }
           }
 
-          # Actuator on the management port, for both services.
           check http://railhook-api:8082/actuator/health          200
           check http://railhook-worker:8081/actuator/health/liveness 200
-          # The scrape the ServiceMonitor performs. 200, not the 401 it got
-          # while the chart left actuator on the authenticated main port —
-          # which is the whole reason MANAGEMENT_PORT is set now.
+          # 200 here, not the 401 it got while actuator shared the authenticated main port.
           check http://railhook-api:8082/actuator/prometheus      200
           check http://railhook-worker:8081/actuator/prometheus   200
-          # And the main port still refuses it, so the 200 above is the split
-          # doing the work rather than actuator having been left wide open.
-          # Asserted as "not 200" rather than a specific code: SecurityConfig
-          # answers 401 there, but which of 401/404 you get depends on whether
-          # authorization or handler mapping speaks first, and the invariant is
-          # that metrics are not served unauthenticated on the traffic port.
+          # "Not 200" rather than a code: whether 401 or 404 answers first is not the invariant.
           code=$(kubectl exec smoke-curl -- \
             curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
             http://railhook-api:8080/actuator/prometheus)
           echo "http://railhook-api:8080/actuator/prometheus  $code (want anything but 200)"
           [ "$code" != "200" ] || { echo "::error::metrics are served unauthenticated on the traffic port"; exit 1; }
-          # The UI image's nginx proxies /actuator/health to the literal
-          # upstream `api` on 8082 — this proves the alias Service forwards to
-          # the real management port.
+          # The UI's nginx proxies /actuator/health to the literal upstream `api` on 8082.
           check http://api:8082/actuator/health/liveness          200
           check http://railhook-ui/                               200
           check http://railhook-ui/actuator/health/liveness       200
@@ -375,18 +328,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       
-      # This and the integration job below are separate GitHub Actions
-      # jobs on separate runners with no shared filesystem, so each writes
-      # its own distinctly-named exec file (jacoco-unit.exec here,
-      # default target/jacoco.exec - a naive setup where both jobs wrote the
-      # same filename and only one got published/read downstream would
-      # silently report only whichever run happened to be looked at, not the
-      # true merged coverage. The coverage-report job later downloads both
-      # sets of exec files into one checkout and runs jacoco:report-aggregate,
-      # whose default file pattern (**/jacoco*.exec) picks up both.
-      # Cheap guard before the tests themselves: the unit/integration split is done
-      # by class-name suffix alone, so a Testcontainers test with a plain *Test name
-      # lands here, where there is no Docker, and fails as if it were broken.
+      # Distinct exec file names so coverage-report's **/jacoco*.exec picks up both jobs.
       - name: Check test routing
         run: scripts/check-test-routing.sh
 
@@ -399,10 +341,7 @@ jobs:
           echo "### Backend Unit Test Results" >> $GITHUB_STEP_SUMMARY
           echo "Unit tests completed. See workflow logs for details." >> $GITHUB_STEP_SUMMARY
 
-      # Uploaded even on failure (--fail-at-end above means a failing class
-      # doesn't stop the rest of the module's tests from running and
-      # recording coverage) so the aggregate job can still build the fullest
-      # picture available.
+      # Uploaded even on failure so the aggregate job still gets the fullest picture.
       - name: Upload unit test coverage data
         if: always()
         uses: actions/upload-artifact@v7
@@ -445,12 +384,7 @@ jobs:
           echo "tests=$tests" >> "$GITHUB_OUTPUT"
 
       - name: Run integration tests with Testcontainers
-        # surefire 3.x split the old failIfNoTests flag in two - failIfNoTests
-        # still covers "this whole run found zero tests", but a -Dtest=pattern that
-        # matches zero classes in a given module (e.g. common/cli, which have no
-        # *RepositoryTest/*IntegrationTest/etc classes) now needs
-        # surefire.failIfNoSpecifiedTests=false too, or the reactor build fails there
-        # before ever reaching api/worker.
+        # failIfNoSpecifiedTests=false: modules like common and cli match no class in -Dtest.
         run: mvn test -B -Dtest="$TESTS" -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Djacoco.destFile=target/jacoco-it-${{ matrix.shard }}.exec --fail-at-end
         env:
           TESTS: ${{ steps.pick.outputs.tests }}
@@ -464,7 +398,6 @@ jobs:
           echo "Integration tests with Testcontainers completed." >> $GITHUB_STEP_SUMMARY
           echo "- PostgreSQL: Testcontainers" >> $GITHUB_STEP_SUMMARY
 
-      # See the matching comment in the unit-test job above - distinct
       # Tarred: upload-artifact drops the railhook-<module>/target/ prefix when all files share it.
       - name: Pack integration test coverage data
         if: always()
@@ -502,20 +435,7 @@ jobs:
           echo "integration test shards: $RESULT"
           [ "$RESULT" = "success" ] || { echo "::error::an integration test shard did not succeed ($RESULT)"; exit 1; }
 
-  # The actual point of splitting exec-data upload above - neither
-  # with no shared filesystem, so "coverage" can't just be read out of
-  # recompiles (tests skipped - only the just-downloaded exec data is used
-  # for coverage, not a fresh run) so class files exist for JaCoCo to map
-  # execution data onto, then runs `mvn verify` so both
-  # jacoco:report-aggregate (railhook-coverage-report/pom.xml) and
-  # each real module's own jacoco:merge + jacoco:check (root pom.xml +
-  # common/api/worker/cli's own pom.xml) fire against the true merged
-  # unit+integration coverage.
-  # `if: ${{ !cancelled() }}` (not the default "needs both to succeed") so a
-  # real coverage number - even partial - is still visible on the PR when
-  # one suite has unrelated failures; --fail-at-end in both test jobs above
-  # means a failing class doesn't stop its module's other tests from running
-  # and recording coverage either.
+  # !cancelled() so partial coverage still shows when one suite has unrelated failures.
   coverage-report:
     name: Aggregate Coverage Report
     runs-on: ubuntu-latest
@@ -555,17 +475,7 @@ jobs:
           echo "integration coverage archives: ${#archives[@]}"
           for a in "${archives[@]}"; do tar -xvf "$a"; done
 
-      # -DskipTests: tests are not re-run here - class files are needed only
-      # so JaCoCo can map the exec data just downloaded onto real bytecode
-      # and source. Needs `verify`, not `test`: report-aggregate (in
-      # railhook-coverage-report/pom.xml) is bound to `test`, but the
-      # per-module jacoco-merge (root pom.xml) and jacoco:check executions
-      # (each of common/api/worker/cli's own pom.xml) are bound to `verify` -
-      # deliberately later than `test`, so CI's two split `mvn test`
-      # invocations elsewhere in this file (unit-only / integration-only
-      # filters) never trip a threshold check against partial data. This is
-      # the one place in the whole pipeline that reaches `verify`, so it's
-      # the only place those merge+check executions run for real.
+      # `verify`, not `test`: jacoco merge and check bind to verify, and only this job has both exec sets.
       - name: Compile modules, aggregate report, threshold check
         run: mvn verify -B -pl railhook-coverage-report -am -DskipTests
 
@@ -588,9 +498,6 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-  # Proves backups are actually restorable, not just "a CronJob ran".
-  # backup -> destroy the data -> restore -> assert it's back. An untested
-  # restore path is the most common cause of an unusable backup.
   restore-drill:
     name: Backup/Restore Drill
     runs-on: ubuntu-latest
@@ -606,13 +513,7 @@ jobs:
       - name: Start embedded Postgres
         run: docker compose --profile embedded-db up -d postgres
 
-      # Over the unix socket, pg_isready says "ready" during the image's own init
-      # phase: the entrypoint starts a temporary server with listen_addresses=''
-      # to apply the initdb scripts, then stops it and starts the real one. This
-      # wait used to return inside that window, and the seed step below hit the
-      # stop with "FATAL: the database system is shutting down". TCP is the
-      # discriminator - the temporary server is not listening on it - and the
-      # query proves the server that answered will still be there for the seed.
+      # Over TCP: the socket answers ready during the image's temporary init server.
       - name: Wait for Postgres to be ready
         run: |
           for i in $(seq 1 45); do
@@ -690,24 +591,10 @@ jobs:
         working-directory: railhook-ui
         run: npm ci
 
-      # openapi.yaml is drift-checked against springdoc by OpenApiDriftIntegrationTest,
-      # so it describes the real backend. This carries that guarantee across to the
-      # frontend: api.generated.ts is committed, and a DTO change that never reached
-      # it fails here instead of surfacing as a runtime `undefined` in the browser.
-      # The typecheck step below is the other half — src/types/api.contract.ts asserts
-      # the hand-written mirror the app imports still matches these schemas.
-      #
-      # A step in this job rather than a job of its own: `main` requires a fixed list
-      # of status checks, and a new job would have to be added to that list before it
-      # could gate anything.
+      # A step, not a job: main's required checks are a fixed list of job names.
       - name: Check generated API types match openapi.yaml
         run: scripts/check-types-drift.sh
 
-      # The docs are a Starlight site of their own (railhook-docs/), served at /docs/ from
-      # the UI image. The API reference renders openapi.yaml directly; the configuration
-      # reference is derived from .env.dist and committed, so the check fails when it lags.
-      # The node tests hold every page to an EN/UK pair, and the build runs the internal links
-      # validator.
       - name: Check docs site (env reference, tests, build with link validation)
         working-directory: railhook-docs
         run: |
@@ -716,9 +603,6 @@ jobs:
           node --test "scripts/*.test.mjs"
           npm run build
 
-      # sitemap.xml is derived from the public route list in scripts/public-routes.mjs
-      # and committed, so a page added without regenerating it would exist and never be
-      # crawled.
       - name: Check sitemap.xml matches the public route list
         working-directory: railhook-ui
         run: npm run seo:sitemap:check
@@ -752,11 +636,6 @@ jobs:
         working-directory: railhook-ui
         run: npm ci
       
-      # test:coverage (vitest run --coverage) subsumes test:ci - it
-      # still runs every test, plus instruments and enforces the thresholds
-      # in vite.config.ts. Using it here (rather than a separate coverage
-      # step) means the coverage gate is the same command a PR's CI actually
-      # ran, not a second, easier-to-drift-from invocation.
       - name: Run tests with coverage
         working-directory: railhook-ui
         run: npm run test:coverage
@@ -781,11 +660,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
-    # The three SDKs had no per-PR coverage at all: their suites ran on a release tag
-    # (publish-sdks.yml) and in the nightly contract workflow, so a change that broke one
-    # merged green and surfaced either overnight or at release. These are the unit tests
-    # only - no stack, no containers - which is what makes them cheap enough to run here.
-    # The contract tests, which need a live platform, stay nightly.
+    # Unit tests only; the contract tests need a live platform and stay nightly.
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -805,8 +680,7 @@ jobs:
           npm ci
           npm test
 
-      # The stdio bridge to the remote MCP server. Built as well as tested: `bin` points into
-      # dist/, so a compile error would otherwise surface only as a broken `npx -y @railhook/mcp`.
+      # Built as well as tested: `bin` points into dist/.
       - name: MCP bridge tests
         working-directory: sdks/mcp
         run: |
@@ -870,10 +744,7 @@ jobs:
           echo "✅ TypeScript typecheck passed" >> $GITHUB_STEP_SUMMARY
           echo "✅ Production build successful" >> $GITHUB_STEP_SUMMARY
 
-  # A page that scrolls sideways on a phone, or a field small enough for iOS Safari to zoom into,
-  # passes every jsdom test. This builds the bundle and checks the public, auth and dashboard
-  # pages in Chromium at 390px and 1440px, with the API mocked in the browser (e2e/fixtures.ts).
-  # Not a required check: it is new, and a flaky browser job must not wedge merges into main.
+  # Not a required check: a flaky browser job must not wedge merges into main.
   frontend-e2e:
     name: Frontend E2E (mobile + desktop)
     runs-on: ubuntu-latest
@@ -930,13 +801,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       
-      # SpotBugs stays advisory (continue-on-error) DELIBERATELY, not by oversight:
-      # the existing findings across all modules have not been triaged yet, so
-      # flipping this to gating today would block every PR on pre-existing debt
-      # instead of new regressions. Triage is tracked separately; once the
-      # backlog is clear (or suppressed with justification, like the OWASP
-      # suppression file below), remove `continue-on-error` here so new SpotBugs
-      # findings fail the build the same way Trivy/OWASP now do.
+      # Advisory until the existing findings are triaged; then drop continue-on-error.
       - name: Run SpotBugs analysis
         run: mvn compile com.github.spotbugs:spotbugs-maven-plugin:4.8.3.1:check -B -DskipTests
         continue-on-error: true
@@ -948,12 +813,6 @@ jobs:
           echo "Static analysis completed. Check workflow logs for findings." >> $GITHUB_STEP_SUMMARY
           echo "_Advisory only — see comment in ci.yml for why this doesn't gate yet._" >> $GITHUB_STEP_SUMMARY
 
-  # OWASP Dependency-Check (SCA) is not here: it lives in
-  # .github/workflows/security-sca.yml, on a nightly schedule plus release/hotfix
-  # branches. It cost 6-104 minutes per run depending on NVD cache state and its
-  # input (the NVD feed) does not change with the diff. Pull requests keep
-  # dependency-CVE coverage through `container-scan` below, which scans the same
-  # Maven artifacts inside the built images. See that workflow's header comment.
 
   docker-build:
     name: Docker Images (${{ matrix.svc }})
@@ -992,19 +851,12 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
-  # Proves docker-compose.yml (the no-Maven/no-npm quick start
-  # advertised in the README) actually boots and answers health checks, so it
-  # is pointed at the local :test images instead of GHCR — no registry
-  # credentials needed to run this.
   install-smoke:
     name: Installer Smoke Test
     runs-on: ubuntu-latest
     needs: docker-build
     timeout-minutes: 25
 
-    # This is the install the README tells people to run, driven exactly as they
-    # would drive it. It replaced a test that invoked Compose by hand: that one
-    # could pass while install.sh — the thing anyone actually runs — was broken.
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -1032,9 +884,7 @@ jobs:
           cd "$HOME/railhook"
           sed -i 's|^API_IMAGE_TAG=.*|API_IMAGE_TAG=test|;s|^WORKER_IMAGE_TAG=.*|WORKER_IMAGE_TAG=test|;s|^UI_IMAGE_TAG=.*|UI_IMAGE_TAG=test|' .env
           echo "DOCKER_REGISTRY=railhook" >> .env
-          # COMPOSE_PROFILES comes from the .env the installer wrote: the
-          # database and the backup sidecar are behind profiles, so a run that
-          # ignored it would come up with no database at all.
+          # The database and backup sidecar sit behind profiles from the installer's .env.
           grep -q '^COMPOSE_PROFILES=.*embedded-db' .env || { echo "::error::installer did not enable embedded-db"; exit 1; }
           # Without --admin-email nobody is a platform admin: no first-account-wins.
           grep -qx 'PLATFORM_ADMIN_EMAILS=' .env || { echo "::error::a plain install named a platform admin"; exit 1; }
@@ -1066,20 +916,17 @@ jobs:
           check /install.sh                200   # the installer, served by the site it installs
           check /actuator/health/liveness  200   # probes
           check /api/v1/projects           401   # reachable, and refusing anonymous access
-          # Neither of these may be public: metrics leak tenant cardinality and
-          # traffic volume, and /actuator/env leaks the configuration wholesale.
+          # Metrics leak tenant cardinality, and /actuator/env the whole configuration.
           check /actuator/prometheus       404
           check /actuator/env              404
-          # A wrong method must not read as a server error — 5xx tells every
-          # sender with a retry policy to come back and try again.
+          # A 5xx would tell every sender with a retry policy to try again.
           code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ingress/nope)
           [ "$code" = "405" ] || { echo "::error::GET /ingress/nope returned $code, expected 405"; exit 1; }
           echo "method handling ok"
 
       - name: Nothing else is bound to the host
         run: |
-          # The single-port promise. Postgres, Kafka, Redis and the API itself
-          # must be reachable only from inside the Docker network.
+          # The single-port promise: Postgres, Kafka, Redis and the API stay inside the Docker network.
           for p in 5432 9092 6379 8082 5173; do
             if curl -s -o /dev/null --max-time 2 "http://localhost:$p" 2>/dev/null \
                || nc -z localhost "$p" 2>/dev/null; then
@@ -1091,9 +938,7 @@ jobs:
 
       - name: Registering leaves the dashboard usable
         run: |
-          # With no SMTP there is no way to deliver a verification token, and a
-          # PENDING_VERIFICATION account meets a dashboard with every write
-          # button disabled.
+          # Without SMTP no verification token can be delivered, and the dashboard stays read-only.
           body=$(curl -sf -X POST http://localhost:8080/api/v1/auth/register \
             -H 'Content-Type: application/json' \
             -d '{"email":"smoke@example.com","password":"Smoke1234!","fullName":"Smoke","organizationName":"Smoke Co"}')
@@ -1112,24 +957,19 @@ jobs:
         env:
           RAILHOOK_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
         run: |
-          # No certificate can be issued in CI, so this checks the wiring: the
-          # terminator is in the service list, the dashboard has moved to
-          # loopback behind it, and production mode is on.
+          # No certificate can be issued in CI, so this checks the wiring only.
           ./install.sh --dir "$HOME/railhook-tls" --version v0.0.0-ci \
             --domain hooks.example.com --email ops@example.com --admin-email ops@example.com --no-start --yes
           cd "$HOME/railhook-tls"
-          # The platform admin panel opens only for the address the installer was given.
           grep -qx 'PLATFORM_ADMIN_EMAILS=ops@example.com' .env || { echo "::error::--admin-email was not written"; exit 1; }
           docker compose config --services | grep -qx caddy || { echo "::error::no TLS terminator"; exit 1; }
           docker compose config | grep -q "host_ip: 127.0.0.1" || { echo "::error::dashboard still bound publicly"; exit 1; }
           grep -qx 'APP_ENV=production' .env || { echo "::error::APP_ENV not production"; exit 1; }
           grep -q '^CORS_ALLOWED_ORIGINS=https://hooks.example.com$' .env || { echo "::error::CORS not on the domain"; exit 1; }
-          # Incoming-source and tunnel URLs are handed to Stripe, GitHub and the CLI. Built from
-          # the compose default they pointed at localhost:8080, a port nothing publishes.
+          # Stripe, GitHub and the CLI call these URLs, so they must be public.
           docker compose config | grep -qE 'WEBHOOK_INGRESS_BASE_URL: "?https://hooks.example.com"?$' \
             || { echo "::error::ingress URLs are not on the domain"; docker compose config | grep WEBHOOK_INGRESS_BASE_URL; exit 1; }
-          # Test endpoint URLs are copied into curl and provider dashboards; the compose default
-          # used to be http://api:8080, an address only the Docker network can reach.
+          # Test endpoint URLs are copied into curl, so a Docker-internal address is useless.
           docker compose config | grep -qE 'TEST_ENDPOINT_BASE_URL: "?https://hooks.example.com"?$' \
             || { echo "::error::test endpoint URLs are not on the domain"; docker compose config | grep TEST_ENDPOINT_BASE_URL; exit 1; }
           test -f Caddyfile || { echo "::error::no Caddyfile"; exit 1; }
@@ -1138,9 +978,6 @@ jobs:
         env:
           RAILHOOK_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
         run: |
-          # The operator already runs nginx, Traefik or a load balancer that holds the
-          # certificate. One command has to produce the same production settings as
-          # --domain, with the dashboard on loopback for that proxy and no Caddy.
           ./install.sh --dir "$HOME/railhook-proxy" --version v0.0.0-ci \
             --domain hooks.example.com --behind-proxy --no-start --yes
           cd "$HOME/railhook-proxy"
@@ -1164,8 +1001,7 @@ jobs:
             echo "::error::--behind-proxy without --domain was accepted"; exit 1
           fi
           echo "$out" | grep -q -- '--domain' || { echo "::error::no explanation: $out"; exit 1; }
-          # Releases before 2.12.0 are unsupported (SECURITY.md) and published under another
-          # name; refused before anything is written or fetched.
+          # Releases before 2.12.0 are unsupported and published under another name.
           if out=$(./install.sh --dir "$HOME/railhook-old" --version v2.11.0 --no-start --yes 2>&1); then
             echo "::error::--version v2.11.0 was accepted"; exit 1
           fi
@@ -1186,15 +1022,7 @@ jobs:
     needs: docker-build
     timeout-minutes: 30
 
-    # CI tested a fresh install and a backup/restore, and nothing tested the path most
-    # deployments actually take: an instance that already has data, upgraded in place. That is
-    # also the riskiest one - UPGRADING.md is the most dangerous document in the repository,
-    # and OPERATIONS.md admits that backward-compatibility of migrations under a rolling
-    # deploy is argued rather than verified.
-    #
-    # So: install the last release, put real rows in it, swap in the images built from this
-    # branch, and check the rows survived and the platform still works. Flyway runs against a
-    # populated schema, which is the thing a fresh install can never exercise.
+    # Flyway against a populated schema, which a fresh install never exercises.
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -1241,8 +1069,7 @@ jobs:
           key=$(curl -sf -X POST "http://localhost:8080/api/v1/projects/$project_id/api-keys" \
             -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
             -d '{"name":"before"}' | sed -n 's/.*"key":"\([^"]*\)".*/\1/p')
-          # An event, so the upgrade meets rows in the tables a migration is most likely to
-          # touch rather than an empty schema.
+          # Rows in the tables a migration is most likely to touch.
           curl -sf -X POST http://localhost:8080/api/v1/events \
             -H "X-API-Key: $key" -H 'Content-Type: application/json' \
             -d '{"type":"upgrade.before","data":{"n":1}}' > /dev/null
@@ -1271,8 +1098,7 @@ jobs:
         run: |
           set -e
           cd "$HOME/railhook"
-          # The Compose file from this branch, against the .env and the volumes the release
-          # left behind - which is what an operator following UPGRADING.md ends up with.
+          # This branch's Compose file against the release's .env and volumes, as UPGRADING.md leaves them.
           cp "$RAILHOOK_COMPOSE_SRC" docker-compose.yml
           sed -i 's|^API_IMAGE_TAG=.*|API_IMAGE_TAG=test|;s|^WORKER_IMAGE_TAG=.*|WORKER_IMAGE_TAG=test|;s|^UI_IMAGE_TAG=.*|UI_IMAGE_TAG=test|' .env
           grep -q '^DOCKER_REGISTRY=' .env && sed -i 's|^DOCKER_REGISTRY=.*|DOCKER_REGISTRY=railhook|' .env \
@@ -1291,9 +1117,7 @@ jobs:
         if: steps.last.outputs.found != ''
         run: |
           set -e
-          # Reading with the credential minted before the upgrade: this is what a customer's
-          # integration does the morning after, and a broken JWT claim or API-key hash would
-          # show up here rather than in a fresh install.
+          # A credential minted before the upgrade: a broken JWT claim or API-key hash shows here.
           curl -sf "http://localhost:8080/api/v1/projects/${{ steps.seed.outputs.project_id }}/events" \
             -H "X-API-Key: ${{ steps.seed.outputs.api_key }}" \
             | grep -q 'upgrade.before' \
@@ -1337,10 +1161,7 @@ jobs:
         env:
           TRIVY_VERSION: v0.74.0
         run: |
-          # Same reason as the kubeconform download: fetch, then run. Pinned, and the whole install
-          # is retried: the installer downloads the release tarball itself, and one TLS failure there
-          # (curl exit 35 on the 2.19.2 hotfix) left no trivy, so every scan step failed with
-          # "command not found" and a required check went red for reasons unrelated to the images.
+          # Whole install retried: the installer fetches its own tarball, and one TLS error once left no trivy.
           for attempt in 1 2 3; do
             if curl -sfL --retry 5 --retry-delay 2 --retry-all-errors \
                  -o install-trivy.sh \
@@ -1358,10 +1179,7 @@ jobs:
           trivy image --download-db-only --db-repository public.ecr.aws/aquasecurity/trivy-db:2
           trivy image --download-java-db-only --java-db-repository public.ecr.aws/aquasecurity/trivy-java-db:1
       
-      # Staged rollout: gate on CRITICAL now (exit-code 1, build goes red), keep
-      # HIGH informational (exit-code 0) until the CRITICAL backlog is triaged.
-      # Widen to HIGH by dropping `--severity CRITICAL --exit-code 1` for the
-      # advisory step below and deleting the gating step once ready.
+      # CRITICAL gates; HIGH stays advisory until the backlog is triaged.
       - name: Run Trivy on API image (CRITICAL - gating)
         run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update railhook-api:test
 

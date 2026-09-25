@@ -1,14 +1,5 @@
 name: Install Script
 
-# railhook-cli/install.sh is the headline install method
-# (README tells users to curl | bash it) but was never exercised in CI. This
-# workflow runs it end to end against a fake "GitHub release" fixture built
-# from the JAR this job compiles — not the real repo's releases — so the run
-# is hermetic and doesn't depend on (or require) a real tagged release to
-# exist. The fixture is served over file:// URLs via install.sh's
-# RAILHOOK_GITHUB_BASE_URL test hook, which only exists for this purpose and
-# is not part of the documented user-facing interface.
-
 on:
   push:
     branches:
@@ -31,11 +22,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Core requirement from the task: run the installer end to end on both
-  # Linux and macOS and assert `railhook --version` works afterward. Java is
-  # already on PATH here (actions/setup-java, needed to build the fixture
-  # JAR), so this run also doubles as the "Java 17 already present" and
-  # "RAILHOOK_SKIP_JAVA=1 with Java present must succeed" cases.
   install-sh:
     name: install.sh end-to-end (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -87,18 +73,7 @@ jobs:
           command -v railhook
           railhook --version
 
-  # Cases that need a machine WITHOUT a pre-existing Java, and a shell rc
-  # file that already mentions .local/bin — GitHub-hosted runners always
-  # have Java (needed to build the fixture) and a bare-bones rc file, so
-  # these run inside disposable Docker containers instead. Linux-only:
-  # macos-latest GitHub-hosted runners cannot run Docker containers.
-  #
-  # Each case is written to its own script file and mounted into the
-  # container rather than passed as a `docker run ... bash -c '...'`
-  # string — nesting docker's -c, su's -c and $PATH-with-a-dollar-sign
-  # through three layers of shell quoting is a real trap (tried it first;
-  # the escaping silently produced a garbage PATH). A mounted script file
-  # sidesteps that entirely.
+  # In containers because runners always have Java; a mounted script avoids three layers of -c quoting.
   install-sh-linux-cases:
     name: install.sh edge cases (Docker, ubuntu-latest)
     runs-on: ubuntu-latest

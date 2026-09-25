@@ -1,9 +1,6 @@
 name: Load & Contract Tests
 
-# Manually-triggered (or nightly at most) on purpose — these boot the full
-# stack plus a k6 load run, which is expensive, and
-# "a load test on every push is a load test everyone disables". Never add a
-# `pull_request:` or `push:` trigger here.
+# Never add a push or pull_request trigger: this boots the full stack plus k6.
 on:
   workflow_dispatch:
     inputs:
@@ -40,8 +37,7 @@ jobs:
         run: cp .env.dist .env
 
       - name: Allow the load-receiver's private address
-        # load-receiver resolves to a Docker-bridge IP; SsrfProtectionCustomizer
-        # blocks private ranges unless this is set — see load/README.md "Setup".
+        # load-receiver sits on a Docker-bridge IP, which SSRF protection blocks otherwise.
         run: echo "WEBHOOK_ALLOW_PRIVATE_IPS=true" >> .env
 
       - name: Test the load-receiver's control plane
@@ -77,17 +73,11 @@ jobs:
             load/failure-recovery.js
 
       - name: Run load/ordering.js (fails the job if FIFO ordering breaks under backlog)
-        # 150s, not 90: the induced retry is due on the ladder's first rung jittered to 50–150%
-        # of a minute, and only once it lands does the backlog behind it drain. A probe that
-        # reads half its burst proves less than one that reads all of it — and now says so.
+        # 150s: the induced retry lands at 50–150% of a minute, and the backlog drains only after it.
         run: k6 run -e BURST_SIZE=15 -e RETRY_WAIT_SECONDS=150 load/ordering.js
 
       - name: Run a short slice of load/soak.js
         if: ${{ inputs.run_soak_smoke == true }}
-        # NOT the real soak run — that's hours long and needs
-        # load/scripts/monitor-soak.sh running alongside it, by design not
-        # something CI does unattended. This just proves the script itself
-        # still works end to end. See load/README.md "Soak run".
         run: k6 run -e TARGET_RPS=10 -e DURATION=60s load/soak.js
 
       - name: Outbox depth snapshot

@@ -1,42 +1,11 @@
 name: Publish SDKs
 
-# NOTE: this workflow used to fire an unconditional `npm publish` /
-# `twine upload` on *every* GitHub release, including CLI-only releases that
-# never touch sdks/. That fails with "version already exists" the moment an
-# SDK's manifest version wasn't bumped for that release. Every publish job
-# below now starts with a "Check version drift" step that compares the
-# manifest version in this checkout against the version currently live on
-# the registry, and skips the rest of the job (build/publish) when they
-# match. Real releases still work exactly as before; no-op releases for a
-# given SDK now no-op instead of failing.
-
-# NOTE 2: `on: release: [published]` is deliberately NOT used, and must not be
-# added back. The v2.3.0 and v2.4.0 releases are created by release-cli.yml via
-# action-gh-release, which runs as github-actions[bot] with the default
-# GITHUB_TOKEN — and GitHub does not start a workflow from an event raised by
-# that token, to stop workflows triggering themselves. So the release event
-# never arrived and the SDKs sat at 2.2.1 through two releases with nothing
-# failing anywhere. This workflow was called directly from release-cli.yml for a
-# while instead; it now listens for the tag push itself, for the npm reason set
-# out below the `on:` key. A tag push is a real push event, so it does not go
-# missing the way the release event did.
+# Never `on: release`: GitHub does not start workflows from events raised by GITHUB_TOKEN.
 on:
-  # Triggered by the tag directly, not called from release-cli.yml, and that distinction is
-  # load-bearing rather than stylistic. npm's Trusted Publisher validates the OIDC token
-  # against the workflow that *entered* the run. Called as a reusable workflow the entry is
-  # release-cli.yml, so a publisher trusting this file was rejected with a bare 404 — while
-  # the identical job started directly from here succeeded. Owning its own trigger keeps the
-  # entry workflow and the trusted publisher the same file, which is the only arrangement npm
-  # accepts without naming the caller instead.
-  #
-  # A tag push is a real push event, so unlike `release: published` it is not dropped for
-  # being raised by GITHUB_TOKEN — the trap documented in NOTE 2 above.
+  # Own tag trigger, never workflow_call: npm's Trusted Publisher checks the workflow that entered the run.
   push:
     tags:
       - 'v*.*.*'
-  # Deliberately not `workflow_call`. Being called makes the caller the entry workflow, and
-  # npm's Trusted Publisher checks the entry workflow — which is how a correctly configured
-  # publisher came back as a bare 404 for six months' worth of releases. Do not add it back.
   workflow_dispatch:
     inputs:
       sdk:
@@ -56,8 +25,6 @@ on:
         default: ''
         type: string
 
-# Least privilege by default. `id-token: write` is granted per-job below, only
-# where a registry's OIDC (Trusted Publishing) flow needs it.
 permissions:
   contents: read
 
@@ -83,9 +50,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          # 22, not 20: `npm@latest` (needed for Trusted Publishing) requires
-          # ^20.17 || >=22.9, and which 20.x the runner image carries is not
-          # something to depend on.
+          # 22: npm@latest, needed for Trusted Publishing, requires ^20.17 || >=22.9.
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
@@ -113,33 +78,19 @@ jobs:
         if: steps.check.outputs.should_publish == 'true'
         run: npm run build
 
-      # npm >= 11.5.1 is what understands Trusted Publishing; setup-node pins an
-      # older npm with Node 20.
+      # Trusted Publishing needs npm >= 11.5.1, newer than setup-node ships.
       - name: Upgrade npm for Trusted Publishing
         if: steps.check.outputs.should_publish == 'true'
         run: npm install -g npm@latest
 
-      # v2.5.0 and v2.6.0 both failed here with
-      #   npm error 404 Not Found - PUT .../@webhook-platform%2fnode
-      # which is what npm returns for an unauthenticated scoped publish: the
-      # long-lived NPM_TOKEN had expired, and npm was left two releases behind
-      # at 2.2.1. OIDC removes the standing secret so that cannot recur, and
-      # --provenance attaches the sigstore attestation the container images
-      # already carry.
-      #
-      # One-time setup on npmjs.com, which no workflow can do for you: package
-      # settings -> Trusted Publisher -> this repository, workflow
-      # `publish-sdks.yml`. NPM_TOKEN stays here as the fallback npm uses when
-      # no trusted publisher is configured; once OIDC works it can be deleted.
+      # Needs a Trusted Publisher on npmjs.com (this repo, publish-sdks.yml); NPM_TOKEN is only the fallback.
       - name: Publish to npm
         if: steps.check.outputs.should_publish == 'true'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  # Mirrors publish-node step for step, and for the same reasons; see the comments there. The
-  # package needs its own Trusted Publisher on npmjs.com (package settings -> Trusted Publisher ->
-  # this repository, workflow `publish-sdks.yml`) before the first OIDC publish can succeed.
+  # Needs its own Trusted Publisher on npmjs.com before the first OIDC publish.
   publish-mcp:
     name: Publish MCP bridge to npm (@railhook/mcp)
     runs-on: ubuntu-latest
@@ -198,11 +149,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  # The MCP Registry (registry.modelcontextprotocol.io) lists io.github.vadymkykalo/railhook, which
-  # is what VS Code, GitHub and other MCP hosts search. sdks/mcp/server.json declares both the remote
-  # server at https://railhook.io/mcp and the npm bridge; the registry checks the npm package's
-  # mcpName, so this runs after that package is on npm. The io.github namespace is proven with this
-  # workflow's GitHub OIDC token — there is no secret to keep.
+  # The registry checks the npm package's mcpName, so the package must be on npm first.
   publish-mcp-registry:
     name: Publish to the MCP Registry
     needs: publish-mcp
@@ -345,20 +292,7 @@ jobs:
         if: steps.check.outputs.should_publish == 'true'
         run: vendor/bin/phpunit --no-coverage
 
-      # Packagist cannot serve a package whose composer.json lives in a subdirectory, so
-      # `railhook/php` there is registered against a separate repository,
-      # vadymkykalo/railhook-php. That repository was kept in step by hand, and the
-      # hand stopped: its last commit is the v2.2.1 release, and every release since has
-      # shipped a PHP SDK that nothing published. Meanwhile this job reported success every
-      # time, because it posted an update-package call naming *this* monorepo — a URL
-      # Packagist does not know — and checked neither the exit code nor the response body,
-      # inside an `if [ -n "$TOKEN" ]` that made a missing secret a silent no-op too.
-      #
-      # Authenticated with a deploy key rather than a personal access token: a deploy key
-      # grants write to exactly one repository and nothing else, which is all this needs.
-      # The public half is registered on vadymkykalo/railhook-php ("railhook-release
-      # (SDK split push)"); revoking it there is enough to cut this off. GITHUB_TOKEN cannot
-      # be used — it is scoped to the repository running the workflow.
+      # Packagist cannot serve a subdirectory, so the SDK goes to a split repo via a deploy key scoped to it.
       - name: Publish sdks/php to the split repository
         if: steps.check.outputs.should_publish == 'true'
         working-directory: .
@@ -376,8 +310,7 @@ jobs:
           VERSION=$(php -r "echo json_decode(file_get_contents('sdks/php/composer.json'), true)['version'] ?? '';")
           [ -n "$VERSION" ] || { echo "::error::no version in sdks/php/composer.json"; exit 1; }
 
-          # Written to disk rather than passed through ssh-agent: the agent would outlive
-          # this step, and the runner is discarded either way.
+          # On disk rather than in ssh-agent: the agent would outlive this step.
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SDK_SPLIT_SSH_KEY" > ~/.ssh/sdk_split
           chmod 600 ~/.ssh/sdk_split
@@ -392,18 +325,12 @@ jobs:
             exit 0
           fi
 
-          # Everything the package needs and nothing else: vendor/ is a build artefact, and
-          # the contract-test harness only means anything against a running platform.
-          # .gitignore is the split repository's own and survives the sweep — it is not
-          # something this monorepo has an opinion about.
+          # .gitignore is the split repository's own and survives the sweep.
           find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .gitignore -exec rm -rf {} +
           cp -r ../sdks/php/src ../sdks/php/tests ../sdks/php/README.md \
                 ../sdks/php/composer.json ../sdks/php/composer.lock ../sdks/php/phpunit.xml .
 
-          # Packagist derives the version from the git tag and advises against a hardcoded
-          # one. The monorepo copy keeps the field because scripts/check-version-drift.sh
-          # reads it as one of the eight places the version has to agree; the published copy
-          # drops it, which is what the split repository has done by hand since 1.1.0.
+          # Packagist takes the version from the tag; the monorepo keeps the field for check-version-drift.sh.
           php -r '
             $f = "composer.json";
             $c = json_decode(file_get_contents($f), true);
@@ -422,9 +349,6 @@ jobs:
           git tag "${VERSION}"
           git push origin HEAD:main --tags
 
-      # Packagist re-crawls from the split repository's own webhook when one is configured
-      # there. This nudge makes the publish deterministic — and unlike the call it replaces,
-      # it fails when the nudge does not land.
       - name: Trigger Packagist update
         if: steps.check.outputs.should_publish == 'true'
         env:

@@ -1,33 +1,11 @@
 name: CodeQL
 
-# Static analysis for vulnerability *patterns* — the taint-tracking question of
-# whether attacker-controlled input reaches a sink — which nothing else here
-# asks. The rest of the security set answers different questions and none of
-# them substitute:
-#
-#   Trivy (in ci.yml)        known CVEs in the dependencies inside the images
-#   OWASP DC (security-sca)  known CVEs, OWASP's matching + the suppression file
-#   SpotBugs (in ci.yml)     bug patterns per method, no cross-procedural taint
-#
-# Not a per-push gate, for the same reason the SCA workflow is not: a full
-# database build over four Maven modules and the UI is minutes of compute, and
-# its findings move with the rulepack far more than with any one diff. It runs
-# nightly, on pull requests into develop, and on release and hotfix branches so
-# nothing reaches main unanalysed.
-#
-# Results land in the repository's Security tab. Deliberately NOT wired to fail
-# the build on a finding: CodeQL's first run on an existing codebase reports a
-# backlog, and a gate that is red on arrival is a gate somebody disables. Turn
-# `fail-on` up once the backlog is triaged.
-#
-# One thing to get right before making this a required status check on main: a
-# required check that has never run on the target branch leaves every PR pending
-# forever. Let it complete on main at least once first.
+# Not a failing gate yet: findings go to the Security tab until the backlog is triaged.
+# Before making it a required check on main, let it complete there once, or every PR hangs pending.
 
 on:
   schedule:
-    # 04:40 UTC — after Security SCA's 04:00 slot, so the two never contend for
-    # a runner or for the Maven cache.
+    # After Security SCA's 04:00 slot, so the two never contend for the Maven cache.
     - cron: '40 4 * * *'
   pull_request:
     branches:
@@ -52,12 +30,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
-      # Writing the SARIF result into the Security tab.
       security-events: write
       actions: read
       contents: read
     strategy:
-      # One language failing should not hide the other's findings.
       fail-fast: false
       matrix:
         include:
@@ -69,8 +45,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Java only. The UI is analysed from source with build-mode: none, so it
-      # needs no toolchain at all.
       - name: Set up JDK 17
         if: matrix.language == 'java-kotlin'
         uses: actions/setup-java@v6
@@ -84,35 +58,9 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          # No `queries:` at all, deliberately. That is how you ask for the
-          # default security suite — high-precision vulnerability queries and
-          # nothing else. `queries: security` reads like the obvious way to say
-          # it and is not: the input takes suite names and pack references, and
-          # there is no pack called `security`, so every run died at
-          # `database init` with "Query pack security cannot be found". CodeQL
-          # was therefore not running at all between that change and this one.
-          #
-          # The two sets either side of the default were both tried here and
-          # both cost more than they returned.
-          #
-          # security-and-quality adds the quality queries, which are style
-          # opinions — "this parameter is unused", "this variable could be
-          # final". They do not answer the taint question this workflow exists
-          # to ask. Ninety-one went untriaged, and one of them held a release
-          # branch until a DLQ resolver was rewritten to stop taking the record
-          # it deliberately ignores: a change with no behaviour in it, made to
-          # quiet a bot.
-          #
-          # security-extended keeps the vulnerability queries but adds the
-          # lower-precision variants, and on this codebase that is not a
-          # marginal difference: java/log-injection went from 3 findings to 59
-          # on the same commit. Fifty-six new comments on the rule that had
-          # already wedged one release is the opposite of the fix.
+          # No `queries:` on purpose: `security` is not a pack name and fails init; -and-quality and -extended were too noisy.
 
-      # build-mode: manual rather than autobuild. Autobuild guesses at a Maven
-      # reactor and its guess here would be `mvn package`, which runs the tests
-      # — Testcontainers included, so it would want a Docker daemon to analyse
-      # source code. Compiling is all CodeQL needs to observe.
+      # manual, not autobuild: autobuild would run `mvn package`, tests and Testcontainers included.
       - name: Compile all modules
         if: matrix.language == 'java-kotlin'
         run: mvn clean compile -B -DskipTests

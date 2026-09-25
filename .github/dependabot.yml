@@ -1,27 +1,5 @@
-# Dependabot version-update configuration.
-#
-# Six ecosystems: root Maven build, the UI app, the three published SDKs
-# (Node/npm, Python/pip, PHP/composer), and the GitHub Actions used in
-# .github/workflows/.
-#
-# Patch AND minor updates are grouped into one PR per ecosystem; majors land
-# individually, since those are the ones that actually need a look. The one
-# exception is github-actions, where majors are grouped too — the reasoning is
-# at that ecosystem's entry below.
-#
-# This was previously patch-only grouping with a limit of 10 per ecosystem, which
-# meant a refresh could open ~30 PRs at once — each dragging a full CI run
-# including the then-per-push OWASP scan that took up to 104 minutes. That is
-# what led to this file being renamed to .paused rather than tuned.
-#
-# The scan has since moved to .github/workflows/security-sca.yml (nightly plus
-# release/hotfix), so a Dependabot PR now costs a normal CI run. The limit is
-# still lowered to 5 per ecosystem: grouped minors mean far fewer PRs are needed
-# to carry the same updates, and a smaller cap keeps a bad week from flooding
-# the queue again.
 version: 2
 updates:
-  # --- Maven (root multi-module build: common, api, worker, cli) ---
   - package-ecosystem: "maven"
     directory: "/"
     target-branch: "develop"
@@ -33,12 +11,7 @@ updates:
         update-types:
           - "patch"
           - "minor"
-    # netty is pinned to a line, not to a version. The root pom overrides what
-    # spring-boot-dependencies manages purely to pick up CVE fixes *within* 4.1 — Spring Boot
-    # 3.5 manages that line and reactor-netty is matched to it. A grouped minor bump took the
-    # override to 4.2.17 and broke the build outright ("package io.netty.channel does not
-    # exist"), because the group admits minors and nothing said netty was different.
-    # Patch updates still come through, which is the entire reason the override exists.
+    # netty stays on Spring Boot's 4.1 line: a minor bump to 4.2 breaks the build.
     ignore:
       - dependency-name: "io.netty:*"
         update-types:
@@ -48,7 +21,6 @@ updates:
       - "dependencies"
       - "maven"
 
-  # --- npm: dashboard UI ---
   - package-ecosystem: "npm"
     directory: "/railhook-ui"
     target-branch: "develop"
@@ -65,7 +37,6 @@ updates:
       - "npm"
       - "ui"
 
-  # --- npm: Node SDK ---
   - package-ecosystem: "npm"
     directory: "/sdks/node"
     target-branch: "develop"
@@ -82,7 +53,6 @@ updates:
       - "npm"
       - "sdk"
 
-  # --- npm: MCP bridge ---
   - package-ecosystem: "npm"
     directory: "/sdks/mcp"
     target-branch: "develop"
@@ -99,7 +69,6 @@ updates:
       - "npm"
       - "sdk"
 
-  # --- pip: Python SDK ---
   - package-ecosystem: "pip"
     directory: "/sdks/python"
     target-branch: "develop"
@@ -116,7 +85,6 @@ updates:
       - "pip"
       - "sdk"
 
-  # --- composer: PHP SDK ---
   - package-ecosystem: "composer"
     directory: "/sdks/php"
     target-branch: "develop"
@@ -133,27 +101,7 @@ updates:
       - "composer"
       - "sdk"
 
-  # --- github-actions: workflow action versions ---
-  # --- GitHub Actions used in .github/workflows/ ---
-  #
-  # The only ecosystem where majors are grouped too, and deliberately the exception
-  # to the rule stated above.
-  #
-  # A major bump of a first-party action — actions/checkout, docker/setup-buildx-action,
-  # azure/setup-helm — is almost always a runner or Node version change on their side,
-  # not a change in what the step does for us. Reviewing five of those individually costs
-  # five CI runs and five context switches and produces the same answer every time: does
-  # CI still pass. Grouped, that question is asked once.
-  #
-  # This is not a claim that action majors never break anything. It is that when one does,
-  # the workflow file is where it shows, CI is what shows it, and a five-line group diff is
-  # no harder to bisect than five separate ones. The ecosystems where a major genuinely
-  # needs its own PR — Spring Boot, Testcontainers, jsdom — keep the split.
-  #
-  # Concretely: the refresh on 2026-08-22 opened 16 PRs, of which 5 were action majors
-  # (actions/upload-pages-artifact 3->5, docker/setup-buildx-action 3->4, azure/setup-helm
-  # 4->5, softprops/action-gh-release 2->3, docker/metadata-action 5->6). Under this
-  # grouping they would have been one.
+  # Majors grouped here only: an action major is a runner/Node bump, and CI is the whole review.
   - package-ecosystem: "github-actions"
     directory: "/"
     target-branch: "develop"
