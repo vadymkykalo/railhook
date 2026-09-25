@@ -95,9 +95,9 @@
           data AND where the per-module `report` goal reads it back from, so
           the two stay in sync. CI overrides this on the command line
           (-Djacoco.destFile=target/jacoco-unit.exec vs
-          target/jacoco-it.exec) because the unit and integration suites run
-          as two separate `mvn test` invocations in two separate GitHub
-          Actions jobs (see ci.yml) - distinct file names let both sets of
+          target/jacoco-it-<shard>.exec) because the unit suite and each
+          integration shard run as separate `mvn test` invocations in separate
+          GitHub Actions jobs (see ci.yml) - distinct file names let both sets of
           exec data survive side by side once collected into one checkout,
           instead of one invocation silently clobbering the other's data (or,
           worse, a report step only ever seeing whichever job happened to run
@@ -197,8 +197,8 @@
                  aggregator itself that have no tests of their own.
               3. merge: folds every jacoco*.exec sitting in THIS module's own
                  target/ (jacoco.exec from a single local run, or
-                 jacoco-unit.exec + jacoco-it.exec once CI's two test jobs'
-                 artifacts have both been downloaded into it - see ci.yml)
+                 jacoco-unit.exec + jacoco-it-<shard>.exec once CI's test jobs'
+                 artifacts have all been downloaded into it - see ci.yml)
                  into one target/jacoco-merged.exec. This exists because
                  jacoco:check (see the per-module `check` execution each of
                  common/api/worker/cli declares in its own pom.xml) - unlike
@@ -251,7 +251,7 @@
                                     <includes>
                                         <include>jacoco.exec</include>
                                         <include>jacoco-unit.exec</include>
-                                        <include>jacoco-it.exec</include>
+                                        <include>jacoco-it*.exec</include>
                                     </includes>
                                 </fileSet>
                             </fileSets>
