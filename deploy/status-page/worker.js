@@ -281,7 +281,7 @@ footer{margin:56px 0 40px;padding-top:20px;border-top:1px solid var(--rail);font
 <body>
 <header><div class="wrap">
   <a class="brand" href="https://railhook.io/">${ICON}Railhook <small>Status</small></a>
-  <nav><a href="https://railhook.io/" class="hide-sm">Website</a><a href="https://railhook.io/docs/">Docs</a><a href="https://railhook.io/contact">Contact</a></nav>
+  <nav><a href="https://railhook.io/" class="hide-sm">Website</a><a href="https://railhook.io/docs/">Docs</a><a href="mailto:support@railhook.io">Contact</a></nav>
 </div></header>
 <main class="wrap">
   <div class="hero">

@@ -66,14 +66,9 @@ describe('message widget', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('is absent without a support address, and on the contact page itself', () => {
+  it('is absent without a support address', () => {
     window.__RAILHOOK__ = {};
-    const { unmount } = renderAt();
-    expect(screen.queryByRole('button', { name: en.site.contact.launcher })).not.toBeInTheDocument();
-    unmount();
-
-    window.__RAILHOOK__ = { contactDomain: 'railhook.io' };
-    renderAt('/contact');
+    renderAt();
     expect(screen.queryByRole('button', { name: en.site.contact.launcher })).not.toBeInTheDocument();
   });
 });

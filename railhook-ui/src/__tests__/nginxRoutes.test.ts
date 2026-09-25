@@ -109,6 +109,30 @@ describe('the public route list', () => {
   });
 });
 
+describe('retired pages', () => {
+  const target = (path: string) => {
+    for (const { head, body } of locations()) {
+      const exact = head.match(/^=\s+(\S+)$/)?.[1];
+      const regex = head.match(/^~\s+(\S+)$/)?.[1];
+      if (exact === path || (regex && new RegExp(regex).test(path))) return body.match(/return\s+301\s+(\S+);/)?.[1];
+    }
+    return undefined;
+  };
+
+  it('send their old URLs on with a 301', () => {
+    expect(target('/about')).toBe('/');
+    expect(target('/contact/')).toBe('/');
+    expect(target('/security')).toBe('/docs/outgoing/endpoint-security/');
+    expect(target('/blog/building-production-software-with-ai-agents')).toBe('/blog');
+    expect(target('/blog/building-production-software-with-ai-agents/')).toBe('/blog');
+  });
+
+  it('are no longer public routes', () => {
+    const paths = publicRoutes().map((r: { path: string }) => r.path);
+    for (const gone of ['/about', '/contact', '/security']) expect(paths).not.toContain(gone);
+  });
+});
+
 describe('the remote MCP server', () => {
   it('is proxied to the API at /mcp, like /api/', () => {
     const mcp = location('= /mcp');

@@ -3,7 +3,6 @@ import { CHROME, SERIES } from '../charts/chartTheme';
 import { cn } from '../../lib/utils';
 import { WEBHOOKS_GUIDE_FIGURES } from './figures/webhooks-guide';
 import { OUTBOX_FIGURES } from './figures/outbox';
-import { BUILT_WITH_AI_FIGURES } from './figures/built-with-ai';
 
 /** Every word is a translation key and each figure has role="img" with a label for screen readers. */
 
@@ -309,5 +308,4 @@ export const FIGURES: Record<string, () => JSX.Element> = {
   gateway: GatewayPipeline,
   ...WEBHOOKS_GUIDE_FIGURES,
   ...OUTBOX_FIGURES,
-  ...BUILT_WITH_AI_FIGURES,
 };

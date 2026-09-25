@@ -9,10 +9,7 @@ const MARKETING = [
   { path: '/pricing', priority: '0.8', changefreq: 'monthly' },
   { path: '/tester', priority: '0.8', changefreq: 'monthly' },
   { path: '/tools/webhook-signature', priority: '0.8', changefreq: 'monthly' },
-  { path: '/security', priority: '0.6', changefreq: 'monthly' },
-  { path: '/about', priority: '0.5', changefreq: 'monthly' },
   { path: '/blog', priority: '0.7', changefreq: 'weekly' },
-  { path: '/contact', priority: '0.5', changefreq: 'monthly' },
   // Google's consent screen requires the privacy link.
   { path: '/privacy', priority: '0.3', changefreq: 'yearly' },
   { path: '/terms', priority: '0.3', changefreq: 'yearly' },

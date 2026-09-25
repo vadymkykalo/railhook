@@ -13,8 +13,8 @@ const publicPaths = [...read('scripts/public-routes.mjs').matchAll(/\{\s*path:\s
 
 /** A page missing from any of these is unreachable, unindexed or empty to crawlers. */
 describe('every public page', () => {
-  it('includes the trust pages and the signature verifier', () => {
-    expect(publicPaths).toEqual(expect.arrayContaining(['/security', '/about', '/tools/webhook-signature']));
+  it('includes the legal pages and the signature verifier', () => {
+    expect(publicPaths).toEqual(expect.arrayContaining(['/privacy', '/terms', '/tools/webhook-signature']));
   });
 
   it('is a route under the public layout', () => {

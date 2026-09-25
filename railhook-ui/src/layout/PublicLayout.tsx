@@ -138,11 +138,8 @@ export function Footer() {
             <PageLink href={`${REPO_URL}/releases`} external>{t('footer.releases')}</PageLink>
           </Column>
           <Column title={t('footer.company')}>
-            <RouteLink to="/about">{t('footer.about')}</RouteLink>
             {publicBlogEnabled() && <RouteLink to="/blog">{t('footer.blog')}</RouteLink>}
-            <RouteLink to="/security">{t('footer.security')}</RouteLink>
             {statusPageUrl() && <PageLink href={statusPageUrl()!} external>{t('footer.status')}</PageLink>}
-            <RouteLink to="/contact">{t('footer.talkToUs')}</RouteLink>
             <RouteLink to="/privacy">{t('footer.privacy')}</RouteLink>
             <RouteLink to="/terms">{t('footer.terms')}</RouteLink>
           </Column>
