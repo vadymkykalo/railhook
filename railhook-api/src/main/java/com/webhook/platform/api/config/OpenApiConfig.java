@@ -24,16 +24,12 @@ import java.util.List;
 @ConditionalOnProperty(name = "springdoc.swagger-ui.enabled", havingValue = "true", matchIfMissing = true)
 public class OpenApiConfig {
 
-    /** What docker-compose publishes, and what the quickstart tells a reader to open. */
     private static final String DEFAULT_BASE_URL = "http://localhost:8080";
 
     static {
-        // AuthContext is resolved from the bearer token or the API key by
-        // AuthContextArgumentResolver — it is never sent by a caller. Left to itself, springdoc
-        // reads it as a method parameter and publishes it as a required `auth` query object,
-        // which describes an API that does not exist.
+        // Resolved from the credential, never sent by a caller. Otherwise springdoc documents
+        // them as required query objects.
         SpringDocUtils.getConfig().addRequestWrapperToIgnore(AuthContext.class);
-        // The same for the portal, whose context comes off the portal session's token.
         SpringDocUtils.getConfig().addRequestWrapperToIgnore(PortalContext.class);
     }
 
@@ -107,11 +103,8 @@ public class OpenApiConfig {
     }
 
     /**
-     * One server, whose host the reader fills in: Railhook is self-hosted, so there is no address
-     * this document could name that would be right for anybody but its author. The default is the
-     * local one, which is where a reader following the quickstart already is: the port is the
-     * one docker-compose publishes, not whatever this process happens to be bound to — a spec
-     * regenerated from a test on a random port would otherwise document that port.
+     * A fixed default rather than the bound port, so a spec regenerated from a test on a random
+     * port stays the same.
      */
     private Server installationServer() {
         return new Server()

@@ -7,10 +7,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * An identity provider account linked to a {@link User}. Not tenant-scoped, like the user it
- * belongs to: a person signs in before any organization is chosen.
- */
+/** Not tenant-scoped: a person signs in before any organization is chosen. */
 @Entity
 @Table(name = "user_identities")
 @Getter
@@ -30,11 +27,10 @@ public class UserIdentity {
     @Column(nullable = false, length = 32)
     private String provider;
 
-    /** The provider's permanent id for the person. The address can change; this cannot. */
+    /** The provider's permanent id; match on this, since the address can change. */
     @Column(nullable = false)
     private String subject;
 
-    /** The address the provider vouched for when the link was made, for a person reading the account. */
     @Column(nullable = false)
     private String email;
 

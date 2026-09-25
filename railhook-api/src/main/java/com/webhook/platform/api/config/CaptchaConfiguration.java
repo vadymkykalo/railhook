@@ -15,13 +15,6 @@ import reactor.netty.http.client.HttpClient;
 
 import java.util.List;
 
-/**
- * Wires whichever CAPTCHA the deployment configured, or none.
- *
- * <p>Presence of a secret is what turns it on, in the same shape the billing providers use: an
- * operator who has not set one gets {@link DisabledCaptchaVerifier} and no third-party call,
- * which is the right default for self-hosting.
- */
 @Slf4j
 @Configuration
 public class CaptchaConfiguration {
@@ -41,10 +34,8 @@ public class CaptchaConfiguration {
             return new DisabledCaptchaVerifier();
         }
 
-        // The verify URL is operator configuration rather than a tenant's, but it is still an
-        // outbound call to a host taken from a string, and every other such client in this
-        // service goes through the same connector. Cheap consistency, and it means a
-        // misconfigured verify-url cannot be turned into an internal request.
+        // Operator config, but still a host taken from a string: a misconfigured verify-url must
+        // not become an internal request.
         WebClient webClient = webClientBuilder
                 .clientConnector(new ReactorClientHttpConnector(
                         SsrfProtectionCustomizer.apply(HttpClient.create(), allowPrivateIps, allowedHosts)))

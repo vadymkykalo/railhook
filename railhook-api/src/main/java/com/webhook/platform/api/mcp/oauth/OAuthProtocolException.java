@@ -3,9 +3,7 @@ package com.webhook.platform.api.mcp.oauth;
 import org.springframework.http.HttpStatus;
 
 /**
- * An OAuth error as the RFCs spell it: a registered {@code error} code the client acts on, and a
- * description a developer reads. Rendered as {@code {"error": ..., "error_description": ...}}
- * rather than through the API's own error shape, which no OAuth client understands.
+ * Rendered in the OAuth error shape rather than the API's own, which no OAuth client understands.
  */
 public class OAuthProtocolException extends RuntimeException {
 

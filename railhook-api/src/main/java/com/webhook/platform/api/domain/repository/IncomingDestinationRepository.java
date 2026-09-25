@@ -36,19 +36,16 @@ public interface IncomingDestinationRepository extends JpaRepository<IncomingDes
 
     long countByTransformationId(UUID transformationId);
 
-    /** Counts for a whole page at once, so listing does not run one query per row. */
     @Query("SELECT d.transformationId, COUNT(d) FROM IncomingDestination d "
             + "WHERE d.transformationId IN :transformationIds GROUP BY d.transformationId")
     List<Object[]> countByTransformationIds(@Param("transformationIds") Collection<UUID> transformationIds);
 
-    /** @see EndpointRepository#findAutoDisableCandidates — the same sweep, the other target. */
     @Query("SELECT d FROM IncomingDestination d WHERE d.enabled = true "
             + "AND d.failingSince IS NOT NULL AND d.failingSince < :cutoff "
             + "AND d.consecutiveFailures >= :minFailures ORDER BY d.failingSince ASC")
     List<IncomingDestination> findAutoDisableCandidates(@Param("cutoff") Instant cutoff,
             @Param("minFailures") int minFailures, Pageable pageable);
 
-    /** @see EndpointRepository#autoDisable — the same conditional update on the other target. */
     @Modifying
     @Transactional
     @Query("UPDATE IncomingDestination d SET d.enabled = false, d.autoDisabledAt = :at, "

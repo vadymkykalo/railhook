@@ -17,12 +17,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One browser trip through {@code /oauth/authorize}, parked while a person reads the consent
- * screen. Everything the app asked for is kept here rather than carried through the browser, so
- * the consent screen can only answer the request, never rewrite it.
- *
- * <p>Not tenant-scoped: nobody has signed in when it is created. The person answering it decides
- * the organization, and that lands on the {@link OAuthGrant}.
+ * Kept server-side rather than carried through the browser, so the consent screen can only answer
+ * the request, never rewrite it. Not tenant-scoped: nobody has signed in when it is created.
  */
 @Entity
 @Table(name = "oauth_authorization_requests")
@@ -37,7 +33,7 @@ public class OAuthAuthorizationRequest {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    /** {@link OAuthClient#getId()}, not the public client_id string. */
+    /** The OAuthClient row id, not the public client_id string. */
     @Column(name = "client_id", nullable = false)
     private UUID clientId;
 

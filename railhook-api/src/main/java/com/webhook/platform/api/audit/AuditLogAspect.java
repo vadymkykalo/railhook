@@ -41,11 +41,8 @@ public class AuditLogAspect {
     private final TrustedProxyResolver trustedProxyResolver;
     private final ObjectMapper objectMapper;
     /**
-     * Deliberately single-threaded and daemon: audit writes are ordered and must never keep the
-     * JVM alive at shutdown. Wrapped so the writer thread inherits the submitting request's tenant
-     * — a hand-built pool gets no {@code TaskDecorator} from {@code AsyncConfig}, and
-     * {@code AuditLog} carries {@code @TenantId}, so an unscoped writer thread would fail on its
-     * first session.
+     * Single-threaded so audit writes stay ordered, daemon so they never hold up shutdown. Wrapped
+     * because a hand-built pool gets no tenant-propagating decorator, and AuditLog is tenant-scoped.
      */
     private final ExecutorService executor = TenantPropagatingTaskDecorator.wrap(
             Executors.newSingleThreadExecutor(r -> {
@@ -88,24 +85,16 @@ public class AuditLogAspect {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof JwtAuthenticationToken jwtAuth) {
             userId = jwtAuth.getUserId();
-            // A platform admin's token still names the organization they are a member of, which
-            // is not the one they are acting on — that is the handler's organizationId, read
-            // below. Recording it against their own would put a suspension of someone else into
-            // the admin's organization's log and leave the suspended tenant's log without it.
+            // A platform admin's token names their own organization, not the one they act on.
             orgId = auth instanceof PlatformAdminUserAuthenticationToken ? null : jwtAuth.getOrganizationId();
         } else if (auth instanceof ApiKeyAuthenticationToken apiKeyAuth) {
             orgId = apiKeyAuth.getOrganizationId();
         } else if (auth instanceof PortalSessionAuthenticationToken portalAuth) {
-            // No user: the change was made by the customer's own user, from the portal.
             orgId = portalAuth.getOrganizationId();
         }
 
-        // Not dead code, and not a fallback for the two branches above: it exists for the one
-        // audited method that legitimately takes the organization as a parameter —
-        // MembershipService.acceptInvite, which is @SystemTenant because the accepting user's
-        // ambient tenant is a *different* organization, so neither the token nor TenantContext
-        // names the organization the invite belongs to. Everywhere else this returns null,
-        // because ServiceTenantParameterTest forbids the parameter it looks for.
+        // Only for acceptInvite: it is @SystemTenant and the invite's organization is not the
+        // caller's, so it arrives as a parameter. Elsewhere that parameter is forbidden.
         if (orgId == null) {
             orgId = extractOrganizationId(joinPoint);
         }
@@ -129,10 +118,6 @@ public class AuditLogAspect {
         }
     }
 
-    /**
-     * Records a row that no single annotated method describes — the platform admin filter's
-     * request log — on the same ordered writer as everything else.
-     */
     public void recordAsync(String action, String resourceType, UUID resourceId,
                             UUID userId, UUID orgId, String status, String errorMessage,
                             int durationMs, String clientIp, String details) {
@@ -140,11 +125,7 @@ public class AuditLogAspect {
                 durationMs, clientIp, details));
     }
 
-    /**
-     * An entry for work whose record cannot come from an annotation: one person's action recorded
-     * against each organization they belong to, or a refusal whose request rolls back. Written on
-     * the same writer thread as everything else, so it survives that rollback and keeps its order.
-     */
+    /** Written on the writer thread, so the entry survives a rollback of the request. */
     public void record(AuditAction action, String resourceType, UUID userId, UUID organizationId,
                        String status, String errorMessage, String details) {
         String ip = resolveClientIp();
@@ -155,19 +136,13 @@ public class AuditLogAspect {
     public void saveAuditLog(String action, String resourceType, UUID resourceId,
                               UUID userId, UUID orgId, String status, String errorMessage,
                               int durationMs, String clientIp, String details) {
-        // The writer thread already inherits the submitting request's scope, but the row's
-        // organization is not always the caller's ambient one: acceptInvite is @SystemTenant and
-        // names its organization in a parameter. So state it rather than inherit it.
-        // Unauthenticated actions (login, register, password reset) genuinely have none and are
-        // written under the SYSTEM sentinel — the nil UUID, which matches no real organization,
-        // so a tenant-scoped reader sees them no more than it did before.
+        // The row's organization is not always the ambient one, so state it. Unauthenticated
+        // actions have none and go under SYSTEM, which no tenant-scoped reader matches.
         UUID rowTenant = orgId != null ? orgId : TenantContext.SYSTEM;
         try {
             TenantContext.runAs(rowTenant, () -> persist(action, resourceType, resourceId, userId, rowTenant,
                     status, errorMessage, durationMs, clientIp, details));
         } catch (Exception e) {
-            // Audit writes must not break the audited call, but swallowing the message alone is
-            // how a platform-wide audit outage stayed invisible — keep the stack trace.
             log.warn("Failed to save audit log: action={}, organizationId={}", action, orgId, e);
         }
     }
@@ -247,11 +222,9 @@ public class AuditLogAspect {
             Map<String, Object> details = new LinkedHashMap<>();
             for (int i = 0; i < names.length; i++) {
                 if (args[i] == null) continue;
-                // Skip UUID params (already captured as resourceId/orgId) and primitives
                 if (args[i] instanceof UUID) continue;
                 if (args[i] instanceof String || args[i] instanceof Number || args[i] instanceof Boolean) continue;
                 if (args[i] instanceof Enum) continue;
-                // Capture request DTOs
                 String className = args[i].getClass().getSimpleName();
                 if (className.endsWith("Request") || className.endsWith("Role")) {
                     details.put(names[i], args[i]);
@@ -259,7 +232,6 @@ public class AuditLogAspect {
             }
             if (details.isEmpty()) return null;
             String json = objectMapper.writeValueAsString(details);
-            // Limit to 2000 chars
             return json.length() > 2000 ? json.substring(0, 2000) : json;
         } catch (Exception e) {
             return null;

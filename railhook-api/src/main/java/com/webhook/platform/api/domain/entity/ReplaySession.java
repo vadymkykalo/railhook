@@ -40,8 +40,6 @@ public class ReplaySession {
     @Builder.Default
     private ReplaySessionStatus status = ReplaySessionStatus.PENDING;
 
-    // --- Filter criteria (immutable after creation) ---
-
     @Column(name = "from_date", nullable = false)
     private Instant fromDate;
 
@@ -57,8 +55,6 @@ public class ReplaySession {
     @Enumerated(EnumType.STRING)
     @Column(name = "source_status")
     private DeliveryStatus sourceStatus;
-
-    // --- Progress tracking ---
 
     @Column(name = "total_events", nullable = false)
     @Builder.Default
@@ -82,8 +78,6 @@ public class ReplaySession {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
-    // --- Timing ---
-
     @Column(name = "started_at")
     private Instant startedAt;
 
@@ -100,8 +94,6 @@ public class ReplaySession {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
-
-    // --- Optimistic locking ---
 
     @Version
     @Column(nullable = false)

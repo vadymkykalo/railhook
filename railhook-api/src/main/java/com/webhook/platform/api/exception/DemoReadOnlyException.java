@@ -1,9 +1,6 @@
 package com.webhook.platform.api.exception;
 
-/**
- * A change attempted from the public demo, which is read-only. Its own {@code error} code, so the
- * dashboard can say "this is the demo" rather than "you lack a role".
- */
+/** Its own error code so the dashboard can say "this is the demo" rather than "you lack a role". */
 public class DemoReadOnlyException extends ForbiddenException {
 
     public static final String CODE = "demo_read_only";

@@ -32,11 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Collections;
 import java.util.UUID;
 
-/**
- * The Incoming half of the DLQ. Separate from {@link DlqController} rather than a mode of it:
- * the two directions abandon different obligations, and the handle for one of them is a Delivery
- * id while the handle for the other is a Forward Attempt id.
- */
+/** Separate from DlqController because an entry here is keyed by a Forward Attempt id, not a Delivery id. */
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/incoming-dlq")
 @Tag(name = "Dead Letter Queue", description = "DLQ management operations")

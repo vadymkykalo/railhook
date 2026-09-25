@@ -58,9 +58,8 @@ public class DeviceAuthController {
     @PostMapping("/token")
     public ResponseEntity<AuthResponse> pollDeviceToken(@Valid @RequestBody DeviceTokenRequest request,
             HttpServletRequest httpRequest) {
-        // permitAll, so bounded by IP and by the presented device_code — but not on the sign-in
-        // bucket: the CLI polls twelve times a minute, and spending that bucket refused the
-        // browser approving the same code from the same address.
+        // Not the sign-in bucket: the CLI polls twelve times a minute and would starve the
+        // browser approving from the same address.
         if (!authRateLimiterService.allowDevicePoll(getClientIp(httpRequest), request.getDeviceCode())) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
@@ -83,10 +82,8 @@ public class DeviceAuthController {
             @Valid @RequestBody DeviceApproveRequest request,
             AuthContext auth,
             HttpServletRequest httpRequest) {
-        // The "verification" step (RFC 8628 terms): a caller here already holds a valid
-        // JWT, but the user_code space (8 chars, ~40 bits) is small enough that unlimited
-        // authenticated attempts could still enumerate a pending code within its 10-minute
-        // window. Same limiter, bucketed by IP and by the presented user_code.
+        // The user_code space (~40 bits) is small enough to enumerate within its 10-minute
+        // window, even for an authenticated caller.
         if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getUserCode())) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
@@ -109,9 +106,7 @@ public class DeviceAuthController {
             @Valid @RequestBody DeviceDenyRequest request,
             AuthContext auth,
             HttpServletRequest httpRequest) {
-        // Rate-limited on the same bucket as approve, and for the same reason: the user_code
-        // space is small enough that unlimited authenticated attempts could enumerate a pending
-        // code, and guessing one to deny it is a denial-of-service on somebody else's login.
+        // Same bucket as approve: guessing a code to deny it blocks somebody else's login.
         if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getUserCode())) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }

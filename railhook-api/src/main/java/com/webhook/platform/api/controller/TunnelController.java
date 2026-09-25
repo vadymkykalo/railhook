@@ -102,7 +102,7 @@ public class TunnelController {
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "50") int size,
             AuthContext auth) {
-        // Verify ownership
+        // Throws unless the session belongs to the caller's organization.
         tunnelService.getBySessionAndOrg(sessionId);
         size = Math.min(size, 100);
         Page<TunnelRequestLog> logs = requestLogRepository

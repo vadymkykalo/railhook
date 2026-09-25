@@ -56,10 +56,7 @@ public class Event {
     @JoinColumn(name = "project_id", insertable = false, updatable = false)
     private Project project;
 
-    /**
-     * Returns the decompressed payload. If payload is not compressed, returns as-is.
-     * Use this method instead of getPayload() to transparently handle compression.
-     */
+    /** Use this rather than getPayload(), which may be compressed. */
     public String getDecompressedPayload() {
         return PayloadCompressionUtil.decompress(payload, payloadCompressed);
     }

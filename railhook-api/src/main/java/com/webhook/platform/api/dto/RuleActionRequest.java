@@ -18,15 +18,13 @@ public class RuleActionRequest {
     @NotNull(message = "Action type is required")
     private ActionType type;
 
-    /** Required for ROUTE action */
+    /** Required for ROUTE. */
     private UUID endpointId;
 
-    /** Required for TRANSFORM action */
+    /** Required for TRANSFORM. */
     private UUID transformationId;
 
-    /** Extra config JSON (custom headers, tags, etc.) */
     private Object config;
 
-    /** Execution order within the rule */
     private Integer sortOrder;
 }

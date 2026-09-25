@@ -19,10 +19,6 @@ public class EventIngestResponse {
     private Instant createdAt;
     private Integer deliveriesCreated;
 
-    /**
-     * The schema-validation errors this event was accepted despite, under a project whose policy
-     * is WARN. Null when the project has validation off, when the payload matched, and on every
-     * response that is not an ingest — a stored event does not carry them.
-     */
+    /** Set only on ingest under a WARN validation policy; stored events do not keep them. */
     private List<String> schemaWarnings;
 }

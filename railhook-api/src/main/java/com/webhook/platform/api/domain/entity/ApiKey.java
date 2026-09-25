@@ -52,11 +52,7 @@ public class ApiKey {
     @Column(name = "expires_at")
     private Instant expiresAt;
 
-    /**
-     * When this key was rotated away. Together with {@link #expiresAt} it is the grace window:
-     * the key keeps authenticating until the expiry, and this says the expiry is a retirement
-     * rather than an expiry the customer asked for.
-     */
+    /** A rotated key keeps authenticating until {@link #expiresAt}, its grace window. */
     @Column(name = "rotated_at")
     private Instant rotatedAt;
 

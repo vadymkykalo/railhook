@@ -24,10 +24,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/**
- * The public demo: the real dashboard, signed in to a read-only organization, for a visitor with
- * no account. Off unless {@code DEMO_ENABLED=true}.
- */
 @RestController
 @RequestMapping("/api/v1/public/demo")
 @Tag(name = "Demo", description = "Read-only sessions in the public demo organization")
@@ -54,7 +50,7 @@ public class PublicDemoController {
     @PostMapping("/session")
     public ResponseEntity<?> createSession(@RequestBody(required = false) DemoSessionRequest body,
                                            HttpServletRequest request) {
-        // First, so an installation without the demo answers exactly as if the path did not exist.
+        // First, so with the demo off the path looks like it does not exist.
         demoSessionService.requireEnabled();
         String ip = trustedProxyResolver.resolve(request);
         if (!authRateLimiterService.allowDemoSession(ip)) {

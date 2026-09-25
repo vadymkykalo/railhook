@@ -12,8 +12,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * {@link #findByTokenHash} is the authentication lookup, made before any tenant is known and so
- * under the system scope — the hash of a token only its holder has is what confines it.
+ * {@link #findByTokenHash} runs under the system scope, before any tenant is known; the token hash
+ * is what confines it.
  */
 @Repository
 public interface PortalSessionRepository extends JpaRepository<PortalSession, UUID> {

@@ -21,20 +21,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One published template of a {@link Transformation}, kept so that the version number the product
- * shows means something: it can be read, compared and put back.
+ * Append-only: a restore publishes a new row naming the one it came from.
  *
- * <p>Append-only. A restore publishes a new row naming the one it came from
- * ({@code restoredFromVersion}); nothing rewrites an existing row, so the history reads as what
- * happened rather than as what the template ended up being.
- *
- * <p>{@code createdBy} is a user id and is null on purpose in three cases: the change came from an
- * API key (no person behind it), the row was backfilled by V083 from a transformation that
- * predates the history, or the user has since been erased — the FK is {@code ON DELETE SET NULL},
- * so an erasure takes the name and leaves the change.
- *
- * <p>There is no worker copy of this entity: the worker resolves a Transformation to its current
- * template and never reads the history.
+ * <p>{@code createdBy} is null for API-key changes, backfilled rows and erased users. No worker
+ * copy exists because the worker never reads the history.
  */
 @Entity
 @Table(name = "transformation_versions")
@@ -62,14 +52,7 @@ public class TransformationVersion {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String template;
 
-    /**
-     * The language {@link #template} was published in, restored together with it.
-     *
-     * <p>Kept per version rather than read off the transformation, because the transformation's
-     * language is whatever it is <em>now</em>: a transformation rewritten from a template into a
-     * script still has template versions behind it, and restoring one has to put the language
-     * back too or the row ends up marked JAVASCRIPT with JSON in it.
-     */
+    // Per version, so restoring an old template also restores its language.
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     @Builder.Default

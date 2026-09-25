@@ -5,10 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * How many of one Event's Deliveries are in each status right now. Every status is present, zero
- * included, so a reader never has to tell "none" from "not reported".
- */
+/** Every status is present, zero included, so "none" is never confused with "not reported". */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -20,6 +17,6 @@ public class DeliveryStatusCounts {
     private int failed;
     private int dlq;
 
-    /** Deliveries a Transformation said not to send. Neither delivered nor failed. */
+    /** Suppressed by a Transformation: neither delivered nor failed. */
     private int cancelled;
 }

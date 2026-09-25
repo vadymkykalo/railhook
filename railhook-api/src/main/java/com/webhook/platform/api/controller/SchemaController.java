@@ -32,8 +32,6 @@ public class SchemaController {
         this.schemaRegistryService = schemaRegistryService;
     }
 
-    // ── Event Type Catalog ──
-
     @Operation(summary = "List event types", description = "Returns all registered event types for the project")
     @GetMapping
     public ResponseEntity<List<EventTypeCatalogResponse>> listEventTypes(
@@ -90,8 +88,6 @@ public class SchemaController {
         schemaRegistryService.deleteEventType(projectId, eventTypeId);
         return ResponseEntity.noContent().build();
     }
-
-    // ── Schema Versions ──
 
     @Operation(summary = "List schema versions", description = "Returns all schema versions for an event type")
     @GetMapping("/{eventTypeId}/versions")
@@ -152,8 +148,6 @@ public class SchemaController {
         auth.requireWriteAccess();
         return ResponseEntity.ok(schemaRegistryService.deprecateSchema(projectId, eventTypeId, versionId));
     }
-
-    // ── Schema Changes ──
 
     @Operation(summary = "List all schema changes", description = "Returns the diff history across all event types in the project")
     @GetMapping("/changes")

@@ -9,10 +9,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * A comma-separated list of at most {@link #max()} email addresses, or nothing. Null and blank are
- * valid: on an update they mean "leave as is" and "clear" respectively.
- */
+/** Null and blank are valid: on an update they mean "leave as is" and "clear". */
 @Documented
 @Constraint(validatedBy = EmailRecipientListValidator.class)
 @Target(ElementType.FIELD)

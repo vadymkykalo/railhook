@@ -13,15 +13,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 /**
- * Authenticates an OAuth access token on {@code /mcp}. A token that stands for nobody leaves the
- * request unauthenticated, and the entry point answers it with a 401 that tells the app to sign
- * in again.
- *
- * <p>Access tokens are recognised by their prefix, so an API key sent as a bearer value passes
- * straight through to {@code ApiKeyAuthenticationFilter}, which runs next.
- *
- * <p>Not a {@code @Component}: a filter bean is also registered with the servlet container, where
- * it would run outside the security chain.
+ * Recognises access tokens by prefix, so an API key sent as a bearer passes through to the API key
+ * filter. Not a {@code @Component}: a filter bean would also be registered with the servlet
+ * container and run outside the security chain.
  */
 public class McpAccessTokenFilter extends OncePerRequestFilter {
 

@@ -17,9 +17,8 @@ import java.util.UUID;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
-    /** Addresses are stored normalized, so pass {@code EmailAddresses.normalize(address)}. */
+    // Addresses are stored normalized, so pass EmailAddresses.normalize(address).
     Optional<User> findByEmail(String email);
-    /** Addresses are stored normalized, so pass {@code EmailAddresses.normalize(address)}. */
     boolean existsByEmail(String email);
     Optional<User> findByVerificationToken(String verificationToken);
     Optional<User> findByPasswordResetToken(String passwordResetToken);
@@ -32,26 +31,19 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     long countByCreatedAtGreaterThanEqualAndEmailVerifiedTrue(Instant since);
 
-    /** {@code [day, count]} of accounts created since then, one row per calendar day that has any. */
     @Query("SELECT CAST(u.createdAt AS LocalDate), COUNT(u) FROM User u WHERE u.createdAt >= :since "
             + "GROUP BY CAST(u.createdAt AS LocalDate)")
     List<Object[]> countPerDaySince(@Param("since") Instant since);
 
-    /** The platform admin's account search: by address or name, a null term matching everyone. */
     @Query("SELECT u FROM User u WHERE :search IS NULL "
             + "OR LOWER(u.email) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) "
             + "OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))")
     Page<User> searchForOperator(@Param("search") String search, Pageable pageable);
 
     /**
-     * Accounts due the day-2 onboarding nudge, oldest welcome first: verified and active, welcomed
-     * before {@code welcomedBefore}, not nudged yet, owning an organization that is not suspended,
-     * and a member of no organization that has sent an Event or received an Incoming Event.
-     *
-     * <p>Crosses every organization on purpose, so it runs only under {@code @SystemTenant} from
-     * {@code OnboardingMailService}; the organization_id references below are joins, not a tenant
-     * predicate. Events are reached through projects because events and incoming_events are
-     * indexed by project and by source, not by organization.
+     * Crosses every organization on purpose, so it runs only under {@code @SystemTenant}; the
+     * organization_id references are joins, not a tenant predicate. Events are reached through
+     * projects and sources because that is how they are indexed.
      */
     @Query(value = """
             SELECT u.id FROM users u
@@ -76,10 +68,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             """, nativeQuery = true)
     List<UUID> findDueOnboardingNudges(@Param("welcomedBefore") Instant welcomedBefore, @Param("limit") int limit);
 
-    /**
-     * Records the nudge as sent, unless it already was; 1 when this call claimed it. Transactional
-     * on its own account: the nudge job runs with no transaction open and sends after each claim.
-     */
+    // Own transaction: the nudge job has none open and sends after each claim.
     @Transactional
     @Modifying
     @Query("UPDATE User u SET u.onboardingNudgeSentAt = :sentAt WHERE u.id = :id AND u.onboardingNudgeSentAt IS NULL")

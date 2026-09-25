@@ -21,16 +21,9 @@ public class EventResponse {
     private Instant createdAt;
     private Integer deliveriesCreated;
 
-    /**
-     * The same Deliveries as {@code deliveriesCreated}, split by status. Null on a test-event
-     * response.
-     */
+    /** Null on a test-event response. */
     private DeliveryStatusCounts deliveryCounts;
 
-    /**
-     * The schema-validation errors this event was accepted despite, under a project whose policy
-     * is WARN. Null when the project has validation off, when the payload matched, and on every
-     * response that is not an ingest — a stored event does not carry them.
-     */
+    /** Only on an ingest response under a WARN policy; stored events do not carry them. */
     private List<String> schemaWarnings;
 }

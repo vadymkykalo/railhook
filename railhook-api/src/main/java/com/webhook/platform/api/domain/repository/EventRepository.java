@@ -22,15 +22,9 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     List<Event> findByProjectIdAndEventTypeContainingIgnoreCase(UUID projectId, String eventType);
     Page<Event> findByProjectId(UUID projectId, Pageable pageable);
 
-    /** Events since then, one organization's excepted: the platform overview leaves the public demo out. */
     long countByCreatedAtGreaterThanEqualAndOrganizationIdNot(Instant since, UUID excludedOrganizationId);
 
-    /** The distinct event types a project has sent since {@code since}: the portal's picker. */
-    /**
-     * The types of several events at once, as {@code [id, eventType]} rows: a delivery list names
-     * the type of each row's event, and loading the events themselves would drag every payload
-     * along with them.
-     */
+    /** Returns {@code [id, eventType]} rows so a delivery list does not load every event payload. */
     @Query("SELECT e.id, e.eventType FROM Event e WHERE e.id IN :ids")
     List<Object[]> findEventTypesByIds(@Param("ids") Collection<UUID> ids);
 
@@ -38,20 +32,14 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     List<String> findRecentEventTypes(@Param("projectId") UUID projectId, @Param("since") Instant since,
                                       Pageable pageable);
 
-    /** {@code [organizationId, count]} over a half-open window, for every organization in scope. */
     @Query("SELECT e.organizationId, COUNT(e) FROM Event e "
             + "WHERE e.createdAt >= :from AND e.createdAt < :to GROUP BY e.organizationId")
     List<Object[]> countPerOrganizationBetween(@Param("from") Instant from, @Param("to") Instant to);
 
-    /**
-     * {@code [day, count]} of events created since then, one row per calendar day that has any,
-     * one organization's excepted.
-     */
     @Query("SELECT CAST(e.createdAt AS LocalDate), COUNT(e) FROM Event e WHERE e.createdAt >= :since "
             + "AND e.organizationId <> :excluded GROUP BY CAST(e.createdAt AS LocalDate)")
     List<Object[]> countPerDaySinceExcluding(@Param("since") Instant since, @Param("excluded") UUID excludedOrganizationId);
 
-    /** As {@link #countPerOrganizationBetween}, for the given organizations only. */
     @Query("SELECT e.organizationId, COUNT(e) FROM Event e WHERE e.organizationId IN :organizationIds "
             + "AND e.createdAt >= :from AND e.createdAt < :to GROUP BY e.organizationId")
     List<Object[]> countForOrganizationsBetween(
@@ -64,14 +52,8 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     long countByProjectIdAndCreatedAtBetween(@Param("projectId") UUID projectId, @Param("from") Instant from, @Param("to") Instant to);
 
     /**
-     * What an organization has been charged for over a half-open window: its events and its
-     * incoming events together.
-     *
-     * <p>Both directions charge the same monthly quota — EventIngestService for an event,
-     * IngressService for an incoming webhook that was stored — so the database count that re-seeds
-     * the Redis counter, stands in for it when Redis is down, and is shown on the usage page has to
-     * count both. Counting only {@code events} let every re-seed forgive the month's incoming
-     * webhooks, and showed a usage figure that disagreed with the quota check refusing requests.
+     * Both directions charge the same monthly quota, so this count, which re-seeds the Redis
+     * counter and stands in for it when Redis is down, has to include incoming events too.
      */
     @Query(value = """
         SELECT (SELECT COUNT(*) FROM events e
@@ -114,8 +96,6 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
             @Param("projectId") UUID projectId,
             @Param("from") Instant from,
             @Param("to") Instant to);
-
-    // --- Event Time Machine: cursor-based scanning (no OFFSET, highload-safe) ---
 
     @Query(value = """
         SELECT e.* FROM events e
@@ -178,32 +158,11 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
             @Param("eventType") String eventType);
 
     /**
-     * Deletes one batch of events past the retention cutoff, newest-safe.
+     * Deliveries and their attempts go with the event through ON DELETE CASCADE. An event with a
+     * PENDING or PROCESSING delivery is skipped however old it is, since a claim may be live on it.
      *
-     * <p>The only thing in the codebase that bounds the growth of {@code events} and, through
-     * it, {@code deliveries}. Retention for those two used to live solely in
-     * {@code RetentionCleanupScheduler}, which returns immediately unless billing is enabled —
-     * so the self-hosted default, which is also the recommended deployment, deleted neither
-     * ever. {@code delivery_attempts} partitions were being dropped at 90 days while the parent
-     * rows carrying the payloads stayed forever.
-     *
-     * <p>One statement, because {@code deliveries.event_id} is {@code ON DELETE CASCADE} to here
-     * (V001) and {@code delivery_attempts.delivery_id} is {@code ON DELETE CASCADE} to
-     * deliveries (V061): deleting the event takes the whole tree with it. Doing it in three
-     * hand-ordered steps, as the billing scheduler does, only reproduces what the constraints
-     * already guarantee.
-     *
-     * <p>An event with a delivery still PENDING or PROCESSING is left alone however old it is.
-     * Those rows are owned by the pipeline — a claim may be live on one — and deleting an event
-     * out from under an in-flight attempt is a far worse failure than keeping it another day.
-     *
-     * <p>Native, for the {@code LIMIT} that JPQL has no bulk-delete form of; the subquery is what
-     * makes the limit apply to the rows chosen rather than to the delete. Deliberately carries no
-     * {@code organization_id}: it runs {@code @SystemTenant} across every organization, and a
-     * tenant predicate would leave every other organization's rows behind — which is the bug.
-     * Listed in {@code NativeQueryTenantPredicateTest.SYSTEM_PATHS} with that reason.
-     *
-     * @return how many rows this call removed, so the caller stops when a batch comes back short
+     * <p>No organization_id predicate: this runs as {@code @SystemTenant} across every
+     * organization.
      */
     @Modifying
     @Query(value = """
@@ -221,12 +180,10 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
         """, nativeQuery = true)
     int deleteOldEvents(@Param("cutoff") Instant cutoff, @Param("limit") int limit);
 
-    /** Estimated row count for {@code events}, for the gauge that makes growth visible. */
     @Query(value = "SELECT COALESCE(n_live_tup, 0) FROM pg_stat_user_tables WHERE relname = 'events'",
             nativeQuery = true)
     long estimatedRowCount();
 
-    /** Estimated row count for {@code deliveries} — one row per fan-out, so the larger of the two. */
     @Query(value = "SELECT COALESCE(n_live_tup, 0) FROM pg_stat_user_tables WHERE relname = 'deliveries'",
             nativeQuery = true)
     long estimatedDeliveryRowCount();

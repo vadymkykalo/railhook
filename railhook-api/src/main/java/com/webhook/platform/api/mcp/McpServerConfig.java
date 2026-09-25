@@ -17,23 +17,18 @@ import tools.jackson.databind.json.JsonMapper;
 import java.util.Map;
 
 /**
- * The transport behind {@code /mcp}, replacing the one Spring AI would build for one reason: its
- * default hands every tool an empty {@link McpTransportContext}.
- *
- * <p>A tool call is not a handler method, so nothing a controller relies on reaches it — not the
- * {@code AuthContext} argument resolver, not {@code ScopeEnforcementInterceptor}, and not a
- * guarantee about which thread it runs on. What does reach it is the transport context, built
- * here on the request thread while the security chain's identity is still in place. The tools
- * take the caller from there and enter its tenant themselves; see {@link McpCaller}.
+ * Replaces Spring AI's default transport, which hands every tool an empty transport context. A
+ * tool call gets neither the AuthContext resolver nor ScopeEnforcementInterceptor, and may run on
+ * another thread, so the caller is captured here on the request thread and the tools enter its
+ * tenant themselves.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "spring.ai.mcp.server", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class McpServerConfig {
 
-    /** Where the server answers. Fixed rather than configurable: clients are given this URL. */
+    // Not configurable: clients are given this URL.
     public static final String ENDPOINT = "/mcp";
 
-    /** The transport-context key the caller's API-key authentication travels under. */
     static final String CALLER = "railhook.caller";
 
     @Bean
@@ -52,10 +47,7 @@ public class McpServerConfig {
                 .build();
     }
 
-    /**
-     * What the MCP server is built on: the transport above, with protocol errors answered as
-     * JSON-RPC rather than HTTP 500. The router still comes from the WebMVC transport itself.
-     */
+    // Protocol errors are answered as JSON-RPC rather than HTTP 500.
     @Bean
     @Primary
     public McpStatelessServerTransport mcpStatelessServerTransport(WebMvcStatelessServerTransport transport) {

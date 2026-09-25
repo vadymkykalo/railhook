@@ -34,8 +34,6 @@ public class AlertController {
 
     private final AlertService alertService;
 
-    // ─── Rules ──────────────────────────────────────────────────────────
-
     @Operation(operationId = "listAlertRules", summary = "List alert rules",
             description = "The conditions this project alerts on, and the channels each notifies.")
     @GetMapping("/rules")
@@ -93,8 +91,6 @@ public class AlertController {
         alertService.deleteRule(projectId, ruleId);
         return ResponseEntity.noContent().build();
     }
-
-    // ─── Events ─────────────────────────────────────────────────────────
 
     @Operation(operationId = "listAlertEvents", summary = "List alert events (fired alerts)",
             description = "Times a rule actually fired, newest first, resolved and unresolved alike.")

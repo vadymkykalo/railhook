@@ -10,7 +10,6 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
-/** Supplies {@link PortalContext} to portal handlers, and refuses any other caller. */
 @Component
 public class PortalContextArgumentResolver implements HandlerMethodArgumentResolver {
 

@@ -2,10 +2,7 @@ package com.webhook.platform.api.exception;
 
 import lombok.Getter;
 
-/**
- * Thrown when an organization exceeds a plan quota (events, endpoints, projects, etc.).
- * Maps to HTTP 402 Payment Required.
- */
+/** Maps to 402 Payment Required. */
 @Getter
 public class QuotaExceededException extends RuntimeException {
 

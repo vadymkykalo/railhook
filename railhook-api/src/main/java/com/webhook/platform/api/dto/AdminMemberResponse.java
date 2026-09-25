@@ -12,7 +12,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** A member of one organization, as the platform admin sees it: who, what role, how they sign in. */
 @Data
 @Builder
 @NoArgsConstructor
@@ -26,13 +25,10 @@ public class AdminMemberResponse {
     private MembershipStatus membershipStatus;
     private boolean emailVerified;
     private UserStatus userStatus;
-    /** {@code PASSWORD}, and one entry per linked identity provider (e.g. {@code GOOGLE}). */
+    /** {@code PASSWORD} plus one entry per linked identity provider. */
     private List<String> signInMethods;
     private Instant joinedAt;
     private Instant lastSeenAt;
-    /**
-     * Listed in PLATFORM_ADMIN_EMAILS, verified and active: the account half of the rule the admin
-     * API itself applies, so the panel marks exactly the people it would let in.
-     */
+    /** Same rule the admin API applies: listed in PLATFORM_ADMIN_EMAILS, verified and active. */
     private boolean platformAdmin;
 }

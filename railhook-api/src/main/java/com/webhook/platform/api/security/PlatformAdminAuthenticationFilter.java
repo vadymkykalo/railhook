@@ -15,16 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 /**
- * Authenticates the platform-admin operator credential.
- *
- * <p>This is a cluster-operator credential, not a tenant credential: it is a single shared
- * secret ({@code platform.admin.token}, env {@code PLATFORM_ADMIN_TOKEN}) presented via the
- * {@code X-Platform-Admin-Token} header, checked with a constant-time comparison. It never
- * touches {@link MembershipRole} or an organization id, so it cannot be satisfied by any
- * tenant's JWT or API key — including a tenant that happens to be OWNER of its own org.
- *
- * <p>Fails closed: if the secret is not configured (blank), this filter never authenticates
- * anyone, so admin-only routes stay unreachable until an operator explicitly sets it.
+ * A single shared operator secret, unrelated to any tenant credential, so no tenant's JWT or API
+ * key can satisfy it. Fails closed: with the secret unset, nobody is authenticated.
  */
 @Slf4j
 @Component

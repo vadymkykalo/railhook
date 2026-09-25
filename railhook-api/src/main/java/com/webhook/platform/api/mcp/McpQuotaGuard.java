@@ -11,13 +11,9 @@ import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 /**
- * The plan quotas the REST controllers declare with {@link RequireQuota}, declared again for the
- * MCP tools that create the same things.
- *
- * <p>A separate bean because the annotation is an aspect: it applies to a call through a Spring
- * proxy, and the tool methods are invoked reflectively on the bean Spring AI scanned. The
- * {@code auth} and {@code projectId} parameter names are what the aspect reads the organization
- * and project from, so neither may be renamed.
+ * A separate bean because the quota aspect only applies through a Spring proxy, and MCP tool
+ * methods are invoked reflectively. The aspect reads the {@code auth} and {@code projectId}
+ * parameters by name, so do not rename them.
  */
 @Component
 public class McpQuotaGuard {

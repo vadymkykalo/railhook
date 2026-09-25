@@ -100,9 +100,8 @@ public class PiiMaskingController {
     }
 
     @Operation(summary = "Preview sanitized payload", description = "Applies current PII rules to a sample payload and returns the result")
-    // Always text/plain: the body echoes the caller's payload, and negotiated as text/html (a
-    // browser's Accept header) markup inside it would render on our origin (CodeQL java/xss).
-    // The dashboard client already accepts a string or a parsed object.
+    // Always text/plain: the body echoes the caller's payload, and as text/html its markup
+    // would render on our origin.
     @PostMapping(value = "/preview", produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> previewSanitization(
             @PathVariable("projectId") UUID projectId,

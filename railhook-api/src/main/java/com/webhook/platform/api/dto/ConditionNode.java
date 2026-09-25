@@ -11,15 +11,6 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * Polymorphic condition tree node.
- * <p>
- * Two types:
- * <ul>
- *   <li><b>group</b> — logical operator (AND / OR / NOT) with children nodes</li>
- *   <li><b>predicate</b> — atomic field comparison (field + operator + value)</li>
- * </ul>
- * <p>
- * Example JSON:
  * <pre>{@code
  * {
  *   "type": "group",
@@ -39,10 +30,7 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public abstract sealed class ConditionNode permits ConditionNode.Group, ConditionNode.Predicate {
 
-    /**
-     * Logical group node: AND / OR / NOT.
-     * NOT must have exactly 1 child.
-     */
+    /** NOT must have exactly one child. */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -53,9 +41,6 @@ public abstract sealed class ConditionNode permits ConditionNode.Group, Conditio
         private List<ConditionNode> children;
     }
 
-    /**
-     * Atomic predicate: field + operator + value.
-     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -66,23 +51,16 @@ public abstract sealed class ConditionNode permits ConditionNode.Group, Conditio
         private PredicateOperator operator;
         private Object value;
         private ValueType valueType;
-
-        /** Case-insensitive string comparison (default: false) */
         private Boolean caseInsensitive;
     }
-
-    // ─── Enums ──────────────────────────────────────────────────────────
 
     public enum GroupOperator {
         AND, OR, NOT
     }
 
     public enum PredicateOperator {
-        // String
         EQ, NEQ, CONTAINS, NOT_CONTAINS, STARTS_WITH, ENDS_WITH, IN, NOT_IN, REGEX,
-        // Numeric / comparable
         GT, GTE, LT, LTE, BETWEEN,
-        // Presence
         EXISTS, NOT_EXISTS, IS_NULL, NOT_NULL
     }
 

@@ -13,8 +13,7 @@ public class DeliverableEmailValidator implements ConstraintValidator<Deliverabl
         if (meant.isEmpty()) {
             return true;
         }
-        // The corrected address is what makes the refusal actionable. Escaped because the message
-        // is an EL template, and an address is user input.
+        // Escaped because the message is an EL template and the address is user input.
         String escaped = meant.get().replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
                 .replace("$", "\\$");
         context.disableDefaultConstraintViolation();

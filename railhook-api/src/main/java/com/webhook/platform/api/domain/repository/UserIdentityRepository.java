@@ -15,7 +15,6 @@ public interface UserIdentityRepository extends JpaRepository<UserIdentity, UUID
 
     Optional<UserIdentity> findByProviderAndSubject(String provider, String subject);
 
-    /** {@code [userId, provider]} for each identity linked to the given accounts. */
     @Query("select i.userId, i.provider from UserIdentity i where i.userId in :userIds")
     java.util.List<Object[]> findProvidersOfUsers(@Param("userIds") java.util.Collection<UUID> userIds);
 

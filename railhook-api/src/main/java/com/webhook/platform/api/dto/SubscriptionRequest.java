@@ -39,7 +39,10 @@ public class SubscriptionRequest {
 
     private String retryDelays;
 
-    /** Which HTTP statuses are worth another attempt. Comma-separated terms: an exact status, a range (500-599), a 5xx shorthand, or a comparison (>=500). Prefix a term with ! to exclude it; exclusions win wherever they are written. */
+    /**
+     * Comma-separated: an exact status, a range (500-599), 5xx, or a comparison (>=500). A ! prefix
+     * excludes a term, and exclusions always win.
+     */
     @Size(max = 255, message = "retryableStatuses must be at most 255 characters")
     private String retryableStatuses;
 

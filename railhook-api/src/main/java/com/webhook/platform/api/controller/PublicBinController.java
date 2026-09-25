@@ -24,10 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/**
- * The webhook tester on the public site, with no account: make a URL, then read what it received.
- * Requests are sent to the URL itself, which {@link PublicBinCaptureController} answers.
- */
+/** The public webhook tester, no account needed. Captured requests land on PublicBinCaptureController. */
 @RestController
 @RequestMapping("/api/v1/public/bins")
 @Tag(name = "Webhook Tester", description = "Public webhook tester URLs that need no account")
@@ -56,8 +53,7 @@ public class PublicBinController {
         if (!authRateLimiterService.allowPublicBin(ip)) {
             return error(HttpStatus.TOO_MANY_REQUESTS, "rate_limit_exceeded", "Too many tester URLs. Try again in a minute.");
         }
-        // The same challenge as registration, where one is configured: the per-address limits
-        // are per address, and addresses are what a script has plenty of.
+        // Per-address limits alone do not stop a script with many addresses.
         if (!captchaVerifier.verify(body == null ? null : body.getCaptchaToken(), ip)) {
             return error(HttpStatus.BAD_REQUEST, "captcha_failed", "Challenge verification failed. Please try again.");
         }

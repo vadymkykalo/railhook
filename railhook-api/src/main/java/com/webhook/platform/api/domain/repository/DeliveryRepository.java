@@ -115,15 +115,8 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     long countDlqByProjectIdSince(@Param("projectId") UUID projectId, @Param("since") Instant since);
 
     /**
-     * The most recent delivery outcomes for one endpoint, newest first.
-     *
-     * <p>Feeds the CONSECUTIVE_FAILURES alert, which asks whether the last N deliveries all
-     * failed — a question no aggregate answers, because a 90% failure rate and nine failures
-     * in a row are different conditions and only the second one means the receiver is down.
-     *
-     * <p>PENDING and PROCESSING rows are excluded: a delivery still in flight has no outcome
-     * yet, and counting it as "not a failure" would reset the streak every time the endpoint
-     * is busy — which is exactly when the streak matters.
+     * In-flight rows are excluded: counting them as "not a failure" would reset the
+     * consecutive-failures streak whenever the endpoint is busy.
      */
     @Query("SELECT d.status FROM Delivery d WHERE d.endpointId = :endpointId "
             + "AND d.status IN ('SUCCESS', 'FAILED', 'DLQ') ORDER BY d.createdAt DESC")
@@ -157,22 +150,9 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
  @Param("organizationId") UUID organizationId,@Param("endpointIds") List<UUID> endpointIds, @Param("since") Instant since);
 
     /**
-     * Deletes at most {@code batchSize} DLQ deliveries, so a purge runs in bounded chunks.
-     *
-     * <p>The unbounded {@code DELETE} this replaces held row locks across every matching
-     * delivery for one transaction — and, with the foreign key restored in V061, cascades into
-     * {@code delivery_attempts} for each, which is where the volume actually is. A project with
-     * a large DLQ could hold those locks for a long time.</p>
-     *
-     * <p>Native, because JPQL has no {@code LIMIT} on a bulk delete; the subquery is what lets
-     * the limit apply to the rows chosen rather than to the delete itself. Being native, it
-     * carries {@code organization_id} explicitly: Hibernate's {@code @TenantId} discriminator
-     * does not reach native SQL, so the JPQL form this replaced was scoped for free and this
-     * one would delete across organizations without the predicate. The service
-     * validates project ownership before calling, so this is the second lock on the door —
-     * which is the point of it.</p>
-     *
-     * @return how many rows this call removed, so the caller stops when a batch comes back short
+     * Bounded so a purge does not hold locks across the whole DLQ and its cascade into
+     * {@code delivery_attempts}. Native because JPQL has no {@code LIMIT} on a bulk delete, so it
+     * carries {@code organization_id} itself: {@code @TenantId} does not reach native SQL.
      */
     @Modifying
     @Query(value = """
@@ -190,21 +170,11 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
             @Param("projectId") UUID projectId,
             @Param("batchSize") int batchSize);
 
-    /**
-     * Highest sequence number ever generated (and persisted) for an endpoint. Used by
-     * {@code SequenceGeneratorService} to reseed its Redis counter after a cache miss (e.g.
-     * a Redis flush) instead of restarting from zero and permanently desyncing from
-     * {@code ordering_cursors}.
-     */
+    /** Reseeds the Redis sequence counter after it is lost, instead of restarting from zero. */
     @Query("SELECT MAX(d.sequenceNumber) FROM Delivery d WHERE d.endpointId = :endpointId")
     Long findMaxSequenceNumber(@Param("endpointId") UUID endpointId);
 
-    /**
-     * Per-endpoint high-water mark of generated sequence numbers, restricted to endpoints
-     * with ordering-enabled activity since {@code since}. Used by the periodic sequence/cursor
-     * reconciliation job — bounded to recently-active endpoints so it stays
-     * cheap regardless of total endpoint count.
-     */
+    /** Limited to recently active endpoints so reconciliation stays cheap as endpoints grow. */
     @Query(value = """
         SELECT d.endpoint_id, MAX(d.sequence_number)
         FROM deliveries d
@@ -214,14 +184,9 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     List<Object[]> findMaxSequenceNumberPerEndpointSince(@Param("since") Instant since);
 
     /**
-     * Backfills the sequence number generated after commit for an ordering-enabled delivery
-     * (see {@code EventIngestService#assignSequenceNumbersPostCommit}). A separate, tiny,
-     * auto-committing statement — not part of the ingest transaction — so a later rollback in
-     * that transaction can never be the reason a generated sequence number goes unused.
-     *
-     * <p>Transactional on its own account: both callers run it with no transaction open, and a
-     * JPQL update refuses to run without one — which is how every ordered Delivery ingested
-     * through the API went out unordered, and the sweep meant to repair them failed the same way.
+     * Runs outside the ingest transaction, so a rollback there cannot waste a generated number.
+     * Transactional itself because both callers have no transaction open and a JPQL update
+     * needs one.
      */
     @Transactional
     @Modifying
@@ -229,17 +194,8 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     int updateSequenceNumber(@Param("id") UUID id, @Param("sequenceNumber") long sequenceNumber);
 
     /**
-     * Ordered Deliveries that were committed and never got their Sequence Number.
-     *
-     * <p>The number is assigned after the transaction commits, on purpose — it comes from Redis
-     * and must not be able to fail an ingest that has already been accepted. The in-process
-     * failure path degrades gracefully and says so. What it cannot cover is the process not
-     * being there any more: a pod that dies between the commit and the backfill leaves the row
-     * with a null sequence for ever, and the worker skips ordering for any Delivery in that
-     * state, silently.
-     *
-     * <p>{@code :before} keeps this off the rows whose backfill is still in flight — without it
-     * the sweep would race the ingest it is meant to be repairing after.
+     * Ordered Deliveries left without a sequence number by a pod that died between commit and
+     * backfill. {@code :before} keeps the sweep off rows whose backfill is still in flight.
      */
     @Query(value = """
         SELECT * FROM deliveries d

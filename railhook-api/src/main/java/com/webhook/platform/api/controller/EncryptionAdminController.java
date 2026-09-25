@@ -15,13 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Cluster-operator endpoints — encryption key rotation touches every tenant's secrets
- * ({@link EncryptionKeyRotationService} uses no organization predicate), so these are
- * gated on the platform-admin operator credential (see
- * {@code security.PlatformAdminAuthenticationFilter}), not on tenant RBAC.
- * {@code SecurityConfig} enforces the {@code PLATFORM_ADMIN} authority on
- * {@code /api/v1/admin/**} before requests ever reach this controller; no org-scoped
- * JWT or API key can satisfy it.
+ * Key rotation touches every tenant's secrets, so this sits under /api/v1/admin/**, which only
+ * the platform-admin credential can reach; no tenant JWT or API key satisfies it.
  */
 @Slf4j
 @RestController
@@ -60,10 +55,7 @@ public class EncryptionAdminController {
                     .errors(result.errors())
                     .build();
 
-            // Partial failure here can leave some tenants' secrets undecryptable — never
-            // report that as a plain 200. The counter (encryption_rotation_partial_failures_total,
-            // incremented in EncryptionKeyRotationService) is the alertable signal; this status
-            // code is the synchronous one for whoever/whatever triggered the rotation.
+            // A partial failure can leave some tenants' secrets undecryptable, so it must not be a 200.
             HttpStatus status = result.errors() == 0 ? HttpStatus.OK : HttpStatus.MULTI_STATUS;
             if (result.errors() > 0) {
                 log.error("Encryption key rotation completed with {} error(s) — some secrets may be "

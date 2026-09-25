@@ -22,27 +22,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Everything that happens to a request on {@code /api/v1/admin/**} between "who is this" and
- * "may they": turning a listed person's sign-in into the platform-admin authority, slowing them
- * down, and writing down what they looked at.
+ * Grants the platform-admin authority only on {@code /api/v1/admin/**}: the same JWT on a tenant
+ * path stays an ordinary member's. Every request made with the authority is audited, reads
+ * included, since reading another organization's data is the sensitive act here.
  *
- * <p><b>Granting.</b> A request carrying a JWT gets {@link PlatformAdminUserAuthenticationToken}
- * only when {@link PlatformAdminAccessService#evaluate} says so, and only on these paths — the
- * same token on a tenant path stays an ordinary member's. When the only thing wrong is an old
- * sign-in the answer is a distinct {@code reauthentication_required} 403, so the panel can say
- * "sign in again" rather than "access denied" to the one person it is for. Anything else is left
- * alone and {@code SecurityConfig} refuses it like any other caller without the authority.
- *
- * <p><b>Rate limit.</b> Per admin user, or per address for the operator token. The panel is a
- * handful of requests per screen; a script walking every organization is not what it is for.
- *
- * <p><b>Audit.</b> Every request made with the authority — reads included, since reading another
- * organization's members is the sensitive act here — becomes a {@code PLATFORM_ADMIN_ACCESS} row:
- * who, from where, which organization or user, and what came back. Written under the system
- * tenant, so it does not appear in either the admin's or the subject's own audit log; writes that
- * change a tenant are additionally recorded against that tenant by {@code @Auditable}.
- *
- * <p>Not a {@code @Component}, for the reason given on {@code TenantContextFilter}.
+ * <p>Not a {@code @Component}: Spring Boot would also register it as a servlet filter.
  */
 @Slf4j
 public class PlatformAdminAccessFilter extends OncePerRequestFilter {
@@ -93,7 +77,7 @@ public class PlatformAdminAccessFilter extends OncePerRequestFilter {
                     return;
                 }
                 case DENIED -> {
-                    // Left as it is: SecurityConfig refuses a caller without the authority.
+                    // SecurityConfig refuses a caller without the authority.
                 }
             }
         }

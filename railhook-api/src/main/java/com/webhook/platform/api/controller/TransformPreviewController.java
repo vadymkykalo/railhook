@@ -51,18 +51,9 @@ public class TransformPreviewController {
         return ResponseEntity.ok(transformPreviewService.preview(projectId, request));
     }
 
-    // Unlike /transform-preview above, which only ever renders a template against
-    // caller-supplied sample input, this returns a real X-Signature computed with the endpoint's signing secret.
-    // That is a write-level capability: holding it lets the caller mint a payload the
-    // destination will accept as genuine. Guard it like one.
-    //
-    // The public demo is the one caller that gets past that guard, and only because it is handed
-    // a dry-run without the capability in it: DemoDryRunMask replaces the signature before the
-    // answer leaves this method, so a visitor sees the body, the URL and every header the real
-    // attempt would send, and nothing anybody could present to a receiver. A demo session is a
-    // VIEWER, so @RequireAccess(WRITE) would otherwise refuse it outright — see
-    // ScopeEnforcementInterceptor.enforceAccessLevel for why @AllowedInDemo lifts the level here
-    // and nowhere a level is the only protection.
+    // WRITE because the response carries a real X-Signature, which lets the caller mint a payload
+    // the destination accepts as genuine. The demo gets past the level only because its copy has
+    // the signature masked.
     @Operation(summary = "Dry-run delivery", description = "Simulate a full delivery: transform payload, compute HMAC signature, build headers — without actually sending the request")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)

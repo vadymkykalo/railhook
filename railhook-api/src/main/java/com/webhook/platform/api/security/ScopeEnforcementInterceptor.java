@@ -19,18 +19,10 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Enforces three things before a handler runs: the {@link RequireAccess} level, the
- * {@link RequireScope} annotation for API-key requests, and the structural
- * {@code {projectId}} tenancy guard described below.
- *
- * <p>{@link RequireScope} resolves method-level first, then class-level; neither means an API-key
- * request is allowed, and a JWT skips this half entirely.
- *
- * <p>Project confinement is structural. {@code AuthContext.organizationId} comes off the key's
- * project, so an organization-only check passes for any project in that org — and the call that
- * did confine a key was opt-in, which a third of {@code {projectId}} routes forgot. Every route
- * whose URI template carries {@code {projectId}} is now compared against the key's own project
- * regardless of what the handler does, unless it declares {@link ProjectScopeExempt}.
+ * Project confinement for API keys is structural: every route whose URI template carries
+ * {@code {projectId}} is compared against the key's own project, whatever the handler does,
+ * unless it declares {@link ProjectScopeExempt}. An organization check alone would pass for any
+ * project in the key's organization.
  */
 @Slf4j
 @Component
@@ -47,32 +39,14 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
     }
 
     /**
-     * Enforces {@link RequireAccess}, for both JWT and API-key callers.
-     *
-     * <p>Before the scope check, not after: scope returns early for a JWT, so a role requirement
-     * placed after it would not apply to dashboard callers — exactly the ones a VIEWER is.
-     *
-     * <p>An authentication that maps to no membership role is refused when a level above READ is
-     * declared. That costs the admin endpoints nothing, since none of them declares one; what the
-     * old pass-through covered was platform-admin tokens aimed at tenant handlers, safe only
-     * because every annotated handler happens to take an {@code AuthContext}.
+     * Runs before the scope check because that one returns early for a JWT, and dashboard
+     * callers are the ones a VIEWER role applies to.
      */
     void enforceAccessLevel(HandlerMethod handlerMethod, Authentication authentication) {
         if (DemoSessions.isDemo(authentication) && handlerMethod.hasMethodAnnotation(AllowedInDemo.class)) {
-            // The demo is a VIEWER by construction — the seeder reasserts that role on every run —
-            // so any level above READ refuses it, and a handler on the allow list would be
-            // unreachable however carefully it was reviewed. The list is the decision: a handler
-            // carries {@link AllowedInDemo} only because somebody argued, in writing, that a
-            // stranger holding the demo's identity may call it. Letting the level refuse it
-            // afterwards would mean the argument was never actually made.
-            //
-            // The one handler this matters to today is TransformPreviewController.deliveryDryRun,
-            // whose WRITE level exists to keep a working X-Signature away from a reader. That
-            // capability is taken off the demo's copy of the answer instead — see DemoDryRunMask —
-            // so nothing the level was protecting is handed over here.
-            //
-            // Narrow on purpose: only a method-level annotation, only for a demo caller, and
-            // DemoSessionAllowListTest freezes the set it can apply to.
+            // The demo is always a VIEWER, so without this an AllowedInDemo handler above READ
+            // would be unreachable. Only a method-level annotation counts, and
+            // DemoSessionAllowListTest freezes the set.
             return;
         }
         RequireAccess required = handlerMethod.getMethodAnnotation(RequireAccess.class);
@@ -100,9 +74,7 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
                             + "belong on /api/v1/admin/**.");
         }
 
-        // Deliberately the same RbacUtil the handlers call, rather than a second implementation
-        // of "what write access means". Two implementations would be two things to keep in
-        // step, and the whole point of this annotation is that there is one answer.
+        // Same RbacUtil the handlers call, so there is one definition of write access.
         if (required.value() == AccessLevel.OWNER) {
             RbacUtil.requireOwnerAccess(role);
         } else {
@@ -110,27 +82,12 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
         }
     }
 
-
     /**
-     * Refuses a write from an account that has not proved it owns its address.
+     * Refuses writes from an unverified account. With mail disabled, registration marks accounts
+     * verified immediately, so this is inert there.
      *
-     * <p>This lived only in the browser: {@code VerificationGate.tsx} greys the buttons out, and
-     * the server issued an ordinary token to a {@code PENDING_VERIFICATION} account and asked
-     * nothing further — login refuses {@code DISABLED} and nothing else. Anyone reaching past
-     * the dashboard had the whole API.
-     *
-     * <p>Inert where verification is meaningless: with mail disabled, registration marks the
-     * account verified on the spot, because an unsent token proves nothing about an address and
-     * a gate with no key is just a locked-out user. So a self-hosted instance sees no change,
-     * and an instance with open registration and a free tier gets the rule it needs.
-     *
-     * <p>Hung off {@link RequireAccess} rather than a path list, so it covers exactly what
-     * writing covers. Reading stays open — the screen that tells the user to check their mail
-     * is a read, and so is every screen they might be looking at when they find out.
-     *
-     * <p>API keys are not re-checked: a key exists only because someone created one, and
-     * creating one is a write that passed this gate. Asking again would mean a user row read on
-     * the hot path of every ingest to re-answer a settled question.
+     * <p>API keys are not re-checked: creating a key is itself a write that passed this gate,
+     * and checking again would add a user lookup to every ingest request.
      */
     void enforceVerifiedEmail(HandlerMethod handlerMethod, Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken jwt) || jwt.isEmailVerified()) {
@@ -154,22 +111,9 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
     }
 
     /**
-     * Refuses to change anything on behalf of a suspended organization.
-     *
-     * <p>Suspension used to be a word. {@code BillingStatus.SUSPENDED} is written by the dunning
-     * scheduler when a grace period expires and read by nothing at all, so an organization that
-     * had stopped paying — or one an operator wanted stopped for abuse — went on ingesting and
-     * delivering exactly as before. There was also no way for an operator to suspend anyone
-     * except by editing the database.
-     *
-     * <p>Keyed off the HTTP method rather than {@link RequireAccess}, unlike the verification
-     * gate next to it, and for a specific reason: ingest carries no access-level annotation, and
-     * ingest is the thing a suspension most needs to stop. Reads stay open so the tenant can
-     * sign in and be told why, and so support can look at the same screens they can.
-     *
-     * <p>The reason the operator wrote is returned to the caller. That is deliberate — a tenant
-     * discovering they are suspended should not have to open a ticket to find out what for —
-     * and it is why the field is documented as something a customer can be shown.
+     * Keyed off the HTTP method rather than {@link RequireAccess} because ingest carries no
+     * access level and is what a suspension most needs to stop. The operator's reason is
+     * returned to the caller on purpose.
      */
     void enforceNotSuspended(HttpServletRequest request, Authentication authentication) {
         if (READ_METHODS.contains(request.getMethod())) {
@@ -178,20 +122,15 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
 
         UUID organizationId;
         if (authentication instanceof PlatformAdminUserAuthenticationToken) {
-            // The platform admin acting from the panel: their own organization being suspended
-            // must not stop them lifting someone else's suspension.
+            // Their own organization's suspension must not stop them lifting someone else's.
             return;
         } else if (authentication instanceof JwtAuthenticationToken jwt) {
             organizationId = jwt.getOrganizationId();
         } else if (authentication instanceof ApiKeyAuthenticationToken apiKey) {
             organizationId = apiKey.getOrganizationId();
         } else if (authentication instanceof PortalSessionAuthenticationToken portal) {
-            // A Consumer registering an Endpoint from the portal is the organization changing
-            // something, whoever's browser the request came from.
             organizationId = portal.getOrganizationId();
         } else {
-            // Unauthenticated, or the platform admin - who is the one able to lift a suspension
-            // and must not be locked out by it.
             return;
         }
 
@@ -203,18 +142,10 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
     }
 
     /**
-     * Refuses every change from the public demo, and the few reads it has no business making.
-     *
-     * <p>Keyed off the HTTP method, like the suspension gate below, and for a stronger reason
-     * than that gate has: a demo token goes to anyone who asks, so "which handlers change
-     * something" must not be a list somebody keeps. {@link RequireAccess} would have been that
-     * list — and the handlers exempt from it (changing a password or an address, managing
-     * members, approving a CLI or an MCP app, the customer portal) are exactly the ones a
-     * stranger holding the demo's identity should reach least.
-     *
-     * <p>First, before anything that might answer differently: a demo caller learns nothing
-     * from any other gate. The way past it is {@link AllowedInDemo}, and only a handler that
-     * changes nothing of the demo's carries it.
+     * Keyed off the HTTP method rather than {@link RequireAccess}: the handlers without an
+     * access level (password, members, CLI and MCP approval, portal) are the ones a stranger
+     * holding the demo token should reach least. Runs first so a demo caller learns nothing from
+     * the other gates.
      */
     void enforceDemoReadOnly(HttpServletRequest request, Object handler, Authentication authentication) {
         if (!DemoSessions.isDemo(authentication)) {
@@ -276,17 +207,10 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
         return true;
     }
 
-    /**
-     * Structural, path-based project-tenancy guard. Runs for every request,
-     * independent of the {@link RequireScope} check above and of anything the handler
-     * method itself does.
-     */
     private void enforceProjectScope(HttpServletRequest request, HandlerMethod handlerMethod,
                                       Authentication authentication) {
         if (!(authentication instanceof ApiKeyAuthenticationToken apiKeyAuth)) {
-            // JWT / platform-admin auth: project access within an org is governed by
-            // org membership at the service layer. Only API
-            // keys are meant to be confined to a single project.
+            // Only API keys are confined to one project; users are scoped by membership.
             return;
         }
 

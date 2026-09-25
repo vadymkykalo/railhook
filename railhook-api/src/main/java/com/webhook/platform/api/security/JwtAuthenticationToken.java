@@ -12,15 +12,8 @@ public class JwtAuthenticationToken extends AbstractAuthenticationToken {
     private final UUID userId;
     private final UUID organizationId;
     private final MembershipRole role;
-    /**
-     * Whether the account behind this token has proved it owns its address. Carried on the
-     * token rather than looked up per request: it changes once, and the alternative is a user
-     * row read on the hot path of every write. A token minted before the claim existed reads
-     * as verified — the same answer a self-hosted deployment gives, and the one that does not
-     * lock existing sessions out on upgrade.
-     */
+    // Carried on the token to avoid a user lookup on every write.
     private final boolean emailVerified;
-    /** Minted by the public demo; see {@link DemoSessions}. */
     private final boolean demo;
 
     public JwtAuthenticationToken(

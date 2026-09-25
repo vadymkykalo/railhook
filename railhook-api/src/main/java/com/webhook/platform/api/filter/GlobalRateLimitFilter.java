@@ -24,8 +24,7 @@ import java.time.Duration;
 public class GlobalRateLimitFilter implements Filter {
 
     private static final String REDIS_KEY = "rate_limiter:global";
-    // A keep-alive, refreshed by every acquire: a TTL set once at startup lapsed a day later and
-    // left each replica on its own local bucket for as long as the process lived.
+    // Refreshed on every acquire; if the key lapses, each replica falls back to a local bucket.
     private static final Duration KEY_TTL = Duration.ofHours(24);
 
     private final ConvergingRateLimiter redisLimiter;
@@ -71,7 +70,6 @@ public class GlobalRateLimitFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         String path = httpRequest.getRequestURI();
 
-        // Skip health/metrics endpoints
         if (path.startsWith("/actuator")) {
             chain.doFilter(request, response);
             return;

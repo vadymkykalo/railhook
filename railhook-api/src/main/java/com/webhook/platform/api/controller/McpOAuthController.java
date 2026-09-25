@@ -29,16 +29,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The OAuth 2.1 endpoints an MCP client talks to on its own: discovery metadata, dynamic client
- * registration, the authorization redirect, the token endpoint and revocation.
- *
- * <p>Hidden from the OpenAPI document: these are defined by RFCs 6749, 7009, 7591, 8414 and 9728,
- * which describe them better than a generated schema could, and nothing but an OAuth client calls
- * them. The screens a person uses — consent and the list of connected apps — are ordinary API
- * endpoints in {@link McpConsentController} and {@link McpGrantController}.
- *
- * <p>Errors come back in the OAuth shape, {@code {"error", "error_description"}}, never the
- * dashboard's, because OAuth clients branch on the {@code error} code.
+ * Hidden from OpenAPI: the RFCs define these endpoints and only OAuth clients call them. Errors
+ * use the OAuth shape because clients branch on the {@code error} code.
  */
 @Hidden
 @RestController
@@ -58,9 +50,8 @@ public class McpOAuthController {
     }
 
     /**
-     * Protected resource metadata (RFC 9728) for the MCP endpoint. The path-suffixed address is the
-     * one the 401 challenge names; the root one describes the origin, since RFC 9728 §3.3 binds a
-     * document's {@code resource} to the URL it was fetched from.
+     * The 401 challenge names this path-suffixed address. The root one describes the origin,
+     * because RFC 9728 binds {@code resource} to the URL the document was fetched from.
      */
     @GetMapping("/.well-known/oauth-protected-resource/mcp")
     public ResponseEntity<Map<String, Object>> protectedResourceMetadata() {
@@ -72,7 +63,6 @@ public class McpOAuthController {
         return metadata(protectedResource(settings.issuer()));
     }
 
-    /** Authorization server metadata (RFC 8414). */
     @GetMapping("/.well-known/oauth-authorization-server")
     public ResponseEntity<Map<String, Object>> authorizationServerMetadata() {
         requireEnabled();
@@ -95,7 +85,7 @@ public class McpOAuthController {
         return metadata(body);
     }
 
-    /** Dynamic client registration (RFC 7591). Open, as MCP clients need it to be; bounded per address. */
+    /** Open by design, since MCP clients register themselves; rate limited per address. */
     @PostMapping(value = "/oauth/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> registerOAuthClient(@RequestBody Map<String, Object> metadata,
                                                         HttpServletRequest request) {
@@ -109,10 +99,7 @@ public class McpOAuthController {
                 .body(oauthService.registerClient(metadata));
     }
 
-    /**
-     * Where the app sends the person's browser. Always a redirect: to the dashboard's consent
-     * screen, or back to the app with an error once its redirect URI is known to be its own.
-     */
+    /** Errors go back to the app only once its redirect URI is known to be its own. */
     @GetMapping("/oauth/authorize")
     public ResponseEntity<Void> authorizeOAuthRequest(@RequestParam Map<String, String> params) {
         requireEnabled();
@@ -138,7 +125,7 @@ public class McpOAuthController {
                 .body(oauthService.token(params, authorization));
     }
 
-    /** Token revocation (RFC 7009). Answers 200 whether or not the token existed. */
+    /** Answers 200 whether or not the token existed (RFC 7009). */
     @PostMapping(value = "/oauth/revoke", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<Void> revokeOAuthToken(@RequestParam MultiValueMap<String, String> form,
                                        @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
@@ -184,10 +171,7 @@ public class McpOAuthController {
         return ResponseEntity.ok().cacheControl(CacheControl.noCache()).body(body);
     }
 
-    /**
-     * A repeated parameter is an error in OAuth (RFC 6749 §3.1), not a list: which copy would win
-     * is exactly the ambiguity a parameter-pollution attack needs.
-     */
+    /** A repeated parameter is an error in OAuth, which closes off parameter pollution. */
     private static Map<String, String> single(MultiValueMap<String, String> form) {
         Map<String, String> out = new LinkedHashMap<>();
         form.forEach((name, values) -> {

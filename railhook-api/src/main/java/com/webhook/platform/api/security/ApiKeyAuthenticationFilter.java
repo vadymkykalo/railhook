@@ -44,10 +44,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         if (apiKeyValue != null && !apiKeyValue.isEmpty()) {
             String keyHash = CryptoUtils.hashApiKey(apiKeyValue);
 
-            // Authentication precedes tenancy: `api_keys` and `projects` are both tenant-scoped,
-            // and the tenant is what these two reads are for. System scope is the only honest
-            // answer here -- the alternative is a chicken-and-egg where the key cannot be looked
-            // up until the organization it names is already known.
+            // System scope: these reads are how the tenant is found in the first place.
             Optional<ApiKey> apiKeyOpt = TenantContext.callAsSystem(() -> apiKeyRepository.findByKeyHash(keyHash));
 
             if (apiKeyOpt.isPresent()) {
@@ -59,10 +56,6 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                     Optional<Project> project = TenantContext.callAsSystem(
                             () -> projectRepository.findById(apiKey.getProjectId()));
 
-                    // A key whose project is gone authenticates nothing. Previously this surfaced
-                    // later, as an UnauthorizedException from AuthContextArgumentResolver; leaving
-                    // the request unauthenticated here reaches the same 401 without a tenant-less
-                    // authenticated token existing in between.
                     if (project.isPresent()) {
                         ApiKeyAuthenticationToken authentication = new ApiKeyAuthenticationToken(
                                 apiKeyValue,
@@ -82,12 +75,8 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * The key from {@code X-API-Key}, or — on the MCP endpoint only — from
-     * {@code Authorization: Bearer}, which is the one header many MCP clients know how to send.
-     *
-     * <p>Confined to that path so the rest of the API keeps a single way in for a key: a bearer
-     * token everywhere else is a JWT, and {@link JwtAuthenticationFilter} ignores a bearer value
-     * it cannot parse, so the two never claim the same request.
+     * Accepts {@code Authorization: Bearer} only on the MCP endpoint, because many MCP clients
+     * can send nothing else. Everywhere else a bearer token is a JWT.
      */
     private static String apiKeyOf(HttpServletRequest request) {
         String header = request.getHeader(API_KEY_HEADER);

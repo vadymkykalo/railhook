@@ -31,26 +31,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Runs one MCP tool call as the API key — or the OAuth grant, which is the same (project, scope)
- * pair — that made it, and turns whatever happens into a result the model can read.
+ * A tool call passes through none of the web layer, so this does its work by hand: the caller
+ * comes from the transport context (not the thread the tool runs on), the tenant and security
+ * context are entered for the call only, and writes are refused for READ_ONLY keys and suspended
+ * organizations. No tool takes a project id, so a call cannot reach another project.
  *
- * <p>Everything a REST request gets from the web layer has to be done here by hand, because a
- * tool call passes through none of it:
- * <ul>
- *   <li>the caller comes from the transport context {@link McpServerConfig} filled on the request
- *       thread, not from the thread the tool happens to run on;</li>
- *   <li>its organization is entered as the tenant, and its authentication as the security context,
- *       for the duration of the call and no longer — audit and quota read the latter;</li>
- *   <li>a write is refused for a READ_ONLY key and for a suspended organization, which is what
- *       {@code ScopeEnforcementInterceptor} does for a handler carrying
- *       {@code @RequireScope(READ_WRITE)};</li>
- *   <li>the project is always the key's own. No tool takes a project id, so there is nothing for a
- *       caller to point at another project with.</li>
- * </ul>
- *
- * <p>Results are JSON written by the same Jackson 2 mapper the REST API writes with, so a tool
- * returns exactly the shapes {@code openapi.yaml} documents. Failures come back as tool errors
- * rather than protocol errors: the model is meant to read them and correct its call.
+ * <p>Failures are tool errors rather than protocol errors so the model can read them and retry.
  */
 @Slf4j
 @Component
@@ -66,17 +52,14 @@ public class McpCaller {
         this.suspensionCheck = suspensionCheck;
     }
 
-    /** A tool that only reads. Any key of the project may call it. */
     public CallToolResult read(McpTransportContext context, Function<AuthContext, Object> body) {
         return run(context, null, body);
     }
 
-    /** A tool that changes something. Refused for a READ_ONLY key and a suspended organization. */
     public CallToolResult write(McpTransportContext context, String tool, Function<AuthContext, Object> body) {
         return run(context, tool, body);
     }
 
-    /** Bean-validates a request DTO the way {@code @Valid} would have on the REST route. */
     public <T> T valid(T request) {
         Set<ConstraintViolation<T>> violations = validator.validate(request);
         if (!violations.isEmpty()) {
@@ -148,7 +131,7 @@ public class McpCaller {
         return CallToolResult.builder().isError(true).addTextContent(message).build();
     }
 
-    /** An argument the tool itself rejects; its message is shown to the model as-is. */
+    /** Its message is shown to the model as-is. */
     public static class McpToolException extends RuntimeException {
         public McpToolException(String message) {
             super(message);

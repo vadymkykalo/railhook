@@ -27,7 +27,6 @@ public class WorkflowResponse {
     private Instant createdAt;
     private Instant updatedAt;
 
-    // Execution stats
     private Long totalExecutions;
     private Long successfulExecutions;
     private Long failedExecutions;

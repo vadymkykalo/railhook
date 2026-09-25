@@ -37,12 +37,8 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // The rate limit runs first: there is no point authorising a request that is about to
-        // be refused anyway, and a caller flooding the API should be turned away as cheaply as
-        // possible.
-        // Not the portal: each portal session has a budget of its own, spent in
-        // PortalSessionAuthenticationFilter, so a Consumer's browser cannot use up the one the
-        // customer's own dashboard and backend share.
+        // Rate limit first, so a flood is turned away cheaply. The portal is excluded: each
+        // portal session has its own budget, so a Consumer cannot use up the organization's.
         registry.addInterceptor(organizationRateLimitInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns("/api/v1/portal/**");

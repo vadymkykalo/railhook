@@ -17,18 +17,9 @@ import java.util.UUID;
 public class DeliveryResponse {
     private UUID id;
     private UUID eventId;
-    /** The event's type, so a list of deliveries reads without opening each row. */
     private String eventType;
     private UUID endpointId;
     private UUID subscriptionId;
-    /**
-     * Typed rather than a String, so the published spec carries the enum. Jackson writes an
-     * enum as its name, so the JSON is byte-for-byte what it was; what changes is that
-     * openapi.yaml now says which five values this can be, the generated TypeScript narrows
-     * from string to a union, and the locale ratchet has something to check the delivery
-     * status labels against - the most-rendered status in the product, and the one namespace
-     * the drift test structurally could not cover.
-     */
     private DeliveryStatus status;
     private Integer attemptCount;
     private Integer maxAttempts;

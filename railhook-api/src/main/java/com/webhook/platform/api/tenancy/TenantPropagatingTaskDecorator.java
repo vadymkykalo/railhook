@@ -10,31 +10,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Carries the submitting thread's tenant scope onto the thread that runs the task.
+ * Carries the submitting thread's tenant scope onto the thread that runs the task, since
+ * {@link TenantContext} is a {@code ThreadLocal}. A submission with no scope propagates nothing,
+ * so the task fails loudly instead of reading another tenant's rows.
  *
- * <p>{@link TenantContext} is a {@code ThreadLocal}, so an {@code @Async} method would otherwise
- * start with no scope at all and fail on its first query. Every {@code @Async} method here is
- * work handed off from a request that already knows whose data it is — dispatching an alert for
- * a rule, running a replay session, triggering workflows for a project — so inheriting the
- * caller's tenant is both the safe answer and the accurate one.
- *
- * <p>An {@code @Async} call made from a system-scoped path inherits {@link TenantContext#SYSTEM}
- * the same way, which is what a scheduler handing work to a pool wants. A submission from a
- * thread with no scope at all propagates nothing, and the task fails the way any unscoped code
- * does — loudly, rather than by quietly reading another tenant's rows.
- *
- * <h2>Pools Spring does not build</h2>
- *
- * <p>{@code TaskDecorator} is a Spring hook, so it reaches only the executors declared in
- * {@code AsyncConfig}. A pool built with {@code Executors.new*} or {@code new ThreadPoolExecutor}
- * has no such hook, and both of the ones in this codebase had grown their own answer to the same
- * problem — one wrapping each task body in {@code runAs}, the other re-implementing this class
- * inline, already missing the {@code captured == null} pass-through. {@link #wrap(ExecutorService)}
- * is the shared answer: same semantics, applied to every task the pool ever runs, whichever
- * {@code submit}/{@code execute}/{@code invokeAll} form the caller used.
- *
- * <p>{@code HandBuiltExecutorTenantPropagationTest} is the ratchet that keeps a third copy from
- * appearing.
+ * <p>A {@code TaskDecorator} only reaches Spring-built executors; a hand-built pool must go
+ * through {@link #wrap(ExecutorService)}.
  */
 public class TenantPropagatingTaskDecorator implements TaskDecorator {
 
@@ -43,22 +24,11 @@ public class TenantPropagatingTaskDecorator implements TaskDecorator {
         return propagate(runnable);
     }
 
-    /**
-     * The same propagation as {@link #decorate}, as a static so a hand-built pool can use it.
-     *
-     * <p>Every task submitted through the returned service runs in the scope its submitter was in,
-     * and the worker thread's own scope is restored afterwards. Lifecycle calls
-     * ({@code shutdown}, {@code awaitTermination}, …) and the delegate's rejection policy pass
-     * straight through, so a pool keeps its saturation behaviour and its shutdown semantics —
-     * which is why the two hand-built pools are wrapped where they are rather than moved into
-     * {@code AsyncConfig}: each exists for a reason that a {@code ThreadPoolTaskExecutor} bean
-     * would flatten.
-     */
+    /** Lifecycle calls and the delegate's rejection policy pass straight through. */
     public static ExecutorService wrap(ExecutorService delegate) {
         return new TenantPropagatingExecutorService(delegate);
     }
 
-    /** Captures the current scope now and re-enters it when the task runs. */
     public static Runnable propagate(Runnable task) {
         UUID captured = TenantContext.current();
         return () -> {
@@ -75,7 +45,6 @@ public class TenantPropagatingTaskDecorator implements TaskDecorator {
         };
     }
 
-    /** {@link #propagate(Runnable)} for work that returns a value or throws. */
     public static <T> Callable<T> propagate(Callable<T> task) {
         UUID captured = TenantContext.current();
         return () -> {
@@ -91,11 +60,7 @@ public class TenantPropagatingTaskDecorator implements TaskDecorator {
         };
     }
 
-    /**
-     * Decorates on {@code execute} alone, which is enough: {@link AbstractExecutorService} routes
-     * {@code submit}, {@code invokeAll} and {@code invokeAny} through it, so there is no form of
-     * hand-off that can slip past the decoration.
-     */
+    /** Decorating {@code execute} is enough: the other submit forms all route through it. */
     private static final class TenantPropagatingExecutorService extends AbstractExecutorService {
 
         private final ExecutorService delegate;

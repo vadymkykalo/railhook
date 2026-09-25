@@ -26,13 +26,12 @@ public class RuleRequest {
 
     private Integer priority;
 
-    /** Event type pattern (supports wildcards: *, **). NULL = catch-all */
+    /** Supports * and ** wildcards; null matches every event type. */
     private String eventTypePattern;
 
-    /** Condition tree (nested AND/OR/NOT groups + predicates). NULL = match all events. */
+    /** Null matches every event. */
     private ConditionNode conditions;
 
-    /** Actions to execute when rule matches */
     @Valid
     private List<RuleActionRequest> actions;
 }

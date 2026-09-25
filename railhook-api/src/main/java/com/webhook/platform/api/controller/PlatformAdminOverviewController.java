@@ -20,14 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * The platform admin panel's deployment-wide views: the overview and the account list.
- *
- * <p>Gated like the rest of {@code /api/v1/admin/**} on the {@code PLATFORM_ADMIN} authority —
- * the operator token, or a sign-in whose verified address is in {@code PLATFORM_ADMIN_EMAILS} —
- * and, like its neighbours, declares no {@code @RequireAccess}: there is no membership role that
- * reaches here. {@code PlatformAdminAccessFilter} rate-limits and audits every request.
- */
+/** No {@code @RequireAccess}: no membership role reaches /api/v1/admin/**. */
 @RestController
 @RequestMapping("/api/v1/admin")
 @Tag(name = "Platform Admin", description = "Deployment-wide overview and accounts (platform admin only)")

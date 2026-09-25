@@ -12,14 +12,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Validates that dangerous development defaults are not used in production.
- * In production mode (APP_ENV=production), placeholder secrets and unsafe settings
- * cause a startup failure to prevent accidental misconfigurations.
- *
- * Runs from {@link PostConstruct} rather than {@code ApplicationReadyEvent}:
- * the latter fires after the embedded connector is already bound and serving traffic,
- * leaving a live window where an insecure config is reachable before the check throws.
- * {@link SecurityConfigValidator} already uses this pattern; this class now matches it.
+ * Runs from {@link PostConstruct} rather than on {@code ApplicationReadyEvent}, which fires
+ * after the connector is already serving traffic with the unsafe config.
  */
 @Component
 @Slf4j
@@ -35,10 +29,7 @@ public class ProductionSafetyValidator {
             "password"
     );
 
-    // The exact values .env.dist ships for each secret. A production deployment that
-    // still has one of these means the operator copied .env.dist -> .env and never
-    // rotated the secret -- a fixed substring denylist alone lets values like
-    // "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" through, so this is checked in addition to it.
+    // Exact values shipped in .env.dist: the operator copied it and never rotated.
     private static final Map<String, String> SHIPPED_DEFAULTS = Map.ofEntries(
             Map.entry("JWT_SECRET", "dev_jwt_secret_key_32_chars_minimum"),
             Map.entry("WEBHOOK_ENCRYPTION_KEY", "dev_encryption_key_32_chars_min!"),
@@ -47,10 +38,7 @@ public class ProductionSafetyValidator {
             Map.entry("REDIS_PASSWORD", "webhook_redis_pass")
     );
 
-    // Floor for the Shannon-entropy estimate (bits, frequency-based) of a secret value.
-    // Chosen to comfortably clear any real generateSecureToken()/openssl-rand style
-    // secret (which land well over 100 bits) while rejecting repeated characters,
-    // short dictionary words, and other low-randomness placeholders.
+    // Real random secrets land well over 100 bits; this rejects repeated characters and words.
     private static final double MIN_SECRET_ENTROPY_BITS = 40.0;
 
     @Value("${APP_ENV:development}")
@@ -65,9 +53,6 @@ public class ProductionSafetyValidator {
     @Value("${jwt.secret:#{null}}")
     private String jwtSecret;
 
-    // Bound directly to the raw env vars rather than their Spring-mapped properties:
-    // these are read purely to gate startup, so there's no need to introduce (or
-    // depend on) an application.yml property for each one.
     @Value("${DB_PASSWORD:}")
     private String dbPassword;
 
@@ -83,8 +68,6 @@ public class ProductionSafetyValidator {
     @Value("${swagger.enabled:true}")
     private boolean swaggerEnabled;
 
-    // The hosted-mode pair. Neither is unsafe on its own; together, one on and the other off
-    // is a service that bills nobody and verifies nobody while believing it does both.
     @Value("${billing.enabled:false}")
     private boolean billingEnabled;
 
@@ -107,11 +90,7 @@ public class ProductionSafetyValidator {
         validateSecret(violations, "WEBHOOK_ENCRYPTION_KEY", "WEBHOOK_ENCRYPTION_KEY", encryptionKey);
         validateSecret(violations, "WEBHOOK_ENCRYPTION_SALT", "WEBHOOK_ENCRYPTION_SALT", encryptionSalt);
         validateSecret(violations, "JWT_SECRET", "JWT_SECRET", jwtSecret);
-        // The app authenticates to Postgres with DB_PASSWORD; POSTGRES_PASSWORD (which sets
-        // the DB's own bootstrap password in docker-compose) isn't forwarded into the api
-        // container at all. Both ship the same default in .env.dist, so validating the one
-        // the app actually receives covers the case the task calls out without adding a new
-        // secret to the api container's environment.
+        // POSTGRES_PASSWORD never reaches this container; DB_PASSWORD ships the same default.
         validateSecret(violations, "POSTGRES_PASSWORD (checked via DB_PASSWORD)", "DB_PASSWORD", dbPassword);
         validateSecret(violations, "REDIS_PASSWORD", "REDIS_PASSWORD", redisPassword);
 
@@ -141,28 +120,10 @@ public class ProductionSafetyValidator {
     }
 
     /**
-     * Checks the settings that only make sense together once the platform is charging strangers.
-     *
-     * <p>{@code BILLING_ENABLED=true} is the whole of what separates a hosted deployment from a
-     * self-hosted one — there is no separate build, no profile, no licence key. Which means the
-     * hosted deployment is one unset variable away from being an open, unbilled, unverified
-     * multi-tenant service that starts up perfectly happily and says nothing.
-     *
-     * <p>Two things it must not be missing:
-     *
-     * <ul>
-     *   <li>Mail. Registration marks an account verified when no mail can be sent, because a
-     *       token nobody receives proves nothing — correct for self-hosting, and on open
-     *       registration it means every account is verified by assertion.</li>
-     *   <li>A CAPTCHA. The registration rate limit is per address, which is the one thing a
-     *       signup farm has plenty of.</li>
-     * </ul>
-     *
-     * <p>A payment provider is not required. With {@code noop} the deployment runs the free plan
-     * only: quotas are enforced, assignPlan admits nothing but {@code free}, and checkout refuses.
-     *
-     * <p>Nothing here fires for a self-hosted deployment: with billing off, which is the shipped
-     * default, this method has nothing to say.
+     * BILLING_ENABLED is the only thing that marks a hosted deployment, and open registration
+     * there needs mail (otherwise accounts are verified on the spot) and a CAPTCHA (the rate
+     * limit is per address). A payment provider is not required: with noop it runs the free
+     * plan only.
      */
     private void validateHostedMode(List<String> violations) {
         if (!billingEnabled) {
@@ -181,15 +142,7 @@ public class ProductionSafetyValidator {
     }
 
     /**
-     * Rejects a secret if it's blank (nothing to check — a required var missing
-     * entirely is already enforced by docker-compose's {@code ${VAR:?must be set}}
-     * guard before the JVM even starts), a known placeholder substring, exactly the
-     * value shipped in {@code .env.dist}, or below the entropy floor.
-     *
-     * @param displayName name used in the violation message (may differ from
-     *                     {@code shippedDefaultsKey} when the checked variable is an
-     *                     alias for the one .env.dist documents)
-     * @param shippedDefaultsKey key into {@link #SHIPPED_DEFAULTS}
+     * A blank value is skipped: docker-compose already refuses to start without a required var.
      */
     private void validateSecret(List<String> violations, String displayName, String shippedDefaultsKey, String value) {
         if (value == null || value.isBlank()) {
@@ -220,12 +173,7 @@ public class ProductionSafetyValidator {
         return PLACEHOLDER_SECRETS.stream().anyMatch(lower::contains);
     }
 
-    /**
-     * Frequency-based Shannon entropy of the value, in total bits (per-character
-     * entropy times length). Not a substitute for a real randomness source, but
-     * enough to reject repeated characters, short/simple values, and other
-     * obviously-not-random placeholders.
-     */
+    /** Frequency-based Shannon entropy, per-character bits times length. */
     private static double estimateEntropyBits(String value) {
         Map<Character, Integer> frequency = new HashMap<>();
         for (char c : value.toCharArray()) {

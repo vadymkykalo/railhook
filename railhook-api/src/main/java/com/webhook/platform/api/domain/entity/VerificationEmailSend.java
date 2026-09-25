@@ -7,7 +7,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.Instant;
 import java.util.UUID;
 
-/** One mail that asked an address to prove itself, kept only to be counted against the daily cap. */
+/** Kept only to count against the daily cap on verification mail. */
 @Entity
 @Table(name = "verification_email_sends")
 @Getter

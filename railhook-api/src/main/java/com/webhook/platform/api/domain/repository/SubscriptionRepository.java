@@ -20,7 +20,6 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     boolean existsByProjectId(UUID projectId);
     long countByTransformationId(UUID transformationId);
 
-    /** Counts for a whole page at once, so listing does not run one query per row. */
     @Query("SELECT s.transformationId, COUNT(s) FROM Subscription s "
             + "WHERE s.transformationId IN :transformationIds GROUP BY s.transformationId")
     List<Object[]> countByTransformationIds(@Param("transformationIds") Collection<UUID> transformationIds);

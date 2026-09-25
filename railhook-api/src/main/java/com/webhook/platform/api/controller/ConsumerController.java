@@ -40,13 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Consumers — the customer's own users — and the portal sessions the customer opens for them.
- *
- * <p>Called from the customer's backend with a project API key, or from the dashboard. Opening a
- * session mints a credential that can register Endpoints in the project, so it is a write, and a
- * READ_ONLY key cannot do it.
- */
+/** Opening a portal session mints a credential that can register Endpoints, so it is a write. */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/projects/{projectId}/consumers")

@@ -23,10 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/**
- * The message form on the public site: a visitor with no account writes to this deployment's
- * support address, and the answer goes back to the address they gave.
- */
 @RestController
 @RequestMapping("/api/v1/public/contact")
 @Tag(name = "Contact", description = "Messages from the public site to the deployment's support address")
@@ -61,8 +57,8 @@ public class PublicContactController {
         if (!captchaVerifier.verify(body.getCaptchaToken(), ip)) {
             return error(HttpStatus.BAD_REQUEST, "captcha_failed", "Challenge verification failed. Please try again.");
         }
-        // Last, so neither a refused challenge nor an over-eager address spends it: this ceiling
-        // exists to keep the mail quota for verification and password-reset mails.
+        // Last, so refused requests don't spend it: this ceiling keeps the mail quota for
+        // verification and password-reset mails.
         if (!contactMessageBudget.tryAcquire()) {
             return error(HttpStatus.TOO_MANY_REQUESTS, "contact_busy", "The form has taken all the messages it can today. Please write to support by email.");
         }

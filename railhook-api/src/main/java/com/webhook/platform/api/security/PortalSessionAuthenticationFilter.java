@@ -23,20 +23,11 @@ import java.time.Clock;
 import java.util.Optional;
 
 /**
- * Authenticates a portal session's bearer token, on the portal's own routes and nowhere else.
+ * Only runs on portal routes, so a portal token is an unrecognised bearer anywhere else. The
+ * lookup is under the system scope because the organization is what it finds.
  *
- * <p>Confined to {@code /api/v1/portal/**} by {@link #shouldNotFilter}, so the token cannot even be
- * looked at on a tenant route: there it is just an unrecognised bearer, and the request is
- * anonymous. The session is found by the SHA-256 of the token, under the system scope, exactly as
- * an API key is — the organization is what the lookup is for.
- *
- * <p>An expired session, or one whose project has since been deleted, leaves the request
- * unauthenticated, which {@code SecurityConfig} answers with 401. So does one whose Consumer is
- * gone: deleting a Consumer deletes its sessions with it.
- *
- * <p>Rate-limited per session here rather than per organization: a session is a credential in a
- * browser that is not the customer's, and a script looping over it should spend its own budget,
- * not the budget of the customer's dashboard.
+ * <p>Rate-limited per session, not per organization: the session lives in a browser that is not
+ * the customer's, and a script abusing it should not spend the customer's own budget.
  */
 @Slf4j
 @Component
@@ -91,8 +82,7 @@ public class PortalSessionAuthenticationFilter extends OncePerRequestFilter {
                             + "\"message\":\"Too many requests. Please retry shortly.\",\"status\":429}");
                     return;
                 }
-                // Replaces whatever the other filters found: on these routes only a portal
-                // session is a caller, so an API key sent alongside the token grants nothing.
+                // Replaces any other authentication: an API key sent alongside grants nothing here.
                 SecurityContextHolder.getContext().setAuthentication(new PortalSessionAuthenticationToken(
                         live.getId(), live.getOrganizationId(), live.getProjectId(), live.getConsumerId()));
                 MDC.put("projectId", live.getProjectId().toString());

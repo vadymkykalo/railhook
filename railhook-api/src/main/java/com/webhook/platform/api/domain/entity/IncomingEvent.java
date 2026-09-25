@@ -47,8 +47,8 @@ public class IncomingEvent {
     private String bodyRaw;
 
     /**
-     * The body exactly as received, set only when {@link #bodyRaw} cannot reproduce it: bytes that
-     * are not valid UTF-8, or a NUL byte, which PostgreSQL text cannot hold (V077).
+     * Set only when {@link #bodyRaw} cannot reproduce the body: invalid UTF-8, or a NUL byte,
+     * which PostgreSQL text cannot hold.
      */
     @Column(name = "body_bytes")
     private byte[] bodyBytes;

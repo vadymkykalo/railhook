@@ -7,28 +7,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The promise a schema version makes about the one before it, and the rule that holds it to it.
- *
- * <p>The rule lives on the enum rather than in the registry service on purpose: this value was
- * stored, echoed back and read by nothing for as long as it existed, which is exactly what
- * happens when a declaration and the code that would honour it live apart. Now the declaration
- * carries its own consequence, and a mode without one cannot be added without noticing.
- *
- * <p>Two directions, and they disagree about which changes cost something:
- *
- * <ul>
- *   <li>{@link #BACKWARD} — a consumer written against the <em>new</em> schema must still be able
- *       to read events produced under the old one. Adding a required property breaks that: the old
- *       events do not carry it. Dropping a property does not.
- *   <li>{@link #FORWARD} — a consumer written against the <em>old</em> schema must still be able
- *       to read events produced under the new one. Dropping a property it required breaks that.
- *       Adding one does not.
- *   <li>{@link #FULL} — both, so a required property may be neither added nor taken away.
- *   <li>{@link #NONE} — no promise, and no check. This is the default, and what auto-discovered
- *       schemas get, so nothing a project has not asked for is ever refused.
- * </ul>
- *
- * <p>Changing a property's type breaks every direction and is refused by all three checking modes.
+ * BACKWARD: a consumer of the new schema must read events produced under the old one, so a new
+ * required property breaks it. FORWARD: a consumer of the old schema must read new events, so
+ * removing a required property breaks it. FULL is both. NONE checks nothing and is the default,
+ * including for auto-discovered schemas. A type change breaks every checking mode.
  */
 public enum CompatibilityMode {
 
@@ -37,10 +19,6 @@ public enum CompatibilityMode {
     FORWARD,
     FULL;
 
-    /**
-     * Why this diff is not allowed under this mode, one sentence per offending property. Empty
-     * means the new schema keeps the promise.
-     */
     public List<String> violations(SchemaDiff diff) {
         if (this == NONE) {
             return List.of();

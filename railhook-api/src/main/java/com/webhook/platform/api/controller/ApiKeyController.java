@@ -48,8 +48,7 @@ public class ApiKeyController {
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody ApiKeyRequest request,
             AuthContext auth) {
-        // Managing keys takes a signed-in user: a key that could create, rotate or revoke keys
-        // lets one leak mint non-expiring successors and outlive its own revocation.
+        // A key that could manage keys would let one leak mint successors that outlive its revocation.
         auth.requireJwt();
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);

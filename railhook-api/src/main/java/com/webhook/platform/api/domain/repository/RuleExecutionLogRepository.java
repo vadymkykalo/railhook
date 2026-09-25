@@ -25,7 +25,6 @@ public interface RuleExecutionLogRepository extends JpaRepository<RuleExecutionL
 
     long countByRuleId(UUID ruleId);
 
-    /** Executions and matches for a whole page at once. */
     @Query("SELECT l.ruleId, COUNT(l), SUM(CASE WHEN l.matched = true THEN 1 ELSE 0 END) "
             + "FROM RuleExecutionLog l WHERE l.ruleId IN :ruleIds GROUP BY l.ruleId")
     List<Object[]> countByRuleIds(@Param("ruleIds") Collection<UUID> ruleIds);

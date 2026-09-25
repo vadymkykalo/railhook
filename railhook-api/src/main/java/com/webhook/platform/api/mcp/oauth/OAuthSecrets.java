@@ -9,10 +9,8 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 /**
- * Minting, hashing and checking the opaque strings the authorization server hands out.
- *
- * <p>Every kind carries its own prefix, so a leaked string says what it is — and so the
- * {@code /mcp} filter can tell an access token from an API key without a database read.
+ * Each kind has its own prefix, so a leaked string says what it is and the {@code /mcp} filter
+ * can tell an access token from an API key without a database read.
  */
 public final class OAuthSecrets {
 
@@ -28,7 +26,6 @@ public final class OAuthSecrets {
     private OAuthSecrets() {
     }
 
-    /** A prefix and 256 bits of randomness. */
     public static String mint(String prefix) {
         return mint(prefix, 32);
     }
@@ -39,7 +36,7 @@ public final class OAuthSecrets {
         return prefix + URL.encodeToString(random);
     }
 
-    /** SHA-256, the same digest API keys are stored under. The values are random, so no salt. */
+    // Unsalted: the values are random.
     public static String hash(String value) {
         return CryptoUtils.hashApiKey(value);
     }
@@ -52,11 +49,7 @@ public final class OAuthSecrets {
                 storedHash.getBytes(StandardCharsets.UTF_8));
     }
 
-    /**
-     * PKCE S256 (RFC 7636 §4.6): the verifier must hash to the challenge the authorization request
-     * carried. The verifier's own shape is checked first — 43 to 128 unreserved characters — so a
-     * degenerate one cannot be used to meet a challenge by accident.
-     */
+    // RFC 7636 4.6. The verifier's shape is checked first so a degenerate one cannot match.
     public static boolean pkceMatches(String verifier, String challenge) {
         if (verifier == null || challenge == null || !verifier.matches("[A-Za-z0-9\\-._~]{43,128}")) {
             return false;
@@ -70,7 +63,6 @@ public final class OAuthSecrets {
         }
     }
 
-    /** A S256 challenge is a base64url SHA-256: exactly 43 characters of that alphabet. */
     public static boolean isS256Challenge(String challenge) {
         return challenge != null && challenge.matches("[A-Za-z0-9\\-_]{43}");
     }

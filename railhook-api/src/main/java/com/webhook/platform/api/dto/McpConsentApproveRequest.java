@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
-/** A person's answer to an MCP app: which project it may reach, and whether it may write. */
 @Data
 @Builder
 @NoArgsConstructor

@@ -25,7 +25,6 @@ public class BillingAutoConfiguration {
     @Value("${billing.default-provider:noop}")
     private String defaultProvider;
 
-    // ── Stripe ──────────────────────────────────────────────────────
     @Value("${billing.stripe.secret-key:}")
     private String stripeSecretKey;
 
@@ -35,7 +34,6 @@ public class BillingAutoConfiguration {
     @Value("${billing.stripe.price-map:}")
     private String stripePriceMap;
 
-    // ── WayForPay ───────────────────────────────────────────────────
     @Value("${billing.wayforpay.merchant-account:}")
     private String wfpMerchantAccount;
 
@@ -57,17 +55,14 @@ public class BillingAutoConfiguration {
 
         List<BillingProvider> providers = new ArrayList<>();
 
-        // Always register NoOp
         providers.add(new NoOpBillingProvider());
 
-        // Stripe — register if configured
         if (!stripeSecretKey.isBlank()) {
             Map<String, String> priceMap = parsePriceMap(stripePriceMap);
             providers.add(new StripeBillingProvider(stripeSecretKey, stripeWebhookSecret, priceMap));
             log.info("Stripe billing provider registered");
         }
 
-        // WayForPay — register if configured
         if (!wfpMerchantAccount.isBlank() && !wfpMerchantSecret.isBlank()) {
             Map<String, Long> planPrices = parsePlanPrices(wfpPlanPrices);
             providers.add(new WayForPayBillingProvider(
@@ -80,9 +75,7 @@ public class BillingAutoConfiguration {
         return new BillingProviderRegistry(providers, effectiveDefault);
     }
 
-    /**
-     * Parse "starter=price_xxx,pro=price_yyy" → Map
-     */
+    /** "starter=price_xxx,pro=price_yyy" */
     private Map<String, String> parsePriceMap(String raw) {
         if (raw == null || raw.isBlank()) return Map.of();
         return Arrays.stream(raw.split(","))
@@ -94,9 +87,7 @@ public class BillingAutoConfiguration {
                 ));
     }
 
-    /**
-     * Parse "starter=2900,pro=9900" → Map (cents)
-     */
+    /** "starter=2900,pro=9900", in cents. */
     private Map<String, Long> parsePlanPrices(String raw) {
         if (raw == null || raw.isBlank()) return Map.of();
         return Arrays.stream(raw.split(","))

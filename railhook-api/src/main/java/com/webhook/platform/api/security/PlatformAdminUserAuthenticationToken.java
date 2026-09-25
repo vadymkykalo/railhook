@@ -5,17 +5,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.util.List;
 
 /**
- * A signed-in person acting as the platform admin, on {@code /api/v1/admin/**} only.
- *
- * <p>Minted by {@link PlatformAdminAccessFilter} from the request's own
- * {@link JwtAuthenticationToken}, after the checks that make a listed address mean something —
- * never by the JWT filter and never outside the admin paths, so the authority does not ride
- * along on the tenant requests the same token makes.
- *
- * <p>Still a {@code JwtAuthenticationToken}, so the audit trail records the real user id. It
- * carries {@link PlatformAdminAuthenticationToken#AUTHORITY} but not
- * {@link PlatformAdminAuthenticationToken#OPERATOR_TOKEN_AUTHORITY}: what only the deployment's
- * operator token may do (re-encrypting every tenant's secrets) stays with that token.
+ * Minted only on the admin paths, so the authority never rides along on tenant requests made
+ * with the same JWT. Lacks the operator-token authority, which stays with the deployment's token.
  */
 public class PlatformAdminUserAuthenticationToken extends JwtAuthenticationToken {
 
@@ -27,7 +18,6 @@ public class PlatformAdminUserAuthenticationToken extends JwtAuthenticationToken
         this.email = email;
     }
 
-    /** The verified address the list matched — what a suspension is signed with. */
     public String getEmail() {
         return email;
     }

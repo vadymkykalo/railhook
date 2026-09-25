@@ -14,31 +14,10 @@ public class CurrentUserResponse {
     private UserResponse user;
     private OrganizationResponse organization;
     private MembershipRole role;
-
-    /**
-     * Whether this deployment can actually deliver mail. False is the shipped default,
-     * and it changes what the product may promise: an invite is not "sent", a link has
-     * to be passed on by hand. The flag rides on the session the UI already loads
-     * rather than on an endpoint of its own.
-     */
     private boolean emailDeliveryEnabled;
-
-    /**
-     * False for an account created through Google that has never set a password. Changing a
-     * password needs the current one, so the settings page offers "Forgot password" instead.
-     */
+    // False for a Google account that never set a password.
     private boolean hasPassword;
-
-    /**
-     * Whether to offer this person the platform admin panel: a verified, active account whose
-     * address is in {@code PLATFORM_ADMIN_EMAILS}. Only decides what the dashboard shows — every
-     * admin request is checked again on the server, including how recent the sign-in is.
-     */
+    // UI hints only: the server checks admin and demo access on every request.
     private boolean platformAdmin;
-
-    /**
-     * Whether this is the public demo: a read-only session anyone can open, which the dashboard
-     * shows with a banner and greyed-out actions. Every change is refused on the server regardless.
-     */
     private boolean demo;
 }

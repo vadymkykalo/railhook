@@ -21,14 +21,11 @@ public class MemberResponse {
     private MembershipStatus status;
     private Instant createdAt;
 
-    /** When a pending invite stops being accepted. Null once the invite is accepted. */
     private Instant inviteExpiresAt;
 
     /**
-     * The accept-invite link, returned only to the owner who just issued or re-issued
-     * the invite, and never on a listing — the token behind it is the credential.
-     * Present because with {@code app.email.enabled=false}, the shipped default, no
-     * invite mail is sent and this is the only copy that reaches a person.
+     * Only in the response to issuing the invite, never on a listing: the token in it is the
+     * credential. With email disabled it is the only copy anyone gets.
      */
     private String inviteUrl;
 }

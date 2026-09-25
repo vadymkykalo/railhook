@@ -33,7 +33,6 @@ public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
     @Query("SELECT e.id FROM Endpoint e WHERE e.consumerId = :consumerId")
     List<UUID> findIdsByConsumerId(@Param("consumerId") UUID consumerId);
 
-    /** {@code [consumerId, count]} of live Endpoints, for each of the given Consumers that has one. */
     @Query("SELECT e.consumerId, COUNT(e) FROM Endpoint e "
             + "WHERE e.consumerId IN :consumerIds AND e.deletedAt IS NULL GROUP BY e.consumerId")
     List<Object[]> countLiveByConsumerIds(@Param("consumerIds") Collection<UUID> consumerIds);
@@ -50,12 +49,8 @@ public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
     long maxEndpointsPerProjectInOrg(@Param("orgId") UUID organizationId);
 
     /**
-     * Endpoints the auto-disable sweep should look at: live, still on, and in an unbroken run of
-     * failures that both started before {@code cutoff} and is at least {@code minFailures} long.
-     *
-     * <p>Both conditions are the query's, not a filter applied to its results: a near-idle
-     * endpoint that failed once three days ago has a {@code failing_since} as old as a dead one's,
-     * and the count is the only thing that tells them apart.
+     * Both conditions matter: a near-idle endpoint that failed once long ago has a
+     * {@code failing_since} as old as a dead one's, and only the count tells them apart.
      */
     @Query("SELECT e FROM Endpoint e WHERE e.enabled = true AND e.deletedAt IS NULL "
             + "AND e.failingSince IS NOT NULL AND e.failingSince < :cutoff "
@@ -64,17 +59,9 @@ public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
             @Param("minFailures") int minFailures, Pageable pageable);
 
     /**
-     * Turns one endpoint off for continuous failure, and reports whether it was this call that
-     * did it.
-     *
-     * <p>A conditional UPDATE rather than saving the entity the sweep read. Two reasons, and the
-     * second is a bug the first would have hidden: saving writes every column, so a merge would
-     * put back the {@code consecutive_failures} the worker has incremented since the read — and,
-     * worse, would re-disable an endpoint its owner re-enabled in the meantime. The {@code WHERE}
-     * clause is what makes "somebody got there first" a zero rather than a silent overwrite.
-     *
-     * <p>The run of failures is deliberately left alone: "failing since" is what the owner is
-     * told, and re-enabling is what clears it.
+     * A conditional UPDATE rather than a save: a save would overwrite the failure count the worker
+     * has bumped since the read, and could re-disable an endpoint its owner just re-enabled.
+     * Returns 0 when someone got there first.
      */
     @Modifying
     @Transactional

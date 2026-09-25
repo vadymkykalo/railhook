@@ -32,8 +32,8 @@ public interface ReplaySessionRepository extends JpaRepository<ReplaySession, UU
                       @Param("allowedStatuses") List<ReplaySessionStatus> allowedStatuses);
 
     /**
-     * The only way a session becomes RUNNING. Conditional, so a launch that comes late — after
-     * cancel, or after {@link #failStaleSessions} gave up on it — does not resurrect the session.
+     * Conditional so a late launch, after a cancel or after {@link #failStaleSessions}, does not
+     * resurrect the session.
      */
     @Modifying
     @Query("UPDATE ReplaySession r SET r.status = :running, r.startedAt = :now, r.updatedAt = :now " +
@@ -44,9 +44,8 @@ public interface ReplaySessionRepository extends JpaRepository<ReplaySession, UU
                     @Param("now") Instant now);
 
     /**
-     * Fails sessions whose runner is gone. A running replay checkpoints {@code updated_at} after
-     * every batch, so a row in an active status that has not been written since {@code cutoff}
-     * has nobody working on it, on this replica or any other.
+     * A running replay writes {@code updated_at} after every batch, so an active row untouched
+     * since {@code cutoff} has no runner on any replica.
      */
     @Modifying
     @Query("UPDATE ReplaySession r SET r.status = :failed, r.errorMessage = :message, " +

@@ -19,11 +19,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One of the customer's own users, grouping the Endpoints registered for them.
- *
- * <p>What a portal session is scoped to: a Consumer sees its own Endpoints and their Deliveries,
- * and nothing else of the project's. {@code externalId} is the customer's key for the user, so
- * their backend can find the Consumer again without keeping Railhook's id.
+ * A portal session is scoped to one Consumer. {@code externalId} is the customer's own key for
+ * the user, so their backend need not store our id.
  */
 @Entity
 @Table(name = "consumers")

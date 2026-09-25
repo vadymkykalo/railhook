@@ -9,21 +9,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One live refresh-token family, and the organization it is currently looking at.
- *
- * <p>Refresh tokens are self-contained JWTs, so before this table nothing knew how many were
- * outstanding: logout revoked the one token it was handed and a user had no way to see, let alone
- * end, a session on a machine they no longer have. The Redis blacklist is still what makes a
- * revocation take effect within a request; this is what makes the list of revocable things
- * survive a Redis flush.
- *
- * <p>Deliberately <b>not</b> {@code @TenantId}-scoped on {@link #organizationId}, which is the
- * only entity in this package that owns an organization without being confined to one. A session
- * belongs to a person. Confining the table would mean a user who switched organizations could no
- * longer see — or sign out of — the sessions they left behind in the other one, which is exactly
- * the situation the feature exists for. The safety this gives up is bought back explicitly:
- * every read is by {@code userId}, and every mutation goes through
- * {@code UserSessionService}, which refuses a session belonging to anyone but the caller.
+ * One refresh-token family. Deliberately not {@code @TenantId}-scoped: a session belongs to a
+ * person, who must still see and end sessions left in another organization. Every read is by
+ * {@code userId} instead, and {@code UserSessionService} refuses anyone else's session.
  */
 @Entity
 @Table(name = "user_sessions")
@@ -34,25 +22,17 @@ import java.util.UUID;
 @Builder
 public class UserSession {
 
-    /**
-     * Assigned by the caller rather than generated, because it has to exist before the row does:
-     * it is the {@code sid} claim of the refresh token whose jti this row stores, so the token
-     * has to be minted with it in hand.
-     */
+    /** Assigned by the caller: the refresh token is minted with it as its {@code sid} claim. */
     @Id
     private UUID id;
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    /** The organization this session is scoped to; changed by the organization switcher. */
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
 
-    /**
-     * The jti of the refresh token this session currently accepts. Rotated on every refresh, so
-     * a refresh token whose jti no longer matches has been superseded by a newer one.
-     */
+    /** Rotated on every refresh; a token whose jti no longer matches has been superseded. */
     @Column(name = "refresh_token_jti", nullable = false, unique = true, length = 64)
     private String refreshTokenJti;
 
@@ -81,7 +61,6 @@ public class UserSession {
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
-    /** Live means not revoked and not past its refresh token's own expiry. */
     public boolean isActive(Instant now) {
         return revokedAt == null && expiresAt.isAfter(now);
     }

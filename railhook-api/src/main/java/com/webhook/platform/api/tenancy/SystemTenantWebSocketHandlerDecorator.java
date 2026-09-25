@@ -7,20 +7,12 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
 
 /**
- * Runs every callback of a WebSocket handler under {@link TenantContext#SYSTEM}.
+ * WebSocket callbacks arrive on container threads with no request scope. A decorator rather than
+ * {@code @SystemTenant} because Spring AOP proxies only public methods, and
+ * {@code handleTextMessage} is protected.
  *
- * <p>A WebSocket connection is not an HTTP request that {@code TenantContextFilter} sees, and its
- * callbacks arrive on container threads long after the handshake, so without this the tunnel hub
- * would hit {@link TenantNotResolvedException} on its first query.
- *
- * <p>A decorator rather than {@code @SystemTenant} on the handler's methods: Spring AOP proxies
- * only public methods, and {@code handleTextMessage} — where the tunnel does most of its work —
- * is protected. An annotation there would have looked like a declaration and enforced nothing,
- * which is exactly the failure mode this avoids.
- *
- * <p>The hub reads and writes {@code tunnel_sessions} across organizations by design: which
- * organization a session belongs to is a property of the row, discovered from the token the CLI
- * presented, not of the connection.
+ * <p>System scope is correct here: a tunnel session's organization comes from the token the CLI
+ * presented, not from the connection.
  */
 public class SystemTenantWebSocketHandlerDecorator extends WebSocketHandlerDecorator {
 

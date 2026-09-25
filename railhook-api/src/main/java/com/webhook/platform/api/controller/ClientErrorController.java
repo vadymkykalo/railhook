@@ -19,23 +19,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Where the dashboard reports a failure it could not recover from.
- *
- * <p>The reports go to this installation's own logs and nowhere else — see
- * {@link ClientErrorReportService} for what happens to them and why each precaution is there.
- *
- * <p>Two decisions worth stating, since neither is obvious from the signature:
- *
- * <p><b>It requires a session.</b> The reporter is the dashboard, and the dashboard is behind a
- * login, so the reports worth having come from someone signed in. Leaving it open would put an
- * unauthenticated write-shaped path on the public internet whose entire job is to append
- * attacker-influenced text to a log — a poor trade for the few errors on the sign-in screen,
- * which stay in the browser console. {@code READ} rather than {@code WRITE} because a Viewer's
- * dashboard breaks exactly as often as an Owner's, and nothing here changes state.
- *
- * <p><b>It always answers 202.</b> Rate-limited, disabled by the operator, or written to the
- * log: the caller is a page that has already failed once, and there is nothing useful it could
- * do with the difference.
+ * Requires a session so the public internet has no unauthenticated path that appends
+ * attacker-controlled text to the logs. READ because a Viewer's dashboard breaks as often as an
+ * Owner's.
  */
 @RestController
 @RequestMapping("/api/v1/client-errors")
@@ -55,9 +41,7 @@ public class ClientErrorController {
     @RequireAccess(AccessLevel.READ)
     @PostMapping
     public ResponseEntity<Void> report(@Valid @RequestBody ClientErrorReportRequest request, AuthContext auth) {
-        // An API key is a program; it has no dashboard to break. Rejecting it outright is
-        // stronger than any scope it could hold, which is why this handler declares no
-        // @RequireScope — see MutatingHandlerScopeDeclarationTest's exemption list.
+        // No @RequireScope: API keys are rejected outright.
         auth.requireJwt();
         clientErrorReportService.record(request, auth.userId());
         return ResponseEntity.status(HttpStatus.ACCEPTED).build();
