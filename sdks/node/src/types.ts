@@ -14,10 +14,7 @@ export interface EventResponse {
   type: string;
   createdAt: string;
   deliveriesCreated: number;
-  /**
-   * Schema-validation errors this event was accepted despite, when the project has schema
-   * validation on with the WARN policy. Absent when the payload matched or validation is off.
-   */
+  /** Schema-validation errors the event was accepted despite (WARN policy only). */
   schemaWarnings?: string[];
 }
 
@@ -127,7 +124,6 @@ export interface DeliveryAttempt {
   errorMessage?: string;
   /** Wall-clock duration of the HTTP request, in milliseconds. */
   durationMs?: number;
-  /** When the attempt was recorded. */
   createdAt: string;
 }
 
@@ -172,11 +168,7 @@ export interface EndpointTestResult {
 export interface RateLimitInfo {
   limit: number;
   remaining: number;
-  /**
-   * Unix timestamp in **seconds** at which the window resets — the raw value
-   * of the `X-RateLimit-Reset` header, which the API sends in seconds, not
-   * milliseconds.
-   */
+  /** Unix time in seconds, not milliseconds, at which the window resets. */
   reset: number;
 }
 
@@ -188,13 +180,8 @@ export interface WebhookEvent {
   data: Record<string, unknown>;
 }
 
-// ── Incoming Webhooks ──
-
 export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO';
-/**
- * `HMAC_GENERIC` checks your own header and prefix; `PROVIDER` uses the scheme of the source's
- * `providerType` (Stripe's timestamped `t=…,v1=…`, GitHub's `sha256=`, …).
- */
+/** `HMAC_GENERIC` checks your own header and prefix; `PROVIDER` uses the source's `providerType` scheme. */
 export type VerificationMode = 'NONE' | 'HMAC_GENERIC' | 'PROVIDER';
 export type IncomingSourceStatus = 'ACTIVE' | 'DISABLED';
 export type IncomingAuthType = 'NONE' | 'BEARER' | 'BASIC' | 'CUSTOM_HEADER';

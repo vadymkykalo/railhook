@@ -12,7 +12,6 @@ datasources:
       timeInterval: 10s
       httpMethod: POST
 
-  # See monitoring/README.md "Logs".
   - name: Loki
     type: loki
     uid: railhook-loki

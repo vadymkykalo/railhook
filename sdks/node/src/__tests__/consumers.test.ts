@@ -1,7 +1,6 @@
 import { Railhook } from '../client';
 import * as http from 'http';
 
-// Minimal mock HTTP server to verify request paths & methods
 let server: http.Server;
 let lastRequest: { method: string; url: string; body: string; headers: http.IncomingHttpHeaders };
 let mockResponse: { status: number; body: unknown } = { status: 200, body: {} };

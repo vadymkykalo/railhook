@@ -9,8 +9,6 @@ spec:
   type: ClusterIP
   clusterIP: None
   ports:
-    # Actuator only — the worker consumes from Kafka and serves no API. The
-    # ServiceMonitor scrapes this port by name.
     - port: {{ include "railhook.worker.managementPort" . }}
       targetPort: management
       protocol: TCP

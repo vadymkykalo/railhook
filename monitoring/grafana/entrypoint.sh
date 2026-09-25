@@ -1,11 +1,6 @@
 #!/bin/sh
-# Grafana's entrypoint, in front of the image's own /run.sh.
-#
-# Grafana reads GF_SECURITY_ADMIN_PASSWORD only when it creates its database. So a changed
-# password in .env did nothing on an existing volume, and the default this stack once
-# shipped would have stayed valid for as long as the volume did. Here the password must be
-# set, must not be a known default, and is re-applied to an existing database on every
-# start: .env is the one place it lives.
+# Grafana reads GF_SECURITY_ADMIN_PASSWORD only when it creates its database, so the password is
+# re-applied on every start and a known default is refused.
 set -eu
 
 pw="${GF_SECURITY_ADMIN_PASSWORD:-}"

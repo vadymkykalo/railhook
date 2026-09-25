@@ -18,7 +18,6 @@ class IncomingEvents
     /**
      * List incoming events for a project.
      *
-     * @param string $projectId Project UUID
      * @param array|null $queryParams Optional filters: sourceId, page, size
      * @return array Paginated incoming events
      */
@@ -32,9 +31,7 @@ class IncomingEvents
         );
     }
 
-    /**
-     * Get incoming event by ID.
-     */
+    /** Get incoming event by ID. */
     public function get(string $projectId, string $eventId): array
     {
         return $this->client->request(
@@ -43,9 +40,7 @@ class IncomingEvents
         );
     }
 
-    /**
-     * Get forward attempts for an incoming event.
-     */
+    /** Get forward attempts for an incoming event. */
     public function getAttempts(string $projectId, string $eventId, ?array $queryParams = null): array
     {
         return $this->client->request(
@@ -56,9 +51,7 @@ class IncomingEvents
         );
     }
 
-    /**
-     * Replay an incoming event to all enabled destinations.
-     */
+    /** Replay an incoming event to all enabled destinations. */
     public function replay(string $projectId, string $eventId): array
     {
         return $this->client->request(

@@ -1,12 +1,5 @@
-// The receiver's control plane, driven over HTTP the way the k6 scenarios drive it.
-//
-// One receiver serves every scenario in a run, and a scenario's deliveries keep arriving after
-// the next one has reset — a retry ladder outlives the scenario that started it. Both guards
-// below exist because that bled across: an ordering probe read another scenario's stream as its
-// own and reported 135 out-of-order transitions, and a forced failure could be spent on a
-// stranger's retry, leaving the probe green having induced nothing.
-//
-// Run: node --test load/receiver/server.test.js
+// Deliveries keep arriving after the next scenario resets; both guards below stop them bleeding
+// into another scenario's results.
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const { spawn } = require('node:child_process');

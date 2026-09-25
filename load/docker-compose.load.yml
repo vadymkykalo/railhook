@@ -1,19 +1,4 @@
-# Additive compose file for the k6 load harness. Does not modify the main
-# docker-compose.yml — run alongside it:
-#
-#   docker compose -f docker-compose.yml -f load/docker-compose.load.yml \
-#     --profile embedded-db up -d load-receiver
-#
-# `load-receiver` joins the same webhook-network as api/worker (top-level
-# `networks:` sections merge across -f files) so it has a DNS name
-# (load-receiver) the worker can reach — see load/lib/config.js
-# RECEIVER_INTERNAL_URL. Its control API is also published to the host so k6
-# (run from the host, or from the `k6` image in CI) can flip its mode and
-# read back what it captured — see RECEIVER_CONTROL_URL.
-#
-# Requires WEBHOOK_ALLOW_PRIVATE_IPS=true on api+worker (load-receiver
-# resolves to a private Docker-bridge address, which SsrfProtectionCustomizer
-# blocks by default — see load/README.md "Setup").
+# Needs WEBHOOK_ALLOW_PRIVATE_IPS=true on api and worker: the receiver has a private address.
 services:
   load-receiver:
     image: node:20-alpine

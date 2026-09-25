@@ -30,10 +30,7 @@ interface FakeRemote {
   close(): Promise<void>;
 }
 
-/**
- * A stand-in for Railhook's /mcp: stateless Streamable HTTP, one JSON answer per POST, GET
- * refused with 405 — what the Spring AI server in railhook-api does.
- */
+/** A stand-in for Railhook's /mcp: stateless Streamable HTTP, GET refused with 405. */
 async function startFakeRemote(): Promise<FakeRemote> {
   const remote: FakeRemote = { url: new URL('http://127.0.0.1'), calls: [], close: async () => undefined };
 

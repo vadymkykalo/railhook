@@ -1,6 +1,4 @@
-"""The point of this scheme is that a receiver can verify with a library they already have,
-so these tests reproduce the reference algorithm rather than round-tripping against our own
-implementation — a round-trip would only prove we agree with our own bug."""
+"""The reference algorithm, not a round-trip: a round-trip would only prove we agree with our own bug."""
 
 import base64
 import hashlib
@@ -39,8 +37,7 @@ def test_accepts_a_reference_signature():
 
 
 def test_header_names_are_case_insensitive():
-    # HTTP header names are case-insensitive, and frameworks disagree about how they
-    # present them — a receiver should not have to care which one they are using.
+    # Frameworks disagree on how they case header names.
     ts = int(time.time())
     upper = {
         "Webhook-Id": MESSAGE_ID,

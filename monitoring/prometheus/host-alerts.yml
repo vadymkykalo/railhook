@@ -1,13 +1,5 @@
-# Railhook — alert rules for the host a Compose deployment runs on.
-#
-# Separate from alerts.yml on purpose: that file is the platform's rules and is held equal to
-# the Helm chart's PrometheusRule. These are about one Linux host and the containers on it —
-# node-exporter, cAdvisor, blackbox-exporter and the backup directory — which a Kubernetes
-# cluster answers with its own tooling.
-#
-# Metrics sources:
-#   - node_* (node-exporter), container_* (cAdvisor), probe_* (blackbox-exporter)
-#   - railhook_backup_* (backup-age sidecar, through node-exporter's textfile collector)
+# Separate from alerts.yml, which is held equal to the Helm chart's PrometheusRule; these are
+# about one Docker host.
 
 groups:
   - name: railhook.host
@@ -101,9 +93,7 @@ groups:
 
   - name: railhook.containers
     rules:
-      # A restart policy restarts the same container, so its start time changes on the same
-      # series. A deploy replaces the container instead, which is a new series and does not
-      # count here.
+      # A deploy replaces the container (a new series), so only policy restarts count.
       - alert: ContainerRestarting
         expr: |
           # By name: a recreated container is a new series under the same name, and one
@@ -276,10 +266,8 @@ groups:
 
   - name: railhook.monitoring
     rules:
-      # Always firing. Alertmanager sends it to ALERTMANAGER_HEARTBEAT_URL every minute; the
-      # service behind that URL mails you when the heartbeats stop. It is the only alert that
-      # can report this host — or this stack — being down, because every other one is sent
-      # from here.
+      # Always firing, sent to ALERTMANAGER_HEARTBEAT_URL: the only alert that can report this host
+      # being down.
       - alert: Watchdog
         expr: vector(1)
         labels:

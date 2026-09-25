@@ -172,8 +172,7 @@ class Railhook:
             return NotFoundError(message)
         elif status == 429:
             import time
-            # `reset` is a Unix timestamp in seconds (see RateLimitInfo), so the
-            # fallback has to be in seconds too.
+            # `reset` is in seconds, so the fallback is too.
             info = rate_limit_info or RateLimitInfo(
                 limit=0, remaining=0, reset=int(time.time()) + 60
             )
@@ -229,12 +228,7 @@ class Endpoints:
     def list(
         self, project_id: str, page: int = 0, size: int = 20
     ) -> PaginatedResponse:
-        """List a project's endpoints.
-
-        The API returns a Spring page envelope here, not a bare array — the
-        endpoints themselves are in ``.content`` (iterating the page yields
-        them directly).
-        """
+        """List a project's endpoints as a page; iterating it yields the endpoints."""
         data = self._client._request(
             "GET",
             f"/api/v1/projects/{project_id}/endpoints",
@@ -446,8 +440,6 @@ class IncomingSources:
             "DELETE",
             f"/api/v1/projects/{project_id}/incoming-sources/{source_id}",
         )
-
-    # ── Destinations ──
 
     def create_destination(
         self,

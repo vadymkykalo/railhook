@@ -3,9 +3,7 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts'],
-  // Lets the smoke test `import ... from '@railhook/node'` resolve to this
-  // package's own source without a real install — mirrors what a consumer
-  // gets from node_modules after `npm install @railhook/node`.
+  // Resolves `@railhook/node` to this package's source, as a consumer's install would.
   moduleNameMapper: {
     '^@railhook/node$': '<rootDir>/src/index.ts',
   },

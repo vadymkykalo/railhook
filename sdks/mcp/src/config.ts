@@ -15,13 +15,6 @@ export class ConfigError extends Error {
   }
 }
 
-/**
- * Reads the bridge's configuration from the environment.
- *
- * `RAILHOOK_API_KEY` is required. `RAILHOOK_BASE_URL` is the origin the dashboard is served on —
- * `https://railhook.io` for Railhook Cloud, your own origin when self-hosted — and the remote
- * server is always at `/mcp` under it.
- */
 /** A loop rather than /\/+$/, which backtracks polynomially on a long run of slashes. */
 function withoutTrailingSlashes(value: string): string {
   let end = value.length;
@@ -29,6 +22,7 @@ function withoutTrailingSlashes(value: string): string {
   return value.slice(0, end);
 }
 
+/** Reads `RAILHOOK_API_KEY` (required) and `RAILHOOK_BASE_URL`, the dashboard origin. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
   const apiKey = env.RAILHOOK_API_KEY?.trim();
   if (!apiKey) {

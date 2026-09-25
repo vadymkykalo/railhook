@@ -1,16 +1,4 @@
-// Shared bootstrap for the node SDK's contract suite. These tests exercise
-// the Railhook client against a REAL API instance (not stubbed HTTP, unlike
-// src/__tests__/*) — see tests/contract/README.md for how to run them and
-// what "real instance" means in CI.
-//
-// The Railhook client itself is API-key scoped (it has no register/login/
-// create-project surface — see src/client.ts), so bootstrapping a throwaway
-// tenant needs a couple of raw fetch calls against the JWT-authenticated
-// endpoints before the SDK proper takes over.
-//
-// Requires Node >= 18 (global fetch) — CI runs Node 20 (see ci.yml), which
-// is already the floor for this repo's tooling even though the published
-// SDK itself supports down to Node 16 at runtime for consumers.
+// The SDK has no register/login surface, so the throwaway tenant is bootstrapped with raw fetch.
 
 export const BASE_URL = process.env.CONTRACT_API_BASE_URL || 'http://localhost:8080';
 const PASSWORD = 'ContractTest!2026x'; // meets AuthController's complexity policy
@@ -29,21 +17,8 @@ async function json(res: Response, label: string): Promise<any> {
   return text ? JSON.parse(text) : undefined;
 }
 
-/**
- * True once verified reachable; checked once via isApiReachable().
- *
- * Probes with an intentionally invalid login: any HTTP response at all proves
- * the API is answering.
- *
- * Deliberately does NOT hit /actuator/health/liveness: under `make up`
- * (docker-compose.yml), actuator is served on its own MANAGEMENT_PORT
- * (8082) which is never published to the host — and on the main port
- * /actuator/health is a 500, not a 404, because nothing maps it. Nor
- * /v3/api-docs: springdoc is only permitAll when SWAGGER_ENABLED=true
- * (SecurityConfig.java) and .env.dist ships it false, so probing it reports
- * a perfectly healthy stack as unreachable and silently skips this whole
- * suite. /api/v1/auth/login is permitAll unconditionally.
- */
+// A login probe: actuator is not published to the host and /v3/api-docs is off by default, so
+// either would silently skip the suite on a healthy stack.
 export async function isApiReachable(): Promise<boolean> {
   try {
     const res = await fetch(`${BASE_URL}/api/v1/auth/login`, {

@@ -1,6 +1,3 @@
-// Bootstrap helpers shared by every scenario's setup(). Each runs once per
-// `k6 run`, outside the VU loop, so plain http.* calls (not the batched/async
-// style used in the VU body) are fine here.
 import http from 'k6/http';
 import { check, fail } from 'k6';
 import { BASE_URL, LOAD_TEST_PASSWORD, RECEIVER_INTERNAL_URL, uniqueSuffix } from './config.js';
@@ -17,17 +14,8 @@ function assertOk(res, label, expectedStatus) {
   return res.json();
 }
 
-/**
- * Registers a fresh user+org (every k6 run gets its own tenant — cheaper and
- * more realistic than trying to share state across runs), creates a project
- * and a READ_WRITE API key scoped to it.
- *
- * With ACCESS_TOKEN and PROJECT_ID set, uses that existing account and project
- * instead: a deployment with a registration captcha (any production one) cannot
- * be registered against from a script.
- *
- * Returns { accessToken, authHeaders, projectId, apiKey }.
- */
+// With ACCESS_TOKEN and PROJECT_ID set, reuses that account: a production registration captcha
+// cannot be passed from a script.
 export function bootstrapProject(namePrefix) {
   const suffix = uniqueSuffix();
 
@@ -91,14 +79,7 @@ export function bootstrapProject(namePrefix) {
   };
 }
 
-/**
- * Creates an Endpoint pointed at the load-receiver (reachable from the
- * worker container over webhook-network — see RECEIVER_INTERNAL_URL) and a
- * Subscription binding it to eventType. Requires WEBHOOK_ALLOW_PRIVATE_IPS=true
- * on api+worker (see load/README.md) — the receiver's DNS name resolves to a
- * private Docker-bridge address, which SsrfProtectionCustomizer blocks by
- * default in every other context.
- */
+// Needs WEBHOOK_ALLOW_PRIVATE_IPS=true on api and worker: the receiver has a private address.
 export function createSubscribedEndpoint(ctx, eventType, { path = '/webhook', orderingEnabled = false } = {}) {
   const endpointRes = http.post(
     `${BASE_URL}/api/v1/projects/${ctx.projectId}/endpoints`,

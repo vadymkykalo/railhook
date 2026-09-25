@@ -1,21 +1,5 @@
-# Railhook monitoring stack — optional, off unless you start it.
-#
-# Its own Compose project next to the platform, joined to the platform's network so
-# Prometheus can scrape the management ports and Caddy can reach Grafana:
-#
-#   docker compose -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml up -d   (an install.sh deployment)
-#   make monitoring-up / monitoring-down          (a clone)
-#
-# Both read the platform's .env (--env-file) and pin the project name, because that .env
-# may carry COMPOSE_PROJECT_NAME=railhook — the platform's own name — and a `down` under
-# that name would take the platform with it.
-#
-# Nothing here is published to the host except Grafana, on loopback. Prometheus,
-# Alertmanager, Loki and the exporters answer only on the `monitoring` network; reach them
-# through Grafana (Explore, Alerting) or `docker compose exec`. The internet reaches Grafana
-# only through Caddy, and only when MONITORING_DOMAIN is set.
-#
-# Memory limits add up to 1.5 GB; measured use on an idle host is well under half that.
+# Pinned project name: the platform's .env may set COMPOSE_PROJECT_NAME=railhook, and a `down`
+# under that name would take the platform with it.
 name: railhook-monitoring
 
 x-logging: &logging
@@ -28,8 +12,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.51.2
     container_name: railhook-prometheus
-    # render-targets.sh writes the uptime probe targets (file_sd) from RAILHOOK_DOMAIN and
-    # MONITORING_PROBE_URLS — Prometheus does not expand env in its own config.
+    # Prometheus does not expand env in its own config, so render-targets.sh writes the probe targets.
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
@@ -62,8 +45,6 @@ services:
         limits:
           memory: 384m
 
-  # The rules in prometheus/*.yml evaluate correctly but, without this, route nowhere.
-  # See monitoring/README.md "Alerting" for receivers (ALERTMANAGER_* in .env).
   alertmanager:
     image: prom/alertmanager:v0.27.0
     container_name: railhook-alertmanager
@@ -110,9 +91,7 @@ services:
   grafana:
     image: grafana/grafana:12.1.1
     container_name: railhook-grafana
-    # entrypoint.sh refuses an empty or known-default password, derives the root URL and
-    # the secure cookie from MONITORING_DOMAIN, and re-applies the password to an existing
-    # database — so .env stays the one place it is set.
+    # Re-applies the admin password on every start: Grafana reads it only when creating its database.
     entrypoint: ["/bin/sh", "/etc/grafana/railhook-entrypoint.sh"]
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
@@ -157,8 +136,6 @@ services:
           # Grafana 12 idles near 200 MB with these dashboards provisioned.
           memory: 320m
 
-  # Logs: api/worker emit structured JSON with correlationId / organizationId in MDC;
-  # Loki keeps them after a container is replaced, which `docker logs` does not.
   loki:
     image: grafana/loki:3.0.0
     container_name: railhook-loki
@@ -204,17 +181,13 @@ services:
         limits:
           memory: 96m
 
-  # Host metrics: CPU, memory, disk, load. Reads the host filesystem read-only through
-  # --path.rootfs; the network collector sees this container's interface, not the host's
-  # (cAdvisor has per-container traffic). The host PID namespace is what makes the mount
-  # table the host's: without it, the file systems listed are this container's own bind
-  # mounts (/etc/hosts, /etc/hostname) rather than the host's disks.
+  # pid: host makes the mount table the host's; without it the file systems listed are this
+  # container's own bind mounts rather than the host's disks.
   node-exporter:
     image: prom/node-exporter:v1.9.1
     container_name: railhook-node-exporter
-    # node_uname_info reports the container's own hostname, which Docker sets to the container
-    # id, so the Host dashboard listed a hash instead of the server. Naming the container after
-    # the host fixes that without sharing the host's UTS namespace.
+    # node_uname_info reports the container's hostname, which Docker sets to the container id;
+    # this names the host without sharing its UTS namespace.
     hostname: ${MONITORING_NODENAME:-railhook-host}
     pid: host
     command:
@@ -235,13 +208,10 @@ services:
         limits:
           memory: 64m
 
-  # Per-container CPU, memory, network and restarts. Only Docker containers, and only the
-  # metrics the dashboards and rules read — the full set is several thousand series.
+  # Only the metrics the dashboards and rules read: the full set is several thousand series.
   cadvisor:
-    # v0.54 or newer: Docker 29 stores images through containerd (storage driver "overlayfs"), and
-    # older cAdvisor looked for each container's layer under /var/lib/docker/image/overlay2, found
-    # nothing, and exported no container_* series at all. The newer lookup asks containerd for the
-    # container's root filesystem, hence its socket (under /var/run) and the host root.
+    # v0.54+: with Docker 29's containerd storage older cAdvisor exported no container_* series; the
+    # new lookup needs the containerd socket and the host root.
     image: ghcr.io/google/cadvisor:v0.60.5
     container_name: railhook-cadvisor
     command:
@@ -271,9 +241,8 @@ services:
         limits:
           memory: 192m
 
-  # Uptime: probes the public URLs the way a customer reaches them (through Cloudflare and
-  # Caddy), and the UI and Caddy from inside the network, so "the site is down" and "the
-  # edge is down" read as different alerts.
+  # Probes the public URLs from outside and the UI and Caddy from inside, so "the site is down"
+  # and "the edge is down" read as different alerts.
   blackbox:
     image: prom/blackbox-exporter:v0.27.0
     container_name: railhook-blackbox
@@ -291,8 +260,7 @@ services:
         limits:
           memory: 32m
 
-  # Writes the age of the newest scheduled backup as a node-exporter textfile metric, so
-  # "no backup in 26 hours" is an alert and not a discovery made during a restore.
+  # So "no backup in 26 hours" is an alert and not a discovery made during a restore.
   backup-age:
     image: busybox:1.36.1
     container_name: railhook-backup-age

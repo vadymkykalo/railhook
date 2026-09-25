@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# One-shot snapshot of outbox backlog: pending count, oldest pending age, and
-# status breakdown. Useful during/after load/ingest.js to find "the point at
-# which the outbox backs up" (see load/README.md "Target numbers").
-#
-# Usage: ./load/scripts/outbox-depth.sh
 set -euo pipefail
 
 DOCKER_COMPOSE="docker compose"

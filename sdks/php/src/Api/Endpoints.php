@@ -15,9 +15,7 @@ class Endpoints
         $this->client = $client;
     }
 
-    /**
-     * Create a new endpoint.
-     */
+    /** Create a new endpoint. */
     public function create(string $projectId, array $params): array
     {
         return $this->client->request(
@@ -27,9 +25,7 @@ class Endpoints
         );
     }
 
-    /**
-     * Get endpoint by ID.
-     */
+    /** Get endpoint by ID. */
     public function get(string $projectId, string $endpointId): array
     {
         return $this->client->request(
@@ -38,9 +34,7 @@ class Endpoints
         );
     }
 
-    /**
-     * List all endpoints for a project.
-     */
+    /** List all endpoints for a project. */
     public function list(string $projectId): array
     {
         return $this->client->request(
@@ -49,9 +43,7 @@ class Endpoints
         );
     }
 
-    /**
-     * Update endpoint.
-     */
+    /** Update endpoint. */
     public function update(string $projectId, string $endpointId, array $params): array
     {
         return $this->client->request(
@@ -61,9 +53,7 @@ class Endpoints
         );
     }
 
-    /**
-     * Delete endpoint.
-     */
+    /** Delete endpoint. */
     public function delete(string $projectId, string $endpointId): void
     {
         $this->client->request(
@@ -72,9 +62,7 @@ class Endpoints
         );
     }
 
-    /**
-     * Rotate endpoint webhook secret.
-     */
+    /** Rotate endpoint webhook secret. */
     public function rotateSecret(string $projectId, string $endpointId): array
     {
         return $this->client->request(
@@ -83,9 +71,7 @@ class Endpoints
         );
     }
 
-    /**
-     * Test endpoint connectivity.
-     */
+    /** Test endpoint connectivity. */
     public function test(string $projectId, string $endpointId): array
     {
         return $this->client->request(

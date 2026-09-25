@@ -68,12 +68,7 @@ class WebhookTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /**
-     * After a rotation Railhook signs each delivery with the new secret and the retired
-     * one for the endpoint's grace window, so a receiver that has not deployed the new
-     * secret yet keeps working. The parser used to keep only the last v1 and rejected
-     * whichever half of the pair the receiver was holding.
-     */
+    /** The parser used to keep only the last v1 and rejected whichever secret the receiver held. */
     private function dualSignatureHeader(string $payload, string $newSecret, string $retiredSecret): string
     {
         $timestamp = (int) (microtime(true) * 1000);
@@ -228,7 +223,6 @@ class WebhookTest extends TestCase
         $oldTimestamp = (int) (microtime(true) * 1000) - 60000; // 1 min ago
         $signature = Webhook::generateSignature(self::PAYLOAD, self::SECRET, $oldTimestamp);
         
-        // Should fail with 30s tolerance
         $this->expectException(RailhookException::class);
         Webhook::verifySignature(self::PAYLOAD, $signature, self::SECRET, 30000);
     }
@@ -238,7 +232,6 @@ class WebhookTest extends TestCase
         $oldTimestamp = (int) (microtime(true) * 1000) - 60000; // 1 min ago
         $signature = Webhook::generateSignature(self::PAYLOAD, self::SECRET, $oldTimestamp);
         
-        // Should pass with 2min tolerance
         $result = Webhook::verifySignature(self::PAYLOAD, $signature, self::SECRET, 120000);
         
         $this->assertTrue($result);

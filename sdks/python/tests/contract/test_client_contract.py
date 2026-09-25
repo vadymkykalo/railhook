@@ -1,18 +1,5 @@
-"""Contract tests: run the python SDK against a REAL API instance and assert
-its request/response shapes still match what the API actually does. The 71
-cases in tests/test_*.py stub `requests` entirely — they'd stay green even
-if the API renamed a field out from under this SDK. These exist to catch
-that drift instead of a user finding it in production.
-
-Run with: pytest tests/contract -v (requires CONTRACT_API_BASE_URL reachable
-— defaults to http://localhost:8080, i.e. `make up`). See
-tests/contract/README.md.
-
-The repo now commits an OpenAPI spec (openapi.yaml at the repo root);
-generating these expectations from the spec would be preferable to
-hand-asserting field-by-field. This hand-asserted suite is the accepted
-fallback until that generation exists.
-"""
+"""Runs against a real API: the unit tests stub ``requests`` and would stay green if the API
+renamed a field out from under this SDK."""
 import pytest
 
 from railhook import (

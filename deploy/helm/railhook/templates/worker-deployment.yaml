@@ -22,11 +22,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "railhook.serviceAccountName" . }}
-      # 30s to drain the Kafka containers, then the two BoundedAsyncExecutors wait
-      # out their in-flight deliveries in @PreDestroy, one after the other. The
-      # Kubernetes default of 30s cut that short on every rollout and every HPA
-      # scale-down. Keep in step with docker-compose.yml's stop_grace_period —
-      # ShutdownBudgetTest fails the build if they disagree.
+      # Keep in step with docker-compose.yml's stop_grace_period; ShutdownBudgetTest checks it.
       terminationGracePeriodSeconds: {{ .Values.worker.terminationGracePeriodSeconds }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
@@ -37,9 +33,6 @@ spec:
           image: "{{ .Values.global.imageRegistry }}{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
           ports:
-            # The worker serves no traffic of its own: this is actuator, and
-            # nothing else. Named for what it is, so the ServiceMonitor and the
-            # api's port of the same name mean the same thing.
             - name: management
               containerPort: {{ include "railhook.worker.managementPort" . }}
               protocol: TCP
@@ -66,20 +59,14 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.encryptionKey.existingSecret }}
                   key: {{ .Values.secrets.encryptionKey.key }}
-            # Required, no default (application.yml: `encryption-salt:
-            # ${WEBHOOK_ENCRYPTION_SALT}`), and it must be the same value the
-            # api gets or the two disagree about how to decrypt every stored
-            # secret.
+            # Must equal the api's value, or the two decrypt stored secrets differently.
             - name: WEBHOOK_ENCRYPTION_SALT
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.encryptionSalt.existingSecret }}
                   key: {{ .Values.secrets.encryptionSalt.key }}
-            # After the worker.env range, deliberately — see the api
-            # Deployment for why neither of these is a knob. The worker's
-            # MANAGEMENT_ADDRESS default is 127.0.0.1 (unlike the api's), so
-            # without this its actuator answered nothing outside the pod: the
-            # kubelet's probes and every scrape failed alike.
+            # After the worker.env range so they cannot be overridden. The worker's own
+            # MANAGEMENT_ADDRESS default is 127.0.0.1, which probes and scrapes cannot reach.
             - name: MANAGEMENT_PORT
               value: {{ include "railhook.worker.managementPort" . | quote }}
             - name: MANAGEMENT_ADDRESS

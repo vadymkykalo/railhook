@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# The only thing the CI deploy key is allowed to do on railhook.io.
-# Installed as /usr/local/bin/railhook-deploy and forced from authorized_keys, so whatever
-# the client asks to run lands in SSH_ORIGINAL_COMMAND and is parsed, never executed.
+# Forced command for the CI deploy key: the client's command arrives in SSH_ORIGINAL_COMMAND and
+# is parsed, never executed.
 set -euo pipefail
 
 read -r -a argv <<< "${SSH_ORIGINAL_COMMAND:-}"

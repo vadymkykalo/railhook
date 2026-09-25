@@ -52,10 +52,6 @@ spec:
             - name: RAILHOOK_PUBLIC_BLOG
               value: {{ .Values.ui.publicBlog | default false | quote }}
           ports:
-            # 5173, not 80: the image is nginx serving `listen 5173`
-            # (railhook-ui/nginx.conf) and EXPOSE 5173. While this said
-            # 80 the readiness probe could never pass and the Service pointed at
-            # a closed port, so `helm install` produced a UI that never came up.
             - name: http
               containerPort: 5173
               protocol: TCP
@@ -65,9 +61,7 @@ spec:
             {{- toYaml .Values.ui.readinessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.ui.resources | nindent 12 }}
-          # nginx writes its temp dirs and its pid file at startup. As a
-          # non-root user those paths are not writable in the image, so without
-          # these the container exits before it ever serves anything.
+          # nginx writes temp dirs and its pid file at startup; non-root cannot write them in the image.
           volumeMounts:
             - name: nginx-cache
               mountPath: /var/cache/nginx

@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Railhook installer: writes docker-compose.yml (pinned to a release), a .env with generated
-# secrets and a small ./railhook helper into one directory, then runs `docker compose up -d`.
-#
 #   curl -fsSL https://railhook.io/install.sh | bash -s -- [options]
 set -euo pipefail
 
@@ -91,7 +88,6 @@ fi
 CHECK_PORTS="$PORT"
 [ "$TLS" = 0 ] || CHECK_PORTS="80 443"
 
-# `docker compose` (v2 plugin) or `docker-compose` (the standalone binary many distros ship).
 COMPOSE_CMD=""
 resolve_compose() {
     [ -n "$COMPOSE_CMD" ] && return 0
@@ -352,8 +348,7 @@ else echo "Docker Compose is not available (tried 'docker compose' and 'docker-c
 # shellcheck disable=SC2086
 compose() { $COMPOSE_CMD "$@"; }
 
-# Replaces the API one container at a time, a single replica included, so an upgrade has no 502
-# gap. Docker DNS publishes a container before it is healthy, so the replacement warms up under a
+# Docker DNS publishes a container before it is healthy, so the replacement api warms up under a
 # throwaway alias and takes the name nginx resolves only once it answers.
 roll_api() {
     local ids target net old new before waited
@@ -387,9 +382,8 @@ roll_api() {
     done
 }
 
-# NAME=value lines from stdin into .env, all or nothing, values never printed. The deploy workflow
-# sends production settings this way through `upgrade`. Generated secrets and image tags are
-# refused: a new encryption key alone makes every encrypted column unreadable.
+# Generated secrets and image tags are refused: a new encryption key alone makes every encrypted
+# column unreadable.
 apply_settings() {
     local input bad tmp
     input=$(tr -d '\r' | grep -vE '^(#|$)' || true)

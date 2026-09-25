@@ -24,16 +24,8 @@ export interface BridgeOptions extends BridgeConfig {
 }
 
 /**
- * An MCP server that owns no tools of its own: every `tools/list` and `tools/call` it receives
- * is passed to the remote Railhook server at `<RAILHOOK_BASE_URL>/mcp`, and the answer is passed
- * back unchanged.
- *
- * The tools live in one place, the Railhook API, so this package never has to change when they
- * do. It exists for MCP clients that can only start a local process over stdio.
- *
- * The remote connection is opened on the first request rather than at startup, so a client
- * that starts this server offline, or with a key that is later fixed, gets an error on the call
- * that needed the network instead of a server that exited before it could say why.
+ * Relays `tools/list` and `tools/call` unchanged to `<RAILHOOK_BASE_URL>/mcp`. Connects on the first
+ * request, so an offline start or a bad key surfaces as an error on the call.
  */
 export function createBridge(options: BridgeOptions): Server {
   const server = new Server(
@@ -98,10 +90,7 @@ async function openRemote(options: BridgeOptions): Promise<Client> {
   return client;
 }
 
-/**
- * Turns a failure to reach the remote server into a sentence the user can act on. The API key
- * is removed from anything that came back, in case a proxy on the way echoed a header.
- */
+/** Turns a remote failure into an actionable sentence, with the API key redacted from any echo. */
 export function describeRemoteError(error: unknown, options: Pick<BridgeConfig, 'apiKey' | 'url'>): string {
   const where = options.url.toString();
   let message: string;

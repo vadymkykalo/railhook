@@ -1,19 +1,6 @@
 #!/usr/bin/env python3
-"""Runs every query the monitoring stack depends on against a live Prometheus and Loki.
-
-A panel whose query returns nothing reads "No data", and an alert whose series does not exist
-can never fire. Neither fails anywhere: Grafana renders the empty panel, Prometheus evaluates the
-rule as healthy. Both happened — whole dashboards stayed empty for a release because the metrics
-they asked for were never exported. This takes every expression from the Railhook dashboards and
-from the Prometheus and Loki rule files, resolves the dashboard variables to "everything", and
-asks the running stack for the last hour. An expression with no series fails the check unless the
-allow-list names it with the reason it is legitimately empty until something happens.
-
-Alert rules are checked without their final comparison — "is outbox_queue_depth there" is the
-question, not "is it above 300 right now".
-
-Standard library only, so it runs in a bare python image on the monitoring network:
-  make monitoring-check-queries
+"""Runs every monitoring query against a live Prometheus and Loki: an empty panel or an alert on a
+missing series fails nowhere else. Standard library only, for a bare python image.
 """
 
 import argparse

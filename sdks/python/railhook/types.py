@@ -25,8 +25,7 @@ class EventResponse:
     type: str
     created_at: str
     deliveries_created: int
-    #: Schema-validation errors this event was accepted despite, when the project has schema
-    #: validation on with the WARN policy. Empty when the payload matched or validation is off.
+    #: Schema-validation errors the event was accepted despite (WARN policy only).
     schema_warnings: List[str] = field(default_factory=list)
 
     @classmethod
@@ -217,7 +216,6 @@ class Delivery:
     max_attempts: int
     created_at: str
     subscription_id: Optional[str] = None
-    #: The API field is ``nextRetryAt``.
     next_retry_at: Optional[str] = None
     last_attempt_at: Optional[str] = None
     succeeded_at: Optional[str] = None
@@ -245,7 +243,6 @@ class Delivery:
 class DeliveryAttempt:
     id: str
     attempt_number: int
-    #: When the attempt was recorded (API field ``createdAt``).
     created_at: str
     delivery_id: Optional[str] = None
     #: JSON object, serialized as a string, of the headers that were sent.
@@ -362,8 +359,7 @@ class EndpointTestResult:
 class RateLimitInfo:
     limit: int
     remaining: int
-    #: Unix timestamp in **seconds** at which the window resets — the raw value
-    #: of the ``X-RateLimit-Reset`` header, which the API sends in seconds.
+    #: Unix time in seconds, not milliseconds, at which the window resets.
     reset: int
 
 
@@ -374,9 +370,6 @@ class WebhookEvent:
     timestamp: int
     type: str
     data: Dict[str, Any]
-
-
-# ── Incoming Webhooks ──
 
 
 class ProviderType(str, Enum):

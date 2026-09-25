@@ -1,19 +1,5 @@
-// Scenario: the incoming direction under sustained traffic, with the destination
-// going down mid-run.
-//
-// setup() creates a Source verified with generic HMAC (raw hex over the body) and one
-// Destination pointed at load-receiver. The `traffic` scenario then POSTs signed
-// provider-style webhooks to the Source's ingress URL at a constant rate; `phase_control`
-// flips load-receiver to "down" for PHASE_DOWN_SECONDS partway through, so every Forward
-// sent in that window has to come back through the retry ladder.
-//
-// Pass criteria, read from {RECEIVER_CONTROL_URL}/_control/summary after SETTLE_SECONDS:
-//   - acceptedSeqs == seqsAnsweredOk: every webhook the ingress accepted was forwarded
-//   - duplicateDeliveries == 0: no seq answered 2xx more than once
-//
-// Usage:
-//   k6 run load/incoming.js
-//   k6 run -e TRAFFIC_RPS=5 -e DURATION_SECONDS=180 -e PHASE_DOWN_SECONDS=60 load/incoming.js
+// Incoming traffic with the destination down for PHASE_DOWN_SECONDS. Passes when every accepted
+// webhook was forwarded exactly once.
 
 import http from 'k6/http';
 import crypto from 'k6/crypto';

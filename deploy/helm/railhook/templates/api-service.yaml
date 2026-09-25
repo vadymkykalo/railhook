@@ -12,12 +12,7 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
-    # Actuator. Unauthenticated by design (that is the point of splitting it
-    # off 8080), so it stays a ClusterIP port — the same trust boundary
-    # docker-compose.yml gives it by not publishing 8082 to the host. The
-    # ServiceMonitor scrapes this port by name; nothing outside the cluster
-    # reaches it unless an Ingress is pointed here, which nothing in this chart
-    # does.
+    # Actuator is unauthenticated, so it stays ClusterIP-only.
     - port: {{ include "railhook.api.managementPort" . }}
       targetPort: management
       protocol: TCP

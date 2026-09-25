@@ -7,12 +7,9 @@ const TIMESTAMP_HEADER = 'x-timestamp';
 const EVENT_ID_HEADER = 'x-event-id';
 const DELIVERY_ID_HEADER = 'x-delivery-id';
 
-const DEFAULT_TOLERANCE = 300000; // 5 minutes in milliseconds
+const DEFAULT_TOLERANCE = 300000; // ms
 
-/**
- * Request headers. Wide enough to take Node's `IncomingHttpHeaders` (Express's `req.headers`)
- * as-is, where a repeated header arrives as a `string[]`; the first value is used.
- */
+/** Takes Node's `IncomingHttpHeaders` as-is; of a repeated header the first value is used. */
 export interface WebhookHeaders {
   'x-signature'?: string | string[];
   'x-timestamp'?: string | string[];
@@ -31,21 +28,15 @@ export interface VerifyOptions {
 }
 
 /**
- * Verifies the webhook signature using HMAC-SHA256.
+ * Verifies an `X-Signature` header (`t=<unix-ms>,v1=<hex>[,v1=...]`); during a secret rotation
+ * any one `v1` matching is enough.
  *
- * The header is `t=<unix-ms>,v1=<hex>`, and it may carry **more than one** `v1`.
- * After you rotate an endpoint's secret, Railhook signs each delivery with both
- * the new secret and the retired one for the endpoint's grace window (24 hours
- * by default), so you can deploy the new secret whenever you like instead of at
- * the instant you press rotate. The delivery is authentic if *any* `v1` matches,
- * which is what this checks.
- *
- * @param payload - Raw request body as string
- * @param signature - X-Signature header value (format: t=timestamp,v1=signature[,v1=...])
+ * @param payload - Raw request body
+ * @param signature - X-Signature header value
  * @param secret - Endpoint webhook secret
- * @param options - Verification options
- * @returns true if signature is valid
- * @throws RailhookError if signature is invalid
+ * @param options - `tolerance` in milliseconds (default 5 minutes)
+ * @returns true if the signature is valid
+ * @throws RailhookError if it is not
  */
 export function verifySignature(
   payload: string,
@@ -66,9 +57,8 @@ export function verifySignature(
   for (const part of parts) {
     const [key, value] = part.split('=');
     if (key === 't') timestamp = value?.trim();
-    // Collected, not overwritten: a header sent during a secret rotation carries
-    // one v1 per valid secret, and keeping only the last would reject whichever
-    // of the pair you are currently holding.
+    // Collected, not overwritten: during a rotation keeping only the last v1 would reject
+    // whichever secret you currently hold.
     if (key === 'v1' && value) signatures.push(value.trim());
   }
 
@@ -80,8 +70,8 @@ export function verifySignature(
     );
   }
 
-  // Digits only. parseInt('abc') is NaN, and NaN compared with the tolerance is false, so a
-  // non-numeric t used to skip the replay window entirely.
+  // parseInt('abc') is NaN, and a NaN comparison is false: a non-numeric t used to skip the
+  // replay window entirely.
   if (!/^\d+$/.test(timestamp)) {
     throw new RailhookError(
       'Invalid signature format. Expected: t=timestamp,v1=signature',
@@ -108,8 +98,7 @@ export function verifySignature(
     .digest('hex');
 
   const expectedBuffer = Buffer.from(expectedSignature);
-  // Every candidate is compared — no early exit — so the time taken does not
-  // depend on which position matched.
+  // No early exit, so timing does not reveal which candidate matched.
   let matched = false;
   for (const candidate of signatures) {
     const sigBuffer = Buffer.from(candidate);
@@ -129,25 +118,17 @@ const STANDARD_ID_HEADER = 'webhook-id';
 const STANDARD_TIMESTAMP_HEADER = 'webhook-timestamp';
 const STANDARD_SIGNATURE_HEADER = 'webhook-signature';
 
-/** Tolerance for the Standard Webhooks headers, whose timestamp is in **seconds**. */
+/** Standard Webhooks timestamps are in seconds, not milliseconds. */
 const DEFAULT_STANDARD_TOLERANCE_SECONDS = 300;
 
 /**
- * Verifies the [Standard Webhooks](https://www.standardwebhooks.com) headers.
+ * Verifies the Standard Webhooks headers (`webhook-id`, `webhook-timestamp`,
+ * `webhook-signature`). During a rotation's grace window any one matching signature is enough.
  *
- * Endpoints receive both header sets by default (`signatureScheme: 'BOTH'`), so use
- * whichever you prefer — this one if you would rather your verification match what other
- * providers send, `verifySignature` if you are already verifying `X-Signature`.
- *
- * Two things differ from Railhook's own scheme beyond the header names: the message id is
- * part of what is signed, and the digest is base64 rather than hex. Rotation works the same
- * way — during the grace window the header carries a space-separated signature per valid
- * secret, and any one matching is enough.
- *
- * @param payload - Raw request body as string
- * @param headers - Request headers, including the three `webhook-*` ones
- * @param secret - The endpoint's `standardWebhooksSecret` (`whsec_…`), not the raw secret.
- *                 A plain secret is accepted too and used as-is.
+ * @param payload - Raw request body
+ * @param headers - Request headers
+ * @param secret - The endpoint's `standardWebhooksSecret` (`whsec_…`); a plain secret is used as-is
+ * @param options - `toleranceSeconds` (default 300)
  * @returns true if the signature is valid
  * @throws RailhookError if it is not
  */
@@ -186,9 +167,6 @@ export function verifyStandardWebhook(
     );
   }
 
-  // `whsec_<base64>` is the conventional form and is what the endpoint's
-  // standardWebhooksSecret gives you; the base64 body decodes to the key bytes. Anything
-  // else is taken literally, so a raw secret still works.
   const key = secret.startsWith('whsec_')
     ? Buffer.from(secret.slice('whsec_'.length), 'base64')
     : Buffer.from(secret, 'utf8');
@@ -199,8 +177,7 @@ export function verifyStandardWebhook(
     .digest('base64');
   const expectedBuffer = Buffer.from(expected);
 
-  // Space-separated, one per valid secret during a rotation window. Every candidate is
-  // compared with no early exit, so the time taken does not reveal which one matched.
+  // No early exit, so timing does not reveal which candidate matched.
   let matched = false;
   for (const part of signature.trim().split(/\s+/)) {
     const comma = part.indexOf(',');
@@ -219,27 +196,14 @@ export function verifyStandardWebhook(
 }
 
 /**
- * Constructs a webhook event from the request.
+ * Verifies the request and parses it into an event. `type` is set only when the body carries a
+ * `type` key; ids come from the headers.
  *
- * What Railhook actually POSTs on the wire is the event's **payload**, not an
- * envelope: a `client.events.send({ type: 'order.completed', data: {...} })`
- * arrives at your endpoint as the `data` object alone, with the identifiers
- * carried in headers (`X-Event-Id`, `X-Delivery-Id`, `X-Timestamp`,
- * `X-Sequence-Number`). So:
- *
- * - `eventId` / `deliveryId` / `timestamp` come from the headers and are
- *   always populated for a real delivery.
- * - `data` is the parsed body.
- * - `type` is only populated when the body happens to carry a `type` key —
- *   which for a default subscription it does not. Route on the payload, or
- *   configure the subscription's `payloadTemplate` to wrap the event so that
- *   `type` is part of the body.
- *
- * @param payload - Raw request body as string
+ * @param payload - Raw request body
  * @param headers - Request headers
  * @param secret - Endpoint webhook secret
  * @param options - Verification options
- * @returns Parsed and verified webhook event
+ * @throws RailhookError if the signature or the JSON is invalid
  */
 export function constructEvent(
   payload: string,
@@ -274,13 +238,7 @@ export function constructEvent(
   };
 }
 
-/**
- * Generates a signature for testing purposes
- * @param payload - Request body as string
- * @param secret - Webhook secret
- * @param timestamp - Optional timestamp (defaults to now)
- * @returns Signature string in format t=timestamp,v1=signature
- */
+/** Builds an `X-Signature` value (`t=<ms>,v1=<hex>`) for tests; `timestamp` defaults to now. */
 export function generateSignature(
   payload: string,
   secret: string,

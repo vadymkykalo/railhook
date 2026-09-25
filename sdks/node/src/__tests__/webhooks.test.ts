@@ -41,12 +41,8 @@ describe('Webhook Signature Verification', () => {
     });
   });
 
-  /**
-   * After a rotation Railhook signs each delivery with the new secret and the retired one
-   * for the endpoint's grace window, so a receiver that has not deployed the new secret yet
-   * keeps working. The parser used to keep only the last v1 and rejected whichever half of
-   * the pair the receiver was holding.
-   */
+  // The parser used to keep only the last v1 and rejected whichever secret of a rotation pair
+  // the receiver was holding.
   describe('a header carrying two signatures (secret rotation)', () => {
     const newSecret = 'whsec_new';
     const retiredSecret = 'whsec_retired';
@@ -194,11 +190,9 @@ describe('Webhook Signature Verification', () => {
       const oldTimestamp = Date.now() - 60000; // 1 minute ago
       const signature = generateSignature(payload, secret, oldTimestamp);
       
-      // Should fail with 30s tolerance
       expect(() => verifySignature(payload, signature, secret, { tolerance: 30000 }))
         .toThrow('outside tolerance window');
       
-      // Should pass with 2min tolerance
       expect(verifySignature(payload, signature, secret, { tolerance: 120000 })).toBe(true);
     });
   });

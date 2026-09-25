@@ -1,15 +1,4 @@
-"""Guards the published identity of this SDK.
-
-The PyPI distribution and the importable module are both ``railhook``, and
-this file exists to keep them that way.
-
-They used to disagree: the distribution was ``webhook-platform`` while the
-module was ``hookflow``, so installing the SDK and importing it required
-knowing two unrelated names. That mismatch is what the rename to Railhook was
-for, and a test is the only thing that stops it drifting back — a rename that
-touches one of the two and not the other reintroduces exactly the old problem,
-and nothing else in the build would notice.
-"""
+"""The distribution and the module once had unrelated names; this keeps both ``railhook``."""
 
 import importlib.metadata
 

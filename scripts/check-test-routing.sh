@@ -1,28 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Fails when a test class that needs Docker is named so that CI routes it to the
-# unit-test job.
-#
-# The split between the two backend jobs in .github/workflows/ci.yml is done
-# purely by class-name suffix: `Backend Integration Tests` runs
-# *IntegrationTest, *IT, *RepositoryTest, *ConcurrencyTest, *RbacTest and
-# *IsolationTest, and `Backend Tests` runs everything else with those excluded.
-# Nothing checks that the name matches what the test actually needs.
-#
-# So a Testcontainers-backed test called plain FooTest passes locally, where
-# Docker is running, and fails in the unit job, where it is not — and the
-# failure looks like a broken test rather than a misnamed one. This catches it
-# at the name.
-#
-# Usage: scripts/check-test-routing.sh
-# CI runs it in the `backend-test` job before the tests themselves.
+# CI splits backend jobs by class-name suffix, so a Testcontainers test named plain FooTest passes
+# locally and fails in the no-Docker unit job.
 
 cd "$(git rev-parse --show-toplevel)"
 
 INTEGRATION_SUFFIXES='(IntegrationTest|IT|RepositoryTest|ConcurrencyTest|RbacTest|IsolationTest)\.java$'
 
-# Markers that mean "this test boots a container or a Spring context with one"
 NEEDS_DOCKER='@Testcontainers|@SpringBootTest|AbstractIntegrationTest|GenericContainer|PostgreSQLContainer|KafkaContainer'
 
 misrouted=()

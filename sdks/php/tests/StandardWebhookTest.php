@@ -8,11 +8,7 @@ use Railhook\Exception\RailhookException;
 use Railhook\Webhook;
 use PHPUnit\Framework\TestCase;
 
-/**
- * The point of this scheme is that a receiver can verify with a library they already have,
- * so these reproduce the reference algorithm rather than round-tripping against our own
- * implementation — a round-trip would only prove we agree with our own bug.
- */
+// The reference algorithm, not a round-trip: a round-trip would only prove we agree with our own bug.
 class StandardWebhookTest extends TestCase
 {
     private const MESSAGE_ID = 'msg_p5jXN8AQM9LWM0D4loKWxJek';
@@ -56,8 +52,7 @@ class StandardWebhookTest extends TestCase
 
     public function testHeaderNamesAreCaseInsensitive(): void
     {
-        // HTTP header names are case-insensitive and frameworks disagree about how they
-        // present them; a receiver should not have to care which one they are using.
+        // Frameworks disagree on how they case header names.
         $ts = time();
         $this->assertTrue(Webhook::verifyStandardWebhook(
             self::PAYLOAD,

@@ -1,20 +1,5 @@
-# PostgreSQL, Kafka and Redis for the kind smoke test in .github/workflows/ci.yml.
-#
-# The chart requires all three and ships none of them (see the Helm README's
-# Prerequisites), so anything that actually installs the chart has to stand them
-# up first. These are the exact images docker-compose.yml runs, configured the
-# way it configures them, because the point of the smoke test is to install the
-# chart against a database and a broker that behave like the real ones.
-#
-# Single replica, emptyDir storage, no resource requests: this exists for the
-# lifetime of one CI job on one kind node. It is not a template for running
-# Railhook's dependencies in production — a managed service or a StatefulSet is,
-# and the README says so.
-#
-# Passwords come from the same Secrets the chart reads, created by the workflow
-# before this is applied. Postgres's bootstrap password and the API's
-# DB_PASSWORD are therefore literally the same value, which is the pairing
-# install.sh spells out for POSTGRES_PASSWORD / DB_PASSWORD.
+# Dependencies for the CI kind smoke test only: the images docker-compose.yml runs, single replica
+# on emptyDir, passwords from the Secrets the workflow creates for the chart.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -49,12 +34,8 @@ spec:
               value: /var/lib/postgresql/data/pgdata
           ports:
             - containerPort: 5432
-          # Over TCP, not the unix socket, and with a real query: the image's
-          # entrypoint runs a temporary server with listen_addresses='' while it
-          # applies the initdb scripts, and a socket probe reports that one as
-          # ready — so a dependant starts and the temporary server is then
-          # stopped out from under it. Same reasoning as docker-compose.yml's
-          # healthcheck and the restore-drill job's wait loop.
+          # Over TCP with a real query: during initdb the entrypoint runs a temporary server with no
+          # TCP listener that a socket probe would report as ready.
           readinessProbe:
             exec:
               command:
@@ -101,9 +82,6 @@ spec:
       containers:
         - name: kafka
           image: apache/kafka:3.7.0
-          # KRaft, single combined broker/controller node — the same shape
-          # docker-compose.yml uses. The advertised listener has to be the
-          # Service name, since that is how the api and worker reach it.
           env:
             - name: KAFKA_NODE_ID
               value: "1"
@@ -112,23 +90,14 @@ spec:
             - name: KAFKA_LISTENERS
               value: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
             - name: KAFKA_ADVERTISED_LISTENERS
-              # Clients do go through the Service, and by the time any connect it has
-              # endpoints — so this one is correct as the Service name.
               value: PLAINTEXT://kafka:9092
             - name: KAFKA_CONTROLLER_LISTENER_NAMES
               value: CONTROLLER
             - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
               value: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
             - name: KAFKA_CONTROLLER_QUORUM_VOTERS
-              # localhost, not the Service name. This is the one line that does not
-              # transfer from docker-compose.yml: there `kafka` is the container's own
-              # hostname, so :9093 lands on the container itself. Here `kafka` is a
-              # Service that publishes 9092 and nothing else, so the controller looked
-              # for its own quorum on a port the Service does not define, never formed
-              # it, and never opened 9092 — the broker crash-looped and the readiness
-              # probe reported "connection refused" on a port that was never going to
-              # be listening. A single combined broker/controller node reaches its own
-              # controller over loopback and needs no Service to do it.
+              # localhost, unlike docker-compose.yml: the `kafka` Service publishes only 9092, so the
+              # controller never formed its quorum on :9093 and the broker crash-looped.
               value: 1@localhost:9093
             - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
               value: "1"

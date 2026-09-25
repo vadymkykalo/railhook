@@ -1,16 +1,4 @@
-// Scenario: fan-out burst — 1 event, N subscribed endpoints, N deliveries.
-//
-// setup() creates FANOUT_N endpoints (default 20) all subscribed to the same
-// event type, all pointed at load-receiver. The VU body then sends a burst
-// of distinct events; each should turn into FANOUT_N deliveries. After a
-// settle period, teardown() compares what load-receiver actually saw against
-// the expected total (EVENTS_TO_SEND * FANOUT_N) — this is the number to
-// record for "how much fan-out amplification can the outbox/worker absorb
-// before it falls behind" (see load/README.md "Target numbers").
-//
-// Usage:
-//   k6 run load/fanout.js
-//   k6 run -e FANOUT_N=100 -e EVENTS_TO_SEND=10 load/fanout.js
+// One event, FANOUT_N subscribed endpoints: does the receiver see EVENTS_TO_SEND * FANOUT_N?
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { BASE_URL, FANOUT_N, RECEIVER_CONTROL_URL } from './lib/config.js';
@@ -18,8 +6,6 @@ import { bootstrapProject, createSubscribedEndpoint } from './lib/setup.js';
 
 const EVENT_TYPE = 'load.fanout_test';
 const EVENTS_TO_SEND = Number(__ENV.EVENTS_TO_SEND || 5);
-// How long to wait after the burst for delivery workers to drain the
-// fan-out before teardown() reads the receiver's summary.
 const SETTLE_SECONDS = Number(__ENV.SETTLE_SECONDS || 30);
 
 export const options = {

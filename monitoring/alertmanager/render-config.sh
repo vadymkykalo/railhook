@@ -1,21 +1,9 @@
 #!/bin/sh
-# Renders /etc/alertmanager/alertmanager.yml from the ALERTMANAGER_* env vars
-# (see .env.dist "ALERTING" section) at container start.
-#
-# Why a shell script instead of a static YAML file: the prom/alertmanager image
-# is busybox-based (no apk, no envsubst, no bash), so this uses only POSIX sh +
-# heredocs. Each of the three receivers (railhook-critical / railhook-default /
-# railhook-info) fans out to whichever sinks (Slack / generic webhook / email /
-# Telegram) are configured, so the rendered config is always valid even with
-# zero secrets configured — alerts then land only in Alertmanager's own API and
-# in Grafana's Alerting pages, not in a crash.
-#
-# The rendered file carries the SMTP password and the Telegram token, so it is
-# never printed: the log names which sinks are on, nothing more.
+# busybox image: POSIX sh, no envsubst. The rendered file holds the SMTP password and Telegram
+# token, so it is never printed.
 set -eu
 
 OUT="${ALERTMANAGER_CONFIG_OUT:-/etc/alertmanager/alertmanager.yml}"
-# email.tmpl is mounted here; the links it needs are written beside the config.
 TEMPLATE_DIR="${ALERTMANAGER_TEMPLATE_DIR:-/etc/alertmanager/templates}"
 LINKS="$(dirname "$OUT")/railhook-links.tmpl"
 
@@ -47,8 +35,8 @@ hostname_or_empty() {
 grafana_domain="$(hostname_or_empty "${MONITORING_DOMAIN:-}")"
 site_domain="$(hostname_or_empty "${RAILHOOK_DOMAIN:-}")"
 
-# Where an alert mail sends its reader. Prometheus and Alertmanager are not published, so their
-# own links in a mail lead nowhere; Grafana on MONITORING_DOMAIN is the one address that works.
+# Prometheus and Alertmanager are not published, so their own links in a mail lead nowhere;
+# Grafana on MONITORING_DOMAIN is the one address that works.
 {
   if [ -n "$site_domain" ]; then
     printf '{{ define "railhook.domain.suffix" }} — %s{{ end }}\n' "$site_domain"
@@ -92,15 +80,13 @@ route:
   group_interval: 5m
   repeat_interval: 4h
   routes:
-    # The dead man's switch (prometheus/host-alerts.yml). Never mailed: it goes only to the
-    # heartbeat URL, whose silence is the alert.
+    # The dead man's switch. Never mailed: it goes only to the heartbeat URL, whose silence is the alert.
     - match:
         alertname: Watchdog
       receiver: railhook-heartbeat
       group_wait: 0s
       group_interval: 1m
       repeat_interval: 1m
-    # Critical: page faster, remind more often.
     - match:
         severity: critical
       receiver: railhook-critical
@@ -110,7 +96,6 @@ route:
     - match:
         severity: warning
       receiver: railhook-default
-    # Info: informational only (e.g. KafkaDlqTopicNotEmpty) — batch, remind rarely.
     - match:
         severity: info
       receiver: railhook-info
@@ -118,25 +103,18 @@ route:
       repeat_interval: 12h
 
 inhibit_rules:
-  # These alertname pairs are different rules (each fixed to one severity —
-  # see prometheus/alerts.yml), so a plain `equal: [alertname]` rule can never
-  # match across them; each pair is listed explicitly by "family" instead. 14
-  # rules firing ungrouped at 3am is its own failure mode.
-  #
-  # DeliveryPendingBacklogCritical firing means the High/Growing warnings for
-  # the same component are a known consequence, not new information.
+  # Each tier is its own alertname fixed to one severity, so `equal: [alertname]` can never
+  # match across them; each family is listed explicitly instead.
   - source_match:
       alertname: DeliveryPendingBacklogCritical
     target_match_re:
       alertname: 'DeliveryPendingBacklog(High|Growing)'
     equal: ['component']
-  # Same relationship for the oldest-pending-age tier.
   - source_match:
       alertname: OldestPendingDeliveryCritical
     target_match:
       alertname: OldestPendingDeliveryStale
     equal: ['component']
-  # Host tiers (prometheus/host-alerts.yml).
   - source_match:
       alertname: HostDiskCritical
     target_match:
@@ -152,8 +130,7 @@ inhibit_rules:
       alertname: UiDown
     target_match_re:
       alertname: 'PublicEndpoint(Down|Slow)'
-  # Generic fallback: any future rule that reuses one alertname across
-  # severities (via a templated threshold) gets this for free.
+  # For a rule that reuses one alertname across severities.
   - source_match:
       severity: critical
     target_match:

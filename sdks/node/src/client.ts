@@ -152,42 +152,27 @@ export class Railhook {
     });
   }
 
-  /**
-   * Generic GET request to any API path.
-   * Use this for endpoints not yet covered by the SDK.
-   */
+  /** GET to any API path, for endpoints the SDK does not wrap yet. */
   async get<T = unknown>(path: string): Promise<T> {
     return this.request<T>('GET', path);
   }
 
-  /**
-   * Generic POST request to any API path.
-   * Use this for endpoints not yet covered by the SDK.
-   */
+  /** POST to any API path, for endpoints the SDK does not wrap yet. */
   async post<T = unknown>(path: string, body?: unknown, idempotencyKey?: string): Promise<T> {
     return this.request<T>('POST', path, body, idempotencyKey);
   }
 
-  /**
-   * Generic PUT request to any API path.
-   * Use this for endpoints not yet covered by the SDK.
-   */
+  /** PUT to any API path, for endpoints the SDK does not wrap yet. */
   async put<T = unknown>(path: string, body?: unknown): Promise<T> {
     return this.request<T>('PUT', path, body);
   }
 
-  /**
-   * Generic PATCH request to any API path.
-   * Use this for endpoints not yet covered by the SDK.
-   */
+  /** PATCH to any API path, for endpoints the SDK does not wrap yet. */
   async patch<T = unknown>(path: string, body?: unknown): Promise<T> {
     return this.request<T>('PATCH', path, body);
   }
 
-  /**
-   * Generic DELETE request to any API path.
-   * Use this for endpoints not yet covered by the SDK.
-   */
+  /** DELETE to any API path, for endpoints the SDK does not wrap yet. */
   async delete<T = void>(path: string): Promise<T> {
     return this.request<T>('DELETE', path);
   }
@@ -222,8 +207,7 @@ export class Railhook {
       case 429:
         return new RateLimitError(
           message,
-          // `reset` is a Unix timestamp in seconds (see RateLimitInfo), so the
-          // fallback has to be in seconds too, not Date.now() + 60000.
+          // `reset` is in seconds, so the fallback is too.
           rateLimitInfo || { limit: 0, remaining: 0, reset: Math.floor(Date.now() / 1000) + 60 }
         );
       case 400:
@@ -268,12 +252,7 @@ class Endpoints {
     );
   }
 
-  /**
-   * Lists a project's endpoints.
-   *
-   * The API returns a Spring page envelope here, not a bare array — the
-   * endpoints themselves are in `.content`.
-   */
+  /** Lists a project's endpoints: a page envelope, the endpoints are in `.content`. */
   async list(
     projectId: string,
     params: EndpointListParams = {}
@@ -443,8 +422,6 @@ class IncomingSources {
       `/api/v1/projects/${projectId}/incoming-sources/${sourceId}`
     );
   }
-
-  // ── Destinations ──
 
   async createDestination(
     projectId: string,

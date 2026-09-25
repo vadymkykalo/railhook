@@ -6,9 +6,7 @@ namespace Railhook\Api;
 
 use Railhook\Railhook;
 
-/**
- * Portal sessions: open the customer portal for one of your consumers.
- */
+/** Portal sessions: open the customer portal for one of your consumers. */
 class PortalSessions
 {
     private Railhook $client;
@@ -19,8 +17,7 @@ class PortalSessions
     }
 
     /**
-     * Open a portal session. Hand the returned `url` to the consumer's browser;
-     * the `token` in it is returned here and never again.
+     * Open a portal session for the consumer's browser; its `token` is returned only here.
      *
      * @param array $params Optional: ttlMinutes (1-1440, default 60), allowedOrigin (https origin that embeds the portal)
      * @return array id, consumerId, url, token, allowedOrigin, expiresAt
@@ -35,9 +32,7 @@ class PortalSessions
         );
     }
 
-    /**
-     * End every open portal session of the consumer.
-     */
+    /** End every open portal session of the consumer. */
     public function revoke(string $projectId, string $consumerId): void
     {
         $this->client->request(

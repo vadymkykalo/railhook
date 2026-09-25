@@ -1,26 +1,4 @@
-// Scenario: an endpoint that goes slow, then down, then recovers, while
-// traffic keeps flowing.
-//
-// Two scenarios run concurrently:
-//   - `traffic`: constant-arrival-rate ingestion for the whole run, tagged
-//     with which phase each event was sent in.
-//   - `phase_control`: a single VU that sleeps through each phase's duration
-//     and flips load-receiver's mode at the right moments (healthy -> slow
-//     -> down -> healthy). See load/receiver/server.js for what each mode
-//     does to the HTTP response.
-//
-// What to look at afterwards (see load/README.md "Reading results"):
-//   - GET {RECEIVER_CONTROL_URL}/_control/received — timestamps show the
-//     slow-phase latency bump, the dead zone during "down", and how quickly
-//     the backlog drains once "healthy" resumes.
-//   - The API's deliveries endpoint
-//     (GET /api/v1/deliveries/projects/{id}?status=FAILED) for how many
-//     attempts got exhausted during the down phase vs. eventually succeeded
-//     via retry.
-//
-// Usage:
-//   k6 run load/failure-recovery.js
-//   k6 run -e PHASE_HEALTHY_SECONDS=60 -e PHASE_DOWN_SECONDS=120 load/failure-recovery.js
+// An endpoint goes slow, then down, then recovers while traffic keeps flowing.
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { BASE_URL, RECEIVER_CONTROL_URL, TARGET_RPS } from './lib/config.js';
@@ -80,11 +58,8 @@ function currentPhase(elapsedSeconds) {
 
 export function sendTraffic(ctx) {
   const phaseSeq = seqCounter++; const seq = __VU * 1000000 + __ITER;
-  // Approximate elapsed-seconds-into-the-run from the arrival rate rather
-  // than wall-clock (k6 has no clean "seconds since this scenario started"
-  // accessor from inside an iteration) — good enough for a human-readable
-  // phase label on each sent event; the receiver's own received-at
-  // timestamps are the authoritative record of what actually happened when.
+  // k6 has no "seconds since this scenario started" inside an iteration, so this is approximate;
+  // the receiver's received-at timestamps are the authoritative record.
   const res = http.post(
     `${BASE_URL}/api/v1/events`,
     JSON.stringify({

@@ -1,10 +1,6 @@
 {{- /*
-The Compose path (docker-compose.yml `db-backup` service, `make backup-db`)
-uses deploy/scripts/db-backup.sh instead of this inline script. They can't
-share one file — a packaged Helm chart only ships files under its own chart
-directory, so a script living at the repo root (where the Makefile/Compose
-need it) isn't available here. Keep the pg_dump flags identical
-(`-Fc --no-owner --no-privileges`) in both places if either one changes.
+Compose uses deploy/scripts/db-backup.sh instead; a packaged chart cannot ship a file from outside
+its directory. Keep the pg_dump flags identical (`-Fc --no-owner --no-privileges`) in both places.
 */}}
 {{- if .Values.backup.enabled }}
 apiVersion: batch/v1
@@ -60,7 +56,6 @@ spec:
                   FILESIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
                   echo "[$(date)] Backup completed: ${BACKUP_FILE} (${FILESIZE})"
 
-                  # Prune old backups — keep last N
                   KEEP={{ .Values.backup.retainCount | default 7 }}
                   cd /backup
                   ls -1t railhook-*.dump 2>/dev/null | tail -n +$((KEEP + 1)) | xargs -r rm -v

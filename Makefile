@@ -1,18 +1,14 @@
 .PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui init rebuild-external-db verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs monitoring-check-queries ratchets types-check docs-dev docs-build docs-check seo-check prerender version-check version-set
 
-# Default target
 .DEFAULT_GOAL := help
 
-# Load .env if exists
 ifneq (,$(wildcard ./.env))
     include .env
     export
 endif
 
-# Detect docker compose command (v2 vs v1)
 DOCKER_COMPOSE := $(shell docker compose version > /dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
 
-# Colors
 GREEN  := \033[0;32m
 YELLOW := \033[1;33m
 RED    := \033[0;31m
@@ -58,8 +54,6 @@ up-external-db: init ## Start services (external DB, dev mode)
 	@echo "$(GREEN)Services started successfully$(NC)"
 	@$(MAKE) health
 
-# Production is not a different Compose file any more — it is APP_ENV=production
-# plus the settings install.sh writes with --domain. The stack is the same stack.
 DOCKER_COMPOSE_PROD := $(DOCKER_COMPOSE)
 
 up-prod: init ## Start services (embedded DB, production mode)
@@ -84,18 +78,11 @@ up-prod-external: init ## Start services (external DB, production mode)
 	@echo "$(GREEN)Production services started$(NC)"
 	@$(MAKE) health
 
-# Pulls this project's own published images (ghcr.io/vadymkykalo/railhook-*)
-# instead of building from source — no Maven/npm toolchain required. That is
-# just docker-compose.yml on its own: it resolves every service to a published
-# image, and docker-compose.build.yml is the overlay that builds the three we
-# own from the working tree instead.
 DOCKER_COMPOSE_PULL := $(DOCKER_COMPOSE)
 DOCKER_COMPOSE_BUILD := $(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.build.yml
 
-# NOTE: to actually install Railhook somewhere, use ./install.sh — it generates
-# real secrets, where the .env.dist this target falls back to contains the
-# public ones from this repository. This target exists for testing the pull
-# images from a clone.
+# For testing published images from a clone only: the .env.dist it falls back to holds this
+# repository's public secrets. To install, use ./install.sh.
 up-pull: ## Start pre-built GHCR images from this clone (to install, use ./install.sh)
 	@if [ ! -f .env ]; then \
 		echo "$(GREEN)Creating .env from .env.dist...$(NC)"; \
@@ -161,14 +148,8 @@ rebuild-external-db: ## Rebuild and restart services (external DB)
 	@echo "$(GREEN)Rebuild complete$(NC)"
 
 ##@ Development (Fast Rebuilds)
-# Every target below builds through DOCKER_COMPOSE_BUILD *and starts through it
-# too*. The overlay does not only add build contexts — it renames the images
-# (`image: railhook-ui:${UI_IMAGE_TAG:-local}`), so a `build` through the
-# overlay followed by an `up -d` through the base file built one image and
-# started another: the published ghcr one, silently, with none of your changes.
-# `make dev-ui` looked like it worked and served five-day-old code.
-# The scale-* targets below deliberately stay on the base file: a production
-# host scaling replicas has no locally built image to start.
+# Build and start through the overlay, which renames the images: via the base file `up -d` served
+# the stale published image. scale-* stays on the base file: prod has no locally built image.
 rebuild-api: ## Rebuild only API service (fast)
 	@echo "$(GREEN)Rebuilding API...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache api
@@ -228,9 +209,6 @@ test-ui: ## Run frontend unit tests (Vitest)
 	@cd railhook-ui && npm run test:ci
 	@echo "$(GREEN)Frontend tests passed$(NC)"
 
-# Enumerates the live set of ratchets instead of asking a doc to list them. Two
-# of the nine boot Testcontainers (OpenApiDrift, EntityMappingParity), so this
-# needs Docker; the other seven are pure reflection or file reads.
 ratchets: ## Run every @Tag("ratchet") guard test (needs Docker)
 	@echo "$(GREEN)Running ratchet guards...$(NC)"
 	@mvn test -B -Dgroups=ratchet
@@ -263,11 +241,7 @@ scale-worker: ## Scale worker instances (usage: make scale-worker N=3)
 	@$(DOCKER_COMPOSE) up -d --scale worker=$(N) --no-recreate
 	@echo "$(GREEN)Worker scaled to $(N) instances$(NC)"
 
-# api publishes no host port, so nothing blocks Compose from running several
-# replicas of it — the API_PORT= trick this comment used to describe was working
-# around a fixed 127.0.0.1:8080 mapping that the file no longer has. Traffic
-# reaches every replica because the UI's nginx proxies to `api:8080` by Compose
-# DNS, which round-robins across all of them on its own.
+# Compose DNS round-robins nginx's `api:8080` across every replica.
 scale-api: ## Scale API instances (usage: make scale-api N=3)
 	@if [ -z "$(N)" ]; then \
 		echo "$(RED)ERROR: Please specify N=<number>, e.g. make scale-api N=3$(NC)"; \
@@ -367,13 +341,7 @@ shell-db: ## Open psql shell in embedded database
 	fi
 	@docker exec -it webhook-postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
-# backup-db / restore-db delegate to deploy/scripts/db-{backup,restore}.sh,
-# the same script the Compose `db-backup` sidecar runs on a schedule. That script
-# supports DB_MODE=embedded (docker exec against webhook-postgres, the default)
-# and DB_MODE=external (pg_dump/pg_restore against DB_HOST via a throwaway
-# postgres:16-alpine container — no local pg_dump/pg_restore binary required).
-# Set DB_MODE=external and DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD to target
-# a managed/remote Postgres instance.
+# The same script the db-backup sidecar runs, so every path passes the same flags.
 backup-db: ## Backup database to ./backups/ (embedded or external — see DB_MODE)
 	@echo "$(GREEN)Creating database backup (DB_MODE=$(DB_MODE))...$(NC)"
 	@DB_MODE="$(DB_MODE)" BACKUP_DIR="$(BACKUP_DIR)" BACKUP_RETENTION_DAYS="$(BACKUP_RETENTION_DAYS)" \
@@ -446,9 +414,8 @@ doctor: ## Run pre-flight checks
 	@echo "$(GREEN)All checks passed$(NC)"
 
 ##@ Monitoring (Prometheus, Grafana, Loki, host exporters)
-# Its own Compose project reading the platform's .env. The project name is fixed because that
-# .env sets COMPOSE_PROJECT_NAME for the platform. The network is found by its Compose label,
-# so the checkout's directory name does not matter.
+# A fixed project name, because the shared .env sets COMPOSE_PROJECT_NAME for the platform. The
+# network is found by label, so the checkout's directory name does not matter.
 MONITORING_NETWORK = $(or $(RAILHOOK_NETWORK),$(shell docker network ls --filter label=com.docker.compose.network=webhook-network --format '{{.Name}}' 2>/dev/null | head -1),railhook_webhook-network)
 MONITORING_COMPOSE = RAILHOOK_NETWORK=$(MONITORING_NETWORK) MONITORING_NODENAME=$(or $(MONITORING_NODENAME),$(shell hostname)) $(DOCKER_COMPOSE) -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml
 

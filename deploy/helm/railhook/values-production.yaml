@@ -1,6 +1,3 @@
-# Production overrides for Railhook Helm chart
-# Usage: helm install railhook ./railhook -f values-production.yaml
-
 api:
   replicaCount: 3
   
@@ -59,23 +56,8 @@ ui:
     enabled: true
     minAvailable: 1
 
-# Transactional email.
-#
-# This used to be `api.env.EMAIL_ENABLED: "true"` and nothing else — the chart
-# carried no SMTP settings at all, so production turned on mail the deployment
-# had no way to send: signup accepted the account and then could not deliver
-# the verification link. Enabled here still, because a production install that
-# cannot send mail creates every account already-verified and can never invite
-# anyone (install.sh warns about the same thing), but the relay has to be
-# supplied — the same bring-your-own arrangement as redis.external below:
-#
-#   --set email.smtp.host=smtp.example.com \
-#   --set email.smtp.username=railhook@example.com \
-#   --set email.smtp.existingSecret=railhook-smtp-secret \
-#   --set app.baseUrl=https://app.railhook.yourdomain.com
-#
-# Set email.enabled=false if you would rather run without mail than with a
-# half-configured relay.
+# Supply the relay with --set email.smtp.host=… email.smtp.username=… email.smtp.existingSecret=…
+# app.baseUrl=…, or set email.enabled=false rather than run a half-configured relay.
 email:
   enabled: true
   from: noreply@example.com
@@ -86,7 +68,6 @@ email:
     starttls: true
     existingSecret: ""  # Secret with the SMTP password under `smtp-password`
 
-# Use external managed services in production
 postgresql:
   enabled: false
 
@@ -95,21 +76,16 @@ kafka:
   topicReplicationFactor: 3  # Production: 3-way replication across brokers
   topicPartitions: 24        # Higher partition count for parallel consumers
 
-# Automated PostgreSQL backups
 backup:
   enabled: true
   schedule: "0 2 * * *"       # Daily at 2 AM UTC
   retainCount: 14             # Keep 2 weeks of backups
   storageSize: 50Gi
 
-# No embedded Redis subchart any more (see Chart.yaml / values.yaml) -
-# production must point redis.external at a managed instance
-# (ElastiCache/Memorystore/etc.), e.g. via
-# `--set redis.external.host=redis.prod.local` at install time.
+# Point redis.external at a managed instance, e.g. --set redis.external.host=redis.prod.local
 redis:
   enabled: false
 
-# Monitoring — enable for kube-prometheus-stack
 monitoring:
   serviceMonitor:
     enabled: true
@@ -124,11 +100,9 @@ monitoring:
     labels:
       grafana_dashboard: "1"
 
-# Enable network policies for security
 networkPolicy:
   enabled: true
 
-# Pod anti-affinity for high availability
 affinity:
   podAntiAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:

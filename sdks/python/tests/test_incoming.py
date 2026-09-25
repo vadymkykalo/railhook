@@ -1,5 +1,3 @@
-"""Tests for incoming webhooks functionality."""
-
 from railhook import (
     Railhook,
     IncomingSource,
@@ -16,8 +14,6 @@ from railhook import (
 
 
 class TestIncomingSourceTypes:
-    """Tests for IncomingSource type classes."""
-
     def test_incoming_source_from_dict(self):
         data = {
             "id": "src-123",
@@ -104,8 +100,6 @@ class TestIncomingSourceTypes:
 
 
 class TestIncomingDestinationTypes:
-    """Tests for IncomingDestination type classes."""
-
     def test_incoming_destination_from_dict(self):
         data = {
             "id": "dest-789",
@@ -172,8 +166,6 @@ class TestIncomingDestinationTypes:
 
 
 class TestIncomingEventTypes:
-    """Tests for IncomingEvent type classes."""
-
     def test_incoming_event_from_dict(self):
         data = {
             "id": "evt-abc",
@@ -270,8 +262,6 @@ class TestIncomingEventTypes:
 
 
 class TestPaginatedResponseGeneric:
-    """Tests for PaginatedResponse with different item types."""
-
     def test_paginated_incoming_sources(self):
         data = {
             "content": [
@@ -338,8 +328,6 @@ class TestIncomingEnums:
 
 
 class TestClientIncomingModules:
-    """Tests that the client initializes incoming API modules."""
-
     def test_has_incoming_sources(self):
         client = Railhook(api_key="test_key")
         assert client.incoming_sources is not None
