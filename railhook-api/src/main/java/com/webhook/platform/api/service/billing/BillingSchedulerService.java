@@ -15,15 +15,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * Scheduled jobs for billing lifecycle:
- * <ul>
- *   <li>Renew merchant-initiated subscriptions (WayForPay)</li>
- *   <li>Expire grace periods → suspend</li>
- *   <li>Apply scheduled plan changes</li>
- *   <li>Generate invoices for upcoming renewals</li>
- * </ul>
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -39,8 +30,6 @@ public class BillingSchedulerService {
     private final BillingProviderRegistry providerRegistry;
     private final SubscriptionLifecycleService lifecycleService;
     private final EntitlementService entitlementService;
-
-    // ── Merchant-initiated renewals (WayForPay) ─────────────────────
 
     @SystemTenant
     @Scheduled(cron = "0 0 */1 * * *")
@@ -77,9 +66,8 @@ public class BillingSchedulerService {
             return;
         }
 
-        // What the checkout charged, in the subscription's currency. The catalog price is USD
-        // cents; charged in a WayForPay subscription's UAH it renewed the plan at a fraction of
-        // its price. A row from before checkout recorded the amount still renews at the catalog.
+        // The checkout's own amount and currency: USD catalog cents charged to a UAH subscription
+        // renewed it at a fraction of the price.
         long amountCents = sub.getPriceCents() != null
                 ? sub.getPriceCents()
                 : sub.getBillingInterval() == BillingInterval.YEARLY
@@ -87,7 +75,6 @@ public class BillingSchedulerService {
                         : sub.getPlan().getPriceMonthlyCents();
         String orderRef = "railhook_renew_" + sub.getId() + "_" + System.currentTimeMillis();
 
-        // Create invoice
         BillingInvoice invoice = BillingInvoice.builder()
                 .organizationId(sub.getOrganizationId())
                 .subscriptionId(sub.getId())
@@ -103,7 +90,6 @@ public class BillingSchedulerService {
                 .build();
         invoice = invoiceRepository.save(invoice);
 
-        // Charge
         BillingProvider.ChargeResult result = provider.chargeRecurring(
                 new BillingProvider.RecurringChargeRequest(
                         sub.getOrganizationId(),
@@ -114,7 +100,6 @@ public class BillingSchedulerService {
                         "Railhook " + sub.getPlan().getDisplayName() + " renewal"
                 ));
 
-        // Record payment
         BillingPayment payment = BillingPayment.builder()
                 .invoiceId(invoice.getId())
                 .organizationId(sub.getOrganizationId())
@@ -148,8 +133,6 @@ public class BillingSchedulerService {
         }
     }
 
-    // ── Grace period expiry ─────────────────────────────────────────
-
     @SystemTenant
     @Scheduled(cron = "0 30 */1 * * *")
     @SchedulerLock(name = "billing_grace_expiry", lockAtMostFor = "PT10M", lockAtLeastFor = "PT2M")
@@ -171,8 +154,6 @@ public class BillingSchedulerService {
             log.info("Suspended {} subscriptions after grace period expiry", expired.size());
         }
     }
-
-    // ── PAST_DUE → GRACE_PERIOD transition ──────────────────────────
 
     @SystemTenant
     @Scheduled(cron = "0 15 */2 * * *")
@@ -196,8 +177,6 @@ public class BillingSchedulerService {
             log.info("Moved {} subscriptions from PAST_DUE to GRACE_PERIOD", pastDue.size());
         }
     }
-
-    // ── Scheduled plan changes ──────────────────────────────────────
 
     @SystemTenant
     @Scheduled(cron = "0 0 0 * * *")

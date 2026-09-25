@@ -9,25 +9,8 @@ import java.security.MessageDigest;
 import java.util.Base64;
 
 /**
- * Square webhook signature verifier.
- *
- * <p>Square sends {@code x-square-hmacsha256-signature}: base64(HMAC-SHA256(signatureKey, data)),
- * where {@code data} is the subscription's notification URL followed immediately by the raw
- * request body, with no separator between them.
- *
- * <p>The URL being part of the signed data is the whole difficulty. {@code http} for
- * {@code https}, a trailing slash or a different host each change the digest, so the URL has to
- * be exactly the one entered in the Square developer console. Taking it from the incoming
- * request would mean trusting {@code Host} and {@code X-Forwarded-Proto}, which behind a reverse
- * proxy is precisely how this breaks — the same trap {@link TwilioVerifier} documents. It comes
- * from {@code webhook.ingress-base-url} instead: the setting that builds the ingress URL shown on
- * the source's page, which is the URL a person copies into Square. The two agree by construction.
- * Only when it is unset does this fall back to what the request claims.
- *
- * <p>Square's scheme carries no timestamp, so the signature over an unchanged body is stable and
- * a resend arrives with the signature already marked as seen. What separates a resend from a
- * replay is the notification's own {@code event_id}, which {@code ProviderEventIdExtractor} reads
- * out of the body and {@code IngressService} deduplicates on ahead of the replay check.
+ * The signed URL must match the Square console exactly, so it comes from webhook.ingress-base-url,
+ * not Host and X-Forwarded-Proto, which break behind a proxy.
  */
 public class SquareVerifier implements WebhookVerificationStrategy {
 
@@ -52,8 +35,7 @@ public class SquareVerifier implements WebhookVerificationStrategy {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            // The URL is ASCII and the body is whatever Square sent, so the two are joined as
-            // bytes: nothing re-encodes the body on its way into the digest.
+            // Joined as bytes so nothing re-encodes the body on its way into the digest.
             mac.update(notificationUrl(request).getBytes(StandardCharsets.UTF_8));
             String computed = Base64.getEncoder().encodeToString(mac.doFinal(body != null ? body : new byte[0]));
 
@@ -67,7 +49,7 @@ public class SquareVerifier implements WebhookVerificationStrategy {
         }
     }
 
-    /** The notification URL as Square was configured with it, query string included. */
+    // Query string included.
     private String notificationUrl(HttpServletRequest request) {
         String base = ingressBaseUrl != null && !ingressBaseUrl.isBlank()
                 ? stripTrailingSlash(ingressBaseUrl) + request.getRequestURI()

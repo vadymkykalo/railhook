@@ -17,18 +17,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Periodic reconciliation of billing subscription state against external providers.
- *
- * <p>Only runs for providers with {@link BillingCapability#MANAGED_SUBSCRIPTIONS}
- * (e.g. Stripe), where the provider manages the subscription lifecycle externally
- * and we learn about changes via webhooks. If webhooks are missed (outage, network
- * issue), our local state drifts from reality.</p>
- *
- * <p>WayForPay is merchant-initiated ({@link BillingCapability#MERCHANT_RECURRING}),
- * meaning WE control the billing cycle via {@link BillingSchedulerService}. Our local
- * state IS the source of truth, so no reconciliation is needed.</p>
- */
+/** Only managed-subscription providers (Stripe) can drift from missed webhooks. */
 @Service
 @Slf4j
 public class BillingReconciliationService {
@@ -131,7 +120,6 @@ public class BillingReconciliationService {
 
         boolean changed = false;
 
-        // 1. Status drift
         SubscriptionStatus expectedStatus = mapExternalStatus(external.status());
         if (expectedStatus != null && expectedStatus != sub.getStatus()) {
             log.warn("Reconciliation: subscription {} status drift: local={} external={} ({})",
@@ -140,7 +128,7 @@ public class BillingReconciliationService {
             changed = true;
         }
 
-        // 2. Period drift — only if external has newer period end
+        // Only move the period forward.
         if (external.periodEnd() != null && sub.getCurrentPeriodEnd() != null
                 && external.periodEnd().isAfter(sub.getCurrentPeriodEnd())) {
             log.warn("Reconciliation: subscription {} period drift: local ends {} but external ends {}",
@@ -151,7 +139,6 @@ public class BillingReconciliationService {
             changed = true;
         }
 
-        // 3. Plan drift
         if (external.planName() != null) {
             Plan currentPlan = sub.getPlan();
             if (currentPlan != null && !external.planName().equals(currentPlan.getName())) {

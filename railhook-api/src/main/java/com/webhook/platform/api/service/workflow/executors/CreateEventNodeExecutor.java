@@ -14,16 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
-/**
- * Create Event node — emits a new event into the platform pipeline.
- * The event goes through the full flow: EventIngestService → subscriptions → deliveries → outbox → Kafka → worker.
- * This allows workflows to trigger the entire outgoing webhook pipeline.
- *
- * Config:
- *   - projectId (required): UUID of the project to emit the event into
- *   - eventType (required): the event type string (e.g. "order.completed")
- *   - payloadTemplate (optional): if set, used as event data; otherwise forwards workflow input
- */
+/** Without a payloadTemplate the workflow input is forwarded as the payload. */
 @Component
 @Slf4j
 public class CreateEventNodeExecutor implements NodeExecutor {
@@ -44,7 +35,6 @@ public class CreateEventNodeExecutor implements NodeExecutor {
     @Override
     public StepResult execute(JsonNode nodeConfig, JsonNode input) {
         try {
-            // Project ID
             String projectIdStr = nodeConfig.has("projectId") ? nodeConfig.get("projectId").asText() : null;
             if (projectIdStr == null || projectIdStr.isBlank()) {
                 return StepResult.failed("Create Event node: projectId is required");
@@ -56,13 +46,11 @@ public class CreateEventNodeExecutor implements NodeExecutor {
                 return StepResult.failed("Create Event node: invalid projectId format");
             }
 
-            // Event type
             String eventType = nodeConfig.has("eventType") ? nodeConfig.get("eventType").asText() : null;
             if (eventType == null || eventType.isBlank()) {
                 return StepResult.failed("Create Event node: eventType is required");
             }
 
-            // Event data: use payloadTemplate if configured, otherwise forward input
             JsonNode eventData;
             if (nodeConfig.has("payloadTemplate") && !nodeConfig.get("payloadTemplate").isNull()) {
                 JsonNode tmpl = nodeConfig.get("payloadTemplate");
@@ -79,8 +67,7 @@ public class CreateEventNodeExecutor implements NodeExecutor {
                 eventData = input != null ? input : objectMapper.createObjectNode();
             }
 
-            // Through the full pipeline, which checks the month's quota like any other Event's
-            // before storing it — this path once charged without checking.
+            // Through the full pipeline so the monthly quota is checked. This path once charged without checking.
             EventIngestRequest request = EventIngestRequest.builder()
                     .type(eventType)
                     .data(eventData)

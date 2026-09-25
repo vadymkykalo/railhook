@@ -55,7 +55,7 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
 
     private static final String ATTR_TUNNEL_TOKEN = "tunnelToken";
     private static final String ATTR_SLUG = "slug";
-    private static final int MAX_MESSAGE_SIZE = 1024 * 1024; // 1MB
+    private static final int MAX_MESSAGE_SIZE = 1024 * 1024;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -149,15 +149,11 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         String slug = (String) session.getAttributes().get(ATTR_SLUG);
 
-        // Only while this socket was still the tunnel: a CLI that reconnected first has already
-        // registered its new socket under the slug, here and in Redis, and must keep both.
+        // A CLI that reconnected first already owns the slug here and in Redis.
         if (slug != null && tunnelRegistry.unregister(slug, session)) {
             redisTunnelCoordinator.unregisterSlug(slug);
         }
-        // The session stays open. A dropped socket is not a closed tunnel: the CLI closes one
-        // explicitly (DELETE /tunnels/{id}), and a session nobody reconnects to expires by
-        // heartbeat in cleanupStaleSessions. Closing it here ended every tunnel on each API restart,
-        // since the CLI's reconnect was then refused as "Tunnel session not active".
+        // A dropped socket is not a closed tunnel; closing it here killed every tunnel on restart.
 
         wsDisconnectCounter.increment();
         log.info("Tunnel WS disconnected: slug={}, status={}", slug, status);
@@ -169,11 +165,6 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
         log.error("Tunnel WS transport error: slug={}", slug, exception);
     }
 
-    /**
-     * Extract token from Sec-WebSocket-Protocol header.
-     * Client sends: Sec-WebSocket-Protocol: tunnel-token.{TOKEN}
-     * Server echoes the subprotocol to complete the handshake.
-     */
     private String extractTokenFromSubprotocol(WebSocketSession session) {
         List<String> protocols = session.getHandshakeHeaders().get("Sec-WebSocket-Protocol");
         if (protocols == null) return null;

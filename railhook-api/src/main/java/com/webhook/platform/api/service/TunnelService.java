@@ -47,7 +47,7 @@ public class TunnelService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
-    /** A slug goes in a URL and is read aloud, so: lower case, no punctuation. */
+    // Goes in a URL and is read aloud, so lower case and no punctuation.
     private static final String SLUG_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
     private static final int SLUG_LENGTH = 12;
 
@@ -56,8 +56,6 @@ public class TunnelService {
                                        int localPort, String clientInfo) {
         UUID organizationId = TenantContext.require();
         if (projectId != null) {
-            // @TenantId confines this to the caller's organization; a project outside it is
-            // simply not found here.
             projectRepository.findById(projectId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                             "Project not found"));
@@ -85,16 +83,7 @@ public class TunnelService {
         return session;
     }
 
-    /**
-     * The active-tunnel limit, checked where the insert happens and under the Organization's row
-     * lock.
-     *
-     * <p>The check used to run only in {@code @RequireQuota}, before this transaction began: a
-     * count with nothing held between it and the insert, so two CLIs opening at once both counted
-     * zero and both got a tunnel on a plan that allows one. Holding the lock, the second open
-     * waits for the first to commit and then counts it. The early check stays where it was — it
-     * still refuses the ordinary case without opening a transaction.
-     */
+    // Under the organization lock, or two concurrent opens both pass a one-tunnel limit.
     private void enforceActiveTunnelLimit(UUID organizationId) {
         if (!entitlementService.isBillingEnabled()) {
             return;
@@ -110,20 +99,12 @@ public class TunnelService {
 
     @Transactional
     public void closeSession(UUID sessionId) {
-        // findById is already confined to the caller's organization by @TenantId, so the
-        // previous findByIdAndOrganizationId asked the same question twice.
         TunnelSession session = tunnelSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel session not found"));
         close(session);
     }
 
-    /**
-     * Closes every tunnel a user holds in the current organization, for a member whose access to
-     * it has just been withdrawn. Revoking their sessions does not reach a tunnel: the CLI
-     * authenticated once with the tunnel token and presents nothing else, so the slug would go on
-     * forwarding to their machine. {@code @TenantId} confines the lookup to this organization — a
-     * tunnel the same person opened elsewhere is not this organization's to close.
-     */
+    // Revoking sessions does not reach a tunnel: the CLI only presents the tunnel token.
     @Transactional
     public void closeSessionsOfUser(UUID userId) {
         TenantContext.require();
@@ -134,12 +115,7 @@ public class TunnelService {
         tunnelSessionRepository.findByUserIdAndStatus(userId, TunnelStatus.ACTIVE).forEach(this::close);
     }
 
-    /**
-     * Closes every tunnel in the current organization, for an organization about to be deleted.
-     * {@code tunnel_sessions} has no foreign key to organizations, so the delete leaves the rows
-     * ACTIVE and the sockets connected, and the ingress — which finds no suspension on a missing
-     * organization — goes on forwarding.
-     */
+    // tunnel_sessions has no foreign key to organizations, so deleting one leaves its tunnels forwarding.
     @Transactional
     public void closeAllSessions() {
         TenantContext.require();
@@ -149,10 +125,6 @@ public class TunnelService {
         tunnelSessionRepository.findByStatus(TunnelStatus.ACTIVE).forEach(this::close);
     }
 
-    /**
-     * {@link #closeAllSessions()} for an organization that is not the caller's scope: one an
-     * erasure deletes because the person being erased was its only member.
-     */
     @SystemTenant("an erasure deletes organizations other than the request's own, read off membership rows")
     @Transactional
     public void closeSessionsOfOrganization(UUID organizationId) {
@@ -160,23 +132,13 @@ public class TunnelService {
                 .forEach(this::close);
     }
 
-    /**
-     * Closes a person's tunnels in every organization, for an erased account. Unlike
-     * {@link #closeSessionsOfUser}, which withdraws access to one organization, nothing of the
-     * person is left anywhere to keep a tunnel open for.
-     */
     @SystemTenant("an erased person's tunnels are in every organization they belonged to")
     @Transactional
     public void closeAllSessionsOfUserEverywhere(UUID userId) {
         tunnelSessionRepository.findByUserIdAndStatus(userId, TunnelStatus.ACTIVE).forEach(this::close);
     }
 
-    /**
-     * Marks the session CLOSED and, once that is committed, ends its tunnel on whichever instance
-     * holds the socket. Marking the row alone left the CLI connected and the slug forwarding — a
-     * tunnel outside the plan's active-tunnel count and outside bandwidth metering. The disconnect
-     * waits for the commit because a CLI reconnecting in between would still read ACTIVE.
-     */
+    // Disconnects after commit: a CLI reconnecting before it would still read ACTIVE.
     private void close(TunnelSession session) {
         session.setStatus(TunnelStatus.CLOSED);
         session.setClosedAt(Instant.now());
@@ -284,13 +246,7 @@ public class TunnelService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    /**
-     * A slug is drawn character by character from the alphabet it is allowed to use.
-     *
-     * <p>It used to be base64 with {@code -} and {@code _} stripped out and the rest cut to
-     * twelve, which throws whenever the encoding happens to contain five of them — a tunnel that
-     * refused to open for a reason nobody could act on.
-     */
+    // Drawn per character: trimmed base64 threw when it held too many - and _.
     static String slug(Random random) {
         StringBuilder slug = new StringBuilder("tun-");
         for (int i = 0; i < SLUG_LENGTH; i++) {

@@ -23,18 +23,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * How much mail one account can cause to be sent to addresses it has not proved it owns.
- *
- * <p>Verification and email-change mail go to an address the requester typed. Without a cap, an
- * account is a way to send a stranger's inbox as many "confirm your email" messages as a script
- * cares to, from the deployment's own reputation. So an account gets {@value #MAX_SENDS_PER_DAY}
- * such mails a day across registration, resend and change, and {@value #MAX_CHANGES_PER_DAY}
- * address changes — counted in Postgres, because a day-long allowance that a Redis restart resets
- * is not a cap.
- *
- * <p>Also the one place these flows write to the audit log, so each entry lands in every
- * organization the person belongs to — which is where an owner looks — and so a refusal is
- * recorded even though the request that hit it rolls back.
+ * Caps mail to unproven addresses so an account cannot flood a stranger's inbox. In Postgres,
+ * because a daily cap that a Redis restart resets is not a cap.
  */
 @Service
 @Slf4j
@@ -43,7 +33,6 @@ public class VerificationMailBudget {
     static final int MAX_SENDS_PER_DAY = 5;
     static final int MAX_CHANGES_PER_DAY = 3;
     private static final Duration WINDOW = Duration.ofHours(24);
-    /** Settled rows are kept a while past the window, then swept on the next write. */
     private static final Duration RETENTION = Duration.ofDays(7);
 
     private final VerificationEmailSendRepository sendRepository;
@@ -87,7 +76,6 @@ public class VerificationMailBudget {
         sendRepository.save(VerificationEmailSend.builder().userId(userId).reason(reason).build());
     }
 
-    /** A per-address or per-IP limiter said no before any of the above was asked. */
     @SystemTenant("audits against every organization the person belongs to")
     public void recordRateLimited(UUID userId, String limit) {
         audit(userId, AuditAction.EMAIL_RATE_LIMITED, "FAILURE", "Rate limit: " + limit, Map.of("limit", limit));

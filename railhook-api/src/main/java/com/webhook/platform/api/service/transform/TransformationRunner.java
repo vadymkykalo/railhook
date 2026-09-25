@@ -15,15 +15,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Applies a transformation of either language, so that nothing in the api has to know which one
- * it is holding.
- *
- * <p>Both read paths that show a person what a transformation does — the Transform Studio's
- * preview and the delivery dry-run — go through here, and the JavaScript half is
- * {@link JavaScriptTransformEngine}, the same instance the worker runs a real Delivery through.
- * That is the point: a preview that disagreed with the delivery would be worse than no preview.
- */
+/** Same engine as the worker, so a preview cannot disagree with a real delivery. */
 @Component
 @RequiredArgsConstructor
 public class TransformationRunner {
@@ -32,7 +24,6 @@ public class TransformationRunner {
     private final JavaScriptTransformEngine scriptEngine;
     private final ObjectMapper objectMapper;
 
-    /** What either language produced, in the shape the JavaScript one needs. */
     @Builder
     public record Result(
             JsonNode payload,
@@ -44,15 +35,7 @@ public class TransformationRunner {
             long durationMs) {
     }
 
-    /**
-     * @param source the template or the script, already resolved from wherever it was stored
-     * @param context the Event and delivery context a script sees; ignored by a template, which
-     *                has no way to reach anything but the payload
-     * @throws ScriptTransformException when a script fails, for any reason. A template is
-     *                                  deliberately more forgiving — a path that matches nothing
-     *                                  is a missing optional field, not an error — so it throws
-     *                                  only when the template is not JSON.
-     */
+    // A template throws only when it is not JSON; an unmatched path is a missing optional field.
     public Result run(TransformationKind kind, String source, TransformRequest context) {
         if (kind == TransformationKind.JAVASCRIPT) {
             TransformOutcome outcome = scriptEngine.run(source, context);

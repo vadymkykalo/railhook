@@ -14,10 +14,7 @@ import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Slack node — sends a message to a Slack webhook URL.
- * Supports {{field.path}} placeholders in the message text.
- */
+/** Supports {{field.path}} placeholders in the message text. */
 @Component
 @Slf4j
 public class SlackNodeExecutor implements NodeExecutor {
@@ -52,7 +49,6 @@ public class SlackNodeExecutor implements NodeExecutor {
             String messageTemplate = nodeConfig.has("message") ? nodeConfig.get("message").asText() : null;
             String channel = nodeConfig.has("channel") ? nodeConfig.get("channel").asText() : null;
 
-            // Build message text
             String text;
             if (messageTemplate != null && !messageTemplate.isBlank()) {
                 text = resolvePlaceholders(messageTemplate, input);
@@ -60,7 +56,6 @@ public class SlackNodeExecutor implements NodeExecutor {
                 text = input != null ? input.toString() : "Workflow notification";
             }
 
-            // Build Slack payload
             ObjectNode payload = objectMapper.createObjectNode();
             payload.put("text", text);
             if (channel != null && !channel.isBlank()) {

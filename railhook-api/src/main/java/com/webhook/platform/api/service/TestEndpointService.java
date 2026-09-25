@@ -62,11 +62,7 @@ public class TestEndpointService {
     private static final int SLUG_LENGTH = 8;
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    /**
-     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
-     * lookup only sees projects inside the caller's organization: a foreign project id is
-     * indistinguishable from a missing one, which is intended.
-     */
+    /** {@code Project} has {@code @TenantId}, so a foreign project id reads as missing. That is intended. */
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
@@ -138,20 +134,10 @@ public class TestEndpointService {
         log.info("Deleted test endpoint {}", id);
     }
 
-    /**
-     * Deliberately not {@code @Transactional}, with the transaction started inside the tenant
-     * scope instead.
-     *
-     * <p>Hibernate reads the tenant when it opens a session, so a scope entered <em>inside</em> a
-     * transaction arrives too late: the session is already bound to whatever scope was in effect
-     * when the transaction began, and the CapturedRequest row is stamped with that instead of the
-     * endpoint's organization. Entering the scope first and opening the transaction within it is
-     * the order that works — the same shape {@code IngressService} uses on the other public path.
-     */
+    // Not @Transactional: Hibernate binds the tenant when the session opens.
     public CapturedRequestResponse captureRequest(String slug, String body, HttpServletRequest request) {
-        // Public path: the slug is the only identity a capture carries. Resolve the endpoint
-        // without a tenant, then confine the capture itself to the organization that owns it so
-        // the CapturedRequest row lands in the right tenant.
+        // Public path: the slug is the only identity. Resolve the endpoint without a tenant, then
+        // capture inside the owning organization.
         TestEndpoint endpoint = TenantContext.callAsSystem(() -> testEndpointRepository.findBySlug(slug))
                 .orElseThrow(() -> new NotFoundException("Test endpoint not found"));
 
@@ -161,8 +147,8 @@ public class TestEndpointService {
         if (!TenantContext.callAsSystem(() -> projectRepository.existsById(endpoint.getProjectId()))) {
             throw new NotFoundException("Test endpoint not found");
         }
-        // Public, so the interceptor that refuses a suspended organization's writes never runs
-        // here; and the caller is whoever holds the URL, so the reason stays with the customer.
+        // Public, so the suspension interceptor never runs here. The caller only holds a URL, so
+        // the reason is not disclosed.
         if (suspensionCheck.suspensionReason(endpoint.getOrganizationId()).isPresent()) {
             throw new ForbiddenException("This test endpoint is not accepting requests.");
         }
@@ -173,10 +159,7 @@ public class TestEndpointService {
     }
 
     private CapturedRequestResponse captureWithinTenant(TestEndpoint endpoint, String body, HttpServletRequest request) {
-        // The same masking the ingress capture applies, rather than a second copy of the loop
-        // without it. This one stored Authorization and Cookie verbatim and then rendered them
-        // in the dashboard; masking at the write, because the dashboard is not the only reader
-        // of these rows.
+        // Masked at write time: the dashboard is not the only reader of these rows.
         String headers = HeaderSanitizer.toJson(request, HEADER_JSON);
 
         CapturedRequest captured = CapturedRequest.builder()

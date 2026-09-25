@@ -35,7 +35,6 @@ public class ProjectService {
         this.apiKeyRepository = apiKeyRepository;
     }
 
-    /** What a brand-new organization's first project is called until its owner renames it. */
     public static final String FIRST_PROJECT_NAME = "My first project";
 
     @Auditable(action = AuditAction.CREATE, resourceType = "Project")
@@ -44,16 +43,7 @@ public class ProjectService {
         return ProjectResponse.of(save(TenantContext.require(), request.getName(), request.getDescription()));
     }
 
-    /**
-     * The project a new organization starts with, created while its account is registered.
-     *
-     * <p>Every section of the dashboard is scoped to a project, so an organization with none opens
-     * onto a sidebar where nothing leads anywhere until its owner has worked out that a project is
-     * the thing to make first. Registration runs before any tenant scope exists, so the
-     * organization is the row just created rather than the caller's; the project is built by the
-     * same {@link #save} the Projects page uses, and counts toward the plan's project quota like any
-     * other.
-     */
+    // Registration runs before any tenant scope exists, so the organization is passed in.
     @Transactional
     public ProjectResponse createFirstProject(Organization organization) {
         return ProjectResponse.of(save(organization.getId(), FIRST_PROJECT_NAME, null));
@@ -65,8 +55,7 @@ public class ProjectService {
                 .organizationId(owningOrganization)
                 .description(description)
                 .build());
-        // Every project starts masking email, phone and card numbers in the dashboard, as the docs
-        // promise; a project with no rules showed customer addresses in full.
+        // A project with no masking rules showed customer addresses in full.
         piiMaskingService.seedDefaultRules(project.getId());
         return project;
     }
@@ -128,9 +117,7 @@ public class ProjectService {
         project.setDeletedAt(now);
         projectRepository.save(project);
 
-        // A deleted project already authenticates nothing. Revoking its keys as well means that
-        // stays true for anything that reads a key without going through the project, and that
-        // the key list says so.
+        // For anything that reads a key without going through the deleted project.
         apiKeyRepository.findByProjectIdAndRevokedAtIsNull(id).forEach(key -> key.setRevokedAt(now));
     }
 

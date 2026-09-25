@@ -21,28 +21,14 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Keeps the declaratively-partitioned high-volume tables ({@code delivery_attempts},
- * {@code tunnel_request_log} — see V052/V053 migrations) supplied with future
- * partitions and drops partitions once every row they can possibly contain is past
- * its retention window.
- * <p>
- * This is what replaces DELETE-based retention for these two tables:
- * {@code DROP TABLE <partition>} is O(1) — it unlinks the partition's files — instead
- * of the O(rows) scan-and-delete the old {@code DataRetentionService} jobs did.
- * <p>
- * {@code deliveries} and {@code incoming_events} are intentionally NOT partitioned by
- * this service (or the migrations it depends on) — both are the target of a foreign
- * key from another high-volume table ({@code delivery_attempts.delivery_id},
- * {@code incoming_forward_attempts.incoming_event_id}), and Postgres requires a
- * partitioned table's unique/PK indexes to include the partition key, which would
- * force the partition key onto the child tables too (composite FK) and touch both
- * JPA entity copies.
+ * Drops whole partitions, O(1) where DELETE is O(rows). deliveries and incoming_events are not
+ * partitioned because Postgres would force the partition key into their foreign keys.
  */
 @Slf4j
 @Service
 public class PartitionMaintenanceService {
 
-    /** Table name is validated against this before ever being spliced into DDL text. */
+    // Identifiers are spliced into DDL text, so they must match this first.
     private static final java.util.regex.Pattern SAFE_IDENTIFIER =
             java.util.regex.Pattern.compile("^[a-z][a-z0-9_]*$");
 
@@ -130,7 +116,6 @@ public class PartitionMaintenanceService {
         refreshDefaultPartitionGauges();
     }
 
-    /** Creates monthly partitions for the current month through +lookaheadMonths, idempotently. */
     public void ensureFutureMonthlyPartitions(String table, int lookaheadMonths) {
         requireSafeIdentifier(table);
         LocalDate monthStart = LocalDate.now(ZoneOffset.UTC).withDayOfMonth(1);
@@ -142,7 +127,7 @@ public class PartitionMaintenanceService {
         }
     }
 
-    /** Creates weekly (ISO, Monday-start — matches Postgres date_trunc('week', ...)) partitions. */
+    // ISO weeks starting Monday, matching Postgres date_trunc('week', ...).
     public void ensureFutureWeeklyPartitions(String table, int lookaheadWeeks) {
         requireSafeIdentifier(table);
         LocalDate weekStart = LocalDate.now(ZoneOffset.UTC).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
@@ -171,16 +156,7 @@ public class PartitionMaintenanceService {
         jdbcTemplate.execute(sql);
     }
 
-    /**
-     * Drops every partition of {@code table} (found via pg_catalog, never by naming
-     * convention alone) whose entire range is older than {@code retentionDays}. The
-     * DEFAULT partition and any partition whose bound this can't confidently parse are
-     * always skipped — silence is the safe failure mode for a destructive operation.
-     * The upper-bound comparison is done in SQL (casting the extracted bound text to
-     * timestamptz) rather than parsed in Java, since the two partitioned tables here
-     * mix TIMESTAMP and TIMESTAMPTZ columns and Postgres already knows how to compare
-     * both correctly.
-     */
+    // The bound is compared in SQL because the tables mix TIMESTAMP and TIMESTAMPTZ.
     public int dropExpiredPartitions(String table, int retentionDays) {
         requireSafeIdentifier(table);
         List<String> expired = jdbcTemplate.queryForList(
@@ -199,8 +175,6 @@ public class PartitionMaintenanceService {
         for (String partition : expired) {
             requireSafeIdentifier(partition);
             if (!partition.startsWith(table + "_")) {
-                // Defense in depth: never drop something pg_catalog says is a child of
-                // this table but whose name doesn't match our own naming convention.
                 log.warn("Skipping partition {} of {} — name doesn't match the expected {}_ prefix", partition, table, table);
                 continue;
             }

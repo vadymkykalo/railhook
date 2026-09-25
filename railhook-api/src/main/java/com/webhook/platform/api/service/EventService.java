@@ -94,10 +94,6 @@ public class EventService {
         return withDeliveryCounts(mapToResponse(event), deliveryCountsOf(List.of(eventId)));
     }
 
-    /**
-     * One grouped query for however many Events, keyed by event id. The ids come from a
-     * project-scoped read, so the Deliveries counted are that project's.
-     */
     private Map<UUID, DeliveryStatusCounts> deliveryCountsOf(List<UUID> eventIds) {
         Map<UUID, DeliveryStatusCounts> byEvent = new HashMap<>();
         if (eventIds.isEmpty()) {
@@ -138,9 +134,7 @@ public class EventService {
         event = eventRepository.saveAndFlush(event);
         log.info("Created test event: {} for project: {}", event.getId(), projectId);
 
-        // The same decision a real ingest of this Event gets — pattern Subscriptions, rules,
-        // fan-out limit — or the test answers a question nobody asked. It used to match the type
-        // exactly and skip the rules, so an order.* Subscription looked broken from here.
+        // The real ingest decision; exact type matching made an order.* Subscription look broken.
         EventIntake.Decision decision = eventIntake.decide(event);
         if (decision.dropped()) {
             log.info("Rule DROP action — no deliveries for test event {}", event.getId());
@@ -168,8 +162,6 @@ public class EventService {
 
     private EventResponse testEventResponse(Event event, int deliveriesCreated, List<String> schemaWarnings) {
         EventResponse response = mapToResponseWithDeliveries(event, deliveriesCreated);
-        // A test event is somebody checking their payload, so this is where a WARN policy's
-        // findings are worth the most: they arrive with the thing they are about.
         response.setSchemaWarnings(schemaWarnings.isEmpty() ? null : schemaWarnings);
         return response;
     }

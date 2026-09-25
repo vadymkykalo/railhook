@@ -12,13 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
-/**
- * Periodic job to recover stuck workflow executions.
- * If a workflow execution stays in RUNNING status for longer than the configured threshold,
- * it is assumed to be stuck (server crash, OOM, thread killed) and is marked FAILED.
- *
- * Uses ShedLock so only one node in the cluster runs it.
- */
+// Fails executions stuck in RUNNING past the threshold, such as after a crash. WAITING is not swept.
 @Component
 @Slf4j
 public class WorkflowExecutionRecoveryJob {

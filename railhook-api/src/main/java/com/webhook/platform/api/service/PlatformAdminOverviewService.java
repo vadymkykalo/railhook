@@ -31,23 +31,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * The deployment at a glance: how many tenants and people, how fast they arrive, how much traffic
- * moves, and who is about to hit a limit.
- *
- * <p>Every figure is a count across all organizations, which is why the whole method runs in the
- * system scope. None of it names a customer except the recent sign-ups, and those only by the
- * address they registered with.
- *
- * <p>The public demo is not a tenant anybody signed up as, and its history is regenerated every
- * hour: counted, it would be the busiest organization on a quiet deployment. Every figure leaves
- * {@link DemoTenant} out.
- */
+/** Excludes the demo tenant, whose hourly regenerated history would dominate the counts. */
 @Service
 @RequiredArgsConstructor
 public class PlatformAdminOverviewService {
 
-    /** "Near quota" starts here — the same point the tenant's own usage bar turns to a warning. */
+    // Same point where the tenant's own usage bar turns to a warning.
     static final double NEAR_QUOTA = 0.8;
 
     private static final int RECENT_SIGNUPS = 10;
@@ -93,10 +82,7 @@ public class PlatformAdminOverviewService {
                 .build();
     }
 
-    /**
-     * The last 30 days including today, with zeroes for the days nothing happened, so a chart of
-     * it has no gaps to interpolate across.
-     */
+    // Zero-filled so the chart has no gaps.
     private List<PlatformOverviewResponse.Day> daily(LocalDate today) {
         LocalDate first = today.minusDays(DAILY_DAYS - 1);
         Instant since = first.atStartOfDay(ZoneOffset.UTC).toInstant();

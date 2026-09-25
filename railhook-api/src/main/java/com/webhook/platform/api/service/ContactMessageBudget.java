@@ -13,15 +13,7 @@ import java.time.LocalDate;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * How many messages the public contact form may send today, across every sender.
- *
- * <p>The per-address limit stops one sender; it does not stop a thousand addresses. Every message
- * spends the same mail-provider quota that verification and password-reset mails need, so the form
- * gets a daily ceiling of its own and refuses past it until the next UTC day. The count lives in
- * Redis so every API instance shares it; with Redis down each instance keeps its own, which still
- * bounds the total by the ceiling times the instance count.
- */
+/** A daily ceiling across all senders: the form spends the mail quota verification mails need. */
 @Service
 @Slf4j
 public class ContactMessageBudget {
@@ -46,7 +38,6 @@ public class ContactMessageBudget {
         this.clock = clock;
     }
 
-    /** Takes one message from today's budget; false once it is spent. */
     public boolean tryAcquire() {
         LocalDate today = LocalDate.now(clock);
         long used;

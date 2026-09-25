@@ -8,11 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Base64;
 
-/**
- * Shopify webhook signature verifier.
- * Shopify sends: X-Shopify-Hmac-SHA256: <base64-hmac-sha256>
- * Note: Shopify uses Base64-encoded HMAC (not hex).
- */
+/** Shopify's HMAC is base64, not hex. */
 public class ShopifyVerifier implements WebhookVerificationStrategy {
 
     private static final String HEADER = "X-Shopify-Hmac-SHA256";

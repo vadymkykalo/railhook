@@ -40,26 +40,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * What an operator can see and do about a tenant, without a database client.
- *
- * <p>Everything under {@code /api/v1/admin/**} used to be one endpoint that rotates encryption
- * keys. An operator handling an abuse report, a support request, or a customer asking why their
- * deliveries stopped had psql and the logs — which is not a tool anyone should have to reach for
- * while a tenant is waiting, and is a poor place to make a decision that affects a paying
- * customer.
- *
- * <p>Every method here runs across organizations rather than inside one, which is the definition
- * of the platform admin: it belongs to whoever runs the deployment, and to no tenant. That is also
- * why none of it can be reached by a tenant role however privileged — SecurityConfig requires
- * {@code PLATFORM_ADMIN}, which only the operator token and a listed, verified, recent sign-in
- * carry.
- *
- * <p>The detail methods that read inside one organization — members, projects, audit log, usage —
- * enter that organization's scope with {@link TenantContext#callAs} and let {@code @TenantId}
- * confine the query, rather than filtering by the id by hand. They are not {@code @Transactional}
- * for the reason {@link #getUsage} gives.
- */
+/** Per-tenant reads enter the tenant's scope with {@link TenantContext#callAs}; see {@link #getUsage}. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -95,17 +76,7 @@ public class PlatformAdminService {
         return toResponse(requireOrganization(organizationId));
     }
 
-    /**
-     * Stops an organization changing anything, until an operator says otherwise.
-     *
-     * <p>Idempotent on purpose: suspending an already-suspended organization refreshes the
-     * reason rather than failing, because the operator doing it is usually reacting to a second
-     * report and the useful outcome is the newer reason, not an error.
-     *
-     * <p>Deliberately does not touch {@code billingStatus}. That column belongs to the payment
-     * state machine, and a suspension recorded there would be lifted by the next successful
-     * charge — which is precisely the wrong behaviour for an abuse control.
-     */
+    // Not recorded in billingStatus, which the next successful charge would clear.
     @SystemTenant("suspension is an operator action on a tenant, taken from outside it")
     @Transactional
     public AdminOrganizationResponse suspend(UUID organizationId, String reason, String suspendedBy) {
@@ -118,8 +89,7 @@ public class PlatformAdminService {
         organization.setSuspendedBy(suspendedBy);
         organizationRepository.save(organization);
 
-        // Before returning, so the operator's next request sees the state they just set rather
-        // than the TTL's idea of it.
+        // Evict before returning so the operator's next request sees the new state, not a cached one.
         suspensionLookup.evict(organizationId);
 
         log.warn("Organization {} suspended by operator ({}): {}",
@@ -144,28 +114,14 @@ public class PlatformAdminService {
         return toResponse(organization);
     }
 
-    /**
-     * What one tenant has used against the plan they are on.
-     *
-     * <p>"Are they near their limit" is the question behind most support tickets that reach an
-     * operator, and the back-office could not answer it: the list carried a plan name and two
-     * row counts, and everything else meant a psql session against the customer's tables.
-     *
-     * <p>Answered by entering the subject's tenant scope and asking the same service the tenant's
-     * own billing page asks, rather than by a second set of queries taking an organization id.
-     * A parallel implementation is how the operator's numbers and the customer's numbers come to
-     * disagree, which is the one thing a support conversation cannot survive.
-     *
-     * <p>Not {@code @Transactional}: the scope is entered around the call, so it must be entered
-     * before any transaction opens rather than switched underneath one that is already running.
-     */
+    // Same service as the tenant's billing page, so the numbers agree. Not @Transactional: the
+    // scope must be entered before a transaction opens.
     @SystemTenant("the operator asking about a tenant's usage is not a member of it")
     public UsageResponse getUsage(UUID organizationId) {
         requireExists(organizationId);
         return TenantContext.callAs(organizationId, billingOverviewService::usage);
     }
 
-    /** Who is in the organization, in what role, and how each of them signs in. */
     @SystemTenant("the operator reading a tenant's members is not one of them")
     public Page<AdminMemberResponse> listMembers(UUID organizationId, Pageable pageable) {
         requireExists(organizationId);
@@ -194,7 +150,6 @@ public class PlatformAdminService {
         });
     }
 
-    /** The organization's live projects — names only, nothing they contain. */
     @SystemTenant("the operator listing a tenant's projects is not a member of it")
     public Page<AdminProjectResponse> listProjects(UUID organizationId, Pageable pageable) {
         requireExists(organizationId);
@@ -206,10 +161,6 @@ public class PlatformAdminService {
                         .build());
     }
 
-    /**
-     * The organization's own audit log, without the request bodies — see
-     * {@link AdminAuditEntryResponse} for why those stay out.
-     */
     @SystemTenant("the operator reading a tenant's audit log is not a member of it")
     public Page<AdminAuditEntryResponse> listAuditLog(UUID organizationId, Pageable pageable) {
         requireExists(organizationId);
@@ -243,7 +194,6 @@ public class PlatformAdminService {
         }
     }
 
-    /** The earliest active OWNER of each organization, by address. */
     private Map<UUID, String> ownerEmails(Collection<UUID> organizationIds) {
         Map<UUID, String> owners = new HashMap<>();
         if (organizationIds.isEmpty()) {
@@ -256,7 +206,6 @@ public class PlatformAdminService {
         return owners;
     }
 
-    /** Events in the current billing period — the figure the tenant's own usage page shows. */
     private Map<UUID, Long> eventsThisMonth(Collection<UUID> organizationIds) {
         if (organizationIds.isEmpty()) {
             return Map.of();

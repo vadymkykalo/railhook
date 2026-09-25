@@ -32,22 +32,13 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/**
- * Browse, retry and purge for Forwards the Incoming Retry Ladder gave up on — the counterpart of
- * {@link DlqService}, which only ever knew about Deliveries.
- *
- * <p>{@code DlqMonitoringService} has published {@code incoming_forward_dlq_depth} as a backlog
- * "awaiting manual retry or purge" for as long as it has existed, and until this there was
- * neither. The only recovery was {@code IncomingEventService.replayEvent}, which fans an Incoming
- * Event out to <em>every</em> enabled Destination — so recovering one failed Forward re-sent the
- * webhook to all the Destinations that had already received it.
- */
+/** The DLQ for Forwards. A replay would re-send to every Destination, not just the failed one. */
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class IncomingDlqService {
 
-    /** Deliberately not "all of them in one statement" — see deleteDlqBatchByProjectId. */
+    // One unbounded DELETE would hold row locks on the whole backlog for the length of the statement.
     private static final int PURGE_BATCH_SIZE = 500;
 
     private final IncomingForwardAttemptRepository attemptRepository;
@@ -58,11 +49,6 @@ public class IncomingDlqService {
     private final ProjectRepository projectRepository;
     private final ForwardDispatch forwardDispatch;
 
-    /**
-     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
-     * lookup only sees projects inside the caller's organization: a foreign project id is
-     * indistinguishable from a missing one, which is intended.
-     */
     public void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
@@ -74,8 +60,6 @@ public class IncomingDlqService {
                 ? attemptRepository.findDlqByProjectIdAndDestinationId(projectId, destinationId, pageable)
                 : attemptRepository.findDlqByProjectId(projectId, pageable);
 
-        // Batch-loaded for the whole page: the destination URL and the source name are one query
-        // each rather than two per row.
         Map<UUID, IncomingDestination> destinations = byId(
                 destinationRepository.findAllById(distinct(attempts, IncomingForwardAttempt::getDestinationId)),
                 IncomingDestination::getId);
@@ -124,25 +108,8 @@ public class IncomingDlqService {
                 .build();
     }
 
-    /**
-     * Re-forwards each abandoned Forward to the Destination that failed, and to nothing else.
-     *
-     * <p>Two things differ from {@link DlqService#retryDeliveries}, both because Incoming records
-     * one row per Attempt rather than mutating one row per obligation:
-     *
-     * <p>The Outgoing retry raises {@code maxAttempts} instead of resetting {@code attemptCount},
-     * so the Attempt history stays a single ascending sequence and the new Attempt cannot collide
-     * in number with one already on the record. Incoming has nowhere to raise: its Ladder length
-     * lives on the Destination, so continuing at N+1 would be exhausted the moment it was claimed
-     * and go straight back to DLQ. It gets a new Replay session instead — a fresh Ladder starting
-     * at attempt 1 inside its own numbering, which honours the same rule the Outgoing comment is
-     * about: no new Attempt ever reuses a number the record already contains.
-     *
-     * <p>And the abandoned Attempt is moved out of DLQ rather than reused. Its own record —
-     * response, error, timings — is left intact; only its status changes, because DLQ means
-     * "abandoned, awaiting a human decision" and a human has now made one. Leaving it would keep
-     * it in the backlog and in {@code incoming_forward_dlq_depth} forever.
-     */
+    // The Ladder length lives on the Destination, so each retry starts a new Replay session at
+    // attempt 1 instead of raising maxAttempts; the abandoned Attempt leaves the DLQ as FAILED.
     @Transactional
     @Auditable(action = AuditAction.DLQ_RETRY, resourceType = "IncomingForward")
     public int retryForwards(UUID projectId, List<UUID> forwardAttemptIds) {
@@ -162,10 +129,7 @@ public class IncomingDlqService {
                 continue;
             }
 
-            // A session per Forward, not per call: a Ladder that has been exhausted twice leaves
-            // two DLQ rows for the same (Incoming Event, Destination), and one session for the
-            // batch would make the two successors collide on the partial unique index and roll
-            // the whole retry back.
+            // Per Forward: two rows for one event and Destination would collide on the unique index.
             UUID replaySessionId = UUID.randomUUID();
 
             attemptRepository.save(IncomingForwardAttempt.builder()
@@ -196,8 +160,6 @@ public class IncomingDlqService {
     public int purgeAllDlq(UUID projectId) {
         validateProjectOwnership(projectId);
 
-        // Batched for the same reason the Outgoing purge is: one unbounded DELETE over a large
-        // backlog holds row locks across every matching Attempt for the length of the statement.
         long total = 0;
         int deleted;
         do {

@@ -22,28 +22,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Turns off a target that has answered nothing but failures for a whole window.
- *
- * <p>The gap this closes: a dead receiver used to burn its retry budget forever. Every new
- * Event started a fresh Ladder, each Ladder ran its seven attempts over days, the circuit
- * breaker deferred a few of them and then forgot, and nothing anywhere said "this endpoint has
- * been dead since Tuesday". The operator saw thousands of Failed Messages and no cause.
- *
- * <p>The decision needs two things the worker cannot reach — the alert and the mail — so the
- * work is split: the worker keeps the run of failures on the target's row at the shared attempt
- * seam, and this reads it. The split also means the hot path costs one UPDATE on a failure and
- * nothing at all on a success, rather than a query over {@code deliveries} per endpoint.
- *
- * <p>Both directions, because the shape fits both exactly: an Endpoint and a Destination each
- * have an {@code enabled} flag the store already honours, and each has the same four columns.
- *
- * <h2>What happens to work already queued</h2>
- *
- * Deliveries and Forwards already made out to the target do not vanish and do not silently
- * fail. The stores hand them to the <strong>DLQ</strong> — Failed Messages — rather than to
- * FAILED, precisely because this is Railhook's decision and not the owner's: once the receiver
- * is fixed and the target re-enabled, they are all there to retry. A target its owner turned
- * off keeps the old behaviour and fails them, which is what "I meant to stop this" means.
+ * Turns off a target that has only failed for a whole window. Its queued work goes to the DLQ,
+ * not FAILED, so it can be retried once the receiver is fixed.
  */
 @Service
 @Slf4j
@@ -69,10 +49,7 @@ public class EndpointAutoDisableService {
             @Value("${endpoint.auto-disable.after-hours:72}") long afterHours,
             @Value("${endpoint.auto-disable.min-failures:10}") int minFailures,
             @Value("${endpoint.auto-disable.batch-size:200}") int batchSize) {
-        // Refused rather than clamped. A window of zero would disable every target that has a
-        // single outstanding failure the moment the sweep runs, and a minimum of zero would do
-        // it on the first one — both are what a typo in an env var looks like, and neither is
-        // something an operator could have meant.
+        // Refused rather than clamped: a zero here would disable targets on their first failure.
         if (enabled && afterHours < 1) {
             throw new IllegalArgumentException(
                     "endpoint.auto-disable.after-hours is " + afterHours
@@ -98,10 +75,6 @@ public class EndpointAutoDisableService {
         }
     }
 
-    /**
-     * Runs every few minutes, which is as often as it needs to: the window is measured in days,
-     * so the sweep's own cadence adds nothing anybody would notice.
-     */
     @SystemTenant("endpoints and destinations of every organization; each is notified inside its own")
     @Scheduled(fixedDelayString = "${endpoint.auto-disable.interval-ms:300000}")
     @SchedulerLock(name = "endpoint_auto_disable", lockAtMostFor = "PT5M", lockAtLeastFor = "PT30S")
@@ -117,7 +90,6 @@ public class EndpointAutoDisableService {
     private void disableEndpoints(Instant cutoff) {
         List<Endpoint> candidates = endpointRepository.findAutoDisableCandidates(cutoff, minFailures, batch);
         for (Endpoint endpoint : candidates) {
-            // Already auto-disabled, from a row the query read before another pass turned it off.
             if (endpoint.getAutoDisabledAt() != null) {
                 continue;
             }
@@ -127,21 +99,17 @@ public class EndpointAutoDisableService {
             try {
                 applied = endpointRepository.autoDisable(endpoint.getId(), at, reason);
             } catch (Exception e) {
-                // One row another transaction holds must not cost the rest of the sweep.
                 log.warn("Endpoint {} could not be auto-disabled: {}", endpoint.getId(), e.toString());
                 continue;
             }
             if (applied == 0) {
-                // Turned back on, or turned off, between the query and here. Either way it is
-                // not this sweep's to announce.
                 log.debug("Endpoint {} changed under the sweep; not disabling it", endpoint.getId());
                 continue;
             }
             log.warn("Endpoint {} ({}) auto-disabled: failing since {}, {} consecutive failures",
                     endpoint.getId(), endpoint.getUrl(), endpoint.getFailingSince(),
                     endpoint.getConsecutiveFailures());
-            // The row is written; these make the in-memory copy say the same thing, because it
-            // is what the notification is composed from.
+            // The notification is composed from the in-memory copy.
             endpoint.setEnabled(false);
             endpoint.setAutoDisabledAt(at);
             endpoint.setAutoDisabledReason(reason);
@@ -176,7 +144,6 @@ public class EndpointAutoDisableService {
             destination.setEnabled(false);
             destination.setAutoDisabledAt(at);
             destination.setAutoDisabledReason(reason);
-            // An alert hangs off a Project, and a Destination reaches one only through its Source.
             UUID projectId = sourceRepository.findById(destination.getIncomingSourceId())
                     .map(IncomingSource::getProjectId)
                     .orElse(null);
@@ -190,11 +157,7 @@ public class EndpointAutoDisableService {
         }
     }
 
-    /**
-     * Telling the owner is not part of the decision. The target is dead whether or not the mail
-     * server is; a throw here used to be the kind of thing that leaves a half-applied sweep, and
-     * the row is already committed by the time this runs.
-     */
+    // The row is already committed; a mail failure must not abort the rest of the sweep.
     private void announce(Runnable announcement, String what, UUID id) {
         try {
             announcement.run();

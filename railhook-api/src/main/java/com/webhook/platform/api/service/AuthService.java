@@ -79,9 +79,6 @@ public class AuthService {
         this.membershipRepository = membershipRepository;
         this.planRepository = planRepository;
         this.jwtUtil = jwtUtil;
-        // Injected rather than constructed, so the BCrypt work factor is one configured number
-        // for the whole application instead of the library's 2010 default in two places --
-        // see PasswordEncoderConfig.
         this.passwordEncoder = passwordEncoder;
         this.tokenBlacklistService = tokenBlacklistService;
         this.userSessionService = userSessionService;
@@ -101,15 +98,9 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
         }
 
-        // With email disabled there is no channel that can carry a verification
-        // token to this address, so requiring verification is a gate with no key:
-        // VerificationGate disables every write in the dashboard, and the only way
-        // through is to read the API container's logs. Skip it — an unsent email
-        // proves nothing about an address, so nothing is being given up here.
+        // Without email a token could never arrive, and VerificationGate would block every write.
         boolean verificationIsDeliverable = emailService.isEnabled();
 
-        // Only the hash is persisted — the plaintext token exists solely
-        // to be emailed to the user and is never written to the database or logs.
         String verificationToken = verificationIsDeliverable ? generateVerificationToken() : null;
 
         User user = User.builder()
@@ -131,7 +122,6 @@ public class AuthService {
             verificationMailBudget.recordSend(user.getId(), VerificationEmailSend.REGISTER);
             emailService.sendVerificationEmail(user.getEmail(), verificationToken);
         } else {
-            // Created already verified, so this is the moment the welcome would otherwise wait for.
             onboardingMailService.welcome(user);
         }
 
@@ -145,9 +135,7 @@ public class AuthService {
         User user = userRepository.findByEmail(EmailAddresses.normalize(request.getEmail()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
 
-        // Before the password check, not after. Verifying first would still spend a BCrypt hash
-        // -- deliberately expensive -- on every attempt of an attack the lockout exists to stop,
-        // which turns the lockout into a way to make the server do the work instead.
+        // Checked before the password so a locked account does not cost a BCrypt hash per attempt.
         Duration lockedFor = accountLockoutService.remainingLockout(user);
         if (!lockedFor.isZero()) {
             throw new ResponseStatusException(HttpStatus.LOCKED,
@@ -156,8 +144,7 @@ public class AuthService {
                             + " minute(s), or reset your password to unlock the account now.");
         }
 
-        // An account created through Google has no password until its owner sets one. It answers
-        // exactly like a wrong password, so the sign-in page does not reveal how an address signs in.
+        // No password (Google account) fails like a wrong one, so sign-in method is not revealed.
         if (user.getPasswordHash() == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             accountLockoutService.recordFailure(user);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
@@ -167,8 +154,6 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
         }
 
-        // The password was right, so whatever was counted against this account was not an
-        // attack in progress. An account in daily use therefore never accumulates a lockout.
         accountLockoutService.clearFailures(user);
 
         Membership membership = membershipToSignInWith(user);
@@ -177,12 +162,7 @@ public class AuthService {
                 Boolean.TRUE.equals(user.getEmailVerified()));
     }
 
-    /**
-     * The organization a new account starts in, on the plan this deployment gives new
-     * organizations, with the account as its owner. Shared by password registration and by
-     * {@link ExternalSignInService}, so an account created through Google lands on exactly the
-     * plan a registered one does. Runs inside the caller's system scope and transaction.
-     */
+    /** Runs inside the caller's system scope and transaction. */
     public Organization createOrganizationOwnedBy(User owner, String organizationName) {
         String defaultPlanName = billingEnabled ? "free" : "self_hosted";
         Plan defaultPlan = planRepository.findByName(defaultPlanName)
@@ -202,11 +182,6 @@ public class AuthService {
         return organization;
     }
 
-    /**
-     * A session for a user who has already proven who they are some other way than a password —
-     * the one-time code {@link ExternalSignInService} hands the dashboard after Google. The same
-     * membership choice and suspension rule as {@link #login}, and the same token pair.
-     */
     public AuthResponse issueSessionFor(User user, SessionOrigin origin) {
         if (user.getStatus() == UserStatus.DISABLED) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
@@ -216,13 +191,7 @@ public class AuthService {
                 Boolean.TRUE.equals(user.getEmailVerified()));
     }
 
-    /**
-     * Mints a token pair and the {@code user_sessions} row that ties them together.
-     *
-     * <p>The session id is chosen here rather than by the database because it has to be inside
-     * the tokens: it is the {@code sid} claim that lets one session be signed out without
-     * touching the others.
-     */
+    // The session id is generated here because the tokens carry it as the sid claim.
     private AuthResponse issueSession(User user, UUID organizationId, MembershipRole role,
                                       SessionOrigin origin, boolean emailVerified) {
         UUID sessionId = UUID.randomUUID();
@@ -247,33 +216,14 @@ public class AuthService {
                 .build();
     }
 
-    /**
-     * Re-scopes the caller's current session to another organization they belong to.
-     *
-     * <p>The two things this must not do, which is most of what it is:
-     *
-     * <ul>
-     *   <li><b>Mint for an organization the caller is not in</b>, or was suspended from. The target arrives as caller
-     *       input — the only endpoint where that is the point rather than a smell — so nothing is
-     *       issued until a {@code Membership} joining this user to this organization has been
-     *       found, and the role on the new token comes from <em>that row</em>, never from the
-     *       token being replaced. A user who is OWNER of one organization and VIEWER of another
-     *       must not carry OWNER across.</li>
-     *   <li><b>Invalidate anything.</b> Switching is a navigation action a person may click
-     *       twice. It writes one column of one session row and mints a fresh access token; the
-     *       refresh token keeps working untouched, other sessions are not consulted, and doing it
-     *       again is the same operation with the same result.</li>
-     * </ul>
-     */
+    // The role comes from the target membership, never the old token, so OWNER does not carry across.
     @SystemTenant("re-scopes a session from one organization to another, so it is in neither while it decides")
     public AuthResponse switchOrganization(UUID userId, SwitchOrganizationRequest request, String refreshToken) {
         UserSession session = requireOwnLiveSession(userId, refreshToken);
 
         Membership membership = membershipRepository
                 .findByUserIdAndOrganizationId(userId, request.getOrganizationId())
-                // The same rule login and refresh apply. Without it, a member suspended here but
-                // still active elsewhere signs in there and switches straight back. Refused with
-                // the non-member message, so the answer does not say a suspension exists.
+                // Refused like a non-member, so a suspension is neither bypassed nor revealed.
                 .filter(m -> m.getStatus() != MembershipStatus.DISABLED)
                 .orElseThrow(() -> new ForbiddenException("You are not a member of that organization"));
 
@@ -295,14 +245,7 @@ public class AuthService {
                 .build();
     }
 
-    /**
-     * The session the presented refresh token names, once it has been shown to be live and to
-     * belong to this user.
-     *
-     * <p>Looked up by jti rather than by the {@code sid} claim: the jti is rotated on every
-     * refresh, so a token carrying a correct {@code sid} but a superseded jti — the shape a
-     * replayed token has — finds nothing here.
-     */
+    // Looked up by jti, not sid: the jti rotates on every refresh, so a replayed token finds nothing.
     private UserSession requireOwnLiveSession(UUID userId, String refreshToken) {
         if (refreshToken == null || !jwtUtil.validateToken(refreshToken)
                 || !JwtUtil.TOKEN_TYPE_REFRESH.equals(jwtUtil.getTokenType(refreshToken))) {
@@ -323,9 +266,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
         }
 
-        // Reject anything that isn't an actual refresh token: an access token (or any
-        // legacy token, which has no "typ" claim at all) must not be exchangeable here.
-        // A missing claim is treated as invalid rather than grandfathered.
+        // Access tokens and legacy tokens without a typ claim are refused.
         if (!JwtUtil.TOKEN_TYPE_REFRESH.equals(jwtUtil.getTokenType(refreshToken))) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
         }
@@ -334,13 +275,7 @@ public class AuthService {
         UUID userId = jwtUtil.getUserIdFromToken(refreshToken);
 
         if (tokenBlacklistService.isBlacklisted(oldJti)) {
-            // Reuse detection: this refresh token was already consumed (rotated away on a
-            // prior refresh, or explicitly revoked via logout). A rotated-away token being
-            // replayed is the signature of a stolen refresh token racing the legitimate
-            // client, so treat it as a compromised token family and kill every token the
-            // user currently holds, not just this one. The session rows go too: revoking only
-            // the access tokens left whoever holds the newest refresh token -- possibly the
-            // thief -- refreshing indefinitely.
+            // A replayed consumed token means theft: revoke every session, not just this token.
             userSessionService.revokeAllSessions(userId);
             log.warn("Rejected reuse of already-rotated/revoked refresh token for user {}; revoked all sessions", userId);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token has been revoked");
@@ -356,10 +291,7 @@ public class AuthService {
         UserSession session = userSessionService.findByRefreshJti(oldJti).orElse(null);
 
         if (session == null && jwtUtil.getSessionIdFromToken(refreshToken) != null) {
-            // The token names a session, and this jti is not the one that session accepts. That
-            // is either a token rotated away in a refresh whose blacklist entry has since expired
-            // or been lost with Redis, or a session that has been signed out. Neither may be
-            // exchanged for a new pair, and the durable row -- not Redis -- is what says so.
+            // Rotated away or signed out; the session row decides, since Redis may have lost the blacklist.
             log.warn("Refresh token names session {} but is not its current token; refusing",
                     jwtUtil.getSessionIdFromToken(refreshToken));
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session is no longer valid");
@@ -373,9 +305,7 @@ public class AuthService {
         tokenBlacklistService.blacklist(oldJti, jwtUtil.getExpirationFromToken(refreshToken));
 
         if (session == null) {
-            // A refresh token minted before sessions existed. Rather than refuse it -- which
-            // would sign out everybody who was logged in across the upgrade -- give it the
-            // session it should have had, so it appears in the list from here on.
+            // Minted before sessions existed. Give it one rather than sign everybody out on upgrade.
             return issueSession(user, membership.getOrganizationId(), membership.getRole(), origin,
                     Boolean.TRUE.equals(user.getEmailVerified()));
         }
@@ -393,26 +323,12 @@ public class AuthService {
                 .build();
     }
 
-    /**
-     * Which organization a refreshed token names.
-     *
-     * <p>The session remembers what the switcher chose, so a refresh does not undo it — which is
-     * what made a second organization unreachable before: login picked the oldest membership and
-     * refresh picked it again fifteen minutes later.
-     *
-     * <p>A membership that has since been removed — or suspended — falls back to the oldest one
-     * the user still holds, rather than failing: losing the organization you happened to be
-     * looking at should not lock you out of the others. The session is moved with it, so the next
-     * refresh does not have to work it out again.
-     */
+    // Keeps the switched-to organization; if that membership is gone, fall back rather than fail.
     private Membership membershipForRefresh(User user, UserSession session) {
         if (session != null) {
             Optional<Membership> remembered = membershipRepository
                     .findByUserIdAndOrganizationId(user.getId(), session.getOrganizationId())
-                    // A suspension has to reach the token the session is already holding.
-                    // Without this, suspending a member left them refreshing their way to a
-                    // fresh fifteen minutes indefinitely, because the session still named an
-                    // organization they were still technically a member of.
+                    // Otherwise a suspended member keeps refreshing indefinitely.
                     .filter(m -> m.getStatus() != MembershipStatus.DISABLED);
             if (remembered.isPresent()) {
                 return remembered.get();
@@ -429,33 +345,7 @@ public class AuthService {
         return oldest;
     }
 
-    /**
-     * The membership a freshly minted token will name, and the one place a suspension is
-     * refused.
-     *
-     * <p>Ordered, because findFirst() over an unordered query made this a coin toss: a user in
-     * two organizations got whichever the database felt like returning, and with it a different
-     * tenant scope on each login. Oldest membership is where a session starts; the organization
-     * switcher moves it from there, and the session remembers.
-     *
-     * <p>A suspended membership is skipped rather than fatal, because a suspension belongs to one
-     * organization: somebody suspended by one customer is still the other customer's member, and
-     * refusing the login outright would lock them out of an organization that never asked for it.
-     * Only when every membership is suspended is there nothing to issue a token for — and that is
-     * a 403, not the 404 of a user who belongs to no organization at all.
-     *
-     * <p>INVITED is deliberately not skipped: that is the membership an invitee signs in with in
-     * order to accept the invite.
-     */
-    /**
-     * {@link #membershipToIssueTokenFor}, for a sign-in: an account left in no organization at all
-     * gets one of its own, as a new account does.
-     *
-     * <p>Being removed from the only organization you were invited to, or having it deleted,
-     * used to end in a 404 here on every sign-in, password and Google alike — and registering
-     * again is refused because the address is taken, while erasing the account needs a session.
-     * Nothing short of the database let that person back in.
-     */
+    // An account left in no organization gets one; otherwise it could never sign in again.
     private Membership membershipToSignInWith(User user) {
         if (membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).isEmpty()) {
             Organization organization = createOrganizationOwnedBy(user, workspaceNameFor(user));
@@ -473,6 +363,8 @@ public class AuthService {
         return name.length() <= 100 ? name : name.substring(0, 100);
     }
 
+    // Ordered, or a user in two organizations got a different tenant per login. INVITED is not
+    // skipped: an invitee signs in with it to accept.
     private Membership membershipToIssueTokenFor(UUID userId) {
         List<Membership> memberships = membershipRepository.findByUserIdOrderByCreatedAtAsc(userId);
         return memberships.stream()
@@ -495,14 +387,11 @@ public class AuthService {
             tokenBlacklistService.blacklist(
                     jwtUtil.getJtiFromToken(refreshToken),
                     jwtUtil.getExpirationFromToken(refreshToken));
-            // The row too, or the session a user just signed out of would still be sitting in
-            // their session list looking live.
             userSessionService.findByRefreshJti(jwtUtil.getJtiFromToken(refreshToken))
                     .ifPresent(session -> userSessionService.revokeSession(session.getUserId(), session.getId()));
         }
     }
 
-    /** Every live session for the caller, with the one making the request flagged. */
     public List<SessionResponse> listSessions(UUID userId, String refreshToken) {
         UUID currentSessionId = null;
         if (refreshToken != null && jwtUtil.validateToken(refreshToken)) {
@@ -542,8 +431,7 @@ public class AuthService {
         if (Boolean.TRUE.equals(user.getEmailVerified())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is already verified");
         }
-        // The per-minute limiter in front of this bounds a burst; this bounds a day of them,
-        // shared with email change so neither is a way around the other.
+        // Daily budget, shared with email change so neither bypasses the other.
         verificationMailBudget.requireSendAllowance(user);
 
         String newToken = generateVerificationToken();
@@ -581,15 +469,11 @@ public class AuthService {
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
-        // Someone who supplied their current password is present, whatever a failure counter
-        // says about them.
         user.setFailedLoginAttempts(0);
         user.setLastFailedLoginAt(null);
         user.setLockoutExpiresAt(null);
         userRepository.save(user);
-        // Access tokens are self-contained and nothing re-checks the database per request, so
-        // without this every session opened with the old password stays valid until its TTL
-        // runs out. Changing a password has to mean the old one no longer gets you anywhere.
+        // Access tokens are not re-checked against the database, so old sessions would outlive the change.
         userSessionService.revokeAllSessions(userId);
         log.info("Password changed for user {}, all sessions revoked", userId);
     }
@@ -600,14 +484,12 @@ public class AuthService {
     public void forgotPassword(String email) {
         User user = userRepository.findByEmail(EmailAddresses.normalize(email)).orElse(null);
 
-        // Always return success to prevent email enumeration
+        // Always succeeds, to prevent email enumeration.
         if (user == null) {
             log.info("Password reset requested for non-existent email: {}", email);
             return;
         }
 
-        // Only the hash is persisted; the plaintext token is emailed and
-        // never stored, matching the invite-token pattern in MembershipService.
         String resetToken = generateVerificationToken();
         user.setPasswordResetToken(CryptoUtils.hashApiKey(resetToken));
         user.setPasswordResetTokenExpiresAt(Instant.now().plus(1, ChronoUnit.HOURS));
@@ -632,18 +514,12 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setPasswordResetToken(null);
         user.setPasswordResetTokenExpiresAt(null);
-        // This is the unlock path, and it is the reason account lockout is not a denial of
-        // service against a known email address: somebody a stranger locked out reaches their
-        // account through their own mailbox, without waiting for a window to lapse or for an
-        // administrator to be awake. See AccountLockoutService.
+        // The unlock path. It is why lockout is not a denial of service against a known address.
         user.setFailedLoginAttempts(0);
         user.setLastFailedLoginAt(null);
         user.setLockoutExpiresAt(null);
         userRepository.save(user);
-        // The reset path is the one that matters most: it is how somebody recovers an account
-        // that has been taken over. Leaving the attacker's already-issued access token valid
-        // for the rest of its TTL hands them the account back for another quarter of an hour,
-        // while the owner believes they have just locked them out.
+        // Reset is how a taken-over account is recovered, so the attacker's tokens must die now.
         userSessionService.revokeAllSessions(user.getId());
         log.info("Password reset completed for user {}, all sessions revoked", user.getEmail());
     }

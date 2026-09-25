@@ -74,10 +74,7 @@ public class AlertService {
         this.allowedHosts = allowedHosts;
     }
 
-    /**
-     * Resolves a rule's open alerts because its condition has stopped holding, which re-arms the
-     * rule for the next crossing. Called by the evaluator inside the rule's organization.
-     */
+    /** Resolving the open alerts re-arms the rule for the next crossing. */
     @Transactional
     public int resolveRecovered(AlertRule rule) {
         int resolved = eventRepository.resolveOpenByAlertRuleId(rule.getId(), Instant.now());
@@ -88,20 +85,13 @@ public class AlertService {
         return resolved;
     }
 
-    /**
-     * A rule's notification webhook is a URL this server fetches on the user's behalf, which
-     * makes it an SSRF sink exactly like an Endpoint's url — and it was the one outbound URL in
-     * the product that nothing validated. Blank is not a bad URL: updateRule reads it as "unset
-     * this", and validating it would leave no way to remove a URL already stored.
-     */
+    // An SSRF sink like an Endpoint URL. Blank means "unset" in updateRule.
     private void validateNotificationUrl(String webhookUrl) {
         if (webhookUrl == null || webhookUrl.isBlank()) {
             return;
         }
         UrlValidator.validateWebhookUrl(webhookUrl, allowPrivateIps, allowedHosts);
     }
-
-    // ─── Rule CRUD ──────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public List<AlertRuleResponse> listRules(UUID projectId) {
@@ -111,13 +101,7 @@ public class AlertService {
                 .toList();
     }
 
-    /**
-     * An EMAIL rule mails every address on it about once a minute while its condition holds, under
-     * a subject the user wrote. Only the organization's own members, with the address verified, may
-     * be on the list; otherwise a rule is a way to send mail from this deployment to anyone.
-     *
-     * @return the list normalized and de-duplicated, or null when there is none
-     */
+    // Verified members only, or a rule could mail anyone once a minute.
     private String requireMemberRecipients(String recipients) {
         if (recipients == null || recipients.isBlank()) {
             return null;
@@ -207,8 +191,6 @@ public class AlertService {
         log.info("Deleted alert rule '{}' from project {}", rule.getName(), projectId);
     }
 
-    // ─── Alert Events ───────────────────────────────────────────────────
-
     @Transactional(readOnly = true)
     public Page<AlertEventResponse> listEvents(UUID projectId, int page, int size) {
         validateProjectAccess(projectId);
@@ -237,19 +219,7 @@ public class AlertService {
         return eventRepository.resolveAllByProjectId(projectId, Instant.now());
     }
 
-    /**
-     * Records an alert nobody wrote a rule for.
-     *
-     * <p>Every other alert is a rule its owner created firing; this is Railhook reporting a
-     * decision it made about their installation, and there is no rule to hang it on. The event
-     * therefore carries a null {@code alertRuleId} — the alternative, a hidden rule per
-     * organization, would put a row in the alert-rules list that nobody could explain or delete.
-     *
-     * <p>It creates no Incident and dispatches to no channel: a rule's channel is the rule's,
-     * and the caller owns telling anybody. The in-app list is what this writes.
-     *
-     * @param endpointId the Endpoint the event is about, or null when it is not about one
-     */
+    // An alert with no rule behind it. Creates no Incident and notifies nobody; the caller decides.
     @Transactional
     public AlertEvent raiseSystemAlert(UUID projectId, UUID endpointId, AlertSeverity severity,
             String title, String message) {
@@ -264,8 +234,6 @@ public class AlertService {
         log.warn("System alert raised: project={}, endpoint={}, title='{}'", projectId, endpointId, title);
         return event;
     }
-
-    // ─── Fire alert (called by evaluator) ───────────────────────────────
 
     @Transactional
     public AlertEvent fireAlert(AlertRule rule, double currentValue, String message) {
@@ -283,12 +251,10 @@ public class AlertService {
         log.warn("Alert fired: rule='{}', project={}, current={}, threshold={}",
                 rule.getName(), rule.getProjectId(), currentValue, rule.getThresholdValue());
 
-        // Slack / webhook / email — only once this alert is stored. Sent from the middle of the
-        // transaction, a failure in anything below rolled the alert back after the message had
-        // already gone, and the next evaluation a minute later sent it again.
+        // Only after commit: sent mid-transaction, a later failure rolled the alert back after
+        // the message went out, and the next evaluation sent it again.
         notifyAfterCommit(rule, event);
 
-        // Auto-create incident for CRITICAL severity alerts
         if (rule.getSeverity() == AlertSeverity.CRITICAL) {
             Incident incident = Incident.builder()
                     .projectId(rule.getProjectId())
@@ -325,8 +291,6 @@ public class AlertService {
                     }
                 });
     }
-
-    // ─── Mappers ────────────────────────────────────────────────────────
 
     private AlertRuleResponse toRuleResponse(AlertRule rule) {
         return AlertRuleResponse.builder()

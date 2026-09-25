@@ -40,12 +40,6 @@ public class RedisRateLimiterService {
     private final Counter rateLimitFallback;
     private final Counter rateLimitFailClosed;
 
-    /**
-     * Local in-memory fallback rate limiters (Bucket4j) used when Redis is
-     * unavailable.
-     * Keyed by projectId to maintain per-project isolation.
-     * Bounded by Caffeine: max 10k entries, 5min expireAfterAccess to prevent memory growth.
-     */
     private final Cache<UUID, Bucket> localFallbackBuckets;
 
     public RedisRateLimiterService(
@@ -139,36 +133,18 @@ public class RedisRateLimiterService {
         return doTryAcquire(SOURCE_KEY_PREFIX + sourceId, sourceId, ratePerSecond);
     }
 
-    /**
-     * One organization's share of the control-plane API — the dashboard's own calls, not event
-     * ingestion, which {@link #tryAcquire(UUID)} already bounds per project.
-     *
-     * <p>Exists because {@code GlobalRateLimitFilter} holds a single bucket for the whole
-     * platform: one tenant looping over the deliveries list can spend it and every other tenant
-     * gets 429s for something they did not do. That is nobody's problem on a self-hosted
-     * installation, where every tenant is the operator's own, and is the first thing a shared
-     * installation runs into.
-     *
-     * <p>Fail-open, like its per-project sibling: a Redis outage must not take the dashboard
-     * down with it.
-     */
+    // Fails open. The global filter's single bucket let one tenant exhaust it for everyone.
     public boolean tryAcquireForOrganization(UUID organizationId, int ratePerSecond) {
         return doTryAcquire(ORGANIZATION_KEY_PREFIX + organizationId, organizationId, ratePerSecond);
     }
 
-    /**
-     * One portal session's share of the portal API. A session is a credential held by a browser
-     * that belongs to the customer's user, not to the customer, so it gets a budget of its own
-     * rather than drawing on the organization's. Fail-open, like the organization limiter.
-     */
+    // Fails open. A portal session is the customer's user, so it does not draw on the org budget.
     public boolean tryAcquireForPortalSession(UUID sessionId, int ratePerSecond) {
         return doTryAcquire(PORTAL_SESSION_KEY_PREFIX + sessionId, sessionId, ratePerSecond);
     }
 
     /**
-     * Fail-closed variant for public ingress endpoints.
-     * Rejects requests when Redis is unavailable instead of falling back to local limiter.
-     * This prevents unbounded traffic from hitting the DB during a Redis outage.
+     * Fails closed: a Redis outage must not let unbounded public ingress reach the database.
      */
     public boolean tryAcquireForSourceFailClosed(UUID sourceId, int ratePerSecond) {
         try {
@@ -190,10 +166,6 @@ public class RedisRateLimiterService {
 
     private static final String SLUG_KEY_PREFIX = "rate_limiter:slug:";
 
-    /**
-     * Rate limit for tunnel/capture slugs. Redis-backed for multi-instance consistency,
-     * falls back to local Bucket4j when Redis is unavailable.
-     */
     public boolean tryAcquireForSlug(String slug, int ratePerSecond) {
         try {
             boolean acquired = slugLimiters.tryAcquire(SLUG_KEY_PREFIX + slug, ratePerSecond);
@@ -274,7 +246,6 @@ public class RedisRateLimiterService {
                     .build();
         } catch (Exception e) {
             log.debug("Unable to get rate limit info, returning conservative estimate: {}", e.getMessage());
-            // Return worst-case estimate: assume limit is close to exhausted
             return RateLimitInfo.builder()
                     .limit(ratePerSecond)
                     .remaining(0)
@@ -283,10 +254,6 @@ public class RedisRateLimiterService {
         }
     }
 
-    /**
-     * Local in-memory rate limiter fallback using Bucket4j.
-     * Provides emergency throttling when Redis is unavailable.
-     */
     private boolean tryLocalFallback(UUID projectId, int ratePerSecond) {
         Bucket bucket = localFallbackBuckets.get(projectId, id -> Bucket.builder()
                 .addLimit(Bandwidth.builder()

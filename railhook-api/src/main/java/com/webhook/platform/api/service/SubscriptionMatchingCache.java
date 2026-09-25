@@ -17,19 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Pre-compiled in-memory cache for subscription matching.
- * Eliminates the two SQL queries per event (exact + wildcard scan) from the hot ingestion path.
- *
- * <p>Cache entry per project holds:
- * <ul>
- *   <li>exactIndex — Map&lt;eventType, List&lt;Subscription&gt;&gt; for O(1) exact lookups</li>
- *   <li>wildcardSubs — pre-filtered list of wildcard subscriptions for O(W) matching</li>
- * </ul>
- *
- * <p>Invalidated by {@link SubscriptionService} on create/update/delete.
- * Short TTL (5 min) as safety net for missed invalidations.
- */
+/** Evicted on every subscription change; the 5 minute TTL covers a missed eviction. */
 @Service
 @Slf4j
 public class SubscriptionMatchingCache {
@@ -55,22 +43,16 @@ public class SubscriptionMatchingCache {
                 .register(meterRegistry);
     }
 
-    /**
-     * Returns all enabled subscriptions matching the given event type for the project.
-     * On cache hit: zero DB queries, pure in-memory matching.
-     */
     public List<Subscription> findMatching(UUID projectId, String eventType) {
         ProjectSubscriptions ps = cache.get(projectId, this::loadFromDb);
 
         List<Subscription> result = new ArrayList<>();
 
-        // O(1) exact lookup
         List<Subscription> exact = ps.exactIndex().get(eventType);
         if (exact != null) {
             result.addAll(exact);
         }
 
-        // O(W) wildcard matching (W = number of wildcard subs, typically small)
         for (Subscription wsub : ps.wildcardSubs()) {
             if (EventTypeMatcher.matches(wsub.getEventType(), eventType)) {
                 result.add(wsub);
@@ -80,10 +62,6 @@ public class SubscriptionMatchingCache {
         return result;
     }
 
-    /**
-     * Evicts the cached subscriptions for a project.
-     * Called by {@link SubscriptionService} on any subscription mutation.
-     */
     public void evict(UUID projectId) {
         cache.invalidate(projectId);
         log.debug("Subscription cache evicted for project {}", projectId);
@@ -110,9 +88,6 @@ public class SubscriptionMatchingCache {
         return new ProjectSubscriptions(exactIndex, wildcardSubs);
     }
 
-    /**
-     * Pre-partitioned subscription data for a project.
-     */
     record ProjectSubscriptions(
             Map<String, List<Subscription>> exactIndex,
             List<Subscription> wildcardSubs

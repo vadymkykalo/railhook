@@ -32,12 +32,6 @@ import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Accounts reached through an identity provider rather than a password: finding the account a
- * verified identity belongs to, creating one when there is none, and handing the finished sign-in
- * to the dashboard. The protocol with Google itself is {@code GoogleSignInService}; nothing here
- * knows about redirects or tokens from outside.
- */
 @Service
 @Slf4j
 public class ExternalSignInService {
@@ -70,19 +64,8 @@ public class ExternalSignInService {
         this.onboardingMailService = onboardingMailService;
     }
 
-    /**
-     * The account a verified identity belongs to, linking it on first use; empty when there is none.
-     *
-     * <p>Matched on the provider's subject first, so a person who changes the address on their
-     * Google account still arrives in the same account. Failing that, on the address, which the
-     * provider has verified — so an account that signed up with a password gains Google as a
-     * second way in rather than a duplicate account appearing beside it.
-     *
-     * <p>One case is not a plain link. An account whose address was never verified may have been
-     * registered by someone who is not its owner, with a password of their own, waiting for the
-     * owner to arrive. When the owner proves the address through Google, that password — which
-     * nobody ever proved belonged to them — is removed and its sessions end.
-     */
+    // Matched on the provider subject first, then the address. An unverified account's password
+    // is removed, since someone else may have registered it.
     @SystemTenant("matches a person an identity provider vouched for to an account, before any organization is chosen")
     @Transactional
     public Optional<UUID> findOrLinkVerifiedIdentity(VerifiedIdentity identity) {
@@ -121,15 +104,7 @@ public class ExternalSignInService {
         return Optional.of(user.getId());
     }
 
-    /**
-     * A new account for a person nobody has seen before: verified by the provider, no password,
-     * and an organization they own on the plan a registered account gets.
-     *
-     * <p>No CAPTCHA here, deliberately. The challenge exists because an address is free to invent;
-     * a Google account the provider has verified is not, and Google runs its own abuse checks
-     * before it vouches for one. ProductionSafetyValidator's hosted-mode rules still hold: the
-     * password registration path keeps its challenge.
-     */
+    // No CAPTCHA: a verified Google account is not free to invent, unlike an address.
     @SystemTenant("creates the Organization it then belongs to, so there is no tenant to run in yet; the Membership it inserts sets organizationId explicitly")
     @Auditable(action = AuditAction.REGISTER, resourceType = "Auth")
     @Transactional
@@ -140,8 +115,7 @@ public class ExternalSignInService {
                 .status(UserStatus.ACTIVE)
                 .emailVerified(true)
                 .build());
-        // Nothing was asked of this person but a click, so the dashboard opens with a project to
-        // work in. A password registration names its own; the setup state leads it there.
+        // Nothing was asked but a click, so the dashboard opens with a project to work in.
         projectService.createFirstProject(authService.createOrganizationOwnedBy(user, organizationName));
         link(user.getId(), identity);
         onboardingMailService.welcome(user);
@@ -149,10 +123,7 @@ public class ExternalSignInService {
         return user.getId();
     }
 
-    /**
-     * A one-time code for the dashboard to trade for a session. Only its hash is stored.
-     * Expired rows are swept here rather than on a schedule: they are only ever written on this path.
-     */
+    // Only the hash is stored. Expired rows are swept here since this is the only writer.
     @SystemTenant("records a finished sign-in for a user who has no session yet")
     @Transactional
     public String issueSignInHandoff(UUID userId, boolean accountCreated) {
@@ -172,12 +143,7 @@ public class ExternalSignInService {
         return code;
     }
 
-    /**
-     * What the browser that finished the sign-in is given to hold beside the code. A code alone
-     * is a link anyone can be sent: someone who stops their own sign-in short of the dashboard
-     * could otherwise hand theirs to another person and have them work inside the sender's
-     * account. A digest rather than the code, so the cookie is no use without the URL.
-     */
+    // Binds the code to the browser that finished sign-in, so a forwarded code opens nothing.
     public static String browserBindingFor(String code) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(code.getBytes(StandardCharsets.UTF_8));
@@ -191,10 +157,7 @@ public class ExternalSignInService {
         return HANDOFF_LIFETIME;
     }
 
-    /**
-     * Refuses a code presented without the binding its browser was given, before the code is
-     * consumed: a refused attempt from somewhere else must not spend the owner's sign-in.
-     */
+    // Checked before the code is consumed, so a refused attempt does not spend the owner's sign-in.
     @SystemTenant("same as login: the membership read decides the organization the new token names")
     @Auditable(action = AuditAction.LOGIN, resourceType = "Auth")
     @Transactional

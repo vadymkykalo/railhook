@@ -6,14 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 
-/**
- * Slack webhook signature verifier.
- * Slack sends:
- *   X-Slack-Signature: v0=<hex-hmac-sha256>
- *   X-Slack-Request-Timestamp: <unix-timestamp>
- * Signed payload = "v0:<timestamp>:<body>"
- * Tolerance: 5 minutes (300 seconds).
- */
+/** Slack signs {@code v0:<timestamp>:<body>} with a five-minute tolerance. */
 public class SlackVerifier implements WebhookVerificationStrategy {
 
     private static final String SIGNATURE_HEADER = "X-Slack-Signature";
@@ -33,7 +26,6 @@ public class SlackVerifier implements WebhookVerificationStrategy {
             return VerificationResult.failure("Missing header: " + TIMESTAMP_HEADER);
         }
 
-        // Timestamp tolerance
         try {
             long ts = Long.parseLong(timestampHeader);
             long now = Instant.now().getEpochSecond();
@@ -44,14 +36,13 @@ public class SlackVerifier implements WebhookVerificationStrategy {
             return VerificationResult.failure("Invalid Slack timestamp: " + timestampHeader);
         }
 
-        // Strip "v0=" prefix
         String prefix = VERSION + "=";
         if (!signatureHeader.startsWith(prefix)) {
             return VerificationResult.failure("Invalid Slack signature format: missing v0= prefix");
         }
         String signature = signatureHeader.substring(prefix.length());
 
-        // Slack signs: "v0:<timestamp>:<body>" — joined as bytes, so the body is not re-encoded.
+        // Joined as bytes, so the body is not re-encoded.
         String computed = GenericHmacVerifier.computeHmacSha256(
                 secret, VERSION + ":" + timestampHeader + ":", body);
 

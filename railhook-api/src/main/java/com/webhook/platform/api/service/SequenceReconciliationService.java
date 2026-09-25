@@ -16,19 +16,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Periodically checks the Redis sequence counter ({@link SequenceGeneratorService}) against
- * the durable high-water mark already persisted in {@code deliveries.sequence_number}, for
- * every endpoint with recent ordering-enabled activity.
- *
- * <p>{@link SequenceGeneratorService#nextSequence} already self-heals this on its own hot
- * path (it reseeds from the durable high-water mark the moment it notices its Redis key is
- * gone), but that only fires the next time an event is ingested for that endpoint. An
- * endpoint that goes quiet right after a Redis flush would otherwise sit desynced —
- * invisibly, since nothing would ever call {@code nextSequence} again to notice — until
- * traffic resumes. This job closes that gap and gives the desync a loud metric instead of
- * letting it stay silent.
- */
+/** nextSequence reseeds a lost counter only on the next ingest, so a quiet endpoint would stay desynced. */
 @Service
 @Slf4j
 public class SequenceReconciliationService {
@@ -98,26 +86,8 @@ public class SequenceReconciliationService {
         backfillStrandedSequences();
     }
 
-    /**
-     * Gives a Sequence Number to an ordered Delivery that committed without one.
-     *
-     * <p>The number is assigned after the ingest transaction commits, deliberately: it comes
-     * from Redis, and a Delivery the customer has already been told was accepted must not be
-     * undone because a counter was unreachable. {@code EventIngestService} handles that failure
-     * in process and degrades gracefully.
-     *
-     * <p>It cannot handle the process ending. A pod that dies between the commit and the
-     * backfill leaves the row with a null sequence permanently — and the worker's ordering gate
-     * reads {@code orderingEnabled && sequenceNumber != null}, so the Delivery is simply
-     * delivered unordered, by a customer who asked for ordering and is not told they did not
-     * get it. Nothing in the system looked for those rows.
-     *
-     * <p>Ordering is not restored retroactively by this: a number issued now sits after
-     * everything issued since, so the stranded Delivery takes its place at the end rather than
-     * back where it was. That is the same choice replay makes, and for the same reason — the
-     * alternative is a gap that blocks the endpoint. What it does restore is that the Delivery
-     * is ordered <em>at all</em>, and that the gap it would otherwise leave in the buffer closes.
-     */
+    // A process that died between commit and numbering left an ordered Delivery with no sequence.
+    // The number goes at the end: the alternative is a gap that blocks the endpoint.
     private void backfillStrandedSequences() {
         Instant before = Instant.now().minusSeconds(strandedAfterSeconds);
         List<Delivery> stranded = deliveryRepository.findOrderedDeliveriesMissingASequence(
@@ -135,7 +105,6 @@ public class SequenceReconciliationService {
                     strandedCounter.increment();
                 }
             } catch (Exception e) {
-                // One endpoint's counter being unreachable is not a reason to abandon the rest.
                 log.error("Could not backfill a stranded sequence for delivery {} (endpoint {}): {}",
                         delivery.getId(), delivery.getEndpointId(), e.getMessage());
             }

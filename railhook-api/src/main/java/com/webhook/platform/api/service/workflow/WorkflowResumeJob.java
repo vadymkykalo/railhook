@@ -18,23 +18,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * Continues executions that suspended at a delay node.
- *
- * <p>The other half of not sleeping. {@code DelayNodeExecutor} returns a due time instead of
- * blocking, {@code WorkflowEngine} writes down where the execution got to and releases the
- * thread, and this picks it up once the delay has expired.
- *
- * <p>Resolution is the poll interval, so a delay is "at least N seconds", never exactly N —
- * which is what a delay in a workflow means anyway. The batch cap matters more than the
- * interval: a burst of executions all becoming due at the same second must not hand the
- * workflow pool more work at once than it could take, so they spill to the next tick in
- * {@code resumeAt} order rather than being rejected.
- *
- * <p>Runs {@code @SystemTenant} because suspended executions belong to every organization, and
- * re-enters each execution's own tenant before touching it — the engine writes step rows, and
- * those are tenant-scoped.
- */
+/** Resumes delayed executions so no thread sleeps; the batch cap keeps a burst off the pool. */
 @Service
 @Slf4j
 public class WorkflowResumeJob {
@@ -77,9 +61,7 @@ public class WorkflowResumeJob {
             try {
                 resumeOne(execution);
             } catch (Exception e) {
-                // One execution that cannot be resumed must not strand the rest of the batch —
-                // they belong to other organizations. Fail this one so it leaves WAITING rather
-                // than being retried forever on every tick.
+                // Fail it, or it stays WAITING and is retried on every tick.
                 log.error("Could not resume workflow execution {}: {}", execution.getId(), e.toString());
                 failTerminally(execution, "Could not resume after delay: " + e.getMessage());
             }
@@ -90,8 +72,6 @@ public class WorkflowResumeJob {
     private void resumeOne(WorkflowExecution execution) {
         var workflow = workflowRepository.findById(execution.getWorkflowId()).orElse(null);
         if (workflow == null) {
-            // The workflow was deleted while its execution slept. There is nothing to continue,
-            // and leaving the row WAITING would poll it forever.
             failTerminally(execution, "Workflow was deleted while this execution was suspended");
             return;
         }
@@ -112,8 +92,6 @@ public class WorkflowResumeJob {
 
         long workingMs = execution.getWorkingMs() == null ? 0L : execution.getWorkingMs();
 
-        // Back into the execution's own organization: the engine writes step rows, which are
-        // tenant-scoped, and this job runs with the tenant filter off.
         TenantContext.runAs(execution.getOrganizationId(), () ->
                 engine.resume(execution.getId(), workflow.getDefinition(), triggerData, state, workingMs));
     }

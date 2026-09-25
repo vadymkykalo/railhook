@@ -16,17 +16,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Stripe billing provider.
- * Stripe manages subscription lifecycle (billing cycles, automatic retries, dunning).
- *
- * <p>Configuration:</p>
- * <ul>
- *   <li>{@code STRIPE_SECRET_KEY}</li>
- *   <li>{@code STRIPE_WEBHOOK_SECRET}</li>
- *   <li>{@code STRIPE_PRICE_MAP} — plan name → Stripe Price ID (e.g. starter=price_xxx,pro=price_yyy)</li>
- * </ul>
- */
+/** Stripe runs the subscription lifecycle itself: billing cycles, retries and dunning. */
 @Slf4j
 public class StripeBillingProvider implements BillingProvider {
 
@@ -56,8 +46,6 @@ public class StripeBillingProvider implements BillingProvider {
     @Override
     public Set<BillingCapability> capabilities() { return CAPABILITIES; }
 
-    // ── Customers ───────────────────────────────────────────────────
-
     @Override
     public String createCustomer(UUID organizationId, String name, String email) {
         try {
@@ -74,8 +62,6 @@ public class StripeBillingProvider implements BillingProvider {
             throw new RuntimeException("Stripe customer creation failed: " + e.getMessage(), e);
         }
     }
-
-    // ── Payment page (Checkout Session) ─────────────────────────────
 
     @Override
     public CreatePaymentResult createPaymentPage(CreatePaymentRequest request) {
@@ -111,8 +97,6 @@ public class StripeBillingProvider implements BillingProvider {
             throw new RuntimeException("Stripe checkout creation failed: " + e.getMessage(), e);
         }
     }
-
-    // ── Managed subscriptions ───────────────────────────────────────
 
     @Override
     public String createSubscription(String externalCustomerId, String planExternalId, String currency) {
@@ -159,8 +143,6 @@ public class StripeBillingProvider implements BillingProvider {
         }
     }
 
-    // ── Invoices ────────────────────────────────────────────────────
-
     @Override
     public List<ExternalInvoice> fetchInvoices(String externalCustomerId) {
         try {
@@ -189,8 +171,6 @@ public class StripeBillingProvider implements BillingProvider {
             return List.of();
         }
     }
-
-    // ── Reconciliation ─────────────────────────────────────────────
 
     @Override
     public ExternalSubscriptionState fetchSubscriptionStatus(String externalSubscriptionId) {
@@ -222,8 +202,6 @@ public class StripeBillingProvider implements BillingProvider {
             return null;
         }
     }
-
-    // ── Webhooks ────────────────────────────────────────────────────
 
     @Override
     public BillingWebhookEvent parseWebhook(String rawPayload, Map<String, String> headers) {

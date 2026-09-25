@@ -15,10 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
-/**
- * Central quota & feature-flag enforcement.
- * When {@code billing.enabled=false} (self-hosted), all checks pass unconditionally.
- */
+/** With {@code billing.enabled=false} (self-hosted) every check passes. */
 @Service
 @Slf4j
 public class EntitlementService {
@@ -57,8 +54,6 @@ public class EntitlementService {
         this.tunnelSessionRepository = tunnelSessionRepository;
         this.quotaCounterService = quotaCounterService;
     }
-
-    // ── Quota checks ──────────────────────────────────────────────
 
     public void checkEventQuota() {
         if (!billingEnabled) return;
@@ -127,40 +122,27 @@ public class EntitlementService {
         }
     }
 
-    // ── Feature flags ─────────────────────────────────────────────
-
     public boolean hasFeature(String featureName) {
         if (!billingEnabled) return true;
         return getPlan().hasFeature(featureName);
     }
 
-    // ── Rate limit ────────────────────────────────────────────────
-
     public int getRateLimit() {
         return getRateLimit(TenantContext.require());
     }
 
-    /**
-     * Explicit-organization form, for callers holding a row rather than a scope — see
-     * {@link #getPlan(java.util.UUID)}.
-     */
+    /** For callers holding a row rather than a tenant scope. */
     public int getRateLimit(UUID organizationId) {
         if (!billingEnabled) return defaultRateLimitPerSecond;
         return getPlan(organizationId).getRateLimitPerSecond();
     }
 
-    /**
-     * Resolve rate limit for a project by looking up its organization's plan.
-     * Used by EventController where only projectId is available (API key auth).
-     */
     public int getRateLimitForProject(UUID projectId) {
         if (!billingEnabled) return defaultRateLimitPerSecond;
         return planLookup.forProject(projectId)
                 .map(Plan::getRateLimitPerSecond)
                 .orElse(defaultRateLimitPerSecond);
     }
-
-    // ── Fanout limit ────────────────────────────────────────────
 
     public int getMaxFanoutForProject(UUID projectId) {
         if (!billingEnabled) return defaultMaxFanoutPerEvent;
@@ -169,14 +151,10 @@ public class EntitlementService {
                 .orElse(defaultMaxFanoutPerEvent);
     }
 
-    // ── Retention ─────────────────────────────────────────────────
-
     public int getRetentionDays() {
         if (!billingEnabled) return -1;
         return getPlan().getMaxRetentionDays();
     }
-
-    // ── Plan access ───────────────────────────────────────────────
 
     public Plan getPlan() {
         return planLookup.forCurrentTenant();

@@ -37,11 +37,6 @@ public class ApiKeyService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int API_KEY_LENGTH = 32;
 
-    /**
-     * How long an outgoing key keeps working when the caller does not say. A working day: long
-     * enough for a deployment to reach every instance, short enough that nobody forgets a second
-     * live credential exists.
-     */
     private static final int DEFAULT_GRACE_PERIOD_HOURS = 24;
 
     public ApiKeyService(ApiKeyRepository apiKeyRepository, ProjectRepository projectRepository) {
@@ -117,29 +112,8 @@ public class ApiKeyService {
     }
 
 
-    /**
-     * Replaces a key with a new one, leaving the old one working for a grace window.
-     *
-     * <p>The gap this closes is the same one {@code EndpointService.rotateSecret} closed for
-     * signing secrets, and it is worth stating in the same terms. With only create and revoke,
-     * rolling a key over is a race the customer has to run themselves: create the new key, deploy
-     * it everywhere, and revoke the old one at exactly the right moment — too early and requests
-     * fail with 401 until the deploy finishes, too late and a credential they meant to retire is
-     * still live and now forgotten. Neither end of that is something an API should make somebody
-     * orchestrate by hand.
-     *
-     * <p>So both keys authenticate for the length of the window. The outgoing key is given an
-     * expiry rather than being revoked, because {@code ApiKeyAuthenticationFilter} already honours
-     * {@code expires_at} on every request — the window needs no new enforcement path, only a date.
-     * {@code rotated_at} is what distinguishes this expiry from one the customer asked for, so a
-     * key in its grace window can be shown as retiring rather than as merely expiring.
-     *
-     * <p>A window of zero is allowed and means "cut it off now": that is the rotation somebody
-     * performs after a leak, where the point is precisely that the old key stops working.
-     *
-     * <p>An expiry already sooner than the window is never pushed out. Rotating a key must not be
-     * a way to extend the life of the key being rotated away.
-     */
+    // The old key gets an expiry, not a revocation, so both work for the grace window.
+    // An earlier existing expiry is never pushed out.
     @Auditable(action = AuditAction.ROTATE_SECRET, resourceType = "ApiKey")
     @Transactional
     public ApiKeyResponse rotateApiKey(UUID projectId, UUID apiKeyId, ApiKeyRotateRequest request) {
@@ -154,8 +128,7 @@ public class ApiKeyService {
                     "API key is revoked; create a new key rather than rotating a dead one");
         }
         if (retiring.getRotatedAt() != null) {
-            // Otherwise a second rotation would silently orphan the key created by the first,
-            // which is live, unnamed in any successor chain, and about to be forgotten.
+            // A second rotation would orphan the live key the first one created.
             throw new IllegalArgumentException(
                     "API key has already been rotated; rotate its replacement instead");
         }
@@ -186,7 +159,6 @@ public class ApiKeyService {
         return mapToResponse(replacement, plainKey);
     }
 
-    /** The sooner of two expiries, treating "no expiry" as later than any date. */
     private static Instant earlier(Instant existing, Instant candidate) {
         if (existing == null) {
             return candidate;

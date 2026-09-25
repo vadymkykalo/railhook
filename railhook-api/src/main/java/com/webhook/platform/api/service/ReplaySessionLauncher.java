@@ -10,22 +10,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 
 /**
- * Starts a replay once its session row has committed, on the replay executor.
- *
- * <p>A bean of its own because the replay has to leave the request thread. ReplayService used to
- * call its own async method, which ran the whole replay — up to the per-session event cap — on
- * the request thread, inside the request's transaction: cancel and the concurrent-session cap
- * could not see the uncommitted session, and one failing batch marked that transaction
- * rollback-only and took the session down with it.
- *
- * <p>After commit, so the replay never starts on a session that is then rolled back. The replay
- * executor carries the request's tenant scope across.
- *
- * <p>Submitted by hand rather than through {@code @Async}, because a full executor has to be
- * answered here. It used to fall back to CallerRunsPolicy, which ran the replay on the request
- * thread inside this after-commit callback, where every write that joins the surrounding
- * transaction joins one that has already committed: the session never left PENDING while its
- * deliveries were created, and the request did not return until the replay was over.
+ * Starts a replay after its session commits. Submitted by hand, not @Async, so a full executor
+ * fails the session rather than running it in a finished transaction.
  */
 @Component
 @Slf4j

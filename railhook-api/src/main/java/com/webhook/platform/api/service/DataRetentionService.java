@@ -25,11 +25,8 @@ import java.util.function.IntSupplier;
 @Slf4j
 public class DataRetentionService {
 
-    /*
-     * Each run's wall-clock budget, a few minutes inside its lockAtMostFor. A run that outlived the
-     * lock kept deleting while the next replica's run, now free to take the lock, started on the
-     * same rows. The margin is for the batch already under way when the budget runs out.
-     */
+    // Kept a few minutes inside lockAtMostFor: a run that outlived the lock kept deleting while
+    // the next replica's run started on the same rows.
     static final Duration NINE_MINUTE_LOCK_BUDGET = Duration.ofMinutes(7);
     static final Duration LIMIT_ENFORCEMENT_BUDGET = Duration.ofMinutes(25);
     static final Duration EVENTS_CLEANUP_BUDGET = Duration.ofMinutes(50);
@@ -84,8 +81,8 @@ public class DataRetentionService {
         this.eventsRetentionDays = eventsRetentionDays;
         this.batchSize = batchSize;
         
-        // Not delivery_attempts_total: Prometheus reserves the suffix for counters and exports a gauge
-        // without it, so the dashboard asking for the name written here found nothing.
+        // Not delivery_attempts_total: Prometheus reserves that suffix for counters and exports a
+        // gauge without it.
         Gauge.builder("delivery_attempts_stored", totalAttemptsCount, AtomicLong::get)
                 .description("Total number of delivery attempts in storage")
                 .register(meterRegistry);
@@ -95,16 +92,13 @@ public class DataRetentionService {
         Gauge.builder("incoming_events_table_rows", incomingEventsEstimatedRows, AtomicLong::get)
                 .description("Estimated row count in incoming_events table")
                 .register(meterRegistry);
-        // The two tables that had no retention at all also had no gauge, so the growth that
-        // mattered most was the growth nobody could see.
         Gauge.builder("events_table_rows", eventsEstimatedRows, AtomicLong::get)
                 .description("Estimated row count in events table")
                 .register(meterRegistry);
         Gauge.builder("deliveries_table_rows", deliveriesEstimatedRows, AtomicLong::get)
                 .description("Estimated row count in deliveries table")
                 .register(meterRegistry);
-        // Registered now rather than on the first deletion, so retention that has had nothing to
-        // delete yet exports 0 instead of no series.
+        // Registered up front so retention with nothing to delete yet exports 0, not no series.
         for (String type : new String[] {"success_age_based", "limit_based", "burst_success"}) {
             Counter.builder("delivery_attempts_cleanup_total").tag("type", type).register(meterRegistry);
         }
@@ -115,10 +109,6 @@ public class DataRetentionService {
                 deliveryAttemptsRetentionDays, successfulAttemptsRetentionDays, incomingEventsRetentionDays, tunnelRequestLogRetentionDays,
                 eventsRetentionDays < 0 ? "unlimited" : eventsRetentionDays + "d", maxAttemptsPerDelivery, batchSize);
     }
-
-    // REMOVED: Outbox cleanup is handled by OutboxPublisherService.cleanupOldMessages()
-    // to avoid duplicate cleanup logic. DataRetentionService focuses on delivery_attempts,
-    // incoming_events, and tunnel_request_log tables.
 
     @SystemTenant
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
@@ -144,14 +134,6 @@ public class DataRetentionService {
         updateMetrics();
     }
     
-    // REMOVED: cleanupOldDeliveryAttempts() used to DELETE every attempt
-    // (success or failure) older than deliveryAttemptsRetentionDays — an O(rows) scan
-    // of the whole table on every run. delivery_attempts is now partitioned monthly
-    // (V052) and PartitionMaintenanceService.dropExpiredPartitions() achieves the same
-    // global cutoff in O(1) via DROP TABLE on whole expired partitions instead. The
-    // underlying deliveryAttemptRepository.deleteOldAttempts() query is left in place
-    // for manual/ad-hoc use but is no longer scheduled.
-
     @SystemTenant
     @Scheduled(cron = "${data-retention.limit-enforcement-cron:0 */30 * * * *}")
     @SchedulerLock(name = "enforcePerDeliveryAttemptLimits", lockAtMostFor = "29m", lockAtLeastFor = "1m")
@@ -196,20 +178,7 @@ public class DataRetentionService {
         }
     }
 
-    /**
-     * Bounds {@code events}, and through the cascades everything hanging off them.
-     *
-     * <p>This is the retention that was missing rather than merely elsewhere. The billing
-     * scheduler ({@code RetentionCleanupScheduler}) enforces per-plan limits and returns
-     * immediately when {@code billing.enabled} is false — the self-hosted default — so in the
-     * deployment shape this project recommends, nothing deleted an event or a delivery ever.
-     * Attempts were still being dropped at 90 days by partition maintenance, which left the
-     * detail gone and the bulk behind.
-     *
-     * <p>Deliberately independent of billing: an operator running this for themselves needs a
-     * bounded database more than a paying customer does, not less. {@code -1} keeps the old
-     * behaviour for anyone who wants it, and is the same sentinel the plans table already uses.
-     */
+    // Independent of billing: with billing off nothing else ever deletes an event. -1 keeps everything.
     @SystemTenant
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
     @SchedulerLock(name = "cleanupOldEvents", lockAtMostFor = "55m", lockAtLeastFor = "1m")
@@ -273,16 +242,6 @@ public class DataRetentionService {
         updateMetrics();
     }
 
-    // REMOVED: cleanupTunnelRequestLog() used to DELETE every row older than
-    // tunnelRequestLogRetentionDays in one unbounded statement. tunnel_request_log is
-    // now partitioned weekly (V053) and PartitionMaintenanceService.dropExpiredPartitions()
-    // drops whole expired partitions instead. tunnelRequestLogRepository.deleteByCreatedAtBefore()
-    // is left in place for manual/ad-hoc use but is no longer scheduled.
-
-    /**
-     * Deletes batch after batch until one comes back short or the budget is spent; whatever is
-     * left goes to the next run.
-     */
     private long deleteInBatches(String job, Duration budget, IntSupplier batch) {
         Instant deadline = clock.instant().plus(budget);
         long total = 0;
@@ -299,14 +258,7 @@ public class DataRetentionService {
         return total;
     }
 
-    /**
-     * Runs one delete batch in a transaction of its own.
-     *
-     * <p>These jobs used to be one transaction each, so a single batch that failed — a foreign key
-     * nobody expected, a statement timeout — rolled back every batch the run had already deleted,
-     * and the same row failed it again the next night. Committing per batch keeps what succeeded
-     * and bounds how long any lock is held.
-     */
+    // Per batch: one failing batch used to roll back the whole night's deletes.
     private int inOwnTransaction(IntSupplier batch) {
         Integer deleted = transactions.execute(status -> batch.getAsInt());
         return deleted == null ? 0 : deleted;

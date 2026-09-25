@@ -4,15 +4,7 @@ import com.webhook.platform.common.retry.RetryLadder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/**
- * Refuses a custom Retry Ladder that outlives the escalation cap of its direction.
- *
- * <p>The worker moves an obligation still outstanding past the cap to the DLQ whatever its
- * attempt count, and at startup it checks only the default ladders against those caps. A
- * Subscription's or Destination's own ladder was accepted up to 30-day tiers and 100 attempts,
- * so a long one was escalated by age before its later tiers ever ran. The caps are the worker's
- * settings, read here from the same variables so the two agree.
- */
+/** A ladder longer than the worker's escalation cap was sent to the DLQ before its later tiers ran. */
 @Component
 public class RetryLadderEscalationCap {
 
@@ -26,12 +18,10 @@ public class RetryLadderEscalationCap {
         this.forwardHardCapHours = forwardHardCapHours;
     }
 
-    /** @throws IllegalArgumentException naming both fields, when a Delivery would be escalated mid-ladder */
     public void requireOutgoingFits(String retryDelays, int maxAttempts) {
         requireFits(retryDelays, maxAttempts, deliveryHardCapHours, "Delivery");
     }
 
-    /** @throws IllegalArgumentException naming both fields, when a Forward would be escalated mid-ladder */
     public void requireIncomingFits(String retryDelays, int maxAttempts) {
         requireFits(retryDelays, maxAttempts, forwardHardCapHours, "Forward");
     }

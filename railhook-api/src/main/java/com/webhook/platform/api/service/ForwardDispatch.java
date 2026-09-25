@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
-/** Announces a Forward to the worker. The Incoming counterpart of {@link DeliveryDispatch}. */
 @Component
 @RequiredArgsConstructor
 public class ForwardDispatch {
@@ -31,11 +30,7 @@ public class ForwardDispatch {
 
     private final ObjectMapper objectMapper;
 
-    /**
-     * @param replaySessionId the Replay this Forward belongs to, null for one created by ingress.
-     *                        A Replay's Attempts live in their own numbering, so every claim the
-     *                        worker makes is scoped to this value.
-     */
+    // replaySessionId is null for ingress; a Replay's Attempts have their own numbering.
     public OutboxMessage outboxFor(UUID eventId, UUID sourceId, UUID destinationId, UUID projectId,
             int attemptNumber, UUID replaySessionId, Reason reason) {
         try {

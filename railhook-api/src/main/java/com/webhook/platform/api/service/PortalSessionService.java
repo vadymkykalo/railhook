@@ -21,14 +21,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.UUID;
 
-/**
- * Opens and ends portal sessions: the credential a customer's backend hands to one of its users'
- * browsers so the portal can act for that one Consumer.
- *
- * <p>The token is 32 random bytes behind a recognisable prefix, returned once and stored only as
- * its SHA-256 — the same treatment as an API key, and unlike a shared debug link, whose token is a
- * read-only view of one event. This one can register Endpoints and retry Deliveries.
- */
+/** Tokens are stored only as SHA-256, like API keys, since they can register Endpoints. */
 @Slf4j
 @Service
 public class PortalSessionService {
@@ -77,7 +70,6 @@ public class PortalSessionService {
                 .build();
     }
 
-    /** Ends every open session of a Consumer — what to do when a token may have leaked. */
     @Auditable(action = AuditAction.REVOKE, resourceType = "PortalSession")
     @Transactional
     public void revokeSessions(UUID projectId, UUID consumerId) {
@@ -86,21 +78,13 @@ public class PortalSessionService {
         log.info("Revoked {} portal sessions of consumer {}", revoked, consumerId);
     }
 
-    /**
-     * The portal's address. The token rides in the fragment, which a browser never sends to any
-     * server — not to Railhook's nginx, not in a Referer — so it reaches the page's script and no
-     * access log. The allowed origin rides in the query, where nginx turns it into the page's
-     * {@code frame-ancestors}; see the portal location in the UI's nginx.conf.
-     */
+    // The token goes in the fragment, which browsers never send to a server, so no log sees it.
     private String portalUrl(String token, String allowedOrigin) {
         String query = allowedOrigin == null ? "" : "?origin=" + allowedOrigin;
         return baseUrl + "/portal" + query + "#" + token;
     }
 
-    /**
-     * Housekeeping only: an expired session authenticates nothing whether or not its row is still
-     * here. Without it the table would grow by one row per portal page load, forever.
-     */
+    // Housekeeping only: an expired session authenticates nothing whether or not its row remains.
     @SystemTenant("housekeeping over every organization's expired portal sessions")
     @Scheduled(fixedDelayString = "${portal.session-cleanup-interval-ms:3600000}")
     @SchedulerLock(name = "portalSessionCleanup", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")

@@ -17,7 +17,6 @@ public class EmailService {
     @Value("${app.email.from:noreply@example.com}")
     private String fromAddress;
 
-    /** Where the "this wasn't me" notice sends a worried person. Blank on a self-hosted install. */
     @Value("${app.email.support-address:}")
     private String supportAddress;
 
@@ -34,25 +33,12 @@ public class EmailService {
         this.mailSender = mailSender;
     }
 
-    /**
-     * Whether anything sent through this service can actually reach a person.
-     * When false every send below degrades to a log line, so callers that
-     * depend on the recipient receiving something — email verification, most
-     * of all — must take a different path rather than wait for a reply that
-     * is never coming.
-     */
+    /** When false every send only logs, so a flow that needs the mail to arrive must take another path. */
     public boolean isEnabled() {
         return emailEnabled;
     }
 
-    /**
-     * An address as the log may show it: the first and last character of the mailbox and the whole
-     * domain — {@code w***8@gmail.con}.
-     *
-     * <p>Enough to match a bounce the provider reports, or the address in a support request, to a
-     * line here; not enough to harvest the address from a log that is shipped, retained and read by
-     * more people than the users table is. The domain stays whole because it is where a typo lives.
-     */
+    /** E.g. {@code w***8@gmail.con}: enough to match a bounce, not enough to harvest the address. */
     static String maskRecipient(String address) {
         if (address == null || address.isBlank()) {
             return "(none)";
@@ -69,18 +55,7 @@ public class EmailService {
         return mailbox.charAt(0) + "***" + mailbox.charAt(mailbox.length() - 1) + domain;
     }
 
-    /**
-     * Whether a short-lived, single-use link may stand in for the mail that could not be sent.
-     *
-     * <p>On a workstation it must: with {@code app.email.enabled=false} — the shipped default —
-     * the log is the only place a password reset can be completed from, and
-     * {@link #sendTemporaryPasswordEmail} sets out why a token that expires in an hour and burns
-     * on first use is a reasonable thing to print there.
-     *
-     * <p>Neither half of that reasoning survives a move to production. The expiry does not slow
-     * down somebody already reading the log, and single-use means they get there first. So the
-     * affordance stays exactly what it was meant to be, and stops at the environment boundary.
-     */
+    // Links are bearer credentials: logging them is only acceptable outside production.
     private boolean mayLogLinkInstead() {
         return !"production".equalsIgnoreCase(appEnv);
     }
@@ -90,7 +65,6 @@ public class EmailService {
                 + "EMAIL_ENABLED=false. Configure SMTP, or the link cannot reach anyone.", what, maskRecipient(to));
     }
 
-    /** The development stand-in for a mail that carries a link: where it would have gone, and the link. */
     private void logLinkInstead(String banner, String to, String label, String url) {
         log.info("========== {} ==========", banner);
         log.info("To: {}", maskRecipient(to));
@@ -103,17 +77,7 @@ public class EmailService {
         void run() throws Exception;
     }
 
-    /**
-     * One send, and its record: the attempt, then what the provider said.
-     *
-     * <p>No body, subject or link reaches the log from here — the links are bearer credentials, and
-     * the template name says which message it was. The provider's error is kept, since it is the
-     * only thing that explains a bounce; an SMTP refusal quotes the recipient back, so that is masked
-     * too. Never throws: a mail that did not go is not a reason to fail the request that sent it.
-     *
-     * <p>No fallback to logging the link on failure. This only runs with {@code app.email.enabled=true}
-     * — a deployment that configured SMTP and had it blink. It did not ask for links in its log.
-     */
+    // Never logs a body, subject or link (links are bearer credentials), and never throws.
     private void deliver(String template, String to, Send send) {
         String masked = maskRecipient(to);
         log.info("Sending mail {} to {}", template, masked);
@@ -178,10 +142,6 @@ public class EmailService {
                 buildPasswordResetHtml(resetUrl)));
     }
 
-    /**
-     * The link that makes a new account address real. Sent to the <em>new</em> address, because
-     * opening it is the proof that the person asking can read mail there.
-     */
     public void sendEmailChangeConfirmation(String to, String token) {
         String confirmUrl = baseUrl + "/confirm-email-change?token=" + token;
 
@@ -207,13 +167,7 @@ public class EmailService {
                 buildEmailChangeConfirmationHtml(confirmUrl)));
     }
 
-    /**
-     * Tells the address an account is moving away from, with a way to stop it.
-     *
-     * <p>This is the mail that matters when the request was not the owner's: whoever holds a session
-     * can ask, and without this the owner's first sign of it would be a sign-in that no longer works.
-     * The cancel link needs no session — the owner may no longer have one.
-     */
+    /** Sent to the old address. The cancel link needs no session, since the owner may no longer have one. */
     public void sendEmailChangeNotice(String to, String newAddress, String cancelToken) {
         String cancelUrl = baseUrl + "/cancel-email-change?token=" + cancelToken;
         String maskedNew = maskRecipient(newAddress);
@@ -245,12 +199,7 @@ public class EmailService {
                 buildEmailChangeNoticeHtml(maskedNew, cancelUrl, help)));
     }
 
-    /**
-     * The address an invitee opens to accept, built here because this is where the
-     * deployment's base URL lives. Handed back to the inviting owner as well as put in
-     * the mail: with {@code app.email.enabled=false} — the shipped default — nothing is
-     * sent, and a link the owner can pass on by hand is the only way the invite arrives.
-     */
+    /** Also returned to the owner: with email off, a link passed on by hand is the only way the invite arrives. */
     public String inviteUrl(String orgId, String inviteToken) {
         return baseUrl + "/accept-invite?token=" + inviteToken + "&orgId=" + orgId;
     }
@@ -267,8 +216,7 @@ public class EmailService {
             return;
         }
 
-        // inviteUrl() hands the same link back to the inviting owner, so a copy in the log would buy
-        // nothing and leave it in the least controlled place there is.
+        // Not logged: inviteUrl() already hands the link to the owner.
         deliver("invite", to, () -> sendBoth(to, "You've been invited to join an organization — Railhook",
                 """
                 You've been invited to join an organization on Railhook.
@@ -279,15 +227,7 @@ public class EmailService {
                 buildInviteHtml(inviteUrl)));
     }
 
-    /**
-     * Sends the one-time temporary password generated for a brand-new user created by
-     * an org invite (see MembershipService#addMember). Unlike the other send*Email
-     * methods, this NEVER falls back to logging the secret when app.email.enabled is
-     * false: a reset/verification token is short-lived and single-use, but this
-     * password grants full, non-expiring account access until changed. In local dev
-     * without SMTP configured, use POST /api/v1/auth/forgot-password instead — that
-     * flow's token is safe to log because it expires in an hour and is single-use.
-     */
+    // Never logs the password: unlike a link it grants full access until changed.
     public void sendTemporaryPasswordEmail(String to, String tempPassword) {
         if (!emailEnabled) {
             log.info("========== TEMP PASSWORD EMAIL SKIPPED (app.email.enabled=false) ==========");
@@ -328,14 +268,7 @@ public class EmailService {
         });
     }
 
-    /**
-     * The welcome a new account gets once its address is proven, from the person who built the
-     * product, with the three things worth doing first.
-     *
-     * <p>Written to be answered: replies go to the support address, not to the no-reply sender.
-     * Nothing in it is a credential, so with email off the log says which mail and to whom and is
-     * done — in production as on a workstation.
-     */
+    /** Replies go to the support address. Nothing here is a credential, so with email off it only logs. */
     public void sendWelcomeEmail(String to) {
         String quickstartUrl = baseUrl + "/docs/start/quickstart/";
         String stripeUrl = baseUrl + "/docs/guides/stripe-webhooks/";
@@ -367,10 +300,6 @@ public class EmailService {
                 buildWelcomeHtml(quickstartUrl, stripeUrl, githubUrl)));
     }
 
-    /**
-     * The one follow-up for an account that has sent and received nothing two days after the
-     * welcome: the shortest path to a first event, and an offer to help.
-     */
     public void sendOnboardingNudgeEmail(String to) {
         String quickstartUrl = baseUrl + "/docs/start/quickstart/";
         if (!emailEnabled) {
@@ -395,32 +324,19 @@ public class EmailService {
                 buildOnboardingNudgeHtml(quickstartUrl)));
     }
 
-    /** Where a reply to a mail written as a person goes: support, when this deployment has one. */
     private String replyAddress() {
         return supportAddress == null || supportAddress.isBlank() ? null : supportAddress;
     }
 
-    /** The stand-in for a mail with no secret in it: which one, and a masked recipient. */
     private void logNotSent(String template, String to) {
         log.info("Mail {} to {} not sent: EMAIL_ENABLED=false", template, maskRecipient(to));
     }
 
-    /** Whether the site's contact form has somewhere to deliver to: the deployment's support address. */
     public boolean isContactAvailable() {
         return supportAddress != null && !supportAddress.isBlank();
     }
 
-    /**
-     * A visitor's message from the public site's contact form, to this deployment's support address.
-     *
-     * <p>The visitor's address is the Reply-To and never a recipient: the form is anonymous, and a
-     * form that mails whatever address it is given is a relay. Plain text only, so nothing the
-     * visitor typed is ever rendered as markup in the inbox that reads it. Without SMTP the log
-     * gets who wrote and about what, not the message.
-     *
-     * <p>Asynchronous: an SMTP round trip takes seconds, and the visitor is waiting on a form. It
-     * reads no tenant data, so it needs no scope on the pool's thread.
-     */
+    // The visitor is only the Reply-To, never a recipient, so the form cannot be used as a relay.
     @Async
     public void sendContactMessage(String replyTo, String name, String topic, String message, String page) {
         String who = name == null || name.isBlank() ? replyTo : oneLine(name);
@@ -449,7 +365,7 @@ public class EmailService {
         });
     }
 
-    /** A header value from what a visitor typed: no line breaks, so it cannot add a header of its own. */
+    /** No line breaks, so a visitor cannot inject a header. */
     private static String oneLine(String value) {
         return value.replaceAll("[\\r\\n\\t]+", " ").strip();
     }
@@ -502,22 +418,11 @@ public class EmailService {
     }
 
 
-    /**
-     * Sends one message as both plain text and HTML.
-     *
-     * <p>{@code setText(html, true)} sends HTML and nothing else, which costs more than
-     * appearance: a message with no {@code text/plain} alternative scores worse with every
-     * spam filter that looks for one, and a password reset is the message that must not be
-     * filtered. It is also what a client that will not render HTML shows — nothing at all.
-     *
-     * <p>Two arguments to the same call is the whole fix. The alternative parts must say the
-     * same thing, so both are built from the same link.
-     */
+    /** Without a text/plain part spam filters score the mail worse, and a password reset must not be filtered. */
     private void sendBoth(String to, String subject, String plain, String html) throws Exception {
         sendBoth(to, subject, null, plain, html);
     }
 
-    /** {@link #sendBoth(String, String, String, String)} with a Reply-To, when {@code replyTo} is not null. */
     private void sendBoth(String to, String subject, String replyTo, String plain, String html) throws Exception {
         var message = mailSender.createMimeMessage();
         var helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -531,14 +436,7 @@ public class EmailService {
         mailSender.send(message);
     }
 
-    /**
-     * The address written out, under the button that points at it.
-     *
-     * <p>A button is an anchor with padding: a client that will not style it leaves the
-     * destination invisible, and a person who would rather copy an address than click a
-     * button in a mail — which is the advice everyone is given about exactly these
-     * messages — has nothing to copy.
-     */
+    /** Written out under the button for clients that do not style it and people who copy rather than click. */
     private static String linkFallback(String url) {
         return """
             <p style="color: #777; font-size: 12px; line-height: 1.6; margin-top: 8px;">

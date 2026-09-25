@@ -14,39 +14,13 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
 /**
- * Where a failure in the dashboard ends up.
- *
- * <p>Before this existed, a render error reached {@code console.error} in one person's browser
- * and stopped there: a screen that threw for every customer looked, from here, exactly like a
- * screen nobody had opened. The reports now go into the same logs as everything else — which,
- * with the {@code production} profile finally activating the JSON appender, means Loki, beside
- * the correlation id of whatever request the page was making when it broke. No third party is
- * involved, and nothing leaves the installation; a self-hosted operator reads their own logs.
- *
- * <p>That decision moves the risk rather than removing it, because the string on the log line
- * is now one a browser chose. Three things follow from that, and they are what this class is:
- *
- * <ul>
- *   <li><b>Nothing a report contains may end a line.</b> Newlines, carriage returns and every
- *       other control character are stripped, so a report cannot forge a second entry and
- *       impersonate any log this platform writes. CodeQL has already caught one log-injection
- *       here; that one arrived over a header rather than a JSON body, but the sink is the same.</li>
- *   <li><b>Nothing a report contains may be unbounded.</b> The DTO caps each field and this
- *       trims further, because a stack trace is the natural place for a page's whole state to
- *       arrive as a string.</li>
- *   <li><b>No browser may write faster than a person can read.</b> A component that throws on
- *       every render would otherwise produce a log line per frame, from every open tab.</li>
- * </ul>
- *
- * <p>The throttle is per-instance and in-memory on purpose. It protects a log volume, not a
- * security boundary — an attacker who wants to fill a disk has cheaper ways — and paying a Redis
- * round trip on the path that handles a page already failing would be the wrong trade.
+ * Browser-chosen text: control characters are stripped against forged log lines. The in-memory
+ * throttle protects log volume, not a security boundary.
  */
 @Service
 @Slf4j
 public class ClientErrorReportService {
 
-    /** How much of each field survives onto the log line. */
     private static final int MAX_MESSAGE = 500;
     private static final int MAX_STACK = 2000;
     private static final int MAX_COMPONENT_STACK = 2000;
@@ -57,17 +31,7 @@ public class ClientErrorReportService {
 
     private final boolean enabled;
     private final int reportsPerUserPerMinute;
-    /**
-     * One window per user, for a minute at a time.
-     *
-     * <p>Expiring, because a plain map here only ever grows: a window lasts a minute and the
-     * entry lasted the life of the process, one per user who ever loaded the dashboard. Small
-     * each, unbounded together — which is the shape of every slow leak. Bounded as well as
-     * expiring, so a burst of distinct users cannot outrun the eviction.
-     *
-     * <p>Caffeine rather than a scheduled sweep, the way
-     * {@code RedisConcurrencyControlService} and {@code MtlsWebClientFactory} already do it.
-     */
+    // Bounded and expiring: a plain map kept one entry per user for the life of the process.
     private final Cache<UUID, Window> windows = Caffeine.newBuilder()
             .maximumSize(50_000)
             .expireAfterWrite(WINDOW.multipliedBy(2))
@@ -80,15 +44,7 @@ public class ClientErrorReportService {
         this.reportsPerUserPerMinute = reportsPerUserPerMinute;
     }
 
-    /**
-     * Records one report, or decides not to. Never throws: the caller is a page that has already
-     * failed once, and the endpoint answers 202 either way — telling a broken dashboard that its
-     * complaint was rate-limited helps nobody.
-     *
-     * <p>The organization comes off the tenant scope rather than off the caller, which is the
-     * rule everywhere in this codebase: whose organization this is is a property of the request,
-     * not an argument a handler can get wrong.
-     */
+    /** Never throws; the endpoint answers 202 whether or not the report was kept. */
     public void record(ClientErrorReportRequest report, UUID userId) {
         if (!enabled) {
             return;
@@ -110,13 +66,12 @@ public class ClientErrorReportService {
                 suffix(" | component: ", clean(report.getComponentStack(), MAX_COMPONENT_STACK)));
     }
 
-    /** How many windows are being tracked. Visible so the bound can be asserted, not a metric. */
+    // For tests.
     long trackedWindows() {
         windows.cleanUp();
         return windows.estimatedSize();
     }
 
-    /** One counter per user per window. Absent users are admitted and start a window. */
     private boolean admit(UUID userId) {
         if (userId == null) {
             return true;
@@ -129,11 +84,7 @@ public class ClientErrorReportService {
         return window.count.incrementAndGet() <= reportsPerUserPerMinute;
     }
 
-    /**
-     * The path, without the query string. A page's path says which screen broke, which is the
-     * whole diagnostic value; its query string is where a share token or a filter carrying
-     * customer data would be, and neither belongs in a log.
-     */
+    // The query string can carry share tokens or customer data, so only the path is logged.
     private static String pathOf(String url) {
         String cleaned = clean(url, MAX_URL);
         int query = cleaned.indexOf('?');
@@ -142,11 +93,7 @@ public class ClientErrorReportService {
         return fragment >= 0 ? withoutQuery.substring(0, fragment) : withoutQuery;
     }
 
-    /**
-     * Strips every character that could end a line or steer a terminal, collapses the runs that
-     * leaves behind, and truncates. Replacing rather than dropping keeps a stack trace readable
-     * as one line instead of running its frames together into a single word.
-     */
+    // Control characters become a single space rather than vanishing, so a stack trace stays readable.
     private static String clean(String value, int max) {
         if (value == null) {
             return "";
@@ -172,7 +119,6 @@ public class ClientErrorReportService {
         return value.isBlank() ? "" : label + value;
     }
 
-    /** A fixed window, replaced wholesale once it has expired. */
     private static final class Window {
         private final Instant startedAt;
         private final AtomicInteger count = new AtomicInteger();

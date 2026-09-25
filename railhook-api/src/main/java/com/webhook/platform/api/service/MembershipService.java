@@ -77,9 +77,7 @@ public class MembershipService {
                             .role(membership.getRole())
                             .status(membership.getStatus())
                             .createdAt(membership.getCreatedAt())
-                            // The expiry, so a pending invite can be seen running out and
-                            // re-issued. Never the link: only the token's hash is stored,
-                            // and a listing is readable by every member of the org.
+                            // Never the invite link: only its hash is stored, and every member can list.
                             .inviteExpiresAt(membership.getInviteExpiresAt())
                             .build();
                 })
@@ -107,8 +105,7 @@ public class MembershipService {
                             .status(UserStatus.ACTIVE)
                             .build();
                     User saved = userRepository.save(newUser);
-                    // The temp password is emailed directly to the invitee and is
-                    // never logged, at any level — only non-secret metadata reaches the log.
+                    // Never log the temp password.
                     emailService.sendTemporaryPasswordEmail(request.getEmail(), tempPass);
                     log.info("Created new user for invite: userId={}, email={}", saved.getId(), request.getEmail());
                     return saved;
@@ -118,10 +115,7 @@ public class MembershipService {
             throw new IllegalArgumentException("User is already a member");
         }
 
-        // The owner invited an address. An existing account becomes a member on the spot, and
-        // reading needs no verified email — so an account registered for someone else's address,
-        // and never proven, would read this organization's data the day that person is invited.
-        // Where verification can be delivered at all, such an account is not taken to be them.
+        // An unverified account may have been registered for someone else's address.
         if (!isNewUser && emailService.isEnabled() && !Boolean.TRUE.equals(user.getEmailVerified())) {
             throw new ConflictException("An account with this address exists but has not verified it. "
                     + "Ask them to verify their email address, then invite them again.");
@@ -155,24 +149,12 @@ public class MembershipService {
                 .status(membership.getStatus())
                 .createdAt(membership.getCreatedAt())
                 .inviteExpiresAt(membership.getInviteExpiresAt())
-                // Handed back to the owner who issued it. With email delivery off — the
-                // shipped default — sendInviteEmail only printed this to the container
-                // log while the browser was told the invitation had been sent, so an
-                // invite in a default install could not be delivered at all. The
-                // temporary password stays where it is: see EmailService's javadoc.
+                // With email off (the default), this is the only way the invite reaches anyone.
                 .inviteUrl(isNewUser ? emailService.inviteUrl(organizationId.toString(), inviteToken) : null)
                 .build();
     }
 
-    /**
-     * Mints a fresh invite token for a membership still sitting at INVITED, replacing
-     * whatever was issued before and starting the 48 hours again.
-     *
-     * <p>The previous token stops working the moment this returns — the row holds one
-     * hash — which is what makes this the revoke-and-replace an expired invite needs.
-     * No new temporary password is generated: the invitee's account already exists, and
-     * a second non-expiring credential would be one more than anyone can deliver.
-     */
+    /** The row holds one hash, so the previous token stops working at once. */
     @Auditable(action = AuditAction.MEMBER_INVITED, resourceType = "Member")
     @Transactional
     public MemberResponse reissueInvite(UUID userId, MembershipRole requestingRole) {
@@ -212,17 +194,6 @@ public class MembershipService {
                 .build();
     }
 
-    /**
-     * Accepting an invite crosses organizations by construction, which is why this one keeps an
-     * explicit organization parameter and runs as the system tenant.
-     *
-     * <p>The invitee arrives holding a token for an organization they are <em>already</em> in —
-     * their own — while the Membership row being accepted belongs to the inviting organization.
-     * Reading the tenant from the ambient scope would look for the invite in the wrong place and
-     * find nothing, and confining the lookup to that scope would make a valid invite a 404. So
-     * {@code organizationId} here is the {@code {orgId}} path variable, and the checks below are
-     * what enforce that the token, the organization and the caller all agree.
-     */
     @SystemTenant("an invite is accepted by a user whose current tenant is a different organization")
     @Auditable(action = AuditAction.INVITE_ACCEPTED, resourceType = "Member")
     @Transactional
@@ -231,8 +202,7 @@ public class MembershipService {
         Membership membership = membershipRepository.findByInviteTokenHash(tokenHash)
                 .orElseThrow(() -> new NotFoundException("Invalid or expired invite token"));
 
-        // Security: validate the invite belongs to the specified organization AND the authenticated user.
-        // Use a single generic error message to prevent information leakage about which check failed.
+        // One generic error so the caller cannot tell which check failed.
         boolean orgMatch = membership.getOrganizationId().equals(organizationId);
         boolean userMatch = membership.getUserId().equals(authenticatedUserId);
         if (!orgMatch || !userMatch) {
@@ -281,10 +251,7 @@ public class MembershipService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    /**
-     * The roles an owner may hand out, whether by adding a member or by changing one. OWNER is
-     * never granted here, and API_KEY is not a human role at all.
-     */
+    /** OWNER is never granted here, and API_KEY is not a human role. */
     private static void requireGrantableRole(MembershipRole role) {
         if (role == MembershipRole.OWNER) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot assign OWNER role through this endpoint");
@@ -314,9 +281,7 @@ public class MembershipService {
 
         membership.setRole(newRole);
         membershipRepository.save(membership);
-        // JwtAuthenticationFilter reads the role out of the access token and never re-checks
-        // it against the database, so a demoted OWNER keeps OWNER authority until that token
-        // expires. Revoking makes the demotion take effect on the next request instead.
+        // The role in the access token is never re-checked, so a demoted OWNER would keep it.
         tokenBlacklistService.revokeAllUserTokens(userId);
 
         User user = userRepository.findById(userId)
@@ -347,30 +312,13 @@ public class MembershipService {
         }
 
         membershipRepository.delete(membership);
-        // Same reasoning as the demotion above: organizationId comes from the token, so a
-        // removed member goes on reaching this organization's data until it expires.
-        // Refreshing is already blocked — that path 404s on the missing membership — which is
-        // precisely why the live access token is the gap left to close.
+        // The live access token still names this organization; refresh already fails.
         tokenBlacklistService.revokeAllUserTokens(userId);
-        // A tunnel is the other access that outlives the membership: its CLI never presents an
-        // access token, so revoking those leaves the slug forwarding to the removed member.
+        // The tunnel CLI never presents an access token, so its sessions outlive the revocation.
         tunnelService.closeSessionsOfUser(userId);
     }
 
-    /**
-     * Takes a member's access away without taking their membership away.
-     *
-     * <p>The alternative was {@link #removeMember}, which deletes the row: a colleague on leave,
-     * a stolen laptop or an offboarding still in progress all cost the record of who the person
-     * was and what they held. A suspension keeps the row and the role, so reinstating is one
-     * call and nothing has to be reconstructed from memory.</p>
-     *
-     * <p>Refusal happens where a membership becomes an authenticated context — {@code login} and
-     * {@code refreshToken} in {@link AuthService} will not mint a token naming this organization
-     * any more — plus the epoch revocation here, for the same reason a demotion and a removal do
-     * it: the access token already in the member's hands is self-contained and re-checks nothing,
-     * so without this the suspension would begin whenever that token happened to expire.</p>
-     */
+    // Keeps the row and role so reinstating is one call; revocation covers issued access tokens.
     @Auditable(action = AuditAction.MEMBER_SUSPENDED, resourceType = "Member")
     @Transactional
     public MemberResponse suspendMember(UUID userId, UUID requestingUserId, MembershipRole requestingRole) {
@@ -380,9 +328,7 @@ public class MembershipService {
         }
 
         if (userId.equals(requestingUserId)) {
-            // Nobody else can lift it for you unless another owner is left, and the check below
-            // does not cover this case: an owner beside a second owner would pass it and lock
-            // themselves out of their own organization.
+            // Otherwise a second owner could become the only one able to lift it.
             throw new ResponseStatusException(HttpStatus.CONFLICT, "You cannot suspend yourself");
         }
 
@@ -390,9 +336,7 @@ public class MembershipService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
 
         if (membership.getStatus() != MembershipStatus.ACTIVE) {
-            // An INVITED membership is not access that can be withdrawn — it is an offer that can
-            // be left to expire or removed. Suspending it would also have no way back: reinstating
-            // sets ACTIVE, which would let the invitee in without ever accepting the invite.
+            // Reinstating sets ACTIVE, which would let an invitee in without accepting.
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only an active member can be suspended");
         }
 
@@ -419,12 +363,7 @@ public class MembershipService {
                 .build();
     }
 
-    /**
-     * Gives a suspended member their access back, in the role the suspension preserved.
-     *
-     * <p>Nothing is revoked here: the epoch marker only invalidates tokens issued before it, so
-     * a token minted after the reinstatement is valid without any further action.</p>
-     */
+    /** Nothing to revoke: the epoch marker only invalidates tokens issued before it. */
     @Auditable(action = AuditAction.MEMBER_REINSTATED, resourceType = "Member")
     @Transactional
     public MemberResponse reinstateMember(UUID userId, MembershipRole requestingRole) {
@@ -437,9 +376,7 @@ public class MembershipService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
 
         if (membership.getStatus() != MembershipStatus.DISABLED) {
-            // Said out loud rather than passed over: reinstating an INVITED membership would
-            // turn an unaccepted invite into a full membership, and reinstating an ACTIVE one
-            // means the caller is looking at a stale list.
+            // Reinstating INVITED would skip accepting the invite; ACTIVE means a stale list.
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Member is not suspended");
         }
 
@@ -460,14 +397,7 @@ public class MembershipService {
                 .build();
     }
 
-    /**
-     * How many owners could still sign in and administer this organization.
-     *
-     * <p>Deliberately not a count of owner rows. A suspended owner cannot sign in, so counting
-     * one would let the last-owner guard be walked around in two steps: suspend one of two
-     * owners, then remove or demote the other, and nobody is left who can administer the
-     * organization — including nobody who can lift the suspension.</p>
-     */
+    // A suspended owner cannot sign in, so counting one would let the last-owner guard be bypassed.
     private long ownersWhoCanStillSignIn(UUID organizationId) {
         return membershipRepository.countByOrganizationIdAndRoleAndStatusNot(
                 organizationId, MembershipRole.OWNER, MembershipStatus.DISABLED);

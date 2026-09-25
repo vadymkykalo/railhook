@@ -47,21 +47,7 @@ public class IncomingSourceService {
         this.ingressBaseUrl = ingressBaseUrl;
     }
 
-    /**
-     * Refuses a source that would fail at ingress rather than at the keyboard.
-     *
-     * <p>Validated against the row as it will be saved, not against the request, because an
-     * update is partial: switching only the mode to {@code PROVIDER} has to be judged
-     * together with the provider type already on the row.
-     *
-     * <p>The failure this prevents is a slow one. A source saved in {@code PROVIDER} mode
-     * with a provider nothing verifies looked configured, and only threw once the provider
-     * was already sending — by which point the webhooks it was rejecting were real.
-     */
-    /**
-     * A secret with no mode is the intent to verify with it. Saving that as NONE accepted forged
-     * and unsigned requests on a source whose owner had handed over the signing secret.
-     */
+    /** A secret with no mode means verify with it. Saving that as NONE accepted forged requests. */
     private VerificationMode defaultVerificationMode(IncomingSourceRequest request) {
         if (request.getHmacSecret() == null || request.getHmacSecret().isBlank()) {
             return VerificationMode.NONE;
@@ -71,6 +57,7 @@ public class IncomingSourceService {
                 : VerificationMode.HMAC_GENERIC;
     }
 
+    // Checks the row as saved, not the request: an update is partial.
     private void validateVerificationSettings(IncomingSource source) {
         VerificationMode mode = source.getVerificationMode();
         if (mode == VerificationMode.PROVIDER
@@ -80,21 +67,14 @@ public class IncomingSourceService {
                             + "Use verificationMode HMAC_GENERIC with your own header and prefix, or NONE.");
         }
         if (mode == VerificationMode.HMAC_GENERIC && source.getHmacSecretEncrypted() == null) {
-            /* Not a crash, but a source that can never verify anything: every delivery would
-               be stored with verified=false and "Verification error", and the reason would be
-               a field nobody filled in. The header name needs no check — the entity defaults
-               it to X-Signature. */
+            // Otherwise every delivery would be stored unverified with no visible reason.
             throw new IllegalArgumentException(
                     "verificationMode HMAC_GENERIC requires hmacSecret — the shared secret the "
                             + "provider signs with.");
         }
     }
 
-    /**
-     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
-     * lookup only sees projects inside the caller's organization: a foreign project id is
-     * indistinguishable from a missing one, which is intended.
-     */
+    /** {@code Project} carries {@code @TenantId}, so a foreign project id is a 404 like a missing one. */
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
@@ -105,7 +85,6 @@ public class IncomingSourceService {
     public IncomingSourceResponse createSource(UUID projectId, IncomingSourceRequest request) {
         validateProjectOwnership(projectId);
 
-        // Generate slug if not provided
         String slug = request.getSlug();
         if (slug == null || slug.isBlank()) {
             slug = generateSlug(request.getName());
@@ -114,7 +93,6 @@ public class IncomingSourceService {
             throw new IllegalArgumentException("Source with slug '" + slug + "' already exists in this project");
         }
 
-        // Generate unique ingress path token
         String ingressPathToken = CryptoUtils.generateSecureToken(32);
         while (sourceRepository.existsByIngressPathToken(ingressPathToken)) {
             ingressPathToken = CryptoUtils.generateSecureToken(32);
@@ -131,7 +109,6 @@ public class IncomingSourceService {
                         : defaultVerificationMode(request))
                 .build();
 
-        // Encrypt HMAC secret if provided
         if (request.getHmacSecret() != null && !request.getHmacSecret().isBlank()) {
             CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getHmacSecret());
             source.setHmacSecretEncrypted(encrypted.getCiphertext());
@@ -158,7 +135,6 @@ public class IncomingSourceService {
         return mapToResponse(source);
     }
 
-    /** Another project's source is "not found", like a missing one - the URL names the project. */
     private IncomingSource requireSource(UUID projectId, UUID id) {
         return sourceRepository.findByIdAndProjectId(id, projectId)
                 .orElseThrow(() -> new NotFoundException("Incoming source not found"));

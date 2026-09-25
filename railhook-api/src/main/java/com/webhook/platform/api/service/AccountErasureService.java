@@ -25,46 +25,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * GDPR Article 17 for a person, rather than for an organization.
- *
- * <p>{@code OrganizationService.deleteOrganization} has always covered a customer erasing
- * everything they hold. It could not cover a human being who is a member of somebody else's
- * organization and wants their own record gone — the half of the right that individuals
- * actually exercise, and the half this platform had no answer for.
- *
- * <h2>Why the row survives</h2>
- *
- * <p>Two things in the schema decide this, and neither is a preference:
- *
- * <ul>
- *   <li>{@code shared_debug_links.created_by} references {@code users(id)} with no cascade, so
- *       deleting the row outright fails for anyone who has ever shared a debug link — the
- *       erasure would work in testing and fail for exactly the people who used the product.</li>
- *   <li>{@code audit_log.user_id} has no foreign key at all, so what someone did outlives them.
- *       That is deliberate and is the reason an audit log is worth having; keeping it is a
- *       legitimate basis under Article 17(3)(b), and it holds no contact details of its own.</li>
- * </ul>
- *
- * <p>So the identifying data goes and the account is made permanently unusable, which is what
- * erasure means here. What remains is a row with an id and no person attached to it.
- *
- * <h2>Why an organization can block it</h2>
- *
- * <p>Leaving an organization ownerless would strand every other member: nobody could invite,
- * change a plan, or delete it afterwards. So the last owner of an organization other people
- * still belong to is refused and told to hand it over first. An organization the person is
- * alone in goes with them — otherwise erasure leaves every event, endpoint and delivery it
- * owned in the database with nobody able to reach them, which is the opposite of the request.
- */
+// The user row is anonymised, not deleted: shared_debug_links references it without cascade,
+// and the audit log is kept under GDPR Article 17(3)(b).
 @Service
 @Slf4j
 public class AccountErasureService {
 
-    /**
-     * The domain erased addresses are moved to. {@code .invalid} is reserved by RFC 2606 and
-     * resolves nowhere, so nothing can ever be delivered to it by accident.
-     */
+    // Reserved by RFC 2606 and resolves nowhere, so nothing can be delivered to it.
     private static final String ERASED_EMAIL_DOMAIN = "@erased.invalid";
 
     private final UserRepository userRepository;
@@ -97,14 +64,7 @@ public class AccountErasureService {
         this.tunnelService = tunnelService;
     }
 
-    /**
-     * Erases one person. All of it or none of it: the refusals below happen before anything is
-     * written, so a caller who is told to hand an organization over first has lost nothing.
-     *
-     * <p>{@code @SystemTenant} because this crosses organizations by construction — the
-     * memberships being removed belong to every organization the person was in, not to the one
-     * whose scope the request happens to carry.
-     */
+    // Refusals happen before anything is written, so a refused caller has lost nothing.
     @SystemTenant("erasing a person spans every organization they belong to, not the request's own")
     @Auditable(action = AuditAction.USER_ERASED, resourceType = "User")
     @Transactional
@@ -127,31 +87,21 @@ public class AccountErasureService {
 
         anonymise(user);
         userRepository.save(user);
-        // The address is gone but a Google link is keyed on Google's own id for the person, which
-        // did not change. Left in place, "Continue with Google" would sign them straight back into
-        // the account they just erased.
+        // A Google link is keyed on Google's id, not the address, and would sign them straight back in.
         userIdentityRepository.deleteByUserId(userId);
-        // Every address the account ever moved between is in these rows, including one still
-        // waiting to be confirmed. Anonymising the user row and leaving them would keep exactly
-        // what the erasure was asked to remove.
+        // These rows hold every address the account ever used.
         emailChangeRequestRepository.deleteByUserId(userId);
         verificationEmailSendRepository.deleteByUserId(userId);
 
-        // The session rows go, and the access tokens already issued are blacklisted: those are
-        // stateless and would otherwise keep working until they expired on their own.
+        // Issued access tokens are stateless and would otherwise work until they expire.
         userSessionService.revokeAllSessions(userId);
         tokenBlacklistService.revokeAllUserTokens(userId);
-        // A tunnel's CLI authenticated once with its own token and never presents an access token,
-        // so neither revocation above reaches it.
+        // A tunnel CLI never presents an access token, so the revocations above do not reach it.
         tunnelService.closeAllSessionsOfUserEverywhere(userId);
 
         log.info("GDPR ERASE: user {} erased", userId);
     }
 
-    /**
-     * Which of the person's organizations die with them — and whether any of them refuses to
-     * let go. Runs to completion before anything is written so the refusal cannot land halfway.
-     */
     private List<UUID> decideOrganizations(List<Membership> memberships) {
         List<UUID> soleMemberOrganizations = new ArrayList<>();
         for (Membership membership : memberships) {
@@ -177,12 +127,7 @@ public class AccountErasureService {
                 organizationId, MembershipRole.OWNER, MembershipStatus.DISABLED) <= 1;
     }
 
-    /**
-     * Replaces everything that identifies the person, and everything that could let the account
-     * be used or recovered. The password hash is replaced rather than blanked because the column
-     * is {@code NOT NULL} and because a blank one is a shape somebody's login path might one day
-     * treat as "no password set".
-     */
+    // The password hash is randomised, not nulled: a null hash means "no password set" to login.
     private void anonymise(User user) {
         user.setEmail(user.getId() + ERASED_EMAIL_DOMAIN);
         user.setFullName(null);

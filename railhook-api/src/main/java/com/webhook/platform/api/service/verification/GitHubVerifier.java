@@ -5,10 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
-/**
- * GitHub webhook signature verifier.
- * GitHub sends: X-Hub-Signature-256: sha256=<hex-hmac-sha256>
- */
+/** {@code X-Hub-Signature-256: sha256=<hex hmac-sha256>} over the raw body. */
 public class GitHubVerifier implements WebhookVerificationStrategy {
 
     private static final String HEADER = "X-Hub-Signature-256";

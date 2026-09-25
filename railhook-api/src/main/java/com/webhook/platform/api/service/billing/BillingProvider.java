@@ -5,106 +5,54 @@ import com.webhook.platform.api.domain.entity.BillingInterval;
 import java.time.Instant;
 import java.util.*;
 
-/**
- * Provider-agnostic billing adapter. Each provider declares its {@link BillingCapability capabilities}
- * so that {@link BillingService} knows what to delegate vs. handle internally.
- *
- * <ul>
- *   <li><b>Stripe</b>  — MANAGED_SUBSCRIPTIONS, CUSTOMERS, CUSTOMER_PORTAL, EXTERNAL_INVOICES</li>
- *   <li><b>WayForPay</b> — MERCHANT_RECURRING</li>
- *   <li><b>NoOp</b>     — (none)</li>
- * </ul>
- */
+/** {@link BillingService} delegates only what a provider's {@link BillingCapability capabilities} declare. */
 public interface BillingProvider {
 
-    /** Unique code stored in DB columns (e.g. "stripe", "wayforpay", "noop"). */
+    /** Stored in DB columns, e.g. "stripe", "wayforpay", "noop". */
     String getProviderCode();
 
-    /** Human-readable name for UI. */
     String getDisplayName();
 
-    /** What this provider can do. */
     Set<BillingCapability> capabilities();
 
-    /** Default currency code for this provider (e.g. "USD", "UAH"). */
     default String getDefaultCurrency() { return "USD"; }
 
     default boolean supports(BillingCapability capability) {
         return capabilities().contains(capability);
     }
 
-    // ── Core: payment page (every paid provider has this) ───────────
-
-    /**
-     * What a checkout for this plan charges, in the provider's {@link #getDefaultCurrency() currency}'s
-     * minor unit. The catalog price is the default; a provider that prices plans in its own table
-     * (WayForPay prices in UAH, the catalog in USD) answers from that table, and throws
-     * {@link IllegalArgumentException} for a plan or interval it has no price for. The amount is
-     * stored on the subscription, and renewals charge the same amount.
-     */
+    /** In the minor unit of {@link #getDefaultCurrency()}; throws for a plan the provider has no price for. */
     default long checkoutPriceCents(String planName, BillingInterval interval, long catalogPriceCents) {
         return catalogPriceCents;
     }
 
-    /** Create a hosted payment / checkout page. Returns URL to redirect user. */
     default CreatePaymentResult createPaymentPage(CreatePaymentRequest request) {
         return new CreatePaymentResult(request.successUrl(), null);
     }
 
-    // ── Customers (Stripe) ──────────────────────────────────────────
-
-    /** Create a customer entity in provider. Returns external customer ID. */
     default String createCustomer(UUID organizationId, String name, String email) { return null; }
 
-    // ── Managed subscriptions (Stripe) ──────────────────────────────
-
-    /** Create a subscription in provider. Returns external subscription ID. */
     default String createSubscription(String externalCustomerId, String planExternalId, String currency) { return null; }
 
-    /** Cancel a subscription in provider. */
     default void cancelExternalSubscription(String externalSubscriptionId) {}
 
-    /** Create a self-service billing portal URL. */
     default String createPortalSession(String externalCustomerId, String returnUrl) { return returnUrl; }
 
-    // ── Merchant-initiated recurring (WayForPay) ────────────────────
-
-    /** Charge a stored card/token. Returns payment result. */
     default ChargeResult chargeRecurring(RecurringChargeRequest request) {
         throw new UnsupportedOperationException(getProviderCode() + " does not support merchant-initiated recurring");
     }
 
-    // ── Invoices ────────────────────────────────────────────────────
-
-    /** List invoices from external system. */
     default List<ExternalInvoice> fetchInvoices(String externalCustomerId) { return List.of(); }
 
-    // Refunds are not initiated from here. Railhook has no refund endpoint and no screen that
-    // asks for one; a refund is issued in the provider's own dashboard and arrives back as a
-    // `payment.refunded` webhook, which BillingService records on the payment row. The outbound
-    // refund() this interface used to declare — implemented against the Stripe and WayForPay
-    // APIs, and guarded by a REFUNDS capability nothing ever queried — was never called by
-    // anything, so it was two untested money-moving code paths one wrong wire away from running.
-
-    // ── Usage reporting (metered billing) ───────────────────────────
+    // No outbound refund: refunds are issued in the provider's dashboard and arrive as a webhook.
 
     default void reportUsage(String externalSubscriptionId, String metricName, long quantity) {}
 
-    // ── Reconciliation (MANAGED_SUBSCRIPTIONS only) ────────────────
-
-    /**
-     * Fetch current subscription state from external provider.
-     * Only meaningful for providers with {@link BillingCapability#MANAGED_SUBSCRIPTIONS}.
-     * Returns null if the subscription cannot be found or the provider doesn't support this.
-     */
+    /** Only for {@link BillingCapability#MANAGED_SUBSCRIPTIONS}. Null when not found or unsupported. */
     default ExternalSubscriptionState fetchSubscriptionStatus(String externalSubscriptionId) { return null; }
 
-    // ── Webhooks ────────────────────────────────────────────────────
-
-    /** Parse and verify incoming webhook. Returns null if signature is invalid. */
+    /** Returns null if the signature is invalid. */
     BillingWebhookEvent parseWebhook(String rawPayload, Map<String, String> headers);
-
-    // ── Inner DTOs (records) ────────────────────────────────────────
 
     record CreatePaymentRequest(
             UUID organizationId,

@@ -32,48 +32,18 @@ public class UsageDailyAggregator {
     private final UsageDailyRepository usageDailyRepository;
     private final IncomingEventRepository incomingEventRepository;
     private final IncomingForwardAttemptRepository incomingForwardAttemptRepository;
-    // aggregateForProject is invoked via `this` from aggregateYesterday, which bypasses
-    // the Spring proxy, so @Transactional silently does nothing there. TransactionTemplate is
-    // driven explicitly instead, matching the pattern used by OutboxPublisherService /
-    // EventIngestService / EncryptionKeyRotationService in this codebase.
+    // Self-invocation bypasses the proxy, so @Transactional would do nothing here.
     private final TransactionTemplate transactionTemplate;
 
-    /**
-     * How many projects are held in memory at once. The sweep visits every project on the
-     * platform; it used to load them all first, which on a large installation is a heap the
-     * scheduler does not need and a failure that takes the whole night's run with it rather
-     * than one project's numbers.
-     */
     static final int BATCH_SIZE = 500;
 
-    /**
-     * How many days back each nightly run looks: yesterday and the four before it.
-     *
-     * <p>A day's row used to be written once, at 00:05 the next morning, and never again, so
-     * every Delivery still on the retry ladder then was missing from that day's outcomes for
-     * good. A Delivery settles at the latest when the worker escalates it to the DLQ,
-     * {@code DELIVERY_ESCALATION_HARD_CAP_HOURS} (96) after it was created — so a Delivery
-     * created in the last second of a day has an outcome by the fifth night after it. The window
-     * stays inside the shortest plan retention (seven days), so a recount does not count a day
-     * retention has already started deleting.
-     */
+    // Outcomes land within 96 hours of creation; must stay below the shortest retention of 7 days.
     static final int RECOUNT_DAYS = 5;
 
-    /**
-     * Days recounted every night whatever their row says. A day whose Deliveries have all
-     * settled can still gain incoming Forwards, which retry for up to 24 hours and are not part
-     * of the settled check — two nights covers them.
-     */
+    // Incoming Forwards retry for up to 24 hours and are not part of the settled check.
     static final int ALWAYS_RECOUNT_DAYS = 2;
 
-    /**
-     * Usage of the last {@link #RECOUNT_DAYS} days, for every live project.
-     *
-     * <p>{@code lockAtMostFor} is the deadline after which ShedLock assumes this instance died
-     * and lets another take over. It has to exceed the longest honest run: crossing it while
-     * still working means two instances sweeping at once, which the single-statement upsert
-     * makes harmless but not free.
-     */
+    // lockAtMostFor must exceed the longest real run, or two instances sweep at once.
     @SystemTenant
     @Scheduled(cron = "0 5 0 * * *")
     @SchedulerLock(name = "usage-daily-aggregator", lockAtLeastFor = "PT1M", lockAtMostFor = "PT2H")
@@ -94,9 +64,7 @@ public class UsageDailyAggregator {
                     LocalDate date = today.minusDays(daysBack);
                     boolean always = daysBack <= ALWAYS_RECOUNT_DAYS;
                     try {
-                        // The scheduler walks every organization, so it has no ambient one — enter
-                        // each project's before touching its rows, and outside the transaction
-                        // below, since Hibernate reads the tenant when it opens the session.
+                        // Entered outside the transaction: Hibernate reads the tenant when it opens the session.
                         TenantContext.runAs(project.getOrganizationId(), () -> {
                             if (always) {
                                 aggregateForProject(project.getId(), date);
@@ -115,8 +83,6 @@ public class UsageDailyAggregator {
                     count++;
                 }
             }
-            // A short page is the last one. Asking again would be a wasted round trip on every
-            // nightly run, and on an empty platform it is the only round trip there is.
             if (batch.size() < BATCH_SIZE) {
                 break;
             }
@@ -131,19 +97,11 @@ public class UsageDailyAggregator {
         }
     }
 
-    /**
-     * Counts one project's day and writes it, replacing a row already there. Must be called
-     * inside that project's organization scope.
-     */
+    /** Must be called inside the project's organization scope. */
     public void aggregateForProject(UUID projectId, LocalDate date) {
         transactionTemplate.executeWithoutResult(status -> countAndWrite(projectId, date));
     }
 
-    /**
-     * Counts one project's day unless its row says every Delivery of that day already has an
-     * outcome. A day with no row is written: a project the sweep missed on its night is caught
-     * up on the next one. Must be called inside that project's organization scope.
-     */
     void recountIfUnsettled(UUID projectId, LocalDate date) {
         transactionTemplate.executeWithoutResult(status -> {
             Optional<UsageDaily> existing = usageDailyRepository.findByProjectIdAndDate(projectId, date);
@@ -171,10 +129,7 @@ public class UsageDailyAggregator {
         long incomingEventsCount = incomingEventRepository.countByProjectAndDateRange(projectId, dayStart, dayEnd);
         long incomingForwardsCount = incomingForwardAttemptRepository.countSuccessfulByProjectAndDateRange(projectId, dayStart, dayEnd);
 
-        // One statement against the UNIQUE (project_id, date) constraint (V020), so overlapping
-        // runs cannot produce a duplicate row. usage_daily.organization_id is NOT NULL (V056) and
-        // this write is native, so the discriminator neither filters it nor fills it in — the
-        // value has to be handed over.
+        // Native upsert, so the tenant discriminator does not fill organization_id; pass it explicitly.
         usageDailyRepository.upsert(
                 TenantContext.require(), projectId, date, eventsCount, deliveriesCount,
                 successCount, failedCount, dlqCount, incomingEventsCount, incomingForwardsCount);

@@ -12,11 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * Filter node — evaluates conditions against input data.
- * Reuses the existing {@link ConditionTreeEvaluator}.
- * Returns SUCCESS (pass-through) if conditions match, SKIPPED if not.
- */
+/** Passes input through when the conditions match, and skips otherwise. */
 @Component
 @Slf4j
 @RequiredArgsConstructor

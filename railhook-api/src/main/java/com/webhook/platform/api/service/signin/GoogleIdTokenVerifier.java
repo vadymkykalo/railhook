@@ -23,21 +23,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Checks a Google ID token the way Google's documentation says to, and nothing looser.
- *
- * <p>Each check closes a specific way into somebody else's account: the signature against Google's
- * published keys (a token anyone could write), the audience (a genuine token Google issued to a
- * different site, which that site can replay here), the nonce (a token captured from an earlier
- * sign-in), the expiry, and {@code email_verified} (an address nobody proved they own). RS256 is
- * the only algorithm accepted, so a token cannot choose to be checked as HMAC against a public key.
- *
- * <p>Keys are fetched from the JWKS URL and cached for an hour. An unknown key id refetches once a
- * minute at most, which follows Google's rotations without letting junk tokens hammer the endpoint.
- */
+// Every check blocks a real takeover. RS256 only, so a token cannot ask to be checked as HMAC
+// against the public key.
 public class GoogleIdTokenVerifier {
 
-    /** Where the JSON Web Key Set comes from; Google's certs URL in production. */
     @FunctionalInterface
     public interface KeySetSource {
         String fetch();
@@ -108,7 +97,6 @@ public class GoogleIdTokenVerifier {
         } catch (SignInRejectedException e) {
             throw e;
         } catch (RuntimeException e) {
-            // Every JwtException, a malformed token, a claim of the wrong type: all mean the same thing.
             if (e.getCause() instanceof SignInRejectedException rejected) {
                 throw rejected;
             }

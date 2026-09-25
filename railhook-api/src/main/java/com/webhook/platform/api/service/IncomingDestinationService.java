@@ -62,23 +62,7 @@ public class IncomingDestinationService {
         this.retryLadderEscalationCap = retryLadderEscalationCap;
     }
 
-    /**
-     * Turns "no such source in this project" into a 404, and hands back the row.
-     *
-     * <p>{@code IncomingSource} carries {@code @TenantId}, so this lookup only sees sources inside
-     * the caller's organization, and the project narrows it to the one in the URL: another
-     * organization's source and another project's are both indistinguishable from a missing one,
-     * which is intended. The organization alone was not enough - an API key is confined to the
-     * project in the URL, and could otherwise add a destination to, or re-point one of, any
-     * project's source.
-     *
-     * <p>It was called {@code validateSourceOwnership}, and it bound a
-     * {@code TenantContext.require()} organization id and the source's {@code Project} and
-     * compared neither — a name promising a check its body did not perform, over an isolation
-     * guarantee that in fact comes from Hibernate. The isolation was real; the reassurance was
-     * not, and a reader looking for where ownership is enforced found a method that looked like
-     * the answer.
-     */
+    // Narrowed to the project, not just the tenant: an API key is confined to the project in the URL.
     private IncomingSource requireSource(UUID projectId, UUID sourceId) {
         return sourceRepository.findByIdAndProjectId(sourceId, projectId)
                 .orElseThrow(() -> new NotFoundException("Incoming source not found"));
@@ -90,11 +74,7 @@ public class IncomingDestinationService {
                 .orElseThrow(() -> new NotFoundException("Incoming destination not found"));
     }
 
-    /**
-     * The request carries this as a string so that {@code ""} can mean "detach", the way a blank
-     * {@code payloadTransform} does. A UUID field could not: Jackson maps both an absent property
-     * and an explicit empty one to null, so the two would be the same request.
-     */
+    // A string so "" can mean "detach". Jackson maps both absent and empty to null for a UUID field.
     private static UUID parseTransformationId(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -126,8 +106,6 @@ public class IncomingDestinationService {
             validateTransformationBelongsToProject(transformationId, source.getProjectId());
         }
 
-        // Same rule as the outgoing side: a malformed ladder is rejected where it is written,
-        // not silently replaced with somebody else's policy at forward time.
         RetryLadder.validate(
                 request.getRetryDelays() != null ? request.getRetryDelays() : RetryLadderDefaults.INCOMING_DELAYS,
                 "retryDelays",
@@ -154,7 +132,6 @@ public class IncomingDestinationService {
                 .transformationId(transformationId)
                 .build();
 
-        // Encrypt auth config if provided
         if (request.getAuthConfig() != null && !request.getAuthConfig().isBlank()) {
             CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getAuthConfig());
             destination.setAuthConfigEncrypted(encrypted.getCiphertext());
@@ -233,12 +210,7 @@ public class IncomingDestinationService {
         if (request.getPayloadTransform() != null) {
             destination.setPayloadTransform(request.getPayloadTransform().isBlank() ? null : request.getPayloadTransform());
         }
-        // Same rule as payloadTransform on the line above, which is the point: a blank value
-        // detaches the destination from its template. There was no way to do that at all --
-        // transformationId only ever moved from one template to another, so a destination that
-        // acquired one was stuck with a transform forever, and the field's own documentation
-        // ("overrides payloadTransform if set") meant payloadTransform could not be got back to
-        // either.
+        // Blank detaches, the same rule as payloadTransform.
         if (request.getTransformationId() != null) {
             UUID requested = parseTransformationId(request.getTransformationId());
             if (requested != null) {

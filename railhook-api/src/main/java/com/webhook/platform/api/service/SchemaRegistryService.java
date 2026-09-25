@@ -47,8 +47,6 @@ public class SchemaRegistryService {
         this.meterRegistry = meterRegistry;
     }
 
-    // ── Event Type Catalog ──
-
     @Auditable(action = AuditAction.CREATE, resourceType = "EventType")
     @Transactional
     public EventTypeCatalogResponse createEventType(UUID projectId, EventTypeCatalogRequest request) {
@@ -101,22 +99,18 @@ public class SchemaRegistryService {
         log.info("Deleted event type '{}'", entity.getName());
     }
 
-    // ── Schema Versions ──
-
     @Auditable(action = AuditAction.CREATE, resourceType = "SchemaVersion")
     @Transactional
     public EventSchemaVersionResponse createSchemaVersion(UUID projectId, UUID eventTypeId, EventSchemaVersionRequest request,
                                                           UUID userId) {
         EventTypeCatalog eventType = requireEventType(projectId, eventTypeId);
 
-        // Validate the schema JSON is valid
         try {
             objectMapper.readTree(request.getSchemaJson());
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Invalid JSON Schema: " + e.getMessage());
         }
 
-        // Compute fingerprint
         String fp;
         try {
             fp = JsonSchemaUtils.fingerprint(request.getSchemaJson());
@@ -124,7 +118,6 @@ public class SchemaRegistryService {
             throw new IllegalArgumentException("Failed to compute schema fingerprint: " + e.getMessage());
         }
 
-        // Check for duplicate schema
         Optional<EventSchemaVersion> existing = versionRepository.findByEventTypeIdAndFingerprint(eventTypeId, fp);
         if (existing.isPresent()) {
             log.info("Schema with fingerprint {} already exists as version {}", fp, existing.get().getVersion());
@@ -137,9 +130,7 @@ public class SchemaRegistryService {
                 ? versionRepository.findByEventTypeIdAndVersion(eventTypeId, nextVersion - 1)
                 : Optional.empty();
 
-        // Omitted means "the promise the previous version made", not "no promise": a project that
-        // asked for BACKWARD once should not lose it the first time somebody posts a schema
-        // without repeating the field.
+        // Omitted means the previous version's mode, not NONE.
         CompatibilityMode mode = request.getCompatibilityMode() != null
                 ? request.getCompatibilityMode()
                 : previous.map(EventSchemaVersion::getCompatibilityMode).orElse(CompatibilityMode.NONE);
@@ -160,7 +151,6 @@ public class SchemaRegistryService {
         version = versionRepository.saveAndFlush(version);
         log.info("Created schema version {} for event type '{}'", nextVersion, eventType.getName());
 
-        // Compute diff with previous version
         if (nextVersion > 1) {
             computeAndSaveDiff(eventTypeId, nextVersion - 1, version);
         }
@@ -195,7 +185,6 @@ public class SchemaRegistryService {
             return mapVersionResponse(version);
         }
 
-        // Deprecate current active version
         versionRepository.findActiveByEventTypeId(version.getEventTypeId())
                 .ifPresent(active -> {
                     active.setStatus(SchemaStatus.DEPRECATED);
@@ -221,8 +210,6 @@ public class SchemaRegistryService {
         return mapVersionResponse(version);
     }
 
-    // ── Schema Changes ──
-
     @Transactional(readOnly = true)
     public List<SchemaChangeResponse> listSchemaChanges(UUID projectId, UUID eventTypeId) {
         EventTypeCatalog eventType = requireEventType(projectId, eventTypeId);
@@ -240,20 +227,7 @@ public class SchemaRegistryService {
                 .collect(Collectors.toList());
     }
 
-    // ── Private helpers ──
-
-    /**
-     * Refuses a version that breaks the promise its mode makes about the one before it.
-     *
-     * <p>The registry stored a compatibility mode from the day it shipped, returned it on every
-     * response, and never once read it: a project could declare FULL and then post a schema that
-     * deleted every required property, and the only trace was a WARN line saying the change was
-     * breaking — after the version had been written. The check is the same diff the schema-changes
-     * board is built from, judged by {@link CompatibilityMode#violations}.
-     *
-     * <p>Nothing declares a mode by accident. It defaults to NONE, auto-discovered schemas get
-     * NONE, and NONE checks nothing — so this can only refuse a project that asked to be refused.
-     */
+    // The default and auto-discovered mode is NONE, so this only refuses a project that asked for it.
     private void enforceCompatibility(CompatibilityMode mode, EventSchemaVersion previous, String schemaJson) {
         if (mode == CompatibilityMode.NONE) {
             return;
@@ -302,10 +276,6 @@ public class SchemaRegistryService {
         }
     }
 
-    /**
-     * The event type as seen from the project in the URL. Another project's event type is "not
-     * found", like a missing one; and a version is only ever reached through its own event type.
-     */
     private EventTypeCatalog requireEventType(UUID projectId, UUID eventTypeId) {
         return catalogRepository.findByIdAndProjectId(eventTypeId, projectId)
                 .orElseThrow(() -> new NotFoundException("Event type not found"));
@@ -316,11 +286,6 @@ public class SchemaRegistryService {
                 .orElseThrow(() -> new NotFoundException("Schema version not found"));
     }
 
-    /**
-     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
-     * lookup only sees projects inside the caller's organization: a foreign project id is
-     * indistinguishable from a missing one, which is intended.
-     */
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));

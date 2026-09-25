@@ -18,15 +18,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Keeps a sign-in's {@link OAuthState} in the browser, signed, instead of on the server.
- *
- * <p>A cookie rather than Redis because the state has exactly one reader — the callback in the
- * same browser — and a server-side store would add a second system to the one path that must
- * work when a person is locked out of everything else. The cookie is HttpOnly and SameSite=Lax,
- * which is what lets it ride along on Google's top-level redirect back and nowhere else.
- *
- * <p>The key is derived from the JWT secret with a label, so the two uses never share a key
- * even though operators configure one secret.
+ * A signed cookie, not Redis, so sign-in depends on nothing else. The key is derived from the JWT
+ * secret with a label so the two never share a key.
  */
 public class OAuthStateCodec {
 
@@ -72,7 +65,6 @@ public class OAuthStateCodec {
         }
     }
 
-    /** The state, if the cookie is one this codec signed and it has not expired; empty otherwise. */
     public Optional<OAuthState> decode(String cookie) {
         if (cookie == null || cookie.isBlank()) {
             return Optional.empty();

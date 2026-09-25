@@ -12,29 +12,8 @@ import java.util.HexFormat;
 import java.util.Map;
 import java.util.TreeMap;
 
-/**
- * Twilio webhook signature verifier.
- *
- * <p>Twilio signs {@code X-Twilio-Signature} as base64(HMAC-SHA1(authToken, data)), and what goes
- * into {@code data} depends on how the request was encoded:
- *
- * <ul>
- *   <li><b>form-encoded</b> (the classic messaging and voice callbacks) — the full request URL,
- *       then every POST parameter sorted by name, each written as the name immediately followed
- *       by its decoded value, with no separators;
- *   <li><b>anything else</b> (JSON, from the newer webhooks) — the full request URL alone, with
- *       Twilio having appended {@code bodySHA256=<hex>} to its query string. The signature then
- *       covers the body only through that hash, so this verifier checks the hash as well: without
- *       it the URL signature would keep verifying while somebody swapped the body underneath it.
- * </ul>
- *
- * <p>"The full request URL" is the one Twilio was configured with, and getting it from the
- * incoming request would mean trusting {@code Host} and {@code X-Forwarded-Proto} — behind a
- * reverse proxy that is exactly how Twilio verification usually breaks. It comes from
- * {@code webhook.ingress-base-url} instead: the same setting that builds the ingress URL shown on
- * the source's page, which is the URL a person copies into the Twilio console. The two agree by
- * construction. Only when it is unset does this fall back to what the request claims.
- */
+// Non-form requests sign only the URL, so its bodySHA256 must be checked or the body could be
+// swapped. The URL comes from ingress-base-url, not Host headers, which break behind a proxy.
 public class TwilioVerifier implements WebhookVerificationStrategy {
 
     private static final String SIGNATURE_HEADER = "X-Twilio-Signature";
@@ -95,13 +74,7 @@ public class TwilioVerifier implements WebhookVerificationStrategy {
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
-    /** Sorted by parameter name, each name immediately followed by its decoded value. */
-    /**
-     * Only reached for {@code application/x-www-form-urlencoded}, where the body is
-     * percent-encoded and therefore ASCII by definition — so decoding it as UTF-8 is a fact
-     * about the encoding rather than an assumption about the sender. The other branch hashes
-     * the bytes without decoding them at all.
-     */
+    // A form-encoded body is ASCII by definition, so decoding it as UTF-8 is safe.
     private static String concatenatedParameters(byte[] rawBody) {
         String body = rawBody != null ? new String(rawBody, StandardCharsets.UTF_8) : null;
         Map<String, String> sorted = new TreeMap<>();

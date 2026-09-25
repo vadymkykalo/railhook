@@ -77,11 +77,7 @@ public class IncomingEventService {
         this.piiMaskingService = piiMaskingService;
     }
 
-    /**
-     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
-     * lookup only sees projects inside the caller's organization: a foreign project id is
-     * indistinguishable from a missing one, which is intended.
-     */
+    // Project carries @TenantId, so a foreign project id is indistinguishable from a missing one.
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
@@ -109,7 +105,6 @@ public class IncomingEventService {
             events = eventRepository.findByProjectId(projectId, pageable);
         }
 
-        // Batch-fetch source names for the page — eliminates N+1 per-row lookup
         Map<UUID, String> sourceNames = resolveSourceNames(events.getContent());
 
         return events.map(event -> mapToResponse(event, sourceNames));
@@ -161,11 +156,7 @@ public class IncomingEventService {
         }
 
         UUID projectId = resolveProjectIdFromSource(event.getIncomingSourceId());
-        // One session for the whole Replay, and a Ladder that starts at attempt 1 inside it.
-        // Reading MAX(attempt_number) and adding one is what this used to do, and it raced the
-        // live Ladder for the same number against a real unique index: whichever transaction
-        // lost rolled back, and when the loser was the worker's finalise the Attempt was left
-        // PROCESSING. V064 gives a Replay its own numbering so there is nothing to race for.
+        // Own attempt numbering: MAX(attempt_number) + 1 raced the live Ladder on a unique index.
         UUID replaySessionId = UUID.randomUUID();
         int replayed = 0;
         for (IncomingDestination destination : destinations) {
@@ -196,7 +187,6 @@ public class IncomingEventService {
     public IncomingBulkReplayResponse bulkReplay(UUID projectId, IncomingBulkReplayRequest request) {
         validateProjectOwnership(projectId);
 
-        // Validate source belongs to project
         IncomingSource source = sourceRepository.findById(request.getSourceId())
                 .orElseThrow(() -> new NotFoundException("Incoming source not found"));
         if (!source.getProjectId().equals(projectId)) {
@@ -211,11 +201,9 @@ public class IncomingEventService {
 
         int maxEvents = request.getMaxEvents() != null ? Math.min(request.getMaxEvents(), 5000) : 1000;
 
-        // Resolve events to replay
         List<IncomingEvent> events;
         if (request.getEventIds() != null && !request.getEventIds().isEmpty()) {
             events = eventRepository.findAllById(request.getEventIds());
-            // Filter to only events belonging to this source
             events = events.stream()
                     .filter(e -> e.getIncomingSourceId().equals(request.getSourceId()))
                     .limit(maxEvents)
@@ -238,9 +226,7 @@ public class IncomingEventService {
                     .build();
         }
 
-        // Process in batches to avoid long-held DB locks and connection pool exhaustion. One
-        // session spans the whole bulk Replay, batches included, so re-running it stays idempotent
-        // against the partial unique index V064 introduced.
+        // One session across batches keeps a re-run idempotent against the partial unique index.
         UUID replaySessionId = UUID.randomUUID();
         int totalAttempts = 0;
         for (int i = 0; i < events.size(); i += BULK_REPLAY_BATCH_SIZE) {
@@ -311,14 +297,7 @@ public class IncomingEventService {
                 .collect(Collectors.toMap(IncomingSource::getId, IncomingSource::getName, (a, b) -> a));
     }
 
-    /**
-     * The raw body a provider posted, with the project's masking rules applied.
-     *
-     * <p>Incoming carries whatever a third party sent — routinely a customer record, a payment
-     * or an address. The rules reached the outgoing events list and not this, so the same
-     * personal data was redacted on one screen and printed verbatim on the other. Masking is
-     * configured per project, and an incoming event reaches its project through its source.
-     */
+    // Masked: provider payloads routinely carry personal data.
     private IncomingEventResponse mapToResponse(IncomingEvent event, Map<UUID, String> sourceNames) {
         UUID projectId = resolveProjectIdFromSource(event.getIncomingSourceId());
         String bodyRaw = event.getBodyRaw();

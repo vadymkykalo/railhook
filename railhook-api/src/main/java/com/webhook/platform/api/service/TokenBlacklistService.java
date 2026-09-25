@@ -25,10 +25,7 @@ public class TokenBlacklistService {
             RedissonClient redissonClient,
             @Value("${jwt.refresh-token-expiration:86400000}") long refreshTokenExpirationMs) {
         this.redissonClient = redissonClient;
-        // An epoch marker only has to outlive the longest-lived token it can invalidate:
-        // once every token issued before the revocation has expired on its own, the marker
-        // says nothing. Doubling the refresh-token lifetime leaves generous headroom for
-        // clock skew and for the setting being raised without this being revisited.
+        // Outlives any token it can invalidate, with room for clock skew and a raised setting.
         this.epochTtl = Duration.ofMillis(refreshTokenExpirationMs * 2);
     }
 
@@ -53,30 +50,15 @@ public class TokenBlacklistService {
 
     public void revokeAllUserTokens(UUID userId) {
         RBucket<Long> bucket = redissonClient.getBucket(EPOCH_PREFIX + userId);
-        // With a TTL, not without one. These keys used to live forever, so Redis grew by one
-        // key per user who ever changed a password or had a session revoked, and none of them
-        // could ever be reclaimed.
+        // With a TTL: without one Redis kept a key forever for every user who ever revoked.
         bucket.set(System.currentTimeMillis(), epochTtl);
         log.info("Revoked all tokens for user {}", userId);
     }
 
-    /**
-     * Ends one session, for every token it ever minted.
-     *
-     * <p>Revoking a session by blacklisting only its refresh token would be a promise kept
-     * fifteen minutes late: the access token already in the client's hands is self-contained and
-     * nothing re-checks it. Access tokens therefore carry the session id as a {@code sid} claim
-     * and {@code JwtAuthenticationFilter} asks this on every request, so "sign this device out"
-     * means what it says.
-     *
-     * <p>Distinct from {@link #revokeAllUserTokens}, which is an epoch over the whole account.
-     * This one is per-session, so signing out a laptop leaves the phone alone.
-     */
+    // Checked per request by sid, so signing out a device takes effect before its token expires.
     public void revokeSession(UUID sessionId, Date sessionExpiry) {
         long ttlMs = sessionExpiry.getTime() - System.currentTimeMillis();
         if (ttlMs <= 0) {
-            // Every token this session could have issued has already expired; a marker would
-            // only occupy a key until it timed out saying nothing.
             return;
         }
         RBucket<String> bucket = redissonClient.getBucket(SESSION_PREFIX + sessionId);
@@ -92,15 +74,7 @@ public class TokenBlacklistService {
         return bucket.isExists();
     }
 
-    /**
-     * Compared in whole seconds, because that is all a JWT's {@code iat} carries. Against the
-     * millisecond epoch, the login a user makes right after changing or resetting a password —
-     * signed in the same second — read as older than the revocation and was refused.
-     *
-     * <p>The cost is the other half of that second: a token signed up to a second <em>before</em>
-     * the revocation also survives, for one access-token lifetime at most: a refresh re-reads the
-     * session row and the membership, which the revoking operation has already changed.
-     */
+    // Whole seconds, because iat has no more; milliseconds refused a login in the same second.
     public boolean isTokenRevokedByEpoch(UUID userId, Date issuedAt) {
         if (userId == null || issuedAt == null) {
             return false;

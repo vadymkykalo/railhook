@@ -58,17 +58,11 @@ public class SubscriptionService {
         this.retryLadderEscalationCap = retryLadderEscalationCap;
     }
 
-    /**
-     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
-     * lookup only sees projects inside the caller's organization: a foreign project id is
-     * indistinguishable from a missing one, which is intended.
-     */
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
     }
 
-    /** Another project's subscription is "not found", like a missing one - the URL names the project. */
     private Subscription requireSubscription(UUID projectId, UUID id) {
         return subscriptionRepository.findByIdAndProjectId(id, projectId)
                 .orElseThrow(() -> new NotFoundException("Subscription not found"));
@@ -104,16 +98,11 @@ public class SubscriptionService {
             throw new ConflictException("Subscription for this endpoint and event type already exists");
         }
 
-        // Reject a malformed ladder here rather than letting the worker meet it. Before this
-        // check both pipelines answered an unparseable retry_delays by logging a warning and
-        // substituting a hardcoded array of their own, so a typo silently bought the customer
-        // a retry policy that was neither theirs nor documented.
+        // Refused here because the worker will not guess at a ladder or status spec it cannot parse.
         RetryLadder.validate(
                 request.getRetryDelays() != null ? request.getRetryDelays() : RetryLadderDefaults.OUTGOING_DELAYS,
                 "retryDelays",
                 request.getMaxAttempts(), "maxAttempts");
-        // Same reason, same place: the worker refuses to guess at a spec it cannot parse, so the
-        // mistake has to be refused where it is made.
         RetryableStatuses.validate(
                 request.getRetryableStatuses() != null
                         ? request.getRetryableStatuses() : RetryableStatuses.DEFAULT_SPEC,
@@ -205,7 +194,6 @@ public class SubscriptionService {
         if (request.getCustomHeaders() != null) {
             subscription.setCustomHeaders(request.getCustomHeaders());
         }
-        // transformationId: explicit null clears the link, non-null sets it
         if (request.getTransformationId() != null) {
             validateTransformationBelongsToProject(request.getTransformationId(), subscription.getProjectId());
             subscription.setTransformationId(request.getTransformationId());

@@ -15,12 +15,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Which plan applies, and where the answer is cached.
- *
- * <p>Separate from {@link EntitlementService}, which decides what a plan allows: this is the
- * lookup, on the request path for every quota check, and the only thing holding the cache.
- */
+/** The cached plan lookup on every quota check's path. */
 @Component
 public class PlanLookup {
 
@@ -45,15 +40,11 @@ public class PlanLookup {
         return forOrganization(TenantContext.require());
     }
 
-    /**
-     * For a caller holding an organization without being scoped to it — the billing schedulers
-     * process organizations under the system tenant rather than inside one.
-     */
+    // The billing schedulers process organizations under the system tenant, not inside one.
     public Plan forOrganization(UUID organizationId) {
         return planCache.get(organizationId, this::load);
     }
 
-    /** Empty when the project is gone: the caller decides what its own default is. */
     public Optional<Plan> forProject(UUID projectId) {
         return projectRepository.findById(projectId)
                 .map(Project::getOrganizationId)

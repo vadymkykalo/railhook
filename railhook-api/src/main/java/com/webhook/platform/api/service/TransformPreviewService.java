@@ -22,14 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * The Transform Studio's run button.
- *
- * <p>Nothing here is a second implementation of anything: a script goes through the same
- * {@code JavaScriptTransformEngine} the worker uses, under the same limits, with the same
- * sandbox. What a person sees here is what the endpoint gets, which is the only reason a
- * preview is worth having.
- */
+// Runs the same engine, limits and sandbox as the worker, so the preview matches what is delivered.
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -129,11 +122,7 @@ public class TransformPreviewService {
         }
     }
 
-    /**
-     * The two shapes that are not a transformation at all: a bare JSONPath to pull one branch
-     * out, and nothing, which is a formatted echo. Both predate saved transformations and both
-     * are still what the Studio does the first time somebody opens it.
-     */
+    // A bare JSONPath extract, or with no expression a formatted echo.
     private TransformPreviewResponse previewWithoutATransformation(TransformPreviewRequest request,
             JsonNode root, Map<String, String> headers, TransformationKind kind) {
         String expression = request.getTransformExpression();
@@ -177,11 +166,6 @@ public class TransformPreviewService {
                 .build();
     }
 
-    /**
-     * What the author is told. The reason comes first because it decides what to do about it: a
-     * TIMEOUT is a loop to find, a CONTRACT is a return statement to fix, and they read nothing
-     * alike.
-     */
     private String describe(ScriptTransformException e) {
         String where = e.line() > 0 ? " (line " + e.line() + ")" : "";
         return e.reason() + where + ": " + e.getMessage();

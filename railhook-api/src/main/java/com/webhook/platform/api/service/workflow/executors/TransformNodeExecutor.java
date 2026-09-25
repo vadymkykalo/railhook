@@ -22,26 +22,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Reshapes the data passing through a workflow, one of two ways.
- *
- * <p><strong>A saved transformation</strong> — {@code transformationId} names one from the
- * project's Transformations page, the same objects a rule action points at, written in
- * {@code ${$.json.path}} and run by {@link TemplateTransformer}. This is what a project with a
- * library of them wants, and until it existed the library was invisible from the canvas: the
- * only way to reuse a transformation in a workflow was to retype it, in a different syntax.
- *
- * <p><strong>An inline template</strong> — {@code template}, in this node's own
- * {@code {{field.path}}} placeholders, for a one-off reshape that does not deserve a name.
- *
- * <p>The two syntaxes are not interchangeable and this node does not try to guess which it was
- * handed: the reference decides. A node carrying both — which is what switching a node from
- * inline to saved leaves behind — runs the saved one.
- *
- * <p>A reference that cannot be resolved fails the step. Passing the payload through instead
- * would send a raw event to a destination promised a reshaped one and report it as a success,
- * which is the worst of the available outcomes and the hardest to notice.
- */
+/** An unresolvable transformation fails the step rather than passing the raw payload through. */
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -76,8 +57,6 @@ public class TransformNodeExecutor implements NodeExecutor {
             return StepResult.failed("Not a transformation id: " + rawId);
         }
 
-        // @TenantId scopes this to the caller's organization, and the engine's pool carries the
-        // tenant across (TenantPropagatingTaskDecorator), so there is no id to check by hand.
         Optional<Transformation> found = transformationRepository.findById(transformationId);
         if (found.isEmpty()) {
             return StepResult.failed("Transformation not found: " + transformationId);
@@ -88,9 +67,7 @@ public class TransformNodeExecutor implements NodeExecutor {
         }
 
         try {
-            // A workflow node has no Delivery behind it, so a script sees the step's input as
-            // its payload and nothing for the delivery context. A script that cancels stops the
-            // step rather than a delivery — there is no delivery here to stop.
+            // No Delivery behind a workflow node, so a cancel stops the step instead.
             TransformationRunner.Result result = runner.run(
                     transformation.getKind(), transformation.getTemplate(),
                     TransformRequest.builder()
@@ -116,19 +93,17 @@ public class TransformNodeExecutor implements NodeExecutor {
         try {
             JsonNode templateNode = nodeConfig.get("template");
             if (templateNode == null || templateNode.isNull()) {
-                return StepResult.success(input); // nothing configured yet = pass through
+                return StepResult.success(input);
             }
 
             String template = templateNode.isTextual() ? templateNode.textValue() : templateNode.toString();
 
-            // If template is a JSON string, parse and resolve placeholders in values
             if (template.trim().startsWith("{")) {
                 JsonNode templateJson = objectMapper.readTree(template);
                 JsonNode resolved = resolvePlaceholders(templateJson, input);
                 return StepResult.success(resolved);
             }
 
-            // Plain string template — resolve and wrap
             String resolved = resolvePlaceholdersInString(template, input);
             return StepResult.success(objectMapper.createObjectNode().put("result", resolved));
         } catch (Exception e) {
@@ -152,7 +127,7 @@ public class TransformNodeExecutor implements NodeExecutor {
             String resolved = resolvePlaceholdersInString(text, input);
             return objectMapper.getNodeFactory().textNode(resolved);
         }
-        return template; // numbers, booleans, arrays — pass through
+        return template;
     }
 
     private String resolvePlaceholdersInString(String template, JsonNode input) {

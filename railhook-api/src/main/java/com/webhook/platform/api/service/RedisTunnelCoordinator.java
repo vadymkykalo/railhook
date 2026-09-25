@@ -20,16 +20,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
 
-/**
- * Redis-backed tunnel coordination for multi-instance deployments.
- * <p>
- * Each API instance gets a unique ID on startup. When a tunnel registers,
- * we store {@code slug → instanceId} in Redis. When a request arrives at
- * the wrong instance, we use Redis Pub/Sub to route it to the owning instance.
- * <p>
- * Fast path: if the slug is local, we skip Redis entirely.
- * Slow path: publish request → owning instance forwards via WebSocket → publishes response.
- */
+/** Relays a tunnel request over Pub/Sub to the instance holding the slug's socket. */
 @Slf4j
 @Service
 public class RedisTunnelCoordinator {
@@ -46,7 +37,6 @@ public class RedisTunnelCoordinator {
     private final TunnelRegistry tunnelRegistry;
     private final String instanceId;
 
-    /** Pending cross-instance responses: requestId → future */
     private final ConcurrentHashMap<String, CompletableFuture<TunnelResponseMessage>> remotePending = new ConcurrentHashMap<>();
 
     private int requestListenerId;
@@ -94,13 +84,11 @@ public class RedisTunnelCoordinator {
 
     @PostConstruct
     public void startListening() {
-        // Listen for cross-instance tunnel requests targeted at this instance
         RTopic requestTopic = redissonClient.getTopic(REQUEST_TOPIC_PREFIX + instanceId);
         requestListenerId = requestTopic.addListener(String.class, (channel, message) -> {
             handleRemoteRequest(message);
         });
 
-        // Listen for cross-instance tunnel responses (for requests we sent)
         RTopic responseTopic = redissonClient.getTopic(RESPONSE_TOPIC_PREFIX + instanceId);
         responseListenerId = responseTopic.addListener(String.class, (channel, message) -> {
             handleRemoteResponse(message);
@@ -124,9 +112,6 @@ public class RedisTunnelCoordinator {
         }
     }
 
-    /**
-     * Register a slug as owned by this instance. Called when a WS connection is established.
-     */
     public void registerSlug(String slug) {
         try {
             RBucket<String> bucket = redissonClient.getBucket(SLUG_KEY_PREFIX + slug);
@@ -137,9 +122,6 @@ public class RedisTunnelCoordinator {
         }
     }
 
-    /**
-     * Unregister a slug from Redis. Called when a WS connection is closed.
-     */
     public void unregisterSlug(String slug) {
         try {
             redissonClient.getBucket(SLUG_KEY_PREFIX + slug).delete();
@@ -149,10 +131,7 @@ public class RedisTunnelCoordinator {
         }
     }
 
-    /**
-     * Ends a tunnel wherever its socket is. The owner key goes before the broadcast, so the slug
-     * stops resolving cluster-wide before the message reaches the instance holding the socket.
-     */
+    // The owner key goes before the broadcast, so the slug stops resolving cluster-wide first.
     public void disconnect(String slug) {
         tunnelRegistry.disconnect(slug);
         unregisterSlug(slug);
@@ -163,9 +142,6 @@ public class RedisTunnelCoordinator {
         }
     }
 
-    /**
-     * Refresh the TTL for a slug. Called on heartbeat.
-     */
     public void refreshSlug(String slug) {
         try {
             RBucket<String> bucket = redissonClient.getBucket(SLUG_KEY_PREFIX + slug);
@@ -175,15 +151,10 @@ public class RedisTunnelCoordinator {
         }
     }
 
-    /**
-     * Check if a slug is active anywhere in the cluster.
-     */
     public boolean isActiveInCluster(String slug) {
-        // Fast path: local check
         if (tunnelRegistry.isActive(slug)) {
             return true;
         }
-        // Slow path: check Redis
         try {
             RBucket<String> bucket = redissonClient.getBucket(SLUG_KEY_PREFIX + slug);
             return bucket.isExists();
@@ -193,20 +164,15 @@ public class RedisTunnelCoordinator {
         }
     }
 
-    /**
-     * Forward a request, potentially cross-instance via Redis Pub/Sub.
-     * Returns null if the tunnel is unreachable or times out.
-     */
+    /** Returns null if the tunnel is unreachable or times out. */
     public TunnelResponseMessage forwardRequest(String slug, TunnelRequestMessage request) {
         Timer.Sample sample = Timer.start();
         try {
-            // Fast path: slug is local
             if (tunnelRegistry.isActive(slug)) {
                 localForwardCounter.increment();
                 return tunnelRegistry.forwardRequest(slug, request);
             }
 
-            // Slow path: find owning instance and forward via Redis
             try {
                 RBucket<String> bucket = redissonClient.getBucket(SLUG_KEY_PREFIX + slug);
                 String ownerInstance = bucket.get();
@@ -227,16 +193,12 @@ public class RedisTunnelCoordinator {
         }
     }
 
-    /**
-     * Send request to remote instance via Redis Pub/Sub and wait for response.
-     */
     private TunnelResponseMessage forwardRemote(String targetInstance, String slug, TunnelRequestMessage request) {
         String requestId = request.getRequestId();
         CompletableFuture<TunnelResponseMessage> future = new CompletableFuture<>();
         remotePending.put(requestId, future);
 
         try {
-            // Envelope: requestId, slug, callerInstance, request payload
             String payload = objectMapper.writeValueAsString(Map.of(
                     "requestId", requestId,
                     "slug", slug,
@@ -265,9 +227,6 @@ public class RedisTunnelCoordinator {
         }
     }
 
-    /**
-     * Handle an incoming request from another instance. Forward through local WS and send response back.
-     */
     private void handleRemoteRequest(String message) {
         try {
             var node = objectMapper.readTree(message);
@@ -278,10 +237,8 @@ public class RedisTunnelCoordinator {
 
             log.debug("Handling remote tunnel request: requestId={}, slug={}, from={}", requestId, slug, callerInstance);
 
-            // Forward through local WS tunnel
             TunnelResponseMessage response = tunnelRegistry.forwardRequest(slug, request);
 
-            // Send response back to caller instance
             String responsePayload = objectMapper.writeValueAsString(Map.of(
                     "requestId", requestId,
                     "response", response != null ? response : TunnelResponseMessage.builder()
@@ -298,9 +255,6 @@ public class RedisTunnelCoordinator {
         }
     }
 
-    /**
-     * Handle a response from a remote instance for a request we sent.
-     */
     private void handleRemoteResponse(String message) {
         try {
             var node = objectMapper.readTree(message);

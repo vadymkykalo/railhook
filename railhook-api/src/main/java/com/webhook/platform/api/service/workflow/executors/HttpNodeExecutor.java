@@ -21,16 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-/**
- * HTTP Request node — makes an outbound HTTP call to a URL the workflow's author typed.
- *
- * <p>That makes it the one node a user can aim, so it carries both halves of the SSRF defence:
- * {@link UrlValidator} refuses a URL that resolves somewhere private, and
- * {@link SsrfProtectionCustomizer} re-checks the address the connector actually dials. The
- * second is not redundant — validating and connecting are two separate resolutions of the same
- * name, and a name can move between them. This class previously claimed to "reuse SSRF
- * protection" while building a bare client, so only the first half was true.
- */
+/** SSRF is checked on the URL and again on the dialled address, since DNS can change in between. */
 @Component
 @Slf4j
 public class HttpNodeExecutor implements NodeExecutor {
@@ -67,17 +58,13 @@ public class HttpNodeExecutor implements NodeExecutor {
                 return StepResult.failed("HTTP node: url is required");
             }
 
-            // Passing the configured allow-list rather than null: it is an exemption list, so
-            // null did not weaken the check — it meant an operator who allow-listed an internal
-            // host for every other outbound path could not reach it from a workflow node. One
-            // WEBHOOK_ALLOWED_HOSTS should mean one thing everywhere.
+            // allowedHosts is an exemption list; null only made operator-allowed hosts unreachable.
             UrlValidator.validateWebhookUrl(url, allowPrivateIps, allowedHosts);
 
             String method = getTextOrDefault(nodeConfig, "method", "POST");
             int timeoutSeconds = nodeConfig.has("timeout") ? nodeConfig.get("timeout").asInt(30) : 30;
             timeoutSeconds = Math.max(1, Math.min(60, timeoutSeconds));
 
-            // Build request body
             String body;
             if (nodeConfig.has("body") && !nodeConfig.get("body").isNull()) {
                 JsonNode bodyNode = nodeConfig.get("body");
@@ -86,13 +73,11 @@ public class HttpNodeExecutor implements NodeExecutor {
                 body = input != null ? input.toString() : "{}";
             }
 
-            // Execute HTTP call
             WebClient.RequestBodySpec requestSpec = webClient.method(org.springframework.http.HttpMethod.valueOf(method))
                     .uri(url)
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("User-Agent", "RailhookWorkflow/1.0");
 
-            // Custom headers
             if (nodeConfig.has("headers") && nodeConfig.get("headers").isObject()) {
                 Iterator<Map.Entry<String, JsonNode>> headers = nodeConfig.get("headers").fields();
                 while (headers.hasNext()) {
@@ -132,7 +117,6 @@ public class HttpNodeExecutor implements NodeExecutor {
                 }
             }
 
-            // Build response headers
             ObjectNode respHeaders = objectMapper.createObjectNode();
             HttpHeaders headers = responseSpec.getHeaders();
             headers.forEach((key, values) -> {

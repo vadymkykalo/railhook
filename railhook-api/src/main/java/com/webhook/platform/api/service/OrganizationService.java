@@ -42,14 +42,7 @@ public class OrganizationService {
         this.tunnelService = tunnelService;
     }
 
-    /**
-     * Every organization this user belongs to — which is more than the one their current token
-     * names, and is the input the organization switcher needs.
-     *
-     * <p>System-scoped for the same reason {@code AuthService.login} is: {@code Membership}
-     * carries {@code @TenantId}, so under the request's own scope this read would be filtered to
-     * the current organization and a user who accepted a second invite would never see it.
-     */
+    // Membership is tenant-scoped, so under the request's scope this would only see the current organization.
     @SystemTenant("lists every organization the user belongs to, which is by definition not one organization")
     public List<OrganizationResponse> getUserOrganizations(UUID userId) {
         List<Membership> memberships = membershipRepository.findByUserId(userId);
@@ -83,18 +76,7 @@ public class OrganizationService {
                 .build();
     }
 
-    /**
-     * GDPR Article 17 — permanently deletes organization and all associated data.
-     * Relies on ON DELETE CASCADE constraints in the schema:
-     * organizations → projects → (api_keys, events, endpoints, subscriptions, deliveries, ...)
-     * organizations → memberships
-     *
-     * <p>The audit log is deliberately <em>not</em> in that list, and never was: {@code audit_log}
-     * carries an {@code organization_id} but no foreign key to organizations, so its rows outlive
-     * the organization they describe. That is what makes auditing this operation meaningful —
-     * a record that vanished along with its subject would answer nobody's question about
-     * whether an erasure was actually carried out, and when.
-     */
+    // Relies on ON DELETE CASCADE; audit_log has no foreign key, so the record outlives it.
     @Auditable(action = AuditAction.ORGANIZATION_DELETED, resourceType = "Organization")
     @Transactional
     public void deleteOrganization() {
@@ -109,18 +91,7 @@ public class OrganizationService {
         log.info("GDPR DELETE: organization {} deleted successfully", organizationId);
     }
 
-    /**
-     * The same erasure, for an organization that is not the caller's current tenant.
-     *
-     * <p>{@link #deleteOrganization()} reads the tenant scope, which is right when a customer
-     * deletes their own organization from inside it. Erasing a person is the other case:
-     * {@link AccountErasureService} walks every organization they were alone in, and none of
-     * those is the scope the request arrived with.
-     *
-     * <p>Not exposed over HTTP, and deliberately not annotated {@code @Auditable} — the erasure
-     * that calls it writes one entry for the whole operation, and a second row per organization
-     * would describe the same act twice.
-     */
+    // Not @Auditable: account erasure writes one entry for the whole operation.
     @SystemTenant("erasing a person deletes organizations other than the request's own")
     @Transactional
     public void deleteOrganizationById(UUID organizationId) {
@@ -135,9 +106,6 @@ public class OrganizationService {
 
     @Transactional
     public OrganizationResponse updateOrganization(UpdateOrganizationRequest request) {
-        // Was: an {orgId} path variable compared against the token's organization. Both halves
-        // are gone -- @RequireOrgAccess already rejects a mismatched path variable, and the
-        // organization being updated is now the caller's tenant by construction.
         UUID organizationId = TenantContext.require();
 
         Organization organization = organizationRepository.findById(organizationId)

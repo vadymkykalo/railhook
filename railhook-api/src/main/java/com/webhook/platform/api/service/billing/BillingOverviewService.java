@@ -22,12 +22,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * What an organization is using, against what its plan allows.
- *
- * <p>Separate from {@link BillingService}, which talks to the payment provider: this one only
- * counts rows and reads the plan, and is the half a self-hosted installation still needs.
- */
 @Service
 @RequiredArgsConstructor
 public class BillingOverviewService {
@@ -41,22 +35,7 @@ public class BillingOverviewService {
     private final MembershipRepository membershipRepository;
     private final Clock clock;
 
-    /**
-     * The plan catalog, which is the same rows for everyone and for nobody in particular.
-     *
-     * <p>Declared system-scoped because this is the one genuinely anonymous read in the API:
-     * SecurityConfig permits it, TenantContextFilter sets no scope without a caller, and
-     * OrganizationTenantResolver refuses to guess - so without this it answered 500 to exactly
-     * the visitor it exists for. Nothing noticed because the only caller is the dashboard's
-     * billing page, which is behind a login and therefore always carried a scope.
-     *
-     * <p>Root scope is safe here in the way it usually is not: plans are a catalog, not tenant
-     * data, and nothing on this path writes.
-     *
-     * <p>The self-hosted plan is an internal row, not something to offer anyone. With no payment
-     * provider configured nothing priced is offered either — the deployment runs the free plan
-     * only, and a price nobody can pay is not an offer.
-     */
+    // With no payment provider configured, nothing priced is offered.
     @SystemTenant("the plan catalog is identical for every organization, and this endpoint is "
             + "reachable without credentials, so there is no tenant to run as")
     public List<PlanResponse> catalog() {
@@ -118,7 +97,7 @@ public class BillingOverviewService {
         return organizationBilling();
     }
 
-    /** The same count the quota check re-seeds from, so the page and the refusal agree. */
+    // Same count the quota check re-seeds from, so the page and the refusal agree.
     private long eventsIn(BillingPeriod period, UUID organizationId) {
         return eventRepository.countEventsAndIncomingEventsBetween(
                 organizationId, period.start(), period.end());

@@ -17,30 +17,12 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Triggers matching workflows when a webhook event is ingested.
- *
- * <p>Primary path: {@link #triggerWorkflowsSync} called by {@code WorkflowTriggerOutboxService}
- * after the outbox poller claims a row. This guarantees at-least-once execution
- * even if the API crashes between event commit and workflow trigger.</p>
- *
- * Reliability features:
- * - Durable outbox: trigger intent persisted in same TX as event
- * - Bounded thread pool (workflowTaskExecutor): configurable concurrent workflows
- * - Recursion depth guard: configurable max chained hops
- * - Idempotency: unique index (workflow_id, trigger_event_id) prevents duplicate runs
- * - ThreadLocal depth tracking for cross-service recursion detection
- */
+/** Runs from the trigger outbox; a unique (workflow_id, trigger_event_id) index makes redelivery harmless. */
 @Service
 @Slf4j
 public class WorkflowTriggerService {
 
-    /**
-     * ThreadLocal tracking current workflow execution depth.
-     * Set by WorkflowEngine before executing nodes, read by EventIngestService
-     * to pass depth into the next triggerWorkflows call.
-     * Reset after workflow execution completes.
-     */
+    // Lets an event created by a workflow carry the depth of the chain that created it.
     private static final ThreadLocal<Integer> CURRENT_DEPTH = ThreadLocal.withInitial(() -> 0);
 
     private final WorkflowRepository workflowRepository;
@@ -62,34 +44,24 @@ public class WorkflowTriggerService {
         this.maxRecursionDepth = maxRecursionDepth;
     }
 
-    /** Read current workflow depth from calling thread (used by EventIngestService). */
     public static int getCurrentDepth() {
         return CURRENT_DEPTH.get();
     }
 
-    /** Set workflow depth on current thread (used by WorkflowEngine). */
     public static void setCurrentDepth(int depth) {
         CURRENT_DEPTH.set(depth);
     }
 
-    /** Clear depth ThreadLocal (called after workflow execution). */
     public static void clearCurrentDepth() {
         CURRENT_DEPTH.remove();
     }
 
-    /**
-     * Synchronous workflow trigger — called by {@code WorkflowTriggerOutboxService}.
-     * Runs on the outbox poller thread (bounded by workflowTaskExecutor).
-     * Throws on failure so the outbox can retry.
-     */
+    /** Throws on failure so the outbox can retry. */
     public void triggerWorkflowsSync(UUID projectId, UUID eventId, String eventType, String eventPayload, int depth) {
         doTriggerWorkflows(projectId, eventId, eventType, eventPayload, depth);
     }
 
-    /**
-     * @deprecated Use durable outbox path via {@link #triggerWorkflowsSync} instead.
-     * Kept for backward compatibility during transition.
-     */
+    /** @deprecated use {@link #triggerWorkflowsSync} through the outbox. */
     @Deprecated
     @Async("workflowTaskExecutor")
     public void triggerWorkflows(UUID projectId, UUID eventId, String eventType, String eventPayload, int depth) {
@@ -97,7 +69,6 @@ public class WorkflowTriggerService {
     }
 
     private void doTriggerWorkflows(UUID projectId, UUID eventId, String eventType, String eventPayload, int depth) {
-        // ── Recursion guard ──────────────────────────────────────
         if (depth > maxRecursionDepth) {
             log.warn("Workflow recursion depth {} exceeds max {} for event {} — skipping",
                     depth, maxRecursionDepth, eventId);
@@ -118,11 +89,7 @@ public class WorkflowTriggerService {
         for (Workflow workflow : workflows) {
             if (!matchesTrigger(workflow, eventType)) continue;
             try {
-                // The only caller is the outbox poller, which runs under TenantContext.SYSTEM:
-                // Hibernate adds no predicate and, more importantly, stamps nothing on insert.
-                // Everything below belongs to the workflow's organization — the execution row,
-                // and the endpoints and deliveries its nodes go on to touch — so enter that
-                // organization's scope here, outside any transaction.
+                // Under SYSTEM, Hibernate stamps no tenant on insert.
                 TenantContext.runAs(workflow.getOrganizationId(),
                         () -> triggerOne(workflow, eventId, eventType, eventPayload, eventJson, depth));
             } catch (Exception e) {
@@ -132,10 +99,8 @@ public class WorkflowTriggerService {
         }
     }
 
-    /** Runs one matched workflow. Called inside that workflow's organization scope. */
     private void triggerOne(Workflow workflow, UUID eventId, String eventType,
                             String eventPayload, JsonNode eventJson, int depth) {
-        // ── Idempotency guard ────────────────────────────
         if (eventId != null && executionRepository.existsByWorkflowIdAndTriggerEventId(
                 workflow.getId(), eventId)) {
             log.debug("Skipping duplicate: workflow {} already triggered for event {}",
@@ -143,7 +108,6 @@ public class WorkflowTriggerService {
             return;
         }
 
-        // ── Create execution with depth tracking ─────────
         WorkflowExecution execution;
         try {
             execution = executionRepository.save(WorkflowExecution.builder()
@@ -153,9 +117,7 @@ public class WorkflowTriggerService {
                     .depth(depth)
                     .build());
         } catch (DataIntegrityViolationException e) {
-            // The unique index on (workflow_id, trigger_event_id) is the only violation this
-            // path expects. Reporting every other one as a duplicate is what kept the missing
-            // organization_id stamp invisible: confirm the duplicate, or let the failure out.
+            // Treating every violation as a duplicate once hid a missing organization_id.
             if (eventId == null || !executionRepository.existsByWorkflowIdAndTriggerEventId(
                     workflow.getId(), eventId)) {
                 throw e;
@@ -167,7 +129,6 @@ public class WorkflowTriggerService {
         log.info("Triggering workflow '{}' (id={}) for event {} (type={}) depth={}",
                 workflow.getName(), workflow.getId(), eventId, eventType, depth);
 
-        // ── Set depth ThreadLocal before engine execution ─
         try {
             setCurrentDepth(depth);
             workflowEngine.execute(execution.getId(), workflow.getDefinition(), eventJson);
@@ -176,9 +137,6 @@ public class WorkflowTriggerService {
         }
     }
 
-    /**
-     * Check if the workflow's trigger config matches the event type.
-     */
     private boolean matchesTrigger(Workflow workflow, String eventType) {
         try {
             JsonNode config = objectMapper.readTree(workflow.getTriggerConfig());
@@ -188,7 +146,6 @@ public class WorkflowTriggerService {
                     return EventTypeMatcher.matches(pattern, eventType);
                 }
             }
-            // No pattern = match all events
             return true;
         } catch (Exception e) {
             log.warn("Failed to parse trigger config for workflow {}: {}", workflow.getId(), e.getMessage());

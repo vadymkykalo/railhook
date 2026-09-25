@@ -17,20 +17,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * "Continue with Google": the authorization-code flow with PKCE and a nonce, the client secret
- * held by the server.
- *
- * <p>The browser is sent to Google carrying a state value and a PKCE challenge; the matching state,
- * nonce and verifier wait in a signed cookie ({@link OAuthStateCodec}). Google sends the browser
- * back with a code, which only this server can exchange — it needs the client secret and the
- * verifier — for an ID token, which {@link GoogleIdTokenVerifier} checks. The person is then
- * matched to an account or given one, and the browser goes to the dashboard with a one-time code,
- * never a token.
- *
- * <p>Registering and signing in are the same flow: the button on either page does both, which is
- * what people expect of it.
- */
+/** Authorization code with PKCE and a nonce; the browser ends up with a one-time code, never a token. */
 @Service
 @Slf4j
 public class GoogleSignInService {
@@ -73,12 +60,12 @@ public class GoogleSignInService {
         this.externalSignInService = externalSignInService;
     }
 
-    /** Both halves configured. Without them the button is not shown and the endpoints answer 404. */
+    /** Without both halves the button is hidden and the endpoints answer 404. */
     public boolean isEnabled() {
         return !clientId.isEmpty() && !clientSecret.isEmpty();
     }
 
-    /** The redirect URI registered in Google Cloud Console; it has to match character for character. */
+    /** Must match the URI registered with Google character for character. */
     public String redirectUri() {
         return appBaseUrl + CALLBACK_PATH;
     }
@@ -104,21 +91,14 @@ public class GoogleSignInService {
         return new Start(url, stateCodec.encode(state));
     }
 
-    /**
-     * Where the browser goes next, and — when the sign-in succeeded — the binding that browser must
-     * hold for the one-time code in that location to work ({@link ExternalSignInService#browserBindingFor}).
-     */
+    /** {@code browserBinding} is what the browser must hold for the one-time code to work. */
     public record Completion(String location, String browserBinding) {
         static Completion refused(String location) {
             return new Completion(location, null);
         }
     }
 
-    /**
-     * Finishes the sign-in Google has sent the browser back from. Always answers with a path on this
-     * origin: the dashboard's callback with a one-time code, or the page the sign-in started on with
-     * an error code. Nothing about the failure beyond that code leaves the server.
-     */
+    /** Always a path on this origin; a failure reveals only its error code. */
     public Completion complete(String code, String state, String error, String stateCookie) {
         Optional<OAuthState> saved = stateCodec.decode(stateCookie);
         String startPage = saved.map(OAuthState::intent).filter("register"::equals).map(i -> "/register").orElse("/login");

@@ -5,13 +5,7 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * Runs the day-2 onboarding nudge hourly on one replica.
- *
- * <p>Kept apart from {@link OnboardingMailService#sendDueNudges} so the lock guards the schedule
- * and not the work: the work is safe to run twice by itself, since each account is claimed with a
- * conditional update before its mail goes.
- */
+/** The lock guards the schedule only; each account is claimed by a conditional update anyway. */
 @Component
 public class OnboardingNudgeScheduler {
 

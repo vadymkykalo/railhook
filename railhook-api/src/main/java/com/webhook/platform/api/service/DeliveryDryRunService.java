@@ -27,14 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Builds the exact request a real Delivery would make — body, headers and signature — and does
- * not send it.
- *
- * <p>The transformation half goes through {@link TransformationRunner}, which is the same engine
- * the worker runs. This endpoint's whole value is that the bytes it shows are the bytes that
- * would go out; a second implementation here would be a lie with a green tick on it.
- */
+/** Uses the worker's TransformationRunner, so the bytes shown are the bytes that would go out. */
 @Service
 @Slf4j
 public class DeliveryDryRunService {
@@ -58,17 +51,7 @@ public class DeliveryDryRunService {
         this.runner = runner;
     }
 
-    /**
-     * @param projectId the project in the request path, which the caller has already been shown to
-     *                  have access to. It has to be threaded down here because the endpoint this
-     *                  signs for arrives in the request <em>body</em>: {@code @TenantId} confines
-     *                  the lookup to the organization and {@code ScopeEnforcementInterceptor}
-     *                  confines the path variable, and an id in the body is outside both. An
-     *                  organization with two projects is the ordinary case, and this is the one
-     *                  read path that hands back a working signature rather than a description of
-     *                  one — so a sibling project's endpoint leaked both a forgeable
-     *                  {@code X-Signature} and the URL to aim it at.
-     */
+    // The endpoint comes from the body, unconfined to the project; a sibling's once leaked a signature.
     public DeliveryDryRunResponse dryRun(UUID projectId, DeliveryDryRunRequest request) {
         List<String> errors = new ArrayList<>();
         String transformedPayload = null;
@@ -83,7 +66,6 @@ public class DeliveryDryRunService {
         Map<String, String> requestHeaders = new LinkedHashMap<>();
         Map<String, String> scriptHeaders = new LinkedHashMap<>();
 
-        // 1. Parse input payload
         JsonNode sourceNode;
         try {
             sourceNode = objectMapper.readTree(request.getPayload());
@@ -96,7 +78,7 @@ public class DeliveryDryRunService {
                     .build();
         }
 
-        // 2. Resolve the transformation. A saved one wins, and brings its own language with it.
+        // A saved transformation wins and brings its own language.
         String source = null;
         TransformationKind kind = request.getKind() == null
                 ? TransformationKind.TEMPLATE : request.getKind();
@@ -121,15 +103,11 @@ public class DeliveryDryRunService {
             source = request.getPayloadTemplate();
         }
 
-        // The endpoint is resolved before the transform because a script is shown the URL it is
-        // being run for. Read-only: a transformation that could choose the address would be past
-        // the SSRF checks a real attempt makes before it gets anywhere near here.
+        // Read-only to the script: choosing the address would bypass the SSRF checks.
         Endpoint endpoint = null;
         if (request.getEndpointId() != null) {
             endpoint = endpointRepository.findById(request.getEndpointId())
-                    // Deliberately folded into "not found": that is the answer @TenantId already
-                    // gives for another organization's row, and distinguishing the two here would
-                    // make the dry-run a way to enumerate endpoint ids.
+                    // "Not found", so the dry-run cannot enumerate endpoint ids.
                     .filter(e -> projectId.equals(e.getProjectId()))
                     .orElse(null);
             if (endpoint == null) {
@@ -139,9 +117,7 @@ public class DeliveryDryRunService {
             }
         }
 
-        // 3. Transform. A failure here fails the dry-run rather than falling back to the raw
-        //    payload: this endpoint exists to show the bytes that would go out, and the fallback
-        //    is the one AttemptRunner's invariant 4 forbids on a real Delivery.
+        // No fallback to the raw payload: AttemptRunner forbids that on a real Delivery.
         if (source != null) {
             try {
                 TransformationRunner.Result result = runner.run(kind, source, TransformRequest.builder()
@@ -151,11 +127,7 @@ public class DeliveryDryRunService {
                         .timestamp(Instant.now())
                         .direction("OUTGOING")
                         .url(endpointUrl)
-                        // The caller's own custom headers, which is what the preview shows a
-                        // script too. A dry-run names an Endpoint but no Subscription, and
-                        // outgoing custom headers are the Subscription's — so there is nothing
-                        // else configured to show, and an empty map would make the dry-run the
-                        // one of the three paths that disagreed.
+                        // A dry-run names no Subscription, so the script sees the caller's headers.
                         .headers(callerHeaders(request.getCustomHeaders()))
                         .build());
 
@@ -163,7 +135,6 @@ public class DeliveryDryRunService {
                 console = result.console();
 
                 if (result.cancelled()) {
-                    // Nothing would be sent, so there is no body to sign and no headers to show.
                     return DeliveryDryRunResponse.builder()
                             .success(errors.isEmpty())
                             .errors(errors)
@@ -197,7 +168,6 @@ public class DeliveryDryRunService {
             }
         }
 
-        // 4. Build headers
         long timestamp = System.currentTimeMillis();
         requestHeaders.put("Content-Type", "application/json");
         requestHeaders.put("User-Agent", "WebhookPlatform/1.0");
@@ -207,14 +177,9 @@ public class DeliveryDryRunService {
             requestHeaders.put("X-Event-Type", request.getEventType());
         }
 
-        // 5. Compute HMAC signature if an endpoint was named
         if (endpoint != null) {
             try {
-                // Go through the registry, not CryptoUtils directly: the dry-run must
-                // resolve the endpoint's own key version and fall back across a rotation
-                // exactly as real delivery does. Reading a single raw key here made the
-                // dry-run report "Failed to compute signature" for any endpoint still
-                // encrypted under a previous version while delivery kept working.
+                // The registry resolves the key version across a rotation, as real delivery does.
                 String secret = encryptionKeyRegistry.decryptWithFallback(
                         endpoint.getSecretEncrypted(),
                         endpoint.getSecretIv(),
@@ -231,11 +196,9 @@ public class DeliveryDryRunService {
             }
         }
 
-        // 6. Whatever the script set, over the computed headers and under the caller's own —
-        //    which stay the last word here exactly as they are on a real Delivery.
+        // Script headers go over the computed ones and under the caller's own, as on a real Delivery.
         requestHeaders.putAll(scriptHeaders);
 
-        // 7. Merge custom headers
         if (request.getCustomHeaders() != null && !request.getCustomHeaders().isBlank()) {
             try {
                 @SuppressWarnings("unchecked")

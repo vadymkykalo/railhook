@@ -27,20 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
-/**
- * Delivers the node's input to an existing platform endpoint using the standard
- * Delivery → Outbox → Kafka pipeline.
- *
- * <p>A Delivery points at an Event, and the worker sends that Event's payload. The node records its
- * own input as an Event in the endpoint's project and delivers that. It used to take the Event from
- * {@code _eventId} in its input: nothing on the server set that, so every delivery node failed, and
- * a customer who set it could point the Delivery at any organization's Event — the worker loads
- * Events without a tenant filter. The endpoint lookup is tenant-scoped, so the project, and the
- * Event with it, are always the workflow's own organization.
- *
- * <p>Config: {@code endpointId} (required), {@code eventType} (optional, default
- * {@value #DEFAULT_EVENT_TYPE}).
- */
+/** Delivers the input as a new Event: an event id from input could name another organization's Event. */
 @Component
 @Slf4j
 public class DeliveryNodeExecutor implements NodeExecutor {
@@ -57,14 +44,7 @@ public class DeliveryNodeExecutor implements NodeExecutor {
     private final long maxPayloadSizeBytes;
     private final int compressionThresholdBytes;
 
-    /**
-     * Scoped to the writes, not to {@link #execute}.
-     *
-     * <p>{@code execute} ends in a catch-all that turns any failure into a failed StepResult. A
-     * {@code @Transactional} around all of it would therefore return normally from a transaction
-     * an inner failure had already marked rollback-only, and the commit would throw
-     * UnexpectedRollbackException from somewhere with no bearing on the cause.
-     */
+    // Not around execute: its catch-all would commit a rollback-only transaction and throw on commit.
     private final TransactionTemplate txTemplate;
 
     public DeliveryNodeExecutor(EndpointRepository endpointRepository,
@@ -117,20 +97,13 @@ public class DeliveryNodeExecutor implements NodeExecutor {
                 return StepResult.skipped("Delivery node: endpoint is disabled");
             }
 
-            // The Event recorded below is charged like any other, so it is checked like one.
             entitlementService.checkEventQuota();
 
             String eventType = nodeConfig.hasNonNull("eventType") && !nodeConfig.get("eventType").asText().isBlank()
                     ? nodeConfig.get("eventType").asText() : DEFAULT_EVENT_TYPE;
             Event event = buildEvent(endpoint.getProjectId(), eventType, input);
 
-            // One transaction, which is what DeliveryDispatch's contract asks of every caller:
-            // the Outbox row is written in the same breath as the Delivery, so the two cannot
-            // disagree about whether the work exists. This node had neither an annotation nor a
-            // template, and WorkflowEngine runs it on its own pool so there was no ambient
-            // transaction to inherit — two auto-commits, and a window between them that left a
-            // PENDING Delivery with no Outbox row and next_retry_at NULL. Nothing dispatches
-            // that; it waits an hour for the stranded-PENDING sweep.
+            // The Delivery and its Outbox row commit together; this pool has no ambient transaction.
             Delivery delivery = txTemplate.execute(tx -> {
                 Event saved = eventRepository.saveAndFlush(event);
                 Delivery created = deliveryRepository.save(Delivery.builder()
@@ -183,7 +156,7 @@ public class DeliveryNodeExecutor implements NodeExecutor {
                 .build();
     }
 
-    /** After the commit, as the ingest path does: the counter is not rolled back with a transaction. */
+    // After the commit: the counter is not rolled back with a transaction.
     private void chargeQuota() {
         try {
             quotaCounterService.increment();

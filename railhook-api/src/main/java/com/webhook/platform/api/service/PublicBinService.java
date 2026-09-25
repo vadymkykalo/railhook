@@ -29,24 +29,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * The webhook tester on the public site: URLs made without an account that record what is sent
- * to them for a day.
- *
- * <p>Nothing here is tenant data — there is no organization behind a public URL — so every
- * method runs in the system scope. The bounds are what keep an anonymous, public store from
- * being one worth abusing, and each closes a different way in:
- * <ul>
- *   <li>per URL: the latest {@value #KEEP_REQUESTS} requests within {@value #BUDGET_BYTES} bytes of
- *       bodies, each body cut at {@value #MAX_BODY_CHARS} characters — so one URL is at most a
- *       megabyte however hard it is fed;</li>
- *   <li>per address: at most {@code perAddress} live URLs, on top of the per-minute rate limit
- *       and the challenge the controller asks for — a limit per minute alone still lets one
- *       address hold thousands;</li>
- *   <li>overall: at most {@code maxActive} live URLs, so even many addresses cannot grow the
- *       tables past a known size — the tester says it is busy instead;</li>
- *   <li>and a day's life, with credentials masked at the write, since anyone with the URL can
- *       read it.</li>
- * </ul>
+ * Public, so it runs in the system scope. Bounded per URL, per address and overall, and
+ * credentials are masked at write because anyone with the URL can read it.
  */
 @Slf4j
 @Service
@@ -90,7 +74,6 @@ public class PublicBinService {
         this.maxActive = maxActive;
     }
 
-    /** Why a URL was not made; the controller turns it into a status and an error code. */
     public static class LimitReached extends RuntimeException {
         private final boolean overall;
 
@@ -99,7 +82,6 @@ public class PublicBinService {
             this.overall = overall;
         }
 
-        /** True when the tester as a whole is full, false when it is this address. */
         public boolean isOverall() {
             return overall;
         }
@@ -175,10 +157,7 @@ public class PublicBinService {
         }
     }
 
-    /**
-     * Off by default: a self-hosted install that never asked for it answers as though the tester
-     * did not exist, rather than opening an anonymous store on someone's own server.
-     */
+    // Off by default, so a self-hosted install does not open an anonymous store unasked.
     private void requireEnabled() {
         if (!enabled) {
             throw new NotFoundException("The webhook tester is not enabled on this server");

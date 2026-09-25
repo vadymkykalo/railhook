@@ -29,16 +29,7 @@ import java.lang.reflect.Method;
 import java.util.UUID;
 
 /**
- * AOP aspect that enforces plan quotas ({@link RequireQuota}) and feature flags
- * ({@link RequireFeature}) declaratively.
- *
- * <p>Resolution strategy for identifiers:</p>
- * <ul>
- *   <li>{@code organizationId} — extracted from {@link AuthContext} in method args</li>
- *   <li>{@code projectId} — extracted from {@code @PathVariable("projectId")} or param named "projectId"</li>
- * </ul>
- *
- * <p>When {@code billing.enabled=false} (self-hosted), all checks are no-ops.</p>
+ * Enforces {@link RequireQuota} and {@link RequireFeature}. A no-op when billing is disabled.
  */
 @Slf4j
 @Aspect
@@ -50,8 +41,6 @@ public class QuotaEnforcementAspect {
     private final ProjectRepository projectRepository;
     private final OrganizationRepository organizationRepository;
     private final PlatformTransactionManager transactionManager;
-
-    // ── @RequireQuota ─────────────────────────────────────────────
 
     @Around("@annotation(requireQuota)")
     public Object enforceQuota(ProceedingJoinPoint joinPoint, RequireQuota requireQuota) throws Throwable {
@@ -87,15 +76,7 @@ public class QuotaEnforcementAspect {
         return joinPoint.proceed();
     }
 
-    /**
-     * Runs the count and the create it guards in one transaction holding the Organization's row
-     * lock, which the create's own transaction joins.
-     *
-     * <p>A count taken before the create's transaction, with nothing held between it and the
-     * insert, let requests released together at one below the limit all count below it and all
-     * get through. Holding the lock, the second create waits for the first to commit and then
-     * counts it — the same lock the active-tunnel limit takes.
-     */
+    // Count and create share one transaction under the org row lock, or concurrent creates all pass.
     private Object underOrganizationLock(UUID orgId, Runnable check, ProceedingJoinPoint joinPoint) throws Throwable {
         TransactionStatus transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         Object result;
@@ -110,8 +91,6 @@ public class QuotaEnforcementAspect {
         transactionManager.commit(transaction);
         return result;
     }
-
-    // ── @RequireFeature ───────────────────────────────────────────
 
     @Before("@annotation(requireFeature)")
     public void enforceFeature(JoinPoint joinPoint, RequireFeature requireFeature) {
@@ -131,14 +110,7 @@ public class QuotaEnforcementAspect {
         }
     }
 
-    // ── Resolution helpers ────────────────────────────────────────
-
-    /**
-     * Resolves organizationId from (in priority order):
-     * 1. AuthContext parameter (controllers with AuthContext arg)
-     * 2. ApiKeyAuthenticationToken (EventController — API key auth)
-     * 3. JwtAuthenticationToken (fallback via SecurityContext)
-     */
+    // AuthContext argument first, then an API key token, then a JWT from the SecurityContext.
     private UUID resolveOrganizationId(JoinPoint joinPoint) {
         for (Object arg : joinPoint.getArgs()) {
             if (arg instanceof AuthContext auth) {
@@ -201,8 +173,6 @@ public class QuotaEnforcementAspect {
         if (authentication instanceof ApiKeyAuthenticationToken apiKey) {
             return apiKey.getProjectId();
         }
-        // An endpoint a Consumer registers from the portal is one of the session's project's,
-        // and counts against that project's limit like any other.
         if (authentication instanceof PortalSessionAuthenticationToken portal) {
             return portal.getProjectId();
         }

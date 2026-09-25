@@ -32,28 +32,23 @@ public class AuthRateLimiterService {
     private static final String REFRESH_TOKEN_KEY_PREFIX = "rate_limiter:auth:refresh:token:";
     private static final String DEVICE_POLL_IP_KEY_PREFIX = "rate_limiter:auth:device_poll:ip:";
     private static final String DEVICE_POLL_CODE_KEY_PREFIX = "rate_limiter:auth:device_poll:code:";
-    /** The CLI polls every five seconds, twelve a minute; the rest is room for a clock that drifts. */
+    /** The CLI polls every five seconds, twelve a minute. The rest is room for clock drift. */
     static final int DEVICE_POLL_PER_CODE_PER_MINUTE = 20;
     static final int DEVICE_POLL_PER_IP_PER_MINUTE = 120;
     private static final String PUBLIC_BIN_KEY_PREFIX = "rate_limiter:public_bin:ip:";
-    /** Public tester URLs a single address may make in a minute; a person needs one or two. */
     static final int PUBLIC_BIN_PER_IP_PER_MINUTE = 5;
     private static final String CONTACT_KEY_PREFIX = "rate_limiter:contact:ip:";
     static final int CONTACT_PER_IP_PER_MINUTE = 2;
     private static final String DEMO_SESSION_KEY_PREFIX = "rate_limiter:demo_session:ip:";
-    /** Demo sessions one address may open in a minute: a visitor needs one, a room behind one NAT a few. */
     static final int DEMO_SESSION_PER_IP_PER_MINUTE = 10;
     private static final String DEMO_SCRIPT_SESSION_KEY_PREFIX = "rate_limiter:demo_script:session:";
     private static final String DEMO_SCRIPT_IP_KEY_PREFIX = "rate_limiter:demo_script:ip:";
     private static final String OAUTH_REGISTER_KEY_PREFIX = "rate_limiter:oauth:register:ip:";
-    /**
-     * Not the sign-up bucket's 5: a hosted app registers from its own servers, so every person who
-     * adds the connector there in the same minute arrives from the same few addresses.
-     */
+    /** Hosted apps register from their own servers, so many users arrive from a few addresses. */
     static final int OAUTH_REGISTER_PER_IP_PER_MINUTE = 60;
     private static final String OAUTH_TOKEN_IP_KEY_PREFIX = "rate_limiter:oauth:token:ip:";
     private static final String OAUTH_TOKEN_CLIENT_KEY_PREFIX = "rate_limiter:oauth:token:client:";
-    /** High, because one hosted app (claude.ai, ChatGPT) refreshes every user's connection from few addresses. */
+    /** One hosted app (claude.ai, ChatGPT) refreshes every user's connection from few addresses. */
     static final int OAUTH_TOKEN_PER_IP_PER_MINUTE = 600;
     static final int OAUTH_TOKEN_PER_CLIENT_PER_MINUTE = 300;
     private static final Duration KEY_TTL = Duration.ofMinutes(5);
@@ -67,12 +62,6 @@ public class AuthRateLimiterService {
     private final int demoScriptPerIpRateLimit;
     private final Counter authRateLimitFallback;
 
-    /**
-     * Local in-memory fallback rate limiters (Bucket4j) used when Redis is
-     * unavailable.
-     * Keyed by the same key as Redis (IP/email) to maintain isolation.
-     * Bounded by Caffeine: max 10k entries, 5min expireAfterAccess to prevent memory growth.
-     */
     private final Cache<String, Bucket> localFallbackBuckets;
 
     public AuthRateLimiterService(
@@ -116,44 +105,19 @@ public class AuthRateLimiterService {
         return true;
     }
 
-    /** Making a webhook tester URL on the public site, which needs no account. */
     public boolean allowPublicBin(String ip) {
         return tryAcquire(PUBLIC_BIN_KEY_PREFIX + ip, PUBLIC_BIN_PER_IP_PER_MINUTE);
     }
 
-    /** A message from the public site's contact form, which needs no account and sends mail. */
     public boolean allowContactMessage(String ip) {
         return tryAcquire(CONTACT_KEY_PREFIX + ip, CONTACT_PER_IP_PER_MINUTE);
     }
 
-    /** Opening a public demo session, which needs no account and mints a token. */
     public boolean allowDemoSession(String ip) {
         return tryAcquire(DEMO_SESSION_KEY_PREFIX + ip, DEMO_SESSION_PER_IP_PER_MINUTE);
     }
 
-    /**
-     * Running a JavaScript Transformation from a demo session — the Transform Studio's preview
-     * and the delivery dry-run, the only two handlers a demo session can execute code through.
-     *
-     * <p>The sandbox already bounds one run: {@code TRANSFORM_SCRIPT_TIMEOUT_MS} (2000 ms by
-     * default) and an allocation ceiling. What it does not bound is how many runs a stranger may
-     * start, and a script runs on the request thread that called it — so a loop of scripts that
-     * each burn the whole time budget is a way to hold Tomcat's request threads, not merely a way
-     * to spend CPU.
-     *
-     * <p>That is what the two numbers are sized against, and why they are stated as runs a
-     * minute. At the default 2 s timeout, the per-address ceiling of 60 is at most 120 seconds of
-     * script time per minute — two request threads held continuously by one address, out of
-     * Tomcat's 200. The per-session 20 is the human bound underneath it: a person editing code in
-     * the Studio presses Run every few seconds, so twenty a minute is comfortable for them and
-     * makes one session worth a third of a thread.
-     *
-     * <p>Per address first, then per session, because a session costs nothing to mint — ten a
-     * minute per address, and the address is the scarce part. The session is identified by the
-     * bearer token it presented, hashed like every other token bucketed here: a demo token is
-     * minted with a {@code jti} of its own, so two tabs are two budgets and a refresh is a new
-     * one, which is the same allowance a second visitor would get.
-     */
+    // Scripts hold a request thread: 60 two-second runs a minute is at most two threads per address.
     public boolean allowDemoScriptRun(String ip, String sessionToken) {
         if (!tryAcquire(DEMO_SCRIPT_IP_KEY_PREFIX + ip, demoScriptPerIpRateLimit)) {
             return false;
@@ -169,13 +133,7 @@ public class AuthRateLimiterService {
         return tryAcquire(REGISTER_KEY_PREFIX + ip, registerRateLimit);
     }
 
-    /**
-     * Like {@link #allowLogin(String, String)}, but for endpoints that identify a
-     * target by a token rather than an email (refresh, password reset). These have
-     * no email to bucket on, so without a second dimension they are IP-only —
-     * bucketing by the presented token as well means repeated guesses/retries
-     * against one token are bounded even if spread across many source IPs.
-     */
+    /** Bucketing by the token too bounds guesses spread across many addresses. */
     public boolean allowTokenAction(String ip, String token) {
         boolean ipAllowed = tryAcquire(LOGIN_IP_KEY_PREFIX + ip, loginRateLimit);
         if (!ipAllowed) {
@@ -187,27 +145,11 @@ public class AuthRateLimiterService {
         return true;
     }
 
-    /**
-     * The platform admin API, per admin user (or per address for the operator token). Generous
-     * for a person clicking through the panel — a screen is a handful of requests — and a hard
-     * stop for a script walking every organization with a stolen session.
-     */
     public boolean allowPlatformAdmin(String caller) {
         return tryAcquire(PLATFORM_ADMIN_KEY_PREFIX + caller, PLATFORM_ADMIN_PER_MINUTE);
     }
 
-    /**
-     * Session refresh, on a budget of its own.
-     *
-     * <p>Refresh used to go through {@link #allowTokenAction}, which spends the per-IP sign-in
-     * bucket. A dashboard refreshes its session on page loads, so ten of them in a minute logged a
-     * signed-in person out with a 429 — and everyone behind one office NAT shared those ten.
-     *
-     * <p>A refresh presents a token the server issued, so the useful bound is per token: enough
-     * for a busy person with several tabs, low enough that a stolen cookie cannot be spun freely.
-     * The per-IP ceiling sits far above normal browsing and only stops one peer cycling through
-     * many different tokens. The sign-in bucket is not touched.
-     */
+    // Its own bucket: sharing the sign-in one logged out a whole office behind one NAT.
     public boolean allowRefresh(String ip, String token) {
         if (!tryAcquire(REFRESH_IP_KEY_PREFIX + ip, refreshPerIpRateLimit)) {
             return false;
@@ -218,19 +160,7 @@ public class AuthRateLimiterService {
         return true;
     }
 
-    /**
-     * A CLI waiting for its device code to be approved, on a budget of its own.
-     *
-     * <p>Polling used to go through {@link #allowTokenAction}, spending the per-IP sign-in bucket
-     * twelve times a minute against a limit of ten. The person approving that code in a browser is
-     * nearly always on the same address, so the approval itself was refused with a 429 and the CLI
-     * could not be logged in at all.
-     *
-     * <p>A device code is long and random, so guessing one is not what this bounds. Per code it is
-     * a client polling faster than the interval it was given; per IP, one peer cycling through
-     * codes. The sign-in bucket is left to approve and deny, where the short user code is the
-     * enumeration target.
-     */
+    // Its own bucket: polling in the sign-in one got the approval from the same address a 429.
     public boolean allowDevicePoll(String ip, String deviceCode) {
         if (!tryAcquire(DEVICE_POLL_IP_KEY_PREFIX + ip, DEVICE_POLL_PER_IP_PER_MINUTE)) {
             return false;
@@ -242,20 +172,10 @@ public class AuthRateLimiterService {
         return true;
     }
 
-    /**
-     * An MCP app registering itself (OAuth dynamic client registration). Open by necessity — the
-     * app has no account to register under — so bounded per address. A script minting clients in a
-     * loop is what this stops.
-     */
     public boolean allowOAuthRegister(String ip) {
         return tryAcquire(OAUTH_REGISTER_KEY_PREFIX + ip, OAUTH_REGISTER_PER_IP_PER_MINUTE);
     }
 
-    /**
-     * The OAuth token and revocation endpoints. Per address, and per client so that one app
-     * guessing at codes or refresh tokens is bounded however many addresses it comes from. An app
-     * in normal use calls this once an hour per connection.
-     */
     public boolean allowOAuthToken(String ip, String clientId) {
         if (!tryAcquire(OAUTH_TOKEN_IP_KEY_PREFIX + ip, OAUTH_TOKEN_PER_IP_PER_MINUTE)) {
             return false;
@@ -284,10 +204,6 @@ public class AuthRateLimiterService {
         }
     }
 
-    /**
-     * Local in-memory rate limiter fallback using Bucket4j.
-     * Provides emergency throttling when Redis is unavailable.
-     */
     private boolean tryLocalFallback(String key, int ratePerMinute) {
         Bucket bucket = localFallbackBuckets.get(key, k -> Bucket.builder()
                 .addLimit(Bandwidth.builder()

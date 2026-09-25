@@ -48,26 +48,14 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * What the customer portal does for one Consumer.
- *
- * <p>The organization is already confined by the tenant scope; what this class adds is the
- * Consumer. Every Endpoint is looked up by id <em>and</em> Consumer, and every Delivery by id
- * <em>and</em> one of that Consumer's Endpoints, so a sibling Consumer's rows — and the project's
- * own unassigned Endpoints — are "not found" exactly like missing ones.
- *
- * <p>Nothing here re-implements an Endpoint or a Delivery rule. URL validation, SSRF protection,
- * secret generation and encryption, rotation with its grace window, subscription matching and the
- * return to the Retry Ladder are all the same services the customer's own API goes through.
- */
+/** Tenancy confines the organization; every lookup here also confines to the one Consumer. */
 @Service
 @RequiredArgsConstructor
 public class PortalService {
 
-    /** How far back "event types this project sends" looks, when it keeps no catalog. */
     private static final Duration RECENT_EVENT_TYPES_WINDOW = Duration.ofDays(7);
 
-    /** A picker, not a report: past this many distinct types the customer wants a catalog. */
+    /** A picker, not a report: past this many types the customer needs a catalog. */
     private static final int RECENT_EVENT_TYPES_LIMIT = 200;
 
     private final PortalSessionRepository portalSessionRepository;
@@ -82,8 +70,6 @@ public class PortalService {
     private final SubscriptionService subscriptionService;
     private final DeliveryService deliveryService;
     private final Clock clock;
-
-    // ── Session ──
 
     public PortalSessionInfoResponse describeSession(PortalContext portal) {
         PortalSession session = portalSessionRepository.findById(portal.sessionId())
@@ -100,11 +86,6 @@ public class PortalService {
                 .build();
     }
 
-    /**
-     * The project's event catalog when it keeps one — that is the list the customer has said
-     * they send. Otherwise, what the project has actually sent lately, together with what its
-     * Endpoints already subscribe to, so a new project's portal is not an empty picker.
-     */
     private List<String> availableEventTypes(UUID projectId) {
         List<String> catalog = eventTypeCatalogRepository.findByProjectIdOrderByNameAsc(projectId).stream()
                 .map(EventTypeCatalog::getName)
@@ -120,8 +101,6 @@ public class PortalService {
                 .forEach(seen::add);
         return List.copyOf(seen);
     }
-
-    // ── Endpoints ──
 
     public List<PortalEndpointResponse> listEndpoints(PortalContext portal) {
         List<Endpoint> endpoints = endpointRepository.findByConsumerIdAndDeletedAtIsNullOrderByCreatedAtAsc(
@@ -179,8 +158,6 @@ public class PortalService {
         return withSecret(requireEndpoint(portal, endpointId), eventTypesOf(portal.projectId(), endpointId), rotated);
     }
 
-    // ── Deliveries ──
-
     public Page<PortalDeliveryResponse> listDeliveries(PortalContext portal, UUID endpointId, DeliveryStatus status,
                                                        Pageable pageable) {
         List<UUID> own = endpointRepository.findIdsByConsumerId(portal.consumerId());
@@ -206,8 +183,6 @@ public class PortalService {
         deliveryService.retryDeliveryToEndpoints(deliveryId, endpointRepository.findIdsByConsumerId(portal.consumerId()));
     }
 
-    // ── helpers ──
-
     private Consumer requireConsumer(PortalContext portal) {
         return consumerRepository.findByIdAndProjectId(portal.consumerId(), portal.projectId())
                 .orElseThrow(() -> new NotFoundException("Consumer not found"));
@@ -219,10 +194,7 @@ public class PortalService {
                 .orElseThrow(() -> new NotFoundException("Endpoint not found"));
     }
 
-    /**
-     * Makes the Endpoint's Subscriptions exactly {@code eventTypes}, through the same service the
-     * customer's API uses, so the matching cache is evicted and the defaults are the same.
-     */
+    /** Through the same service as the customer's API, so the matching cache is evicted. */
     private void replaceSubscriptions(UUID projectId, UUID endpointId, List<String> eventTypes) {
         List<Subscription> current = subscriptionsOf(projectId, endpointId);
         Set<String> wanted = new LinkedHashSet<>(eventTypes);
@@ -239,11 +211,7 @@ public class PortalService {
         }
     }
 
-    /**
-     * Refuses a type the project does not send, when it keeps a catalog saying what it sends. A
-     * wildcard is accepted when it matches at least one catalogued type — {@code order.*} is a
-     * reasonable thing to want, {@code nonsense.*} is a typo.
-     */
+    // With a catalog, a wildcard must match a catalogued type, so a typo is refused.
     private List<String> distinctEventTypes(UUID projectId, List<String> requested) {
         List<String> eventTypes = requested == null ? List.of() : requested.stream().distinct().toList();
         List<String> catalog = eventTypeCatalogRepository.findByProjectIdOrderByNameAsc(projectId).stream()
