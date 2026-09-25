@@ -5,9 +5,8 @@ set -euo pipefail
 # Helm chart, the UI package.json (+ lockfile), the three SDK manifests and the
 # MCP bridge's package.json (+ lockfile).
 #
-# This replaces the old release process step ("2. Update version numbers",
-# CONTRIBUTING.md), which meant hand-editing six files and was the direct
-# cause of the drift that followed: root pom.xml stuck at 1.0.0-SNAPSHOT while
+# Hand-editing these files one by one caused the drift this replaced:
+# root pom.xml stuck at 1.0.0-SNAPSHOT while
 # eight releases were tagged and Chart.yaml/ui/package.json never moved.
 #
 # Usage:
