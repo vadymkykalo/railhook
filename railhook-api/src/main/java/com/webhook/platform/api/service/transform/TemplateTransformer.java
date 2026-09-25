@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * A lone ${$.path} keeps the value's type; embedded in text it becomes a string. An unmatched path
@@ -51,7 +52,7 @@ public class TemplateTransformer {
         return template.deepCopy();
     }
 
-    public JsonNode apply(String template, JsonNode source) throws com.fasterxml.jackson.core.JsonProcessingException {
+    public JsonNode apply(String template, JsonNode source) throws JsonProcessingException {
         return apply(objectMapper.readTree(template), source);
     }
 

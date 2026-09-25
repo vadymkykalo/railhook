@@ -17,6 +17,8 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import org.apache.kafka.common.header.Header;
 
 @Component
 @Slf4j
@@ -70,9 +72,9 @@ public class IncomingForwardConsumer {
     }
 
     private String extractCorrelationId(ConsumerRecord<String, IncomingForwardMessage> record) {
-        org.apache.kafka.common.header.Header header = record.headers().lastHeader("X-Correlation-ID");
+        Header header = record.headers().lastHeader("X-Correlation-ID");
         if (header != null && header.value() != null && header.value().length > 0) {
-            return new String(header.value(), java.nio.charset.StandardCharsets.UTF_8);
+            return new String(header.value(), StandardCharsets.UTF_8);
         }
         return UUID.randomUUID().toString();
     }

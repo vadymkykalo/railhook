@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import java.util.List;
 
 @Service
 @Slf4j
@@ -51,7 +52,7 @@ public class EndpointVerificationService {
             EndpointRepository endpointRepository,
             WebClient.Builder webClientBuilder,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts,
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
             PlatformTransactionManager transactionManager) {
         this.endpointRepository = endpointRepository;
         this.txTemplate = new TransactionTemplate(transactionManager);

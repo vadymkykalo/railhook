@@ -19,6 +19,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+import java.time.temporal.WeekFields;
+import java.util.regex.Pattern;
 
 /**
  * Drops whole partitions, O(1) where DELETE is O(rows). deliveries and incoming_events are not
@@ -29,8 +31,8 @@ import java.util.concurrent.atomic.AtomicLong;
 public class PartitionMaintenanceService {
 
     // Identifiers are spliced into DDL text, so they must match this first.
-    private static final java.util.regex.Pattern SAFE_IDENTIFIER =
-            java.util.regex.Pattern.compile("^[a-z][a-z0-9_]*$");
+    private static final Pattern SAFE_IDENTIFIER =
+            Pattern.compile("^[a-z][a-z0-9_]*$");
 
     private static final DateTimeFormatter BOUND_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -141,7 +143,7 @@ public class PartitionMaintenanceService {
     }
 
     private int[] isoYearWeek(LocalDate date) {
-        java.time.temporal.WeekFields iso = java.time.temporal.WeekFields.ISO;
+        WeekFields iso = WeekFields.ISO;
         return new int[] {
                 date.get(iso.weekBasedYear()),
                 date.get(iso.weekOfWeekBasedYear())

@@ -6,6 +6,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import java.util.UUID;
 
 /**
  * Ordered ahead of {@code @Transactional}: Hibernate reads the tenant when it opens the session,
@@ -18,7 +19,7 @@ public class SystemTenantAspect {
 
     @Around("@annotation(com.webhook.platform.api.tenancy.SystemTenant)")
     public Object runAsSystem(ProceedingJoinPoint joinPoint) throws Throwable {
-        java.util.UUID previous = TenantContext.set(TenantContext.SYSTEM);
+        UUID previous = TenantContext.set(TenantContext.SYSTEM);
         try {
             return joinPoint.proceed();
         } finally {

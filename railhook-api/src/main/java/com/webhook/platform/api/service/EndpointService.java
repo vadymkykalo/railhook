@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.webhook.platform.api.dto.MtlsConfigRequest;
+import com.webhook.platform.api.dto.TestResult;
 
 @Slf4j
 @Service
@@ -347,7 +349,7 @@ public class EndpointService {
                         int status = resp.statusCode().value();
                         return resp.bodyToMono(String.class)
                                 .defaultIfEmpty("")
-                                .map(responseBody -> new com.webhook.platform.api.dto.TestResult(status, responseBody));
+                                .map(responseBody -> new TestResult(status, responseBody));
                     })
                     .timeout(Duration.ofSeconds(10))
                     .blockOptional()
@@ -421,7 +423,7 @@ public class EndpointService {
 
     @Transactional
     public EndpointResponse configureMtls(UUID projectId, UUID endpointId, 
-            com.webhook.platform.api.dto.MtlsConfigRequest request) {
+            MtlsConfigRequest request) {
         Endpoint endpoint = requireEndpoint(projectId, endpointId);
 
         CryptoUtils.EncryptedData encryptedCert = encryptionKeyRegistry.encrypt(request.getClientCert());

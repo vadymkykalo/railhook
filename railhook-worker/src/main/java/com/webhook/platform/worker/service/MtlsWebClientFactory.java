@@ -31,6 +31,7 @@ import java.util.Base64;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -38,7 +39,7 @@ public class MtlsWebClientFactory {
 
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
-    private final java.util.List<String> allowedHosts;
+    private final List<String> allowedHosts;
     private final WebClient.Builder webClientBuilder;
     private final ConnectionProvider connectionProvider;
     private final Cache<UUID, CachedClient> mtlsClientCache = Caffeine.newBuilder()
@@ -51,7 +52,7 @@ public class MtlsWebClientFactory {
     public MtlsWebClientFactory(
             EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts,
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
             WebClient.Builder webClientBuilder,
             ConnectionProvider webhookConnectionProvider) {
         this.encryptionKeyRegistry = encryptionKeyRegistry;

@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.time.ZoneOffset;
 
 @Service
 @RequiredArgsConstructor
@@ -84,7 +85,7 @@ public class BillingSchedulerService {
                 .totalCents(amountCents)
                 .currency(sub.getCurrency())
                 .periodStart(sub.getCurrentPeriodEnd())
-                .periodEnd(sub.getCurrentPeriodEnd().atZone(java.time.ZoneOffset.UTC)
+                .periodEnd(sub.getCurrentPeriodEnd().atZone(ZoneOffset.UTC)
                         .plus(sub.getBillingInterval().getPeriod()).toInstant())
                 .dueDate(Instant.now())
                 .build();
@@ -122,7 +123,7 @@ public class BillingSchedulerService {
             invoiceRepository.save(invoice);
 
             Instant newStart = sub.getCurrentPeriodEnd();
-            Instant newEnd = newStart.atZone(java.time.ZoneOffset.UTC)
+            Instant newEnd = newStart.atZone(ZoneOffset.UTC)
                     .plus(sub.getBillingInterval().getPeriod()).toInstant();
             lifecycleService.renew(sub.getId(), newStart, newEnd);
         } else {

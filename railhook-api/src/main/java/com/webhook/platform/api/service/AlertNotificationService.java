@@ -30,7 +30,7 @@ public class AlertNotificationService {
             EmailService emailService,
             @Value("${app.alerts.notifications-enabled:false}") boolean enabled,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts) {
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         // A user aims this client, and a name validated at write time can resolve elsewhere later.
         this.webClient = webClientBuilder
                 .clientConnector(new ReactorClientHttpConnector(

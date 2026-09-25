@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 /** Same engine as the worker, so a preview cannot disagree with a real delivery. */
 @Component
@@ -59,7 +60,7 @@ public class TransformationRunner {
                     .console(List.of())
                     .durationMs((System.nanoTime() - startedAt) / 1_000_000)
                     .build();
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (JsonProcessingException e) {
             throw new ScriptTransformException(ScriptTransformException.Reason.SYNTAX,
                     "The template is not valid JSON: " + e.getOriginalMessage());
         }

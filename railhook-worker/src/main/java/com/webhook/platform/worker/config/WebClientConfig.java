@@ -9,6 +9,7 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
+import java.util.List;
 
 @Configuration
 public class WebClientConfig {
@@ -38,7 +39,7 @@ public class WebClientConfig {
     @Bean
     public WebClient outgoingWebClient(WebClient.Builder builder, ConnectionProvider webhookConnectionProvider,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts) {
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         return ssrfSafe(builder, webhookConnectionProvider, allowPrivateIps, allowedHosts)
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0")
                 .build();
@@ -48,12 +49,12 @@ public class WebClientConfig {
     public WebClient incomingForwardWebClient(WebClient.Builder builder,
             ConnectionProvider webhookConnectionProvider,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts) {
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         return ssrfSafe(builder, webhookConnectionProvider, allowPrivateIps, allowedHosts).build();
     }
 
     private WebClient.Builder ssrfSafe(WebClient.Builder builder, ConnectionProvider connectionProvider,
-            boolean allowPrivateIps, java.util.List<String> allowedHosts) {
+            boolean allowPrivateIps, List<String> allowedHosts) {
         HttpClient httpClient = SsrfProtectionCustomizer.createHttpClient(
                 connectionProvider, allowPrivateIps, allowedHosts);
         return builder.clientConnector(new ReactorClientHttpConnector(httpClient));

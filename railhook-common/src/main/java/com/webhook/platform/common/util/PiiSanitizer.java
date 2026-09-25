@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 public final class PiiSanitizer {
 
@@ -313,8 +315,8 @@ public final class PiiSanitizer {
 
     private static String hashMask(String value) {
         try {
-            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
             String hex = bytesToHex(hash);
             return "sha256:" + hex.substring(0, 12);
         } catch (Exception e) {

@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+import com.webhook.platform.api.exception.ForbiddenException;
 
 @Slf4j
 @RestController
@@ -83,7 +84,7 @@ public class OrganizationController {
             AuthContext auth) {
         auth.requireOwnerAccess();
         if (!orgId.equals(auth.organizationId())) {
-            throw new com.webhook.platform.api.exception.ForbiddenException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         GdprExportDto export = gdprExportService.exportOrganizationData();
         return ResponseEntity.ok()
@@ -104,7 +105,7 @@ public class OrganizationController {
             AuthContext auth) {
         auth.requireOwnerAccess();
         if (!orgId.equals(auth.organizationId())) {
-            throw new com.webhook.platform.api.exception.ForbiddenException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         organizationService.deleteOrganization();
         return ResponseEntity.noContent().build();

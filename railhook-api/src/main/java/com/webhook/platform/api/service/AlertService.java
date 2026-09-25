@@ -38,6 +38,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -279,12 +281,12 @@ public class AlertService {
     }
 
     private void notifyAfterCommit(AlertRule rule, AlertEvent event) {
-        if (!org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             notificationService.dispatch(rule, event);
             return;
         }
-        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-                new org.springframework.transaction.support.TransactionSynchronization() {
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
                         notificationService.dispatch(rule, event);

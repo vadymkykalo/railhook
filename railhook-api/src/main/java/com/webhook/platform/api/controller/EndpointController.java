@@ -28,6 +28,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import com.webhook.platform.api.dto.MtlsConfigRequest;
 
 @Slf4j
 @RestController
@@ -157,7 +158,7 @@ public class EndpointController {
     public ResponseEntity<EndpointResponse> configureMtls(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
-            @Valid @RequestBody com.webhook.platform.api.dto.MtlsConfigRequest request,
+            @Valid @RequestBody MtlsConfigRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);

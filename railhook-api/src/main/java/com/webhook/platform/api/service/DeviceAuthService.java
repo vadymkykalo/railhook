@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.UUID;
+import com.webhook.platform.api.domain.repository.UserRepository;
 
 @Slf4j
 @Service
@@ -36,7 +37,7 @@ public class DeviceAuthService {
 
     private final DeviceAuthCodeRepository deviceAuthCodeRepository;
     private final MembershipRepository membershipRepository;
-    private final com.webhook.platform.api.domain.repository.UserRepository userRepository;
+    private final UserRepository userRepository;
     private final UserSessionService userSessionService;
     private final JwtUtil jwtUtil;
 

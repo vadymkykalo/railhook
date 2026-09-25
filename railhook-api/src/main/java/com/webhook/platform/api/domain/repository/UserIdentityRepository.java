@@ -9,6 +9,8 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collection;
+import java.util.List;
 
 @Repository
 public interface UserIdentityRepository extends JpaRepository<UserIdentity, UUID> {
@@ -16,7 +18,7 @@ public interface UserIdentityRepository extends JpaRepository<UserIdentity, UUID
     Optional<UserIdentity> findByProviderAndSubject(String provider, String subject);
 
     @Query("select i.userId, i.provider from UserIdentity i where i.userId in :userIds")
-    java.util.List<Object[]> findProvidersOfUsers(@Param("userIds") java.util.Collection<UUID> userIds);
+    List<Object[]> findProvidersOfUsers(@Param("userIds") Collection<UUID> userIds);
 
     @Modifying
     @Query("delete from UserIdentity i where i.userId = :userId")

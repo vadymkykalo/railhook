@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.time.Instant;
 
 /** An unresolvable transformation fails the step rather than passing the raw payload through. */
 @Component
@@ -74,7 +75,7 @@ public class TransformNodeExecutor implements NodeExecutor {
                             .payload(input == null ? "null" : input.toString())
                             .eventType("workflow.step")
                             .eventId(transformationId.toString())
-                            .timestamp(java.time.Instant.now())
+                            .timestamp(Instant.now())
                             .direction("OUTGOING")
                             .build());
             if (result.cancelled()) {

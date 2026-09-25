@@ -53,6 +53,9 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 
 @Service
 @Slf4j
@@ -303,11 +306,11 @@ public class IngressService {
     private static String decodeUtf8Exactly(byte[] body) {
         try {
             return StandardCharsets.UTF_8.newDecoder()
-                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
-                    .decode(java.nio.ByteBuffer.wrap(body))
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(body))
                     .toString();
-        } catch (java.nio.charset.CharacterCodingException e) {
+        } catch (CharacterCodingException e) {
             return null;
         }
     }

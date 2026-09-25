@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /** The DLQ for Forwards. A replay would re-send to every Destination, not just the failed one. */
 @Service
@@ -217,7 +218,7 @@ public class IncomingDlqService {
     }
 
     private <T> Map<UUID, T> byId(Iterable<T> rows, Function<T, UUID> id) {
-        return java.util.stream.StreamSupport.stream(rows.spliterator(), false)
+        return StreamSupport.stream(rows.spliterator(), false)
                 .collect(Collectors.toMap(id, Function.identity(), (a, b) -> a));
     }
 }

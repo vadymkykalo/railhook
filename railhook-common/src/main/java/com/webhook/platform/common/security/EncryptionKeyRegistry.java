@@ -9,6 +9,7 @@ import jakarta.annotation.PostConstruct;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Versioned encryption keys, so a key can rotate without downtime. Either
@@ -101,7 +102,7 @@ public class EncryptionKeyRegistry {
         return keyMap.containsKey(version);
     }
 
-    public java.util.Set<Integer> getVersions() {
+    public Set<Integer> getVersions() {
         return keyMap.keySet();
     }
 

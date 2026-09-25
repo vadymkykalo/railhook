@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collection;
 
 /**
  * UserSession has no {@code @TenantId}, so every method must be keyed by userId or by a session
@@ -25,7 +26,7 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
 
     /** Rows of {@code [userId, lastSeenAt]}. */
     @Query("SELECT s.userId, MAX(s.lastSeenAt) FROM UserSession s WHERE s.userId IN :userIds GROUP BY s.userId")
-    List<Object[]> findLastSeenOfUsers(@Param("userIds") java.util.Collection<UUID> userIds);
+    List<Object[]> findLastSeenOfUsers(@Param("userIds") Collection<UUID> userIds);
 
     List<UserSession> findByUserIdAndRevokedAtIsNullAndExpiresAtAfterOrderByLastSeenAtDesc(
             UUID userId, Instant now);

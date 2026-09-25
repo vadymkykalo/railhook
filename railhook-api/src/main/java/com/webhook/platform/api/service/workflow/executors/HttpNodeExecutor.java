@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpMethod;
 
 /** SSRF is checked on the URL and again on the dialled address, since DNS can change in between. */
 @Component
@@ -73,7 +74,7 @@ public class HttpNodeExecutor implements NodeExecutor {
                 body = input != null ? input.toString() : "{}";
             }
 
-            WebClient.RequestBodySpec requestSpec = webClient.method(org.springframework.http.HttpMethod.valueOf(method))
+            WebClient.RequestBodySpec requestSpec = webClient.method(HttpMethod.valueOf(method))
                     .uri(url)
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("User-Agent", "RailhookWorkflow/1.0");

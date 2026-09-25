@@ -2,6 +2,7 @@ package com.webhook.platform.common.retry;
 
 import java.util.BitSet;
 import java.util.Objects;
+import java.util.Locale;
 
 /**
  * Which HTTP statuses earn another Attempt. {@link RetryLadder} says when; this says whether.
@@ -60,7 +61,7 @@ public final class RetryableStatuses {
         BitSet excluded = new BitSet(MAX_STATUS + 1);
 
         for (int i = 0; i < terms.length; i++) {
-            String term = terms[i].trim().toUpperCase(java.util.Locale.ROOT);
+            String term = terms[i].trim().toUpperCase(Locale.ROOT);
             boolean exclude = term.startsWith("!");
             if (exclude) {
                 term = term.substring(1).trim();

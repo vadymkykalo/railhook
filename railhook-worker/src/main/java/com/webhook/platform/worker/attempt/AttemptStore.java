@@ -1,5 +1,7 @@
 package com.webhook.platform.worker.attempt;
 
+import java.nio.charset.StandardCharsets;
+
 /**
  * One adapter per direction: how a Claim is taken, proved and released, and how Attempts are
  * recorded. The Runner is generic over the Claim type {@code C}, so it cannot read a fencing
@@ -18,7 +20,7 @@ public interface AttemptStore<C> {
 
     /** A store that kept a body's exact received bytes returns those instead. */
     default byte[] wireBody(C claim, String body) {
-        return body != null ? body.getBytes(java.nio.charset.StandardCharsets.UTF_8) : new byte[0];
+        return body != null ? body.getBytes(StandardCharsets.UTF_8) : new byte[0];
     }
 
     /** Outgoing spends the rung here, so a crash mid-send still counts against the Ladder. */

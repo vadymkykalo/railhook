@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Breaker state shared by all workers through Redis. {@code cb:{id}:open} exists while the
@@ -99,11 +102,11 @@ public class CircuitBreakerService {
     public void recordSuccess(UUID endpointId, long durationMs) {
         try {
             RScript script = redissonClient.getScript(LongCodec.INSTANCE);
-            java.util.List<Object> result = script.eval(
+            List<Object> result = script.eval(
                     RScript.Mode.READ_WRITE,
                     recordSuccessScript,
                     RScript.ReturnType.LIST,
-                    java.util.Arrays.asList(callsKey(endpointId), slowKey(endpointId)),
+                    Arrays.asList(callsKey(endpointId), slowKey(endpointId)),
                     windowTtlSeconds, durationMs, slowCallThresholdMs, minimumNumberOfCalls, slowCallRateThreshold
             );
 
@@ -128,11 +131,11 @@ public class CircuitBreakerService {
     public void recordFailure(UUID endpointId, Throwable throwable) {
         try {
             RScript script = redissonClient.getScript(LongCodec.INSTANCE);
-            java.util.List<Object> result = script.eval(
+            List<Object> result = script.eval(
                     RScript.Mode.READ_WRITE,
                     recordFailureScript,
                     RScript.ReturnType.LIST,
-                    java.util.Arrays.asList(failsKey(endpointId), callsKey(endpointId)),
+                    Arrays.asList(failsKey(endpointId), callsKey(endpointId)),
                     windowTtlSeconds, minimumNumberOfCalls, failureRateThreshold
             );
 
@@ -192,7 +195,7 @@ public class CircuitBreakerService {
     private String loadLuaScript(String path) {
         try {
             ClassPathResource resource = new ClassPathResource(path);
-            return new String(resource.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load Lua script: " + path, e);
         }

@@ -13,6 +13,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.net.ConnectException;
 
 public class LocalForwarder {
 
@@ -96,7 +97,7 @@ public class LocalForwarder {
                     .timestampMs(System.currentTimeMillis())
                     .build();
 
-        } catch (java.net.ConnectException e) {
+        } catch (ConnectException e) {
             long durationMs = System.currentTimeMillis() - startMs;
             log.warn("{} {} → connection refused (localhost:{})", request.getMethod(), request.getPath(), localPort);
             return TunnelResponseMessage.builder()

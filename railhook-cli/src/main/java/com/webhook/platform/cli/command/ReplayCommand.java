@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.LinkedHashMap;
 
 @Command(
         name = "replay",
@@ -57,7 +58,7 @@ public class ReplayCommand implements Callable<Integer> {
         Instant fromDate = from != null ? Instant.parse(from) : Instant.now().minus(24, ChronoUnit.HOURS);
         Instant toDate = to != null ? Instant.parse(to) : Instant.now();
 
-        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        Map<String, Object> body = new LinkedHashMap<>();
         body.put("fromDate", fromDate.toString());
         body.put("toDate", toDate.toString());
         if (eventType != null) body.put("eventType", eventType);

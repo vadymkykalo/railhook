@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Locale;
 
 /**
  * Runs from {@link PostConstruct} rather than on {@code ApplicationReadyEvent}, which fires
@@ -159,7 +160,7 @@ public class ProductionSafetyValidator {
         }
         double entropyBits = estimateEntropyBits(value);
         if (entropyBits < MIN_SECRET_ENTROPY_BITS) {
-            violations.add(String.format(java.util.Locale.ROOT,
+            violations.add(String.format(Locale.ROOT,
                     "%s has too little entropy (~%.1f bits) to be a real secret — must be changed for production",
                     displayName, entropyBits));
         }

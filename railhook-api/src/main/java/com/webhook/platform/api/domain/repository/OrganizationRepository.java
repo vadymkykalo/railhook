@@ -15,6 +15,8 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collection;
+import java.util.List;
 
 @Repository
 public interface OrganizationRepository extends JpaRepository<Organization, UUID> {
@@ -48,7 +50,7 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
 
     /** Rows of {@code [organizationId, maxEventsPerMonth]}. */
     @Query("SELECT o.id, p.maxEventsPerMonth FROM Organization o JOIN o.plan p WHERE o.id IN :organizationIds")
-    java.util.List<Object[]> findEventLimits(@Param("organizationIds") java.util.Collection<UUID> organizationIds);
+    List<Object[]> findEventLimits(@Param("organizationIds") Collection<UUID> organizationIds);
 
     /**
      * Unscoped by design: the platform-admin caller has no organization of its own. Search also

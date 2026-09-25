@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
 
 @Repository
 public interface ProjectRepository extends JpaRepository<Project, UUID> {
@@ -16,7 +17,7 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     long countByOrganizationIdAndDeletedAtIsNull(UUID organizationId);
 
     @Query("SELECT p FROM Project p WHERE p.deletedAt IS NULL")
-    org.springframework.data.domain.Page<Project> findLive(Pageable pageable);
+    Page<Project> findLive(Pageable pageable);
 
     /** The organization id is the scope a job must enter before it can read the project's rows. */
     interface ProjectRef {

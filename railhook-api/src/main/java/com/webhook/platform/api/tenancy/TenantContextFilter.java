@@ -14,6 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.UUID;
 
 /**
  * Sets the tenant scope for the request from the authenticated identity. An unauthenticated
@@ -35,7 +36,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        java.util.UUID previous = TenantContext.current();
+        UUID previous = TenantContext.current();
         if (authentication instanceof PlatformAdminUserAuthenticationToken) {
             // Must precede the JWT branch, which it extends.
             TenantContext.set(TenantContext.SYSTEM);

@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @Slf4j
@@ -293,7 +294,7 @@ public class OutboxPublisherService {
 
     private long calculateBackoff(int retryCount) {
         long base = (long) Math.min(Math.pow(2, retryCount) * 10, 600);
-        long jitter = java.util.concurrent.ThreadLocalRandom.current().nextLong(0, base / 4 + 1);
+        long jitter = ThreadLocalRandom.current().nextLong(0, base / 4 + 1);
         return base + jitter;
     }
 

@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -125,7 +126,7 @@ public class AuditLogService {
     private Map<UUID, String> resolveEmails(List<AuditLog> entries) {
         Set<UUID> userIds = entries.stream()
                 .map(AuditLog::getUserId)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         return userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, User::getEmail));

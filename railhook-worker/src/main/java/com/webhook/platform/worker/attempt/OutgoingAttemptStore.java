@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.http.MediaType;
 
 /**
  * Outgoing mutates one {@code deliveries} row in place and appends a {@code delivery_attempts}
@@ -315,7 +316,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         return new RequestSpec(
                 client,
                 request -> {
-                    request.contentType(org.springframework.http.MediaType.APPLICATION_JSON);
+                    request.contentType(MediaType.APPLICATION_JSON);
                     sent.forEach(request::header);
                     custom.forEach(request::header);
                 },

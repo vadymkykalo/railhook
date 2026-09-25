@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
 
 @Slf4j
 @Service
@@ -120,7 +121,7 @@ public class DashboardService {
     
     private List<DashboardStatsResponse.EndpointHealthSummary> getEndpointHealth(UUID projectId, Instant since) {
         List<Endpoint> endpoints = endpointRepository.findByProjectIdAndDeletedAtIsNull(projectId,
-                org.springframework.data.domain.PageRequest.of(0, 100)).getContent();
+                PageRequest.of(0, 100)).getContent();
         
         if (endpoints.isEmpty()) {
             return new ArrayList<>();

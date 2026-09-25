@@ -2,6 +2,7 @@ package com.webhook.platform.api.dto.validation;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Locale;
 
 /**
  * Only TLDs no registry has delegated are listed, so nothing here can refuse a working address.
@@ -39,12 +40,12 @@ public final class EmailTypoPolicy {
         if (at <= 0 || dot < at) {
             return Optional.empty();
         }
-        String tld = trimmed.substring(dot + 1).toLowerCase(java.util.Locale.ROOT);
+        String tld = trimmed.substring(dot + 1).toLowerCase(Locale.ROOT);
         String meant = IMPOSSIBLE_TLDS.get(tld);
         if (meant == null) {
             return Optional.empty();
         }
-        String domain = trimmed.substring(at + 1, dot + 1).toLowerCase(java.util.Locale.ROOT);
+        String domain = trimmed.substring(at + 1, dot + 1).toLowerCase(Locale.ROOT);
         return Optional.of(trimmed.substring(0, at) + "@" + domain + meant);
     }
 }

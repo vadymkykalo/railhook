@@ -9,6 +9,8 @@ import picocli.CommandLine.Parameters;
 
 import java.io.PrintStream;
 import java.util.concurrent.Callable;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * The platform-admin token is the same secret for every tenant on the instance. It is read from
@@ -79,7 +81,7 @@ public class AdminCommand implements Runnable {
         Integer run(AdminApiClient client) throws Exception {
             StringBuilder path = new StringBuilder("/api/v1/admin/organizations?size=" + size);
             if (search != null && !search.isBlank()) {
-                path.append("&search=").append(java.net.URLEncoder.encode(search, java.nio.charset.StandardCharsets.UTF_8));
+                path.append("&search=").append(URLEncoder.encode(search, StandardCharsets.UTF_8));
             }
             if (suspendedOnly) {
                 path.append("&suspendedOnly=true");
