@@ -29,11 +29,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
 
-/**
- * A membership status is a state, not a delivery outcome, but it reads on the same four meanings.
- * A suspension is `halt` rather than `idle`: somebody's access was deliberately stopped, which is
- * not the same as an invite nobody has acted on yet.
- */
+/** A suspension is halt, not idle: access was deliberately stopped. */
 function kindOfMemberStatus(status: string): StatusKind {
   if (status === 'ACTIVE') return 'ok';
   if (status === 'INVITED') return 'retry';
@@ -60,9 +56,7 @@ export default function MembersPage() {
 
   const { data: members = [], isLoading, isError, error, refetch, isRefetching } = useMembers(orgId);
 
-  // Client-side, because the API serves members as one unpaginated array - which is fine for
-  // the size an organization actually is, and is why scrolling was the only way to find
-  // someone. Matching on email and role covers what people search a member list for.
+  // Client-side: the API returns members as one unpaginated array.
   const [searchFilter, setSearchFilter] = useState('');
   const filteredMembers = useMemo(() => {
     if (!searchFilter) return members;
@@ -98,10 +92,7 @@ export default function MembersPage() {
     });
   };
 
-  /* An invite that has not been accepted has no member behind it yet, so taking it
-     back is deleting the membership row — the same call as removing a member, asked
-     for in the words of what it actually does and without the type-the-name ritual
-     an irreversible removal earns. */
+  /* An unaccepted invite has no member behind it: revoking deletes the membership row. */
   const handleRevoke = () => {
     if (!revoking) return;
     removeMember.mutate(revoking.userId, {
@@ -113,9 +104,7 @@ export default function MembersPage() {
     });
   };
 
-  /* Re-issuing replaces the token, so the previous link stops working. The new one
-     is put on screen rather than announced as sent: with EMAIL_ENABLED=false, the
-     shipped default, nothing leaves the server. */
+  /* Shown on screen, not announced as sent: with EMAIL_ENABLED=false nothing leaves the server. */
   const handleReissue = (member: MemberResponse) => {
     reissueInvite.mutate(member.userId, {
       onSuccess: (fresh) => setReissued(fresh),
@@ -170,7 +159,6 @@ export default function MembersPage() {
         actions={addButton}
       />
 
-      {/* What each role grants, on the page that grants it. */}
       <section aria-labelledby="roles-heading" className="mb-6">
         <h3 id="roles-heading" className="mono-label mb-2.5">{t('members.rolesHeading')}</h3>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -290,11 +278,6 @@ export default function MembersPage() {
                       <TableCell>
                         {!isSelf && (
                           <div className="flex items-center gap-0.5">
-                            {/* An invite, an active member and a suspended one are three
-                                different situations and each earns a different pair of
-                                actions. Only a pending invite can be re-issued or revoked;
-                                only an active member can be suspended; only a suspended one
-                                can be reinstated. */}
                             {member.status === 'INVITED' && (
                               <Button
                                 variant="ghost"
@@ -404,8 +387,6 @@ export default function MembersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Suspending is reversible, so it asks once and plainly. Removal, below, is not, and
-          makes the owner type the member's address. */}
       <ConfirmDialog
         open={!!suspending}
         onOpenChange={(open) => !open && setSuspending(null)}

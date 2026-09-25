@@ -11,20 +11,11 @@ interface ChartTooltipProps {
   active?: boolean;
   label?: string | number;
   payload?: ChartTooltipItem[];
-  /** Renders the crosshair's x position — a date, a bucket, a category. */
   labelFormatter?: (label: string | number) => string;
   valueFormatter?: (value: number, dataKey: string) => string;
 }
 
-/**
- * One tooltip for every chart in the product.
- *
- * Two rules it exists to hold: it lists *every* series at the hovered position,
- * so the pointer never has to land on a particular line to get a value; and the
- * value leads while the series name follows, because by the time someone is
- * hovering they already know which series they want. Series names arrive from
- * the API (event types, endpoint URLs) and are rendered as text nodes only.
- */
+/** Series names come from the API (event types, URLs): render them as text nodes only. */
 export default function ChartTooltip({
   active, label, payload, labelFormatter, valueFormatter,
 }: ChartTooltipProps) {

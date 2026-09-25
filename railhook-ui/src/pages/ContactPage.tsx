@@ -8,34 +8,7 @@ import { docsUrl } from '../lib/docsUrl';
 import { contactDomain } from '../lib/runtimeConfig';
 import ContactForm from '../components/site/ContactForm';
 
-/**
- * The route that replaces a mailto to a personal Gmail address.
- *
- * Two places on the pricing section used to link
- * `mailto:vadymkykalo@gmail.com?subject=Railhook Enterprise` — the largest deal
- * on the page priced at "Custom" and then routed to an inbox that reads as a
- * side project, with the address itself published for anything that scrapes.
- *
- * Addresses are role accounts and are assembled at render rather than written
- * into the markup, which stops the cheapest scrapers without hiding anything
- * from a reader or a screen reader.
- *
- * The domain comes from RAILHOOK_CONTACT_DOMAIN on the UI container and there
- * is no default. It was once a constant naming a domain this project does not
- * own, so every self-hosted install invited its users to write to a stranger
- * about a product that stranger has never heard of.
- *
- * It is read at runtime, not inlined at build: the published image is the same
- * one the hosted cloud runs and every self-hosted install pulls. As a build
- * argument the choice was between no addresses on the cloud's own site or the
- * cloud's addresses on everyone's deployment.
- *
- * With the variable unset the two mail cards are not rendered at all, rather
- * than falling back to the repository. A deployment someone runs for their own
- * company has no sales desk, and an address that reaches nobody is worse than
- * an absent one — the reader who needs a human still has the issues card and
- * the docs card, which are true everywhere.
- */
+/** Assembled at render rather than in the markup, which stops the cheapest scrapers. */
 function mailto(mailbox: string, domain: string): string {
   return `mailto:${mailbox}@${domain}`;
 }

@@ -13,8 +13,7 @@ vi.mock('../../api/projects.api', () => ({
 vi.mock('../../api/events.api', () => ({
   eventsApi: { listByProject: vi.fn(), get: vi.fn(), sendTestEvent: vi.fn() },
 }));
-// Radix Select's listbox never opens in jsdom; a native select keeps the same onChange contract,
-// so the status filter can be changed the way an operator would.
+// Radix Select never opens in jsdom; a native select keeps the same onChange contract.
 vi.mock('../../components/ui/select', () => ({
   Select: ({ id, value, onChange, children, ...rest }: {
     id?: string; value?: string; children?: ReactNode; 'aria-label'?: string;

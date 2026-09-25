@@ -3,21 +3,12 @@ import { CHROME, SERIES } from '../../charts/chartTheme';
 import { cn } from '../../../lib/utils';
 import { AXIS, Figure, LABEL, MONO, SOFT } from '../figures';
 
-/**
- * The figures of "how to build software with an AI coding agent that you can actually trust":
- * the loop every change goes around, and the bugs that became guardrails.
- */
-
 
 function useFigureText(key: string) {
   const { t } = useTranslation();
   return (path: string) => t(`blog.figures.${key}.${path}`);
 }
 
-/**
- * The engineering loop around the agent. Each box says who owns the step: the person, the agent,
- * or a machine check.
- */
 type Owner = 'human' | 'agent' | 'machine';
 
 const OWNER_STROKE: Record<Owner, { stroke: string; width: number; dash?: string }> = {
@@ -60,7 +51,6 @@ function HarnessLoop() {
         </marker>
       </defs>
 
-      {/* Legend: who owns a step. */}
       {(['human', 'agent', 'machine'] as Owner[]).map((owner, index) => (
         <g key={owner} transform={`translate(${16 + index * 180}, 14)`}>
           <rect
@@ -107,7 +97,6 @@ function HarnessLoop() {
         );
       })}
 
-      {/* The top row runs left to right, the bottom row right to left. */}
       {[0, 1, 2].map((column) => (
         <line
           key={`top-${column}`}
@@ -131,7 +120,6 @@ function HarnessLoop() {
         />
       ))}
 
-      {/* Code goes down into the checks... */}
       <line
         x1={x(3) + 40}
         y1={rowTop + height + 2}
@@ -140,7 +128,6 @@ function HarnessLoop() {
         stroke={CHROME.muted}
         markerEnd="url(#ai-loop-arrow)"
       />
-      {/* ...and a refusal from either check comes back up to the agent. */}
       <path
         d={`M ${x(2) + width / 2} ${rowBottom} L ${x(2) + width / 2} ${rowBottom - 34} L ${x(3) + 112} ${rowBottom - 34}`}
         fill="none"
@@ -160,7 +147,6 @@ function HarnessLoop() {
         {f('refused')}
       </text>
 
-      {/* What gets through anyway becomes a rule: the arrow that makes it a loop. */}
       <rect
         x={incident.x}
         y={incident.y}
@@ -200,7 +186,6 @@ function HarnessLoop() {
   );
 }
 
-/** Six real bugs, how each was noticed, and the guardrail that now refuses it. */
 const BUGS = ['compressed', 'copied', 'native', 'squash', 'upgrade', 'zoom'];
 
 function BugGuardrail() {

@@ -19,18 +19,13 @@ interface ConfirmDialogProps {
   description: ReactNode;
   onConfirm: () => void;
   loading?: boolean;
-  /** Defaults to the shared "delete" label, which is what most callers want. */
   confirmLabel?: string;
   loadingLabel?: string;
-  /** Red confirm button. Off for a reversible action — disabling, not deleting. */
   destructive?: boolean;
   children?: ReactNode;
 }
 
-/**
- * A yes-or-no on an action the person can still take back, or one small enough not to warrant
- * typing its name. For anything irreversible, DangerConfirmDialog asks for the name instead.
- */
+/** For irreversible actions DangerConfirmDialog asks for the name instead. */
 export default function ConfirmDialog({
   open,
   onOpenChange,

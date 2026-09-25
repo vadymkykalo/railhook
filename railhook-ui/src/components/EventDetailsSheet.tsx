@@ -30,11 +30,6 @@ interface EventDetailsSheetProps {
   onViewDeliveries?: (eventId: string) => void;
 }
 
-/**
- * The quick look at one Event: what was announced, and what became of the
- * Deliveries it created. Each delivery carries its own attempt rail, so the
- * answer to "is anything still owed" is visible without opening a second view.
- */
 export default function EventDetailsSheet({
   projectId,
   eventId,

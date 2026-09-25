@@ -4,17 +4,7 @@ import { Link } from 'react-router-dom';
 import { Reveal, Section } from './landing/primitives';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
-/**
- * The privacy policy and the terms of service for Railhook Cloud.
- *
- * Both are prose the owner reviews as a whole, so the text lives in the locale files section by
- * section and this component only sets it. A body is plain paragraphs separated by a blank line;
- * a paragraph whose lines start with "- " is a list. No markup in the translations, so a
- * translator cannot break the page.
- *
- * Google publishes the "Continue with Google" consent screen only with a privacy policy and terms
- * link on it, and the registration form already asks people to agree to both.
- */
+/** No markup in the translations, so a translator cannot break the page. */
 
 type Doc = 'privacy' | 'terms';
 
@@ -24,7 +14,6 @@ const SECTIONS: Record<Doc, string[]> = {
   terms: ['service', 'free', 'use', 'suspension', 'warranty', 'liability', 'selfHosted', 'law', 'changes', 'contact'],
 };
 
-/** The date both documents were last changed. */
 export const LEGAL_UPDATED = '2026-09-13';
 
 function Body({ text }: { text: string }) {

@@ -10,15 +10,7 @@ interface DiffViewProps {
   maxHeight?: string;
 }
 
-/**
- * What the transformation actually changed, line by line.
- *
- * The question a Diff tab answers is not "are these different" — the Output tab
- * already shows that — but "did it change only what I meant it to". So unchanged
- * stretches collapse, and the summary at the top is a count of lines rather than
- * a verdict: "nothing changed" is a perfectly good outcome for a script that
- * only sets a header.
- */
+/** Unchanged stretches collapse; "nothing changed" is a valid outcome, not a failure. */
 export default function DiffView({
   before, after, beforeLabel, afterLabel, maxHeight = '420px',
 }: DiffViewProps) {

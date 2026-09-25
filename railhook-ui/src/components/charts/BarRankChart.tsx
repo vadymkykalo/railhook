@@ -10,36 +10,21 @@ export interface RankDatum {
 
 interface BarRankChartProps {
   data: RankDatum[];
-  /** Names the single series in the tooltip. */
   seriesLabel: string;
   formatValue?: (value: number) => string;
-  /**
-   * True when the categories carry an order the reader should see in the
-   * colour — p50 → p99, tiers, buckets. False for names that could be shuffled
-   * without changing the meaning, which take one flat hue instead.
-   */
   ordinal?: boolean;
   categoryWidth?: number;
   maxLabelChars?: number;
 }
 
-/** Row height chosen so bars stay under the 24px cap with air left in the band. */
 export const BAR_ROW_HEIGHT = 30;
 
-/** Sizes a chart body to its rows, so the card never grows a nested scrollbar. */
+/** Sized to the rows so the card never grows a nested scrollbar. */
 export function barChartHeight(rowCount: number): number {
   return Math.max(rowCount, 1) * BAR_ROW_HEIGHT + 16;
 }
 
-/**
- * Magnitude across named things — event types, endpoints by volume, latency
- * percentiles.
- *
- * Horizontal, because the names are long and an event type reads badly rotated
- * under a column. One hue for nominal categories: colouring each bar by its own
- * value would spend the identity channel re-encoding what bar length already
- * says. Ordered categories get the same hue stepped in lightness instead.
- */
+/** One hue for nominal categories: bar length already carries the value. */
 export default function BarRankChart({
   data, seriesLabel, formatValue = formatCompact, ordinal = false,
   categoryWidth = 132, maxLabelChars = 22,

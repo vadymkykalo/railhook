@@ -11,12 +11,7 @@ import { cn } from '../lib/utils';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 
-/**
- * Approving a CLI login is a security decision, so the code the person is
- * approving is the loudest thing on the screen and it is set in mono — it came
- * out of a terminal, and it has to be comparable character by character with
- * what is still on that terminal.
- */
+/** Mono and loud: it must be compared character by character with the terminal. */
 function DeviceCode({ code }: { code: string }) {
   const { t } = useTranslation();
   return (
@@ -71,11 +66,7 @@ export default function DeviceApprovePage() {
     }
   };
 
-  /**
-   * The other half of the decision. Cancel used to only clear the form, which told the terminal
-   * nothing: the code stayed pending and whoever had asked for it kept polling until it expired.
-   * Denying ends the request now, and the CLI stops on its next poll.
-   */
+  /** Denying ends the request so the CLI stops polling now. */
   const handleDeny = async () => {
     setStatus('denying');
     try {

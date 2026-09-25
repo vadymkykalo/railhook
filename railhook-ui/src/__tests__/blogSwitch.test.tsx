@@ -11,12 +11,6 @@ import PublicLayout from '../layout/PublicLayout';
 import { publicBlogEnabled } from '../lib/runtimeConfig';
 import { router } from '../router';
 
-/**
- * The blog is railhook.io's own content. The one published image runs railhook.io and every
- * self-hosted install, so the blog is off unless the deployment turns it on (BLOG_ENABLED):
- * no Blog link in the header or the footer, and /blog renders the not-found page — the same
- * answer nginx has already given with a 404 status.
- */
 const SIGNED_OUT = { auth: { user: null, token: null, isAuthenticated: false } };
 
 beforeAll(() => {
@@ -72,7 +66,6 @@ describe('the footer', () => {
   });
 });
 
-/** The app's real route table, as a signed-out visitor meets it. */
 async function renderRoute(path: string) {
   const auth: AuthState = { user: null, token: null, isAuthenticated: false, login: () => {}, logout: () => {}, updateUser: () => {} };
   await router.navigate(path);

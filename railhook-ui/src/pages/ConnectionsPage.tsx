@@ -44,23 +44,6 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { cn } from '../lib/utils';
 
-/**
- * Connections — one row per endpoint, holding everything that decides where
- * that endpoint's events go and whether they are arriving.
- *
- * The section used to be four destinations for one job: a wizard that created
- * an endpoint plus its subscriptions, a read-only matrix of the same pairs, and
- * a flat list of each half. This is the one that answers the question a person
- * actually arrives with — "where do my events go, and is that working" — and
- * the flat lists stay as sibling tabs for the times you want to work on one
- * half at a time.
- *
- * A row groups: the endpoint (URL, enabled, verification, signing secret) and
- * every Subscription hanging off it, scored against the deliveries those
- * subscriptions have recently produced.
- */
-
-/** How many recent deliveries the health column is scored over. */
 const HEALTH_WINDOW = 100;
 
 interface Health {
@@ -91,7 +74,6 @@ function scoreHealth(deliveries: DeliveryResponse[]): Health {
   return { total, ok, failing, pending, kind };
 }
 
-/** Verification is a configuration state, mapped onto the four status meanings. */
 function verificationKind(status: EndpointResponse['verificationStatus']): StatusKind {
   switch (status) {
     case 'VERIFIED':
@@ -130,13 +112,9 @@ export default function ConnectionsPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showSetup, setShowSetup] = useState(false);
   const [rotateFor, setRotateFor] = useState<EndpointResponse | null>(null);
-  // The whole response, not just the secret: rotation is the other moment the
-  // `whsec_…` form is returned, and which of the two a reader needs depends on
-  // the scheme the response also carries.
+  // The whole response: which secret form to show depends on its scheme.
   const [rotated, setRotated] = useState<EndpointResponse | null>(null);
-  // The scheme a person just chose, held until the endpoints query catches up.
-  // Without it the radio springs back to the old option for the length of a
-  // refetch, which reads as the click having failed.
+  // Held until the refetch lands, or the radio springs back and the click looks failed.
   const [pendingScheme, setPendingScheme] = useState<Record<string, SignatureScheme>>({});
   const [subscribeTo, setSubscribeTo] = useState<string | null>(null);
   const [editingSubscription, setEditingSubscription] = useState<SubscriptionResponse | null>(null);
@@ -232,11 +210,7 @@ export default function ConnectionsPage() {
     setRotated(null);
   };
 
-  /**
-   * The update carries `rateLimitPerSecond` because the API reads that field
-   * unconditionally — an update that leaves it out clears the endpoint's rate
-   * limit as a side effect of changing something else entirely.
-   */
+  /** Must carry rateLimitPerSecond: the API clears it when absent. */
   const handleSchemeChange = async (endpoint: EndpointResponse, scheme: SignatureScheme) => {
     setPendingScheme((prev) => ({ ...prev, [endpoint.id]: scheme }));
     try {
@@ -448,7 +422,6 @@ export default function ConnectionsPage() {
                     <TableRow key={`${endpoint.id}-detail`} className="hover:bg-transparent">
                       <TableCell colSpan={7} className="bg-secondary/30 p-0">
                         <div className="grid gap-6 p-5 lg:grid-cols-2">
-                          {/* Subscriptions on this endpoint */}
                           <div className="space-y-3">
                             <div className="mono-label">{t('connections.detailSubscriptions', 'Subscriptions')}</div>
                             {subs.length === 0 ? (
@@ -514,7 +487,6 @@ export default function ConnectionsPage() {
                             )}
                           </div>
 
-                          {/* Signing secret */}
                           <div className="space-y-3">
                             <div className="mono-label">{t('connections.detailSecret', 'Signing secret')}</div>
                             <p className="text-sm text-muted-foreground">
@@ -565,7 +537,6 @@ export default function ConnectionsPage() {
 
       <ConnectionSetupDialog projectId={projectId} open={showSetup} onOpenChange={setShowSetup} />
 
-      {/* Rotate: confirm, then show the new secret exactly once. */}
       <AlertDialog open={!!rotateFor && !rotated} onOpenChange={(open) => !open && setRotateFor(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -591,8 +562,6 @@ export default function ConnectionsPage() {
           {rotated?.secret && (
             <SecretField secret={rotated.secret} label={t('connectionSetup.secret.label')} />
           )}
-          {/* The `whsec_…` form is the one a Standard Webhooks library takes, and
-              it is only worth showing to an endpoint that is sent those headers. */}
           {rotated?.standardWebhooksSecret && sendsStandardHeaders(rotated.signatureScheme) && (
             <>
               <SecretField

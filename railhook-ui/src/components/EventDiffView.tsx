@@ -3,14 +3,7 @@ import type { DiffEntry, DiffType } from '../api/eventDiff.api';
 import JsonEditor from './JsonEditor';
 import { formatJson } from '../lib/json';
 
-/**
- * Two payloads and what moved between them.
- *
- * The marks do the work: `+` a field appeared, `−` it went, `~` it changed.
- * They used to be green/red/amber fills, which is the status palette this
- * product reserves for what a Delivery is doing — a diff is not a status, so
- * the difference is carried by the mark, the mono voice and the rail instead.
- */
+/** Marks, not colours: the status palette is reserved for Delivery state. */
 
 interface EventDiffViewProps {
   leftPayload: string;

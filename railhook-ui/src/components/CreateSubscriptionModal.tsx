@@ -21,14 +21,7 @@ import {
   DialogTitle,
 } from './ui/dialog';
 
-/**
- * Whether a retryable-status spec is one the API will accept. The grammar is
- * `RetryableStatuses`' in railhook-common: comma-separated terms, each an exact status, an
- * inclusive range, a `5xx` shorthand or a comparison, optionally prefixed with `!` to exclude.
- *
- * Duplicated here rather than shared, because the alternative is a round trip per keystroke -
- * and a spec the server rejects arrives as one toast with no field attached to it.
- */
+/** Mirrors RetryableStatuses in railhook-common: a server rejection is one toast with no field. */
 export function isRetryableStatusSpec(spec: string): boolean {
   const trimmed = spec.trim();
   if (!trimmed) return false;
@@ -55,7 +48,6 @@ interface CreateSubscriptionModalProps {
   projectId: string;
   endpoints: EndpointResponse[];
   subscription?: SubscriptionResponse | null;
-  /** Preselects the endpoint when opened from a connection's own row. */
   defaultEndpointId?: string;
   open: boolean;
   onClose: () => void;
@@ -138,8 +130,6 @@ export default function CreateSubscriptionModal({
     if (retryDelays.trim() && !/^\d+(,\d+)*$/.test(retryDelays.trim())) {
       newErrors.retryDelays = t('createSubscription.validation.retryDelays');
     }
-    // Mirrors RetryableStatuses' grammar, which the API also enforces: a rejection there is one
-    // red toast, and this is the field where the mistake was made.
     if (!isRetryableStatusSpec(retryableStatuses)) {
       newErrors.retryableStatuses = t('createSubscription.validation.retryableStatuses');
     }
@@ -233,14 +223,12 @@ export default function CreateSubscriptionModal({
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-5 py-4">
-            {/* ── Section 1: Essential ── */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Zap className="h-4 w-4 text-primary" />
                 {t('createSubscription.sections.essentials')}
               </div>
 
-              {/* Endpoint */}
               <div className="space-y-2">
                 <Label htmlFor="endpoint">
                   {t('createSubscription.fields.endpoint')} <span className="text-halt">*</span>
@@ -277,7 +265,6 @@ export default function CreateSubscriptionModal({
                 )}
               </div>
 
-              {/* Event Type */}
               <EventTypeField
                 projectId={projectId}
                 eventType={eventType}
@@ -287,7 +274,6 @@ export default function CreateSubscriptionModal({
               />
             </div>
 
-            {/* ── Section 2: Behavior ── */}
             <div className="space-y-3 border-t border-rail pt-4">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Settings2 className="h-4 w-4 text-muted-foreground" />
@@ -335,7 +321,6 @@ export default function CreateSubscriptionModal({
               </div>
             </div>
 
-            {/* ── Section 3: Advanced ── */}
             <div className="border-t border-rail pt-4">
               <button
                 type="button"
@@ -350,7 +335,6 @@ export default function CreateSubscriptionModal({
 
               {showAdvanced && (
                 <div className="space-y-4 mt-4">
-                  {/* Retry row */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="maxAttempts" className="text-xs">{t('createSubscription.fields.maxAttempts')}</Label>
@@ -425,7 +409,6 @@ export default function CreateSubscriptionModal({
                     </div>
                   </div>
 
-                  {/* Transformation */}
                   <div className="space-y-1.5">
                     <Label htmlFor="transformationId" className="text-xs flex items-center gap-1.5">
                       {t('createSubscription.fields.transformation')}
@@ -456,7 +439,6 @@ export default function CreateSubscriptionModal({
                     })()}
                   </div>
 
-                  {/* Payload template + custom headers side by side */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="payloadTemplate" className="text-xs flex items-center gap-1.5">
@@ -505,7 +487,6 @@ export default function CreateSubscriptionModal({
               )}
             </div>
 
-            {/* ── Summary / Tip ── */}
             {!subscription && endpointId && eventType.trim() && (
               <div className="bg-primary/5 border border-primary/20 p-3 flex items-start gap-2.5">
                 <HelpCircle className="h-4 w-4 text-primary mt-0.5 shrink-0" />
@@ -539,8 +520,6 @@ export default function CreateSubscriptionModal({
   );
 }
 
-// ── Schema-Aware Event Type Field ──────────────────────────────────
-
 function EventTypeField({
   projectId,
   eventType,
@@ -559,20 +538,17 @@ function EventTypeField({
   const [focused, setFocused] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Filter catalog by typed value
   const query = eventType.toLowerCase();
   const suggestions = catalogTypes.filter(
     (et) => et.name.toLowerCase().includes(query) || !query
   );
 
-  // Find exact match for schema hint
   const exactMatch = catalogTypes.find(
     (et) => et.name === eventType.trim()
   );
 
   const showDropdown = focused && suggestions.length > 0 && !exactMatch;
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
@@ -600,7 +576,6 @@ function EventTypeField({
           autoComplete="off"
         />
 
-        {/* Autocomplete dropdown */}
         {showDropdown && (
           <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto border bg-popover shadow-lg">
             {suggestions.map((et) => (
@@ -639,7 +614,6 @@ function EventTypeField({
 
       {error && <p className="text-sm text-halt">{error}</p>}
 
-      {/* Schema info badge for exact match */}
       {exactMatch && (
         <div className="border bg-primary/5 overflow-hidden">
           <div className="flex items-start gap-2 p-2.5">
@@ -670,7 +644,6 @@ function EventTypeField({
         </div>
       )}
 
-      {/* Hint when no match and catalogTypes exist */}
       {!exactMatch && eventType.trim() && catalogTypes.length > 0 && !focused && (
         <p className="text-xs text-muted-foreground flex items-center gap-1">
           <Info className="h-3 w-3" />
@@ -684,8 +657,6 @@ function EventTypeField({
     </div>
   );
 }
-
-// ── Schema Fields Preview ──────────────────────────────────────────
 
 interface SchemaField {
   name: string;
@@ -712,7 +683,6 @@ function SchemaFieldsPreview({ projectId, eventTypeId }: { projectId: string; ev
   const { t } = useTranslation();
   const { data: versions, isLoading } = useSchemaVersions(projectId, eventTypeId);
 
-  // Find the latest active version, or just the latest
   const latest = versions
     ?.slice()
     .sort((a, b) => b.version - a.version)

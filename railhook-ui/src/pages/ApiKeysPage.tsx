@@ -36,7 +36,6 @@ import { usePermissions } from '../auth/usePermissions';
 const SCOPES: ApiKeyScope[] = ['READ_WRITE', 'READ_ONLY'];
 const PAGE_SIZE = 20;
 
-/** A key is identified by its prefix and nothing else once it has been issued. */
 function KeyFingerprint({ prefix }: { prefix: string }) {
   return (
     <span className="font-mono text-[13px] text-muted-foreground">
@@ -144,9 +143,6 @@ export default function ApiKeysPage() {
       });
       setRotating(null);
       setCopied(false);
-      // Straight into the same one-and-only-sighting dialog the create flow uses: a rotation
-      // produces a real key that is shown exactly once, and inventing a second way to show it
-      // would be two places to get "you cannot see this again" wrong.
       setNewApiKey(replacement);
       loadData();
     } catch (err: any) {
@@ -209,8 +205,6 @@ export default function ApiKeysPage() {
         <div className="animate-fade-in space-y-3">
           {apiKeys.map((apiKey) => {
             const expired = !!apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date();
-            // A key with a rotated-at is not merely expiring, it is being handed over: its
-            // successor is already live and this one stops working when the window closes.
             const retiring = !!apiKey.rotatedAt && !expired;
             return (
               <Card key={apiKey.id}>
@@ -297,7 +291,6 @@ export default function ApiKeysPage() {
 
       {projectId && <ConnectedMcpApps projectId={projectId} />}
 
-      {/* Create */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
@@ -373,7 +366,6 @@ export default function ApiKeysPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Rotate: the create-then-revoke race, done by the server instead of by hand. */}
       <ConfirmDialog
         open={!!rotating}
         onOpenChange={(open) => !open && setRotating(null)}
@@ -404,7 +396,6 @@ export default function ApiKeysPage() {
         </div>
       </ConfirmDialog>
 
-      {/* Revoke */}
       <DangerConfirmDialog
         open={!!revoking}
         onOpenChange={(open) => !open && setRevoking(null)}
@@ -421,7 +412,6 @@ export default function ApiKeysPage() {
         confirmLabel={t('apiKeys.revoke')}
       />
 
-      {/* The one and only sighting of the secret. */}
       <Dialog open={!!newApiKey} onOpenChange={(open) => { if (!open) { setNewApiKey(null); setCopied(false); } }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>

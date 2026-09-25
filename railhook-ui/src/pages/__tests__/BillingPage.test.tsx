@@ -27,15 +27,6 @@ vi.mock('../../api/billing.api', () => ({
 import BillingPage from '../BillingPage';
 import { billingApi } from '../../api/billing.api';
 
-/**
- * The page that decides what a customer is charged, which shipped with no test at all.
- *
- * <p>Two things it has to get right and would fail silently at. The first is `-1`, which is how
- * every limit in the plan catalog spells "unlimited" — rendered as a number it reads as a plan
- * that allows minus one project, and the enterprise tier is nothing but those. The second is the
- * self-hosted case, where every limit is -1 and the whole page is that one rule.
- */
-
 const FREE: PlanResponse = {
   id: 'plan-free',
   name: 'free',
@@ -135,8 +126,6 @@ describe('BillingPage', () => {
   });
 
   it('ticks exactly the features the plan returns', async () => {
-    // The feature list is the plan's own flags from the API, so it cannot claim more or less
-    // than the backend enforces.
     vi.mocked(billingApi.getOrganizationBilling).mockResolvedValue({
       ...BILLING,
       plan: { ...FREE, features: { workflows: true, rules: true, replay: true, mTLS: true, tunnels: true } },
@@ -149,8 +138,6 @@ describe('BillingPage', () => {
   });
 
   it('renders an unlimited plan as unlimited, not as -1', async () => {
-    // Every limit in the enterprise row is -1. Printed as a number it reads as a plan that
-    // allows minus one project, and it is the whole of the self-hosted plan as well.
     renderBilling();
 
     await screen.findByText(/enterprise/i);
@@ -159,9 +146,6 @@ describe('BillingPage', () => {
   });
 
   it('offers no plan picker when the current plan is the only one on offer', async () => {
-    // A hosted deployment with no payment provider lists the free plan and nothing else. A
-    // "plans" section holding only the card marked Current, with a monthly/yearly toggle over
-    // it, is a choice with nothing to choose.
     vi.mocked(billingApi.listPlans).mockResolvedValue([FREE]);
     renderBilling();
 
@@ -174,7 +158,6 @@ describe('BillingPage', () => {
   it('shows usage against the limit', async () => {
     renderBilling();
 
-    // 2,500 of 10,000 — the number a customer checks before they are cut off.
     await waitFor(() => expect(billingApi.getUsage).toHaveBeenCalled());
     expect(await screen.findByText(/2[,.\s]?500/)).toBeInTheDocument();
   });
@@ -190,10 +173,7 @@ describe('BillingPage', () => {
   });
 
   it('shows a paid invoice as paid, not as neither-here-nor-there', async () => {
-    // The badge compared inv.status against 'paid' while InvoiceStatus is upper case, so
-    // every paid invoice rendered in the idle (grey) style. The label came from a translation
-    // key that *did* handle the case, which is exactly why nobody noticed: the row read
-    // "Paid" in the colour of an invoice nobody had settled.
+    // Regression: the badge compared status to 'paid' while InvoiceStatus is upper case.
     vi.mocked(billingApi.listInvoices).mockResolvedValue([INVOICE]);
     renderBilling();
 
@@ -203,18 +183,14 @@ describe('BillingPage', () => {
   });
 
   it('survives an organization whose billing call fails', async () => {
-    // A self-hosted deployment with BILLING_ENABLED=false is the common case, and this page
-    // must not be a white screen there.
     vi.mocked(billingApi.getOrganizationBilling).mockRejectedValue(new Error('billing disabled'));
     renderBilling();
 
-    // Something has to be on screen — an error state or a skeleton. A blank page is the
-    // failure mode this guards, and a query that has not settled yet is not it.
+    // A skeleton or an error state is fine; a blank page is the failure this guards.
     await waitFor(() => expect(document.body.textContent?.trim()).not.toBe(''));
   });
 
   it('does not charge anyone by rendering', async () => {
-    // Nothing on this page may start a checkout or cancel a subscription without a click.
     renderBilling();
 
     await screen.findAllByText(/free/i);

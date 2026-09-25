@@ -10,12 +10,6 @@ import { Button, buttonVariants } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { useAuth } from './auth.store';
 
-/**
- * An outcome screen: the invite token in the URL has already decided what
- * happens. Each state names the outcome and offers exactly one way on — the
- * "create an account instead" path is a cross-link, not a second button
- * competing with it.
- */
 export default function AcceptInvitePage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -42,8 +36,7 @@ export default function AcceptInvitePage() {
 
     membersApi.acceptInvite(orgId, token)
       .then(() => {
-        // The organization switcher only appears with a second organization to switch to, and its
-        // cached list does not know about the one just joined.
+        // The switcher's cached list doesn't know the organization just joined.
         queryClient.invalidateQueries({ queryKey: queryKeys.organizations.mine });
         setStatus('success');
       })

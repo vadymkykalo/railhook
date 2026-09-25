@@ -29,10 +29,6 @@ function renderGate(user: CurrentUserResponse) {
   );
 }
 
-/**
- * In the live demo every action is greyed out, and the reason given is the demo — not a role, which
- * would send a visitor looking for a teammate who does not exist.
- */
 describe('PermissionGate in the live demo', () => {
   it('disables the action and says the demo is read-only', async () => {
     renderGate({ ...VIEWER, demo: true });

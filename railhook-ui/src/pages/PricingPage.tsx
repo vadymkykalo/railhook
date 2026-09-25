@@ -10,14 +10,7 @@ import { Band, PageIntro, SectionHeading, SectionLabel } from './landing/primiti
 import { docsUrl } from '../lib/docsUrl';
 import { FREE_PLAN } from './landing/plans';
 
-/**
- * What Railhook costs: nothing, in the cloud or on your own servers.
- *
- * There is one plan and it is free, so this is not a plan grid: the free cloud allowance with
- * every figure a reader checks before signing up, the self-hosted promise, and the questions
- * people ask first — also published as FAQPage data. No other vendor's prices: the owner's call,
- * a price comparison reads as a discount shop. Feature comparisons live in the docs.
- */
+/** No competitor prices here: the owner's call. */
 
 /** FAQ order is part of the page, and the FAQPage data follows it. */
 const FAQ = ['free', 'limit', 'card', 'paid', 'selfHost'] as const;

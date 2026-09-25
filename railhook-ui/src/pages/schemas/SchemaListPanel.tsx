@@ -12,12 +12,6 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { cn } from '../../lib/utils';
 
-/**
- * The catalog: every event type this project has a contract for.
- *
- * One job — choose which event type you are looking at, or register a new one.
- * Versions, diffs and policy live elsewhere.
- */
 export default function SchemaListPanel({
   projectId, selected, onSelect,
 }: {

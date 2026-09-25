@@ -22,15 +22,6 @@ vi.mock('../../api/transformations.api', () => ({
 import TransformationHistoryPage from '../TransformationHistoryPage';
 import { transformationsApi } from '../../api/transformations.api';
 
-/**
- * The screen exists because the version number in the transformations list used to promise a
- * rollback nothing implemented. What is held down here is that promise and its one sharp edge:
- * a restore is not an undo. It publishes the old template again as the next version and leaves
- * everything published since where it is, so the confirmation has to say so before anybody
- * clicks it — someone who reads "restore v1" as "delete v2 and v3" will click it on a
- * transformation that is live.
- */
-
 const TRANSFORMATION_ID = 'tf-1';
 const ROUTE = '/projects/:projectId/transformations/:transformationId/history';
 const AT = `/projects/${TEST_PROJECT_ID}/transformations/${TRANSFORMATION_ID}/history`;
@@ -94,8 +85,6 @@ describe('TransformationHistoryPage', () => {
     expect(screen.getByText('v2')).toBeInTheDocument();
     expect(screen.getByText('v1')).toBeInTheDocument();
     expect(screen.getAllByText('owner@example.com')).toHaveLength(2);
-    // v2 has no user behind it — an API key published it, and the row says so rather than
-    // leaving a blank where a name should be.
     expect(screen.getByText('API key')).toBeInTheDocument();
     expect(screen.getByText('Current')).toBeInTheDocument();
   });
@@ -136,7 +125,6 @@ describe('TransformationHistoryPage', () => {
     renderPage(<TransformationHistoryPage />, { path: ROUTE, initialEntry: AT });
 
     await waitFor(() => expect(screen.getByText('v3')).toBeInTheDocument());
-    // Two restorable versions out of three rows.
     expect(screen.getAllByRole('button', { name: /Restore/i })).toHaveLength(2);
   });
 });

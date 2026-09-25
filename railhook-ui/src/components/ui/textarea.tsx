@@ -4,10 +4,6 @@ import { cn } from "../../lib/utils"
 export interface TextareaProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
 
-/* Same contract as Input: the surface is `bg-card` so a field on a card is not
-   a grey inset, and `min-h-20` is the 5rem that `:where(textarea)` in
-   index.css already sets — restated, not overridden, so the two cannot drift.
-   Focus belongs to index.css for the same reason it does on Input. */
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, ...props }, ref) => {
     return (

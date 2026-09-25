@@ -8,7 +8,7 @@ vi.mock('../../api/piiRules.api', () => ({
   piiRulesApi: { preview: vi.fn() },
 }));
 
-// CodeMirror does not run in jsdom; the editor is a textarea here.
+// CodeMirror does not run in jsdom.
 vi.mock('../JsonEditor', () => ({
   default: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
     <textarea aria-label="payload" value={value} onChange={(e) => onChange(e.target.value)} />
@@ -29,8 +29,6 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('PiiPreview', () => {
   it('shows what the rules actually did, not an illustration of what they might do', async () => {
-    // The page used to print a hand-written example — including a fabricated
-    // 'sha256:a1b2c3d4e5f6' that no backend ever produced.
     vi.mocked(piiRulesApi.preview).mockResolvedValue('{"email":"jo***@example.com"}');
     const user = userEvent.setup();
     render();
@@ -42,10 +40,7 @@ describe('PiiPreview', () => {
   });
 
   it('renders a preview the client handed back already parsed', async () => {
-    // The endpoint answers text/plain, but axios parses anything that looks
-    // like JSON regardless of content type — so this client resolved an object
-    // while its type said string. Rendering that threw React error #31 on the
-    // whole page.
+    // axios parses JSON-looking text/plain into an object; rendering it threw React error #31.
     vi.mocked(piiRulesApi.preview).mockResolvedValue(
       { customer: { email: 'jo***@example.com' }, amount: 4900 } as unknown as string
     );
@@ -77,7 +72,7 @@ describe('PiiPreview', () => {
 
     const editor = screen.getByLabelText('payload');
     await user.clear(editor);
-    // userEvent reads { and [ as key descriptors; every one of them is doubled to type it literally.
+    // userEvent reads { and [ as key descriptors; doubling types them literally.
     await user.type(editor, payload.replace(/[{[]/g, '$&$&'));
     await user.click(screen.getByRole('button', { name: /Run preview/i }));
 

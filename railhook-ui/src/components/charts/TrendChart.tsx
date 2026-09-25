@@ -7,18 +7,12 @@ import ChartTooltip, { type ChartTooltipItem } from './ChartTooltip';
 interface TrendChartProps {
   data: Record<string, unknown>[];
   dataKey: string;
-  /** Names the single series for the tooltip. No legend: the title says it. */
   seriesLabel: string;
   formatTick: (timestamp: string) => string;
   formatStamp: (timestamp: string) => string;
   formatValue: (value: number) => string;
 }
 
-/**
- * One measure over time — latency, throughput, anything that is not an
- * outcome. A single series, so it takes the brand hue rather than a status
- * one: nothing about a latency curve means delivered or abandoned.
- */
 export default function TrendChart({
   data, dataKey, seriesLabel, formatTick, formatStamp, formatValue,
 }: TrendChartProps) {

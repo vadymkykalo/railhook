@@ -9,10 +9,6 @@ import { renderPage } from '../../test/renderPage';
 import AboutPage from '../AboutPage';
 import { REPO_URL } from '../landing/plans';
 
-/**
- * Who builds Railhook and why, in facts only: the maintainer, the licence, the stack and where
- * the work happens. No invented team, customers, location or funding.
- */
 function renderAbout() {
   return renderPage(<AboutPage />, {
     path: '/about',

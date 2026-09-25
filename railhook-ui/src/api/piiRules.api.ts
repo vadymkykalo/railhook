@@ -43,15 +43,7 @@ export const piiRulesApi = {
     return http.post<PiiMaskingRuleResponse[]>(`/api/v1/projects/${projectId}/pii-rules/seed-defaults`);
   },
 
-  /**
-   * The sanitized form of a payload, as text.
-   *
-   * <p>The endpoint answers `text/plain`, but axios parses any body that looks
-   * like JSON whatever the content type says — so this resolved an object while
-   * its signature promised a string, and rendering that threw React error #31
-   * over the whole page. Normalising here keeps the promise true rather than
-   * asking every caller to guess which it got.
-   */
+  /** axios parses JSON-looking text/plain bodies; rendering the object threw React error #31. */
   preview: async (projectId: string, payload: string): Promise<string> => {
     const sanitized = await http.post<unknown>(
       `/api/v1/projects/${projectId}/pii-rules/preview`,

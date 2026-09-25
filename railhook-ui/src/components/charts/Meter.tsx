@@ -7,7 +7,6 @@ import { quotaKind } from './statusScale';
 interface MeterProps {
   label: string;
   current: number;
-  /** Zero or negative means the plan does not cap this resource. */
   limit: number;
   percentUsed: number;
   className?: string;
@@ -19,15 +18,6 @@ const FILL: Record<string, string> = {
   over: SERIES.halt,
 };
 
-/**
- * Quota against a limit.
- *
- * The unfilled track is a lighter step of the fill's own hue rather than a
- * neutral gray, so the state reads across the whole bar and not just the part
- * that happens to be filled. The bar stays in the brand hue while there is
- * room; it only borrows a status hue once someone has to do something about it
- * — approaching the limit is `retry`, past it is `halt`.
- */
 export default function Meter({ label, current, limit, percentUsed, className }: MeterProps) {
   const { t } = useTranslation();
   const unlimited = !Number.isFinite(limit) || limit <= 0;

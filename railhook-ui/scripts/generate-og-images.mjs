@@ -1,23 +1,5 @@
 #!/usr/bin/env node
-/**
- * Renders one social card per blog post into `public/blog/<slug>.png`, 1200×630.
- *
- * Committed, not generated at build. Two reasons: `npm run build` is what CI runs, and making it
- * download and drive a browser would cost minutes on every push; and an `og:image` that only
- * exists after a successful prerender is an `og:image` that is missing from every local build,
- * which is exactly when somebody is pasting a link into Slack to check it.
- *
- * So this is run by hand when a post is added, like `npm run seo:sitemap`:
- *
- *   npm run blog:og          regenerate every card (commit the result)
- *   npm run blog:og -- --check   fail when a post has no card
- *
- * The card is drawn in the site's own voice — ink surface, cobalt rail, Manrope — because a
- * social card is the first thing most readers see of the article and it should not look like a
- * different product. The typeface is fetched from Google Fonts, the same place index.html gets
- * it; without a network the card falls back to a system sans and is still correct, only less
- * ours.
- */
+/** Committed, not built: CI shouldn't drive a browser, and og:image must exist in local builds too. */
 import { readdirSync, readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
@@ -62,7 +44,6 @@ function chromiumPath() {
 const escape = (value) =>
   String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** The tokens are the ones `src/index.css` declares for `.surface-ink`. */
 function card({ title, lead, author, date, tags }) {
   return `<!doctype html>
 <html><head><meta charset="utf-8">
@@ -77,7 +58,6 @@ function card({ title, lead, author, date, tags }) {
     padding: 64px 72px;
     position: relative; overflow: hidden;
   }
-  /* The rail: the ladder's own tick spacing, the same motif the pages divide on. */
   .rail { position: absolute; left: 0; right: 0; top: 0; height: 6px; background: #1D4BFF; }
   .grid {
     position: absolute; inset: 0;
@@ -116,7 +96,6 @@ function card({ title, lead, author, date, tags }) {
 </body></html>`;
 }
 
-/** The lead is a paragraph; a card holds about two lines of it. */
 function shorten(text, limit = 132) {
   if (text.length <= limit) return text;
   const cut = text.slice(0, limit);
@@ -147,8 +126,7 @@ async function main() {
   });
   try {
     for (const post of entries) {
-      // A fresh page per card: on one reused page, the second card's setContent timed out waiting
-      // for networkidle0, so a second post could never get a card.
+      // A fresh page per card: a reused page timed out on the second setContent.
       const page = await browser.newPage();
       await page.setViewport({ width: WIDTH, height: HEIGHT, deviceScaleFactor: 1 });
       const tags = (parseFrontMatter(readFileSync(join(CONTENT, post.slug, 'en.md'), 'utf8')).lists.tags ?? []).slice(0, 3);

@@ -10,15 +10,8 @@ interface ProjectSwitcherProps {
   collapsed?: boolean;
 }
 
-/** Filtering only earns its keystrokes once the list stops fitting on screen. */
 const FILTER_THRESHOLD = 7;
 
-/**
- * The switcher sits under the logo and never leaves the screen, so its whole
- * job is to answer "which project am I in?" before anyone has to ask. The
- * current project gets the name slot and an accent marker; everything else about
- * the control stays quiet.
- */
 export default function ProjectSwitcher({ currentProjectId, collapsed }: ProjectSwitcherProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -64,7 +57,6 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
   const handleSwitch = (newProjectId: string) => {
     setOpen(false);
     if (newProjectId === currentProjectId) return;
-    // Land on the same facet of the new project rather than back at its root.
     const subSection = location.pathname.match(/\/admin\/projects\/[^/]+\/(.+)/)?.[1] || 'endpoints';
     navigate(`/admin/projects/${newProjectId}/${subSection}`);
   };

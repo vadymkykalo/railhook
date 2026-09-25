@@ -19,16 +19,9 @@ afterEach(() => {
   delete (window as { __RAILHOOK__?: unknown }).__RAILHOOK__;
 });
 
-/**
- * Text a person copies out of the product and runs somewhere else. QA on a fresh cloud account
- * found `https://your-api.com` and `https://your-domain.com` in two curl snippets, and a CLI
- * command (`railhook listen --port 3000`) the CLI does not accept.
- */
 describe('sendEventCurl', () => {
   it('targets the API this dashboard itself calls, not the canonical site URL', () => {
-    // The site URL is what pages name about themselves (APP_BASE_URL). On a local stack still
-    // carrying the old localhost:5173 default it pointed the copied curl at a port nothing served,
-    // while the dashboard talked to its own origin. The API a curl should reach is that one.
+    // The curl targets this origin: siteUrl may be a stale localhost:5173 nothing serves.
     (window as { __RAILHOOK__?: unknown }).__RAILHOOK__ = { siteUrl: 'http://localhost:5173' };
     const curl = sendEventCurl({ payload: '{"a":1}' });
     expect(curl).toContain(`curl -X POST ${window.location.origin}/api/v1/events`);
@@ -82,11 +75,6 @@ describe('canonicalTimezone', () => {
   });
 });
 
-/**
- * The header each built-in provider signs in has to be the one the API's verifier reads. The
- * source page used to print the generic default `X-Signature` for a Stripe source, whose
- * verifier reads `Stripe-Signature`.
- */
 describe('PROVIDER_SIGNATURE_HEADERS', () => {
   const verifiers: Record<string, string> = {
     GITHUB: 'GitHubVerifier',

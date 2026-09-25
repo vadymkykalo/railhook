@@ -8,11 +8,6 @@ import { ErrorState } from '../components/EmptyState';
 import PageSkeleton from '../components/PageSkeleton';
 import { formatJson } from '../lib/json';
 
-/**
- * A public page: whoever opens it has a link and nothing else, so it stands on
- * its own outside the admin shell. The facts the product produced — event type,
- * payload — are set in mono; the words around them are not.
- */
 function Fact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="border border-rail bg-card p-3.5">

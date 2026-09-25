@@ -2,12 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Monochrome, square, hairline-drawn. --highlight is the one accent; the four status
-   hues (ok, retry, halt, idle) are for statuses only and never for chrome. */
+/* The four status hues are for statuses only, never chrome. */
 
 @layer base {
   :root {
-    /* Surfaces */
     --background: 0 0% 100%;             /* #FFFFFF */
     --foreground: 0 0% 0%;               /* #000000  ink */
     --card: 0 0% 100%;
@@ -15,7 +13,6 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 0%;
 
-    /* The one accent. Works on white and on #111 alike, so dark mode keeps it. */
     --highlight: 191.3 100% 74.9%;       /* #7FE7FF */
 
     --primary: 0 0% 0%;                  /* #000000 */
@@ -24,19 +21,16 @@
     --accent: var(--highlight);
     --accent-foreground: 0 0% 0%;
 
-    /* Neutrals */
     --secondary: 0 0% 95.7%;             /* #F4F4F4  soft band */
     --secondary-foreground: 0 0% 0%;
     --muted: 0 0% 95.7%;                 /* #F4F4F4 */
     --muted-foreground: 0 0% 33.3%;      /* #555555  7.5:1 on white */
 
-    /* Hairlines. Inputs take the strong line so a field reads as a field. */
     --rail: 220 13% 91%;                 /* #E5E7EB */
     --border: 220 13% 91%;
     --input: 0 0% 68.6%;                 /* #AFAFAF */
     --ring: 0 0% 0%;
 
-    /* Status — reserved. Never chrome. */
     --ok: 153.3 75.3% 28.6%;             /* #12804F  delivered       */
     --ok-soft: 148.2 45.9% 92.7%;        /* #E4F5EC */
     --retry: 31.7 100% 34.9%;            /* #B25E00  attempt pending */
@@ -53,7 +47,7 @@
     --warning: 31.7 100% 34.9%;
     --warning-foreground: 0 0% 100%;
 
-    /* Syntax: no status hue; every value clears AA on white and on #F4F4F4. */
+    /* No status hue; every value clears AA on white and on #F4F4F4. */
     --code-fg: #111111;
     --code-comment: #6B6B6B;
     --code-punct: #555555;
@@ -66,7 +60,7 @@
     --code-annotation: #4F5400;
     --code-variable: #3D3D3D;
 
-    /* Secondary text inside a blog figure: darker than muted, because it is set small. */
+    /* Darker than muted, because it is set small. */
     --figure-soft: 0 0% 25%;             /* #404040 */
 
     --radius: 0px;
@@ -117,7 +111,6 @@
 
     --figure-soft: 0 0% 76%;             /* #C2C2C2 */
 
-    /* The same set the code surface uses: >= 6:1 on this ground. */
     --code-fg: #EDEDED;
     --code-comment: #8C8C8C;
     --code-punct: #A8A8A8;
@@ -143,17 +136,12 @@
   html {
     scroll-behavior: smooth;
   }
-  /* Two weights only: 400 and 500. Headings are set light, never bold. */
   b, strong, th {
     font-weight: 500;
   }
 }
 
 @layer utilities {
-  /* ── The mono voice ──────────────────────────────────────────────────
-     Event types, HTTP codes, ids, URLs, column heads and eyebrows are all
-     machine facts. They are set in mono so a reader can tell at a glance
-     what the product said from what a person wrote. */
   .mono-label {
     font-family: theme('fontFamily.mono');
     font-size: 0.6875rem;
@@ -186,13 +174,7 @@
     -webkit-box-decoration-break: clone;
   }
 
-  /* ── An always-ink surface ───────────────────────────────────────────
-     Some panels are dark in both themes — the auth panel, a terminal. Using
-     `bg-foreground` for that inverts in dark mode and turns the panel white.
-     This redeclares the tokens locally instead, so anything nested inside
-     (including AttemptRail, which reads --rail and --background straight out
-     of the cascade) renders correctly on ink. Status hues take their
-     dark-theme values, because the light-theme ones are too dark to read here. */
+  /* Redeclares tokens locally: bg-foreground would turn this panel white in dark mode. */
   .surface-ink {
     background-color: hsl(0 0% 5.5%);            /* #0E0E0E */
     color: hsl(0 0% 90%);                        /* #E5E5E5 */
@@ -215,15 +197,13 @@
     --halt: 4.8 85.2% 65.5%;
     --idle: 0 0% 60%;
 
-    /* The soft tints have to come with their hues, or a badge on this panel
-       paints a near-white pill on near-black. */
+    /* Soft tints must come with their hues, or a badge paints a near-white pill on ink. */
     --ok-soft: 153.3 47.4% 11.2%;
     --retry-soft: 36 48.4% 12.2%;
     --halt-soft: 348.4 43.7% 13.9%;
     --idle-soft: 0 0% 12%;
 
-    /* Read by components that render in place rather than through a portal:
-       the tooltip, the global form-control rule, skeletons, ErrorBoundary. */
+    /* Read by in-place (non-portal) components: tooltip, form controls, skeletons, ErrorBoundary. */
     --card-foreground: 0 0% 90%;
     --popover: 0 0% 8.6%;
     --popover-foreground: 0 0% 90%;
@@ -251,8 +231,6 @@
     --code-variable: #CFCFCF;
   }
 
-  /* On a dark page the ink surface drops below the ground, so it still reads
-     as the deepest thing there. */
   .dark .surface-ink {
     background-color: hsl(0 0% 1.5%);
     --background: 0 0% 1.5%;
@@ -286,9 +264,7 @@
   to { opacity: 1; transform: scale(1); }
 }
 
-/* ── Syntax tokens ───────────────────────────────────────────────────────
-   Emitted by SyntaxHighlight. Outside any @layer so the purge never drops a
-   class that only a grammar produces. */
+/* Outside any @layer so the purge never drops a class only a grammar produces. */
 .tok-comment { color: var(--code-comment); font-style: italic; }
 .tok-punct { color: var(--code-punct); }
 .tok-keyword { color: var(--code-keyword); font-weight: 500; }
@@ -302,10 +278,7 @@
 .tok-flag { color: var(--code-number); }
 .tok-member { color: var(--code-fg); }
 
-/* ── The attempt rail ────────────────────────────────────────────────────
-   The signature device. A hairline with tick marks at exponential spacing,
-   because that is what a retry ladder actually is: 1m, 5m, 15m, 1h, 6h, 24h.
-   Even spacing would be a lie about the product. */
+/* Ticks at exponential spacing, like the retry ladder itself. */
 @keyframes rail-tick-in {
   from { opacity: 0; transform: scale(0.4); }
   to { opacity: 1; transform: scale(1); }
@@ -315,12 +288,7 @@
 }
 
 
-/* ── Tables on a phone ─────────────────────────────────────────────────────
-   Below sm a list table is a stack of cards: each row a card, each cell a line with its column
-   name (data-label, copied from the header by Table) in front of the value. A desktop table
-   swiped sideways at 390px showed one column at a time and hid what a row was about. Cells
-   already hidden at this width (`hidden lg:table-cell`) stay hidden, so each page's own choice of
-   secondary columns carries over. Desktop is untouched: everything here is inside the query. */
+/* Below sm each row is a card; a sideways-swiped table showed one column at a time. */
 @media (max-width: 639px) {
   .rh-table-stack { overflow: visible; }
   .rh-table-stack > table,
@@ -345,8 +313,6 @@
     letter-spacing: 0.08em; text-transform: uppercase; color: hsl(var(--muted-foreground));
   }
   .rh-table-stack > table > tbody > tr > td[data-label] > * { min-width: 0; max-width: 100%; }
-  /* A cell that holds several blocks (an endpoint's URL, then its description and badges) keeps
-     them stacked under one another beside the label, instead of squeezing them onto one line. */
   .rh-table-stack > table > tbody > tr > td[data-label]:has(> :nth-child(2)) {
     display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 0.75rem; row-gap: 0.125rem;
   }
@@ -369,7 +335,6 @@
   .rh-table-stack > table > tbody > tr > td a { display: inline-flex; min-height: 2.5rem; align-items: center; }
 }
 
-/* The landing. Status hues appear only on data (a 503, a ✓), never on chrome. */
 html, body { overflow-x: clip; }
 
 .lp-rule { position: relative; border-top: 1px solid hsl(var(--rail)); }
@@ -492,7 +457,6 @@ html, body { overflow-x: clip; }
   .lp-attempts-row { transition: none; }
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -508,7 +472,6 @@ html, body { overflow-x: clip; }
   background: hsl(var(--muted-foreground));
 }
 
-/* ── Universal form control styling (low specificity via :where) ── */
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]),
 textarea) {
   height: 2.25rem;
@@ -542,12 +505,7 @@ textarea:focus, textarea:focus-visible) {
   box-shadow: 0 0 0 1px hsl(var(--ring));
 }
 
-/* The blanket reset used to be `*:focus-visible { outline: none }` paired with
-   an allowlist that restored the ring. Checkboxes matched neither — they carry
-   no role and no tabindex, and the form-control rule above excludes them — so
-   the select-all and select-row controls on Events, Deliveries, DLQ and
-   Incoming Events had no visible focus at all. The reset now names the
-   elements whose native outline is actually being replaced. */
+/* Names the replaced elements: a blanket outline:none left checkboxes with no visible focus. */
 :where(button, a, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [tabindex]):focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;

@@ -43,11 +43,6 @@ function shortId(id: string | null) {
   return `${id.substring(0, 8)}…`;
 }
 
-/**
- * The log of who did what. An audit action is not a status — only the outcome
- * of the attempt is — so the actions are set in the machine voice and the four
- * status colours stay reserved for the SUCCESS/FAILURE column.
- */
 export default function AuditLogPage() {
   const { t } = useTranslation();
   const [page, setPage] = useState(0);

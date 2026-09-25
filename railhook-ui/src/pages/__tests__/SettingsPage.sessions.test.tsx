@@ -35,13 +35,6 @@ function session(overrides: Partial<SessionResponse> = {}): SessionResponse {
   };
 }
 
-/**
- * The account screen's answer to "what is signed in to this, and how do I stop it?".
- *
- * The CLI row is the one that earns the feature. A device-code grant is issued to a developer
- * machine and outlives it far more often than a browser tab does, and before sessions were
- * recorded there was no surface anywhere that admitted one existed.
- */
 describe('SettingsPage — active sessions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,8 +63,6 @@ describe('SettingsPage — active sessions', () => {
     const { container } = renderSettings();
     await screen.findByText('Browser');
 
-    /* The list is readable by anything holding an access token, so it must never be a place a
-       stolen short-lived credential can be traded up for a long-lived one. */
     expect(container.textContent).not.toMatch(/refresh/i);
   });
 
@@ -102,8 +93,6 @@ describe('SettingsPage — active sessions', () => {
 
     await user.click(within(currentRow).getByRole('button', { name: /Sign out/i }));
 
-    /* Revoking your own session is legitimate, but it takes effect on the very next request --
-       so it has to say so rather than leave the tab discovering it as a string of 401s. */
     expect(await screen.findByText(/This is the device you are using/i)).toBeInTheDocument();
   });
 

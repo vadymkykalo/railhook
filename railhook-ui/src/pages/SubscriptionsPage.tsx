@@ -32,11 +32,6 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-/**
- * The flat list of Subscriptions — the other half of a connection. One row is
- * one standing statement that an endpoint wants events of a given type, which
- * is why the event type leads the row and the endpoint follows it.
- */
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
@@ -132,7 +127,6 @@ export default function SubscriptionsPage() {
     }
   };
 
-  /** Point the selected subscriptions at a different endpoint. */
   const handleBulkMove = async () => {
     if (!projectId || !moveToEndpointId) return;
     setBulkProcessing(true);

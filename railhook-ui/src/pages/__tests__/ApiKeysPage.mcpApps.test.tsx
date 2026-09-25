@@ -56,10 +56,6 @@ function renderApiKeys(auth = {}) {
   });
 }
 
-/**
- * Apps connected by signing in sit under the project's API keys: they are the same kind of
- * credential, and whoever can revoke a key can disconnect one.
- */
 describe('ApiKeysPage — connected AI apps', () => {
   beforeEach(() => {
     vi.clearAllMocks();

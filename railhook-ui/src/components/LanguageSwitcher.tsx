@@ -1,15 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { cn } from '../lib/utils';
 
-/**
- * A segmented control rather than a flag.
- *
- * Emoji flags were the previous design and they are unreliable: Windows renders
- * them as bare letter pairs, so the control looked different on every other
- * machine. A language is also not a country. Two mono labels in a hairline
- * box show both choices at once, the active one in ink, which a single-button
- * toggle never did.
- */
+/** Not flags: Windows renders emoji flags as letter pairs, and a language isn't a country. */
 
 const LANGUAGES = [
   { code: 'en', label: 'EN', name: 'English' },
@@ -57,7 +49,7 @@ export default function LanguageSwitcher({ variant = 'icon', className }: Langua
       role="group"
       aria-label={t('settings.language')}
       className={cn(
-        // Each half is a 40px tap target on a phone; the track is 32px from sm.
+        // A 40px tap target per half on a phone.
         'inline-flex h-8 items-stretch border border-input max-sm:h-10',
         className
       )}

@@ -28,12 +28,6 @@ import Callout from '../components/Callout';
 
 const QUICK_RANGES = ['1h', '6h', '24h', '7d', 'custom'] as const;
 
-/**
- * A replay session is an action taken over a selection of events, so it borrows
- * the same four status meanings everything else uses rather than inventing a
- * palette: running is an attempt still owed, completed is delivered, failed is
- * abandoned, cancelled is nothing tried.
- */
 function kindOfReplayStatus(status: string): StatusKind {
   switch (status) {
     case 'COMPLETED': return 'ok';

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 
-/** True while the app is in dark mode, and re-rendered when that changes. */
 export function useIsDarkTheme(): boolean {
   const [isDark, setIsDark] = useState(
     () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'),

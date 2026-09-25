@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-/** The Caddyfile install.sh writes, as the heredoc in write_caddyfile. */
 function generatedCaddyfile(): string {
   const installer = readFileSync(join(repoRoot, 'install.sh'), 'utf8');
   const open = `cat > "\${INSTALL_DIR}/Caddyfile" <<'CADDY'\n`;
@@ -17,23 +16,13 @@ function generatedCaddyfile(): string {
   return installer.slice(start + open.length, end);
 }
 
-/** The global options block: the first `{ … }` at column zero. */
 function globalOptions(caddyfile: string): string {
   const m = /^\{\n([\s\S]*?)^\}/m.exec(caddyfile);
   expect(m, 'a global options block').not.toBeNull();
   return m![1];
 }
 
-/**
- * Who the API believes the client is.
- *
- * The API walks X-Forwarded-For from the right and stops at the first hop that is not in
- * WEBHOOK_TRUSTED_PROXIES — the one place that decision is made. Caddy, left at its default,
- * trusts no upstream and replaces the header with the address of whoever connected to it. Behind
- * a CDN that address is the CDN's edge, so every visitor through one edge shared one sign-in rate
- * limit: found on production, where approving a CLI login answered 429. Caddy has to pass the
- * chain on intact and leave the choice to the API.
- */
+/** Caddy's default replaced X-Forwarded-For with the CDN edge, so visitors shared one rate limit. */
 describe('Caddyfile written by install.sh', () => {
   it('forwards X-Forwarded-For intact instead of replacing it with the connecting peer', () => {
     const options = globalOptions(generatedCaddyfile());

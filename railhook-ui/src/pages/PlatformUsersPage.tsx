@@ -15,7 +15,6 @@ import {
   EmailText, OrganizationLink, PLATFORM_TABLE, PLATFORM_TABLE_HEADER, PlatformAdminBadge, PlatformErrorState, PlatformScope, SignInMethods, UserStatusBadge, VerifiedBadge, useDebouncedValue,
 } from './platformAdminParts';
 
-/** Every account on the deployment, newest first. */
 export default function PlatformUsersPage() {
   const { t } = useTranslation();
   const [page, setPage] = useState(0);

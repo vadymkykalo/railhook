@@ -11,12 +11,6 @@ import DangerConfirmDialog from './DangerConfirmDialog';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 
-/**
- * AI apps connected to the project by signing in — claude.ai, ChatGPT — listed under the API keys
- * because that is what each one is: a credential for this project with a scope, which the same
- * people manage and revoke. A connected app has no key to show; what tells two apart is the host its
- * sign-in returned to and who approved it.
- */
 export default function ConnectedMcpApps({ projectId }: { projectId: string }) {
   const { t } = useTranslation();
   const { canManageApiKeys } = usePermissions();

@@ -14,18 +14,6 @@ import { cn } from '../lib/utils';
 import { blogDate, ReadingTime, useBlogDateFormat } from './BlogPage';
 import { PageIntro, panel, WRAP } from './landing/primitives';
 
-/**
- * One article.
- *
- * The body is Markdown from `src/content/blog/<slug>/<locale>.md`, parsed into data and rendered
- * by `Prose`. Everything around it — the byline, the contents, the two ways on and the call to
- * action — is the site's own furniture, so a post is prose and nothing else.
- *
- * The table of contents is a wide-screen affordance: below `xl` the column would push the
- * measure down to something unreadable, so the article takes the full column instead and the
- * headings do the navigating.
- */
-
 function NotFound() {
   const { t } = useTranslation();
   return (
@@ -37,7 +25,6 @@ function NotFound() {
   );
 }
 
-/** The article's own headings, as a rail down the side. */
 function Contents({ post }: { post: BlogPost }) {
   const { t } = useTranslation();
   if (post.document.headings.length < 2) return null;
@@ -62,7 +49,6 @@ function Contents({ post }: { post: BlogPost }) {
   );
 }
 
-/** Where a reader goes after the last paragraph. The tester only where the deployment has one. */
 function CallToAction() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
@@ -135,8 +121,7 @@ export default function BlogPostPage() {
   const dates = useBlogDateFormat();
   const site = siteUrl();
 
-  // Hooks cannot be skipped, so the unknown-slug case still describes itself — as the blog
-  // index, which is where the page sends the reader.
+  // Hooks cannot be skipped, so an unknown slug describes itself as the blog index.
   useDocumentMeta(
     post
       ? { title: post.title, description: post.description, path: `/blog/${post.slug}`, image: post.image }
@@ -185,10 +170,7 @@ export default function BlogPostPage() {
       </Link>
 
       <div className="mt-2 grid gap-12 xl:grid-cols-[minmax(0,1fr)_15rem]">
-        {/* `min-w-0`: a grid item's automatic minimum is its content's min-content, and the
-            comparison table sets one. Without this the column grows to the table's width and the
-            whole article scrolls sideways on a phone, rather than the table scrolling inside its
-            own box. */}
+        {/* min-w-0: otherwise the table widens the grid column and the page scrolls sideways on a phone. */}
         <article className="min-w-0">
           <header className="max-w-[68ch]">
             <h1 className="text-[2rem] font-normal leading-[1.16] tracking-[-0.03em] text-foreground [text-wrap:balance] sm:text-[2.7rem]">

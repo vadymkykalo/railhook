@@ -10,17 +10,8 @@ import { siteUrl } from '../lib/siteUrl';
 import { cn } from '../lib/utils';
 import { Band, PageIntro, panel } from './landing/primitives';
 
-/**
- * The blog's index: what has been published, newest first.
- *
- * Posts are files in `src/content/blog/`, so this page cannot fall behind them. The feed at /blog/rss.xml is written by the
- * `blogRss()` plugin in `vite.config.ts` from the same directory, and announced here as the
- * page's alternate representation, which is how a feed reader finds it.
- */
-
 export const BLOG_FEED_PATH = '/blog/rss.xml';
 
-/** The feed, announced in the head while the index is on screen. */
 function useFeedLink(title: string) {
   useEffect(() => {
     const link = document.createElement('link');
@@ -41,16 +32,14 @@ export function useBlogDateFormat() {
   );
 }
 
-/** A `YYYY-MM-DD` front-matter date as a `Date`, read as UTC so it never shifts a day. */
+/** Read as UTC so it never shifts a day. */
 export function blogDate(date: string): Date {
   return new Date(`${date}T00:00:00Z`);
 }
 
 export function ReadingTime({ minutes }: { minutes: number }) {
   const { t } = useTranslation();
-  // `{{minutes}}`, not i18next's `count`: a plural key expands to a different set of suffixes
-  // per language (Ukrainian has four), and `locales.test.ts` requires the two files to hold
-  // exactly the same key paths.
+  // {{minutes}}, not count: plural suffixes differ per language and locales.test.ts needs identical keys.
   return <span>{t('blog.readingTime', { minutes })}</span>;
 }
 
@@ -102,10 +91,7 @@ export default function BlogPage() {
           <ul className="grid gap-5">
             {posts.map((post) => (
               <li key={post.slug}>
-                {/* The whole card is the link, by the stretched-link pattern: the title's link
-                    draws an `::after` over the card, so a click anywhere on it lands on the one
-                    real link. A screen reader still hears one link, named by the title, instead
-                    of a card-sized link reading out the lead and every tag. */}
+                {/* Stretched link: a screen reader hears one link named by the title, not the whole card. */}
                 <article
                   className={cn(
                     'group relative h-full cursor-pointer p-6 sm:p-7',

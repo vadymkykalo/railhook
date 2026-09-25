@@ -4,26 +4,12 @@ import { formatJson } from '../lib/json';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import { cn } from '../lib/utils';
 
-/**
- * A webhook payload, header map or audit blob, shown the same way everywhere.
- *
- * <p>Every screen that shows one had grown its own: a bare `<pre>` with the
- * same `try { JSON.stringify(JSON.parse(x), null, 2) } catch { return x }`
- * inlined as an IIFE — six times in one file — even though `lib/json.ts`
- * exported exactly that as `formatJson`, and `Workbench`'s `OutputBlock`
- * already framed it. None of those copies could be copied to the clipboard
- * except the two on the test console, which had a private wrapper of their own.
- *
- * <p>`collapsible` is what the delivery sheet needs: four of these per attempt,
- * and an attempt list is unreadable if they are all open. Everywhere else the
- * block is the point, so it is open.
- */
+/** collapsible for the delivery sheet, where four per attempt would be unreadable open. */
 export default function JsonBlock({
   label, value, collapsible = false, maxHeight = 'max-h-40', className,
 }: {
   label: string;
-  /** Raw text. Pretty-printed when it parses, shown as-is when it does not —
-   *  a body that never was JSON is still the honest answer. */
+  /** Shown as-is when it doesn't parse: a body that never was JSON is still the honest answer. */
   value: string;
   collapsible?: boolean;
   maxHeight?: string;

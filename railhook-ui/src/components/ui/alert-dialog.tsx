@@ -9,8 +9,6 @@ const AlertDialogTrigger = AlertDialogPrimitive.Trigger
 
 const AlertDialogPortal = AlertDialogPrimitive.Portal
 
-/* Same scrim as Dialog and Sheet: `bg-foreground/30`, matching the
-   mobile-sidebar scrim in AppLayout. See dialog.tsx for why not black. */
 const AlertDialogOverlay = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Overlay>

@@ -1,15 +1,9 @@
 import { http } from './http';
 
-/**
- * The webhook tester on the public site: a URL anyone can make without an account, which
- * records what is sent to it for a day. Anonymous — the dashboard's session plays no part.
- */
-
 export interface PublicBinRequest {
   id: number;
   method: string;
   query: string | null;
-  /** Header name to value, credentials and signatures masked. */
   headers: Record<string, string>;
   body: string | null;
   bodyTruncated: boolean;
@@ -24,12 +18,10 @@ export interface PublicBin {
   url: string;
   expiresAt: string;
   requestCount: number;
-  /** Newest first, at most the latest hundred. */
   requests: PublicBinRequest[];
 }
 
 export const publicBinApi = {
-  /** The challenge answer, when the deployment asks for one (the same CAPTCHA as registration). */
   create: (captchaToken?: string): Promise<PublicBin> =>
     http.post<PublicBin>('/api/v1/public/bins', captchaToken ? { captchaToken } : {}),
   get: (slug: string): Promise<PublicBin> => http.get<PublicBin>(`/api/v1/public/bins/${slug}`),

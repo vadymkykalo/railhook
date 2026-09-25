@@ -36,8 +36,6 @@ export default function RegisterPage() {
   const { login } = useAuth();
   useLeaveDemo();
   const [searchParams] = useSearchParams();
-  // An invite or a CLI approval sent the visitor here to make an account first; they carry on
-  // there once it exists. Only a path on this site counts.
   const requested = searchParams.get('redirect');
   const redirect = requested && safeDestination(requested, '') ? requested : null;
 
@@ -52,8 +50,6 @@ export default function RegisterPage() {
         password,
         fullName,
         organizationName,
-        // Absent unless the deployment configured a challenge; the API accepts a registration
-        // without one in exactly that case.
         ...(captchaToken ? { captchaToken } : {}),
       });
       http.setToken(authResponse.accessToken);
@@ -66,9 +62,7 @@ export default function RegisterPage() {
       }
       setRegistered(true);
     } catch (err: any) {
-      // The API answers a rejected field with fieldErrors {field: reason} and a
-      // generic "Invalid request parameters" summary. Showing the summary threw
-      // away the only part that says what to change.
+      // The API's summary is generic; fieldErrors say what to change.
       const data = err.response?.data;
       const fieldDetail = data?.fieldErrors
         ? Object.values(data.fieldErrors as Record<string, string>).join('. ')
@@ -202,8 +196,7 @@ export default function RegisterPage() {
             autoComplete="new-password"
           />
           <PasswordStrengthIndicator password={password} />
-          {/* The submit button stays disabled until every rule is met; say which one is left
-              rather than leave a disabled button to be puzzled over. */}
+          {/* Say which rule is left rather than leave a puzzling disabled button. */}
           {password && !passwordMeetsPolicy(password) && (
             <p role="status" className="text-xs font-medium text-halt">
               {t('passwordStrength.missing', {

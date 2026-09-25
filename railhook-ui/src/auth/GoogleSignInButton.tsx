@@ -4,22 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/auth.api';
 
 interface Props {
-  /** Which page an error returns to. Both sign in an existing account and create a missing one. */
   intent: 'login' | 'register';
-  /** A path on this site to land on afterwards; the API replaces anything else. */
+  /** The API replaces anything that isn't a path on this site. */
   returnTo?: string;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
-/**
- * "Continue with Google", above the form — only where the deployment has it configured, which the
- * API says rather than the bundle, because the same image runs installs with and without it.
- *
- * <p>A plain link, not a request: the flow is a chain of full-page redirects through Google and
- * back, and nothing about it fits in an XHR. It also shows the error the API sent the browser back
- * with, since that is the only place the person will see why it did not work.
- */
+/** The API says whether it's configured, not the bundle; a plain link since the flow is full-page redirects. */
 export default function GoogleSignInButton({ intent, returnTo }: Props) {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -30,7 +22,6 @@ export default function GoogleSignInButton({ intent, returnTo }: Props) {
     authApi
       .providers()
       .then((providers) => { if (!cancelled) setAvailable(Boolean(providers?.google)); })
-      // A deployment that cannot answer this simply does not show the button.
       .catch(() => { if (!cancelled) setAvailable(false); });
     return () => { cancelled = true; };
   }, []);

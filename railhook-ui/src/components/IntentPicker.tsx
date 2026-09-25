@@ -9,15 +9,10 @@ export type WebhookIntent = Track;
 
 interface IntentPickerProps {
   onSelect: (intent: WebhookIntent) => void;
-  /** The answer already on record, when the picker is re-asking. */
   value?: WebhookIntent | null;
 }
 
-/**
- * The three choices are the two directions and both, so they are told apart by
- * their icons and their words — never by colour. The status hues are reserved,
- * and the only accent here is the brand mark on the selected card.
- */
+/** Told apart by icon and words, never colour: the status hues are reserved. */
 const INTENTS: { key: WebhookIntent; icon: React.ElementType }[] = [
   { key: 'send', icon: Send },
   { key: 'receive', icon: Radio },
@@ -28,12 +23,7 @@ export default function IntentPicker({ onSelect, value = null }: IntentPickerPro
   const { t } = useTranslation();
   const [selected, setSelected] = useState<WebhookIntent | null>(value);
 
-  /**
-   * The picker asks; it does not remember. It used to write two localStorage
-   * keys of its own, and both callers then ignored the answer — which is how
-   * the question came to be asked and thrown away. Storage lives in
-   * `src/lib/onboarding.ts` now, and the caller decides what the answer means.
-   */
+  /** The picker doesn't store the answer; lib/onboarding.ts does, and the caller decides. */
   const handleContinue = () => {
     if (selected) onSelect(selected);
   };

@@ -1,7 +1,5 @@
 import { http } from './http';
 
-// ─── Types ──────────────────────────────────────────────────────
-
 export type TriggerType = 'WEBHOOK_EVENT' | 'MANUAL' | 'SCHEDULE';
 export type ExecutionStatus = 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 export type StepStatus = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
@@ -91,8 +89,6 @@ export interface PageResponse<T> {
   number: number;
   size: number;
 }
-
-// ─── API ────────────────────────────────────────────────────────
 
 export const workflowsApi = {
   list: (projectId: string): Promise<WorkflowResponse[]> =>

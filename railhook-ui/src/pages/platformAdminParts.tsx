@@ -24,15 +24,9 @@ import { formatNumber } from '../lib/date';
 import { showApiError, showSuccess } from '../lib/toast';
 import { cn } from '../lib/utils';
 
-/**
- * The pieces the platform admin pages share: how an organization's and an account's standing is
- * shown, how sign-in methods read, and the two dialogs and states every view needs.
- */
-
 /** The reason field's limit, matching SuspendOrganizationRequest on the server. */
 export const REASON_MAX = 500;
 
-/** A search box that asks the server once the person stops typing, not on every key. */
 export function useDebouncedValue<T>(value: T, delayMs = 300): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -42,10 +36,7 @@ export function useDebouncedValue<T>(value: T, delayMs = 300): T {
   return debounced;
 }
 
-/**
- * A failed load. The sign-in-too-old refusal gets its own state, because what fixes it is signing
- * in again, and a generic "could not load" with a retry button would loop on the same 403.
- */
+/** A too-old sign-in gets its own state: a retry button would loop on the same 403. */
 export function PlatformErrorState({
   error, onRetry, retrying,
 }: {
@@ -80,11 +71,6 @@ export function PlatformErrorState({
   return <ErrorState error={error} fallbackKey="platformAdmin.loadFailed" onRetry={onRetry} retrying={retrying} />;
 }
 
-/**
- * Who sees the panel and what it can change, said once at the top of each view. The wording
- * follows the code: the rule PlatformAdminAccessService applies, and suspend/reinstate being the
- * only writes the admin API has.
- */
 export function PlatformScope() {
   const { t, i18n } = useTranslation();
   return (
@@ -103,11 +89,7 @@ export function PlatformScope() {
   );
 }
 
-/**
- * An email address in the panel. Cut with an ellipsis rather than broken mid-word — a table cell
- * ignores max-width, so the limit sits on this element — and the whole address is on hover. On a
- * phone, where rows are stacked cards, it takes the width the card has.
- */
+/** The limit sits on this element: a table cell ignores max-width. */
 export function EmailText({ email, className }: { email: string | null | undefined; className?: string }) {
   if (!email) return <span className="text-muted-foreground">—</span>;
   return (
@@ -117,10 +99,6 @@ export function EmailText({ email, className }: { email: string | null | undefin
   );
 }
 
-/**
- * A link to one organization. One line with an ellipsis in a desktop table, the full name on
- * hover; on a phone the name wraps at word boundaries instead of being cut off.
- */
 export function OrganizationLink({ id, name, className }: { id: string; name: string; className?: string }) {
   return (
     <Link
@@ -137,16 +115,10 @@ export function OrganizationLink({ id, name, className }: { id: string; name: st
   );
 }
 
-/** Column titles stay on one line; a table wider than its card scrolls inside it instead. */
 export const PLATFORM_TABLE_HEADER = '[&_th]:whitespace-nowrap';
 
-/**
- * Slightly tighter cells than the dashboard default, so the widest panel table fits its card at a
- * 1440px screen. The phone layout sets its own cell padding and is not affected.
- */
 export const PLATFORM_TABLE = '[&_td]:px-3 [&_th]:px-3';
 
-/** An account the server counts as a platform admin, next to its row in the panel's lists. */
 export function PlatformAdminBadge() {
   const { t } = useTranslation();
   return (
@@ -203,11 +175,6 @@ export function SignInMethods({ methods }: { methods: SignInMethod[] }) {
   );
 }
 
-/**
- * Events this month against the plan's limit: the number, and a bar that warns from 80%. A plan
- * without a limit — every organization on a deployment with billing off — says so, rather than
- * showing a fraction of infinity and an empty bar.
- */
 export function EventsAgainstLimit({ current, limit }: { current: number; limit: number }) {
   const { t } = useTranslation();
   if (limit <= 0) {
@@ -244,13 +211,6 @@ export function PanelTitle({ title, meta }: { title: string; meta?: ReactNode })
   );
 }
 
-/**
- * Suspending or reinstating an organization: type its name back, and say why.
- *
- * The typed name is the same ritual every irreversible action in the product uses; the reason is
- * what the tenant is shown when suspended, and what the audit log keeps when reinstated. Neither
- * button unlocks until both are there.
- */
 export function SuspensionDialog({
   organization, mode, open, onOpenChange,
 }: {

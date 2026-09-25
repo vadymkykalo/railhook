@@ -15,26 +15,8 @@ import {
 import { useIsDarkTheme } from '../../hooks/useIsDarkTheme';
 import { editorTheme, tokenHighlight } from './theme';
 
-/**
- * The JavaScript surface a transformation is written on.
- *
- * CodeMirror rather than Monaco, and the deciding argument was not size. The app
- * ships `script-src 'self'` with no `unsafe-eval` (see `src/lib/csp.ts`) and
- * declares no `worker-src`, so it falls back to `default-src 'self'` with no
- * `blob:`. Monaco's language services live in workers it constructs from blob
- * URLs, so the editor that buys TypeScript-grade diagnostics is exactly the one
- * that would need the CSP opened up for a page whose job is to run other
- * people's code. CodeMirror needs no worker and no eval, and it was already a
- * dependency; `@codemirror/lang-javascript` is the whole cost.
- *
- * What is given up is real type checking. What replaces it: the handler's
- * argument shape is a completion source below, so `webhook.` lists exactly the
- * seven things a script can see and says what each one is — and the server's own
- * failure line comes back as a diagnostic on the line that threw, which is the
- * one thing type checking would not have caught anyway.
- */
+/** CodeMirror, not Monaco: Monaco needs blob workers, which the CSP (no worker-src, no unsafe-eval) forbids. */
 
-/** The contract, as the editor knows it. Mirrors `TransformRequest` on the server. */
 const WEBHOOK_MEMBERS: Array<{ label: string; detail: string; info: string }> = [
   { label: 'payload', detail: 'object', info: 'The event body, already parsed.' },
   { label: 'eventType', detail: 'string', info: 'The event type, e.g. "order.completed".' },
@@ -56,14 +38,6 @@ const HANDLER_SNIPPET = `function handler(webhook) {
   return { payload: webhook.payload };
 }`;
 
-/**
- * Completion for the one shape that matters.
- *
- * Deliberately narrow: after `webhook.` it offers the contract and nothing else,
- * because everything else in scope is either standard JavaScript — which the
- * language package already completes — or absent from the sandbox, and offering
- * a name that does not exist is worse than offering none.
- */
 function contractCompletions(context: CompletionContext): CompletionResult | null {
   const afterWebhook = context.matchBefore(/webhook\.\w*/);
   if (afterWebhook) {
@@ -75,7 +49,6 @@ function contractCompletions(context: CompletionContext): CompletionResult | nul
     };
   }
 
-  // Inside a `return { … }` the useful names are the envelope's.
   const inReturn = context.matchBefore(/return\s*\{\s*\w*/);
   if (inReturn) {
     const word = context.matchBefore(/\w*/);
@@ -106,7 +79,6 @@ function contractCompletions(context: CompletionContext): CompletionResult | nul
 interface ScriptEditorProps {
   value: string;
   onChange?: (value: string) => void;
-  /** Cmd/Ctrl+Enter. The whole loop is edit-run-look, so running is a keystroke. */
   onRun?: () => void;
   onSave?: () => void;
   placeholder?: string;
@@ -114,7 +86,6 @@ interface ScriptEditorProps {
   minHeight?: string;
   maxHeight?: string;
   className?: string;
-  /** The line the last run failed on, 1-based, with what it said. */
   errorLine?: number | null;
   errorMessage?: string | null;
   'aria-label'?: string;
@@ -160,8 +131,7 @@ export default function ScriptEditor({
       lintGutter(),
       autocompletion({ override: [contractCompletions] }),
       syntaxHighlighting(tokenHighlight, { fallback: true }),
-      // Above the default keymap, which binds Enter: a run shortcut that only
-      // sometimes wins is worse than none.
+      // Above the default keymap, which binds Enter.
       Prec.highest(keymap.of([
         {
           key: 'Mod-Enter',
@@ -204,8 +174,7 @@ export default function ScriptEditor({
       view.destroy();
       viewRef.current = null;
     };
-    // Mount only; the doc and the theme are synced by the effects below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only; effects below sync doc and theme
   }, []);
 
   useEffect(() => {
@@ -223,7 +192,6 @@ export default function ScriptEditor({
     view.setState(createState(view.state.doc.toString()));
   }, [isDark, readOnly, createState]);
 
-  // The server's verdict, put back on the line it came from.
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
@@ -238,9 +206,7 @@ export default function ScriptEditor({
       });
     }
     view.dispatch(setDiagnostics(view.state, diagnostics));
-    // `isDark` is in here because the theme effect above rebuilds the whole EditorState, which
-    // throws the diagnostics away with it. Without this, switching theme quietly erased the
-    // marker on the line that failed — the one thing on this screen you were looking at.
+    // isDark: the theme effect rebuilds EditorState and drops the diagnostics.
   }, [errorLine, errorMessage, value, isDark]);
 
   return <div ref={containerRef} className={`script-editor ${className}`} />;

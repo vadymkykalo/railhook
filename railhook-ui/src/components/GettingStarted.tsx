@@ -15,33 +15,13 @@ import IntentPicker from './IntentPicker';
 import ConnectionSetupDialog from './ConnectionSetupDialog';
 import SendTestEventModal from './SendTestEventModal';
 
-/**
- * The one onboarding surface.
- *
- * <p>It replaces two that disagreed: a seven-step modal that opened itself over
- * the dashboard and created nothing, and a twelve-step checklist underneath it
- * whose rows only ever linked away. Both described the product; neither could
- * tell you where you actually were, because the steps that mattered were
- * hardcoded and the direction question was answered into a key nothing read.
- *
- * <p>So this card does two things the old pair could not. It <em>launches</em>
- * the flows that build a connection and send an event, in place, so following a
- * step never costs you the card. And it derives every row from
- * `src/lib/onboarding.ts`, which is pure and tested — a row can no longer claim
- * more than its evidence supports.
- *
- * <p>Nothing opens on first render. The direction question, when the account is
- * too new to answer it from data, is asked inside the card rather than by a
- * dialog thrown in front of a dashboard nobody has read yet.
- */
+/** Every row derives from lib/onboarding.ts, so none can claim more than its evidence. */
 
-/** A step either builds something here, or honestly sends you where it lives. */
 type Launch = { kind: 'dialog'; dialog: 'connection' | 'testEvent' } | { kind: 'route'; segment: string };
 
 const LAUNCH: Record<StepKey, Launch> = {
   createConnection: { kind: 'dialog', dialog: 'connection' },
-  // The plaintext key is shown exactly once, on the page that owns that
-  // ritual. Inlining it here would be a second place to get it wrong.
+  // The plaintext key is shown once, on the page that owns that ritual.
   createApiKey: { kind: 'route', segment: 'api-keys' },
   sendEvent: { kind: 'dialog', dialog: 'testEvent' },
   seeDelivery: { kind: 'route', segment: 'deliveries' },
@@ -95,8 +75,7 @@ export default function GettingStarted({ projectId }: { projectId: string | unde
   const navigate = useNavigate();
 
   const { data: status, isLoading } = useOnboardingStatus(projectId);
-  // Only the incoming track needs the sources, and only to answer "does any of
-  // them actually verify" — the one question the onboarding endpoint cannot.
+  // The one question the onboarding endpoint can't answer: does any source verify.
   const { data: sourcePage } = useIncomingSources(
     status?.hasIncomingSources ? projectId : undefined,
     0
@@ -137,9 +116,7 @@ export default function GettingStarted({ projectId }: { projectId: string | unde
     );
   }
 
-  // Render nothing rather than a card full of unticked rows: a returning user
-  // watching their finished checklist un-tick and re-tick on every load is how
-  // a surface stops being believed.
+  // Render nothing while loading, or a finished checklist un-ticks and re-ticks on every load.
   if (isLoading || !status) return null;
 
   const handleLaunch = (key: StepKey) => {
@@ -183,8 +160,6 @@ export default function GettingStarted({ projectId }: { projectId: string | unde
         </div>
 
         {!track ? (
-          // Asked once, here, where the answer is about to be used — not by a
-          // dialog in front of a dashboard the person has not read yet.
           <div className="mt-4 max-w-md">
             <p className="mb-3 text-sm font-medium">{t('auth.intent.title')}</p>
             <IntentPicker onSelect={chooseIntent} />

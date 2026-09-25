@@ -4,15 +4,6 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import '../../i18n';
 import PublicLayout from '../PublicLayout';
 
-/**
- * Following a link between two long public pages lands at the top of the new one.
- *
- * <p>Reported, not hypothetical: a link clicked from partway down the home page opened the next
- * public page already scrolled into its middle, because the router leaves the offset where it was
- * and only the landing page reset it. A hash still wins — the nav links to #run, and jumping to
- * the top instead would break every one of those.
- */
-
 const scrollTo = vi.fn();
 
 beforeEach(() => {
@@ -41,8 +32,7 @@ describe('public pages start at their top', () => {
   });
 
   it('leaves a hash alone', () => {
-    // #run is a real nav target on the landing page; hijacking it to the top would make
-    // every anchor in the header do nothing.
+    // #run is a real nav target; forcing the top would break every header anchor.
     renderAt('/#run');
     expect(scrollTo).not.toHaveBeenCalled();
   });

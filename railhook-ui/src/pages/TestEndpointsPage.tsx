@@ -19,12 +19,6 @@ import { usePermissions } from '../auth/usePermissions';
 import { cn } from '../lib/utils';
 import { formatJson } from '../lib/json';
 
-/**
- * A throwaway URL that keeps whatever is posted to it.
- *
- * Same workbench shape as the rest of Develop: what you are driving on the
- * left (which endpoint), what came back on the right (what it captured).
- */
 export default function TestEndpointsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
@@ -56,8 +50,7 @@ export default function TestEndpointsPage() {
     }
   }, [projectId]);
 
-  // Only the latest load may write: switching endpoints while one is still loading used to let
-  // the earlier, slower answer land on top of the endpoint now selected.
+  // Only the latest load may write, or a slower earlier answer lands on the newly selected endpoint.
   const latestRequestsLoad = useRef(0);
   const loadRequests = useCallback(async (endpointId: string) => {
     if (!projectId) return;

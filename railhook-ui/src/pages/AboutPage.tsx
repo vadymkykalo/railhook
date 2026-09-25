@@ -21,15 +21,7 @@ import { cn } from '../lib/utils';
 import { Band, FactCard, PageIntro, panel, SectionHeading } from './landing/primitives';
 import { REPO_URL } from './landing/plans';
 
-/**
- * Who builds Railhook and why, for the reader who wants to know what is behind the product
- * before relying on it.
- *
- * Facts only: the maintainer and his GitHub profile, the licence, the reasons the project exists
- * as the README and the landing page already state them, and the stack. No team size, customer
- * logos, location or funding — none of them is true yet, and an about page is where a reader
- * goes to find out whether the rest of the site is.
- */
+/** Facts only: no team size, logos or funding — none of them is true yet. */
 const MAINTAINER_URL = 'https://github.com/vadymkykalo';
 
 function LinkCard({

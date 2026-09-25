@@ -3,16 +3,10 @@ import { Eye } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface DemoBannerProps {
-  /** Ends the demo and opens registration. */
   onStartFree: () => void;
-  /** Ends the demo and returns to the public site. */
   onExit: () => void;
 }
 
-/**
- * Said on every page of the live demo, above the content: this is somebody else's sample shop,
- * nothing here can be changed, and here is how to get one of your own.
- */
 export default function DemoBanner({ onStartFree, onExit }: DemoBannerProps) {
   const { t } = useTranslation();
 

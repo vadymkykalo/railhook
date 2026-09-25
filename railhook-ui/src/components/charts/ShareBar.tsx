@@ -5,19 +5,10 @@ export interface ShareSegment {
   key: string;
   label: string;
   value: number;
-  /** Only ever a status token here: every segment of this bar *is* an outcome. */
   token: Extract<SeriesToken, 'ok' | 'retry' | 'halt' | 'idle'>;
 }
 
-/**
- * Part-to-whole for one total, as a single stacked bar rather than four
- * unrelated progress bars each against its own maximum — which is what the
- * page used to draw, and made 88 abandoned deliveries look like the same
- * quantity as 182,710 delivered ones.
- *
- * Segments are separated by a 2px gap in the surface colour, never by a stroke
- * around each fill, and a non-zero segment never rounds away to nothing.
- */
+/** A single stacked bar: separate bars made 88 abandoned look like 182,710 delivered. */
 export default function ShareBar({
   segments, total, className,
 }: {
@@ -55,7 +46,7 @@ export default function ShareBar({
             </span>
             <span className="flex-shrink-0 font-mono text-[13px] tabular-nums">
               {formatCompact(segment.value)}
-              {/* A real separator, not only a margin: read as text, "1" and "50%" became "150%". */}
+              {/* A real separator: read as text, "1" and "50%" became "150%". */}
               <span className="text-muted-foreground"> · {formatRate(share(segment.value, total))}%</span>
             </span>
           </li>

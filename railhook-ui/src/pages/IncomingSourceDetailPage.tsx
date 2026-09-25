@@ -42,22 +42,9 @@ import VerificationGate from '../components/VerificationGate';
 import { formatJson, isValidJson } from '../lib/json';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-/**
- * One incoming source and the destinations its events are forwarded to.
- *
- * The incoming direction has the same shape as the outgoing one — a thing that
- * receives, and standing statements about where what it receives goes — but
- * never borrows its words: these are Destinations receiving Forwards, not
- * subscriptions receiving deliveries.
- */
-
 const AUTH_TYPES: IncomingAuthType[] = ['NONE', 'BEARER', 'BASIC', 'CUSTOM_HEADER'];
 
-/**
- * The header a request to this source has to be signed in. A provider-verified source is checked
- * against that provider's own header — Stripe-Signature, not the generic X-Signature the source row
- * also carries, which is what this card used to show for a Stripe source.
- */
+/** Provider-verified sources are checked against the provider's own header, not X-Signature. */
 function signatureHeaderOf(source: IncomingSourceResponse): string | undefined {
   if (source.verificationMode === 'NONE') return undefined;
   if (source.verificationMode === 'PROVIDER') {
@@ -237,8 +224,7 @@ export default function IncomingSourceDetailPage() {
       timeoutSeconds: parseInt(destTimeout) || 30,
       retryDelays: destRetryDelays || undefined,
       payloadTransform: destPayloadTransform || undefined,
-      // '' rather than null: an omitted transformationId leaves the current one in place, and
-      // clearing the field on this form is a request to detach.
+      // '' rather than null: an omitted transformationId keeps the current one.
       transformationId: destTransformationId,
     };
 

@@ -7,18 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { AlertDialog, AlertDialogContent, AlertDialogTitle } from '../alert-dialog';
 import '../../../i18n';
 
-/**
- * A dialog may not grow past the window it is centred in.
- *
- * <p>This is a real report, not a hypothetical: the endpoint form opened on a laptop with its
- * title above the top of the screen and Save and Cancel below the bottom, and because Radix
- * freezes the page behind an open dialog there was nothing to scroll and no way to reach either.
- *
- * <p>What makes it worth a test rather than a fix is how it survived: six call sites had already
- * pasted `max-h-[85vh] overflow-y-auto` onto their own dialog, at three different heights, so
- * the bug looked fixed everywhere anyone had looked. The last assertion here is about that — the
- * cap belongs to the primitive, and a call site adding its own is the pattern coming back.
- */
+/** Radix freezes the page behind a dialog, so a taller-than-window dialog hid Save with no way to scroll. */
 
 const src = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -44,8 +33,7 @@ describe('a dialog is bounded by the viewport', () => {
   });
 
   it('measures against dvh, which is the window a phone actually has', () => {
-    // 100vh counts the space behind a mobile address bar, so a vh-capped dialog is still
-    // taller than the screen on exactly the devices with the least room to spare.
+    // 100vh counts the space behind a mobile address bar.
     render(
       <Dialog open>
         <DialogContent><DialogTitle>Anything</DialogTitle></DialogContent>
@@ -79,7 +67,7 @@ describe('a dialog is bounded by the viewport', () => {
   });
 
   it('has no call site setting a height of its own', () => {
-    // The six that did were the reason the other dozen went unnoticed. One cap, one place.
+    // The cap belongs to the primitive; a call site adding its own is the pattern coming back.
     const offenders: string[] = [];
     const walk = (dir: string) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {

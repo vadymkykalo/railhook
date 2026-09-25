@@ -19,45 +19,32 @@ export function usePermissions() {
         isDeveloper: role === 'DEVELOPER',
         isViewer: role === 'VIEWER',
 
-        // Projects
         canCreateProject: hasMinRole(role, 'DEVELOPER'),
         canDeleteProject: role === 'OWNER',
 
-        // Endpoints
         canManageEndpoints: hasMinRole(role, 'DEVELOPER'),
 
-        // Events
         canSendEvents: hasMinRole(role, 'DEVELOPER'),
 
-        // Deliveries
         canReplayDeliveries: hasMinRole(role, 'DEVELOPER'),
 
-        // Subscriptions
         canManageSubscriptions: hasMinRole(role, 'DEVELOPER'),
 
-        // API Keys
         canManageApiKeys: hasMinRole(role, 'DEVELOPER'),
 
-        // DLQ
         canManageDlq: hasMinRole(role, 'DEVELOPER'),
 
-        // Test Endpoints
         canManageTestEndpoints: hasMinRole(role, 'DEVELOPER'),
 
-        // Incoming Webhooks
         canManageIncomingSources: hasMinRole(role, 'DEVELOPER'),
         canReplayIncomingEvents: hasMinRole(role, 'DEVELOPER'),
 
-        // Members
         canManageMembers: role === 'OWNER',
 
-        // Settings
         canManageOrgSettings: role === 'OWNER',
 
-        // PII Masking
         canManagePiiRules: hasMinRole(role, 'DEVELOPER'),
 
-        // Debug Links
         canCreateDebugLinks: hasMinRole(role, 'DEVELOPER'),
     };
 }

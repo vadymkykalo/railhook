@@ -10,10 +10,6 @@ vi.mock('../../api/contact.api', () => ({ contactApi: { send: vi.fn() } }));
 import ContactPage from '../ContactPage';
 import { contactApi } from '../../api/contact.api';
 
-/**
- * The contact page carries the message form wherever the deployment has a support address to
- * write to, so a visitor asks a question without leaving the site or opening a mail client.
- */
 function renderContact() {
   return renderPage(<ContactPage />, {
     path: '/contact', initialEntry: '/contact', auth: { user: null, token: null, isAuthenticated: false },

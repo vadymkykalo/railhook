@@ -16,16 +16,7 @@ import { publicTesterEnabled } from '../lib/runtimeConfig';
 import { cn } from '../lib/utils';
 import { Band, WRAP } from './landing/primitives';
 
-/**
- * The webhook tester on the public site: make a URL, point Stripe, GitHub or curl at it, see
- * exactly what arrived. Free and without an account, which is the point — it is the first thing
- * a developer can do with Railhook before deciding to sign up, and what brings them here from a
- * search for "webhook tester".
- *
- * A URL is made only when the reader asks for one, never on load: crawlers and the prerender
- * load this page too. The slug is remembered in this browser, so coming back within the day
- * shows the same URL and what it received; the list is polled while the page is open.
- */
+/** A URL is made only on request, never on load: crawlers and the prerender load this page too. */
 export const STORAGE_KEY = 'railhook.tester.slug';
 const POLL_MS = 3000;
 
@@ -54,7 +45,6 @@ function errorCode(error: unknown): string | undefined {
   return (error as { response?: { data?: { error?: string } } } | null)?.response?.data?.error;
 }
 
-/** Why a URL was not made, in the reader's words. */
 function createErrorKey(error: unknown): string {
   const code = errorCode(error);
   if (code === 'too_many_active_urls') return 'tester.errors.tooManyActive';
@@ -66,7 +56,6 @@ function createErrorKey(error: unknown): string {
 
 const LIMITS = ['lifetime', 'kept', 'rate', 'masked', 'methods'] as const;
 
-/** What the tester does and where it stops, stated before anyone relies on it. */
 function Limits() {
   const { t } = useTranslation();
   return (
@@ -100,7 +89,6 @@ function CopyButton({ value }: { value: string }) {
 }
 
 function CodeLine({ value, prompt = false }: { value: string; prompt?: boolean }) {
-  // A prompted line is a shell command and is coloured as one; a bare line is a URL, which is data.
   return (
     <div className="surface-ink flex items-center gap-3 overflow-hidden border border-rail py-2.5 pl-4 pr-3">
       <pre
@@ -263,9 +251,7 @@ export default function TesterPage() {
     onError: () => setCaptchaToken(''),
   });
 
-  /* "New URL" goes back to the form rather than making one straight away: a new URL needs a
-     fresh challenge answer, and the old one keeps counting against this address until it
-     expires, which the form is the place to say. */
+  /* Back to the form: a new URL needs a fresh challenge answer. */
   const startOver = () => {
     writeSlug(null);
     setSlug(null);

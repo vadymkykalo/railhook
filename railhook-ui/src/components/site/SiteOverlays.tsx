@@ -9,23 +9,13 @@ import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 import ContactForm from './ContactForm';
 
-/**
- * What floats over the public pages: the cookie notice and the "write to us" widget.
- *
- * <p>Both only where they mean something. The notice appears where the deployment runs analytics
- * (a web analytics token is set) and says, once, what the site stores: the sign-in cookie and
- * cookieless visit counts. It asks nothing, because there is nothing optional to refuse. The widget appears where there is a support address to write to (the
- * contact domain is set), and not on the contact page, which carries the same form in full.
- * Owned together because on a phone they share the bottom edge: the launcher rises above the
- * notice while the notice is up.
- */
+/** Owned together: on a phone they share the bottom edge, so the launcher rises above the notice. */
 export default function SiteOverlays() {
   const { pathname } = useLocation();
   const [noticeOpen, setNoticeOpen] = useState(false);
 
   useEffect(() => {
     if (!webAnalyticsToken() || noticeSeen()) return;
-    // Not on first paint: the page is what the visitor came for.
     const timer = window.setTimeout(() => setNoticeOpen(true), 900);
     return () => window.clearTimeout(timer);
   }, []);
@@ -70,8 +60,7 @@ function CookieNotice({ onAnswer }: { onAnswer: () => void }) {
           </p>
         </div>
       </div>
-      {/* One button. The policy is a link in the sentence: as a second button its Ukrainian
-          label ("Політика конфіденційності") ran outside its own border on a phone. */}
+      {/* One button: as a second button the Ukrainian policy label overflowed on a phone. */}
       <div className="mt-4 flex justify-end">
         <Button size="sm" onClick={dismiss} className="max-sm:w-full">{t('site.cookie.ok')}</Button>
       </div>
@@ -82,8 +71,7 @@ function CookieNotice({ onAnswer }: { onAnswer: () => void }) {
 function ContactWidget({ raised }: { raised: boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  // Mounted on the first open (the challenge script loads only for someone who means to write),
-  // then kept, so a half-written message survives closing the panel.
+  // Mounted on first open (loads the challenge script only then), then kept so a draft survives closing.
   const [started, setStarted] = useState(false);
   const launcher = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -92,9 +80,7 @@ function ContactWidget({ raised }: { raised: boolean }) {
     if (!open) return;
     setStarted(true);
     panel.current?.querySelector<HTMLInputElement>('input[type="email"]')?.focus();
-    // On a phone the panel is a full-screen sheet, so the page behind it must not scroll: with
-    // the keyboard up, a scrolled page took the close button off screen and the sheet could not
-    // be dismissed at all.
+    // With the keyboard up, a scrolled page pushed the sheet's close button off screen.
     const phone = window.matchMedia('(max-width: 639px)').matches;
     const previousOverflow = document.body.style.overflow;
     if (phone) document.body.style.overflow = 'hidden';
@@ -118,8 +104,7 @@ function ContactWidget({ raised }: { raised: boolean }) {
   }, [open]);
 
   return (
-    // Above the sticky header (z-50): as a phone-sized sheet it covers the page, and a header
-    // drawn over its top edge took the close button with it.
+    // Above the sticky header (z-50), which otherwise covered the sheet's close button.
     <div className={cn('fixed right-4 z-[60] transition-[bottom] duration-300 sm:right-6 sm:bottom-6', raised ? 'bottom-52' : 'bottom-4')}>
       <div
         ref={panel}
@@ -128,12 +113,7 @@ function ContactWidget({ raised }: { raised: boolean }) {
         aria-labelledby="contact-widget-title"
         hidden={!open}
         className={cn(
-          // A sheet on a phone — full height, its own scroll — and a popover from the launcher
-          // from sm up. The sheet is what makes the close button reachable with the keyboard up.
-          //
-          // Closed is `hidden` as a class, not only as the attribute: `display:flex` from a
-          // responsive class wins over `[hidden]`, and the sheet then covered the whole phone
-          // screen invisibly and swallowed every tap on the page behind it.
+          // `hidden` as a class: a responsive display:flex beats [hidden] and the invisible sheet ate every tap.
           open
             ? 'max-sm:fixed max-sm:inset-0 max-sm:flex max-sm:h-[100dvh] max-sm:w-full max-sm:max-w-none max-sm:flex-col'
             : 'hidden',
@@ -179,8 +159,6 @@ function ContactWidget({ raised }: { raised: boolean }) {
         onClick={() => setOpen((value) => !value)}
         className={cn(
           'group flex h-11 items-center gap-2 bg-primary pl-3.5 pr-4 text-primary-foreground shadow-elevated',
-          // While the sheet covers the screen the launcher is behind it; on a wide screen it
-          // stays put and turns into the close button.
           open && 'max-sm:hidden',
           'transition-colors duration-200 hover:bg-primary-hover',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',

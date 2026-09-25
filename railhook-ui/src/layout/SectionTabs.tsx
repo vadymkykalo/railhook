@@ -4,18 +4,7 @@ import { cn } from '../lib/utils';
 import { hasMinRole, type Role } from '../auth/ProtectedRoute';
 import { sectionFor, segmentOf } from './nav.config';
 
-/**
- * The second level of navigation, rendered once by the layout rather than by
- * every page, so a page cannot disagree with the rail about where it lives.
- *
- * <p>It looks like a tab strip and it is not one. These are `<Link>`s that
- * change the route; ARIA tabs are required to control a `tabpanel`, and there
- * is none here, so `role="tablist"` had a screen reader announce "tab 1 of 8"
- * and then wait for a panel that never arrives. The rail one level up
- * (`Sidebar.tsx`) already got this right with `aria-current="page"` — two
- * levels of the same menu, in the same directory, disagreeing. This is the
- * navigation markup, matching its sibling.
- */
+/** Links, not ARIA tabs: role="tablist" with no tabpanel left screen readers waiting. */
 export default function SectionTabs({ projectId, role }: { projectId?: string; role: Role }) {
   const { t } = useTranslation();
   const location = useLocation();

@@ -7,10 +7,6 @@ import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
 import { useAuth } from './auth.store';
 
-/**
- * An outcome screen, not a form: the token in the URL has already decided what
- * happens. Each state says plainly what happened and offers exactly one way on.
- */
 export default function VerifyEmailPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();

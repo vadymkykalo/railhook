@@ -14,15 +14,6 @@ interface BaseNodeProps {
   children?: ReactNode;
 }
 
-/**
- * One surface for every node: `bg-card` on `border-rail`, like every other
- * container in the product. The only colour is the role rail down the left
- * edge, and the only emphasis is the brand ring on the selected node — so a
- * canvas of nine node types still reads as one quiet system.
- *
- * The subtitle is always a machine fact (an event type, a URL, an endpoint id,
- * a delay), so it is set in mono.
- */
 function BaseNodeComponent({ role, icon, label, subtitle, selected, hasInput = true, hasOutput = true, children }: BaseNodeProps) {
   const accent = NODE_ROLE_COLOR[role];
 

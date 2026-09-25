@@ -6,40 +6,19 @@ import {
 } from 'lucide-react';
 import type { Role } from '../auth/ProtectedRoute';
 
-/**
- * Two levels, and only two.
- *
- * The rail names the seven things a person comes here to do. Everything else
- * is a tab inside one of them, because it is a facet of that thing rather than
- * a separate destination: a Schema is a property of the connection it validates,
- * the DLQ is a status a delivery is in, Replay is something you do to deliveries
- * you have selected.
- *
- * The previous sidebar listed all of it flat — 32 entries in 10 groups, needing
- * 1472px of column in a 731px viewport — and answered the overflow with a
- * "show advanced features" toggle. Two levels is the answer; a toggle is not.
- */
-
 export interface NavEntry {
   nameKey: string;
-  /** Built from the project id, or absolute when the destination is org-level. */
   path: (projectId?: string) => string;
   icon: React.ElementType;
   requiredRole?: Role;
-  /** Route segments this entry owns, for active-state matching. */
   owns: string[];
 }
 
 export interface NavSection extends NavEntry {
-  /** Rendered as a tab strip under the header. One entry means no strip. */
   tabs: NavEntry[];
 }
 
-/**
- * With no project the destination is the section's own setup screen, not `/admin/projects`: every
- * entry used to resolve to that one page, so a brand-new organization saw a rail of links that all
- * led back to where it already was.
- */
+/** With no project each entry leads to its own setup screen, not back to /admin/projects. */
 const p = (projectId: string | undefined, segment: string) =>
   projectId ? `/admin/projects/${projectId}/${segment}` : `/admin/start/${segment}`;
 
@@ -68,7 +47,6 @@ export const PROJECT_SECTIONS: NavSection[] = [
     tabs: [],
   },
   {
-    // Everything that decides where an event goes and what it looks like on arrival.
     nameKey: 'nav.connections',
     path: (projectId) => p(projectId, 'connections'),
     icon: Network,
@@ -127,7 +105,6 @@ export const PROJECT_SECTIONS: NavSection[] = [
     ],
   },
   {
-    // The workbench: things you drive, not records you read.
     nameKey: 'nav.develop',
     path: (projectId) => p(projectId, 'test-console'),
     icon: Wrench,
@@ -142,14 +119,6 @@ export const PROJECT_SECTIONS: NavSection[] = [
   },
 ];
 
-/**
- * Settings, reached from the sidebar footer rather than the rail.
- *
- * Only some of it is org-level. `/admin/settings` is the person's own profile —
- * their display name, their timezone, the form that changes their password — and
- * every member has to be able to open it. The three that follow act on the
- * organization, and those stay OWNER-only.
- */
 export const SETTINGS_SECTION: NavSection = {
   nameKey: 'nav.settings',
   path: () => '/admin/settings',
@@ -159,22 +128,13 @@ export const SETTINGS_SECTION: NavSection = {
     orgTab('nav.profile', '/admin/settings', Settings),
     orgTab('nav.orgSettings', '/admin/org-settings', Building2, 'OWNER'),
     orgTab('nav.members', '/admin/members', Users, 'OWNER'),
-    // The one project-scoped tab here: a key is what the first event needs, and it was reachable
-    // only from the command palette.
     tab('nav.apiKeys', 'api-keys', Key),
     orgTab('nav.auditLog', '/admin/audit-log', FileText),
     orgTab('nav.billing', '/admin/billing', CreditCard, 'OWNER'),
   ],
 };
 
-/**
- * The platform admin panel, for the people who run the deployment — reached from the sidebar
- * footer, and only offered when `/auth/me` says `platformAdmin`.
- *
- * Deliberately no `requiredRole`: an organization role has nothing to do with it, and an OWNER
- * is not a platform admin. The pages check `platformAdmin` themselves, and the server checks it
- * again — with the sign-in's age — on every request.
- */
+/** No requiredRole: an OWNER is not a platform admin; pages and server check platformAdmin. */
 export const PLATFORM_SECTION: NavSection = {
   nameKey: 'nav.platformAdmin',
   path: () => '/admin/platform',
@@ -192,14 +152,12 @@ export const PLATFORM_SECTION: NavSection = {
   ],
 };
 
-/** The route segment currently in view, from either URL shape. */
 export function segmentOf(pathname: string): string {
   const afterAdmin = pathname.replace(/^\/admin\/?/, '');
   const parts = afterAdmin.split('/').filter(Boolean);
   if (parts[0] === 'projects' && parts.length >= 3) return parts[2];
   if (parts[0] === 'start' && parts.length >= 2) return parts[1];
-  // The panel's views are one level deeper, so each is named for its second segment: otherwise
-  // Overview, Organizations and Users would all be "platform", and every tab would be current.
+  // Named by the second segment, or every platform tab would be current.
   if (parts[0] === 'platform') return parts[1] ? `platform-${parts[1]}` : 'platform';
   return parts[0] ?? '';
 }
@@ -211,17 +169,7 @@ export function sectionFor(pathname: string): NavSection | undefined {
   return PROJECT_SECTIONS.find((s) => s.owns.includes(segment));
 }
 
-/**
- * The minimum role a destination demands — read by the navigation to decide what
- * to offer, and by the layout to decide what to admit.
- *
- * One table for both, because they were two. The sidebar showed the Settings
- * entry to every member while the router guarded `/admin/settings` at OWNER, so
- * an invited developer or viewer clicked their own profile and got Access
- * Denied — with no other way to change their password. Neither side declares a
- * role of its own any more: an entry states what it needs here, and a tab that
- * is shown is by construction a tab that opens.
- */
+/** One table for nav and router: two tables once showed members a Settings link that denied them. */
 const ROLE_BY_SEGMENT: ReadonlyMap<string, Role> = new Map(
   [
     ...PROJECT_SECTIONS.flatMap((section) => [section as NavEntry, ...section.tabs]),

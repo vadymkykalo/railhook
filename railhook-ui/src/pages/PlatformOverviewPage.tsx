@@ -23,12 +23,7 @@ function Kpi({ label, value, hint }: { label: string; value: number; hint?: stri
   );
 }
 
-/**
- * How far the last 30 days' sign-ups got. Two groups, because the later steps belong to the
- * organization rather than to whoever signed up: accounts and how many verified; organizations
- * and how many created a project, then sent an event. Each step is shown against the one before
- * it — that ratio is where people are lost — with a bar scaled to the first step of its group.
- */
+/** Each step is shown against the one before it: that ratio is where people are lost. */
 function ActivationFunnel({ activation }: { activation: PlatformActivation }) {
   const { t } = useTranslation();
   const steps: { key: string; value: number; base: number; previous?: number }[] = [
@@ -68,7 +63,6 @@ function ActivationFunnel({ activation }: { activation: PlatformActivation }) {
   );
 }
 
-/** The deployment at a glance, and who arrived most recently. */
 export default function PlatformOverviewPage() {
   const { t, i18n } = useTranslation();
   const { data, isLoading, isError, error, refetch, isRefetching } = usePlatformOverview();

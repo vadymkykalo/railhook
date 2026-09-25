@@ -4,12 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '../../../lib/utils';
 import { NODE_ROLE_COLOR } from './nodeTypes';
 
-/**
- * The one node that cannot use BaseNode: it has two outputs, and which one a
- * run takes is the whole point of it. So the two handles are labelled rather
- * than coloured — the true branch carries the brand accent as the main path,
- * the false branch is drawn in the same muted role colour as the node itself.
- */
+/** Handles are labelled, not coloured. */
 function BranchNode({ data, selected }: NodeProps) {
   const { t } = useTranslation();
   const d = data as Record<string, unknown>;

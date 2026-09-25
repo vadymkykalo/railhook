@@ -4,17 +4,7 @@ import SyntaxHighlight, { normalizeLanguage } from '../SyntaxHighlight';
 import type { Block, Inline } from '../../lib/markdown';
 import { FIGURES } from './figures';
 
-/**
- * A post's parsed Markdown, rendered as elements.
- *
- * The typography is the site's, set here rather than through a prose plugin: the pages already
- * own a display face, a rail colour and a code surface, and a second typographic system would
- * drift from them. Measure is capped at ~68 characters, which is what the rest of the public
- * pages read at.
- *
- * Nothing from a file is ever handed to `dangerouslySetInnerHTML` — `src/lib/markdown.ts`
- * produces data, and this walks it.
- */
+/** Nothing from a file reaches dangerouslySetInnerHTML; markdown.ts produces data. */
 
 function Nodes({ nodes }: { nodes: Inline[] }): ReactNode {
   return (
@@ -135,11 +125,7 @@ function Table({ head, rows }: { head: Inline[][]; rows: Inline[][][] }) {
   );
 }
 
-/**
- * The measure prose is read at. Figures, tables and code blocks are deliberately not held to
- * it — a comparison table at 68 characters wraps every cell — so it sits on the text blocks
- * rather than on the container.
- */
+/** Figures and tables are not held to the measure, so it sits on text blocks only. */
 const MEASURE = 'max-w-[68ch]';
 
 function One({ block }: { block: Block }): ReactNode {
@@ -193,8 +179,6 @@ function One({ block }: { block: Block }): ReactNode {
       return <Table head={block.head} rows={block.rows} />;
     case 'figure': {
       const Drawing = FIGURES[block.key];
-      // A post naming a figure nobody drew renders nothing rather than a broken box; the
-      // `every figure a post names exists` test is what stops that reaching a reader.
       return Drawing ? <Drawing /> : null;
     }
   }

@@ -4,14 +4,7 @@ import { hasMinRole, type Role } from '../../auth/ProtectedRoute';
 
 const ROLES: Role[] = ['VIEWER', 'DEVELOPER', 'OWNER'];
 
-/**
- * The sidebar decided who saw a link and the router decided who could open it,
- * and the two were written out separately. `/admin/settings` — the personal
- * profile page, where a password is changed — ended up shown to everyone and
- * guarded at OWNER, so an invited developer could see the entry, click it, and
- * be told access was denied to their own account. Both sides now read
- * `requiredRoleFor`, and these are the facts that keeps.
- */
+/** Sidebar and router both read requiredRoleFor; separate lists once showed a link that denied access. */
 describe('route roles', () => {
   it('lets any authenticated member reach their own profile', () => {
     expect(requiredRoleFor('/admin/settings')).toBeUndefined();

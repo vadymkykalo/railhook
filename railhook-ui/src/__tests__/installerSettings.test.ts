@@ -9,20 +9,6 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 
-/**
- * Production settings arrive with the deploy, not over an SSH session.
- *
- * The 2.17.0 deploy needed hand edits to /opt/railhook/.env — a renamed CAPTCHA key, billing
- * switched on — made by whoever had a root shell, recorded nowhere and reviewed by nobody. The
- * settings now live in the GitHub `production` environment as DOTENV_<NAME> variables and
- * secrets; the deploy workflow sends them on the SSH session's stdin, and the helper install.sh
- * writes to the host applies them to .env before it upgrades anything.
- *
- * The helper is exercised for real here: extracted from install.sh exactly as install.sh writes
- * it, run by bash against a scratch .env, with a stub `docker` so no daemon is needed.
- */
-
-/** The helper script, as install.sh writes it to <install dir>/railhook. */
 function helperSource(): string {
   const installer = read('install.sh');
   const start = installer.indexOf(`<<'HELPER'\n`);
@@ -51,8 +37,7 @@ function install() {
   dirs.push(dir);
   const bin = join(dir, 'bin');
   spawnSync('mkdir', ['-p', bin]);
-  // `docker compose version` must succeed for the helper to start; nothing else is called
-  // unless a test gets as far as a backup, which the ones here must not.
+  // Only `docker compose version` must succeed; nothing else may be called.
   writeFileSync(join(bin, 'docker'), '#!/bin/sh\necho "docker $*" >> "$(dirname "$0")/calls"\nexit 0\n');
   chmodSync(join(bin, 'docker'), 0o755);
   writeFileSync(join(dir, 'railhook'), helperSource());
@@ -118,7 +103,6 @@ describe('railhook settings', () => {
 
       expect(status).not.toBe(0);
       expect(out).toContain(key);
-      // All or nothing: the allowed line before it must not have been applied either.
       expect(readFileSync(env, 'utf8')).toBe(SAMPLE_ENV);
       expect(readdirSync(dir).filter((f) => f.startsWith('.env.'))).toEqual([]);
     },
@@ -150,7 +134,7 @@ describe('railhook settings', () => {
 describe('railhook upgrade reads the settings a deploy sends', () => {
   it('stops before the backup, having changed nothing, when a setting is refused', () => {
     const { dir, bin, env } = install();
-    // Past the helper refresh, which would fetch install.sh from GitHub.
+    // Skips the helper refresh, which would fetch install.sh from GitHub.
     const { status, out } = run(dir, bin, ['upgrade', 'v2.17.2'], 'JWT_SECRET=x\n', { RAILHOOK_HELPER_REFRESHED: '1' });
 
     expect(status).not.toBe(0);
@@ -175,8 +159,6 @@ describe('the deploy workflow sends them', () => {
   it('builds the payload from DOTENV_-prefixed variables and a named list of secrets', () => {
     expect(workflow).toMatch(/toJSON\(vars\)/);
     expect(workflow).toContain('DOTENV_');
-    // The whole secrets context put the SSH deploy key and every other secret into one step's
-    // environment just to throw most of it away. Secrets are named one by one instead.
     expect(workflow).not.toMatch(/toJSON\(secrets\)/);
     expect(workflow).toMatch(/DOTENV_SMTP_PASSWORD: \$\{\{ secrets\.DOTENV_SMTP_PASSWORD \}\}/);
   });

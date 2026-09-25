@@ -31,13 +31,6 @@ import {
 import { cn } from '../../lib/utils';
 import { formatJson } from '../../lib/json';
 
-/**
- * One event type's history: every version it has had, and every diff between
- * them. A schema version is a contract, so its state is a domain status —
- * active is `ok`, a draft nobody has activated is `idle`, and a deprecated
- * version is `halt`.
- */
-
 function kindOfVersionStatus(status: string): StatusKind {
   switch (status) {
     case 'ACTIVE': return 'ok';
@@ -82,7 +75,6 @@ function parseChangeSummary(summary: string): ChangeSummary {
   }
 }
 
-/** A single +/−/~ tally, in the machine voice. */
 function ChangeTally({ summary }: { summary: ChangeSummary }) {
   const { t } = useTranslation();
   return (
@@ -292,8 +284,6 @@ function HistoryTab({ active, onClick, label }: { active: boolean; onClick: () =
   );
 }
 
-// ── Versions ───────────────────────────────────────────────────────
-
 function VersionList({ projectId, eventType }: { projectId: string; eventType: EventTypeCatalogResponse }) {
   const { t } = useTranslation();
   const {
@@ -318,8 +308,7 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
       return;
     }
     try {
-      // Left blank the field is omitted, and the server inherits the previous version's mode.
-      // Sending NONE explicitly is a different thing: it drops the promise the type was under.
+      // Blank is omitted so the server inherits the previous mode; sending NONE would drop it.
       await createMutation.mutateAsync({
         schemaJson: schemaInput,
         description: versionDesc.trim() || undefined,
@@ -506,8 +495,6 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
   );
 }
 
-// ── Changes for one event type ─────────────────────────────────────
-
 function ChangeList({ projectId, eventType }: { projectId: string; eventType: EventTypeCatalogResponse }) {
   const { t } = useTranslation();
   const {
@@ -553,8 +540,6 @@ function ChangeList({ projectId, eventType }: { projectId: string; eventType: Ev
     </ul>
   );
 }
-
-// ── Project-wide timeline, shown when no event type is selected ────
 
 export function RecentSchemaChanges({ projectId }: { projectId: string }) {
   const { t } = useTranslation();

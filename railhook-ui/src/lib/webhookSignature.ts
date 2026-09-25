@@ -1,22 +1,11 @@
-/**
- * Webhook signature checks for the public verifier at /tools/webhook-signature.
- *
- * Everything runs in the browser with Web Crypto: the secret and the payload a reader pastes are
- * never sent anywhere, which is the promise the page makes. The schemes match what Railhook's
- * own verifiers accept (the backend's StripeVerifier, GitHubVerifier, ShopifyVerifier,
- * SlackVerifier and StandardWebhookSignature), including the 300-second window for the schemes
- * that sign a timestamp.
- */
+/** Runs entirely in the browser: the pasted secret and payload are never sent anywhere. */
 
 export type Provider = 'standard' | 'railhook' | 'stripe' | 'github' | 'shopify' | 'slack';
 
 export interface ProviderScheme {
   id: Provider;
-  /** The headers the reader pastes, in the order the form shows them. */
   headers: string[];
-  /** The header that carries the signature itself. */
   signatureHeader: string;
-  /** How far a signed timestamp may be from now, where the scheme signs one. */
   toleranceSeconds?: number;
 }
 
@@ -46,9 +35,7 @@ export function schemeOf(provider: Provider): ProviderScheme {
 }
 
 export interface TimestampCheck {
-  /** The signed timestamp, in seconds. */
   value: number;
-  /** How long before `now` it was signed; negative when it is in the future. */
   ageSeconds: number;
   toleranceSeconds: number;
   withinTolerance: boolean;
@@ -59,7 +46,6 @@ export type VerifyResult =
   | { status: 'malformed'; reason: 'secret' | 'header' | 'timestamp'; header?: string }
   | {
       status: 'valid' | 'invalid';
-      /** The signature header as it should read for this payload and secret. */
       expected: string;
       timestamp?: TimestampCheck;
     };
@@ -68,9 +54,7 @@ export interface VerifyInput {
   provider: Provider;
   payload: string;
   secret: string;
-  /** Header values by the names in the provider's `headers`. */
   headers: Record<string, string>;
-  /** Milliseconds since the epoch; the clock, injectable for tests. */
   now?: number;
 }
 
@@ -100,17 +84,12 @@ function fromBase64(value: string): Uint8Array | null {
   }
 }
 
-/**
- * A header's value, with its name taken off the front if the reader pasted the whole line
- * (`Stripe-Signature: t=…`), which is how it is usually copied out of a log.
- */
 export function readHeaderValue(raw: string, name: string): string {
   const value = raw.trim();
   const prefix = `${name.toLowerCase()}:`;
   return value.toLowerCase().startsWith(prefix) ? value.slice(prefix.length).trim() : value;
 }
 
-/** `t=…,v1=…,v1=…` into its timestamp and every v1, as Stripe and Railhook both send it. */
 function readTimestampedHeader(value: string): { t?: string; signatures: string[] } {
   let t: string | undefined;
   const signatures: string[] = [];
@@ -135,7 +114,6 @@ function timestampCheck(seconds: number, now: number): TimestampCheck {
 
 const INTEGER = /^\d+$/;
 
-/** The key a Standard Webhooks secret stands for: base64 after `whsec_`, or the text as given. */
 function standardKey(secret: string): Uint8Array | null {
   return secret.startsWith('whsec_') ? fromBase64(secret.slice('whsec_'.length)) : encoder.encode(secret);
 }
@@ -201,7 +179,6 @@ export async function verifySignature({ provider, payload, secret, headers, now 
   }
 }
 
-/** Headers that sign `payload` with `secret` now: the page's "try an example". */
 export async function exampleHeaders(provider: Provider, payload: string, secret: string, now = Date.now()): Promise<Record<string, string>> {
   const seconds = String(Math.floor(now / 1000));
   const utf8Key = encoder.encode(secret);

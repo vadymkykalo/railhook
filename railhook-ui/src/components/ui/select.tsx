@@ -3,7 +3,6 @@ import * as SelectPrimitive from "@radix-ui/react-select"
 import { ChevronDown, Check } from "lucide-react"
 import { cn } from "../../lib/utils"
 
-/* ── Option extraction helper ── */
 const EMPTY_SENTINEL = '__EMPTY__'
 
 interface OptionItem {
@@ -29,7 +28,6 @@ function extractOptions(children: React.ReactNode): OptionItem[] {
   return options
 }
 
-/* ── Drop-in Select (same API as native <select>) ── */
 export interface SelectProps
   extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'onChange' | 'value'> {
   value?: string
@@ -54,12 +52,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           id={id}
           aria-label={rest['aria-label']}
           aria-labelledby={rest['aria-labelledby']}
-          /* The trigger is a <button>, so the global form-control rule in
-             index.css cannot reach it — it has to spell out the field shape
-             itself, and it spells out the same one: h-9 to sit level with
-             Input and Button, bg-card so it is not paper-grey on white. Focus
-             is left to the global `:focus-visible` outline; the old
-             `focus:ring-ring/20 focus:border-ring` was a third focus look. */
+          /* A <button>, so the global form-control rule misses it; it restates h-9 and bg-card. */
           className={cn(
             "flex h-9 w-full items-center justify-between border border-input bg-card px-3 py-2 text-base sm:text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
             className

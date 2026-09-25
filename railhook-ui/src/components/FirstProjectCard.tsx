@@ -8,17 +8,8 @@ import VerificationGate from './VerificationGate';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 
-/** The steps that follow once there is a project, shown so the first one has a visible point. */
 const NEXT_STEPS = ['createApiKey', 'createConnection', 'sendEvent'] as const;
 
-/**
- * The dashboard's first step for an organization with no project yet.
- *
- * <p>The getting-started card needs a project to read its progress from, so an organization without
- * one used to get a bare "no projects" panel and nothing about what comes after. This shows the whole
- * path with the one step that can be taken now, and creates the project in place: the dashboard then
- * picks it up and the regular getting-started card takes over from step two.
- */
 export default function FirstProjectCard() {
   const { t } = useTranslation();
   const navigate = useNavigate();

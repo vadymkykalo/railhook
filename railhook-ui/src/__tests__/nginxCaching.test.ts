@@ -6,14 +6,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const conf = readFileSync(join(repoRoot, 'railhook-ui/nginx.conf'), 'utf8');
 
-/**
- * A year-long `immutable` cache is only right for a file whose name changes when its content does.
- *
- * The static-asset location matched by extension, so the landing's screenshots, the logos, the
- * favicon and og-image — files in public/ with the same name in every release — were sent
- * `immutable` for a year. A browser that had seen the old screenshots kept showing them after a
- * deploy replaced them, without ever asking the server again.
- */
+/** Only hashed names may be immutable: browsers kept showing old public/ files after deploys. */
 function locations(): { head: string; body: string }[] {
   const out: { head: string; body: string }[] = [];
   const re = /^\s*location\s+([^{]+)\{/gm;

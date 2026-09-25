@@ -6,8 +6,7 @@ import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ProjectResponse, EndpointResponse } from '../../types/api.types';
 import type { DlqItemResponse, DlqStatsResponse, PageResponse } from '../../api/dlq.api';
 
-// Radix Select's listbox never opens in jsdom; a native select keeps the same onChange contract,
-// so these tests can change the endpoint filter the way an operator would.
+// Radix Select never opens in jsdom; a native select keeps the same onChange contract.
 vi.mock('../../components/ui/select', () => ({
   Select: ({ id, value, onChange, children }: {
     id?: string; value?: string; children?: ReactNode;

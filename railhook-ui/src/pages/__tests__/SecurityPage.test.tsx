@@ -9,11 +9,6 @@ import { renderPage } from '../../test/renderPage';
 import SecurityPage from '../SecurityPage';
 import { REPO_URL } from '../landing/plans';
 
-/**
- * How Railhook protects data, stated only as far as the code and the privacy policy bear it out.
- * A security page is read by the people most likely to check it, so a claim it cannot back —
- * a certification, an uptime figure — costs more trust than the page earns.
- */
 function renderSecurity() {
   return renderPage(<SecurityPage />, {
     path: '/security',

@@ -9,13 +9,6 @@ import type { EmailChangeResponse } from '../types/api.types';
 import ChangeEmailForm from './ChangeEmailForm';
 import { Button } from './ui/button';
 
-/**
- * "Change email" in Settings, and the state between asking and confirming.
- *
- * A verified account keeps its address until the new one is proved, so the page has to say which
- * address is waiting and offer the two things a person can do about it: send the link again, or
- * call the change off.
- */
 export default function EmailAddressSection() {
   const { t } = useTranslation();
   const { user, updateUser } = useAuth();

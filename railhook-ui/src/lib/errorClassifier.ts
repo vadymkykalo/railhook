@@ -17,11 +17,8 @@ export type ErrorCategory =
 
 export interface ErrorClassification {
   category: ErrorCategory;
-  /** i18n key for error category label */
   labelKey: string;
-  /** i18n key for suggested fix */
   fixKey: string;
-  /** severity: info, warning, error */
   severity: 'info' | 'warning' | 'error';
 }
 
@@ -29,10 +26,7 @@ export function classifyError(attempt: DeliveryAttemptResponse): ErrorClassifica
   const msg = (attempt.errorMessage || '').toLowerCase();
   const status = attempt.httpStatusCode;
 
-  // Before anything about the network: these two never reached it. A transformation that
-  // failed or cancelled is the most specific thing an attempt can say about itself, and
-  // landing in UNKNOWN — "something went wrong, check the endpoint" — sends the reader to
-  // look at a receiver that was never asked.
+  // Checked first: a transformation failure never reached the network and must not blame the receiver.
   if (msg.includes('cancelled_by_transformation')) {
     return {
       category: 'TRANSFORM_CANCELLED',
@@ -50,7 +44,6 @@ export function classifyError(attempt: DeliveryAttemptResponse): ErrorClassifica
     };
   }
 
-  // Connection-level errors (no HTTP status)
   if (!status || status === 0) {
     if (msg.includes('timeout') || msg.includes('timed out') || msg.includes('deadline exceeded')) {
       return { category: 'TIMEOUT', labelKey: 'errorClass.timeout.label', fixKey: 'errorClass.timeout.fix', severity: 'warning' };
@@ -67,7 +60,6 @@ export function classifyError(attempt: DeliveryAttemptResponse): ErrorClassifica
     return { category: 'UNKNOWN', labelKey: 'errorClass.unknown.label', fixKey: 'errorClass.unknown.fix', severity: 'error' };
   }
 
-  // HTTP status-based classification
   if (status === 401 || status === 403) {
     return { category: 'AUTH_REJECTED', labelKey: 'errorClass.auth.label', fixKey: 'errorClass.auth.fix', severity: 'error' };
   }

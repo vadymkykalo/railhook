@@ -11,15 +11,6 @@ import SchemaValidationPanel from './schemas/SchemaValidationPanel';
 import SchemaListPanel from './schemas/SchemaListPanel';
 import SchemaVersionHistory, { RecentSchemaChanges } from './schemas/SchemaVersionHistory';
 
-/**
- * The schema registry, as three things rather than one 943-line file:
- *
- *   `SchemaListPanel`        — which event types have a contract
- *   `SchemaVersionHistory`   — what that contract has been, version by version
- *   `SchemaValidationPanel`  — what happens to an event that breaks it
- *
- * This file only decides which event type is selected and where the three sit.
- */
 export default function SchemasPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
@@ -37,10 +28,7 @@ export default function SchemasPage() {
     );
   }
 
-  // Without this the catalogue request failing falls through `data = []` and
-  // draws "0 event types" over an empty list — a down backend wearing the face
-  // of an empty project, which is the one thing EmptyState's own docblock says
-  // never to do.
+  // Otherwise a failed request draws "0 event types": a down backend posing as an empty project.
   if (isError) {
     return (
       <div className="p-4 lg:p-6">

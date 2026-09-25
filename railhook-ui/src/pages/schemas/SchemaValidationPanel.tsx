@@ -6,15 +6,6 @@ import { ErrorState } from '../../components/EmptyState';
 import { SkeletonRows } from '../../components/PageSkeleton';
 import { cn } from '../../lib/utils';
 
-/**
- * What happens to an event that does not match its schema.
- *
- * Two settings, one row each: whether an event is validated at all and what a
- * failed validation costs, and whether a duplicate is rejected. They used to be
- * two cards tinted green, blue and purple — colours the palette reserves for
- * statuses — so the choice is now carried by which segment is selected.
- */
-
 function SegmentedChoice<T extends string>({
   value, options, onChange, disabled, ariaLabel,
 }: {
@@ -82,9 +73,7 @@ export default function SchemaValidationPanel({ projectId }: { projectId: string
 
   if (isLoading) return <SkeletonRows count={2} height="h-[72px]" />;
 
-  // Both rows are a switch reading its position from the project. Rendering
-  // nothing on a failed fetch hid the two settings that decide whether a
-  // malformed event is rejected.
+  // Rendering nothing on a failed fetch hid the settings that decide whether malformed events are rejected.
   if (isError || !project) {
     return <ErrorState error={error} onRetry={() => refetch()} retrying={isRefetching} />;
   }

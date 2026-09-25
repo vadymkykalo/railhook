@@ -33,12 +33,7 @@ import NodeConfigPanel from '../components/workflow/NodeConfigPanel';
 import StatusBadge, { type StatusKind } from '../components/StatusBadge';
 import JsonBlock from '../components/JsonBlock';
 
-/**
- * How the canvas frames a workflow it has just opened. The zoom floor is well under React Flow's
- * default 0.5, because a six-node workflow laid out left to right is around a thousand pixels
- * wide and 0.5 of that does not fit a phone — the fit silently clamped and half the workflow sat
- * off the side of the screen.
- */
+/** Zoom floor under React Flow's default 0.5: at 0.5 a six-node workflow does not fit a phone. */
 const FIT_VIEW_OPTIONS = { padding: 0.2 };
 const MIN_ZOOM = 0.2;
 
@@ -73,19 +68,15 @@ function WorkflowBuilderInner() {
     enabled: !!projectId && !!workflowId,
   });
 
-  // A refetch (after a toggle, say) must not throw away edits nobody has saved yet. The flag and
-  // the rest of the toolbar read `workflow` directly, so only the canvas waits for a save.
+  // A refetch must not discard unsaved edits; only the canvas waits for a save.
   const hasUnsavedRef = useRef(hasUnsaved);
   hasUnsavedRef.current = hasUnsaved;
 
-  // Load definition into canvas
   useEffect(() => {
     if (hasUnsavedRef.current) return;
     if (workflow?.definition) {
       const def = workflow.definition;
-      // The API documents a node as id, type and data, and an edge as source and target. Position
-      // and edge ids are the canvas's own; a workflow created over the API has neither, and the
-      // canvas throws on a node without a position. Lay those out left to right instead.
+      // API-created workflows have no positions or edge ids and the canvas throws without them, so lay them out.
       if (def.nodes && Array.isArray(def.nodes)) {
         setNodes((def.nodes as Partial<Node>[]).map((node, index) => ({
           ...node,
@@ -102,9 +93,7 @@ function WorkflowBuilderInner() {
     }
   }, [workflow, setNodes, setEdges]);
 
-  // The definition arrives after the canvas has mounted, so React Flow's own `fitView` runs while
-  // there is nothing on it and the loaded nodes then land wherever the default viewport sits —
-  // on a phone, mostly off the side of it. Fit once, as soon as those nodes have been measured.
+  // Fit once the loaded nodes are measured: React Flow's own fitView ran on an empty canvas.
   useEffect(() => {
     if (fitted.current || !nodesInitialized || nodes.length === 0) return;
     fitted.current = true;
@@ -127,9 +116,7 @@ function WorkflowBuilderInner() {
     setSelectedNode(null);
   }, []);
 
-  // The canvas reports its own measurements and what it has selected as changes too, and neither
-  // is an edit: counting them lit "Unsaved" and armed Save the moment the page opened, on a
-  // workflow nobody had touched.
+  // Measurement and selection changes are not edits; counting them armed Save on open.
   const isEdit = (type: string) => type !== 'dimensions' && type !== 'select';
 
   const handleNodesChange: typeof onNodesChange = useCallback(
@@ -148,7 +135,6 @@ function WorkflowBuilderInner() {
     [onEdgesChange],
   );
 
-  // Update node data from config panel
   const handleNodeDataUpdate = useCallback(
     (nodeId: string, newData: Record<string, unknown>) => {
       setNodes((nds) =>
@@ -160,9 +146,7 @@ function WorkflowBuilderInner() {
     [setNodes],
   );
 
-  // Both ways of adding a node land here, so a tap puts down exactly what a drag does. The
-  // canvas converts the screen point itself, which keeps the node under the pointer however far
-  // the canvas has been panned or zoomed — subtracting the wrapper's offset by hand did not.
+  // The canvas converts the screen point, so the node lands under the pointer at any pan or zoom.
   const addNode = useCallback(
     (template: NodeTemplate, screenPoint: { x: number; y: number }) => {
       const dropped = screenToFlowPosition(screenPoint);
@@ -180,7 +164,6 @@ function WorkflowBuilderInner() {
     [screenToFlowPosition, setNodes],
   );
 
-  // Drag & drop from the palette
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -197,8 +180,7 @@ function WorkflowBuilderInner() {
     [addNode],
   );
 
-  // A touch screen fires no dragstart, so the palette is a row of buttons as well: a tap has no
-  // pointer to drop under, and drops the node in the middle of what the canvas is showing.
+  // Touch screens fire no dragstart, so a tap drops the node in the middle of the view.
   const addNodeToView = useCallback(
     (template: NodeTemplate) => {
       const bounds = reactFlowWrapper.current?.getBoundingClientRect();
@@ -208,7 +190,6 @@ function WorkflowBuilderInner() {
     [addNode],
   );
 
-  // Delete selected node
   const deleteSelectedNode = useCallback(() => {
     if (!selectedNode) return;
     setNodes((nds: Node[]) => nds.filter((n) => n.id !== selectedNode.id));
@@ -217,7 +198,6 @@ function WorkflowBuilderInner() {
     setHasUnsaved(true);
   }, [selectedNode, setNodes, setEdges]);
 
-  // Save
   const saveMutation = useMutation({
     mutationFn: () =>
       workflowsApi.update(projectId!, workflowId!, {
@@ -263,7 +243,6 @@ function WorkflowBuilderInner() {
     refetchInterval: showHistory ? 5000 : false,
   });
 
-  // Extract trigger config from the trigger node
   const extractTriggerConfig = useCallback((): Record<string, unknown> => {
     const triggerNode = nodes.find((n) => n.type === 'webhookTrigger');
     if (triggerNode?.data) {
@@ -273,7 +252,6 @@ function WorkflowBuilderInner() {
     return {};
   }, [nodes]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -298,8 +276,7 @@ function WorkflowBuilderInner() {
     );
   }
 
-  // A fetch that failed is not a workflow that was deleted, and the canvas
-  // below writes back to whatever this returned.
+  // A failed fetch is not a deleted workflow, and the canvas writes back to what this returns.
   if (isError) {
     return (
       <div className="p-4 lg:p-6">
@@ -318,9 +295,6 @@ function WorkflowBuilderInner() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)]">
-      {/* Toolbar. The name and the controls need the whole width of a phone between them, so the
-          meta line sits under both instead of competing with the back arrow for the same row,
-          and every control but Save shows only its icon until there is room for a label. */}
       <div className="border-b border-rail bg-card px-3 py-2 sm:px-4">
         <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
           <Button variant="ghost" size="icon-sm" className="flex-shrink-0" onClick={() => navigate(`/admin/projects/${projectId}/workflows`)} title={t('workflows.builder.back')} aria-label={t('workflows.builder.back')}>
@@ -382,10 +356,7 @@ function WorkflowBuilderInner() {
         </p>
       </div>
 
-      {/* Main area */}
       <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-        {/* Node palette: a column beside the canvas where there is room for one, and a strip
-            above it on a phone, where a 192px column left the canvas a sliver. */}
         <div className="flex-shrink-0 border-b border-rail bg-card lg:flex lg:w-48 lg:flex-col lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <p className="mono-label px-3 pt-2 lg:px-4 lg:pt-3">
             <span className="lg:hidden">{t('workflows.builder.tapToAdd')}</span>
@@ -414,7 +385,6 @@ function WorkflowBuilderInner() {
           </div>
         </div>
 
-        {/* Canvas */}
         <div className="min-h-0 flex-1" ref={reactFlowWrapper}>
           <ReactFlow
             nodes={nodes}
@@ -437,8 +407,7 @@ function WorkflowBuilderInner() {
             <Controls position="bottom-left" />
             <MiniMap
               position="bottom-right"
-              /* A map of the canvas is worth less than the canvas itself on a phone, where it
-                 covers a quarter of it. */
+              /* Hidden on a phone, where the minimap covers a quarter of the canvas. */
               className="!hidden !border !border-rail !bg-card sm:!block"
               maskColor="hsl(var(--muted) / 0.6)"
               nodeColor="hsl(var(--muted-foreground))"
@@ -455,7 +424,6 @@ function WorkflowBuilderInner() {
           </ReactFlow>
         </div>
 
-        {/* Config panel */}
         {selectedNode && (
           <NodeConfigPanel
             node={selectedNode}
@@ -465,7 +433,6 @@ function WorkflowBuilderInner() {
         )}
       </div>
 
-      {/* Execution history drawer */}
       {showHistory && (
         <div className="max-h-80 overflow-y-auto border-t border-rail bg-card">
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-rail bg-card px-4 py-2">
@@ -475,7 +442,6 @@ function WorkflowBuilderInner() {
             </Button>
           </div>
 
-          {/* Stats summary */}
           {(() => {
             const total = workflow.totalExecutions ?? 0;
             const success = workflow.successfulExecutions ?? 0;
@@ -540,7 +506,6 @@ function WorkflowBuilderInner() {
         </div>
       )}
 
-      {/* Manual trigger dialog */}
       {showTriggerDialog && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowTriggerDialog(false)}>
           <div className="w-[480px] max-w-[90vw] space-y-4 border border-rail bg-card p-5 shadow-elevated" onClick={(e) => e.stopPropagation()}>
@@ -585,9 +550,6 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
   const [expanded, setExpanded] = useState(false);
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
 
-  // An execution and its steps are domain statuses, so they resolve to the four
-  // reserved hues like every other status in the product: done, still owed,
-  // abandoned, nothing tried.
   const statusIcon = exec.status === 'COMPLETED' ? <CheckCircle2 className="h-3.5 w-3.5 text-ok" aria-hidden />
     : exec.status === 'FAILED' ? <XCircle className="h-3.5 w-3.5 text-halt" aria-hidden />
     : exec.status === 'RUNNING' ? <Loader2 className="h-3.5 w-3.5 animate-spin text-retry" aria-hidden />
@@ -670,14 +632,6 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
   );
 }
 
-/**
- * A workflow step's status is a domain status, so it wears the four reserved
- * meanings like every other one: a finished step is `ok`, one still going is
- * `retry` (an attempt still owed), a failure is `halt`, and a step that never
- * ran is `idle`. This page used to keep a private colour map that reached for
- * the same tokens by hand — which is exactly how a status stops matching the
- * rest of the product one rename later.
- */
 function kindOfStepStatus(status: string): StatusKind {
   switch (status) {
     case 'SUCCESS': return 'ok';

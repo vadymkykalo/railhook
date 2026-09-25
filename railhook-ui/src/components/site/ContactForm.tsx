@@ -19,7 +19,6 @@ function errorOf(error: unknown): { status?: number; code?: string } {
   return { status: response?.status, code: response?.data?.error };
 }
 
-/** Why the message did not go, in the reader's words. */
 function errorKey(error: unknown): string {
   const { status, code } = errorOf(error);
   if (code === 'captcha_failed') return 'site.contact.errors.captcha';
@@ -29,11 +28,6 @@ function errorKey(error: unknown): string {
   return 'site.contact.errors.generic';
 }
 
-/**
- * Write to support without leaving the page: the widget in the corner and the contact page both
- * render this. The server mails the deployment's own support address with the visitor's as the
- * Reply-To, so the answer arrives in their inbox like any other mail.
- */
 export default function ContactForm({ compact = false, autoFocus = false }: { compact?: boolean; autoFocus?: boolean }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();

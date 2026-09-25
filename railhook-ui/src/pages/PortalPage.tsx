@@ -12,15 +12,7 @@ import PortalEndpoints from './portal/PortalEndpoints';
 import PortalDeliveries from './portal/PortalDeliveries';
 import { WRAP, panel } from './landing/primitives';
 
-/**
- * The customer portal: what a Railhook customer embeds in their own product so that their user —
- * a Consumer — can register Endpoints, choose what they receive, and see why a Delivery failed.
- *
- * It stands outside the dashboard entirely. There is no Railhook user here and no dashboard
- * session: the one credential is the portal session token the customer's backend put in the
- * URL's fragment. It is taken out of the address bar on the first render, so it does not linger
- * in history, a bookmark or a screenshot, and held in memory only.
- */
+/** The token is taken out of the URL fragment on first render so it stays out of history and screenshots. */
 
 type Tab = 'endpoints' | 'deliveries';
 
@@ -58,9 +50,7 @@ function useBranding(params: PortalParams) {
   }, [params.theme]);
   useEffect(() => {
     if (!params.lang || i18n.language === params.lang) return;
-    // i18next caches whatever it switches to as this origin's language, which is the dashboard's
-    // preference too: a customer's `lang` must not change the language a Railhook user signs
-    // in to next. The previous choice is put back once the switch has been cached.
+    // A customer's lang must not change the language a Railhook user signs in to next.
     let previous: string | null = null;
     try {
       previous = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -76,8 +66,7 @@ function useBranding(params: PortalParams) {
       }
     });
   }, [params.lang, i18n]);
-  // On the document rather than the page's wrapper: dialogs and sheets render in a portal at the
-  // end of <body>, outside anything the wrapper's variables would reach.
+  // On the document: dialogs render in a portal outside the wrapper's variables.
   useEffect(() => {
     if (!params.primary) return undefined;
     const root = document.documentElement;
@@ -106,8 +95,7 @@ export default function PortalPage() {
   const [expired, setExpired] = useState(false);
   const [tab, setTab] = useState<Tab>('endpoints');
 
-  // The shell's static title is the landing page's; inside someone else's product that reads as
-  // an advert in the browser's tab strip.
+  // The shell's static title is the landing page's, which reads as an advert inside another product.
   useEffect(() => {
     document.title = t('portal.title');
   }, [t]);

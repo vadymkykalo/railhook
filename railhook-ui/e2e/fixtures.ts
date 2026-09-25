@@ -1,10 +1,6 @@
 import type { Page, Route } from '@playwright/test';
 
-/**
- * The API, answered in the browser, so the layout checks run against the production bundle with
- * no backend. Shapes are the minimum each page reads; anything unlisted gets an empty success,
- * which is what a fresh organization looks like.
- */
+/** Unlisted API calls get an empty success, which is what a fresh organization looks like. */
 export const PROJECT_ID = '00000000-0000-4000-8000-000000000001';
 export const EVENT_ID = '00000000-0000-4000-8000-000000000002';
 export const WORKFLOW_ID = '00000000-0000-4000-8000-000000000003';
@@ -34,11 +30,7 @@ const PROJECT = {
 
 const page0 = (content: unknown[] = []) => ({ content, totalElements: content.length, totalPages: 1, number: 0, size: 20 });
 
-/**
- * Records with the lengths that break a phone layout: endpoint URLs a customer really registers,
- * dotted event types, a page of rows rather than one. An empty list lays out trivially and hid
- * that every list table was a 650–1060px desktop table swiped sideways at 390px.
- */
+/** Long values on purpose: an empty list hid that every table overflowed at 390px. */
 const at = (minutesAgo: number) => new Date(Date.UTC(2026, 8, 13, 12, 0) - minutesAgo * 60_000).toISOString();
 const ENDPOINTS = Array.from({ length: 6 }, (_, i) => ({
   id: `00000000-0000-4000-8000-00000000e${String(i).padStart(3, '0')}`,
@@ -71,10 +63,6 @@ const DELIVERIES = EVENTS.map((event, i) => ({
   createdAt: event.createdAt,
 }));
 
-/**
- * A workflow wide enough that its canvas has to be fitted into the screen rather than shown at
- * 1:1 — six nodes laid out left to right is what the builder looks like once somebody uses it.
- */
 const WORKFLOW = {
   id: WORKFLOW_ID,
   projectId: PROJECT_ID,
@@ -108,7 +96,6 @@ const WORKFLOW = {
   failedExecutions: 1,
 };
 
-/** The platform admin panel, with the lengths a real deployment has: long names, long addresses. */
 const PLATFORM_ORGS = Array.from({ length: 6 }, (_, i) => ({
   id: i === 0 ? PLATFORM_ORG_ID : `00000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`,
   name: `Northwind Logistics International Holdings ${i + 1}`,
@@ -194,11 +181,6 @@ function body(url: URL): unknown {
   return {};
 }
 
-/**
- * A brand-new organization: no project until the create call, then the one it made. The list
- * answers from state so the dashboard's refetch after creating sees the new project, the way the
- * real API would.
- */
 export async function mockNewOrganization(page: Page) {
   const created = { id: PROJECT_ID, name: 'Checkout', description: '', createdAt: '2026-09-13T12:00:00Z' };
   let projects: unknown[] = [];

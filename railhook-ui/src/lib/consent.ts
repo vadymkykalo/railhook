@@ -1,9 +1,4 @@
-/**
- * Whether this browser has already seen the cookie notice, kept in this browser only.
- *
- * The notice asks nothing: the site sets only the sign-in cookie, and its analytics are
- * cookieless, so there is nothing to consent to. It says so once, and this is how it knows.
- */
+/** No consent to ask: only the sign-in cookie, and analytics are cookieless. */
 export const NOTICE_KEY = 'railhook.cookie-notice';
 
 export function noticeSeen(): boolean {

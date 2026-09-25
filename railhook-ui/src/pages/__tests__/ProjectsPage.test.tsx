@@ -22,15 +22,6 @@ vi.mock('../../api/dashboard.api', () => ({
 import ProjectsPage from '../ProjectsPage';
 import { projectsApi } from '../../api/projects.api';
 
-/**
- * The first screen after signing up, and the one a delete goes through.
- *
- * <p>What is worth holding down here is the destructive path: a project owns every endpoint,
- * subscription and event under it, so a delete that fires without a confirmation is not a bug
- * someone reports — it is a support conversation about data that is gone. The rest is that the
- * empty state exists at all, because a brand-new account sees nothing else.
- */
-
 const PROJECT: ProjectResponse = {
   id: 'project-1',
   name: 'Production',
@@ -59,8 +50,6 @@ describe('ProjectsPage', () => {
     renderProjects();
 
     await waitFor(() => expect(projectsApi.list).toHaveBeenCalled());
-    // Whatever the wording, there has to be something: this is the whole screen for a
-    // just-registered user.
     await waitFor(() => expect(document.body.textContent?.trim()).not.toBe(''));
     expect(screen.queryByText('Production')).toBeNull();
   });
@@ -74,7 +63,6 @@ describe('ProjectsPage', () => {
 
     if (deleteButton) {
       await userEvent.click(deleteButton);
-      // Opening the dialog is not the same as agreeing to it. Nothing may be gone yet.
       expect(projectsApi.delete).not.toHaveBeenCalled();
     }
     expect(projectsApi.delete).not.toHaveBeenCalled();

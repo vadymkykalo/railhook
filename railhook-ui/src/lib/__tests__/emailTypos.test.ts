@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { IMPOSSIBLE_TLDS, hasImpossibleTld, suggestEmail } from '../emailTypos';
 
 describe('the refused endings', () => {
-  // The API refuses the same list, so a client that skips this form meets the same answer.
   it('are the same list the API refuses', () => {
     const java = readFileSync(resolve(__dirname,
       '../../../../railhook-api/src/main/java/com/webhook/platform/api/dto/validation/EmailTypoPolicy.java'), 'utf8');
@@ -15,11 +14,6 @@ describe('the refused endings', () => {
   });
 });
 
-/**
- * A real person registered as `wheelet1228@gmail.con`. Every verification mail bounced, and
- * nothing on the form had said a word. These are the typos people actually make with the
- * addresses people actually have.
- */
 describe('suggestEmail', () => {
   it.each([
     ['wheelet1228@gmail.con', 'wheelet1228@gmail.com'],
@@ -63,7 +57,7 @@ describe('hasImpossibleTld', () => {
     expect(hasImpossibleTld(email)).toBe(true);
   });
 
-  // A typo of a popular domain is a suggestion, never a refusal: gmial.com is a registrable name.
+  // A typo of a popular domain is a suggestion, never a refusal: gmial.com is registrable.
   it.each(['a@gmial.com', 'a@icloud.co', 'a@acme.io', 'a@x.co', 'a@x.om', 'a@x.cm', 'nope'])('%s is allowed', (email) => {
     expect(hasImpossibleTld(email)).toBe(false);
   });

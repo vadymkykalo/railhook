@@ -1,23 +1,8 @@
-/**
- * The `---` block at the top of a blog post, and the body below it.
- *
- * A deliberately small YAML subset — `key: value` and `key: [a, b, c]` — rather than a YAML
- * parser in the browser bundle. The posts are files this repository writes and reviews, their
- * shape is fixed by `BlogPost`, and js-yaml would be a general-purpose parser shipped to every
- * reader for eight scalar fields. A field that wants more than a scalar or a flat list wants to
- * be a component instead.
- *
- * Two callers must agree on it: `src/lib/blog.ts`, which builds the pages, and the `blogRss()`
- * plugin in `vite.config.ts`, which writes the feed at build time. That is why this module
- * imports nothing.
- */
+/** A tiny YAML subset, no imports: the vite RSS plugin reuses it and js-yaml is too big for the bundle. */
 
 export interface FrontMatter {
-  /** Scalars as written, with surrounding quotes removed. */
   values: Record<string, string>;
-  /** `key: [a, b, c]` entries. */
   lists: Record<string, string[]>;
-  /** Everything after the closing `---`. */
   body: string;
 }
 
@@ -32,14 +17,8 @@ function unquote(value: string): string {
   return trimmed;
 }
 
-/**
- * Splits `source` into its front matter and its body.
- *
- * A file with no front matter is not an error here: `blog.ts` decides a post is unusable, and
- * it can name the field that is missing, which "no front matter" cannot.
- */
 export function parseFrontMatter(source: string): FrontMatter {
-  // A byte-order mark ahead of the opening `---` would keep the delimiter from matching.
+  // A BOM ahead of `---` would keep the delimiter from matching.
   const lines = source.replace(/^\u{FEFF}/u, '').split(/\r?\n/);
   if (!DELIMITER.test(lines[0] ?? '')) {
     return { values: {}, lists: {}, body: source.trim() };

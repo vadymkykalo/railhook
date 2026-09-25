@@ -12,11 +12,7 @@ initCSP();
 initTheme();
 installStaleChunkReload();
 
-// Locale bundles now load via a dynamic import() per language (see src/i18n),
-// so any component that calls useTranslation() before its language's bundle
-// has resolved will suspend. This top-level boundary catches that on first
-// load and on every language switch — nested route-level <Suspense> boundaries
-// (see router.tsx) still handle their own lazy-loaded page chunks separately.
+// Locale bundles load lazily, so useTranslation() suspends on first load and on every language switch.
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Suspense fallback={<BootSplash />}>

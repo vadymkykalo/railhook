@@ -43,10 +43,6 @@ function renderDemo(startDemo = vi.fn()) {
   return startDemo;
 }
 
-/**
- * /demo opens a read-only session and hands the visitor to the dashboard, with no form to fill in
- * where the deployment asks no challenge. Where the demo is off it says so rather than failing.
- */
 describe('DemoPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -16,11 +16,6 @@ import { Band, WRAP } from './landing/primitives';
 
 const DASHBOARD = '/admin/dashboard';
 
-/**
- * The way into the live demo: opens a read-only session in the demo organization and hands the
- * visitor to the dashboard. Straight through when the deployment asks no challenge; otherwise the
- * same CAPTCHA registration uses, then a button.
- */
 export default function DemoPage() {
   const { t } = useTranslation();
   useDocumentMeta({ titleKey: 'meta.demo.title', descriptionKey: 'meta.demo.description', path: '/demo' });
@@ -33,8 +28,7 @@ export default function DemoPage() {
   const open = useMutation({
     mutationFn: async () => {
       const session = await demoApi.createSession(captchaToken || undefined);
-      // The dashboard's own "who am I" call, made with the demo token, so the session the app
-      // holds is the one the server describes rather than one assembled here.
+      // Asks the server "who am I" so the session held is the one the server describes.
       const previous = http.getToken();
       const previousDemo = http.isDemo();
       http.setToken(session.accessToken);
@@ -63,8 +57,7 @@ export default function DemoPage() {
       navigate(DASHBOARD, { replace: true });
       return;
     }
-    // Without a challenge there is nothing to ask the visitor: open it at once. Once, although
-    // React may run this effect twice in development.
+    // Once: React may run this effect twice in development.
     if (enabled && !isCaptchaConfigured() && !started.current) {
       started.current = true;
       open.mutate();

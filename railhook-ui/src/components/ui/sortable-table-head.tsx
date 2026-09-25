@@ -18,11 +18,6 @@ interface SortableTableHeadProps {
   className?: string;
 }
 
-/* Composes TableHead rather than rendering its own <th>. It used to declare
-   `h-12 px-4 font-medium text-xs`, which is what shadcn shipped before the
-   header row was restyled — so any table mixing a sortable column with a plain
-   one showed a 12px height jog and two typefaces in the same row. Everything
-   here is now only what sorting adds: the pointer affordance and the arrow. */
 export function SortableTableHead({ field, sort, onSort, children, className }: SortableTableHeadProps) {
   const isActive = sort.field === field;
 

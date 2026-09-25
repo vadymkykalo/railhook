@@ -7,11 +7,6 @@ import LandingPage from '../LandingPage';
 import LandingNav from '../landing/LandingNav';
 import PricingPage from '../PricingPage';
 
-/**
- * "Try the live demo" — in the landing's last section, on /pricing and in the header — exactly
- * where the deployment runs the demo, and for a visitor who is not signed in. A self-hosted
- * install that never turned it on must not offer a link that answers 404.
- */
 const SIGNED_OUT = { auth: { user: null, token: null, isAuthenticated: false } };
 
 beforeAll(() => {
@@ -41,7 +36,6 @@ describe('the live demo entry points', () => {
     const offer = document.getElementById('cloud') as HTMLElement;
     const link = within(offer).getByRole('link', { name: new RegExp(en.landing.hero.tryDemo) });
     expect(link).toHaveAttribute('href', '/demo');
-    // Secondary: the first call to action is still signing up.
     expect(within(offer).getAllByRole('link')[0]).toHaveAttribute('href', '/register');
   });
 

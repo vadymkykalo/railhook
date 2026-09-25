@@ -2,16 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { CheckCircle2, CircleDashed, Clock, XCircle, Ban } from 'lucide-react';
 import { Badge } from './ui/badge';
 
-/**
- * The single place a domain status becomes a colour.
- *
- * Every status in this product resolves to one of four meanings, and the tokens
- * are named for the meanings rather than the colours: delivered is `ok`, an
- * attempt still owed is `retry`, an obligation abandoned is `halt`, and nothing
- * tried yet is `idle`. Pages map their own vocabulary onto these four and never
- * pick a colour themselves.
- */
-
 export type StatusKind = 'ok' | 'retry' | 'halt' | 'idle';
 
 const ICON = {
@@ -21,11 +11,7 @@ const ICON = {
   idle: CircleDashed,
 } as const;
 
-/**
- * Where an invoice stands. Matches InvoiceStatus on the backend, which is upper case —
- * BillingPage used to compare against 'paid' and so painted every paid invoice grey.
- * The label was right, which is what kept it quiet.
- */
+/** Backend InvoiceStatus is upper case; comparing to 'paid' once painted every paid invoice grey. */
 export function kindOfInvoiceStatus(status: string): StatusKind {
   switch (status) {
     case 'PAID':
@@ -37,7 +23,6 @@ export function kindOfInvoiceStatus(status: string): StatusKind {
   }
 }
 
-/** Delivery and Forward share the attempt lifecycle, so they share this mapping. */
 export function kindOfDeliveryStatus(status: string): StatusKind {
   switch (status) {
     case 'SUCCESS':
@@ -51,8 +36,7 @@ export function kindOfDeliveryStatus(status: string): StatusKind {
     case 'DLQ':
     case 'ABANDONED':
       return 'halt';
-    // Deliberate and terminal: a transformation said not to send it. Not ok — nothing
-    // arrived; not halt — nothing went wrong.
+    // Not ok (nothing arrived), not halt (nothing went wrong).
     case 'CANCELLED':
       return 'idle';
     default:
@@ -76,14 +60,7 @@ export default function StatusBadge({
   );
 }
 
-/**
- * A disabled/enabled pill, which is a configuration state rather than a status.
- *
- * With `autoDisabled`, a third state: Railhook turned this target off because it answered
- * nothing but failures. It reads `halt` rather than `idle` on purpose - an owner who switched
- * something off knows they did, and one whose endpoint was switched off for them needs to
- * notice.
- */
+/** autoDisabled reads halt, not idle: an owner whose endpoint was switched off for them must notice. */
 export function EnabledBadge({
   enabled, autoDisabled = false,
 }: {

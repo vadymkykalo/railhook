@@ -6,11 +6,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ResetPasswordPage from '../ResetPasswordPage';
 import { authApi } from '../../api/auth.api';
 
-/**
- * The screen someone reaches from an email when they are already locked out. Getting it wrong
- * strands them: there is no signed-in session to fall back on and no second route to the same
- * outcome, so every branch below is one where the user has nowhere else to go.
- */
 describe('ResetPasswordPage', () => {
   function renderAt(search: string) {
     return render(
@@ -39,8 +34,6 @@ describe('ResetPasswordPage', () => {
     renderAt('');
 
     expect(screen.queryByRole('button', { name: /reset|set|save|submit|change/i })).not.toBeInTheDocument();
-    // Two ways onward — ask for a fresh link, or go back and sign in — because a dead link is
-    // the one state the user cannot resolve on this screen.
     expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
   });
 
@@ -64,8 +57,6 @@ describe('ResetPasswordPage', () => {
   });
 
   it('does not send a password the backend would reject for length', async () => {
-    // Checked here as well as on the server so the user is told before the round trip, and
-    // so a rejected reset does not look like a broken token.
     const reset = vi.spyOn(authApi, 'resetPassword').mockResolvedValue(undefined);
 
     renderAt('?token=the-token');

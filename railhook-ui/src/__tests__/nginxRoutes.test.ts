@@ -7,16 +7,11 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '.
 const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 const conf = read('railhook-ui/nginx.conf');
 
-/** The prerendered public paths, as scripts/public-routes.mjs lists them (read as text: it is untyped JS). */
 function publicRoutes(): { path: string }[] {
   const source = read('railhook-ui/scripts/public-routes.mjs');
   return [...source.matchAll(/\{\s*path:\s*'([^']+)'/g)].map((m) => ({ path: m[1] }));
 }
 
-/**
- * The first path segment of every prerendered page: `/tools/webhook-signature` is served from
- * `dist/tools/webhook-signature/index.html` by `location /`, so `tools` is not an app route.
- */
 function prerenderedSegments(): string[] {
   return publicRoutes().map((r) => r.path.slice(1).split('/')[0]).filter(Boolean);
 }
@@ -40,14 +35,12 @@ function locations(): { head: string; body: string }[] {
 
 const location = (head: string) => locations().find((l) => l.head === head);
 
-/** The first path segment of every absolute route the router declares, `/` and `*` aside. */
 function routerTopLevelSegments(): string[] {
   const router = read('railhook-ui/src/router.tsx');
   const segments = [...router.matchAll(/path:\s*'\/([^/'*:]+)/g)].map((m) => m[1]);
   return [...new Set(segments)].sort();
 }
 
-/** The SPA location: a regex over the app's own top-level routes. */
 function spaLocation() {
   return locations().find((l) => l.head.startsWith('~ ^/(') && /index\.html/.test(l.body));
 }
@@ -58,11 +51,7 @@ function spaSegments(): string[] {
   return group.split('|').filter(Boolean).sort();
 }
 
-/**
- * Every URL used to answer 200 with the prerendered landing page: `/this-does-not-exist` and
- * each dashboard route alike, all carrying the landing's title and a canonical pointing at `/`.
- * To a crawler that is one page duplicated at every address anyone links to — a soft 404.
- */
+/** Every URL used to answer 200 with the landing page, a soft 404 to crawlers. */
 describe('nginx answers with the status the URL deserves', () => {
   it('finds the router routes it is meant to be checking', () => {
     expect(routerTopLevelSegments()).toEqual(expect.arrayContaining(['admin', 'login', 'register', 'shared']));
@@ -70,7 +59,7 @@ describe('nginx answers with the status the URL deserves', () => {
 
   it('serves the app shell for every top-level route the router owns', () => {
     const prerendered = prerenderedSegments();
-    // The portal has a location of its own, below, because its headers differ.
+    // The portal has its own location because its headers differ.
     const owned = routerTopLevelSegments().filter((s) => !prerendered.includes(s) && s !== 'portal');
     expect(spaLocation(), 'a regex location for the app routes').toBeDefined();
     expect(spaSegments()).toEqual(owned);
@@ -111,8 +100,7 @@ describe('the public route list', () => {
   });
 
   it('serves the privacy policy and the terms as prerendered pages, not as 404s or noindex shells', () => {
-    // Google's consent screen links both, so they must answer 200 and stay indexable: prerendered
-    // into dist/<page>/index.html and served by `location /`, never by the app-route regex.
+    // Google's consent screen links these, so they must answer 200 and stay indexable.
     const paths = publicRoutes().map((r: { path: string }) => r.path);
     expect(paths).toEqual(expect.arrayContaining(['/privacy', '/terms']));
     expect(spaSegments()).not.toContain('privacy');
@@ -130,11 +118,6 @@ describe('the remote MCP server', () => {
   });
 });
 
-/**
- * The customer portal is the one page another site may frame. Every other page keeps
- * X-Frame-Options SAMEORIGIN; the portal drops it for a frame-ancestors taken from the `origin` its
- * URL was issued with, and the portal itself checks that origin against its session.
- */
 describe('framing', () => {
   const snippet = read('railhook-ui/nginx-security-headers.conf');
   const common = read('railhook-ui/nginx-security-headers-common.conf');
@@ -164,8 +147,7 @@ describe('framing', () => {
   it('derives frame-ancestors from the origin only in the shapes an origin has', () => {
     const map = conf.match(/map\s+\$arg_origin\s+\$portal_frame_ancestors\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
     expect(map).toMatch(/default\s+"https: http:\/\/localhost:\* http:\/\/127\.0\.0\.1:\*";/);
-    // Every pattern is anchored and admits no quote, space or semicolon, which is what keeps a
-    // crafted query from writing a second directive into the header.
+    // Anchored, no quote, space or semicolon, so a query can't add a directive.
     const patterns = [...map.matchAll(/"(~\*?\^[^"]+\$)"/g)].map((m) => m[1]);
     expect(patterns.length).toBe(4);
     for (const pattern of patterns) {
@@ -174,11 +156,6 @@ describe('framing', () => {
   });
 });
 
-/**
- * claude.ai and ChatGPT connect to /mcp by signing in: they read the metadata under
- * /.well-known, register and trade codes at /oauth/*, and send the person to /oauth/consent —
- * which, unlike its siblings, is the app's own screen.
- */
 describe('sign-in for the MCP server', () => {
   const oauthApi = () => locations().find((l) => l.head.startsWith('~ ^/oauth/'));
 
@@ -211,11 +188,6 @@ describe('sign-in for the MCP server', () => {
   });
 });
 
-/**
- * The blog is railhook.io's own content, carried by the one image every install runs. Off —
- * the default — nginx answers it 404 like any unknown address, and /sitemap.xml lists none of it.
- * The files cannot be removed at runtime (the root filesystem is read-only), so nginx is the gate.
- */
 describe('the blog switch', () => {
   const blog = () => location('^~ /blog');
   const isBlog = (path: string) => path === '/blog' || path.startsWith('/blog/');
@@ -229,8 +201,6 @@ describe('the blog switch', () => {
   });
 
   it('answers /blog, every post and the feed 404 when off, with the app shell as the body', () => {
-    // `^~` covers /blog, /blog/<slug>, /blog/<slug>.png and /blog/rss.xml, and keeps the
-    // static-file regex from serving a social card around the switch.
     expect(blog(), 'a ^~ /blog location').toBeDefined();
     expect(blog()!.body).toMatch(/if\s+\(\$railhook_blog\s+!=\s+"on"\)\s*\{\s*return\s+404;\s*\}/);
     expect(blog()!.body).toMatch(/error_page\s+404\s+\/index\.html;/);

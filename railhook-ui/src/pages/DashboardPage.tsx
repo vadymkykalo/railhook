@@ -44,7 +44,6 @@ function SkeletonDashboard() {
   );
 }
 
-/** One row of the "needs a human" list: a count, what it means, and where it lives. */
 function AttentionRow({
   to, icon: Icon, label, count, kind,
 }: {
@@ -120,13 +119,11 @@ export default function DashboardPage() {
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
-  // The page's own failure. A project's stats or its charts failing is reported
-  // inside the card that wanted them, not by blanking the whole dashboard.
+  // A card's own failure is reported in the card, not by blanking the dashboard.
   const pageIsError = projectsIsError || statsIsError;
   const retryPage = () => { refetchProjects(); refetchStats(); };
 
-  // Every read of the payload goes through here: the dashboard is the first
-  // screen a new account sees, and it has to render before the data does.
+  // Coerced: the first screen a new account sees must render before the data does.
   const stats = coerceDeliveryStats(dashboardStats?.deliveryStats);
   const recentEvents = dashboardStats?.recentEvents ?? [];
   const endpointHealth = dashboardStats?.endpointHealth ?? [];
@@ -210,7 +207,6 @@ export default function DashboardPage() {
         <FirstProjectCard />
       ) : (
         <div className="animate-fade-in space-y-4">
-          {/* The answer, then the evidence. */}
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="flex flex-col justify-between p-5">
               <div>
@@ -265,7 +261,6 @@ export default function DashboardPage() {
             </ChartCard>
           </div>
 
-          {/* The totals, after the answer rather than instead of it. */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <StatTile
               label={t('dashboard.stats.deliveries')}
@@ -296,7 +291,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* What needs a human. */}
             <Card className="p-5">
               <div className="mb-1 flex items-start justify-between gap-3">
                 <div>
@@ -337,7 +331,6 @@ export default function DashboardPage() {
               </div>
             </Card>
 
-            {/* Anything still walking the ladder. */}
             <Card className="p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
@@ -391,7 +384,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* Endpoint health — the "where is it failing" half of the question. */}
             <Card className="p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
@@ -451,7 +443,6 @@ export default function DashboardPage() {
               )}
             </Card>
 
-            {/* What arrived. */}
             <Card className="p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>

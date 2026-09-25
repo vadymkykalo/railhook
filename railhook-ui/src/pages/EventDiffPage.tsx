@@ -18,8 +18,6 @@ import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
 import { formatDateTime, formatRelativeTime } from '../lib/date';
 
-// ── Searchable event picker ─────────────────────────────────────────
-
 interface EventPickerProps {
   label: string;
   events: EventResponse[];
@@ -31,7 +29,6 @@ interface EventPickerProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   loading: boolean;
-  /** The caught error from the last event fetch, if it failed. */
   error?: unknown;
   onRetry: () => void;
   totalElements: number;
@@ -58,8 +55,7 @@ function EventPicker({
     <div className="space-y-1.5" ref={wrapperRef}>
       <span className="mono-label">{label}</span>
       <div className="relative">
-        {/* A div, not a <button>: it hosts a real nested clear-button, and HTML
-            forbids interactive content inside <button>. */}
+        {/* A div, not a <button>: HTML forbids the nested clear-button inside one. */}
         <div
           role="button"
           tabIndex={0}
@@ -169,8 +165,6 @@ function EventPicker({
     </div>
   );
 }
-
-// ── Page ────────────────────────────────────────────────────────────
 
 export default function EventDiffPage() {
   const { t } = useTranslation();
@@ -334,8 +328,6 @@ export default function EventDiffPage() {
     />
   ) : (
     <ResultFrame
-      // Two events that differ are not "broken", but a drift between them is
-      // the thing a reader came to notice, so it reads as attention-needed.
       kind={summary.total === 0 ? 'ok' : 'retry'}
       statusLabel={summary.total === 0
         ? t('eventDiff.noDiffsTitle')

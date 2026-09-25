@@ -22,14 +22,6 @@ import {
 } from '../lib/webhookSignature';
 import { Band, PageIntro, SectionHeading } from './landing/primitives';
 
-/**
- * A free webhook signature verifier: paste a body, a secret and the signature header, and see
- * whether they match — and what the signature should have been when they do not.
- *
- * Like the tester, it is a first use of Railhook before an account, and something people search
- * for. Unlike the tester it needs no server: the HMAC runs in the browser, which is what makes it
- * reasonable to paste a real secret into it, so the page says that before anything else.
- */
 const PATH = '/tools/webhook-signature';
 
 const EXAMPLE_PAYLOAD = '{"id":"evt_1Q2w3E4r","type":"invoice.paid","data":{"amount":4200,"currency":"eur"}}';
@@ -46,7 +38,6 @@ type HeaderValues = Record<Provider, Record<string, string>>;
 
 const EMPTY_HEADERS = Object.fromEntries(PROVIDERS.map((p) => [p.id, {}])) as HeaderValues;
 
-/** "5 minutes ago", "in 2 hours": the largest unit that keeps the number readable. */
 function relativeTime(ageSeconds: number, language: string): string {
   const format = new Intl.RelativeTimeFormat(language, { numeric: 'auto' });
   const abs = Math.abs(ageSeconds);
@@ -290,8 +281,7 @@ export default function SignatureVerifierPage() {
                 spellCheck={false}
                 rows={8}
                 aria-describedby={field('payload-hint')}
-                // 16px on a phone: iOS Safari zooms into any focused field smaller than that,
-                // and a zoomed page is a page the reader then has to pan back.
+                // 16px on a phone: iOS Safari zooms into any focused field smaller than that.
                 className="font-mono text-base sm:text-[13px]"
               />
               <p id={field('payload-hint')} className="text-xs text-muted-foreground">{t('webhookSignature.payloadHint')}</p>

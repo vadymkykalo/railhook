@@ -21,8 +21,7 @@ vi.mock('../../api/projects.api', () => ({
   projectsApi: { get: vi.fn(), list: vi.fn() },
 }));
 
-// The page loads endpoints and transformations to fill the action pickers. Without these the
-// whole load rejects and every assertion below would pass against an error state.
+// Without these mocks the load rejects and every assertion passes against an error state.
 vi.mock('../../api/endpoints.api', () => ({
   endpointsApi: { list: vi.fn().mockResolvedValue([]) },
 }));
@@ -33,18 +32,6 @@ vi.mock('../../api/transformations.api', () => ({
 import RulesPage from '../RulesPage';
 import { rulesApi } from '../../api/rules.api';
 import { projectsApi } from '../../api/projects.api';
-
-/**
- * Rules decide what happens to an event before anything is delivered, and one of the four
- * actions is DROP.
- *
- * <p>That is the whole reason this page is worth a test. A rule that routes to the wrong
- * endpoint produces a delivery somebody can see and complain about; a rule that drops produces
- * nothing at all — no delivery, no attempt, no failure — and the customer's report is "we never
- * got the webhook", which looks like every other cause. So what is pinned here is that the page
- * says out loud which rules drop, that a rule is never toggled or deleted by accident, and that
- * the search narrows the list rather than the list being what the API returned.
- */
 
 const now = new Date('2026-08-01T00:00:00Z').toISOString();
 
@@ -128,7 +115,6 @@ describe('RulesPage', () => {
     renderRules();
 
     expect(await screen.findByText('Route payments')).toBeInTheDocument();
-    // The pattern is the half a reader checks first: which events this touches at all.
     expect(screen.getByText('payment.*')).toBeInTheDocument();
     expect(within(rowFor('Route payments')).getByText('https://example.com/hook')).toBeInTheDocument();
   });
@@ -137,7 +123,6 @@ describe('RulesPage', () => {
     renderRules();
 
     await screen.findByText('Discard test traffic');
-    // Whatever the wording, a dropping rule may not read as a rule that does nothing.
     const row = rowFor('Discard test traffic');
     expect(row.textContent).toMatch(/drop|відкид/i);
     expect(row.textContent).not.toMatch(/rules\.actionTypes/);
@@ -184,8 +169,6 @@ describe('RulesPage', () => {
   });
 
   it('shows an error state rather than an empty rule list when the load fails', async () => {
-    // An empty list here reads as "no rule touches your events", which is the opposite of
-    // what an unknown state means when a DROP rule might be among them.
     vi.mocked(rulesApi.list).mockRejectedValue(new Error('boom'));
     renderRules();
 

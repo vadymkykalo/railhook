@@ -1,36 +1,22 @@
 import { useMemo } from 'react';
 import { cn } from '../lib/utils';
 
-/**
- * The attempt rail.
- *
- * A retry ladder is not a progress bar: the waits between attempts grow
- * exponentially (1m → 5m → 15m → 1h → 6h → 24h), so attempt 6 sits a day away
- * from attempt 1 while attempts 1–3 crowd into the first quarter hour. Placing
- * the ticks evenly would draw a schedule the product does not actually run, so
- * they are placed on a log scale of their delay and the crowding is the point.
- *
- * Used inline in a delivery row, and full-width on a delivery's detail view.
- */
+/** Ticks on a log scale of delay: retry waits grow exponentially, and the crowding is the point. */
 
 export type AttemptOutcome = 'ok' | 'failed' | 'pending' | 'scheduled';
 
 export interface RailAttempt {
-  /** 1-based attempt number. */
   number: number;
   outcome: AttemptOutcome;
-  /** Minutes waited before this attempt was made. Attempt 1 is 0. */
   delayMinutes: number;
-  /** HTTP status the attempt resolved to, when it resolved to one. */
   code?: number;
 }
 
 interface AttemptRailProps {
   attempts: RailAttempt[];
-  /** Rungs the ladder has in total, so an unfinished ladder shows what is left. */
   maxAttempts?: number;
   size?: 'inline' | 'full';
-  /** Screen-reader description; callers own the wording so it stays translated. */
+  /** Callers own the wording so it stays translated. */
   ariaLabel: string;
   className?: string;
 }
@@ -42,7 +28,6 @@ const OUTCOME_COLOR: Record<AttemptOutcome, string> = {
   scheduled: 'hsl(var(--rail))',
 };
 
-/** Log placement, with attempt 1 pinned to the left edge. */
 function positionOf(delayMinutes: number, span: number): number {
   if (delayMinutes <= 0) return 0;
   return Math.log1p(delayMinutes) / Math.log1p(span);
@@ -71,7 +56,6 @@ export default function AttemptRail({
 
   const { ticks, span } = useMemo(() => {
     const rungs = Math.max(maxAttempts ?? attempts.length, attempts.length, 2);
-    // The ladder this product ships: doubling-ish waits out to a day.
     const ladder = [0, 1, 5, 15, 60, 360, 1440, 2880];
     const all: RailAttempt[] = [...attempts];
     for (let n = attempts.length + 1; n <= rungs; n++) {
@@ -85,7 +69,6 @@ export default function AttemptRail({
     return { ticks: all, span: maxDelay };
   }, [attempts, maxAttempts]);
 
-  // The rail is drawn as far as the ladder has actually been walked.
   const lastRealIndex = attempts.length - 1;
   const progressX =
     lastRealIndex >= 0
@@ -102,7 +85,6 @@ export default function AttemptRail({
       className={cn(full && 'w-full', className)}
       style={full ? { maxWidth: width } : undefined}
     >
-      {/* The unwalked remainder of the ladder */}
       <line
         x1={padX}
         y1={baselineY}
@@ -112,7 +94,6 @@ export default function AttemptRail({
         strokeWidth={1}
         strokeDasharray="2 3"
       />
-      {/* The part that has been walked */}
       <line
         x1={padX}
         y1={baselineY}

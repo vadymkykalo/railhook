@@ -7,7 +7,6 @@ import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'ax
 import { http } from '../../api/http';
 import { destinationAfterSignIn } from '../../lib/signInDestination';
 
-/** The app's own QueryClient, as the page under the router sees it. */
 const seen = vi.hoisted(() => ({ queryClient: null as QueryClient | null }));
 
 vi.mock('../../router', async () => {
@@ -39,7 +38,6 @@ const STORED_USER = {
 
 type Call = { url: string; authorization: unknown };
 
-/** Answers a URL with a status; everything else answers 200 and the refresh hands out 'restored'. */
 let overrides: Record<string, number> = {};
 
 describe('App session', () => {

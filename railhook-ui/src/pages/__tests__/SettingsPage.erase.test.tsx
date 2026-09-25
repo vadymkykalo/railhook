@@ -27,11 +27,6 @@ import SettingsPage from '../SettingsPage';
 import { authApi } from '../../api/auth.api';
 import { showApiError, showSuccess } from '../../lib/toast';
 
-/**
- * The right to erasure, reachable by the person who holds it. What these cover is the guard
- * rather than the happy path: an irreversible action that can be reached by one click is one
- * people reach by accident.
- */
 describe('SettingsPage — erasing your account', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,9 +72,7 @@ describe('SettingsPage — erasing your account', () => {
   });
 
   it('does not sign the person out when the erasure was refused', async () => {
-    // The 409 — last owner of an organization other people still belong to — means nothing has
-    // been erased. Signing them out anyway would strand them outside an account that still
-    // exists, with an error they can no longer read.
+    // A 409 erased nothing, so signing out would strand them outside a live account.
     const user = userEvent.setup();
     vi.mocked(authApi.eraseOwnAccount).mockRejectedValue({
       response: { data: { message: 'You are the last owner of an organization that still has other members.' } },
@@ -93,7 +86,6 @@ describe('SettingsPage — erasing your account', () => {
 
     await waitFor(() => expect(showApiError).toHaveBeenCalled());
     expect(showSuccess).not.toHaveBeenCalled();
-    // Still on the settings page, still signed in.
     expect(screen.getAllByRole('button', { name: /erase my account/i }).length).toBeGreaterThan(0);
   });
 

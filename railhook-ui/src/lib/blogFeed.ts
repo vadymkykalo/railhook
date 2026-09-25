@@ -1,21 +1,13 @@
-/**
- * The blog's RSS feed, as text.
- *
- * Split out from the `blogRss()` plugin in `vite.config.ts` so the feed can be asserted on
- * without running a build: the plugin does the file reading and the emitting, this decides what
- * the XML says. Nothing here touches the filesystem or the DOM.
- */
+/** Split from the vite plugin so the XML can be tested without a build; no fs or DOM here. */
 
 export interface FeedItem {
   slug: string;
   title: string;
   description: string;
-  /** `YYYY-MM-DD`. */
   date: string;
   author?: string;
 }
 
-/** Five characters, because a title with an ampersand in it must not break the document. */
 export function escapeXml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -25,25 +17,17 @@ export function escapeXml(value: string): string {
     .replace(/'/g, '&apos;');
 }
 
-/** A front-matter date as the RFC 822 stamp RSS wants, read as UTC so it never shifts a day. */
+/** Read as UTC so it never shifts a day. */
 export function rfc822(date: string): string {
   return new Date(`${date}T00:00:00Z`).toUTCString();
 }
 
-/**
- * `site` is an origin with no trailing slash. At build time it is the placeholder nginx
- * substitutes with the container's RAILHOOK_SITE_URL, for the same reason the sitemap and every
- * canonical carry it: the image is built once for every deployment.
- *
- * One feed, in English. The site serves one URL per page in both languages and chooses the
- * language in the browser, so there is no second set of URLs a second feed could point at.
- */
+/** `site` is the placeholder nginx swaps for RAILHOOK_SITE_URL: one image serves every deployment. */
 export function renderFeed(site: string, items: FeedItem[]): string {
   const newest = items[0]?.date;
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    // `dc:creator` is how a feed reader shows a byline; RSS 2.0's own `<author>` is an email
-    // address, and the author of these posts does not want one published.
+    // dc:creator, not <author>: RSS author is an email address, and none is published.
     '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">',
     '  <channel>',
     '    <title>Railhook blog</title>',

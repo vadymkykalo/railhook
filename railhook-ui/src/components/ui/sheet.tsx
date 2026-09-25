@@ -13,8 +13,6 @@ const SheetClose = SheetPrimitive.Close
 
 const SheetPortal = SheetPrimitive.Portal
 
-/* Same scrim as Dialog and AlertDialog: `bg-foreground/30`, matching the
-   mobile-sidebar scrim in AppLayout. See dialog.tsx for why not black. */
 const SheetOverlay = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>

@@ -4,12 +4,6 @@ import i18n from '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ProjectResponse, EndpointResponse } from '../../types/api.types';
 
-// Regression test: DeliveriesPage used to render its status-filter
-// options and status badges as raw hardcoded English (`{ value: '', label:
-// 'All Statuses' }`, `{status}`) instead of going through i18n — so switching
-// the dashboard to Ukrainian left this page half-translated. This asserts a
-// status badge and a filter option are actually translated in both locales.
-
 vi.mock('../../api/projects.api', () => ({
   projectsApi: { get: vi.fn(), list: vi.fn() },
 }));
@@ -94,10 +88,7 @@ describe('DeliveriesPage i18n', () => {
     renderDeliveries();
 
     expect(await screen.findByText('Success')).toBeInTheDocument();
-    // The status <Select> is a closed Radix combobox in tests — its trigger
-    // shows the currently selected option's translated label ("" -> "All
-    // Statuses" / "Усі статуси"), which is what a user actually sees without
-    // opening the dropdown.
+    // The Radix select stays closed in jsdom; its trigger shows the selected option's label.
     expect(screen.getByRole('combobox', { name: /status/i })).toHaveTextContent('All Statuses');
   });
 
@@ -107,7 +98,6 @@ describe('DeliveriesPage i18n', () => {
 
     expect(await screen.findByText('Успіх')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: /статус/i })).toHaveTextContent('Усі статуси');
-    // The raw English default value must not leak through when translated.
     expect(screen.queryByText('SUCCESS')).not.toBeInTheDocument();
   });
 });

@@ -7,13 +7,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 
-/**
- * URLs the product hands to people are public origins, never names from inside the stack.
- *
- * Production showed a test endpoint as `http://api:8080/hook/x52thd04`: the Compose default for
- * TEST_ENDPOINT_BASE_URL was the API's container name, which resolves only on the Docker network,
- * so the URL someone copied into curl or a provider dashboard could never receive a request.
- */
+/** A Compose default once made test endpoints http://api:8080/..., unreachable outside Docker. */
 describe('public URLs follow the public origin', () => {
   const compose = read('docker-compose.yml');
   const envDist = read('.env.dist');

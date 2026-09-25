@@ -1,17 +1,4 @@
-/**
- * The Markdown a blog post is written in, read into data the article page renders.
- *
- * Plain data rather than HTML, so `react/no-danger` stays an error across the app.
- *
- * The subset, and nothing else:
- *   `## h2` / `### h3`      — each gets an id, which is what the table of contents links to
- *   ```lang … ```           — a fenced code block, highlighted by `SyntaxHighlight`
- *   `> quote`               — a pull quote
- *   `| a | b |` + `|---|`   — a table with a header row
- *   `- item` / `1. item`    — lists, one level
- *   `:::figure key`         — the figure registered under `key` in `components/blog/figures.tsx`
- *   inline                  — `**strong**`, `*em*`, `` `code` ``, `[text](href)`, `![alt](src)`
- */
+/** Plain data rather than HTML, so react/no-danger stays an error across the app. */
 
 export type Inline =
   | { type: 'text'; value: string }
@@ -38,9 +25,7 @@ export type Block =
 
 export interface Document {
   blocks: Block[];
-  /** Every `##` and `###`, in document order, for the table of contents. */
   headings: Heading[];
-  /** Words of prose, code blocks excluded — what the reading time is estimated from. */
   words: number;
 }
 
@@ -53,10 +38,7 @@ const FIGURE = /^:::figure\s+([A-Za-z0-9-]+)\s*$/;
 const TABLE_ROW = /^\|(.*)\|\s*$/;
 const TABLE_RULE = /^\|[\s:|-]+\|\s*$/;
 
-/**
- * A heading's anchor. Latin letters, digits and dashes only, so a Ukrainian heading still gets a
- * usable id — the Cyrillic is dropped and the position keeps it unique.
- */
+/** Latin letters only, so a Ukrainian heading still gets a usable id; the index keeps it unique. */
 export function slugify(text: string, index: number): string {
   const base = text
     .toLowerCase()
@@ -66,7 +48,6 @@ export function slugify(text: string, index: number): string {
   return base || `section-${index + 1}`;
 }
 
-/** Pushes text onto the list, merging with a text node already at its end. */
 function pushText(out: Inline[], value: string) {
   if (!value) return;
   const last = out[out.length - 1];
@@ -74,7 +55,6 @@ function pushText(out: Inline[], value: string) {
   else out.push({ type: 'text', value });
 }
 
-/** A link target a post may point at: this site, another site, or an anchor on the page. */
 function safeHref(href: string): string | null {
   const value = href.trim();
   if (/^https?:\/\//i.test(value)) return value;
@@ -139,7 +119,6 @@ export function parseInline(source: string): Inline[] {
       }
     }
 
-    // Plain text up to the next character that could open something.
     const next = rest.slice(1).search(/[`*[!]/);
     const length = next === -1 ? rest.length : next + 1;
     pushText(out, rest.slice(0, length));
@@ -155,7 +134,6 @@ function cells(row: string): Inline[][] {
     .map((cell) => parseInline(cell.trim()));
 }
 
-/** Words in a run of inline nodes, for the reading-time estimate. */
 function countWords(nodes: Inline[]): number {
   return nodes.reduce((total, node) => {
     switch (node.type) {
@@ -214,9 +192,7 @@ export function parseMarkdown(source: string): Document {
     if (heading) {
       flushParagraph();
       const level = heading[1].length === 2 ? 2 : 3;
-      // Two headings can reduce to the same slug, most easily in Ukrainian, where only the Latin
-      // words survive: "Скільки Railhook пробує?" and "Що Railhook гарантує?" are both "railhook".
-      // The second then numbers itself, or the contents would link twice to the first.
+      // Two headings can reduce to one slug (Ukrainian keeps only Latin words), so the second numbers itself.
       const slug = slugify(heading[2], headings.length);
       let id = slug;
       for (let n = 2; headings.some((h) => h.id === id); n++) id = `${slug}-${n}`;
@@ -258,7 +234,6 @@ export function parseMarkdown(source: string): Document {
       while (i < lines.length && (BULLET.test(lines[i]) || ORDERED.test(lines[i]))) {
         const match = ordered ? ORDERED.exec(lines[i])! : BULLET.exec(lines[i])!;
         const text = [match[1]];
-        // A wrapped bullet continues on an indented line.
         while (/^\s+\S/.test(lines[i + 1] ?? '')) {
           text.push(lines[i + 1].trim());
           i += 1;

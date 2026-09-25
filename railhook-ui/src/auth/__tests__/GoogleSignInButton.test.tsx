@@ -5,10 +5,6 @@ import { MemoryRouter } from 'react-router-dom';
 import GoogleSignInButton from '../GoogleSignInButton';
 import { authApi } from '../../api/auth.api';
 
-/**
- * The button is a promise that Google sign-in works here, so it must appear only where the API says
- * it is configured — and the error Google's round trip came back with has to reach the person.
- */
 describe('GoogleSignInButton', () => {
   beforeEach(() => {
     vi.restoreAllMocks();

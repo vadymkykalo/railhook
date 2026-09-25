@@ -20,10 +20,6 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
 
-/**
- * The organization form. Everything a customer owns hangs off exactly one
- * Organization, so this page is where its name, its people and its ending live.
- */
 export default function OrgSettingsPage() {
   const { t } = useTranslation();
   const { user, updateUser } = useAuth();
@@ -87,8 +83,7 @@ export default function OrgSettingsPage() {
     );
   }
 
-  // The danger zone spells out what deleting costs from these two counts. A
-  // failed fetch would render that as "0 projects, 0 members" — an invitation.
+  // A failed fetch would read as "0 projects, 0 members" in the danger zone.
   if (membersFailed || projectsFailed) {
     return (
       <div className="p-4 lg:p-6">
@@ -245,11 +240,6 @@ function GdprExportSection({ orgId }: { orgId: string }) {
   );
 }
 
-/**
- * The one action on this page that cannot be undone, kept away from the fields
- * that can. Confirmation runs through DangerConfirmDialog like every other
- * destructive action in the product, so the ritual is always the same one.
- */
 function DangerZone({
   orgId, orgName, projectCount, memberCount,
 }: {

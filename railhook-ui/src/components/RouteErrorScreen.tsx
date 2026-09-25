@@ -3,12 +3,7 @@ import { isRouteErrorResponse, useRouteError } from 'react-router-dom';
 import { ErrorFallback } from './ErrorBoundary';
 import { isStaleChunkError, reloadOnceForStaleChunk } from '../lib/staleChunkReload';
 
-/**
- * The router's `errorElement`. Without one, a route that failed to load — most often a lazy page
- * whose chunk the latest deploy replaced — rendered React Router's bare "Unexpected Application
- * Error!", on the public pages too. A stale chunk gets one reload; anything else, or a reload that
- * did not help, gets the app's own error screen.
- */
+/** Without an errorElement a stale lazy chunk showed React Router's bare error page. */
 export default function RouteErrorScreen() {
   const error = useRouteError();
   const stale = isStaleChunkError(error);

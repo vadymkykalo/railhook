@@ -24,12 +24,6 @@ const STORED: CurrentUserResponse = {
   platformAdmin: false,
 };
 
-/**
- * The layout asks the server who the person is on every navigation, and used to keep the answer
- * only when the account status or the platform-admin flag had changed. A demotion, or an
- * organization switched in another tab, left the stored copy — and every role check that reads
- * it — describing someone the server no longer recognised.
- */
 describe('the signed-in user the layout keeps', () => {
   beforeEach(() => {
     vi.clearAllMocks();

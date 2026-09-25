@@ -1,13 +1,7 @@
 import { Trans, useTranslation } from 'react-i18next';
 import { hasImpossibleTld, suggestEmail } from '../lib/emailTypos';
 
-/**
- * "Did you mean …?" under an address field, with the likely address as the one-click fix.
- *
- * Two voices, matching the two strengths in `emailTypos`: an ending that can never receive mail
- * is an alert, and the form it sits in refuses to submit it; a near miss of a popular domain is
- * a quiet hint, because it might be real.
- */
+/** An impossible ending is an alert that blocks submit; a near miss is a hint, since it might be real. */
 export default function EmailSuggestion({
   email, onAccept, id,
 }: {

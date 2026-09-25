@@ -13,7 +13,7 @@ function getLocale(): string {
 }
 
 export function getStoredTimezone(): string {
-  // canonicalTimezone: Chromium still reports Ukraine as the renamed `Europe/Kiev`.
+  // Chromium still reports Ukraine as the renamed Europe/Kiev.
   return canonicalTimezone(localStorage.getItem(TZ_STORAGE_KEY) || Intl.DateTimeFormat().resolvedOptions().timeZone);
 }
 
@@ -25,9 +25,6 @@ function tzOption(): { timeZone: string } {
   return { timeZone: getStoredTimezone() };
 }
 
-/**
- * Full date + time: "Feb 19, 2025, 2:30:15 PM" / "19 лют. 2025 р., 14:30:15"
- */
 export function formatDateTime(dateString: string): string {
   return new Date(dateString).toLocaleString(getLocale(), {
     ...tzOption(),
@@ -40,9 +37,6 @@ export function formatDateTime(dateString: string): string {
   });
 }
 
-/**
- * Short date + time (no seconds): "Feb 19, 2025, 2:30 PM"
- */
 export function formatDateTimeShort(dateString: string): string {
   return new Date(dateString).toLocaleString(getLocale(), {
     ...tzOption(),
@@ -54,9 +48,6 @@ export function formatDateTimeShort(dateString: string): string {
   });
 }
 
-/**
- * Date only: "Feb 19, 2025" / "19 лют. 2025 р."
- */
 export function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString(getLocale(), {
     ...tzOption(),
@@ -66,9 +57,6 @@ export function formatDate(dateString: string): string {
   });
 }
 
-/**
- * Short date + time (no year): "Feb 19, 2:30:15 PM" — for audit logs, etc.
- */
 export function formatDateTimeCompact(dateString: string): string {
   return new Date(dateString).toLocaleString(getLocale(), {
     ...tzOption(),
@@ -80,9 +68,6 @@ export function formatDateTimeCompact(dateString: string): string {
   });
 }
 
-/**
- * Time only: "14:30" — for chart axes
- */
 export function formatTime(dateString: string): string {
   return new Date(dateString).toLocaleTimeString(getLocale(), {
     ...tzOption(),
@@ -91,11 +76,6 @@ export function formatTime(dateString: string): string {
   });
 }
 
-/**
- * Relative time: "just now", "5m ago", "2h ago", "3d ago"
- * Falls back to formatted date for >7 days.
- * Uses i18n translation keys from `relativeTime.*`.
- */
 export function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
@@ -115,10 +95,6 @@ export function formatRelativeTime(dateString: string): string {
   return formatDate(dateString);
 }
 
-/**
- * Relative future time: "in 30s", "in 5m", "in 2h"
- * For past dates, falls back to formatRelativeTime.
- */
 export function formatRelativeFuture(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
@@ -138,9 +114,6 @@ export function formatRelativeFuture(dateString: string): string {
   return formatDateTime(dateString);
 }
 
-/**
- * Locale-aware number formatting: 1234567 → "1,234,567" / "1 234 567"
- */
 export function formatNumber(value: number): string {
   return value.toLocaleString(getLocale());
 }

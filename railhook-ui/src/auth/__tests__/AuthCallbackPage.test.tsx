@@ -17,10 +17,6 @@ const USER = {
   platformAdmin: false,
 } as unknown as CurrentUserResponse;
 
-/**
- * The last step of "Continue with Google": a one-time code in the URL becomes a session, the same
- * way the login form's answer does, and the person lands where they were going.
- */
 describe('AuthCallbackPage', () => {
   let login: Mock<AuthState['login']>;
 

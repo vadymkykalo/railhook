@@ -6,27 +6,7 @@ import { RailhookIcon } from '../components/icons/RailhookIcon';
 import AttemptRail from '../components/AttemptRail';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
-/**
- * One shell for all seven auth screens, which each used to draw their own.
- *
- * The left panel shows the product's actual material — a signed request and the
- * ladder it was delivered on — rather than a gradient and three adjectives. It
- * is the first thing a developer sees, and a real signature header says more
- * about what this is than any tagline.
- */
-
-/**
- * The headers a real outgoing attempt carries, copied from
- * OutgoingAttemptStore: X-Signature, X-Event-Id, X-Delivery-Id, X-Timestamp,
- * X-Sequence-Number, Idempotency-Key. The signature format is
- * `t=<unix-ms>,v1=<hex>` from WebhookSignatureUtils.buildSignatureHeader.
- *
- * This panel used to invent `x-railhook-signature: sha256=…` and
- * `x-railhook-attempt: 4 of 8` — headers the product does not send, in a
- * format the docs teach differently, over an attempt count the outgoing ladder
- * does not have. It is the first thing a developer sees on all seven auth
- * screens; a fabricated wire format is the most expensive kind of wrong.
- */
+/** Real headers, as OutgoingAttemptStore sends them; an invented format is the costliest kind of wrong. */
 const SAMPLE = [
   ['POST', '/webhooks/orders'],
   ['host', 'api.acme.com'],

@@ -8,9 +8,7 @@ const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap border border-transparent text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
-      // The foregrounds are tokens, not `text-white`: on the ink panel and in
-      // dark mode --halt / --ok lighten, and their paired *-foreground tokens
-      // darken with them. Hardcoded white went unreadable there.
+      // Token foregrounds, not text-white: --halt/--ok lighten on ink and dark mode.
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary-hover",
         destructive: "bg-halt text-destructive-foreground hover:bg-halt/90",
@@ -44,13 +42,7 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, isLoading = false, disabled, children, ...props }, ref) => {
-    // Slot requires exactly one element child. Rendering
-    // `{isLoading && <Loader2/>}{children}` handed it two — `false` and the
-    // element — so every `asChild` call site white-screened with "Slot failed
-    // to slot onto its children", whether or not anything was loading. The
-    // spinner belongs to the <button> branch, which is the only branch that
-    // owns its own markup; asChild passes the caller's element through
-    // untouched.
+    // Slot needs exactly one child, so the spinner lives only in the <button> branch.
     if (asChild) {
       return (
         <Slot className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props}>

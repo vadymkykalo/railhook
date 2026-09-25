@@ -32,7 +32,6 @@ import Callout from '../components/Callout';
 import { formatJson } from '../lib/json';
 
 
-/** Verification is the incoming direction's status: did this really come from the source. */
 function verificationOf(event: IncomingEventResponse): { kind: StatusKind; key: string } {
   if (event.verified === true) return { kind: 'ok', key: 'incomingEvents.verified' };
   if (event.verified === false) return { kind: 'halt', key: 'incomingEvents.failed' };
@@ -40,12 +39,6 @@ function verificationOf(event: IncomingEventResponse): { kind: StatusKind; key: 
 }
 
 
-/**
- * Incoming events are the same table as outgoing events, read from the other
- * end: a Source instead of an Endpoint, a Forward instead of a Delivery. The
- * row components are shared with the outgoing side on purpose — a person should
- * not have to learn two tables to answer the same question twice.
- */
 export default function IncomingEventsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
@@ -89,7 +82,6 @@ export default function IncomingEventsPage() {
   } = useIncomingEventAttempts(projectId, selectedEventId ?? undefined);
   const attempts = useMemo(() => attemptsPage?.content ?? [], [attemptsPage]);
 
-  /** Attempts belong to a Forward — one obligation per destination — so they group by it. */
   const forwards = useMemo(() => {
     const byDestination = new Map<string, IncomingForwardAttemptResponse[]>();
     for (const attempt of attempts) {
@@ -418,13 +410,7 @@ export default function IncomingEventsPage() {
                                     {t('incomingEvents.detail.nextRetry', { time: formatDateTime(attempt.nextRetryAt) })}
                                   </p>
                                 )}
-                                {/* What we sent, not only what came back. The Forward's request
-                                    headers and body are recorded server-side — masked through
-                                    HeaderSanitizer and truncated there — and showing them is what
-                                    brings debugging a Forward level with debugging a Delivery,
-                                    which has shown both for as long as it has existed. Collapsed
-                                    by default: the response is what a reader looks at first, and
-                                    "what did we send them" is the second question. */}
+                                {/* Collapsed: the response is what a reader looks at first. */}
                                 {attempt.requestHeadersJson && (
                                   <details className="mt-1.5">
                                     <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground">

@@ -4,17 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/button';
 import { useAuth } from '../auth/auth.store';
 
-/**
- * Reached from inside the admin shell and from the open web, so it never
- * renders an h1 the layout would duplicate, and it names the path that missed.
- */
+/** Never renders an h1: inside the admin shell the layout already has one. */
 export default function NotFoundPage() {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
-  // Was reading localStorage['auth_token'], a key nothing in this codebase ever writes —
-  // the session is auth_user plus a token held in memory. So this was always false, and a
-  // signed-in user who mistyped a path inside the dashboard was offered the marketing site.
   const { isAuthenticated } = useAuth();
 
   return (

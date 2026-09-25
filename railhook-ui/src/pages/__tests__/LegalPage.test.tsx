@@ -10,11 +10,6 @@ import { PrivacyPage, TermsPage } from '../LegalPage';
 const uiRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p: string) => readFileSync(join(uiRoot, p), 'utf8');
 
-/**
- * Google publishes the "Continue with Google" consent screen only with a privacy policy and a
- * terms of service link on it, and the registration form asks people to agree to both. Neither
- * page existed.
- */
 describe('legal pages', () => {
   it('the privacy policy renders, with the statements Google requires of it', async () => {
     renderPage(<PrivacyPage />, { path: '/privacy', initialEntry: '/privacy' });

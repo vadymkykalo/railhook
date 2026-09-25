@@ -11,7 +11,6 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../../components/ui/dialog';
 
-/** Everything, whatever the project sends now or later. */
 export const ALL_EVENT_TYPES = '**';
 
 /** The API's own rule for an event type, wildcards included. */
@@ -20,9 +19,7 @@ const EVENT_TYPE_PATTERN = /^(\*{1,2}|[a-z][a-z0-9_]*)(\.([a-z][a-z0-9_]*|\*{1,2
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** What the session says this project sends. */
   eventTypes: string[];
-  /** Present when editing; absent when registering a new endpoint. */
   endpoint?: PortalEndpointResponse;
   saving: boolean;
   onSubmit: (data: PortalEndpointRequest) => void;

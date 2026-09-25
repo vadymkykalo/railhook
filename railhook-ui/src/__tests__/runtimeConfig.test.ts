@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** Every character a RegExp treats specially, backslash included. */
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -19,19 +18,7 @@ const SNIPPET = '/etc/nginx/snippets/security-headers.conf';
 const PLACEHOLDER = 'https://site-url.railhook.invalid';
 const TURNSTILE = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
-/**
- * What differs between deployments is a property of the container, not of the image.
- *
- * The published image is built once and runs both railhook.io and every self-hosted install.
- * The contact domain, the public origin and the registration challenge used to be VITE_ values
- * inlined at build time, so railhook.io ran a second, hand-built image — and `railhook upgrade`
- * moved the API to the new release while that image stayed a release behind.
- *
- * So the UI container writes `window.__RAILHOOK__` at startup, nginx serves it as /config.js,
- * and index.html loads it before the app; the origin also reaches nginx, which substitutes it
- * for the placeholder the build leaves in the HTML, the sitemaps and robots.txt. Each hop is
- * asserted here, because any one missing fails silently.
- */
+/** Per-deployment values live in the container, not the image; every hop fails silently if missing. */
 
 type Config = {
   contactDomain?: string;
@@ -50,7 +37,6 @@ const EMPTY: Config = {
   publicDemo: false, publicBlog: false,
 };
 
-/** Runs the entrypoint script as the container would, and evaluates what it wrote. */
 function runEntrypoint(env: Record<string, string | undefined>) {
   const dir = mkdtempSync(join(tmpdir(), 'railhook-runtime-config-'));
   const out = join(dir, 'railhook-config.js');
@@ -70,7 +56,6 @@ function runEntrypoint(env: Record<string, string | undefined>) {
   return { status: result.status, stdout: result.stdout, stderr: result.stderr, js, siteConf, config: window.__RAILHOOK__ };
 }
 
-/** The snippet's origin line; the blog switch follows it on a line of its own. */
 const originLine = (siteConf: string) => siteConf.split('\n')[0];
 
 function locationBody(conf: string, head: string): string | undefined {
@@ -236,11 +221,6 @@ describe('live demo', () => {
   });
 });
 
-/**
- * The blog is railhook.io's own content. The image carries it because railhook.io runs the same
- * image as every self-hosted install, so it is off unless the deployment turns it on — in the
- * page, which hides the links, and in nginx, which answers 404 for the pages and the feed.
- */
 describe('blog', () => {
   it('is off by default, in the page and in nginx', () => {
     const { config, siteConf, stdout } = runEntrypoint({});
@@ -316,8 +296,7 @@ describe('nginx serves the runtime config', () => {
   const body = locationBody(conf, '= /config.js');
 
   it('from the file the entrypoint wrote, in an exact-match location', () => {
-    // Exact match, so it wins over the static-file regex and over the build-time
-    // public/config.js that dist/ also carries.
+    // Exact match wins over the static regex and the build's placeholder config.js.
     expect(body, 'location = /config.js').toBeDefined();
     expect(body).toMatch(new RegExp(`^\\s*alias\\s+${escapeRegExp(OUT)};`, 'm'));
   });
@@ -382,8 +361,7 @@ describe('the build leaves the placeholder origin, and nothing else, where an or
   });
 
   it('the prerender strips the CSP it rendered, so it cannot intersect with the real one', () => {
-    // Baked into static HTML, the prerender's policy has no CAPTCHA origin; a browser enforcing
-    // it alongside the one the page writes from the real config would block the widget.
+    // The prerender's CSP has no CAPTCHA origin and would be intersected with the real one.
     expect(read('railhook-ui/scripts/prerender.mjs')).toMatch(/meta\[http-equiv="Content-Security-Policy"\][^\n]*remove\(\)/);
   });
 });
@@ -406,7 +384,6 @@ describe('the page loads the runtime config before the app', () => {
   });
 });
 
-/** Cross-file contract: the deployment files must hand the container these names. */
 describe('status page link', () => {
   it('carries an https status page address into the config', () => {
     const { config } = runEntrypoint({ RAILHOOK_STATUS_PAGE_URL: ' https://status.railhook.io ' });
@@ -444,9 +421,7 @@ describe('the settings reach the container', () => {
   });
 
   it('APP_BASE_URL defaults to where Compose publishes the dashboard, not the Vite dev server', () => {
-    // It defaulted to localhost:5173, which is `npm run dev`. `make up` publishes the ui container
-    // on RAILHOOK_PORT (80), so every verification, reset and invite link a local stack mailed
-    // pointed at a port nothing listened on. install.sh writes the real address either way.
+    // localhost:5173 is `npm run dev`; `make up` serves on RAILHOOK_PORT.
     const api = compose.slice(compose.indexOf('\n  api:'), compose.indexOf('\n  worker:'));
     expect(read('.env.dist')).toMatch(/^APP_BASE_URL=http:\/\/localhost$/m);
     expect(api).toMatch(/^\s+APP_BASE_URL: \$\{APP_BASE_URL:-http:\/\/localhost\}$/m);

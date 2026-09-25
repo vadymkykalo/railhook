@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 
-// Test the hasMinRole logic directly (extracted from usePermissions)
 type Role = 'OWNER' | 'DEVELOPER' | 'VIEWER';
 
 function hasMinRole(current: Role, required: Role): boolean {

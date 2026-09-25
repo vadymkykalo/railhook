@@ -25,15 +25,6 @@ import type { DeliveryStatusCounts } from '../types/api.types';
 import { useDebounced } from '../hooks/useDebounced';
 
 
-/**
- * What happened to the Deliveries one Event owed.
- *
- * An Event has no status of its own — it exists whether or not anyone was
- * listening — so the only question this page can answer, and the reason it
- * exists, is what became of the Deliveries it created. The event list carries
- * each Event's Delivery counts by status, so every row is exact on any page and
- * for any fan-out.
- */
 type EventStatus = 'delivered' | 'owed' | 'abandoned' | 'unsubscribed';
 
 function deliveredOf(counts: DeliveryStatusCounts | undefined) {
@@ -51,11 +42,7 @@ function statusOf(counts: DeliveryStatusCounts | undefined): EventStatus {
   return 'delivered';
 }
 
-/**
- * Exported for the locale test: a Record over the union means TypeScript
- * guarantees these keys are the complete set of statuses this page can render,
- * so the test does not have to restate them and cannot fall behind.
- */
+/** Exported for the locale test: the Record guarantees these keys are complete. */
 export const STATUS_KIND: Record<EventStatus, StatusKind> = {
   delivered: 'ok',
   owed: 'retry',
@@ -100,8 +87,7 @@ export default function EventsPage() {
 
   const visibleRows = statusFilter ? rows.filter((r) => r.status === statusFilter) : rows;
 
-  // First load only: a search or page change keeps the previous rows (keepPreviousData), so
-  // the search input the user is typing into is not unmounted by a skeleton.
+  // Skeleton on first load only, so the search input is not unmounted while typing.
   const loading = eventsLoading && !eventsData;
   const isError = projectIsError || eventsIsError;
   const retry = () => { refetchProject(); refetchEvents(); };

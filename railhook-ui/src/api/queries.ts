@@ -27,8 +27,6 @@ import { portalApi, type PortalDeliveryFilters } from './portal.api';
 import { mcpAppsApi } from './mcpApps.api';
 import type { ConsumerRequest, PortalEndpointRequest, PortalSessionRequest, EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest, TransformationRequest } from '../types/api.types';
 
-// ─── Query Keys ────────────────────────────────────────────────────
-
 export const queryKeys = {
     publicBin: (slug: string) => ['publicBin', slug] as const,
     platformAdmin: {
@@ -80,8 +78,7 @@ export const queryKeys = {
     mcpConsent: {
         request: (requestId: string) => ['mcp-consent', requestId] as const,
     },
-    // Account-level rather than organization-level: a user's sessions and their organizations
-    // are both things they hold across tenants, so neither key carries an organization.
+    // Account-level: sessions and organizations span tenants, so these keys carry no organization.
     sessions: {
         all: ['auth', 'sessions'] as const,
     },
@@ -153,8 +150,7 @@ export const queryKeys = {
         paged: (projectId: string, page: number, size: number) => ['consumers', projectId, 'paged', page, size] as const,
         endpoints: (projectId: string, consumerId: string) => ['consumers', projectId, consumerId, 'endpoints'] as const,
     },
-    // The portal holds one session per page, so its keys carry no project or consumer: whose
-    // data it is is decided by the token, and a page never sees a second one.
+    // The token decides whose data it is, and a page never sees a second one.
     portal: {
         session: ['portal', 'session'] as const,
         endpoints: ['portal', 'endpoints'] as const,
@@ -162,8 +158,6 @@ export const queryKeys = {
         attempts: (deliveryId: string) => ['portal', 'deliveries', deliveryId, 'attempts'] as const,
     },
 } as const;
-
-// ─── Projects ──────────────────────────────────────────────────────
 
 export function useProjects() {
     return useQuery({
@@ -197,8 +191,6 @@ export function useDeleteProject() {
     });
 }
 
-// ─── Dashboard ─────────────────────────────────────────────────────
-
 export function useDashboardStats(projectId: string | undefined) {
     return useQuery({
         queryKey: queryKeys.dashboard.stats(projectId!),
@@ -224,8 +216,6 @@ export function useOnboardingStatus(projectId: string | undefined) {
         staleTime: 30_000,
     });
 }
-
-// ─── Endpoints ─────────────────────────────────────────────────────
 
 export function useEndpoints(projectId: string | undefined) {
     return useQuery({
@@ -269,11 +259,7 @@ export function useUpdateEndpoint(projectId: string) {
     });
 }
 
-/**
- * Turns an endpoint back on. Separate from `useUpdateEndpoint` because it is a different act:
- * an update resends the whole endpoint, and both pages that toggled through it rebuilt only the
- * four fields they happened to render. This sends nothing and clears the auto-disable server-side.
- */
+/** Not useUpdateEndpoint: an update resends the whole endpoint, and pages rebuilt only some fields. */
 export function useEnableEndpoint(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
@@ -306,16 +292,13 @@ export function useSkipVerification(projectId: string) {
     });
 }
 
-// ─── Deliveries ────────────────────────────────────────────────────
-
 export function useDeliveries(projectId: string | undefined, filters: DeliveryFilters) {
     return useQuery({
         queryKey: queryKeys.deliveries.list(projectId!, filters),
         queryFn: () => deliveriesApi.listByProject(projectId!, filters),
         enabled: !!projectId,
         placeholderData: keepPreviousData,
-        // Poll only while there are deliveries still in flight — replaces the
-        // page-level setInterval + eslint-disable react-hooks/exhaustive-deps.
+        // Poll only while deliveries are in flight.
         refetchInterval: (query) => {
             const hasActive = query.state.data?.content?.some(
                 (d) => d.status === 'PENDING' || d.status === 'PROCESSING'
@@ -333,15 +316,12 @@ export function useBulkReplayDeliveries() {
     });
 }
 
-// ─── Events ────────────────────────────────────────────────────────
-
 export function useEvents(projectId: string | undefined, page: number, size = 20, sort = 'createdAt,desc', eventType?: string) {
     return useQuery({
         queryKey: [...queryKeys.events.list(projectId!, page, size, sort), eventType ?? ''],
         queryFn: () => eventsApi.listByProject(projectId!, { page, size, sort, eventType }),
         enabled: !!projectId,
         placeholderData: keepPreviousData,
-        // Each row's delivery counts move while its deliveries are still in flight.
         refetchInterval: (query) => {
             const inFlight = query.state.data?.content?.some(
                 (e) => (e.deliveryCounts?.pending ?? 0) + (e.deliveryCounts?.processing ?? 0) > 0
@@ -358,8 +338,6 @@ export function useEvent(projectId: string | undefined, eventId: string | undefi
         enabled: !!projectId && !!eventId,
     });
 }
-
-// ─── Subscriptions ─────────────────────────────────────────────────
 
 export function useSubscriptions(projectId: string | undefined) {
     return useQuery({
@@ -385,8 +363,6 @@ export function useDeleteSubscription(projectId: string) {
         onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.subscriptions.list(projectId) }); },
     });
 }
-
-// ─── Members ───────────────────────────────────────────────────────
 
 export function useMembers(orgId: string | undefined) {
     return useQuery({
@@ -437,16 +413,11 @@ export function useReinstateMember(orgId: string) {
     });
 }
 
-// ─── API Keys ──────────────────────────────────────────────────────
-
-// ─── Sessions ──────────────────────────────────────────────────────
-
 export function useSessions() {
     return useQuery({
         queryKey: queryKeys.sessions.all,
         queryFn: () => authApi.listSessions(),
-        // A stale session list is worse than a slow one: it invites somebody to revoke a device
-        // that is already gone, or to miss one that is not.
+        // A stale list invites revoking a device that's already gone.
         staleTime: 0,
     });
 }
@@ -467,16 +438,12 @@ export function useRevokeAllSessions() {
     });
 }
 
-// ─── Organizations ─────────────────────────────────────────────────
-
 export function useOrganizations() {
     return useQuery({
         queryKey: queryKeys.organizations.mine,
         queryFn: () => organizationsApi.list(),
     });
 }
-
-// ─── MCP apps ──────────────────────────────────────────────────────
 
 export function useMcpGrants(projectId: string | undefined) {
     return useQuery({
@@ -494,10 +461,7 @@ export function useRevokeMcpGrant(projectId: string) {
     });
 }
 
-/**
- * A consent request is answered once and expires in minutes: never retried, never refetched on
- * focus, so a 404 for an answered request is shown rather than papered over.
- */
+/** Answered once and expires in minutes, so a 404 is shown rather than retried. */
 export function useMcpConsentRequest(requestId: string | null, enabled: boolean) {
     return useQuery({
         queryKey: queryKeys.mcpConsent.request(requestId ?? ''),
@@ -507,8 +471,6 @@ export function useMcpConsentRequest(requestId: string | null, enabled: boolean)
         refetchOnWindowFocus: false,
     });
 }
-
-// ─── DLQ ───────────────────────────────────────────────────────────
 
 export function useDlq(projectId: string | undefined, page: number, size = 20, filters?: DlqFilters) {
     return useQuery({
@@ -551,8 +513,6 @@ export function useDlqPurge(projectId: string) {
     });
 }
 
-// ─── Incoming DLQ ──────────────────────────────────────────────────
-
 export function useIncomingDlq(projectId: string | undefined, page: number, size = 20, filters?: IncomingDlqFilters) {
     return useQuery({
         queryKey: queryKeys.incomingDlq.list(projectId!, page, size, filters),
@@ -594,18 +554,12 @@ export function useIncomingDlqPurge(projectId: string) {
     });
 }
 
-// ─── Test Endpoints ────────────────────────────────────────────────
-
-// ─── Audit Log ─────────────────────────────────────────────────────
-
 export function useAuditLog(page: number, size = 20, filters?: AuditLogFilters) {
     return useQuery({
         queryKey: queryKeys.auditLog.list(page, size, filters),
         queryFn: () => auditLogApi.list(page, size, filters),
     });
 }
-
-// ─── Incoming Sources ─────────────────────────────────────────────
 
 export function useIncomingSources(projectId: string | undefined, page: number, size = 20) {
     return useQuery({
@@ -648,8 +602,6 @@ export function useDeleteIncomingSource(projectId: string) {
     });
 }
 
-// ─── Incoming Destinations ────────────────────────────────────────
-
 export function useIncomingDestinations(projectId: string | undefined, sourceId: string | undefined, page: number, size = 20) {
     return useQuery({
         queryKey: queryKeys.incomingDestinations.list(projectId!, sourceId!, page, size),
@@ -681,8 +633,6 @@ export function useDeleteIncomingDestination(projectId: string, sourceId: string
         onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-destinations', projectId, sourceId] }); },
     });
 }
-
-// ─── Incoming Events ──────────────────────────────────────────────
 
 export function useIncomingEvents(projectId: string | undefined, filters: IncomingEventFilters) {
     return useQuery({
@@ -717,8 +667,6 @@ export function useBulkReplayIncomingEvents(projectId: string) {
     });
 }
 
-// ─── Schema Registry ─────────────────────────────────────────────
-
 export function useEventTypes(projectId: string | undefined) {
     return useQuery({
         queryKey: queryKeys.schemas.eventTypes(projectId!),
@@ -735,13 +683,6 @@ export function useCreateEventType(projectId: string) {
     });
 }
 
-/**
- * Rename an event type, or give it the description it never got.
- *
- * <p>`PUT /schemas/{eventTypeId}` shipped with the rest of the registry and was
- * never called, so a typo in an event type's name was permanent: the catalogue
- * could create and delete, and nothing in between.
- */
 export function useUpdateEventType(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
@@ -817,8 +758,6 @@ export function useProjectSchemaChanges(projectId: string | undefined) {
     });
 }
 
-// ─── Alerts ──────────────────────────────────────────────────────
-
 export function useAlertRules(projectId: string | undefined) {
     return useQuery({
         queryKey: queryKeys.alerts.rules(projectId!),
@@ -891,8 +830,6 @@ export function useResolveAllAlerts(projectId: string) {
     });
 }
 
-// ─── Usage ──────────────────────────────────────────────────────
-
 export function useUsageStats(projectId: string | undefined, days = 30) {
     return useQuery({
         queryKey: queryKeys.usage.stats(projectId!, days),
@@ -900,8 +837,6 @@ export function useUsageStats(projectId: string | undefined, days = 30) {
         enabled: !!projectId,
     });
 }
-
-// ─── Incidents ──────────────────────────────────────────────────
 
 export function useIncidents(projectId: string | undefined, openOnly = false, page = 0, size = 20) {
     return useQuery({
@@ -952,8 +887,6 @@ export function useAddTimelineEntry(projectId: string) {
         onSuccess: () => { qc.invalidateQueries({ queryKey: ['incidents', projectId] }); },
     });
 }
-
-// ─── Transformations ────────────────────────────────────────────
 
 export function useTransformations(projectId: string) {
     return useQuery({
@@ -1025,7 +958,6 @@ export function useTransformationVersionDiff(
     });
 }
 
-/** A restore publishes a new version, so the transformation itself and its history both move. */
 export function useRestoreTransformationVersion(projectId: string, id: string) {
     const qc = useQueryClient();
     return useMutation({
@@ -1037,8 +969,6 @@ export function useRestoreTransformationVersion(projectId: string, id: string) {
         },
     });
 }
-
-// ─── Transform Preview ──────────────────────────────────────────
 
 export function useTransformPreview(projectId: string) {
     return useMutation({
@@ -1052,8 +982,6 @@ export function useDeliveryDryRun(projectId: string) {
     });
 }
 
-// ─── Project Settings ───────────────────────────────────────────
-
 export function useUpdateProject(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
@@ -1062,8 +990,6 @@ export function useUpdateProject(projectId: string) {
         onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) }); },
     });
 }
-
-// ─── Rules ──────────────────────────────────────────────────────
 
 export function useRules(projectId: string) {
     return useQuery({
@@ -1107,12 +1033,7 @@ export function useToggleRule(projectId: string) {
     });
 }
 
-// ─── Platform admin ─────────────────────────────────────────────
-
-/**
- * A 4xx from the platform admin API is an answer — not listed, sign-in too old, no such
- * organization — and asking again changes nothing except the rate limit it counts against.
- */
+/** A 4xx here is an answer; retrying only spends the rate limit. */
 function platformRetry(failureCount: number, error: unknown) {
     const status = (error as { response?: { status?: number } } | null)?.response?.status;
     return !(status !== undefined && status < 500) && failureCount < 2;
@@ -1207,8 +1128,6 @@ export function useReinstateOrganization() {
     });
 }
 
-// ─── Consumers ─────────────────────────────────────────────────────
-
 export function useConsumersPaged(projectId: string | undefined, page: number, size = 20) {
     return useQuery({
         queryKey: queryKeys.consumers.paged(projectId!, page, size),
@@ -1258,8 +1177,6 @@ export function useRevokePortalSessions(projectId: string) {
         mutationFn: (consumerId: string) => consumersApi.revokePortalSessions(projectId, consumerId),
     });
 }
-
-// ─── Customer portal ───────────────────────────────────────────────
 
 export function usePortalSession(enabled: boolean) {
     return useQuery({

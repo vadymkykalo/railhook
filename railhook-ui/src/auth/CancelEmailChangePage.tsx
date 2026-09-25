@@ -7,11 +7,7 @@ import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
 import { useAuth } from './auth.store';
 
-/**
- * "This wasn't me", from the notice sent to the old address. Somebody holding a session asked for
- * the change, so cancelling also signs every session out — and the next thing to do is a new
- * password, which is the one link this page offers.
- */
+/** Cancelling signs every session out, so a new password is the only next step. */
 export default function CancelEmailChangePage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();

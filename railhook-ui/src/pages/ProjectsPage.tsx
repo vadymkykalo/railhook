@@ -18,7 +18,6 @@ import { Card, CardContent } from '../components/ui/card';
 import CreateProjectDialog from '../components/CreateProjectDialog';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
 
-/** A project's delivery record, read on the same four meanings as a delivery itself. */
 function kindOfSuccessRate(rate: number): StatusKind {
   if (rate >= 95) return 'ok';
   if (rate >= 80) return 'retry';

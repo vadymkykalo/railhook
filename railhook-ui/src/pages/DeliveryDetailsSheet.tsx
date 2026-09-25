@@ -75,7 +75,6 @@ export default function DeliveryDetailsSheet({
     }
   }, [deliveryId, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-refresh for active deliveries
   useEffect(() => {
     if (!delivery || !open) return;
     if (delivery.status !== 'PENDING' && delivery.status !== 'PROCESSING') return;
@@ -83,8 +82,7 @@ export default function DeliveryDetailsSheet({
     return () => clearInterval(interval);
   }, [delivery?.status, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The 3-second refresh of an in-flight delivery is a background load: it neither swaps the
-  // panel for a skeleton nor toasts again while the same outage is already reported.
+  // Background refresh: no skeleton, no repeated toast for the same outage.
   const refreshFailureReported = useRef(false);
 
   const loadDelivery = async (background = false) => {
@@ -191,7 +189,6 @@ export default function DeliveryDetailsSheet({
     showSuccess(t('deliveryDetails.toast.copied', { label }));
   };
 
-  // The measured ladder — real waits, real codes — from the attempts fetched above.
   const rail = delivery
     ? railFromDeliveryAttempts(attempts, delivery)
     : { attempts: [], maxAttempts: 0 };
@@ -202,9 +199,7 @@ export default function DeliveryDetailsSheet({
 
 
   const getDiagnosisPanel = () => {
-    // CANCELLED belongs here even though nothing went wrong: "why did this never reach my
-    // endpoint" is the same question, and the answer — a transformation said not to send it,
-    // and its reason — is the same panel.
+    // CANCELLED too: "why did it never reach my endpoint" gets the same answer panel.
     if (!delivery || (delivery.status !== 'FAILED' && delivery.status !== 'DLQ'
         && delivery.status !== 'CANCELLED')) return null;
     const failedAttempts = attempts.filter(a => a.errorMessage || (a.httpStatusCode && a.httpStatusCode >= 400));
@@ -268,7 +263,6 @@ export default function DeliveryDetailsSheet({
             <div className="mt-6"><SkeletonRows count={4} height="h-20" /></div>
           ) : delivery ? (
             <div className="space-y-6 mt-6">
-              {/* Status Banner */}
               {delivery.status === 'PROCESSING' && (
                 <div className="flex items-center gap-3 border border-retry/30 bg-retry-soft p-3">
                   <Loader2 className="h-4 w-4 animate-spin text-retry" aria-hidden />
@@ -302,7 +296,6 @@ export default function DeliveryDetailsSheet({
                 </div>
               )}
 
-              {/* Trace Block */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('deliveryDetails.trace')}</CardTitle>
@@ -351,7 +344,6 @@ export default function DeliveryDetailsSheet({
                 </CardContent>
               </Card>
 
-              {/* Quick Actions — incident integration */}
               {projectId && (delivery.status === 'FAILED' || delivery.status === 'DLQ') && (
                 <Card className="border-rail">
                   <CardContent className="p-4">
@@ -376,7 +368,6 @@ export default function DeliveryDetailsSheet({
                 </Card>
               )}
 
-              {/* Status & Progress */}
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
@@ -392,8 +383,6 @@ export default function DeliveryDetailsSheet({
                         {delivery.attemptCount}/{delivery.maxAttempts}
                       </span>
                     </div>
-                    {/* The ladder this delivery actually walked: HTTP code above each
-                        tick, the wait that preceded it below, placed on a log scale. */}
                     <AttemptRail
                       attempts={rail.attempts}
                       maxAttempts={rail.maxAttempts}
@@ -444,7 +433,6 @@ export default function DeliveryDetailsSheet({
 
               {getDiagnosisPanel()}
 
-              {/* Latency Sparkline — only when ≥2 attempts with duration data */}
               {attempts.filter(a => a.durationMs != null).length >= 2 && (() => {
                 const durations = attempts.filter(a => a.durationMs != null).map(a => a.durationMs!);
                 const maxDur = Math.max(...durations);
@@ -512,7 +500,6 @@ export default function DeliveryDetailsSheet({
                   )}
                 </CardHeader>
                 <CardContent>
-                  {/* Inline attempt comparison panel */}
                   {compareMode && compareLeft !== null && compareRight !== null && (() => {
                     const left = attempts.find(a => a.attemptNumber === compareLeft);
                     const right = attempts.find(a => a.attemptNumber === compareRight);
@@ -592,7 +579,6 @@ export default function DeliveryDetailsSheet({
 
                         return (
                           <div key={attempt.id} className="relative">
-                            {/* Time gap indicator */}
                             {timeGap !== null && timeGap > 0 && (
                               <div className="flex items-center gap-2 py-1.5 pl-[18px]">
                                 <div className="w-px h-4 bg-border" />
@@ -602,9 +588,7 @@ export default function DeliveryDetailsSheet({
                               </div>
                             )}
 
-                            {/* Timeline row */}
                             <div className="flex gap-3">
-                              {/* Timeline dot + line */}
                               <div className="flex flex-col items-center pt-1">
                                 <div className={`flex h-4 w-4 shrink-0 items-center justify-center border-2 ${
                                   isSuccess
@@ -620,7 +604,6 @@ export default function DeliveryDetailsSheet({
                                 {i < attempts.length - 1 && <div className="mt-1 w-px flex-1 bg-rail" />}
                               </div>
 
-                              {/* Attempt content */}
                               <div className="flex-1 pb-4 min-w-0">
                                 <div
                                   className={`border p-4 space-y-2 ${
@@ -691,9 +674,7 @@ export default function DeliveryDetailsSheet({
                                     </div>
                                   )}
 
-                                  {/* What was sent and what came back. Collapsed:
-                                      four of these per attempt, and an attempt
-                                      list is unreadable with them all open. */}
+                                  {/* Collapsed: four per attempt make the list unreadable. */}
                                   <div className="mt-2 space-y-1">
                                     {attempt.requestHeaders && (
                                       <JsonBlock collapsible label={t('deliveryDetails.requestHeaders')} value={attempt.requestHeaders} maxHeight="max-h-32" />
@@ -751,8 +732,7 @@ export default function DeliveryDetailsSheet({
                 </Card>
               )}
 
-              {/* Pinned to the bottom of the sheet's own scroll: replaying is why most people open
-                  it, and the buttons sat below the trace, the chart and every attempt. */}
+              {/* Pinned: replaying is why most people open the sheet. */}
               <div
                 data-testid="delivery-actions"
                 className="sticky bottom-0 z-10 flex gap-2 border-t border-rail bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80"

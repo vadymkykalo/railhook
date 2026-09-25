@@ -43,7 +43,6 @@ const TIMELINE_ICON: Record<IncidentTimelineType, React.ElementType> = {
   STATUS_CHANGE: ArrowRight,
 };
 
-/** A timeline entry's type is a lifecycle state, so it maps onto the same four. */
 const TIMELINE_KIND = {
   FAILURE: 'halt',
   RETRY: 'retry',
@@ -79,10 +78,7 @@ export default function IncidentsPage() {
   const { data: expandedIncident } = useIncident(projectId, expandedId ?? undefined);
 
   const incidents = incidentsData?.content ?? [];
-  // All three come from the server, all three span the project. They used to be one real
-  // count beside two derived from `incidents` — which is one page of a filtered list, so a
-  // project with more open incidents than fit on a page read "Critical: 0" with a critical
-  // incident open on page two.
+  // Server counts span the project: counting one filtered page undercounted critical incidents.
   const openIncidents = openCount?.count ?? 0;
   const investigating = openCount?.investigating ?? 0;
   const critical = openCount?.critical ?? 0;
@@ -181,7 +177,6 @@ export default function IncidentsPage() {
           />
         </div>
 
-        {/* One filter row, above what it scopes. */}
         <div className="flex flex-wrap items-center gap-2">
           <div
             role="group"
@@ -238,7 +233,6 @@ export default function IncidentsPage() {
                     onClick={() => setExpandedId(isExpanded ? null : incident.id)}
                     aria-expanded={isExpanded}
                   >
-                    {/* The severity rule: colour and position, before any words. */}
                     <span
                       aria-hidden
                       className={cn('mt-0.5 h-9 w-1 flex-shrink-0', STATUS_FILL[severityKind])}

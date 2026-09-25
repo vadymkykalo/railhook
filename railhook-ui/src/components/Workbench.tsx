@@ -5,27 +5,10 @@ import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import StatusBadge, { type StatusKind } from './StatusBadge';
 
-/**
- * The workbench shape.
- *
- * Test console, Transform studio and Event diff are the same job three times:
- * give it an input, run it, read the output. They used to invent three
- * arrangements of that — one with the run button buried in a card footer, one
- * with it between two accordions, one with no run button at all — so this
- * component states the shape once.
- *
- *   input on the left · one unmistakable run control under it · result on the right
- *
- * The result column leads with its verdict: a `StatusBadge` and a row of mono
- * metrics, so the answer is legible before anything is scrolled. Detail —
- * payloads, attempts, headers — hangs below that strip.
- */
-
 export function Workbench({
   input, run, result, className,
 }: {
   input: ReactNode;
-  /** The single primary control. Rendered directly under the input column. */
   run?: ReactNode;
   result: ReactNode;
   className?: string;
@@ -41,7 +24,6 @@ export function Workbench({
   );
 }
 
-/** A titled slab. The eyebrow is mono because it names a part of the machine. */
 export function WorkbenchPanel({
   eyebrow, title, description, actions, children, className, bodyClassName,
 }: {
@@ -70,10 +52,6 @@ export function WorkbenchPanel({
   );
 }
 
-/**
- * The run control. There is exactly one per workbench page and it always looks
- * the same, so "how do I make this thing go" is never a question.
- */
 export function RunControl({
   label, runningLabel, running, disabled, onClick, type = 'button', icon: Icon = Play, hint, secondary,
 }: {
@@ -84,9 +62,7 @@ export function RunControl({
   onClick?: () => void;
   type?: 'button' | 'submit';
   icon?: LucideIcon;
-  /** One short line under the button — what will happen, or why it is disabled. */
   hint?: ReactNode;
-  /** Anything that is not the primary action (reset, load a sample). */
   secondary?: ReactNode;
 }) {
   return (
@@ -109,11 +85,6 @@ export function RunControl({
   );
 }
 
-/**
- * The verdict strip plus whatever detail belongs under it. `kind` comes from
- * the page's own mapping onto the four status meanings — never a colour the
- * page picked.
- */
 export function ResultFrame({
   kind, statusLabel, title, metrics, actions, children, className,
 }: {
@@ -144,7 +115,6 @@ export function ResultFrame({
   );
 }
 
-/** One number that matters, in the machine voice. */
 export function ResultMetric({
   label, value, unit,
 }: {
@@ -163,7 +133,6 @@ export function ResultMetric({
   );
 }
 
-/** The right column before anything has been run. Quiet — the action is left. */
 export function ResultPlaceholder({
   icon: Icon, title, hint,
 }: {
@@ -182,7 +151,6 @@ export function ResultPlaceholder({
   );
 }
 
-/** A labelled, copyable block of machine output. */
 export function OutputBlock({
   label, actions, children, className,
 }: {
@@ -202,7 +170,6 @@ export function OutputBlock({
   );
 }
 
-/** A segmented control: which mode of one workbench, not navigation. */
 export function ModeSwitch<T extends string>({
   value, onChange, options, ariaLabel,
 }: {

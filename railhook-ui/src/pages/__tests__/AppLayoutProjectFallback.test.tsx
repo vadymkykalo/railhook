@@ -27,13 +27,7 @@ function renderAt(path: string) {
   return renderPage(<AppLayout />, { path: '/admin/*', initialEntry: path });
 }
 
-/**
- * The rail's href only settles once `useProjects` resolves, and waitFor's
- * default second is not enough for that on a loaded CI runner — this failed at
- * 1313ms there while passing locally every time. Same reasoning as
- * DashboardPage's SETTLE_MS: room for a slow machine, no cover for a wrong
- * render, because a bad href still fails on the first poll after settling.
- */
+/** Room for a slow CI runner (it failed at 1313ms there); a bad href still fails on the first poll. */
 const SETTLE_MS = 8_000;
 
 beforeEach(() => {
@@ -42,8 +36,6 @@ beforeEach(() => {
 });
 
 describe('the project the rail falls back to', () => {
-  // Clicking Overview left "load-test" for "test": a page without a project in its URL took the
-  // account's first project, whichever one you had been working in. Found on production.
   it('is the project you were last in, not the first one', async () => {
     vi.mocked(projectsApi.list).mockResolvedValue([
       project('first-project', 'test'),
@@ -81,9 +73,6 @@ describe('the project the rail falls back to', () => {
 
 describe('the rail without a project in the URL', () => {
   it('still points every entry at a real project', async () => {
-    // On /admin/projects there is no :projectId, and nav.config used to fall
-    // back to '/admin/projects' — the page you are already on. Every rail entry
-    // was a link that changed nothing, which reads as a broken button.
     vi.mocked(projectsApi.list).mockResolvedValue([project(TEST_PROJECT_ID, 'Production')]);
     renderAt('/admin/projects');
 
@@ -101,9 +90,6 @@ describe('the rail without a project in the URL', () => {
   });
 
   it('sends each entry to its own setup screen when the account has none', async () => {
-    // '/admin/projects' for every entry was six links to one page — on production a brand-new
-    // account read it as a rail it could not click. Each section now opens a screen that says
-    // what it is for and creates the project that unlocks it.
     vi.mocked(projectsApi.list).mockResolvedValue([]);
     renderAt('/admin/dashboard');
 

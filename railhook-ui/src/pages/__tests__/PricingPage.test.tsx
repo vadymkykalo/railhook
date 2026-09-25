@@ -8,14 +8,6 @@ import PricingPage from '../PricingPage';
 import { FREE_PLAN } from '../landing/plans';
 
 
-/**
- * What Railhook costs, and what the alternatives cost, on one page.
- *
- * There is exactly one plan to price and it is free, so the page is not a plan grid: it is the
- * free cloud allowance, the self-hosted promise and the questions a reader asks before signing
- * up. No other vendor's prices. Its FAQ is also published as schema.org
- * FAQPage data, which has to say what the page says.
- */
 function renderPricing() {
   return renderPage(<PricingPage />, {
     path: '/pricing',

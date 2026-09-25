@@ -38,16 +38,6 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import ConditionTreeEditor, { mkGroup, mkPredicate, countPredicates, NO_VALUE_OPS } from '../components/ConditionTreeEditor';
 
-/**
- * Rules: *when this matches, do that*. The PII rules page says the same
- * sentence about a different subject, so both are drawn with the pieces in
- * `RuleLayout` — see the note there.
- *
- * An action type used to carry its own colour (blue route, purple transform,
- * red drop). Those are not statuses, and the palette reserves colour for
- * statuses, so an action is now told apart by its icon and its name.
- */
-
 const ACTION_ICON: Record<ActionType, LucideIcon> = {
   ROUTE: Route,
   TRANSFORM: Wand2,
@@ -366,7 +356,6 @@ export default function RulesPage() {
         </div>
       )}
 
-      {/* Create / edit */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -415,7 +404,6 @@ export default function RulesPage() {
               </Label>
             </div>
 
-            {/* Conditions */}
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex items-center gap-2">
@@ -449,7 +437,6 @@ export default function RulesPage() {
               )}
             </div>
 
-            {/* Actions */}
             <div className="space-y-3">
               <span className="flex items-center gap-2">
                 <Zap className="h-4 w-4 text-muted-foreground" aria-hidden />
@@ -527,7 +514,6 @@ export default function RulesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -546,8 +532,6 @@ export default function RulesPage() {
     </div>
   );
 }
-
-// ── Read-only condition tree ───────────────────────────────────────
 
 function ConditionTreeDisplay({ node }: { node: ConditionNode }) {
   if (node.type === 'predicate') {

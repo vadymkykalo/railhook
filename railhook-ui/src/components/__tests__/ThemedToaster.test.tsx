@@ -4,11 +4,6 @@ import { toast } from 'sonner';
 import ThemedToaster from '../ThemedToaster';
 import { applyTheme } from '../../lib/theme';
 
-/**
- * Sonner draws its own light palette unless told otherwise, so on the dark theme a "Welcome
- * back" toast arrived as a pale green slab. The toaster has to follow the theme that is applied
- * to the document, including when the reader flips it while a toast is still on screen.
- */
 function toasterTheme() {
   return document.querySelector('[data-sonner-toaster]')?.getAttribute('data-sonner-theme');
 }

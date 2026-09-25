@@ -3,22 +3,8 @@ import type { ReactNode } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-/**
- * The shape a rule takes on screen.
- *
- * A Rule and a PII masking rule are the same sentence: *when this matches, do
- * that*. They were drawn as two unrelated screens — one a stack of expanding
- * cards, the other a bare table — so a reader had to relearn the idea on the
- * second page. Both now use these pieces, and the sentence reads left to right:
- *
- *   status · name · what it matches → what it does · controls
- *
- * Action chips are deliberately colourless. An action is not a status, and the
- * four status hues are reserved; what an action means is carried by its icon
- * and its words.
- */
+/** Action chips are colourless on purpose: the four status hues are reserved. */
 
-/** The counts strip above a rule list. Values are machine facts, so mono. */
 export function RuleStats({ items }: { items: { label: string; value: ReactNode }[] }) {
   return (
     <div className="grid grid-cols-2 gap-px overflow-hidden border border-rail bg-rail sm:grid-cols-4">
@@ -32,7 +18,6 @@ export function RuleStats({ items }: { items: { label: string; value: ReactNode 
   );
 }
 
-/** What a rule matches on: an event-type pattern, a JSON path, a field name. */
 export function MatchExpression({ children, title }: { children: ReactNode; title?: string }) {
   return (
     <code
@@ -44,7 +29,6 @@ export function MatchExpression({ children, title }: { children: ReactNode; titl
   );
 }
 
-/** What a rule does when it matches. */
 export function RuleActionChip({
   icon: Icon, label, detail,
 }: {
@@ -61,15 +45,10 @@ export function RuleActionChip({
   );
 }
 
-/** The arrow that turns two halves into one sentence. */
 export function MatchArrow() {
   return <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />;
 }
 
-/**
- * One rule. `match` and `then` are the two halves of the sentence; `status`
- * and `controls` bracket it.
- */
 export function RuleRow({
   status, name, meta, match, then: thenPart, controls, footer, muted, className,
 }: {
@@ -80,7 +59,6 @@ export function RuleRow({
   then?: ReactNode;
   controls?: ReactNode;
   footer?: ReactNode;
-  /** A disabled rule reads back, not gone. */
   muted?: boolean;
   className?: string;
 }) {

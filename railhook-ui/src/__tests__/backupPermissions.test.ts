@@ -7,14 +7,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 
-/**
- * Database dumps are written readable by their owner only.
- *
- * Production had every dump at -rw-r--r--: the scheduled backup and `./railhook backup` both wrote
- * with the default umask, so any account or process on the host could read a full copy of the
- * database — account emails, API key hashes, payloads — and the encrypted columns sit beside a
- * .env that is one misconfiguration away from being readable too.
- */
+/** Dumps used to be -rw-r--r-- under the default umask. */
 describe('backups are owner-only', () => {
   it('the scheduled backup script sets umask 077 before writing a dump', () => {
     const script = read('deploy/scripts/db-backup.sh');

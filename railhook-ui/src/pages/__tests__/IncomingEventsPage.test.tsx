@@ -127,11 +127,6 @@ describe('IncomingEventsPage', () => {
   });
 
   it('shows what was actually forwarded, not only what came back', async () => {
-    /* The Forward's request headers and body were added to incoming_forward_attempts and
-       exposed on the response, and nothing rendered them — so debugging a failed Forward
-       stayed structurally weaker than debugging a failed Delivery, which has shown both
-       for as long as it has existed. "What did we send them" is the first question a
-       failing integration asks. */
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
     vi.mocked(incomingEventsApi.list).mockResolvedValue(populatedEventsPage([INCOMING_EVENT]));
     vi.mocked(incomingEventsApi.getAttempts).mockResolvedValue({

@@ -1,14 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { EVENT_ID, PLATFORM_ORG_ID, PROJECT_ID, WORKFLOW_ID, mockApi, mockNewOrganization } from './fixtures';
 
-/**
- * Every page fits its screen.
- *
- * Seen on production: the registration form cut off at the right edge of an iPhone, because
- * iOS Safari zooms into any focused field under 16px. A page that scrolls sideways, or a field
- * small enough to trigger that zoom, is invisible to jsdom, so it is checked here in a real
- * browser at a phone width and a desktop width.
- */
+/** iOS Safari zooms into focused fields under 16px; jsdom sees neither that nor overflow. */
 
 const PUBLIC = ['/', '/pricing', '/tester', '/tools/webhook-signature', '/security', '/about', '/contact', '/login', '/register', '/forgot-password', '/reset-password?token=e2e', '/verify-email?token=e2e', '/no-such-page'];
 const ADMIN = [
@@ -30,7 +23,6 @@ const ADMIN = [
   '/admin/platform/users',
 ];
 
-/** Elements that stick out past the right edge and are not inside something that scrolls or clips. */
 async function overflow(page: Page) {
   return page.evaluate(() => {
     const vw = document.documentElement.clientWidth;
@@ -68,8 +60,6 @@ async function checkPage(page: Page, path: string, isMobile: boolean) {
   // Pages that animate in settle within this; the check is about resting layout.
   await page.waitForTimeout(400);
 
-  // The page's own title: an h1, or the h2 PageHeader draws on dashboard pages whose layout has no
-  // section heading (/admin/projects).
   const heading = page.locator('h1, main h2').first();
   await expect(heading, `${path}: a heading is on screen`).toBeVisible();
   const box = await heading.boundingBox();
@@ -100,7 +90,6 @@ test.describe('the landing page on a phone', () => {
   });
 
   test('the install command stays on one line and scrolls instead of breaking inside the URL', async ({ page }) => {
-    // Seen on production: `$ curl -fsSL` / `https://railhook.io/instal` / `l.sh | bash`.
     const box = page.getByTestId('install-command');
     await expect(box).toBeVisible();
     const m = await box.evaluate((el) => ({
@@ -111,7 +100,6 @@ test.describe('the landing page on a phone', () => {
     }));
     expect(m.whiteSpace).toBe('pre');
     expect(m.overflowX).toMatch(/auto|scroll/);
-    // One line of text plus the vertical padding, not two or three lines.
     expect(m.height).toBeLessThan(m.lineHeight * 2);
   });
 
@@ -147,8 +135,6 @@ test.describe('dashboard pages fit the screen', () => {
   }
 
   test.describe('record lists on a phone', () => {
-    // Seen on the local stack with real data: every list was a 650–1060px desktop table swiped
-    // sideways, with row checkboxes, copy icons and pagination under 36px tall.
     const LISTS = [
       `/admin/projects/${PROJECT_ID}/deliveries`,
       `/admin/projects/${PROJECT_ID}/events`,
@@ -211,12 +197,7 @@ test.describe('dashboard pages fit the screen', () => {
     }
   });
 
-  /**
-   * Seen on a phone: the meta line ran straight through the back arrow, History / Test Run /
-   * Enabled / Save ran off the right edge, and a 192px palette column left the canvas a sliver.
-   * The palette was drag-only too, and a touch screen fires no dragstart — so on a phone nothing
-   * could be added to a workflow at all.
-   */
+  /** A touch screen fires no dragstart, so the palette can't be drag-only. */
   test.describe('the workflow builder on a phone', () => {
     const BUILDER = `/admin/projects/${PROJECT_ID}/workflows/${WORKFLOW_ID}`;
 
@@ -236,7 +217,6 @@ test.describe('dashboard pages fit the screen', () => {
       const saveBox = (await save.boundingBox())!;
       expect(saveBox.x + saveBox.width, 'Save sits inside the screen').toBeLessThanOrEqual(vw + 1);
 
-      // The palette is a strip above the canvas, not a column beside it.
       const canvasBox = (await page.locator('.react-flow').boundingBox())!;
       expect(Math.round(canvasBox.width), 'the canvas has the full width').toBe(vw);
       expect(canvasBox.height, 'the canvas has most of the height').toBeGreaterThan(vh * 0.5);
@@ -251,8 +231,6 @@ test.describe('dashboard pages fit the screen', () => {
     });
 
     test('opens the workflow with every node inside the canvas', async ({ page }) => {
-      // The definition loads after the canvas mounts, so the nodes used to land wherever the
-      // default viewport happened to be — for a wide workflow, off the side of a phone.
       const outside = await page.evaluate(() => {
         const pane = document.querySelector('.react-flow')!.getBoundingClientRect();
         return Array.from(document.querySelectorAll<HTMLElement>('.react-flow__node'))
@@ -265,8 +243,7 @@ test.describe('dashboard pages fit the screen', () => {
     });
 
     test('opens with nothing to save', async ({ page }) => {
-      // The canvas reports its own measurements as changes; counting them lit "Unsaved" and
-      // armed Save on a workflow nobody had touched.
+      // The canvas reports its own measurements as changes.
       await expect(page.getByRole('button', { name: /^save$/i })).toBeDisabled();
       await expect(page.getByText(/unsaved/i)).toHaveCount(0);
     });
@@ -284,11 +261,6 @@ test.describe('dashboard pages fit the screen', () => {
   });
 });
 
-/**
- * Seen on production from a brand-new Google sign-up: "I can't click anything on the left until I
- * create a project." Every rail entry led back to the projects list. With no project, an entry
- * opens its own setup screen, which creates the project and carries on into the section.
- */
 test.describe('a brand-new organization', () => {
   test('can open a section from the rail, create a project there, and land in that section', async ({ page, isMobile }) => {
     test.skip(isMobile, 'the rail is a drawer on a phone; the flow is the same');

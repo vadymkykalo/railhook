@@ -12,15 +12,6 @@ import CreateProjectDialog from '../components/CreateProjectDialog';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 
-/**
- * Where a rail entry leads when the organization has no project yet.
- *
- * <p>Every section of the dashboard lives inside a project, and a brand-new organization used to
- * find that out by clicking six links that all bounced to the projects list. This screen names the
- * section, says in one sentence what it is for, and offers the one action that unlocks it — then
- * carries on to the section that was clicked, so creating the project is a step on the way rather
- * than a detour.
- */
 export default function ProjectSetupPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();

@@ -12,10 +12,7 @@ function recentlyReloaded(): boolean {
   }
 }
 
-/**
- * Reloads once to pick up the current deploy. Returns false — and does nothing — when it already
- * did so a moment ago, because then the chunk is really missing and another reload would loop.
- */
+/** False when it reloaded moments ago: the chunk is really missing and another reload would loop. */
 export function reloadOnceForStaleChunk(reload: () => void = () => window.location.reload()): boolean {
   if (recentlyReloaded()) return false;
   try {
@@ -27,17 +24,12 @@ export function reloadOnceForStaleChunk(reload: () => void = () => window.locati
   return true;
 }
 
-/** Whether an error is a lazily imported chunk that could not be fetched. */
 export function isStaleChunkError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
   return /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS/i.test(message);
 }
 
-/**
- * After a deploy, a tab still running the previous build asks for chunk file names that no longer
- * exist. Vite reports that as `vite:preloadError`; reloading fetches the new index.html and its
- * chunks. Returns the uninstaller.
- */
+/** A tab on the previous build asks for chunks a deploy removed; reloading fetches the new ones. */
 export function installStaleChunkReload(reload?: () => void): () => void {
   const onPreloadError = (event: Event) => {
     if (reloadOnceForStaleChunk(reload)) event.preventDefault();

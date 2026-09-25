@@ -23,7 +23,6 @@ import {
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
 
-/** A tunnel lives only as long as a CLI stays connected, so the page is a live roster. */
 export default function TunnelsPage() {
   const { t } = useTranslation();
   const { canManageEndpoints: canCloseTunnels } = usePermissions();

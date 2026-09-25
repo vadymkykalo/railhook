@@ -10,18 +10,14 @@ import { showSuccess } from '../lib/toast';
 import { Button } from '../components/ui/button';
 import { safeDestination } from '../lib/signInDestination';
 
-/**
- * Where the API sends the browser after "Continue with Google". The URL carries a one-time code,
- * never a token; this page trades it for a session the same way the login form does, then moves on.
- */
+/** The URL carries a one-time code, never a token. */
 export default function AuthCallbackPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { login } = useAuth();
   const [failed, setFailed] = useState(false);
-  // The code works once. React's development double-invoke of effects would otherwise spend it on
-  // the first run and fail the second, showing an error for a sign-in that succeeded.
+  // The code works once; StrictMode's double effect would spend it and show a false error.
   const exchanged = useRef(false);
 
   useEffect(() => {
@@ -43,7 +39,6 @@ export default function AuthCallbackPage() {
         const user = await authApi.getCurrentUser();
         login(authResponse.accessToken, user);
         if (isNewAccount) {
-          // Nobody typed this organization's name; say what it was called and where to change it.
           showSuccess(t('auth.google.renameOrganization', { name: user.organization?.name }));
         }
         navigate(destination, { replace: true });

@@ -11,23 +11,12 @@ export function setTheme(theme: Theme) {
   applyTheme(theme);
 }
 
-/**
- * Whether the dark palette is on the document right now — not what is stored. The two differ
- * whenever the stored value is 'system', which is the default, so it is the applied one every
- * decision here has to be made against.
- */
+/** The applied theme, not the stored one: stored 'system' can mean either. */
 export function isDarkApplied(): boolean {
   return document.documentElement.classList.contains('dark');
 }
 
-/**
- * Flip to the opposite of what is on screen, and return what is now applied.
- *
- * <p>Inverting the stored value instead is the bug this replaces: with nothing stored
- * getTheme() answers 'system', 'system' is not 'dark', so the toggle chose 'dark' — which on a
- * machine set to dark is the theme already showing. The first click did nothing, every time,
- * for every user who had never chosen a theme.
- */
+/** Flip what is on screen: inverting a stored 'system' made the first click a no-op. */
 export function toggleTheme(): Exclude<Theme, 'system'> {
   const next = isDarkApplied() ? 'light' : 'dark';
   setTheme(next);

@@ -31,11 +31,6 @@ const TEMPLATE_DEFAULTS: Record<ProjectTemplate, { name: string; description: st
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/**
- * Creating a project, wherever it is started from: the Projects page, a section's setup screen,
- * the dashboard's first step. One dialog, so the three cannot drift in what they ask; where to go
- * next is the caller's, because each of them was on its way somewhere different.
- */
 export default function CreateProjectDialog({
   open, onOpenChange, onCreated,
 }: {

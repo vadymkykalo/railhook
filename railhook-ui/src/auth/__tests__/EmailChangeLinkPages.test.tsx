@@ -29,7 +29,6 @@ function renderAt(path: string, logout = vi.fn()) {
   return logout;
 }
 
-/** The two links the email change mails carry. Each ends every session, so this tab's too. */
 describe('the email change links', () => {
   beforeEach(() => vi.clearAllMocks());
 

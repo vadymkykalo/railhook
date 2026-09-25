@@ -1,32 +1,11 @@
 import { captchaScriptUrl, captchaSiteKey, webAnalyticsToken } from './runtimeConfig';
 
-/**
- * Injects the Content-Security-Policy meta tag.
- *
- * Build-time (VITE_):
- *   VITE_API_URL          — API origin (e.g. https://api.example.com). Empty = same origin.
- *   VITE_CSP_EXTRA_CONNECT — additional connect-src origins, space-separated.
- * Runtime (window.__RAILHOOK__, written by the UI container):
- *   captchaSiteKey         — presence of this turns the registration challenge on, which is
- *                            what widens script-src and frame-src below.
- *   webAnalyticsToken      — presence of this loads Cloudflare's beacon (public/analytics.js),
- *                            which widens script-src and connect-src to Cloudflare's two hosts.
- *
- * In development (localhost), connect-src automatically includes http://localhost:* and ws://localhost:*.
- * In production, only 'self' + VITE_API_URL origin are allowed.
- */
 export function initCSP() {
   const apiUrl = import.meta.env.VITE_API_URL || '';
   const extraConnect = import.meta.env.VITE_CSP_EXTRA_CONNECT || '';
   const isDev = import.meta.env.DEV;
 
-  /*
-   * The CAPTCHA is a third-party script and an iframe, so a deployment that configures one has
-   * to allow the origin it comes from — otherwise the widget is blocked and the registration
-   * page has a submit button that can never be enabled. Derived from the script URL rather
-   * than a separate variable, so the two cannot disagree; widened only when a site key is set,
-   * so a self-hosted deployment keeps the tighter policy it has today.
-   */
+  /* Widened only when a captcha key is set; origin derived from the script URL so the two cannot disagree. */
   let captchaOrigin = '';
   if (captchaSiteKey()) {
     try {
@@ -36,7 +15,6 @@ export function initCSP() {
     }
   }
 
-  // Build connect-src
   const connectSources = new Set<string>(["'self'"]);
 
   if (apiUrl) {
@@ -82,8 +60,7 @@ export function initCSP() {
     `script-src ${scriptSources.join(' ')}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    // The portal shows a logo from wherever the customer hosts it (portalParams.ts accepts
-    // https only). Nothing else loads a foreign image, so only that page is widened.
+    // Only the portal shows a foreign (https) logo, so only it widens img-src.
     window.location.pathname === '/portal' ? "img-src 'self' data: blob: https:" : "img-src 'self' data: blob:",
     `connect-src ${[...connectSources].join(' ')}`,
     frameSources.length ? `frame-src ${frameSources.join(' ')}` : "frame-src 'none'",

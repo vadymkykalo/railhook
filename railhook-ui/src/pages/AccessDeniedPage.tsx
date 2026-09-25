@@ -5,11 +5,6 @@ import { usePermissions } from '../auth/usePermissions';
 import { RoleCard } from '../components/PermissionGate';
 import { Button } from '../components/ui/button';
 
-/**
- * Rendered by ProtectedRoute when a role is not enough for a route. It says
- * which role the reader holds and what that role can do, because "access
- * denied" on its own leaves a person with nowhere to go.
- */
 export default function AccessDeniedPage() {
   const { t } = useTranslation();
   const { role } = usePermissions();

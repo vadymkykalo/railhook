@@ -23,16 +23,6 @@ import { http } from '../../api/http';
 const HOME: OrganizationResponse = { id: 'org-1', name: 'Test Org', createdAt: new Date().toISOString() };
 const CLIENT: OrganizationResponse = { id: 'org-2', name: 'Client Co', createdAt: new Date().toISOString() };
 
-/**
- * The control that makes a second organization reachable at all.
- *
- * `GET /api/v1/orgs` has always returned every organization a user belongs to, and nothing in
- * the app ever called it: login minted a token for the oldest membership and refresh minted the
- * same one again, so accepting an invite to a second organization silently changed nothing you
- * could see. Two properties matter here — that the control appears only when there is a genuine
- * choice, and that taking it replaces the whole cached view rather than showing one
- * organization's rows under another's name.
- */
 describe('OrganizationSwitcher', () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -46,7 +36,6 @@ describe('OrganizationSwitcher', () => {
     render();
 
     await waitFor(() => expect(organizationsApi.list).toHaveBeenCalled());
-    /* A switcher over a list of one is a control that answers a question nobody asked. */
     expect(screen.queryByRole('button', { name: /Current organization/i })).not.toBeInTheDocument();
     expect(screen.getByText('Test Org')).toBeInTheDocument();
   });
@@ -83,8 +72,7 @@ describe('OrganizationSwitcher', () => {
     await user.click(await screen.findByText('Client Co'));
 
     await waitFor(() => expect(authApi.switchOrganization).toHaveBeenCalledWith('org-2'));
-    /* The token has to be installed before /auth/me is asked anything, or the answer describes
-       the organization we are trying to leave. */
+    /* The token must be installed before /auth/me, or the answer describes the old organization. */
     expect(http.setToken).toHaveBeenCalledWith('token-for-client-co');
     await waitFor(() => expect(authApi.getCurrentUser).toHaveBeenCalled());
   });

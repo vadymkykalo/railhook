@@ -1,10 +1,6 @@
 import { type ReactNode } from 'react';
 
-/**
- * The loading placeholder for a page body. It mirrors the real layout — the
- * page container, a header block, then content — so nothing shifts when the
- * data lands. Blocks are drawn in `bg-muted`, never a status hue.
- */
+/** Mirrors the real layout so nothing shifts when data lands. */
 interface PageSkeletonProps {
   maxWidth?: string;
   header?: boolean;

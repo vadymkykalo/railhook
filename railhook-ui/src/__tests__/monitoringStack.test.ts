@@ -9,17 +9,6 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 
-/**
- * The monitoring stack is optional, and when it runs on a host facing the internet it must not
- * be the way in.
- *
- * It used to publish Prometheus, Alertmanager and Loki on the host, and shipped Grafana with a
- * password printed in the README, the Makefile and the docs. Anyone who put Grafana behind a
- * domain had a well-known login in front of their logs. These tests hold the stack to: nothing
- * but Grafana published, Grafana only on loopback, no password unless the operator set one, and
- * a total memory budget a small host can afford.
- */
-
 const dirs: string[] = [];
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -30,7 +19,6 @@ const scratch = (prefix: string) => {
   return dir;
 };
 
-/** Each service's block in monitoring/docker-compose.yml, by name. */
 function composeServices(): Map<string, string> {
   const compose = read('monitoring/docker-compose.yml');
   const section = compose.slice(compose.indexOf('\nservices:\n'), compose.indexOf('\nvolumes:\n'));
@@ -106,7 +94,7 @@ describe('monitoring/docker-compose.yml', () => {
   });
 
   it("names node-exporter after the host, not its container id, without sharing more of the host", () => {
-    // node_uname_info.nodename is what the Host dashboard's selector lists; in a container it is the id.
+    // In a container nodename is the id.
     expect(services.get('node-exporter')).toMatch(/^ {4}hostname: \$\{MONITORING_NODENAME:-railhook-host\}$/m);
     expect(services.get('node-exporter')).not.toMatch(/uts: host|privileged|cap_add/);
     expect(read('Makefile')).toMatch(/MONITORING_NODENAME=\$\(or \$\(MONITORING_NODENAME\),\$\(shell hostname\)\)/);
@@ -262,8 +250,7 @@ describe('alertmanager/render-config.sh', () => {
   });
 
   it('puts the summary in the subject as plain text and escapes it only in the HTML body', () => {
-    // Alertmanager renders headers with its HTML engine: without safeHtml a ">" in a summary
-    // reached the subject line as "&gt;".
+    // Headers are HTML-rendered: without safeHtml a ">" reached the subject as "&gt;".
     const template = read('monitoring/alertmanager/email.tmpl');
     const block = (name: string) => {
       const start = template.indexOf(`{{ define "${name}" -}}`);
@@ -356,13 +343,12 @@ describe('the Caddyfile install.sh writes', () => {
   function writeCaddyfile(envFile: string | null) {
     const installer = read('install.sh');
     const start = installer.indexOf('write_caddyfile() {');
-    // The function ends where its last heredoc does; the Caddyfile inside has braces of its own.
+    // The function ends where its last heredoc does; the Caddyfile has braces of its own.
     const end = installer.indexOf('\nCADDY\n}\n', start);
     expect(start, 'write_caddyfile in install.sh').toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
     const dir = scratch('railhook-caddy-');
     if (envFile !== null) writeFileSync(join(dir, '.env'), envFile);
-    // write_caddyfile reads .env through env_get, so the harness defines it the same way.
     const envGet = /^env_get\(\) .*$/m.exec(installer);
     expect(envGet, 'env_get in install.sh').not.toBeNull();
     const script = `set -euo pipefail\nwarn() { echo "$*" >&2; }\n${envGet![0]}\n${installer.slice(start, end + '\nCADDY\n}\n'.length)}\nwrite_caddyfile\n`;

@@ -13,7 +13,6 @@ export interface RegisterRequest {
   password: string;
   fullName: string;
   organizationName: string;
-  /** Only sent when the deployment configured a CAPTCHA; absent otherwise. */
   captchaToken?: string;
 }
 
@@ -28,11 +27,7 @@ export interface AuthResponse {
   emailVerified?: boolean;
 }
 
-/**
- * A new address for the signed-in account. An unverified account sends `captchaToken` (when the
- * deployment has a CAPTCHA); a verified one sends `currentPassword`, or nothing when it has no
- * password and signed in within the last ten minutes.
- */
+/** Unverified: captchaToken; verified: currentPassword, or nothing if passwordless and signed in recently. */
 export interface ChangeEmailRequest {
   newEmail: string;
   currentPassword?: string;
@@ -60,27 +55,10 @@ export interface CurrentUserResponse {
   user: UserResponse;
   organization: OrganizationResponse;
   role: 'OWNER' | 'DEVELOPER' | 'VIEWER';
-  /**
-   * Whether this deployment can deliver mail. False is the shipped default
-   * (`EMAIL_ENABLED=false`), and where it is false the product must not claim an
-   * invite or a reset "was sent" — it wasn't.
-   */
+  /** False by default (EMAIL_ENABLED=false): never claim an invite or reset "was sent". */
   emailDeliveryEnabled: boolean;
-  /**
-   * False for an account created with "Continue with Google" that has never set a password.
-   * Changing a password needs the current one, so settings points to "Forgot password" instead.
-   */
   hasPassword: boolean;
-  /**
-   * Whether to offer the platform admin panel: a verified, active account listed in
-   * `PLATFORM_ADMIN_EMAILS`. The server checks it again, with the sign-in's age, on every
-   * admin request.
-   */
   platformAdmin: boolean;
-  /**
-   * The public demo: a read-only session anyone can open. The dashboard shows a banner and greys
-   * out every action; the server refuses every change regardless.
-   */
   demo?: boolean;
 }
 
@@ -114,13 +92,7 @@ export interface ProjectResponse {
   updatedAt: string;
 }
 
-/**
- * Which signature headers an endpoint receives.
- *
- * `BOTH` is the default: extra headers cost a receiver nothing, so an existing integration
- * keeps verifying `X-Signature` while a new one can use an off-the-shelf Standard Webhooks
- * library.
- */
+/** BOTH is the default: extra headers cost a receiver nothing. */
 export type SignatureScheme = 'LEGACY' | 'STANDARD' | 'BOTH';
 
 export interface EndpointRequest {
@@ -138,7 +110,6 @@ export interface EndpointRequest {
 export interface EndpointResponse {
   id: string;
   projectId: string;
-  /** The Consumer this endpoint belongs to, or absent when it is the project's own. */
   consumerId?: string;
   url: string;
   description?: string;
@@ -150,33 +121,22 @@ export interface EndpointResponse {
   verificationAttemptedAt?: string;
   verificationCompletedAt?: string;
   verificationSkipReason?: string;
-  /** Start of the current unbroken run of failed deliveries; absent once one succeeds. */
   failingSince?: string;
-  /** Attempts in that run. */
   consecutiveFailures?: number;
-  /**
-   * When Railhook turned this endpoint off for continuous failure. Absent while it is on, and
-   * absent when its owner turned it off - the two are different states, and only this one is
-   * cleared by re-enabling.
-   */
+  /** Absent when its owner turned it off; only an auto-disable is cleared by re-enabling. */
   autoDisabledAt?: string;
-  /** Why, in words meant for the endpoint's owner. */
   autoDisabledReason?: string;
   createdAt: string;
   updatedAt: string;
   secret?: string;
   signatureScheme?: SignatureScheme;
-  /**
-   * The same secret in the form a Standard Webhooks library expects (`whsec_` + base64).
-   * Present only where `secret` is — at creation and rotation.
-   */
+  /** Present only where secret is: at creation and rotation. */
   standardWebhooksSecret?: string;
 }
 
 export interface DeliveryResponse {
   id: string;
   eventId: string;
-  /** Absent on a single delivery; the list fills it. */
   eventType?: string;
   endpointId: string;
   subscriptionId: string;
@@ -204,7 +164,6 @@ export interface DeliveryAttemptResponse {
   createdAt: string;
 }
 
-/** One of the customer's own users, grouping the endpoints registered for them. */
 export interface ConsumerResponse {
   id: string;
   projectId: string;
@@ -225,7 +184,6 @@ export interface PortalSessionRequest {
   allowedOrigin?: string;
 }
 
-/** A new portal session; the token is in this response and nowhere else. */
 export interface PortalSessionResponse {
   id: string;
   consumerId: string;
@@ -235,7 +193,6 @@ export interface PortalSessionResponse {
   expiresAt: string;
 }
 
-/** What the portal learns about the session it runs in. */
 export interface PortalSessionInfoResponse {
   consumerName: string;
   projectName: string;
@@ -259,7 +216,6 @@ export interface PortalEndpointResponse {
   eventTypes: string[];
   createdAt: string;
   updatedAt: string;
-  /** Present only in the response that created or rotated it. */
   secret?: string;
   standardWebhooksSecret?: string;
 }
@@ -286,9 +242,7 @@ export interface EventResponse {
   payload: string;
   createdAt: string;
   deliveriesCreated?: number;
-  /** The same Deliveries as `deliveriesCreated`, by status. Absent on a test-event response. */
   deliveryCounts?: DeliveryStatusCounts;
-  /** Set only on a test-event response, and only under a project whose policy is WARN. */
   schemaWarnings?: string[];
 }
 
@@ -298,7 +252,6 @@ export interface DeliveryStatusCounts {
   success: number;
   failed: number;
   dlq: number;
-  /** Deliveries a transformation said not to send. Neither delivered nor failed. */
   cancelled: number;
 }
 
@@ -308,21 +261,13 @@ export interface SubscriptionResponse {
   endpointId: string;
   eventType: string;
   enabled: boolean;
-  /**
-   * Which HTTP statuses are worth another attempt, as a spec: `408,429,500-599`, `>=500`,
-   * `5xx,!501`. The default reproduces what used to be hardcoded.
-   */
   retryableStatuses?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-// ─── MCP apps (OAuth connections to the MCP server) ─────────────────
-
-/** Same two values an API key carries: a connected app is a key with a person behind it. */
 export type McpGrantScope = 'READ_ONLY' | 'READ_WRITE';
 
-/** What the consent screen shows about an app asking to connect. */
 export interface McpConsentRequestResponse {
   requestId: string;
   /** Self-declared by the app; the redirect host is what identifies it. */
@@ -354,8 +299,6 @@ export interface McpGrantResponse {
   createdAt: string;
   lastUsedAt: string | null;
 }
-
-// ─── Incoming Webhooks ──────────────────────────────────────────────
 
 export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO'
   | 'SQUARE' | 'ADYEN' | 'SENDGRID' | 'HUBSPOT';
@@ -464,14 +407,12 @@ export interface IncomingForwardAttemptResponse {
   createdAt: string;
 }
 
-/** Statistics for either direction's DLQ; the backend returns one shape for both. */
 export interface DlqStatsResponse {
   totalItems: number;
   last24Hours: number;
   last7Days: number;
 }
 
-/** One abandoned Forward: a Destination and an Incoming Event, keyed on the Attempt row. */
 export interface IncomingDlqItemResponse {
   forwardAttemptId: string;
   incomingEventId: string;
@@ -506,12 +447,7 @@ export interface IncomingBulkReplayRequest {
   maxEvents?: number;
 }
 
-// ─── Transformations ─────────────────────────────────────────────────
-
-/**
- * Which language a transformation's `template` column holds. Omitted on a request
- * means TEMPLATE, which is what every transformation was before JavaScript existed.
- */
+/** Omitted on a request means TEMPLATE. */
 export type TransformationKind = 'TEMPLATE' | 'JAVASCRIPT';
 
 export interface TransformationRequest {
@@ -537,20 +473,15 @@ export interface TransformationResponse {
   updatedAt: string;
 }
 
-/**
- * One published template. `template` is only populated by the single-version endpoint — the
- * list of versions is an index and leaves it out.
- */
+/** `template` is only populated by the single-version endpoint. */
 export interface TransformationVersionResponse {
   id: string;
   transformationId: string;
   version: number;
   template?: string;
   current: boolean;
-  /** Present only when this version was published by restoring an earlier one. */
   restoredFromVersion?: number;
   createdBy?: string;
-  /** Null for an API key, for a version backfilled from before the history existed, and for an erased user. */
   createdByEmail?: string;
   createdAt: string;
 }

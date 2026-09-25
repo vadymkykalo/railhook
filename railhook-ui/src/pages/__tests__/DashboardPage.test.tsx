@@ -69,12 +69,7 @@ const EMPTY_PAGE: PageResponse<DeliveryResponse> = {
   content: [], totalElements: 0, totalPages: 0, size: 20, number: 0, first: true, last: true,
 };
 
-/**
- * The dashboard fans out to seven queries and mounts Recharts containers, so
- * it settles slower than a list page — and slower still when vitest runs the
- * suite's files in parallel. These give it room without hiding a real hang:
- * the assertions still fail fast on a wrong render, only later on a slow one.
- */
+/** Seven queries plus Recharts settle slowly under parallel files; a wrong render still fails fast. */
 const SETTLE_MS = 8_000;
 const TEST_TIMEOUT_MS = 20_000;
 
@@ -104,8 +99,6 @@ describe('DashboardPage', () => {
   });
 
   it('opens nothing over the dashboard on a first visit', async () => {
-    // A seven-step tour used to mount itself here before the page had even
-    // finished loading, and it created nothing once you had read it.
     vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
     vi.mocked(dashboardApi.getProjectStats).mockResolvedValue(STATS);
     renderDashboard();
@@ -113,9 +106,6 @@ describe('DashboardPage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   }, TEST_TIMEOUT_MS);
 
-  // Overview carries no project in its URL, and the page took the account's first project every
-  // time: open "load-test", click Overview, and the dashboard — and the rail with it — showed
-  // "test". Found on production. It opens on the project you were last in.
   it('opens on the project you were last in, not the first one', async () => {
     const OTHER: ProjectResponse = { ...PROJECT, id: 'project-other', name: 'Load test' };
     vi.mocked(projectsApi.list).mockResolvedValue([PROJECT, OTHER]);
@@ -129,8 +119,6 @@ describe('DashboardPage', () => {
   }, TEST_TIMEOUT_MS);
 
   it('starts an organization with no project on the first step, with one call to action', async () => {
-    // A bare "no projects" panel said nothing about what comes after. The first step is shown
-    // with the path it opens, and there is exactly one way to take it.
     vi.mocked(projectsApi.list).mockResolvedValue([]);
     renderDashboard();
     expect(await screen.findByText('Create a project')).toBeInTheDocument();
@@ -149,8 +137,6 @@ describe('DashboardPage', () => {
   });
 
   it('offers a way back after the getting-started card is dismissed', async () => {
-    // Dismissing used to be terminal: one localStorage boolean, no control
-    // anywhere in the UI that could unset it.
     vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
     vi.mocked(dashboardApi.getProjectStats).mockResolvedValue(STATS);
     const user = userEvent.setup();
@@ -160,8 +146,6 @@ describe('DashboardPage', () => {
     const restore = await screen.findByRole('button', { name: /Getting started/ });
 
     await user.click(restore);
-    // A brand-new account has no direction to infer, so the returning card
-    // asks — which is the card, back.
     expect(await screen.findByText('What brings you to Railhook?')).toBeInTheDocument();
   }, TEST_TIMEOUT_MS);
 
@@ -205,14 +189,11 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 
-  // The regression this page shipped with: reading deliveryStats.totalDeliveries
-  // off a payload that came back without deliveryStats at all.
   it('renders a project whose stats payload is missing deliveryStats entirely', async () => {
     vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
     vi.mocked(dashboardApi.getProjectStats).mockResolvedValue({} as unknown as DashboardStats);
     renderDashboard();
 
-    // The hero figure renders its "no traffic yet" placeholder rather than throwing.
     await waitFor(() => expect(screen.getByTestId('delivery-health-figure')).toHaveTextContent('—'));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });

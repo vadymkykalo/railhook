@@ -35,21 +35,7 @@ import type {
 } from '../api/transform.api';
 import type { TransformationKind, TransformationResponse } from '../types/api.types';
 
-/**
- * The Transform Studio.
- *
- * One loop, and it has to close without leaving the page: edit a script, run it
- * against a real recent event, read the Output, the Diff and the Console side by
- * side, and save it back into the transformation. Every part of that used to be
- * somewhere else — the editor was a JSON box, there was no console because there
- * was nothing to log, and saving meant going to a different page and pasting.
- *
- * What runs here is the engine the worker runs. The preview endpoint and the
- * delivery dry-run both go through `JavaScriptTransformEngine` in
- * `railhook-common`, under the same sandbox and the same limits, so a script
- * that works here is a script that works on a real Delivery. That is the only
- * reason a preview is worth anything.
- */
+/** Runs the worker's own JavaScriptTransformEngine, so a script that works here works on a real Delivery. */
 
 const SAMPLE_PAYLOAD = JSON.stringify({
   id: 'ord_9001',
@@ -60,11 +46,6 @@ const SAMPLE_PAYLOAD = JSON.stringify({
   ],
 }, null, 2);
 
-/**
- * What a new script starts as: the three things the template language cannot do,
- * in the order the documentation explains them. An empty editor is a worse
- * starting point than a working example you delete.
- */
 const STARTER_SCRIPT = `function handler(webhook) {
   // Reshape an array — a template cannot loop.
   var lines = webhook.payload.items.map(function (item) {
@@ -111,7 +92,6 @@ const HINT_EXPRESSIONS = [
   { expr: '$', descKey: 'transform.hints.passThrough' },
 ];
 
-/** Two JSON documents are "the same" when they parse to the same value. */
 function isUnchanged(input: string, output: string): boolean {
   try {
     return JSON.stringify(JSON.parse(input)) === JSON.stringify(JSON.parse(output));
@@ -171,8 +151,7 @@ export default function TransformStudioPage() {
     setDryRunResult(null);
   }, []);
 
-  // `?transformation=<id>` is how the Transformations page hands one over, so
-  // "edit this script" lands in the editor with the script already in it.
+  // ?transformation=<id> is how the Transformations page hands a script over.
   const appliedFromUrl = useRef<string | null>(null);
   useEffect(() => {
     const wanted = searchParams.get('transformation');
@@ -187,14 +166,7 @@ export default function TransformStudioPage() {
   const dirty = savedSource !== null && savedSource !== source;
   const canSave = source.trim().length > 0;
 
-  /**
-   * What to run: the editor, unless the editor is exactly what is saved.
-   *
-   * Running a saved transformation *by id* is the honest thing to do while you have not touched
-   * it — the server resolves it the way a Delivery would, version and all. The moment you edit,
-   * it stops being honest: the run would be of the saved script and the editor would be showing
-   * you something else, which is the one thing a debug loop must never do.
-   */
+  /** Run by id only while untouched: after an edit the run would not be what the editor shows. */
   const runsSavedById = Boolean(selectedTransformationId) && !dirty;
 
   const handleSelectTransformation = (id: string) => {
@@ -219,8 +191,7 @@ export default function TransformStudioPage() {
   const handleSwitchKind = (next: TransformationKind) => {
     if (next === kind) return;
     setKind(next);
-    // Only when the editor still holds the starter for the other language: a
-    // switch must never silently eat something somebody wrote.
+    // Only when the editor holds a starter: a language switch must never eat someone's script.
     if (source.trim() === '' || source === STARTER_SCRIPT || source === STARTER_TEMPLATE) {
       setSource(next === 'JAVASCRIPT' ? STARTER_SCRIPT : STARTER_TEMPLATE);
     }
@@ -329,7 +300,6 @@ export default function TransformStudioPage() {
     setTab('input');
   };
 
-  // ── what the last run said ──────────────────────────────────────────────
   const outputPayload = mode === 'preview'
     ? preview?.outputPayload ?? null
     : dryRunResult?.transformedPayload ?? null;
@@ -342,11 +312,7 @@ export default function TransformStudioPage() {
   const errorReason = (mode === 'preview' ? preview?.errorReason : dryRunResult?.errorReason) ?? null;
   const hasRun = preview !== null || dryRunResult !== null;
 
-  /**
-   * The engine speaks English and this UI does not, necessarily. The reason comes back as a
-   * value precisely so the sentence can be ours; the engine's own message is kept underneath
-   * it, verbatim, because that is where the line number and the thrown message live.
-   */
+  /** The headline is ours to translate; the engine's own message stays underneath for the line number. */
   const failureHeadline = errors.length === 0
     ? null
     : t(`transform.errorReason.${(errorReason ?? 'UNKNOWN') as ScriptFailureReason | 'UNKNOWN'}`, {
@@ -376,7 +342,6 @@ export default function TransformStudioPage() {
 
   const isScript = kind === 'JAVASCRIPT';
 
-  // ── left column: the script ─────────────────────────────────────────────
   const editorColumn = (
     <div className="space-y-4">
       <WorkbenchPanel
@@ -550,7 +515,6 @@ export default function TransformStudioPage() {
     </div>
   );
 
-  // ── right column: four views of one run ─────────────────────────────────
   const resultColumn = (
     <ResultFrame
       kind={verdict.kind}

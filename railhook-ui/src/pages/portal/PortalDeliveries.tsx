@@ -29,7 +29,6 @@ import { railFromDeliveryAttempts } from '../attemptRailData';
 
 const STATUSES: PortalDeliveryResponse['status'][] = ['SUCCESS', 'FAILED', 'DLQ', 'PENDING', 'PROCESSING'];
 
-/** A Delivery the Railhook ladder has stopped on, which is the only kind a retry makes sense for. */
 function retryable(status: PortalDeliveryResponse['status']): boolean {
   return status === 'FAILED' || status === 'DLQ';
 }

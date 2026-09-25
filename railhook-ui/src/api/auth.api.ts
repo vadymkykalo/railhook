@@ -3,17 +3,14 @@ import type {
   RegisterRequest, LoginRequest, AuthResponse, CurrentUserResponse, ChangeEmailRequest, EmailChangeResponse,
 } from '../types/api.types';
 
-/** One signed-in device, as the sessions list shows it. Carries no token material. */
 export interface SessionResponse {
   id: string;
-  /** WEB for a browser sign-in, CLI for a device-code grant from the command line. */
   client: 'WEB' | 'CLI';
   userAgent: string | null;
   ipAddress: string | null;
   createdAt: string;
   lastSeenAt: string;
   expiresAt: string;
-  /** The session making this request — never offered for revocation as if it were another. */
   current: boolean;
 }
 
@@ -26,15 +23,10 @@ export const authApi = {
     return http.post<AuthResponse>('/api/v1/auth/login', data);
   },
 
-  /** Which identity providers this deployment offers. Public: the sign-in page asks first. */
   providers: (): Promise<{ google: boolean }> => {
     return http.get<{ google: boolean }>('/api/v1/auth/providers');
   },
 
-  /**
-   * Trades the one-time code the Google callback put in the URL for a session, exactly like a
-   * password sign-in: access token in the body, refresh token in its cookie. Works once.
-   */
   exchangeSignInCode: (code: string): Promise<AuthResponse> => {
     return http.post<AuthResponse>('/api/v1/auth/oauth/exchange', { code });
   },
@@ -51,15 +43,10 @@ export const authApi = {
     return http.post<void>(`/api/v1/auth/resend-verification?email=${encodeURIComponent(email)}`);
   },
 
-  /** The account's address and the change waiting for confirmation, if any. */
   getEmailChange: (): Promise<EmailChangeResponse> => {
     return http.get<EmailChangeResponse>('/api/v1/auth/email-change');
   },
 
-  /**
-   * An unverified account moves at once (answering the CAPTCHA when one is configured); a verified
-   * one sends its password and waits for the new address to confirm.
-   */
   requestEmailChange: (data: ChangeEmailRequest): Promise<EmailChangeResponse> => {
     return http.post<EmailChangeResponse>('/api/v1/auth/email-change', data);
   },
@@ -76,7 +63,6 @@ export const authApi = {
     return http.post<void>(`/api/v1/auth/email-change/confirm?token=${encodeURIComponent(token)}`);
   },
 
-  /** "This wasn't me", from the notice sent to the old address. */
   cancelEmailChangeByToken: (token: string): Promise<void> => {
     return http.post<void>(`/api/v1/auth/email-change/cancel?token=${encodeURIComponent(token)}`);
   },
@@ -85,7 +71,7 @@ export const authApi = {
     return http.post<void>('/api/v1/auth/change-password', { currentPassword, newPassword });
   },
 
-  /** Takes the token to end explicitly: the caller clears the client's own before this is sent. */
+  /** The caller clears the client's own token before this is sent. */
   logout: (accessToken: string | null): Promise<void> => {
     return http.post<void>('/api/v1/auth/logout', {}, accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined);
   },
@@ -110,21 +96,11 @@ export const authApi = {
     return http.post<void>('/api/v1/auth/sessions/revoke-all', {});
   },
 
-  /**
-   * GDPR Article 17, for the signed-in person. Irreversible: the account's personal data is
-   * replaced, every session is closed, and any organization they were the only member of is
-   * deleted with it. Answers 409 when they are the last owner of an organization that still
-   * has other members.
-   */
   eraseOwnAccount: (): Promise<void> => {
     return http.delete<void>('/api/v1/auth/me');
   },
 
-  /**
-   * Re-issues an access token scoped to another organization. Returns only an access token:
-   * the refresh cookie is deliberately untouched, so switching invalidates nothing and a
-   * double-click is the same operation twice rather than a token-reuse alarm.
-   */
+  /** The refresh cookie is untouched, so a double-click isn't a token-reuse alarm. */
   switchOrganization: (organizationId: string): Promise<AuthResponse> => {
     return http.post<AuthResponse>('/api/v1/auth/switch-organization', { organizationId });
   },

@@ -28,7 +28,7 @@ export interface PageResponse<T> {
   number: number;
 }
 
-/** Only what `GET /dlq` accepts: anything else would be dropped server-side while the UI claimed it filtered. */
+/** Only what GET /dlq accepts; anything else would be silently dropped server-side. */
 export interface DlqFilters {
   endpointId?: string;
 }

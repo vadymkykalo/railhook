@@ -6,27 +6,12 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 
-/**
- * nginx must not hold an address the API has moved off.
- *
- * A name in a literal `proxy_pass` is resolved once, at startup, and kept for the life of the
- * process. Docker gives a recreated container a new address, so nginx went on posting to one
- * that no longer answered — measured at 32 seconds of 502 on an ordinary `up -d api`, of which
- * roughly seven were nginx alone and the rest the JVM starting.
- *
- * Resolving through a variable makes nginx look the name up per request instead, honouring the
- * `valid=` window. Both halves are required and neither is any use without the other, which is
- * why they are asserted together.
- */
+/** A literal proxy_pass resolves once; a recreated API meant 32s of 502. */
 describe('nginx upstream resolution', () => {
   const conf = read('railhook-ui/nginx.conf');
 
   it('does not hardcode whose DNS, and does not try to patch itself', () => {
-    // Two ways this went wrong. Hardcoding Docker's 127.0.0.11 made every lookup fail
-    // under Helm, because Kubernetes has no such address. Substituting it into this file
-    // at startup then failed too: the chart runs the pod with a read-only root
-    // filesystem, so `sed -i` returns "Permission denied" and nginx starts on a config it
-    // cannot parse. The address is written to /tmp and included from there.
+    // 127.0.0.11 doesn't exist under Kubernetes, and the root fs is read-only, hence /tmp.
     expect(conf).toMatch(/^\s*include\s+\/tmp\/railhook-resolver\.conf;/m);
     expect(conf, 'the resolver address must not be hardcoded').not.toMatch(
       /^\s*resolver\s+\d+\.\d+\.\d+\.\d+/m,
@@ -39,16 +24,14 @@ describe('nginx upstream resolution', () => {
     expect(entrypoint).toMatch(/\/etc\/resolv\.conf/);
     expect(entrypoint, 'writing into /etc/nginx fails on a read-only root filesystem')
       .not.toMatch(/sed -i[^\n]*\/etc\/nginx/);
-    // The base image runs /docker-entrypoint.d/*.sh before nginx; without the copy the
-    // include names a file that does not exist and nginx refuses to start.
+    // Without the copy the include names a missing file and nginx won't start.
     expect(read('railhook-ui/Dockerfile')).toMatch(
       /COPY .*docker-entrypoint\.d\/15-resolver\.sh \/docker-entrypoint\.d\//,
     );
   });
 
   it('bounds how long a resolved address is kept', () => {
-    // Docker publishes a 600s TTL. Inheriting it would restore the cached-forever
-    // behaviour with extra steps, so the window is set rather than taken from the record.
+    // Docker publishes a 600s TTL.
     const entrypoint = read('railhook-ui/docker-entrypoint.d/15-resolver.sh');
     const valid = entrypoint.match(/resolver \$\{RESOLVER\} valid=(\d+)s/);
     expect(valid, 'the generated resolver line must set valid=').not.toBeNull();
@@ -56,33 +39,22 @@ describe('nginx upstream resolution', () => {
   });
 
   it('resolves the upstream by a name its own resolver can answer', () => {
-    // nginx's resolver speaks DNS itself, and a raw query carries no search list. So the
-    // bare `api` that Docker's embedded DNS answers is NXDOMAIN under Kubernetes, where
-    // the name is only reachable as api.<namespace>.svc.cluster.local — and the chart's
-    // UI served 502 for every proxied path while nginx itself was perfectly healthy.
-    // A literal proxy_pass did not have this problem, because it resolves once through
-    // libc, which does apply `search`. The entrypoint has to close that gap.
+    // nginx's resolver applies no search list, so bare `api` is NXDOMAIN under Kubernetes.
     const entrypoint = read('railhook-ui/docker-entrypoint.d/15-resolver.sh');
     expect(entrypoint, 'the search list has to be read').toMatch(/\^search/);
-    // And the qualified candidate has to be tried FIRST. Probing the bare name and only
-    // falling back to a suffix is the shape that looks right and does nothing: libc
-    // applies the search list itself, so `getent hosts api` succeeds inside the pod and
-    // the bare name — the one nginx cannot resolve — is what gets written.
+    // Qualified first: libc applies the search list, so probing bare `api` always succeeds.
     const probes = [...entrypoint.matchAll(/getent hosts "([^"]+)"/g)].map((m) => m[1]);
     expect(probes.length, 'a candidate has to be probed through libc').toBeGreaterThan(0);
     expect(probes[0], 'the suffixed name must be probed before the bare one').toContain(
       '${suffix}',
     );
-    // And the result has to reach nginx, which means overriding the defaults below.
-    // Backslash-escaped in the script: the heredoc is unquoted so that ${API_HOST}
-    // expands, which means nginx's own $ has to survive the shell.
+    // Escaped because the heredoc is unquoted.
     expect(entrypoint).toMatch(/set \\\$api_backend/);
     expect(entrypoint).toMatch(/set \\\$api_actuator/);
   });
 
   it('keeps working defaults if the generated file says nothing about the upstream', () => {
-    // The include has to come after them, or the defaults win and the override is dead
-    // code — which is exactly how this would regress.
+    // After the defaults, or the override is dead code.
     const defaultAt = conf.search(/^\s*set \$api_backend\s/m);
     const includeAt = conf.search(/^\s*include\s+\/tmp\/railhook-resolver\.conf;/m);
     expect(defaultAt, 'nginx fails to start on an undefined variable').toBeGreaterThan(-1);
@@ -90,7 +62,6 @@ describe('nginx upstream resolution', () => {
   });
 
   it('never names the API directly in a proxy_pass', () => {
-    // A literal is what gets cached. The variable is the whole mechanism.
     const literals = [...conf.matchAll(/proxy_pass\s+https?:\/\/(?!\$)([^\s;]+)/g)].map((m) => m[1]);
     expect(literals).toEqual([]);
   });
@@ -106,14 +77,7 @@ describe('nginx upstream resolution', () => {
   });
 });
 
-/**
- * The API must be able to be replaced rather than restarted.
- *
- * `container_name` pins a service to a single container and Compose refuses to scale it at
- * all — so the only way to put a new API in place was to stop the one that was serving. The
- * rolling path in `railhook upgrade` needs a second container to exist for a moment, and it
- * cannot if the name is fixed.
- */
+/** container_name blocks the second container a rolling upgrade needs. */
 describe('the API can be rolled', () => {
   const compose = read('docker-compose.yml');
   const installer = read('install.sh');
@@ -128,51 +92,30 @@ describe('the API can be rolled', () => {
   });
 
   it('upgrade warms the replacement out of rotation before it takes traffic', () => {
-    // Docker's DNS publishes a container's address the moment it exists and does not
-    // withhold it while the healthcheck is still failing — so a replacement that joins
-    // under its real name is handed live traffic by nginx while the JVM is still booting.
-    // The throwaway alias is what keeps it out until it can answer.
+    // Docker DNS publishes a container before it is healthy; the alias keeps traffic off it.
     expect(installer).toMatch(/--alias api-warming/);
     expect(installer).toMatch(/--alias api\b/);
     expect(installer).toMatch(/State\.Health\.Status/);
   });
 
   it('rolls a one-replica host too, by borrowing a second only for the upgrade', () => {
-    // Running two API containers around the clock to buy a seamless upgrade is a bad
-    // trade on the box this ships for — the second one costs memory every hour of the
-    // day to save thirty seconds a month. So one is the default, and the roll scales to
-    // two for the length of the swap and back down again.
-    //
-    // The regression this guards is the early return: `-le 1` sent exactly the default
-    // installation down the restart-in-place path, which is the downtime the roll exists
-    // to remove. Only an API that is not running at all has nothing to roll.
+    // One API by default; the roll scales to two only for the swap.
     const roll = installer.slice(installer.indexOf('roll_api() {'));
     const guard = roll.match(/\$\{target:-0\}" (-le|-lt|-eq) ([0-9]+)/);
     expect(guard, 'roll_api still has to decide when there is nothing to roll').not.toBeNull();
     expect(`${guard![1]} ${guard![2]}`, 'one replica must still be rolled').not.toBe('-le 1');
-    // And the scale-up has to be one more than whatever is there, not a fixed 2.
     expect(roll).toMatch(/--scale api=\$\(\(target \+ 1\)\)/);
   });
 
   it('upgrade replaces the helper before it uses it', () => {
-    // The helper is written once, at install time, and `upgrade` refreshed
-    // docker-compose.yml but never itself. So a release that changed the helper —
-    // this rolling path, for one — reached an existing host only on the deploy
-    // *after* the one that shipped it, and the deploy that was supposed to prove the
-    // fix restarted the API in place instead. Measured on the 2.16.2 deploy, which
-    // logged "Container railhook-api-9 Recreated" with the roll already released.
-    //
-    // So it fetches its own replacement first and re-execs, rather than editing the
-    // file bash is still reading line by line.
+    // The helper never refreshed itself, so its fixes reached a host one deploy late.
     expect(installer).toMatch(/--refresh/);
     const roll = installer.slice(installer.indexOf('upgrade)'));
     expect(roll, 'the new helper has to be the one that runs').toMatch(/exec "\$0"/);
     expect(roll, 'and only once, or it re-execs for ever').toMatch(
       /RAILHOOK_HELPER_REFRESHED/,
     );
-    // The flag the helper asks for has to be one install.sh accepts, or the fetch is
-    // a no-op that reports success. Read the flag out of the helper rather than
-    // naming it here, so renaming it in one place and not the other fails.
+    // Read from the helper so renaming it in one place fails.
     const asked = roll.match(/bash -s -- (--[a-z-]+) --dir/);
     expect(asked, 'the helper has to ask for something').not.toBeNull();
     expect(installer, `install.sh must accept ${asked?.[1]}`).toMatch(
@@ -181,11 +124,7 @@ describe('the API can be rolled', () => {
   });
 
   it('and says so where the operator is looking', () => {
-    // The refresh writes the helper, rewrites the Caddyfile and reloads Caddy, and
-    // every word of that went to /dev/null. A deploy log therefore could not answer
-    // "did the Caddyfile update" or "did the reload fail" — the only way to know was
-    // to ssh in and read Caddy's own logs, which is exactly what this whole chain
-    // exists to stop anyone having to do.
+    // The refresh's output used to go to /dev/null, so deploy logs couldn't show a failed reload.
     const roll = installer.slice(installer.indexOf('upgrade)'));
     const refresh = roll.slice(roll.indexOf('bash -s -- --refresh'));
     expect(
@@ -195,55 +134,32 @@ describe('the API can be rolled', () => {
   });
 
   it('and a rewritten Caddyfile is actually the one Caddy is serving', () => {
-    // The Caddyfile is a bind mount, so `compose up -d` sees no change in it and does
-    // not recreate the container — Caddy goes on serving the config it parsed at
-    // startup. Writing the file was therefore only two thirds of the job: the retry
-    // reached the host's disk and would have sat there unused until something
-    // unrelated restarted Caddy.
-    //
-    // Validated before reloading, because a reload that fails leaves the old config
-    // running but a validate that fails says so before anything is attempted; and a
-    // failure here must not abort the upgrade, since the previous config is still
-    // serving and the images are the point of the exercise.
+    // A bind-mounted Caddyfile isn't picked up by `up -d`; validate first, and never abort the upgrade.
     expect(installer).toMatch(/caddy validate/);
     expect(installer).toMatch(/caddy reload/);
     const reload = installer.slice(installer.indexOf('reload_caddy() {'));
     expect(reload.slice(0, 1200), 'validate has to come first').toMatch(
       /validate[\s\S]*reload/,
     );
-    // Only when there is a Caddy to reload. An installation with no domain runs none.
     expect(reload.slice(0, 1200)).toMatch(/ps .*caddy|caddy.*running|-q caddy/);
   });
 
   it('and the retry actually reaches a host that already exists', () => {
-    // The Caddyfile is written once, at install time, exactly like the helper was —
-    // and `upgrade` refreshed neither. So the retry above shipped in 2.16.3 and the
-    // production Caddyfile still had no lb_try_duration after deploying it. Same
-    // failure as the helper, one file over.
-    //
-    // So the refresh covers both, and only rewrites a Caddyfile that is already
-    // there: an installation without a domain never had one and must not gain one.
+    // Existing hosts never got Caddyfile changes; an install without a domain must not gain one.
     expect(installer).toMatch(/write_caddyfile/);
-    // The action case in main, not the `--refresh)` flag in the argument parser.
     const refresh = installer.slice(installer.search(/^\s+refresh\)/m));
     expect(refresh.slice(0, 400)).toMatch(/write_helper/);
     expect(refresh.slice(0, 400)).toMatch(/Caddyfile/);
   });
 
   it('a UI restart is a slow request, not a 502', () => {
-    // Caddy is the front door and proxies everything — the dashboard, /hook, /ingress
-    // — to one upstream, the UI's nginx. That container cannot be rolled the way the
-    // API is, because it publishes a host port and two replicas cannot bind it. So
-    // the gap is closed at the proxy instead: Caddy retries a refused dial for a few
-    // seconds rather than answering 502 immediately. Nothing has been sent when a
-    // dial fails, so the retry is safe for any method.
+    // The UI's nginx binds a host port and can't be rolled, so Caddy retries refused dials.
     expect(installer).toMatch(/lb_try_duration/);
     expect(installer).toMatch(/lb_try_interval/);
   });
 
   it('and drains the one it replaces rather than killing it', () => {
-    // docker stop sends SIGTERM, which Spring's graceful shutdown uses to finish what is
-    // in flight. Going straight to rm would drop those requests on the floor.
+    // SIGTERM lets Spring finish in-flight requests; rm would drop them.
     const roll = installer.slice(installer.indexOf('roll_api() {'));
     expect(roll.indexOf('docker stop')).toBeGreaterThan(-1);
     expect(roll.indexOf('docker stop')).toBeLessThan(roll.indexOf('docker rm -f "$old"'));

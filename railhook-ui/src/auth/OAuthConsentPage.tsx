@@ -21,15 +21,7 @@ import type { McpGrantScope } from '../types/api.types';
 
 const SCOPES: McpGrantScope[] = ['READ_ONLY', 'READ_WRITE'];
 
-/**
- * Where claude.ai, ChatGPT or another MCP app sends a person to connect Railhook: the app is
- * named, the host it will hand access to is shown, and the person picks the one project
- * and the access it gets.
- *
- * <p>The decision is an API call made with the session's token, and the browser is only sent
- * back to the app after the API answers with the app's own registered address — this page never
- * builds a redirect itself. Signed out, it goes through the sign-in screen and comes back here.
- */
+/** The redirect comes from the API's answer, never built here. */
 export default function OAuthConsentPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -42,7 +34,7 @@ export default function OAuthConsentPage() {
   const errorDescription = searchParams.get('error_description');
 
   const consent = useMcpConsentRequest(requestId, isAuthenticated && !errorCode);
-  // Signed out, this page only redirects to sign-in: asking for either list would be a 401.
+  // Signed out, this page only redirects; either list would 401.
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: queryKeys.projects.all,
     queryFn: () => projectsApi.list(),
@@ -131,8 +123,7 @@ export default function OAuthConsentPage() {
       http.setToken(accessToken);
       const me = await authApi.getCurrentUser();
       login(accessToken, me);
-      // Projects, and whether this person may grant write access, both belong to the
-      // organization just left.
+      // Projects and write permission both belong to the organization just left.
       queryClient.clear();
     } catch (error) {
       showApiError(error, 'org.switchFailed');

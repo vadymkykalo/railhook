@@ -50,7 +50,6 @@ const CHANNEL_ICON: Record<AlertChannel, React.ElementType> = {
   SLACK: MessageSquare,
 };
 
-/** True while a rule is actually armed — enabled, not muted, not snoozed. */
 function isArmed(rule: { enabled: boolean; muted: boolean; snoozedUntil: string | null }): boolean {
   if (!rule.enabled || rule.muted) return false;
   return !rule.snoozedUntil || new Date(rule.snoozedUntil) <= new Date();
@@ -246,7 +245,6 @@ export default function AlertsPage() {
           />
         </div>
 
-        {/* What fired — the surface that needs a human. */}
         <section>
           <div className="mb-3">
             <h3 className="text-sm font-medium leading-tight">{t('alerts.history.title')}</h3>
@@ -394,7 +392,6 @@ export default function AlertsPage() {
           )}
         </section>
 
-        {/* What is watching. */}
         <section>
           <div className="mb-3">
             <h3 className="text-sm font-medium leading-tight">{t('alerts.rules.title')}</h3>

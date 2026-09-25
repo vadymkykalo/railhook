@@ -1,19 +1,11 @@
-/**
- * What the customer puts on the portal's URL, read and validated in one place.
- *
- * The token rides in the fragment and everything else in the query. Every value here is written
- * by someone else's page, so each is checked against the one shape it may have and dropped
- * otherwise — a bad `primary` leaves Railhook's colour, it does not break the page.
- */
+/** Every value is written by someone else's page, so each is validated and dropped when malformed. */
 
 export type PortalTheme = 'light' | 'dark';
 export type PortalLanguage = 'en' | 'uk';
 
 export interface PortalParams {
   token: string | null;
-  /** The embedding origin the URL was issued for; see `embeddingAllowed`. */
   origin: string | null;
-  /** `#rrggbb`, normalised from 3 or 6 hex digits with or without the `#`. */
   primary: string | null;
   logo: string | null;
   theme: PortalTheme | null;
@@ -67,7 +59,6 @@ function validLogo(value: string | null): string | null {
   }
 }
 
-/** `#rrggbb` as the `H S% L%` triple the theme's CSS variables hold. */
 export function hexToHslTriple(hex: string): { h: number; s: number; l: number } {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
@@ -92,7 +83,6 @@ function round(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-/** Relative luminance, to decide whether text on the colour should be light or dark. */
 function luminance(hex: string): number {
   const channel = (i: number) => {
     const c = parseInt(hex.slice(i, i + 2), 16) / 255;
@@ -101,7 +91,6 @@ function luminance(hex: string): number {
   return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
 }
 
-/** The CSS variables a brand colour replaces, for both themes alike. */
 export function brandVariables(hex: string): Record<string, string> {
   const { h, s, l } = hexToHslTriple(hex);
   const hover = Math.max(0, l - 8);
@@ -113,19 +102,7 @@ export function brandVariables(hex: string): Record<string, string> {
   };
 }
 
-/**
- * Whether the portal may render where it finds itself.
- *
- * Without an allowed origin on the session, anywhere. With one, the rule is enforced twice. The
- * browser does the first half: nginx serves this page with `frame-ancestors` set to the URL's
- * `origin`, so a page from any other origin cannot frame it at all. This is the second half —
- * the URL's `origin` has to be the session's. Otherwise anyone holding a token could frame it
- * from their own site by writing their own origin into the URL.
- *
- * Opened as a top-level page nothing embeds it, so there is nothing to check, unless the URL
- * names an origin that is not the session's. Where the browser reports the embedder itself
- * (`location.ancestorOrigins`, not in Firefox), that is checked too.
- */
+/** Second half of the frame check: nginx's frame-ancestors trusts the URL's origin, so it must be the session's. */
 export function embeddingAllowed({
   allowedOrigin, originParam, framed, ancestorOrigins,
 }: {

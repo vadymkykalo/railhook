@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { toast } from 'sonner';
 
-// Mock sonner
 vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),
@@ -11,7 +10,6 @@ vi.mock('sonner', () => ({
   },
 }));
 
-// Mock i18n
 vi.mock('../../i18n', () => ({
   default: {
     t: (key: string) => {

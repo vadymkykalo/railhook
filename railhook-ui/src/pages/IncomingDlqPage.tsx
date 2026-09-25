@@ -21,7 +21,6 @@ import VerificationGate from '../components/VerificationGate';
 import { railFromCounts } from './attemptRailData';
 import { AttemptCell, CopyId, SelectBox, SelectionBar, TimeCell } from './tableParts';
 
-/** A number worth reading on its own, in the machine voice. */
 function Metric({ label, value, halt }: { label: string; value: number; halt?: boolean }) {
   return (
     <div className="border border-rail bg-card px-4 py-3">
@@ -31,16 +30,7 @@ function Metric({ label, value, halt }: { label: string; value: number; halt?: b
   );
 }
 
-/**
- * The same page as the outgoing DLQ, read from the other end: a Forward that Railhook
- * stopped trying to get to a Destination, rather than a Delivery it stopped trying to get
- * to an Endpoint.
- *
- * One difference is worth knowing while looking at it. Retrying here re-forwards to the one
- * Destination that failed and starts a fresh Retry Ladder for it; the Time Machine's replay,
- * which was the only recovery before this page existed, fans an Incoming Event out to every
- * enabled Destination — including the ones that already received it.
- */
+/** Retry re-forwards to the one failed Destination; a Time Machine replay fans out to all of them. */
 export default function IncomingDlqPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();

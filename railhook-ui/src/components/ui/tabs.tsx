@@ -1,25 +1,13 @@
 import { useCallback, useId, useRef, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
-/**
- * An in-page tab strip.
- *
- * Hand-rolled rather than another Radix package, because the visual language
- * already exists — `ModeSwitch` in `Workbench.tsx` is the same control — and what
- * `ModeSwitch` is missing is only the ARIA roles and the arrow-key behaviour
- * that make a *tab* strip a tab strip. `ModeSwitch` stays what it is: a choice
- * of mode, where each option changes what the page does. These are views of one
- * result, where each panel shows the same run from a different angle, and a
- * screen reader should be told which.
- */
+/** Hand-rolled ModeSwitch plus tab ARIA roles and arrow keys, so screen readers hear a tab strip. */
 
 export interface TabDefinition<T extends string> {
   value: T;
   label: string;
   icon?: LucideIcon;
-  /** A count or a dot beside the label — "3" console lines, "2" errors. */
   badge?: ReactNode;
-  /** Draws the badge in the halt colour. For errors, not for counts. */
   badgeAlarming?: boolean;
 }
 
@@ -28,7 +16,6 @@ interface TabsProps<T extends string> {
   onChange: (value: T) => void;
   tabs: Array<TabDefinition<T>>;
   ariaLabel: string;
-  /** Rendered at the right-hand end of the strip: a copy button, a metric. */
   actions?: ReactNode;
   className?: string;
 }
@@ -39,8 +26,6 @@ export function Tabs<T extends string>({
   const baseId = useId();
   const stripRef = useRef<HTMLDivElement>(null);
 
-  // Left/Right move between tabs and Home/End jump to the ends, which is what
-  // the tab role promises and what keyboard users will try.
   const onKeyDown = useCallback((event: React.KeyboardEvent) => {
     const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
     if (!keys.includes(event.key)) return;
@@ -113,11 +98,7 @@ interface TabPanelProps<T extends string> {
   className?: string;
 }
 
-/**
- * Kept mounted and hidden rather than unmounted, so switching tabs does not
- * throw away an editor's scroll position mid-debug — the loop is edit, run,
- * look at three views of the same run, and each look should be instant.
- */
+/** Kept mounted so switching tabs keeps an editor's scroll position. */
 export function TabPanel<T extends string>({ value, active, children, className = '' }: TabPanelProps<T>) {
   const selected = value === active;
   return (

@@ -46,7 +46,6 @@ const CREATED: EndpointResponse = {
   updatedAt: NOW,
 };
 
-/** Walks the wizard's first step, which is what puts a secret on the screen. */
 async function createTheEndpoint(created: EndpointResponse = CREATED) {
   const { default: userEvent } = await import('@testing-library/user-event');
   const user = userEvent.setup();

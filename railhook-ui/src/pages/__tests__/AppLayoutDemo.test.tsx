@@ -26,7 +26,6 @@ const DEMO: CurrentUserResponse = {
   demo: true,
 };
 
-/** Where the layout sends a demo visitor, rendered so a test can see it arrived. */
 function WithDestinations() {
   return (
     <Routes>
@@ -37,11 +36,6 @@ function WithDestinations() {
   );
 }
 
-/**
- * The live demo's dashboard says what it is on every page, and every way out of it ends the demo
- * session: signing up, or leaving for the public site — never the sign-in page, since a demo
- * visitor has no account to sign in to.
- */
 describe('the dashboard in the live demo', () => {
   beforeEach(() => {
     vi.clearAllMocks();

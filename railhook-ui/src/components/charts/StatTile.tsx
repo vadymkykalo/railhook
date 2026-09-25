@@ -7,26 +7,15 @@ import { SERIES } from './chartTheme';
 
 interface StatTileProps {
   label: string;
-  /** Preformatted — the tile does not guess how its measure should read. */
   value: string;
   hint?: ReactNode;
   badge?: ReactNode;
-  /** 12-ish points of history behind the value. Brand hue: it is not an outcome. */
   spark?: number[];
-  /** A tile that names something a person can go and look at, leads there. */
   to?: string;
   className?: string;
 }
 
-/**
- * A single current number is a stat tile, not a chart. A one-bar bar chart and
- * a two-slice donut are the two most common ways a dashboard says less than
- * the number would have said on its own.
- *
- * The value takes the font's proportional figures rather than `tabular-nums`:
- * equal-width digits are for columns that must line up, and at tile size they
- * make a number like 121 look loose.
- */
+/** Proportional figures, not tabular-nums: equal-width digits look loose at tile size. */
 export default function StatTile({ label, value, hint, badge, spark, to, className }: StatTileProps) {
   const body = (
     <>

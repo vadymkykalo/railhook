@@ -7,10 +7,6 @@ import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
 import { useAuth } from './auth.store';
 
-/**
- * Opened from the link mailed to the new address. Confirming signs every session out, this tab's
- * included, so the only way on is to sign in with the new address.
- */
 export default function ConfirmEmailChangePage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -19,7 +15,7 @@ export default function ConfirmEmailChangePage() {
   const token = searchParams.get('token');
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
-  // The token is single-use; a second run of the effect must not spend it again.
+  // Single-use token: a second effect run must not spend it again.
   const started = useRef(false);
 
   useEffect(() => {

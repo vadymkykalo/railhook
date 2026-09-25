@@ -105,10 +105,7 @@ export default function Sidebar({
         ))}
       </nav>
 
-      {/* Documentation and settings. Search is not here: the header bar carries
-          it, and it carries it at every width — this copy only rendered on an
-          expanded sidebar, so a wide screen showed two identical "Search ⌘K"
-          controls at once and a collapsed one showed none. */}
+      {/* Search lives in the header at every width; a copy here showed twice or not at all. */}
       <div className="space-y-0.5 border-t border-rail p-2">
         {!narrow && <p className="mono-label px-2.5 pb-1.5 pt-2">{t('nav.resources')}</p>}
         {/* A page load, not a route: the docs are their own site at /docs/. */}
@@ -124,9 +121,6 @@ export default function Sidebar({
           <BookOpen className="h-4 w-4 flex-shrink-0" />
           {!narrow && <span>{t('nav.documentation')}</span>}
         </a>
-        {/* Shown to everyone, and it lands on the personal profile — the page
-            where a member changes their own password. What the section's
-            org-level tabs need is stated in nav.config and filtered there. */}
         <Link
           to={SETTINGS_SECTION.path()}
           onClick={isMobile ? onNavigate : undefined}
@@ -143,9 +137,7 @@ export default function Sidebar({
           <Settings className="h-4 w-4 flex-shrink-0" />
           {!narrow && <span>{t('nav.settings')}</span>}
         </Link>
-        {/* Only for the people who run the deployment. Hiding it is a courtesy, not the
-            control: the pages refuse without `platformAdmin`, and the API refuses anyone
-            not listed in PLATFORM_ADMIN_EMAILS whatever this renders. */}
+        {/* A courtesy, not the control: pages and the API refuse without platformAdmin. */}
         {user.platformAdmin && (
           <Link
             to={PLATFORM_SECTION.path()}
@@ -177,8 +169,6 @@ export default function Sidebar({
             <>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] leading-tight">{user.user?.email}</p>
-                {/* Renders as the plain name it always was until there is a second organization
-                    to switch to, so nobody gets a control over a list of one. */}
                 <OrganizationSwitcher />
               </div>
               <Button variant="ghost" size="icon-sm" onClick={onLogout}

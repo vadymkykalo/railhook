@@ -36,7 +36,6 @@ function BackLink() {
   );
 }
 
-/** One resource against the plan. No limit (billing off, self_hosted) reads as Unlimited, with no bar. */
 function UsageRow({ label, usage }: { label: string; usage: AdminResourceUsage }) {
   const { t } = useTranslation();
   const unlimited = usage.limit <= 0;
@@ -63,7 +62,6 @@ function UsageRow({ label, usage }: { label: string; usage: AdminResourceUsage }
   );
 }
 
-/** One organization: who is in it, what it has, what it has used, what happened, and suspension. */
 export default function PlatformOrganizationDetailPage() {
   const { t } = useTranslation();
   const { organizationId = '' } = useParams();

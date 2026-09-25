@@ -7,7 +7,6 @@ import { auditLogApi } from '../auditLog.api';
 import { organizationsApi } from '../organizations.api';
 import { resolveErrorMessage } from '../../lib/toast';
 
-/** What axios hands back for a failed `responseType: 'blob'` request: the JSON error body, as a Blob. */
 function blobBodiedError(status: number, body: unknown) {
   return {
     response: { status, data: new Blob([JSON.stringify(body)], { type: 'application/json' }) },

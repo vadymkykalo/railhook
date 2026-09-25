@@ -10,18 +10,7 @@ import SiteOverlays from '../components/site/SiteOverlays';
 import { REPO_URL } from '../pages/landing/plans';
 import { WRAP } from '../pages/landing/primitives';
 
-/**
- * A new public page starts at the top of itself.
- *
- * <p>`createBrowserRouter` leaves the scroll offset alone across a navigation, which is right
- * for an app shell whose panes scroll independently and wrong for a set of long marketing
- * pages: following a link from halfway down the home page landed on the next page at the
- * same offset. The page looked like it had lost its top.
- *
- * <p>The landing page keeps its own effect because it has something extra to do — the nav
- * links to `#run` and friends, and a hash has to win over this. Scrolling on layout rather
- * than after paint so the jump is never drawn.
- */
+/** The router keeps the scroll offset across navigation; the landing page handles its own hash links. */
 function useScrollToTopOnNavigate() {
   const { pathname, hash } = useLocation();
   useLayoutEffect(() => {
@@ -30,11 +19,6 @@ function useScrollToTopOnNavigate() {
   }, [pathname, hash]);
 }
 
-/**
- * The chrome every public page shares: the header, then one 1336px frame with hairlines at both
- * edges holding the page and the footer. `nav` is opt-in because the documentation brings its
- * own; the footer is not.
- */
 export default function PublicLayout({ nav = true }: { nav?: boolean }) {
   useScrollToTopOnNavigate();
   return (
@@ -51,8 +35,7 @@ export default function PublicLayout({ nav = true }: { nav?: boolean }) {
   );
 }
 
-/* Below sm a link is a 40px row, so a thumb hits the one it meant; from sm the column is as dense
-   as it always was. */
+/* Below sm a link is a 40px row, so a thumb hits the one it meant. */
 const LINK = 'text-[14.5px] text-[#555] transition-colors hover:text-foreground dark:text-muted-foreground max-sm:flex max-sm:min-h-10 max-sm:items-center';
 
 function Column({ title, children }: { title: string; children: ReactNode }) {
@@ -74,7 +57,7 @@ function RouteLink({ to, children }: { to: string; children: ReactNode }) {
   );
 }
 
-/** Docs are a separate static site, so a full navigation, not a router link. */
+/** Docs are a separate static site, so a full navigation. */
 function PageLink({ href, external = false, children }: { href: string; external?: boolean; children: ReactNode }) {
   return (
     <li>
@@ -85,11 +68,6 @@ function PageLink({ href, external = false, children }: { href: string; external
   );
 }
 
-/**
- * Only accounts that exist: the repository always, support mail only where the deployment has a
- * contact domain — the same rule as the contact page, since a self-hosted install has no support
- * desk. Another account is one more entry in `links`.
- */
 function ConnectWithUs() {
   const { t } = useTranslation();
   const captionId = useId();
@@ -124,18 +102,11 @@ function ConnectWithUs() {
   );
 }
 
-/**
- * The theme toggle lives here rather than in the header: it is set once, and the header is kept
- * to the places a reader goes. The language switch used to sit beside it and does not any more —
- * a reader who cannot read the page should not have to scroll past all of it to say so, so it
- * moved into the header (`LandingNav`).
- */
 export function Footer() {
   const { t } = useTranslation();
   return (
     <footer className="lp-rule bg-background">
       <div className={`${WRAP} pb-12 pt-14`}>
-        {/* Two columns of links on a phone, with the brand across the top, instead of one long list. */}
         <div className="grid gap-[30px] max-sm:grid-cols-2 max-sm:gap-x-6 max-sm:gap-y-8 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(4,minmax(0,1fr))]">
           <div className="max-sm:col-span-2">
             <Link to="/" className="mb-3.5 flex items-center gap-2 text-[22px] font-medium leading-none tracking-[-0.03em] text-foreground max-sm:min-h-10">
