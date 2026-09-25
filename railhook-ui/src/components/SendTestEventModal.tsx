@@ -185,7 +185,7 @@ export default function SendTestEventModal({
             </div>
 
             {eventType.trim() && matchingCount === 0 && (
-              <div className="rounded-md border border-retry/30 bg-retry-soft p-3">
+              <div className="border border-retry/30 bg-retry-soft p-3">
                 <p className="flex items-start gap-2 text-sm text-retry">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                   <span>{t('events.sendModal.noMatchWarning')}</span>
@@ -194,7 +194,7 @@ export default function SendTestEventModal({
             )}
 
             {eventType.trim() && matchingCount > 0 && (
-              <div className="rounded-md border border-ok/30 bg-ok-soft p-3">
+              <div className="border border-ok/30 bg-ok-soft p-3">
                 <p className="flex items-center gap-2 text-sm text-ok">
                   <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
                   <span>{t('events.sendModal.matchInfo', { count: matchingCount })}</span>
@@ -203,7 +203,7 @@ export default function SendTestEventModal({
             )}
 
             {!eventType.trim() && (
-              <div className="rounded-md border border-rail bg-secondary/50 p-3">
+              <div className="border border-rail bg-secondary/50 p-3">
                 <p className="text-sm text-muted-foreground">
                   <strong className="text-foreground">{t('events.sendModal.noteLabel')}</strong> {t('events.sendModal.noteBody')}
                 </p>

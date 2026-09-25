@@ -126,7 +126,7 @@ export default function ConditionTreeEditor({
   };
 
   return (
-    <div className="space-y-2 rounded-lg border-l-[3px] border-rail bg-muted/30 py-2 pl-3">
+    <div className="space-y-2 border-l-[3px] border-rail bg-muted/30 py-2 pl-3">
       {/* Group header */}
       <div className="flex items-center gap-2">
         <button
@@ -222,7 +222,7 @@ function PredicateEditor({
   // Compact layout: stack vertically for narrow sidebar
   if (compact) {
     return (
-      <div className="bg-muted/40 rounded-lg p-2 border space-y-1.5">
+      <div className="bg-muted/40 p-2 border space-y-1.5">
         <div className="flex items-center gap-1">
           <Input
             placeholder="data.amount"
@@ -232,7 +232,7 @@ function PredicateEditor({
           />
           <button
             onClick={onRemove}
-            className="p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+            className="p-1 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0"
             title={t('rules.form.conditionTree.removeCondition')}
             aria-label={t('rules.form.conditionTree.removeCondition')}
           >
@@ -264,7 +264,7 @@ function PredicateEditor({
 
   // Wide layout: horizontal row
   return (
-    <div className="flex items-start gap-2 bg-muted/40 rounded-lg p-2.5 border">
+    <div className="flex items-start gap-2 bg-muted/40 p-2.5 border">
       <div className={`flex-1 grid gap-2 ${needsValue ? 'grid-cols-3' : 'grid-cols-2'}`}>
         <Input
           placeholder="payload.data.amount"
@@ -292,7 +292,7 @@ function PredicateEditor({
       </div>
       <button
         onClick={onRemove}
-        className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors mt-0.5"
+        className="p-1.5 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors mt-0.5"
         title={t('rules.form.conditionTree.removeCondition')}
         aria-label={t('rules.form.conditionTree.removeCondition')}
       >

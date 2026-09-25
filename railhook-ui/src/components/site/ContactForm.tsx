@@ -63,10 +63,10 @@ export default function ContactForm({ compact = false, autoFocus = false }: { co
   if (send.isSuccess) {
     return (
       <div role="status" className="flex flex-col items-center px-2 py-8 text-center">
-        <span className="grid h-12 w-12 place-items-center rounded-full bg-accent text-primary">
+        <span className="grid h-12 w-12 place-items-center bg-accent text-accent-foreground">
           <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
         </span>
-        <p className="mt-4 text-[1.05rem] font-semibold text-foreground">{t('site.contact.sentTitle')}</p>
+        <p className="mt-4 text-[1.05rem] font-medium text-foreground">{t('site.contact.sentTitle')}</p>
         <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">{t('site.contact.sentBody', { email: email.trim() })}</p>
         <Button
           variant="outline"
@@ -98,7 +98,7 @@ export default function ContactForm({ compact = false, autoFocus = false }: { co
             <label
               key={value}
               className={cn(
-                'cursor-pointer rounded-full border px-3 py-1 text-sm transition-colors',
+                'cursor-pointer border px-3 py-1 text-sm transition-colors',
                 'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-1',
                 topic === value
                   ? 'border-primary bg-primary text-primary-foreground'

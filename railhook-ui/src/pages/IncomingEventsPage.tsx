@@ -228,7 +228,7 @@ export default function IncomingEventsPage() {
             </SelectionBar>
           )}
 
-          <div className="overflow-hidden rounded-lg border border-rail bg-card">
+          <div className="overflow-hidden border border-rail bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -333,7 +333,7 @@ export default function IncomingEventsPage() {
 
           {selectedEvent && (
             <div className="mt-6 space-y-6">
-              <section className="rounded-lg border border-rail">
+              <section className="border border-rail">
                 <h3 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.requestMeta')}</h3>
                 <dl className="divide-y divide-rail text-[13px]">
                   {[
@@ -360,7 +360,7 @@ export default function IncomingEventsPage() {
                 )}
               </section>
 
-              <section className="rounded-lg border border-rail">
+              <section className="border border-rail">
                 <div className="flex items-center justify-between border-b border-rail px-4 py-2.5">
                   <h3 className="text-[13px] font-medium">{t('incomingEvents.detail.forwards')}</h3>
                   {canReplayIncomingEvents && (
@@ -399,7 +399,7 @@ export default function IncomingEventsPage() {
                           />
                           <ul className="space-y-2">
                             {forward.attempts.map((attempt) => (
-                              <li key={attempt.id} className="rounded-md border border-rail p-3 text-[12px]">
+                              <li key={attempt.id} className="border border-rail p-3 text-[12px]">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className="font-medium">{t('incomingEvents.detail.attempt', { number: attempt.attemptNumber })}</span>
                                   {attempt.responseCode != null && (
@@ -461,7 +461,7 @@ export default function IncomingEventsPage() {
               </section>
 
               {selectedEvent.headersJson && (
-                <section className="rounded-lg border border-rail">
+                <section className="border border-rail">
                   <h3 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.headers')}</h3>
                   <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-[11px]">
                     {formatJson(selectedEvent.headersJson)}
@@ -470,7 +470,7 @@ export default function IncomingEventsPage() {
               )}
 
               {selectedEvent.bodyRaw && (
-                <section className="rounded-lg border border-rail">
+                <section className="border border-rail">
                   <h3 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.body')}</h3>
                   <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-[11px]">
                     {formatJson(selectedEvent.bodyRaw)}

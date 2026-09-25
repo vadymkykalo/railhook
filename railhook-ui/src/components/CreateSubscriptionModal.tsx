@@ -235,7 +235,7 @@ export default function CreateSubscriptionModal({
           <div className="space-y-5 py-4">
             {/* ── Section 1: Essential ── */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Zap className="h-4 w-4 text-primary" />
                 {t('createSubscription.sections.essentials')}
               </div>
@@ -289,13 +289,13 @@ export default function CreateSubscriptionModal({
 
             {/* ── Section 2: Behavior ── */}
             <div className="space-y-3 border-t border-rail pt-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Settings2 className="h-4 w-4 text-muted-foreground" />
                 {t('createSubscription.sections.behavior')}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-lg border">
+                <div className="flex items-center gap-3 p-3 bg-muted/40 border">
                   <Switch
                     id="enabled"
                     checked={enabled}
@@ -314,7 +314,7 @@ export default function CreateSubscriptionModal({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-lg border">
+                <div className="flex items-center gap-3 p-3 bg-muted/40 border">
                   <Switch
                     id="orderingEnabled"
                     checked={orderingEnabled}
@@ -339,7 +339,7 @@ export default function CreateSubscriptionModal({
             <div className="border-t border-rail pt-4">
               <button
                 type="button"
-                className="flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors w-full"
+                className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors w-full"
                 onClick={() => setShowAdvanced(!showAdvanced)}
               >
                 {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -445,7 +445,7 @@ export default function CreateSubscriptionModal({
                     {transformationId && (() => {
                       const selected = transformations.find(tr => tr.id === transformationId);
                       return selected ? (
-                        <div className="rounded-md border bg-muted/30 p-2.5 text-xs space-y-1">
+                        <div className="border bg-muted/30 p-2.5 text-xs space-y-1">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{selected.name}</span>
                             <span className="text-muted-foreground">v{selected.version}</span>
@@ -465,7 +465,7 @@ export default function CreateSubscriptionModal({
                       </Label>
                       <textarea
                         id="payloadTemplate"
-                        className="w-full h-28 p-2 text-xs font-mono border rounded-md bg-background resize-y"
+                        className="w-full h-28 p-2 text-xs font-mono border bg-background resize-y"
                         placeholder={'{\n  "id": "${$.id}",\n  "data": "${$.data}"\n}'}
                         value={payloadTemplate}
                         onChange={(e) => setPayloadTemplate(e.target.value)}
@@ -486,7 +486,7 @@ export default function CreateSubscriptionModal({
                       </Label>
                       <textarea
                         id="customHeaders"
-                        className="w-full h-28 p-2 text-xs font-mono border rounded-md bg-background resize-y"
+                        className="w-full h-28 p-2 text-xs font-mono border bg-background resize-y"
                         placeholder={'{\n  "X-Api-Key": "key",\n  "Authorization": "Bearer ..."\n}'}
                         value={customHeaders}
                         onChange={(e) => setCustomHeaders(e.target.value)}
@@ -507,7 +507,7 @@ export default function CreateSubscriptionModal({
 
             {/* ── Summary / Tip ── */}
             {!subscription && endpointId && eventType.trim() && (
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-start gap-2.5">
+              <div className="bg-primary/5 border border-primary/20 p-3 flex items-start gap-2.5">
                 <HelpCircle className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                 <div className="text-xs space-y-1">
                   <p className="font-medium text-foreground">{t('createSubscription.summary.title')}</p>
@@ -602,12 +602,12 @@ function EventTypeField({
 
         {/* Autocomplete dropdown */}
         {showDropdown && (
-          <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-lg border bg-popover shadow-lg">
+          <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto border bg-popover shadow-lg">
             {suggestions.map((et) => (
               <button
                 key={et.id}
                 type="button"
-                className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors border-b last:border-b-0"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors border-b last:border-b-0"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   onChange(et.name);
@@ -641,12 +641,12 @@ function EventTypeField({
 
       {/* Schema info badge for exact match */}
       {exactMatch && (
-        <div className="rounded-lg border bg-primary/5 overflow-hidden">
+        <div className="border bg-primary/5 overflow-hidden">
           <div className="flex items-start gap-2 p-2.5">
             <FileJson2 className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
             <div className="text-xs space-y-0.5 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono font-semibold">{exactMatch.name}</span>
+                <span className="font-mono font-medium">{exactMatch.name}</span>
                 {exactMatch.latestVersion != null && (
                   <span className="text-muted-foreground">v{exactMatch.latestVersion}</span>
                 )}

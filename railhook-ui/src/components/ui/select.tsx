@@ -61,7 +61,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
              is left to the global `:focus-visible` outline; the old
              `focus:ring-ring/20 focus:border-ring` was a third focus look. */
           className={cn(
-            "flex h-9 w-full items-center justify-between rounded-md border border-input bg-card px-3 py-2 text-base sm:text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
+            "flex h-9 w-full items-center justify-between border border-input bg-card px-3 py-2 text-base sm:text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
             className
           )}
         >
@@ -75,7 +75,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
 
         <SelectPrimitive.Portal>
           <SelectPrimitive.Content
-            className="relative z-50 max-h-[240px] min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
+            className="relative z-50 max-h-[240px] min-w-[8rem] overflow-hidden border bg-popover text-popover-foreground shadow-md"
             position="popper"
             sideOffset={4}
           >
@@ -86,8 +86,8 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                   value={option.value}
                   disabled={option.disabled}
                   className={cn(
-                    "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none",
-                    "focus:bg-accent focus:text-accent-foreground",
+                    "relative flex w-full cursor-default select-none items-center py-1.5 pl-8 pr-2 text-sm outline-none",
+                    "focus:bg-secondary focus:text-foreground",
                     "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
                   )}
                 >

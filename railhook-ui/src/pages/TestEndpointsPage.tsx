@@ -154,7 +154,7 @@ export default function TestEndpointsPage() {
       <PageSkeleton>
         <div className="grid gap-6 lg:grid-cols-2">
           <SkeletonRows count={2} height="h-28" />
-          <div className="h-64 animate-pulse rounded-xl bg-muted" />
+          <div className="h-64 animate-pulse bg-muted" />
         </div>
       </PageSkeleton>
     );
@@ -217,8 +217,8 @@ export default function TestEndpointsPage() {
               <div
                 key={endpoint.id}
                 className={cn(
-                  'rounded-lg border p-3 transition-colors',
-                  selectedEndpoint === endpoint.id ? 'border-primary/40 bg-accent' : 'border-rail hover:bg-secondary/60',
+                  'border p-3 transition-colors',
+                  selectedEndpoint === endpoint.id ? 'border-primary bg-secondary' : 'border-rail hover:bg-secondary/60',
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -291,7 +291,7 @@ export default function TestEndpointsPage() {
                 requests.map((req) => {
                   const expanded = expandedRequest === req.id;
                   return (
-                    <div key={req.id} className="overflow-hidden rounded-lg border border-rail">
+                    <div key={req.id} className="overflow-hidden border border-rail">
                       <button
                         type="button"
                         aria-expanded={expanded}

@@ -1,7 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { RouterProvider } from 'react-router-dom';
-import userEvent from '@testing-library/user-event';
 import '../i18n';
 import en from '../i18n/locales/en.json';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -35,8 +34,6 @@ afterEach(() => {
   delete window.__RAILHOOK__;
 });
 
-const blogLinks = () => screen.queryAllByRole('link', { name: en.landing.nav.blog });
-
 describe('publicBlogEnabled', () => {
   it('is on only for a literal true', () => {
     expect(publicBlogEnabled()).toBe(false);
@@ -51,28 +48,11 @@ describe('publicBlogEnabled', () => {
 });
 
 describe('the header', () => {
-  async function openMobileMenu() {
-    await userEvent.click(screen.getByRole('button', { name: en.landing.nav.openMenu }));
-  }
-
-  it('links the blog, wide and in the mobile menu, where the deployment serves it', async () => {
+  it('leaves the blog to the footer, whether or not it is on', () => {
     window.__RAILHOOK__ = { publicBlog: true };
     renderPage(<LandingNav />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
-    const nav = screen.getByRole('navigation', { name: en.landing.nav.label });
-    expect(within(nav).getByRole('link', { name: en.landing.nav.blog })).toHaveAttribute('href', '/blog');
-
-    await openMobileMenu();
-    expect(blogLinks().length).toBe(2);
-  });
-
-  it('has no Blog link anywhere when the blog is off', async () => {
-    renderPage(<LandingNav />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
-    expect(blogLinks()).toHaveLength(0);
-
-    await openMobileMenu();
-    expect(blogLinks()).toHaveLength(0);
-    // The rest of the reading links stay.
-    expect(screen.getAllByRole('link', { name: en.landing.nav.about }).length).toBeGreaterThan(0);
+    const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(hrefs).not.toContain('/blog');
   });
 });
 

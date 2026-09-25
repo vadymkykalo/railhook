@@ -122,7 +122,7 @@ export function RoleCard({
   );
 
   if (!interactive) {
-    return <div className="rounded-lg border border-rail bg-card p-4">{body}</div>;
+    return <div className="border border-rail bg-card p-4">{body}</div>;
   }
 
   return (
@@ -133,9 +133,9 @@ export function RoleCard({
       disabled={disabled}
       onClick={() => onSelect(role)}
       className={cn(
-        'rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        'border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        selected ? 'border-primary bg-accent/40' : 'border-rail bg-card hover:border-primary/40'
+        selected ? 'border-primary bg-secondary' : 'border-rail bg-card hover:border-primary/40'
       )}
     >
       {body}

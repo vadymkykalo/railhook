@@ -57,7 +57,7 @@ export default function ResetPasswordPage() {
         title={t('auth.resetPassword.invalidLink')}
         subtitle={t('auth.resetPassword.invalidLinkMessage')}
         footer={
-          <Link to="/login" className="font-medium text-primary hover:underline">
+          <Link to="/login" className="font-medium link-ink">
             {t('auth.resetPassword.backToSignIn')}
           </Link>
         }
@@ -87,7 +87,7 @@ export default function ResetPasswordPage() {
       title={t('auth.resetPassword.title')}
       subtitle={t('auth.resetPassword.subtitle')}
       footer={
-        <Link to="/login" className="font-medium text-primary hover:underline">
+        <Link to="/login" className="font-medium link-ink">
           {t('auth.resetPassword.backToSignIn')}
         </Link>
       }
@@ -123,7 +123,7 @@ export default function ResetPasswordPage() {
         </div>
 
         {error && (
-          <div role="alert" className="animate-scale-in rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+          <div role="alert" className="animate-scale-in border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
             {error}
           </div>
         )}

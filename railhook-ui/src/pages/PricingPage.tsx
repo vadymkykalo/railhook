@@ -6,7 +6,8 @@ import { useAuth } from '../auth/auth.store';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useJsonLd } from '../hooks/useJsonLd';
 import { cn } from '../lib/utils';
-import { Band, SectionHeading, WRAP } from './landing/primitives';
+import { Band, PageIntro, SectionHeading, SectionLabel } from './landing/primitives';
+import { docsUrl } from '../lib/docsUrl';
 import { FREE_PLAN } from './landing/plans';
 
 /**
@@ -21,8 +22,9 @@ import { FREE_PLAN } from './landing/plans';
 /** FAQ order is part of the page, and the FAQPage data follows it. */
 const FAQ = ['free', 'limit', 'card', 'paid', 'selfHost'] as const;
 
-const CARD = 'flex flex-col gap-3 rounded-2xl border border-rail bg-card p-5 sm:p-7';
-const PILL = 'self-start rounded-full bg-accent px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-[0.08em] text-primary';
+const CARD = 'flex flex-col gap-3 border bg-card p-6 sm:p-10';
+const PRICE = 'text-[2.5rem] font-normal leading-none tracking-[-0.02em] text-foreground';
+const TITLE = 'text-[1.625rem] font-normal tracking-[-0.02em] text-foreground';
 
 export default function PricingPage() {
   const { t, i18n } = useTranslation();
@@ -43,24 +45,15 @@ export default function PricingPage() {
 
   return (
     <>
-      <section className="pb-4 pt-14 sm:pt-20">
-        <div className={WRAP}>
-          <h1 className="max-w-3xl font-display text-[2.2rem] font-bold leading-[1.05] tracking-[-0.035em] text-foreground [text-wrap:balance] sm:text-[3.2rem]">
-            {t('pricing.title')}
-          </h1>
-          <p className="mt-4 max-w-2xl text-[1.1rem] text-muted-foreground">{t('pricing.lead')}</p>
-        </div>
-      </section>
+      <PageIntro title={t('pricing.title')} lead={t('pricing.lead')} />
 
       <Band labelledBy="pricing-plans">
         <h2 id="pricing-plans" className="sr-only">{t('pricing.title')}</h2>
-        <div className="grid gap-5 md:grid-cols-2">
-          <article className={cn(CARD, 'border-primary shadow-elevated ring-1 ring-primary')}>
-            <span className="self-start rounded-full bg-primary px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-[0.08em] text-primary-foreground">
-              {t('pricing.cloud.pill')}
-            </span>
-            <h3 className="text-[1.35rem] font-semibold tracking-[-0.01em] text-foreground">{t('pricing.cloud.title')}</h3>
-            <p className="font-display text-[2rem] font-bold text-foreground">{t('pricing.cloud.price')}</p>
+        <div className="grid gap-6 md:grid-cols-2">
+          <article className={cn(CARD, 'border-foreground')}>
+            <SectionLabel as="span">{t('pricing.cloud.pill')}</SectionLabel>
+            <h3 className={cn(TITLE, 'mt-3')}>{t('pricing.cloud.title')}</h3>
+            <p className={PRICE}><span className="mark-hl">{t('pricing.cloud.price')}</span></p>
             <p className="text-muted-foreground">
               {t('pricing.cloud.body', {
                 events,
@@ -82,14 +75,14 @@ export default function PricingPage() {
             </div>
           </article>
 
-          <article className={CARD}>
-            <span className={PILL}>{t('pricing.selfHosted.pill')}</span>
-            <h3 className="text-[1.35rem] font-semibold tracking-[-0.01em] text-foreground">{t('pricing.selfHosted.title')}</h3>
-            <p className="font-display text-[2rem] font-bold text-foreground">{t('pricing.selfHosted.price')}</p>
+          <article className={cn(CARD, 'border-rail')}>
+            <SectionLabel as="span">{t('pricing.selfHosted.pill')}</SectionLabel>
+            <h3 className={cn(TITLE, 'mt-3')}>{t('pricing.selfHosted.title')}</h3>
+            <p className={PRICE}>{t('pricing.selfHosted.price')}</p>
             <p className="text-muted-foreground">{t('pricing.selfHosted.body')}</p>
             <div className="mt-auto pt-3">
               <Button asChild variant="outline" className="max-sm:w-full">
-                <a href="/docs/self-hosting/overview/">{t('pricing.selfHosted.cta')}</a>
+                <a href={docsUrl(i18n.language, 'self-hosting/overview')}>{t('pricing.selfHosted.cta')}</a>
               </Button>
             </div>
           </article>
@@ -98,10 +91,10 @@ export default function PricingPage() {
 
       <Band labelledBy="pricing-faq">
         <SectionHeading id="pricing-faq" title={t('pricing.faq.title')} />
-        <dl className="grid gap-x-10 gap-y-8 md:grid-cols-2">
+        <dl className="grid border-t border-rail md:grid-cols-2 md:gap-x-10">
           {FAQ.map((id) => (
-            <div key={id}>
-              <dt className="text-[1.05rem] font-semibold text-foreground">{t(`pricing.faq.${id}.q`)}</dt>
+            <div key={id} className="border-b border-rail py-6">
+              <dt className="text-[1.0625rem] font-medium text-foreground">{t(`pricing.faq.${id}.q`)}</dt>
               <dd className="mt-2 text-muted-foreground">{t(`pricing.faq.${id}.a`)}</dd>
             </div>
           ))}

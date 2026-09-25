@@ -77,7 +77,7 @@ export default function DemoPage() {
     <>
       <section className="pb-2 pt-14 sm:pt-20">
         <div className={WRAP}>
-          <h1 className="max-w-3xl font-display text-[2.2rem] font-bold leading-[1.05] tracking-[-0.035em] text-foreground [text-wrap:balance] sm:text-[3.2rem]">
+          <h1 className="max-w-3xl text-[2.375rem] font-normal leading-[1.16] tracking-[-0.03em] text-foreground [text-wrap:balance] sm:text-[3.5rem]">
             {t('demo.page.title')}
           </h1>
           <p className="mt-4 max-w-2xl text-[1.1rem] text-muted-foreground">{t('demo.page.lead')}</p>
@@ -87,14 +87,14 @@ export default function DemoPage() {
       <Band labelledBy="demo-open">
         <h2 id="demo-open" className="sr-only">{t('demo.page.title')}</h2>
         {!enabled ? (
-          <div className="flex flex-col items-start gap-4 rounded-2xl border border-dashed border-rail p-6 sm:p-8">
+          <div className="flex flex-col items-start gap-4 border border-dashed border-rail p-6 sm:p-8">
             <p className="text-muted-foreground">{t('demo.page.disabled')}</p>
             <Button asChild variant="outline">
               <Link to="/">{t('demo.page.home')}</Link>
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col items-start gap-4 rounded-2xl border border-dashed border-rail p-6 sm:p-8">
+          <div className="flex flex-col items-start gap-4 border border-dashed border-rail p-6 sm:p-8">
             {open.isPending && (
               <p className="flex items-center gap-2 text-muted-foreground" role="status">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -122,7 +122,7 @@ export default function DemoPage() {
                 )}
               </div>
             )}
-            <Link to="/register" className="text-sm text-primary underline-offset-4 hover:underline">
+            <Link to="/register" className="text-sm link-ink">
               {t('demo.page.signUp')}
             </Link>
           </div>

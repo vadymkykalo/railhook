@@ -41,7 +41,7 @@ export default function EventDiffView({ leftPayload, rightPayload, diffs, leftLa
       {diffs.length > 0 && (
         <div className="space-y-2">
           <p className="mono-label">{t('eventDiff.changes', { count: diffs.length })}</p>
-          <ul className="divide-y divide-rail overflow-hidden rounded-lg border border-rail">
+          <ul className="divide-y divide-rail overflow-hidden border border-rail">
             {diffs.map((diff, i) => (
               <li key={`${diff.path}-${i}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2 text-xs">
                 <span className="w-3 flex-shrink-0 font-mono font-medium text-muted-foreground" aria-hidden>

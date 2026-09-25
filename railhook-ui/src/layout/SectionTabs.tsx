@@ -44,7 +44,7 @@ export default function SectionTabs({ projectId, role }: { projectId?: string; r
               className={cn(
                 'flex items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-[13px] transition-colors max-sm:min-h-11',
                 active
-                  ? 'border-primary font-medium text-foreground'
+                  ? 'border-foreground font-medium text-foreground'
                   : 'border-transparent text-muted-foreground hover:border-rail hover:text-foreground'
               )}
             >

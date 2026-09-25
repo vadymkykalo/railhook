@@ -29,7 +29,7 @@ function BaseNodeComponent({ role, icon, label, subtitle, selected, hasInput = t
   return (
     <div
       className={cn(
-        'relative min-w-[180px] max-w-[240px] overflow-hidden rounded-lg border bg-card shadow-card transition-colors',
+        'relative min-w-[180px] max-w-[240px] overflow-hidden border bg-card shadow-card transition-colors',
         selected ? 'border-primary ring-2 ring-primary/25' : 'border-rail',
       )}
     >

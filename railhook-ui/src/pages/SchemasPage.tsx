@@ -83,7 +83,7 @@ export default function SchemasPage() {
                   icon={FileJson2}
                   title={t('schemas.selectEventType')}
                   description={t('schemas.selectEventTypeHint')}
-                  className="flex min-h-[240px] flex-col items-center justify-center rounded-xl border border-dashed border-rail px-6"
+                  className="flex min-h-[240px] flex-col items-center justify-center border border-dashed border-rail px-6"
                 />
               </>
             )}

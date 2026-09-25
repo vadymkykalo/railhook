@@ -29,11 +29,11 @@ export default function ShareBar({
 
   return (
     <div className={cn('space-y-3', className)}>
-      <div className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-muted" role="presentation">
+      <div className="flex h-2.5 w-full gap-0.5 overflow-hidden bg-muted" role="presentation">
         {present.map((segment) => (
           <span
             key={segment.key}
-            className="h-full rounded-full first:rounded-l-full last:rounded-r-full"
+            className="h-full"
             style={{
               backgroundColor: SERIES[segment.token],
               width: `${Math.max(share(segment.value, total), 0.75)}%`,
@@ -48,7 +48,7 @@ export default function ShareBar({
             <span className="flex min-w-0 items-center gap-2">
               <span
                 aria-hidden
-                className="h-2 w-2 flex-shrink-0 rounded-sm"
+                className="h-2 w-2 flex-shrink-0"
                 style={{ backgroundColor: SERIES[segment.token] }}
               />
               <span className="truncate text-muted-foreground">{segment.label}</span>

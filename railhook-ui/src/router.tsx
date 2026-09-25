@@ -27,7 +27,6 @@ const DemoPage = lazy(() => import('./pages/DemoPage'));
 const SignatureVerifierPage = lazy(() => import('./pages/SignatureVerifierPage'));
 const SecurityPage = lazy(() => import('./pages/SecurityPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
-const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
 const BlogPage = lazy(() => import('./pages/BlogPage'));
 const BlogPostPage = lazy(() => import('./pages/BlogPostPage'));
 const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.PrivacyPage })));
@@ -137,10 +136,6 @@ export const router = createBrowserRouter([
           {
             path: '/about',
             element: <S><AboutPage /></S>,
-          },
-          {
-            path: '/changelog',
-            element: <S><ChangelogPage /></S>,
           },
           {
             path: '/blog',

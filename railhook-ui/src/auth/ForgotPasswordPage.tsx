@@ -44,7 +44,7 @@ export default function ForgotPasswordPage() {
         subtitle={<Trans i18nKey="auth.forgotPassword.sentMessage" values={{ email }} components={{ strong: <strong className="font-medium text-foreground" /> }} />}
       >
         <div className="space-y-3">
-          <div className="flex items-center gap-3 rounded-md border border-rail bg-card p-3">
+          <div className="flex items-center gap-3 border border-rail bg-card p-3">
             <Mail className="h-4 w-4 flex-shrink-0 text-primary" aria-hidden />
             <span className="truncate font-mono text-[13px]">{email}</span>
           </div>
@@ -66,7 +66,7 @@ export default function ForgotPasswordPage() {
       footer={
         <>
           {t('auth.forgotPassword.remember')}{' '}
-          <Link to="/login" className="font-medium text-primary hover:underline">
+          <Link to="/login" className="font-medium link-ink">
             {t('auth.forgotPassword.signIn')}
           </Link>
         </>
@@ -89,7 +89,7 @@ export default function ForgotPasswordPage() {
         </div>
 
         {error && (
-          <div role="alert" className="animate-scale-in rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+          <div role="alert" className="animate-scale-in border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
             {error}
           </div>
         )}

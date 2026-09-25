@@ -20,9 +20,9 @@ import { Label } from '../components/ui/label';
 function DeviceCode({ code }: { code: string }) {
   const { t } = useTranslation();
   return (
-    <div className="rounded-lg border border-rail bg-card p-5 text-center">
+    <div className="border border-rail bg-card p-5 text-center">
       <p className="mono-label mb-3">{t('auth.device.codeLabel')}</p>
-      <p className="font-mono text-[28px] font-semibold leading-none tracking-[0.2em] text-foreground">
+      <p className="font-mono text-[28px] font-medium leading-none tracking-[0.2em] text-foreground">
         {code}
       </p>
     </div>
@@ -123,7 +123,7 @@ export default function DeviceApprovePage() {
         <div className="space-y-5">
           <DeviceCode code={formatCode(userCode)} />
 
-          <div className="rounded-md border border-retry/25 bg-retry-soft p-3 text-sm text-retry">
+          <div className="border border-retry/25 bg-retry-soft p-3 text-sm text-retry">
             {t('auth.device.confirmWarning')}
           </div>
 
@@ -149,7 +149,7 @@ export default function DeviceApprovePage() {
       <AuthLayout title={label} subtitle={t('auth.device.confirmDesc')}>
         <div className="space-y-5">
           <DeviceCode code={formatCode(userCode)} />
-          <div className="flex items-center gap-3 rounded-md border border-rail bg-card p-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-3 border border-rail bg-card p-4 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
             {label}
           </div>
@@ -163,7 +163,7 @@ export default function DeviceApprovePage() {
       <AuthLayout title={t('auth.device.deniedTitle')} subtitle={t('auth.device.deniedDesc')}>
         <div className="space-y-5">
           <DeviceCode code={formatCode(userCode)} />
-          <div className="rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+          <div className="border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
             {t('auth.device.deniedHint')}
           </div>
           <Button className="h-10 w-full" onClick={() => navigate('/admin/dashboard')}>
@@ -192,7 +192,7 @@ export default function DeviceApprovePage() {
     return (
       <AuthLayout title={t('auth.device.errorTitle')} subtitle={t('auth.device.failed')}>
         <div className="space-y-5">
-          <div role="alert" className="rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+          <div role="alert" className="border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
             {errorMessage}
           </div>
           <Button className="h-10 w-full" onClick={handleReset}>

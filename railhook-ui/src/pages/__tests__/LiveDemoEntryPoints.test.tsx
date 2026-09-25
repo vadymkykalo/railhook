@@ -1,4 +1,3 @@
-import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import '../../i18n';
@@ -9,9 +8,9 @@ import LandingNav from '../landing/LandingNav';
 import PricingPage from '../PricingPage';
 
 /**
- * "Try the live demo" — on the hero, on /pricing and in the Developers menu — exactly where the
- * deployment runs the demo, and for a visitor who is not signed in. A self-hosted install that
- * never turned it on must not offer a link that answers 404.
+ * "Try the live demo" — in the landing's last section, on /pricing and in the header — exactly
+ * where the deployment runs the demo, and for a visitor who is not signed in. A self-hosted
+ * install that never turned it on must not offer a link that answers 404.
  */
 const SIGNED_OUT = { auth: { user: null, token: null, isAuthenticated: false } };
 
@@ -31,19 +30,19 @@ afterEach(() => {
 });
 
 function demoLinks() {
-  return screen.queryAllByRole('link', { name: new RegExp(en.landing.hero.tryDemo) });
+  return screen.queryAllByRole('link', { name: new RegExp(`${en.landing.hero.tryDemo}|${en.landing.nav.liveDemo}`) });
 }
 
 describe('the live demo entry points', () => {
-  it('sits next to the hero calls to action when the demo is on', () => {
+  it('sits next to the last call to action when the demo is on', () => {
     window.__RAILHOOK__ = { publicDemo: true };
     renderPage(<LandingPage />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
 
-    const hero = screen.getByRole('region', { name: /never lose a/i });
-    const link = within(hero).getByRole('link', { name: new RegExp(en.landing.hero.tryDemo) });
+    const offer = document.getElementById('cloud') as HTMLElement;
+    const link = within(offer).getByRole('link', { name: new RegExp(en.landing.hero.tryDemo) });
     expect(link).toHaveAttribute('href', '/demo');
     // Secondary: the first call to action is still signing up.
-    expect(within(hero).getAllByRole('link')[0]).toHaveAttribute('href', '/register');
+    expect(within(offer).getAllByRole('link')[0]).toHaveAttribute('href', '/register');
   });
 
   it('is on the pricing page, beside the free plan', () => {
@@ -53,15 +52,12 @@ describe('the live demo entry points', () => {
     expect(demoLinks().map((a) => a.getAttribute('href'))).toEqual(['/demo']);
   });
 
-  it('is in the Developers menu', async () => {
+  it('is in the header', () => {
     window.__RAILHOOK__ = { publicDemo: true };
     renderPage(<LandingNav />, { path: '/', initialEntry: '/', ...SIGNED_OUT });
     const nav = screen.getByRole('navigation', { name: en.landing.nav.label });
 
-    await userEvent.click(within(nav).getByRole('button', { name: en.landing.nav.developers }));
-
-    expect(within(nav).getByRole('link', { name: new RegExp(en.landing.nav.devDemo) })).toHaveAttribute('href', '/demo');
-    expect(within(nav).getByText(en.landing.nav.devDemoBody)).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: new RegExp(en.landing.nav.liveDemo) })).toHaveAttribute('href', '/demo');
   });
 
   it('is nowhere when the deployment does not run the demo', async () => {

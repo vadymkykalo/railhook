@@ -212,7 +212,7 @@ export default function MembersPage() {
           </div>
 
           {filteredMembers.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-rail px-6 py-12 text-center text-sm text-muted-foreground">
+            <p className="border border-dashed border-rail px-6 py-12 text-center text-sm text-muted-foreground">
               {t('members.noResults')}
             </p>
           ) : (
@@ -237,8 +237,8 @@ export default function MembersPage() {
                   <TableRow key={member.userId}>
                     <TableCell>
                       <div className="flex items-center gap-2.5">
-                        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-accent" aria-hidden>
-                          <span className="font-mono text-[11px] font-medium text-accent-foreground">
+                        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-foreground" aria-hidden>
+                          <span className="font-mono text-[11px] font-medium text-background">
                             {member.email.charAt(0).toUpperCase()}
                           </span>
                         </span>

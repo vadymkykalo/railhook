@@ -42,14 +42,14 @@ function RailLink({
       aria-current={active ? 'page' : undefined}
       title={collapsed ? name : undefined}
       className={cn(
-        'relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors',
+        'relative flex items-center gap-3 px-2.5 py-2 text-sm transition-colors',
         collapsed && 'justify-center px-2',
         active
-          ? 'bg-card font-medium text-foreground shadow-[inset_0_0_0_1px_hsl(var(--rail))]'
-          : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
+          ? 'bg-accent font-medium text-accent-foreground'
+          : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
       )}
     >
-      <Icon className={cn('h-4 w-4 flex-shrink-0', active && 'text-primary')} />
+      <Icon className="h-4 w-4 flex-shrink-0" />
       {!collapsed && <span className="truncate">{name}</span>}
     </Link>
   );
@@ -64,13 +64,11 @@ export default function Sidebar({
   const narrow = collapsed && !isMobile;
 
   return (
-    <div className="flex h-full flex-col bg-muted">
+    <div className="flex h-full flex-col bg-background">
       <div className={cn('flex h-14 items-center border-b border-rail px-3', narrow && 'justify-center px-2')}>
         <Link to="/" className="flex items-center gap-2 transition-opacity hover:opacity-70">
-          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-primary">
-            <RailhookIcon className="h-3.5 w-3.5 text-primary-foreground" />
-          </div>
-          {!narrow && <span className="text-[15px] font-semibold tracking-tight">Railhook</span>}
+          <RailhookIcon className="h-6 w-6 flex-shrink-0 text-foreground" />
+          {!narrow && <span className="text-[18px] font-medium tracking-[-0.03em]">Railhook</span>}
         </Link>
         {isMobile ? (
           <Button variant="ghost" size="icon-sm" onClick={onNavigate} className="ml-auto"
@@ -94,6 +92,7 @@ export default function Sidebar({
       )}
 
       <nav aria-label={t('nav.navigation')} className="flex-1 space-y-0.5 overflow-y-auto p-2">
+        {!narrow && <p className="mono-label px-2.5 pb-1.5 pt-2">{t('nav.project')}</p>}
         {PROJECT_SECTIONS.filter((section) => !section.requiredRole || hasMinRole(role, section.requiredRole)).map((section) => (
           <RailLink
             key={section.nameKey}
@@ -111,13 +110,14 @@ export default function Sidebar({
           expanded sidebar, so a wide screen showed two identical "Search ⌘K"
           controls at once and a collapsed one showed none. */}
       <div className="space-y-0.5 border-t border-rail p-2">
+        {!narrow && <p className="mono-label px-2.5 pb-1.5 pt-2">{t('nav.resources')}</p>}
         {/* A page load, not a route: the docs are their own site at /docs/. */}
         <a
           href={docsUrl(i18n.language)}
           onClick={isMobile ? onNavigate : undefined}
           title={narrow ? t('nav.documentation') : undefined}
           className={cn(
-            'flex items-center gap-3 rounded-md px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground',
+            'flex items-center gap-3 px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
             narrow && 'justify-center px-2'
           )}
         >
@@ -133,11 +133,11 @@ export default function Sidebar({
           aria-current={SETTINGS_SECTION.owns.includes(segment) ? 'page' : undefined}
           title={narrow ? t('nav.settings') : undefined}
           className={cn(
-            'relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors',
+            'relative flex items-center gap-3 px-2.5 py-2 text-sm transition-colors',
             narrow && 'justify-center px-2',
             SETTINGS_SECTION.owns.includes(segment)
-              ? 'bg-secondary font-medium text-foreground'
-              : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+              ? 'bg-accent font-medium text-accent-foreground'
+              : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
           )}
         >
           <Settings className="h-4 w-4 flex-shrink-0" />
@@ -153,11 +153,11 @@ export default function Sidebar({
             aria-current={PLATFORM_SECTION.owns.includes(segment) ? 'page' : undefined}
             title={narrow ? t('nav.platformAdmin') : undefined}
             className={cn(
-              'relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors',
+              'relative flex items-center gap-3 px-2.5 py-2 text-sm transition-colors',
               narrow && 'justify-center px-2',
               PLATFORM_SECTION.owns.includes(segment)
-                ? 'bg-secondary font-medium text-foreground'
-                : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+                ? 'bg-accent font-medium text-accent-foreground'
+                : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
             )}
           >
             <ShieldCheck className="h-4 w-4 flex-shrink-0" />
@@ -168,8 +168,8 @@ export default function Sidebar({
 
       <div className="border-t border-rail p-2">
         <div className={cn('flex items-center gap-2.5 px-1 py-1', narrow && 'justify-center px-0')}>
-          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-accent">
-            <span className="font-mono text-[11px] font-medium text-accent-foreground">
+          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center bg-foreground">
+            <span className="font-mono text-[11px] font-medium text-background">
               {user.user?.email?.charAt(0).toUpperCase() || 'U'}
             </span>
           </div>

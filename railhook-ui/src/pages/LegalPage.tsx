@@ -57,7 +57,7 @@ function LegalDocument({ doc }: { doc: Doc }) {
     <Section ruled={false}>
       <Reveal>
         <article className="max-w-2xl">
-          <h1 className="font-display text-3xl leading-[1.1] tracking-tight text-foreground sm:text-headline">
+          <h1 className="text-[2.375rem] font-normal leading-[1.16] tracking-[-0.03em] text-foreground sm:text-[3.5rem]">
             {t(`legal.${doc}.title`)}
           </h1>
           <p className="mt-3 font-mono text-xs text-muted-foreground">{t('legal.updated', { date: updated })}</p>
@@ -67,7 +67,7 @@ function LegalDocument({ doc }: { doc: Doc }) {
 
           {SECTIONS[doc].map((id) => (
             <Fragment key={id}>
-              <h2 className="mt-10 text-lg font-semibold tracking-tight text-foreground">
+              <h2 className="mt-10 text-lg font-medium tracking-tight text-foreground">
                 {t(`legal.${doc}.sections.${id}.title`)}
               </h2>
               <div className="text-[15px] leading-relaxed text-muted-foreground">
@@ -77,7 +77,7 @@ function LegalDocument({ doc }: { doc: Doc }) {
           ))}
 
           <p className="mt-12 border-t border-rail pt-6 text-sm text-muted-foreground">
-            <Link to={`/${other}`} className="font-medium text-primary hover:underline">
+            <Link to={`/${other}`} className="font-medium link-ink">
               {t(`legal.${other}.title`)}
             </Link>
           </p>

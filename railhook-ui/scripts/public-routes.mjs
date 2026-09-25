@@ -23,11 +23,9 @@ const MARKETING = [
   { path: '/tester', priority: '0.8', changefreq: 'monthly' },
   // The signature verifier: the other free tool, for "validate a Stripe webhook signature".
   { path: '/tools/webhook-signature', priority: '0.8', changefreq: 'monthly' },
-  // Read before trusting a vendor with webhooks: what protects the data, who builds it, and
-  // how actively (the release history, rebuilt from CHANGELOG.md on every build).
+  // Read before trusting a vendor with webhooks: what protects the data and who builds it.
   { path: '/security', priority: '0.6', changefreq: 'monthly' },
   { path: '/about', priority: '0.5', changefreq: 'monthly' },
-  { path: '/changelog', priority: '0.6', changefreq: 'weekly' },
   // The blog index. The posts themselves are appended below, from the content directory.
   { path: '/blog', priority: '0.7', changefreq: 'weekly' },
   { path: '/contact', priority: '0.5', changefreq: 'monthly' },

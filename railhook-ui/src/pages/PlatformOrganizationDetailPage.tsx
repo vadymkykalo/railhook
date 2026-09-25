@@ -52,9 +52,9 @@ function UsageRow({ label, usage }: { label: string; usage: AdminResourceUsage }
         </span>
       </div>
       {!unlimited && (
-        <div className="mt-1.5 h-1.5 rounded-full bg-secondary" aria-hidden>
+        <div className="mt-1.5 h-1.5 bg-secondary" aria-hidden>
           <div
-            className={cn('h-1.5 rounded-full', percent >= 100 ? 'bg-halt' : percent >= 80 ? 'bg-retry' : 'bg-primary')}
+            className={cn('h-1.5', percent >= 100 ? 'bg-halt' : percent >= 80 ? 'bg-retry' : 'bg-primary')}
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -133,7 +133,7 @@ export default function PlatformOrganizationDetailPage() {
       />
 
       {suspended && (
-        <div role="status" className="mb-5 rounded-lg border border-halt/30 bg-halt-soft p-3 text-sm">
+        <div role="status" className="mb-5 border border-halt/30 bg-halt-soft p-3 text-sm">
           <p className="font-medium text-halt">
             {t('platformAdmin.detail.suspendedSince', {
               time: formatDateTimeCompact(org.suspendedAt!),
@@ -232,7 +232,7 @@ export default function PlatformOrganizationDetailPage() {
           ) : !projects.data ? (
             <SkeletonTable rows={3} />
           ) : projects.data.content.length === 0 ? (
-            <EmptyState icon={FolderOpen} title={t('platformAdmin.detail.noProjects')} className="rounded-none border-0 py-10" />
+            <EmptyState icon={FolderOpen} title={t('platformAdmin.detail.noProjects')} className="border-0 py-10" />
           ) : (
             <ul className="divide-y divide-rail">
               {projects.data.content.map((project) => (
@@ -252,7 +252,7 @@ export default function PlatformOrganizationDetailPage() {
           ) : !audit.data ? (
             <SkeletonTable rows={4} />
           ) : audit.data.content.length === 0 ? (
-            <EmptyState icon={FileText} title={t('platformAdmin.detail.noAudit')} className="rounded-none border-0 py-10" />
+            <EmptyState icon={FileText} title={t('platformAdmin.detail.noAudit')} className="border-0 py-10" />
           ) : (
             <Table className={PLATFORM_TABLE}>
               <TableHeader className={PLATFORM_TABLE_HEADER}>

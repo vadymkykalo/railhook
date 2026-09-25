@@ -109,7 +109,7 @@ export default function ChangeEmailForm({
       </p>
 
       {error && (
-        <p role="alert" className="rounded-md border border-halt/25 bg-halt-soft p-2.5 text-sm text-halt">{error}</p>
+        <p role="alert" className="border border-halt/25 bg-halt-soft p-2.5 text-sm text-halt">{error}</p>
       )}
 
       <div className="flex flex-wrap gap-2">

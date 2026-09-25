@@ -1652,7 +1652,6 @@
   },
   "footer": {
     "apiReference": "API reference",
-    "changelog": "Changelog",
     "cloud": "Cloud",
     "community": "Community",
     "connect": "Connect with us",
@@ -1671,7 +1670,7 @@
     "selfHost": "Self-host",
     "selfHosting": "Self-hosting guide",
     "signIn": "Sign in",
-    "tagline": "Open-source webhook gateway. Send and receive webhooks, in our cloud or on your own servers.",
+    "tagline": "Open-source webhook gateway. MIT licence.",
     "talkToUs": "Talk to us",
     "terms": "Terms of Service",
     "pricing": "Pricing",
@@ -2068,183 +2067,125 @@
     "successDesc": "You are now a member of the organization. Welcome aboard!"
   },
   "landing": {
-    "architecture": {
-      "title": "Built so events survive failures",
-      "stored": "Railhook saves every event before it replies to the sender.",
-      "survives": "If a server restarts or a service goes down, deliveries wait and then carry on.",
-      "runsOn": "It runs on PostgreSQL, Kafka and Redis, which you can run yourself.",
-      "factStored": "stored before 201",
-      "factRetries": "retries 1m → 24h",
-      "factDeploy": "Docker or Kubernetes",
-      "factsLabel": "In short",
-      "sources": "Event sources",
-      "endpoints": "Your customers' endpoints",
-      "worker": "Worker",
-      "shared": "Shared services",
-      "diagramAria": "Your app, Stripe, GitHub and Shopify send webhooks to the Railhook API, which checks the providers' signatures and stores each event in PostgreSQL before replying, then passes it through Kafka to the worker. The worker delivers to your customers and your services and retries what fails; both use PostgreSQL, and Redis for rate limits and ordering."
-    },
-    "developer": {
-      "title": "Built for developers",
-      "lead": "One API call sends an event. The rest is in the docs.",
-      "docsTitle": "Documentation",
-      "docsBody": "Guides for sending, receiving and running Railhook.",
-      "apiTitle": "API reference",
-      "apiBody": "Every endpoint, with requests you can try against your own instance.",
-      "standardTitle": "Standard Webhooks",
-      "standardBody": "Signatures any Standard Webhooks library can verify.",
-      "newTab": "opens in a new tab",
-      "codeTitle": "Send an event with one API call",
-      "languages": "Language",
-      "response": "2 deliveries created",
-      "readDocs": "Read the docs",
-      "mcpTitle": "AI agents (MCP)",
-      "mcpBody": "Let Claude, Cursor or any MCP client send events and replay deliveries.",
-      "portalTitle": "Customer portal",
-      "portalBody": "Embed a page where your own users add endpoints, see their deliveries and retry the failed ones."
-    },
-    "directions": {
-      "inBody": "One address per service. Railhook checks that Stripe or GitHub really sent it, then passes it on to your app.",
-      "inTag": "Receive",
-      "inTitle": "Webhooks from other services",
-      "outBody": "Your customers add their URLs themselves, in a portal you embed in your product. Railhook delivers each event there, signed, and tries again if their server is down.",
-      "outTag": "Send",
-      "outTitle": "Webhooks for your customers",
-      "scene": {
-        "attempt": "attempt {{n}}",
-        "delivered": "delivered",
-        "invalidSignature": "invalid signature",
-        "receiveSummary": "Requests from Stripe, GitHub and Shopify are verified and passed to your app; a forged one is refused.",
-        "rejected": "rejected",
-        "retryIn": "retry in 1m",
-        "retrying": "retrying",
-        "sendSummary": "One event reaches three customers; one server is down, so Railhook retries and it arrives.",
-        "signatureOk": "signature verified",
-        "unknownSender": "Unknown",
-        "verified": "verified"
-      },
-      "title": "Send and receive, in one place",
-      "yourApp": "Your app"
+    "nav": {
+      "label": "Main",
+      "product": "Product",
+      "selfHosting": "Self-hosting",
+      "pricing": "Pricing",
+      "docs": "Docs",
+      "liveDemo": "Live demo",
+      "startFree": "Get started for free",
+      "goToDashboard": "Go to dashboard",
+      "signIn": "Sign in",
+      "github": "Railhook on GitHub",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu"
     },
     "hero": {
-      "install": "Install on your server",
-      "lead": "Send webhooks to your customers and receive them from Stripe, GitHub or any other service — in our cloud or on your own servers, with every delivery on record.",
-      "startFree": "Start free",
-      "title": "Never lose a <em>webhook</em>",
+      "title": "Webhook infrastructure<br/>you can <hl>run yourself</hl>",
+      "lead": "Send webhooks to your customers and receive them from Stripe, GitHub and the rest. Retries, signatures, a customer portal and replay, with every attempt on record. An open-source webhook gateway under MIT.",
+      "startFree": "Get started for free",
+      "selfHost": "Self-host it",
       "tryDemo": "Try the live demo"
     },
-    "install": {
-      "copied": "Copied",
-      "copy": "Copy",
-      "copyAria": "Copy the install command",
-      "copyFailed": "Select to copy",
-      "label": "Install in one command",
-      "requirementDocker": "Needs Docker and 4 GB of RAM"
+    "stage": {
+      "aria": "One delivery, attempt by attempt: the customer's server answers 503, refuses the connection and answers 502, Railhook waits longer each time, and the fifth attempt is delivered.",
+      "yourApp": "Your app",
+      "stored": "stored before 201",
+      "attempt": "attempt {{n}}",
+      "sending": "sending",
+      "retrying": "retrying",
+      "delivered": "delivered on attempt {{n}}",
+      "next": "next {{wait}}",
+      "ok": "200 OK · delivered",
+      "ms": "{{n}} ms",
+      "minutes": "{{n}}m",
+      "hours": "{{n}}h"
     },
-    "map": {
-      "aria": "Events from Stripe, GitHub and Shopify flow through Railhook to your service, Slack and a customer's server. One delivery fails, waits, tries again and arrives.",
-      "customer": "Customer",
-      "legendFlight": "on its way",
-      "legendOk": "delivered",
-      "legendRetry": "waiting to retry",
-      "retryLabel": "503 · retry",
-      "receive": "RECEIVE",
-      "send": "SEND",
-      "yourService": "Your service"
-    },
-    "nav": {
-      "closeMenu": "Close menu",
-      "docs": "Docs",
-      "github": "Railhook on GitHub",
-      "goToDashboard": "Go to dashboard",
-      "label": "Main",
-      "openMenu": "Open menu",
-      "product": "Product",
-      "signIn": "Sign in",
-      "startFree": "Start free",
-      "pricing": "Pricing",
-      "about": "About",
-      "developers": "Developers",
-      "devDocs": "Documentation",
-      "devDocsBody": "Guides, quickstart and the API reference.",
-      "devCli": "CLI",
-      "devCliBody": "railhook listen forwards webhooks to your localhost.",
-      "devMcp": "MCP server",
-      "devMcpBody": "Let Claude, Cursor and other agents send and replay events.",
-      "devTester": "Webhook tester",
-      "devTesterBody": "A free URL that shows exactly what arrives.",
-      "devVerifier": "Signature verifier",
-      "devVerifierBody": "Check a Stripe, GitHub or Standard Webhooks signature.",
-      "devStatus": "Status",
-      "devStatusBody": "Live uptime of the site, the API and deliveries.",
-      "blog": "Blog",
-      "devDemo": "Live demo",
-      "devDemoBody": "The real dashboard with a day of sample traffic. No sign-up."
+    "providers": {
+      "label": "Verifies webhooks from",
+      "any": "+ Any HMAC"
     },
     "product": {
-      "analytics": {
-        "alt": "Railhook analytics: delivery volume, success rate and latency charts",
-        "caption": "Volume, success rate and latency, per endpoint and over time.",
-        "tab": "Analytics"
+      "label": "Product",
+      "title": "Send webhooks to customers and <hl>receive</hl><br/>them from anyone, in one place.",
+      "out": {
+        "tag": "Delivery your customers can check",
+        "title": "Outgoing webhooks",
+        "lead": "Your app makes one API call. Railhook signs it, delivers it to every subscribed endpoint and keeps trying when their server is down.",
+        "explore": "Explore outgoing webhooks",
+        "retriesTitle": "Retries + failed messages",
+        "retriesBody": "408, 429, 5xx and timeouts retry for up to 31 hours, then wait in Failed messages for you to resend.",
+        "signaturesTitle": "Signatures + rotation",
+        "signaturesBody": "Standard Webhooks headers any library verifies. During a rotation, requests carry both signatures.",
+        "portalTitle": "Customer portal",
+        "portalBody": "Embed a page where your customers add endpoints, see their deliveries and retry the failed ones.",
+        "endpoint": "Endpoint",
+        "portalPill": "Portal",
+        "refused": "refused"
       },
-      "attempts": {
-        "alt": "A delivery opened in Railhook, listing its attempts: server errors first, then a retry that succeeded",
-        "caption": "Each attempt of one delivery, with the status code and response body it got.",
-        "tab": "Retries"
-      },
-      "deliveries": {
-        "alt": "Railhook deliveries list: webhooks to several customer endpoints, most delivered, some retrying or failed, with response codes",
-        "caption": "Every webhook you sent, to whom, and what their server answered.",
-        "tab": "Deliveries"
-      },
-      "failed": {
-        "alt": "Railhook failed messages: deliveries that exhausted their retries, with a replay button",
-        "caption": "What ran out of retries waits here until you replay it, one or all at once.",
-        "tab": "Failed messages"
-      },
-      "incoming": {
-        "alt": "Railhook incoming events from Stripe and GitHub, each marked with its signature verification result",
-        "caption": "Webhooks from Stripe and GitHub, their signatures checked before anything is forwarded.",
-        "tab": "Incoming"
-      },
-      "lead": "The real product, with demo data: the screens your team opens when a customer asks what happened.",
-      "portal": {
-        "alt": "The Railhook customer portal embedded in a customer-facing app, showing endpoints and recent deliveries",
-        "caption": "Your customers manage their own endpoints and see their own deliveries, inside your app.",
-        "tab": "Customer portal"
-      },
-      "tabsLabel": "Product screens",
-      "title": "See it in action"
+      "in": {
+        "tag": "A buffer in front of your app",
+        "title": "Incoming webhooks",
+        "lead": "Point Stripe or GitHub at Railhook instead of at your app. It checks the signature, answers them at once and forwards to you with the same retries.",
+        "explore": "Explore incoming webhooks",
+        "verifyTitle": "Signature verification",
+        "verifyBody": "Stripe, GitHub, Shopify, Slack, Twilio, SendGrid or any HMAC. Forged requests are refused and still logged.",
+        "forwardTitle": "Forward with retries",
+        "forwardBody": "If your app is down, the request waits in Railhook and is forwarded when it comes back.",
+        "replayTitle": "Replay + Time Machine",
+        "replayBody": "Fixed a bug? Resend a past time range to your app as new deliveries.",
+        "source": "Source",
+        "signature": "Signature",
+        "forwardedTo": "Forwarded to",
+        "result": "Result",
+        "verified": "verified",
+        "invalid": "invalid",
+        "rejected": "rejected",
+        "unknown": "Unknown",
+        "retryIn": "503 · retry 1m"
+      }
     },
     "reliability": {
-      "failedBody": "See what didn't arrive and send it again with one click.",
-      "failedTitle": "Failures in one list",
-      "lead": "When the other side has a bad day, your events wait instead of disappearing.",
-      "recordBody": "Who got what, when, and what their server answered.",
-      "recordTitle": "Every delivery on record",
-      "retryBody": "If the receiver is down, the delivery waits and tries again.",
-      "retryTitle": "Retries on its own",
-      "title": "Nothing gets lost"
+      "label": "Built to survive failures",
+      "title": "Their server was down for an hour.",
+      "titleMuted": "The webhook still arrived.",
+      "how": "How delivery works",
+      "pipeAria": "POST /api/v1/events is written to PostgreSQL, passed through Kafka and picked up by a worker that runs the retry schedule.",
+      "written": "written to PostgreSQL",
+      "pickedUp": "picked up by a worker",
+      "worker": "Worker · retry ladder",
+      "caption": "If Kafka or the worker restarts, the event waits in PostgreSQL",
+      "scheduleTitle": "Default schedule, outgoing",
+      "perEndpoint": "change it per endpoint",
+      "attempt": "Attempt",
+      "waits": "Waits",
+      "since": "Since first try",
+      "failed": "→ Failed messages",
+      "note": "Retried: <c>408</c>, <c>429</c>, <c>5xx</c>, timeouts, connection errors. Not retried: other <c>4xx</c>, they go straight to Failed messages. Send an <c>Idempotency-Key</c> and a repeated call returns the event you already created."
     },
-    "run": {
-      "cloud": {
-        "body": "Sign up and send your first webhook in minutes. Free with limits: {{events}} events a month, {{projects}} projects, {{retention}} days of history.",
-        "cta": "Start free",
-        "later": "Later we'll add paid plans with support and higher limits.",
-        "pill": "Free right now",
-        "title": "Railhook Cloud"
-      },
-      "selfHosted": {
-        "body": "One command installs everything. Every feature, no plan limits, MIT licence, no licence key.",
-        "check1": "Installs with one command",
-        "check2": "HTTPS sets itself up on your domain",
-        "check3": "Upgrades and backups are one command too",
-        "github": "GitHub",
-        "install": "Install",
-        "pill": "Open source · MIT",
-        "title": "On your servers"
-      },
-      "title": "Run it your way",
-      "compare": "Pricing and questions"
+    "selfHost": {
+      "label": "Self-hosting",
+      "tag": "Your server, your data",
+      "title": "Runs on <hl>your server.</hl>",
+      "body": "The self-hosted version is the whole product: every feature, no event limits, no licence key.",
+      "deployLabel": "Deploy",
+      "deploy": "Docker Compose or the Helm chart",
+      "needsLabel": "Needs",
+      "needs": "Docker, about 4 GB of RAM",
+      "httpsLabel": "HTTPS",
+      "https": "Caddy + Let’s Encrypt with <c>--domain</c>",
+      "opsLabel": "Ops",
+      "ops": "Prometheus metrics, optional Grafana stack",
+      "guide": "Read the self-hosting guide",
+      "termComment": "one command: writes .env with generated secrets,\ngets a certificate and starts the stack",
+      "termDayTwo": "day two",
+      "termBackup": "backs up first",
+      "termAria": "The install command and the three day-two commands: status, upgrade and backup."
+    },
+    "final": {
+      "title": "Free in our cloud,<br/>unlimited on <hl>your server.</hl>",
+      "body": "Railhook Cloud: {{events}} events a month, {{projects}} projects, {{retention}} days of history. Self-hosted: everything, MIT."
     }
   },
   "legal": {
@@ -2510,7 +2451,7 @@
       "titleSection": "{{section}} — Railhook docs"
     },
     "landing": {
-      "description": "Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start.",
+      "description": "Open-source webhook gateway. Send webhooks to your customers and receive them from Stripe, GitHub and the rest, with retries, signatures and every attempt on record. In our cloud or self-hosted.",
       "title": "Railhook — Open-source webhook gateway"
     },
     "privacy": {
@@ -2536,10 +2477,6 @@
     "about": {
       "title": "About — Railhook",
       "description": "Railhook is an open-source, MIT-licensed webhook gateway built by Vadym Kykalo: send and receive webhooks, with every delivery on record."
-    },
-    "changelog": {
-      "title": "Changelog — Railhook",
-      "description": "Every Railhook release, newest first: what was added, changed and fixed."
     },
     "signatureVerifier": {
       "title": "Webhook signature verifier — validate Stripe, GitHub, Shopify and Slack signatures | Railhook",
@@ -4786,21 +4723,13 @@
       },
       "changelog": {
         "title": "Changelog",
-        "body": "Every release, and what changed in it."
+        "body": "Every release and what changed in it, in CHANGELOG.md on GitHub."
       },
       "contact": {
         "title": "Contact",
         "body": "Questions about Railhook Cloud or running it yourself."
       }
     }
-  },
-  "changelog": {
-    "eyebrow": "Changelog",
-    "title": "What's new in Railhook",
-    "lead": "Every release, newest first. This is the same history as CHANGELOG.md in the repository.",
-    "languageNote": "Release notes are written in English.",
-    "releases": "Releases on GitHub",
-    "anchor": "Link to version {{version}}"
   },
   "webhookSignature": {
     "eyebrow": "Free tool",

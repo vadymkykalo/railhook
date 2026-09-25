@@ -24,7 +24,7 @@ const publicPaths = [...read('scripts/public-routes.mjs').matchAll(/\{\s*path:\s
  */
 describe('every public page', () => {
   it('includes the trust pages and the signature verifier', () => {
-    expect(publicPaths).toEqual(expect.arrayContaining(['/security', '/about', '/changelog', '/tools/webhook-signature']));
+    expect(publicPaths).toEqual(expect.arrayContaining(['/security', '/about', '/tools/webhook-signature']));
   });
 
   it('is a route under the public layout', () => {

@@ -46,7 +46,7 @@ export default function GoogleSignInButton({ intent, returnTo }: Props) {
   return (
     <>
       {errorMessage && (
-        <div role="alert" className="mb-5 rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+        <div role="alert" className="mb-5 border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
           {errorMessage}
         </div>
       )}
@@ -54,7 +54,7 @@ export default function GoogleSignInButton({ intent, returnTo }: Props) {
         <div className="mb-5 space-y-5">
           <a
             href={`${API_URL}/api/v1/auth/oauth/google/start?${params.toString()}`}
-            className="flex h-10 w-full items-center justify-center gap-2.5 rounded-md border border-rail bg-card text-sm font-medium text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-10 w-full items-center justify-center gap-2.5 border border-rail bg-card text-sm font-medium text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <img src="/logos/brand/google.svg" alt="" aria-hidden="true" className="h-[18px] w-[18px]" />
             {t('auth.google.continue')}

@@ -34,7 +34,7 @@ function Nodes({ nodes }: { nodes: Inline[] }): ReactNode {
             );
           case 'strong':
             return (
-              <strong key={index} className="font-semibold text-foreground">
+              <strong key={index} className="font-medium text-foreground">
                 <Nodes nodes={node.children} />
               </strong>
             );
@@ -62,7 +62,7 @@ function Nodes({ nodes }: { nodes: Inline[] }): ReactNode {
                   href={node.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-medium text-primary underline-offset-2 hover:underline"
+                  className="font-medium link-ink"
                 >
                   <Nodes nodes={node.children} />
                 </a>
@@ -70,13 +70,13 @@ function Nodes({ nodes }: { nodes: Inline[] }): ReactNode {
             }
             if (node.href.startsWith('#') || node.href.startsWith('/docs/')) {
               return (
-                <a key={index} href={node.href} className="font-medium text-primary underline-offset-2 hover:underline">
+                <a key={index} href={node.href} className="font-medium link-ink">
                   <Nodes nodes={node.children} />
                 </a>
               );
             }
             return (
-              <Link key={index} to={node.href} className="font-medium text-primary underline-offset-2 hover:underline">
+              <Link key={index} to={node.href} className="font-medium link-ink">
                 <Nodes nodes={node.children} />
               </Link>
             );
@@ -89,7 +89,7 @@ function Nodes({ nodes }: { nodes: Inline[] }): ReactNode {
 
 function CodeBlock({ language, code }: { language: string; code: string }) {
   return (
-    <div className="surface-ink my-7 overflow-x-auto rounded-xl border border-rail p-4 sm:p-5">
+    <div className="surface-ink my-7 overflow-x-auto border border-rail p-4 sm:p-5">
       <pre className="font-mono text-[12.5px] leading-[1.7] [font-variant-ligatures:none] sm:text-[13px]">
         <code className="block w-max min-w-full text-foreground">
           <SyntaxHighlight code={code} language={normalizeLanguage(language)} />
@@ -101,7 +101,7 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
 
 function Table({ head, rows }: { head: Inline[][]; rows: Inline[][][] }) {
   return (
-    <div className="my-8 overflow-x-auto rounded-xl border border-rail">
+    <div className="my-8 overflow-x-auto border border-rail">
       <table className="w-full min-w-[34rem] border-collapse text-[14px]">
         <thead>
           <tr className="border-b border-rail bg-muted/60">
@@ -148,12 +148,12 @@ function One({ block }: { block: Block }): ReactNode {
       return block.level === 2 ? (
         <h2
           id={block.id}
-          className={`${MEASURE} mt-12 scroll-mt-24 font-display text-[1.6rem] font-bold leading-[1.15] tracking-[-0.025em] text-foreground first:mt-0`}
+          className={`${MEASURE} mt-12 scroll-mt-24 text-[1.6rem] font-medium leading-[1.15] tracking-[-0.025em] text-foreground first:mt-0`}
         >
           {block.text}
         </h2>
       ) : (
-        <h3 id={block.id} className={`${MEASURE} mt-8 scroll-mt-24 text-[1.15rem] font-semibold text-foreground`}>
+        <h3 id={block.id} className={`${MEASURE} mt-8 scroll-mt-24 text-[1.15rem] font-medium text-foreground`}>
           {block.text}
         </h3>
       );
@@ -165,7 +165,7 @@ function One({ block }: { block: Block }): ReactNode {
       );
     case 'list':
       return block.ordered ? (
-        <ol className={`${MEASURE} mt-5 list-decimal space-y-2 pl-6 text-[1.0625rem] leading-[1.75] text-muted-foreground marker:font-mono marker:text-primary`}>
+        <ol className={`${MEASURE} mt-5 list-decimal space-y-2 pl-6 text-[1.0625rem] leading-[1.75] text-muted-foreground marker:font-mono marker:text-foreground`}>
           {block.items.map((item, index) => (
             <li key={index} className="pl-1">
               <Nodes nodes={item} />
@@ -173,7 +173,7 @@ function One({ block }: { block: Block }): ReactNode {
           ))}
         </ol>
       ) : (
-        <ul className={`${MEASURE} mt-5 list-disc space-y-2 pl-6 text-[1.0625rem] leading-[1.75] text-muted-foreground marker:text-primary`}>
+        <ul className={`${MEASURE} mt-5 list-disc space-y-2 pl-6 text-[1.0625rem] leading-[1.75] text-muted-foreground marker:text-foreground`}>
           {block.items.map((item, index) => (
             <li key={index} className="pl-1">
               <Nodes nodes={item} />

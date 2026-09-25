@@ -126,7 +126,7 @@ export default function ProjectsPage() {
                       onClick={() => navigate(`/admin/projects/${project.id}/endpoints`)}
                       className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
-                      <span className="block truncate text-[15px] font-medium hover:text-primary">{project.name}</span>
+                      <span className="block truncate text-[15px] font-medium hover:text-foreground">{project.name}</span>
                       <span className="mono-label mt-0.5 block">{t('projects.created', { date: formatDate(project.createdAt) })}</span>
                     </button>
                     <div className="flex flex-shrink-0 gap-0.5">
@@ -181,7 +181,7 @@ export default function ProjectsPage() {
                       <button
                         key={action.label}
                         onClick={() => navigate(action.path)}
-                        className="inline-flex items-center gap-1 rounded-md border border-rail px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="inline-flex items-center gap-1 border border-rail px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <action.icon className="h-3 w-3" aria-hidden />
                         {action.label}

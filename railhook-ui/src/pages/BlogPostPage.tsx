@@ -51,7 +51,7 @@ function Contents({ post }: { post: BlogPost }) {
           <li key={heading.id} className={heading.level === 3 ? 'pl-7' : 'pl-4'}>
             <a
               href={`#${heading.id}`}
-              className="block text-[13px] leading-snug text-muted-foreground transition-colors hover:text-primary"
+              className="block text-[13px] leading-snug text-muted-foreground transition-colors hover:text-foreground"
             >
               {heading.text}
             </a>
@@ -68,7 +68,7 @@ function CallToAction() {
   const { isAuthenticated } = useAuth();
   return (
     <aside className={cn('mt-14 max-w-[68ch] p-6 sm:p-7', panel())}>
-      <h2 className="font-display text-[1.3rem] font-bold tracking-[-0.02em] text-foreground">{t('blog.cta.title')}</h2>
+      <h2 className="text-[1.5rem] font-normal tracking-[-0.02em] text-foreground">{t('blog.cta.title')}</h2>
       <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{t('blog.cta.body')}</p>
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <Button asChild className="max-sm:w-full">
@@ -110,7 +110,7 @@ function Neighbours({ slug, language }: { slug: string; language: string }) {
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             {t('blog.previous')}
           </span>
-          <span className="font-semibold text-foreground">{previous.title}</span>
+          <span className="font-medium text-foreground">{previous.title}</span>
         </Link>
       ) : (
         <span aria-hidden="true" />
@@ -121,7 +121,7 @@ function Neighbours({ slug, language }: { slug: string; language: string }) {
             {t('blog.next')}
             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
           </span>
-          <span className="font-semibold text-foreground">{next.title}</span>
+          <span className="font-medium text-foreground">{next.title}</span>
         </Link>
       )}
     </nav>
@@ -179,7 +179,7 @@ export default function BlogPostPage() {
 
   return (
     <div className={`${WRAP} pb-20 pt-10 sm:pt-14`}>
-      <Link to="/blog" className="mono-label inline-flex min-h-10 items-center gap-1.5 hover:text-primary">
+      <Link to="/blog" className="mono-label inline-flex min-h-10 items-center gap-1.5 hover:text-foreground">
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
         {t('blog.allPosts')}
       </Link>
@@ -191,7 +191,7 @@ export default function BlogPostPage() {
             own box. */}
         <article className="min-w-0">
           <header className="max-w-[68ch]">
-            <h1 className="font-display text-[2rem] font-bold leading-[1.08] tracking-[-0.035em] text-foreground [text-wrap:balance] sm:text-[2.7rem]">
+            <h1 className="text-[2rem] font-normal leading-[1.16] tracking-[-0.03em] text-foreground [text-wrap:balance] sm:text-[2.7rem]">
               {post.title}
             </h1>
             <p className="mt-4 text-[1.15rem] leading-relaxed text-muted-foreground">{post.lead}</p>

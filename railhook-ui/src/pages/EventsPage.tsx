@@ -180,7 +180,7 @@ export default function EventsPage() {
         />
       ) : (
         <div className="animate-fade-in">
-          <div className="overflow-hidden rounded-lg border border-rail bg-card">
+          <div className="overflow-hidden border border-rail bg-card">
             <Table>
               <TableHeader>
                 <TableRow>

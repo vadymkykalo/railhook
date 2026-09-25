@@ -164,7 +164,7 @@ export default function EventDetailPage() {
           { label: t('eventDetail.payloadSize'), value: event.payload ? formatBytes(new TextEncoder().encode(event.payload).length) : '—' },
           { label: t('eventDetail.project'), value: event.projectId.substring(0, 8) },
         ].map((metric) => (
-          <div key={metric.label} className="rounded-lg border border-rail bg-card px-4 py-3">
+          <div key={metric.label} className="border border-rail bg-card px-4 py-3">
             <dt className="mono-label">{metric.label}</dt>
             <dd className="mt-1 truncate font-mono text-[15px]" title={metric.value}>{metric.value}</dd>
           </div>
@@ -188,7 +188,7 @@ export default function EventDetailPage() {
               <tab.icon className="h-3.5 w-3.5" aria-hidden />
               {tab.label}
               {tab.badge !== undefined && tab.badge > 0 && (
-                <span className="ml-1 rounded-full bg-secondary px-1.5 py-0.5 font-mono text-[10px]">{tab.badge}</span>
+                <span className="ml-1 bg-secondary px-1.5 py-0.5 font-mono text-[10px]">{tab.badge}</span>
               )}
             </button>
           ))}
@@ -197,7 +197,7 @@ export default function EventDetailPage() {
 
       <div className="animate-fade-in pt-5">
         {activeTab === 'raw' && (
-          <section className="overflow-hidden rounded-lg border border-rail bg-card">
+          <section className="overflow-hidden border border-rail bg-card">
             <div className="flex items-center justify-between border-b border-rail px-4 py-2.5">
               <h3 className="text-[13px] font-medium">{t('eventDetail.rawPayload')}</h3>
               <Button variant="ghost" size="sm" onClick={() => handleCopy(formatPayload(event.payload), t('eventDetail.payloadCopied'))}>
@@ -211,7 +211,7 @@ export default function EventDetailPage() {
         )}
 
         {activeTab === 'sanitized' && (
-          <section className="rounded-lg border border-rail bg-card p-4">
+          <section className="border border-rail bg-card p-4">
             <h3 className="flex items-center gap-2 text-[13px] font-medium">
               <Shield className="h-4 w-4 text-muted-foreground" aria-hidden />
               {t('eventDetail.sanitized')}
@@ -223,7 +223,7 @@ export default function EventDetailPage() {
                 <p className="mono-label mb-2">{t('eventDetail.existingLinks')}</p>
                 {debugLinks.map((link) => (
                   <div key={link.id} className="flex items-center gap-2 py-1">
-                    <a href={link.shareUrl} target="_blank" rel="noopener noreferrer" className="flex-1 truncate font-mono text-xs text-primary hover:underline">
+                    <a href={link.shareUrl} target="_blank" rel="noopener noreferrer" className="flex-1 truncate font-mono text-xs link-ink">
                       {link.shareUrl}
                     </a>
                     <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(link.shareUrl, t('eventDetail.linkCopied'))} title={t('eventDetail.copyLink')} aria-label={t('eventDetail.copyLink')}>
@@ -237,7 +237,7 @@ export default function EventDetailPage() {
         )}
 
         {activeTab === 'schema' && (
-          <section className="rounded-lg border border-rail bg-card p-4">
+          <section className="border border-rail bg-card p-4">
             <h3 className="text-[13px] font-medium">{t('eventDetail.schemaInfo')}</h3>
             {matchingSchema ? (
               <div className="mt-3 space-y-3">
@@ -261,7 +261,7 @@ export default function EventDetailPage() {
         )}
 
         {activeTab === 'deliveries' && (
-          <section className="overflow-hidden rounded-lg border border-rail bg-card">
+          <section className="overflow-hidden border border-rail bg-card">
             {deliveriesLoading ? (
               <SkeletonTable rows={4} />
             ) : deliveries.length === 0 ? (
@@ -340,7 +340,7 @@ export default function EventDetailPage() {
         )}
 
         {activeTab === 'debug' && (
-          <section className="rounded-lg border border-rail bg-card">
+          <section className="border border-rail bg-card">
             <div className="flex items-center justify-between border-b border-rail px-4 py-2.5">
               <h3 className="text-[13px] font-medium">{t('eventDetail.tabs.debug')}</h3>
               <Button size="sm" onClick={handleShareDebug} disabled={sharingDebug}>
@@ -358,9 +358,9 @@ export default function EventDetailPage() {
               ) : (
                 <div className="space-y-3">
                   {debugLinks.map((link) => (
-                    <div key={link.id} className="flex items-center justify-between gap-3 rounded-lg border border-rail p-3">
+                    <div key={link.id} className="flex items-center justify-between gap-3 border border-rail p-3">
                       <div className="min-w-0 flex-1">
-                        <a href={link.shareUrl} target="_blank" rel="noopener noreferrer" className="block truncate font-mono text-sm text-primary hover:underline">
+                        <a href={link.shareUrl} target="_blank" rel="noopener noreferrer" className="block truncate font-mono text-sm link-ink">
                           {link.shareUrl}
                         </a>
                         <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">

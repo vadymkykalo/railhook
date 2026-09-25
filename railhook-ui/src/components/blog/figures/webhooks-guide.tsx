@@ -7,7 +7,7 @@ import { AXIS, Figure, LABEL, MONO, SOFT, wrapWords } from '../figures';
  * The drawings for "Webhooks, explained", placed with `:::figure <key>`.
  *
  * Same rules as `../figures.tsx`: tokens only, `ok` / `retry` / `halt` / `idle` for what they
- * name and the brand cobalt for everything else, every word a key under `blog.figures.*`.
+ * name and ink for everything else, every word a key under `blog.figures.*`.
  *
  * The one exception to "every word a key" is wire data — header names, a message id, a
  * signature. Those are the bytes a request carries, identical in every language, so they are
@@ -58,7 +58,7 @@ function PollingVsPush() {
 
       {/* The moment the order is created, through both lanes: the one instant both rows share. */}
       <line x1={eventX} y1={30} x2={eventX} y2={axisY} stroke={CHROME.ink} strokeWidth={1} strokeDasharray="3 3" />
-      <text x={eventX} y={22} textAnchor="middle" fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+      <text x={eventX} y={22} textAnchor="middle" fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
         {f('event')}
       </text>
 
@@ -68,13 +68,13 @@ function PollingVsPush() {
         { key: 'push', y: pushY + 4 },
       ].map((lane) => (
         <g key={lane.key}>
-          <text x={12} y={lane.y} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+          <text x={12} y={lane.y} fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
             {f(`${lane.key}.title`)}
           </text>
           <text x={12} y={lane.y + 16} fill={CHROME.muted} className={MONO}>
             {f(`${lane.key}.body`)}
           </text>
-          <text x={12} y={lane.y + 34} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+          <text x={12} y={lane.y + 34} fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
             {f(`${lane.key}.tally`)}
           </text>
         </g>
@@ -111,7 +111,7 @@ function PollingVsPush() {
               y={pollY + 4}
               textAnchor="middle"
               fill={useful ? CHROME.surface : CHROME.muted}
-              className={cn(REQUEST, useful && 'font-semibold')}
+              className={cn(REQUEST, useful && 'font-medium')}
             >
               GET /orders
             </text>
@@ -128,7 +128,7 @@ function PollingVsPush() {
               y={pollY + 42}
               textAnchor="middle"
               fill={useful ? SERIES.brand : CHROME.muted}
-              className={cn(MONO, useful && 'font-semibold')}
+              className={cn(MONO, useful && 'font-medium')}
             >
               {f(useful ? 'polling.found' : 'polling.empty')}
             </text>
@@ -142,16 +142,16 @@ function PollingVsPush() {
         fill="none"
         stroke={CHROME.ink}
       />
-      <text x={center(polls[found])} y={pollY + 74} textAnchor="middle" fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
+      <text x={center(polls[found])} y={pollY + 74} textAnchor="middle" fill={CHROME.ink} className={cn(MONO, 'font-medium')}>
         {f('polling.lag')}
       </text>
 
       {/* Webhook: one POST, at the instant the order is created, to your endpoint. */}
-      <text x={eventX + 4} y={pushY - 16} fill={SERIES.brand} className={cn(MONO, 'font-semibold')}>
+      <text x={eventX + 4} y={pushY - 16} fill={SERIES.brand} className={cn(MONO, 'font-medium')}>
         {f('push.when')}
       </text>
       <rect x={eventX} y={pushY - 12} width={54} height={24} rx={12} fill={SERIES.brand} />
-      <text x={eventX + 27} y={pushY + 4} textAnchor="middle" fill={CHROME.surface} className={cn(REQUEST, 'font-semibold')}>
+      <text x={eventX + 27} y={pushY + 4} textAnchor="middle" fill={CHROME.surface} className={cn(REQUEST, 'font-medium')}>
         POST
       </text>
       <line
@@ -226,7 +226,7 @@ function WebhookAnatomy() {
           y={firstLine + index * step}
           fill={line.note ? CHROME.ink : SOFT}
           style={{ whiteSpace: 'pre' }}
-          className={cn('font-mono text-[14px]', line.note && line.note !== 'body' && 'font-semibold')}
+          className={cn('font-mono text-[14px]', line.note && line.note !== 'body' && 'font-medium')}
         >
           {line.text}
         </text>
@@ -242,7 +242,7 @@ function WebhookAnatomy() {
               stroke={SERIES.brand}
               strokeWidth={1}
             />
-            <text x={calloutX} y={y} fill={CHROME.ink} className="text-[16px] font-semibold">
+            <text x={calloutX} y={y} fill={CHROME.ink} className="text-[16px] font-medium">
               {f(`${line.note}.title`)}
             </text>
             <text x={calloutX} y={y + 20} fill={SOFT} className="text-[14px]">
@@ -286,13 +286,13 @@ function ReceiverAck() {
       <text x={X0} y={20} fill={SOFT} className={MONO}>
         {f('budget')}
       </text>
-      <text x={budgetEnd + 6} y={20} fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
+      <text x={budgetEnd + 6} y={20} fill={CHROME.ink} className={cn(MONO, 'font-medium')}>
         {f('timeout')}
       </text>
 
       {Object.entries(lanes).map(([key, y]) => (
         <g key={key}>
-          <text x={12} y={y - 4} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+          <text x={12} y={y - 4} fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
             {f(`lane.${key}.title`)}
           </text>
           <text x={12} y={y + 11} fill={SOFT} className={MONO}>
@@ -311,7 +311,7 @@ function ReceiverAck() {
         </g>
       ))}
       <line x1={X0 + 216} y1={lanes.request - 2} x2={X0 + 244} y2={lanes.request - 2} stroke={SERIES.ok} strokeWidth={1.5} markerEnd="url(#wg-ack-arrow-ok)" />
-      <text x={X0 + 250} y={lanes.request + 2} fill={SERIES.ok} className={cn(MONO, 'font-semibold')}>
+      <text x={X0 + 250} y={lanes.request + 2} fill={SERIES.ok} className={cn(MONO, 'font-medium')}>
         {f('ok')}
       </text>
 
@@ -340,7 +340,7 @@ function ReceiverAck() {
         <line x1={-5} y1={-5} x2={5} y2={5} stroke={SERIES.halt} strokeWidth={2} />
         <line x1={-5} y1={5} x2={5} y2={-5} stroke={SERIES.halt} strokeWidth={2} />
       </g>
-      <text x={708} y={lanes.inline + 26} textAnchor="end" fill={SERIES.halt} className={cn(MONO, 'font-semibold')}>
+      <text x={708} y={lanes.inline + 26} textAnchor="end" fill={SERIES.halt} className={cn(MONO, 'font-medium')}>
         {f('inlineFail')}
       </text>
     </Figure>
@@ -381,7 +381,7 @@ function RetryBackoff() {
       {/* The outage, across both lanes: a wash, because it is a period rather than an outcome. */}
       <rect x={x(0)} y={48} width={x(OUTAGE_SECONDS) - x(0)} height={160} fill={CHROME.muted} opacity={0.1} />
       <line x1={x(OUTAGE_SECONDS)} y1={48} x2={x(OUTAGE_SECONDS)} y2={208} stroke={CHROME.muted} strokeDasharray="3 3" />
-      <text x={x(0) + 6} y={40} fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
+      <text x={x(0) + 6} y={40} fill={CHROME.ink} className={cn(MONO, 'font-medium')}>
         {f('outage')}
       </text>
       <text x={x(OUTAGE_SECONDS) + 6} y={40} fill={SOFT} className={MONO}>
@@ -404,7 +404,7 @@ function RetryBackoff() {
       ].map((lane) => (
         <g key={lane.key}>
           <line x1={X0} y1={lane.y} x2={X1} y2={lane.y} {...AXIS} strokeDasharray="2 4" />
-          <text x={12} y={lane.y - 4} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+          <text x={12} y={lane.y - 4} fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
             {f(`${lane.key}.title`)}
           </text>
           <text x={12} y={lane.y + 11} fill={SOFT} className={MONO}>
@@ -431,13 +431,13 @@ function RetryBackoff() {
           </g>
         );
       })}
-      <text x={x(BACKOFF[BACKOFF.length - 1].seconds) + 10} y={retryY + 4} fill={SERIES.ok} className={cn(MONO, 'font-semibold')}>
+      <text x={x(BACKOFF[BACKOFF.length - 1].seconds) + 10} y={retryY + 4} fill={SERIES.ok} className={cn(MONO, 'font-medium')}>
         {f('retries.result')}
       </text>
 
       {/* One attempt, then nothing. */}
       <circle cx={x(0)} cy={onceY} r={5} fill={SERIES.halt} />
-      <text x={x(0) + 12} y={onceY - 8} fill={SERIES.halt} className={cn(MONO, 'font-semibold')}>
+      <text x={x(0) + 12} y={onceY - 8} fill={SERIES.halt} className={cn(MONO, 'font-medium')}>
         {f('once.result')}
       </text>
     </Figure>
@@ -463,7 +463,7 @@ function DuplicateDelivery() {
         { key: 'receiver', x: receiver },
       ].map((party) => (
         <g key={party.key}>
-          <text x={party.x} y={22} textAnchor="middle" fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+          <text x={party.x} y={22} textAnchor="middle" fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
             {f(party.key)}
           </text>
           <line x1={party.x} y1={32} x2={party.x} y2={232} {...AXIS} />
@@ -496,7 +496,7 @@ function DuplicateDelivery() {
         {f('seen')}
       </text>
       <line x1={receiver} y1={rows.reply} x2={sender + 4} y2={rows.reply} stroke={SERIES.ok} strokeWidth={1.5} markerEnd="url(#wg-dup-arrow-ok)" />
-      <text x={(sender + receiver) / 2} y={rows.reply - 8} textAnchor="middle" fill={SERIES.ok} className={cn(MONO, 'font-semibold')}>
+      <text x={(sender + receiver) / 2} y={rows.reply - 8} textAnchor="middle" fill={SERIES.ok} className={cn(MONO, 'font-medium')}>
         {f('ok')}
       </text>
 
@@ -521,10 +521,10 @@ function OutOfOrder() {
 
   return (
     <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 720 240">
-      <text x={left} y={30} textAnchor="end" fill={SOFT} className={cn(LABEL, 'font-semibold')}>
+      <text x={left} y={30} textAnchor="end" fill={SOFT} className={cn(LABEL, 'font-medium')}>
         {f('happened')}
       </text>
-      <text x={right} y={30} fill={SOFT} className={cn(LABEL, 'font-semibold')}>
+      <text x={right} y={30} fill={SOFT} className={cn(LABEL, 'font-medium')}>
         {f('arrived')}
       </text>
 
@@ -560,7 +560,7 @@ function OutOfOrder() {
             y={rowY(index) + 4}
             textAnchor="end"
             fill={verdict[key] === 'apply' ? SERIES.ok : SOFT}
-            className={cn(MONO, 'font-semibold')}
+            className={cn(MONO, 'font-medium')}
           >
             {f(`verdict.${key}`)}
           </text>
@@ -592,7 +592,7 @@ function SecretRotation() {
         { key: 'cutover', y: cutY },
       ].map((lane) => (
         <g key={lane.key}>
-          <text x={12} y={lane.y - 4} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+          <text x={12} y={lane.y - 4} fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
             {f(`${lane.key}.title`)}
           </text>
           <text x={12} y={lane.y + 11} fill={SOFT} className={MONO}>
@@ -610,7 +610,7 @@ function SecretRotation() {
           {/* Broken between the lanes, so the overlap's result reads clear of it. */}
           <line x1={marker.x} y1={34} x2={marker.x} y2={overlapY + 22} stroke={CHROME.ink} strokeDasharray="3 3" />
           <line x1={marker.x} y1={cutY - 26} x2={marker.x} y2={226} stroke={CHROME.ink} strokeDasharray="3 3" />
-          <text x={marker.x} y={26} textAnchor="middle" fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
+          <text x={marker.x} y={26} textAnchor="middle" fill={CHROME.ink} className={cn(MONO, 'font-medium')}>
             {f(`marker.${marker.key}`)}
           </text>
         </g>
@@ -622,10 +622,10 @@ function SecretRotation() {
         {f('old')}
       </text>
       <rect x={rotate} y={overlapY + 2} width={X1 - rotate} height={barHeight} rx={4} fill={SERIES.brand} opacity={0.85} />
-      <text x={retire + 8} y={overlapY + 15} fill={CHROME.surface} className={cn(MONO, 'font-semibold')}>
+      <text x={retire + 8} y={overlapY + 15} fill={CHROME.surface} className={cn(MONO, 'font-medium')}>
         {f('new')}
       </text>
-      <text x={(rotate + retire) / 2} y={overlapY + 36} textAnchor="middle" fill={SERIES.ok} className={cn(MONO, 'font-semibold')}>
+      <text x={(rotate + retire) / 2} y={overlapY + 36} textAnchor="middle" fill={SERIES.ok} className={cn(MONO, 'font-medium')}>
         {f('overlap.result')}
       </text>
       <line x1={retire} y1={overlapY - 26} x2={retire} y2={overlapY + 22} stroke={CHROME.muted} strokeWidth={1} />
@@ -641,10 +641,10 @@ function SecretRotation() {
       </text>
       <rect x={rotate} y={cutY + 2} width={X1 - rotate} height={barHeight} rx={4} fill={SERIES.brand} opacity={0.85} />
       <rect x={rotate} y={cutY - 22} width={deploy - rotate} height={barHeight} rx={4} fill={SERIES.halt} opacity={0.3} />
-      <text x={(rotate + deploy) / 2} y={cutY - 9} textAnchor="middle" fill={SERIES.halt} className={cn(MONO, 'font-semibold')}>
+      <text x={(rotate + deploy) / 2} y={cutY - 9} textAnchor="middle" fill={SERIES.halt} className={cn(MONO, 'font-medium')}>
         {f('cutover.result')}
       </text>
-      <text x={retire + 8} y={cutY + 15} fill={CHROME.surface} className={cn(MONO, 'font-semibold')}>
+      <text x={retire + 8} y={cutY + 15} fill={CHROME.surface} className={cn(MONO, 'font-medium')}>
         {f('new')}
       </text>
     </Figure>

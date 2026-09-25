@@ -78,9 +78,9 @@ function UsageMeter({ label, usage }: { label: string; usage: ResourceUsage }) {
         <p className="mt-1.5 text-xs text-muted-foreground">{t('billing.noCeiling')}</p>
       ) : (
         <>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
+          <div className="mt-2 h-1.5 overflow-hidden bg-secondary">
             <div
-              className={cn('h-full rounded-full transition-[width] duration-500', BAR_COLOR[kind])}
+              className={cn('h-full transition-[width] duration-500', BAR_COLOR[kind])}
               style={{ width: `${Math.min(100, percent)}%` }}
               role="progressbar"
               aria-valuenow={percent}
@@ -343,7 +343,7 @@ export default function BillingPage() {
           {/* What else it could be on */}
           {!isSelfHosted && plans.some((p) => p.name !== plan?.name) && (
             <FormSection title={t('billing.availablePlans')} description={t('billing.availablePlansDesc')}>
-              <div className="inline-flex items-center gap-1 rounded-lg border border-rail p-1" role="group" aria-label={t('billing.billingInterval')}>
+              <div className="inline-flex items-center gap-1 border border-rail p-1" role="group" aria-label={t('billing.billingInterval')}>
                 {([false, true] as const).map((yearly) => (
                   <button
                     key={String(yearly)}
@@ -351,7 +351,7 @@ export default function BillingPage() {
                     aria-pressed={annual === yearly}
                     onClick={() => setAnnual(yearly)}
                     className={cn(
-                      'rounded-md px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      'px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                       annual === yearly ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'
                     )}
                   >
@@ -372,8 +372,8 @@ export default function BillingPage() {
                     <div
                       key={p.id}
                       className={cn(
-                        'rounded-lg border p-4',
-                        isCurrent ? 'border-primary bg-accent/30' : 'border-rail bg-card'
+                        'border p-4',
+                        isCurrent ? 'border-primary bg-secondary' : 'border-rail bg-card'
                       )}
                     >
                       <div className="flex items-baseline justify-between gap-2">
@@ -494,7 +494,7 @@ export default function BillingPage() {
           {!isSelfHosted && (
             <FormSection title={t('billing.invoices')} description={t('billing.invoicesDesc')}>
               {invoices.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-rail px-4 py-8 text-center text-sm text-muted-foreground">
+                <p className="border border-dashed border-rail px-4 py-8 text-center text-sm text-muted-foreground">
                   {t('billing.invoicesEmpty')}
                 </p>
               ) : (
@@ -532,7 +532,7 @@ export default function BillingPage() {
                                 href={inv.invoiceUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[13px] text-primary hover:underline"
+                                className="inline-flex items-center gap-1 text-[13px] link-ink"
                               >
                                 {t('billing.invoiceView')}
                                 <ExternalLink className="h-3 w-3" aria-hidden />

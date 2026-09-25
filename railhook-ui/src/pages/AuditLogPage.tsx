@@ -269,7 +269,7 @@ export default function AuditLogPage() {
               {selected.errorMessage && (
                 <div className="pt-3">
                   <p className="mono-label mb-1.5">{t('auditLog.columns.error')}</p>
-                  <p className="break-all rounded-lg border border-halt/30 bg-halt-soft p-3 text-[13px] text-halt">
+                  <p className="break-all border border-halt/30 bg-halt-soft p-3 text-[13px] text-halt">
                     {selected.errorMessage}
                   </p>
                 </div>

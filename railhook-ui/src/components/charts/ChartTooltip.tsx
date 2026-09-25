@@ -31,7 +31,7 @@ export default function ChartTooltip({
   if (!active || !payload || payload.length === 0) return null;
 
   return (
-    <div className="pointer-events-none min-w-[9rem] rounded-lg border border-rail bg-popover px-3 py-2 shadow-elevated">
+    <div className="pointer-events-none min-w-[9rem] border border-rail bg-popover px-3 py-2 shadow-elevated">
       {label !== undefined && (
         <p className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
           {labelFormatter ? labelFormatter(label) : String(label)}

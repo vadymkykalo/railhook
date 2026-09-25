@@ -242,7 +242,7 @@ export default function DeliveriesPage() {
       />
 
       {eventIdFilter && (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-rail bg-secondary/50 px-3 py-2">
+        <div className="mb-4 flex flex-wrap items-center gap-2 border border-rail bg-secondary/50 px-3 py-2">
           <Send className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />
           <span className="text-sm text-muted-foreground">{t('deliveries.filteringByEvent')}</span>
           <code className="font-mono text-[13px]">{eventIdFilter.substring(0, 8)}</code>
@@ -318,7 +318,7 @@ export default function DeliveriesPage() {
             </SelectionBar>
           </PermissionGate>
 
-          <div className="overflow-hidden rounded-lg border border-rail bg-card">
+          <div className="overflow-hidden border border-rail bg-card">
             <Table>
               <TableHeader>
                 <TableRow>

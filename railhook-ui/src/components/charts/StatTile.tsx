@@ -39,7 +39,7 @@ export default function StatTile({ label, value, hint, badge, spark, to, classNa
       </div>
       <div className="mt-2 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-2xl font-semibold leading-none tracking-tight">{value}</p>
+          <p className="text-2xl font-medium leading-none tracking-tight">{value}</p>
           {hint && <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>}
         </div>
         {spark && spark.length >= 2 && (
@@ -49,7 +49,7 @@ export default function StatTile({ label, value, hint, badge, spark, to, classNa
     </>
   );
 
-  const shell = 'block rounded-xl border border-rail bg-card p-4 shadow-card';
+  const shell = 'block border border-rail bg-card p-4 shadow-card';
 
   if (to) {
     return (

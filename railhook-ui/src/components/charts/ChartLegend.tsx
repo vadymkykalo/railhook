@@ -21,7 +21,7 @@ export default function ChartLegend({ items, className }: { items: LegendItem[];
         <li key={item.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span
             aria-hidden
-            className={cn('flex-shrink-0', item.shape === 'line' ? 'h-0.5 w-3.5 rounded-full' : 'h-2.5 w-2.5 rounded-sm')}
+            className={cn('flex-shrink-0', item.shape === 'line' ? 'h-0.5 w-3.5 rounded-full' : 'h-2.5 w-2.5')}
             style={{ backgroundColor: item.color, opacity: item.opacity ?? 1 }}
           />
           {item.label}

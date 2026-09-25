@@ -54,14 +54,14 @@ function Card({
   return (
     <div className={cn('flex h-full flex-col p-6', panel(true))}>
       <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
-      <h2 className="mt-3 text-[15px] font-semibold text-foreground">{title}</h2>
+      <h2 className="mt-3 text-[15px] font-medium text-foreground">{title}</h2>
       <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{body}</p>
       <div className="mt-auto pt-5">{action}</div>
     </div>
   );
 }
 
-const LINK = 'text-sm font-medium text-primary hover:underline';
+const LINK = 'text-sm font-medium link-ink';
 
 export default function ContactPage() {
   const { t, i18n } = useTranslation();
@@ -72,7 +72,7 @@ export default function ContactPage() {
     <Section ruled={false}>
       <Reveal>
         <div className="max-w-2xl">
-          <h1 className="font-display text-3xl leading-[1.1] tracking-tight text-foreground sm:text-headline">
+          <h1 className="text-[2.375rem] font-normal leading-[1.16] tracking-[-0.03em] text-foreground sm:text-[3.5rem]">
             {t('contact.title')}
           </h1>
           <p className="mt-4 text-body-lg text-muted-foreground">{t('contact.subtitle')}</p>
@@ -83,7 +83,7 @@ export default function ContactPage() {
       {domain && (
         <Reveal>
           <div className={cn('mt-10 p-6 sm:p-8', panel())}>
-            <h2 className="font-display text-[1.35rem] font-bold tracking-[-0.02em] text-foreground">{t('site.contact.formTitle')}</h2>
+            <h2 className="text-[1.5rem] font-normal tracking-[-0.02em] text-foreground">{t('site.contact.formTitle')}</h2>
             <p className="mt-1.5 text-muted-foreground">{t('site.contact.formLead')}</p>
             <div className="mt-6">
               <ContactForm />

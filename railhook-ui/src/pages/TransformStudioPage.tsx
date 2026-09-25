@@ -458,7 +458,7 @@ export default function TransformStudioPage() {
                   type="button"
                   onClick={() => setSource(hint.expr)}
                   title={t(hint.descKey)}
-                  className="rounded-md border border-rail bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                  className="border border-rail bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {hint.expr}
                 </button>
@@ -626,7 +626,7 @@ export default function TransformStudioPage() {
         </div>
 
         {showEventPicker && (
-          <div className="space-y-2 rounded-lg border border-rail bg-muted/30 p-3">
+          <div className="space-y-2 border border-rail bg-muted/30 p-3">
             <div className="flex items-center justify-between">
               <p className="mono-label">{t('transform.recentEvents')}</p>
               <Button
@@ -659,7 +659,7 @@ export default function TransformStudioPage() {
                     key={event.id}
                     type="button"
                     onClick={() => handleLoadEvent(event.payload, event.eventType)}
-                    className="flex w-full items-center justify-between gap-2 rounded-md border border-rail bg-card px-2.5 py-2 text-left transition-colors hover:border-primary/40"
+                    className="flex w-full items-center justify-between gap-2 border border-rail bg-card px-2.5 py-2 text-left transition-colors hover:border-primary/40"
                   >
                     <span className="truncate font-mono text-[11px]">{event.eventType}</span>
                     <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
@@ -695,7 +695,7 @@ export default function TransformStudioPage() {
         {!hasRun ? (
           <ResultPlaceholder icon={Play} title={t('transform.emptyTitle')} hint={t('transform.noOutput')} />
         ) : cancelled ? (
-          <div className="rounded-lg border border-rail bg-muted/30 p-5 text-center">
+          <div className="border border-rail bg-muted/30 p-5 text-center">
             <Ban className="mx-auto mb-2 h-5 w-5 text-muted-foreground" aria-hidden="true" />
             <p className="text-sm font-medium">{t('transform.cancelledTitle')}</p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -706,7 +706,7 @@ export default function TransformStudioPage() {
         ) : (
           <>
             {mode === 'dryRun' && dryRunResult?.endpointUrl && (
-              <div className="flex items-center gap-2 rounded-lg border border-rail bg-muted/30 px-3 py-2">
+              <div className="flex items-center gap-2 border border-rail bg-muted/30 px-3 py-2">
                 <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <span className="truncate font-mono text-[11px]">{dryRunResult.endpointUrl}</span>
               </div>
@@ -768,11 +768,11 @@ export default function TransformStudioPage() {
 
       <TabPanel value="console" active={tab} className="space-y-3">
         {errors.length > 0 && (
-          <div className="overflow-hidden rounded-lg border border-halt/40">
+          <div className="overflow-hidden border border-halt/40">
             <div className="border-b border-halt/30 bg-halt/10 px-2.5 py-2">
               <p className="text-[13px] font-medium text-foreground">
                 {errorLine && (
-                  <span className="mr-2 rounded bg-halt/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-halt">
+                  <span className="mr-2 rounded bg-halt/15 px-1.5 py-0.5 font-mono text-[10px] font-medium text-halt">
                     {t('transform.atLine', { line: errorLine })}
                   </span>
                 )}
@@ -801,7 +801,7 @@ export default function TransformStudioPage() {
           />
         ) : (
           consoleLines.length > 0 && (
-            <div className="overflow-hidden rounded-lg border border-rail">
+            <div className="overflow-hidden border border-rail">
               <ul className="divide-y divide-rail font-mono text-[11px]">
                 {consoleLines.map((line, index) => (
                   <li key={index} className="flex gap-2 px-2.5 py-1.5">

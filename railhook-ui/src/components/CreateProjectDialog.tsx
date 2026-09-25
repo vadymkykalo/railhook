@@ -95,8 +95,8 @@ export default function CreateProjectDialog({
                       setDescription(TEMPLATE_DEFAULTS[key].description);
                     }}
                     className={cn(
-                      'flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                      selectedTemplate === key ? 'border-primary bg-accent/40' : 'border-rail hover:border-primary/40'
+                      'flex flex-col items-center gap-1.5 border p-3 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                      selectedTemplate === key ? 'border-primary bg-secondary' : 'border-rail hover:border-primary/40'
                     )}
                   >
                     <TIcon className={cn('h-4 w-4', selectedTemplate === key ? 'text-primary' : 'text-muted-foreground')} aria-hidden />

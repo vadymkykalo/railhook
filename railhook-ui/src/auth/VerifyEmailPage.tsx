@@ -41,7 +41,7 @@ export default function VerifyEmailPage() {
   if (status === 'loading') {
     return (
       <AuthLayout title={t('verifyEmail.verifying')} subtitle={t('verifyEmail.pleaseWait')}>
-        <div className="flex items-center gap-3 rounded-md border border-rail bg-card p-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3 border border-rail bg-card p-4 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
           {t('verifyEmail.verifying')}
         </div>
@@ -53,7 +53,7 @@ export default function VerifyEmailPage() {
     return (
       <AuthLayout title={t('verifyEmail.errorTitle')} subtitle={t('verifyEmail.failed')}>
         <div className="space-y-5">
-          <div role="alert" className="rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+          <div role="alert" className="border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
             {errorMessage}
           </div>
           <Button className="h-10 w-full" onClick={() => navigate('/login')}>

@@ -75,7 +75,7 @@ export function ErrorFallback({ error, variant }: { error: Error | null; variant
       }
     >
       <div role="alert" className="w-full max-w-md text-center">
-        <div className="mx-auto mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-halt/30 bg-halt-soft">
+        <div className="mx-auto mb-5 flex h-11 w-11 items-center justify-center border border-halt/30 bg-halt-soft">
           <AlertTriangle className="h-5 w-5 text-halt" aria-hidden />
         </div>
         {page ? (
@@ -87,7 +87,7 @@ export function ErrorFallback({ error, variant }: { error: Error | null; variant
           {i18n.t('errorBoundary.description')}
         </p>
         {error && (
-          <pre className="mt-5 max-h-32 overflow-auto rounded-md border border-rail bg-card p-3 text-left font-mono text-xs text-muted-foreground">
+          <pre className="mt-5 max-h-32 overflow-auto border border-rail bg-card p-3 text-left font-mono text-xs text-muted-foreground">
             {error.message}
           </pre>
         )}

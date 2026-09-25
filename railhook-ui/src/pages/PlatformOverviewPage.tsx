@@ -53,8 +53,8 @@ function ActivationFunnel({ activation }: { activation: PlatformActivation }) {
           return (
             <li key={step.key} className="grid grid-cols-[minmax(0,11rem)_1fr_auto] items-center gap-3 text-sm max-sm:grid-cols-[1fr_auto]">
               <span className="truncate text-muted-foreground">{t(`platformAdmin.overview.activation.${step.key}`)}</span>
-              <span className="h-2 rounded-full bg-muted max-sm:order-last max-sm:col-span-2" aria-hidden="true">
-                <span className="block h-full rounded-full" style={{ width: `${width}%`, backgroundColor: SERIES.brand }} />
+              <span className="h-2 bg-muted max-sm:order-last max-sm:col-span-2" aria-hidden="true">
+                <span className="block h-full" style={{ width: `${width}%`, backgroundColor: SERIES.brand }} />
               </span>
               <span className="whitespace-nowrap text-right font-mono tabular-nums">
                 {formatNumber(step.value)}
@@ -162,7 +162,7 @@ export default function PlatformOverviewPage() {
           <Card className="mt-6 overflow-hidden">
             <PanelTitle title={t('platformAdmin.overview.recentSignups')} />
             {data.recentSignups.length === 0 ? (
-              <EmptyState icon={UserPlus} title={t('platformAdmin.overview.noSignups')} className="rounded-none border-0 py-10" />
+              <EmptyState icon={UserPlus} title={t('platformAdmin.overview.noSignups')} className="border-0 py-10" />
             ) : (
               <Table className={PLATFORM_TABLE}>
                 <TableHeader className={PLATFORM_TABLE_HEADER}>

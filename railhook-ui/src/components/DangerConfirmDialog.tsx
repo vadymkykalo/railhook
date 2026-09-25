@@ -67,7 +67,7 @@ export default function DangerConfirmDialog({
         </AlertDialogHeader>
 
         {impact && impact.length > 0 && (
-          <div className="rounded-lg border border-halt/30 bg-halt-soft p-3">
+          <div className="border border-halt/30 bg-halt-soft p-3">
             <p className="mono-label text-halt">{t('dangerConfirm.impact')}</p>
             <ul className="mt-1.5 space-y-1">
               {impact.map((line) => (

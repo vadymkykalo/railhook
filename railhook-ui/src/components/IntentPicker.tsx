@@ -51,15 +51,15 @@ export default function IntentPicker({ onSelect, value = null }: IntentPickerPro
               aria-checked={active}
               onClick={() => setSelected(key)}
               className={cn(
-                'flex w-full items-start gap-3.5 rounded-lg border p-4 text-left transition-colors',
+                'flex w-full items-start gap-3.5 border p-4 text-left transition-colors',
                 active
-                  ? 'border-primary bg-accent'
+                  ? 'border-primary bg-secondary'
                   : 'border-rail bg-card hover:border-primary/40 hover:bg-secondary/50',
               )}
             >
               <div
                 className={cn(
-                  'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border',
+                  'flex h-9 w-9 flex-shrink-0 items-center justify-center border',
                   active ? 'border-primary/30 bg-primary text-primary-foreground' : 'border-rail bg-secondary text-muted-foreground',
                 )}
               >

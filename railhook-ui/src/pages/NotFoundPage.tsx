@@ -20,13 +20,13 @@ export default function NotFoundPage() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center p-4 lg:p-6">
       <div className="w-full max-w-md">
-        <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-rail bg-card">
+        <div className="mb-5 flex h-11 w-11 items-center justify-center border border-rail bg-card">
           <Compass className="h-5 w-5 text-muted-foreground" aria-hidden />
         </div>
         <p className="mono-label">404</p>
         <h1 className="mt-1 text-title">{t('notFound.title')}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{t('notFound.description')}</p>
-        <p className="mt-3 overflow-x-auto rounded-md border border-rail bg-secondary/60 px-3 py-2 font-mono text-[12px] text-muted-foreground">
+        <p className="mt-3 overflow-x-auto border border-rail bg-secondary/60 px-3 py-2 font-mono text-[12px] text-muted-foreground">
           {location.pathname}
         </p>
 

@@ -31,7 +31,8 @@ function useScrollToTopOnNavigate() {
 }
 
 /**
- * The chrome every public page shares. `nav` is opt-in because the documentation brings its
+ * The chrome every public page shares: the header, then one 1336px frame with hairlines at both
+ * edges holding the page and the footer. `nav` is opt-in because the documentation brings its
  * own; the footer is not.
  */
 export default function PublicLayout({ nav = true }: { nav?: boolean }) {
@@ -39,10 +40,12 @@ export default function PublicLayout({ nav = true }: { nav?: boolean }) {
   return (
     <div className="flex min-h-screen flex-col">
       {nav && <LandingNav />}
-      <div className="flex-1">
-        <Outlet />
+      <div className="mx-auto flex w-full max-w-[1336px] flex-1 flex-col border-x border-rail max-sm:border-x-0">
+        <div className="flex-1">
+          <Outlet />
+        </div>
+        <Footer />
       </div>
-      <Footer />
       <SiteOverlays />
     </div>
   );
@@ -50,13 +53,13 @@ export default function PublicLayout({ nav = true }: { nav?: boolean }) {
 
 /* Below sm a link is a 40px row, so a thumb hits the one it meant; from sm the column is as dense
    as it always was. */
-const LINK = 'text-sm text-muted-foreground transition-colors hover:text-foreground max-sm:flex max-sm:min-h-10 max-sm:items-center';
+const LINK = 'text-[14.5px] text-[#555] transition-colors hover:text-foreground dark:text-muted-foreground max-sm:flex max-sm:min-h-10 max-sm:items-center';
 
 function Column({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h2 className="mono-label mb-3 max-sm:mb-1">{title}</h2>
-      <ul className="space-y-2 max-sm:space-y-0">{children}</ul>
+      <h2 className="mb-3.5 text-sm font-medium leading-none text-foreground max-sm:mb-1">{title}</h2>
+      <ul className="space-y-2.5 max-sm:space-y-0">{children}</ul>
     </div>
   );
 }
@@ -109,7 +112,7 @@ function ConnectWithUs() {
               href={href}
               aria-label={label}
               title={label}
-              className="grid h-9 w-9 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground max-sm:h-10 max-sm:w-10"
+              className="grid h-9 w-9 place-items-center text-muted-foreground transition-colors hover:text-foreground max-sm:h-10 max-sm:w-10"
               {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             >
               <Icon className="h-5 w-5" aria-hidden="true" />
@@ -130,18 +133,16 @@ function ConnectWithUs() {
 export function Footer() {
   const { t } = useTranslation();
   return (
-    <footer className="border-t border-rail bg-background">
-      <div className={`${WRAP} py-12`}>
+    <footer className="lp-rule bg-background">
+      <div className={`${WRAP} pb-12 pt-14`}>
         {/* Two columns of links on a phone, with the brand across the top, instead of one long list. */}
-        <div className="grid gap-10 max-sm:grid-cols-2 max-sm:gap-x-6 max-sm:gap-y-8 sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(4,minmax(0,1fr))]">
+        <div className="grid gap-[30px] max-sm:grid-cols-2 max-sm:gap-x-6 max-sm:gap-y-8 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(4,minmax(0,1fr))]">
           <div className="max-sm:col-span-2">
-            <Link to="/" className="mb-4 flex items-center gap-2.5 max-sm:min-h-10">
-              <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-md bg-primary">
-                <RailhookIcon className="h-4 w-4 text-primary-foreground" />
-              </span>
-              <span className="font-semibold text-foreground">Railhook</span>
+            <Link to="/" className="mb-3.5 flex items-center gap-2 text-[22px] font-medium leading-none tracking-[-0.03em] text-foreground max-sm:min-h-10">
+              <RailhookIcon className="h-[22px] w-[22px]" aria-hidden="true" />
+              Railhook
             </Link>
-            <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">{t('footer.tagline')}</p>
+            <p className="max-w-[16rem] text-[13.5px] leading-relaxed text-[#777] dark:text-muted-foreground">{t('footer.tagline')}</p>
           </div>
           <Column title={t('footer.product')}>
             <RouteLink to="/#product">{t('footer.overview')}</RouteLink>
@@ -169,7 +170,6 @@ export function Footer() {
             <RouteLink to="/about">{t('footer.about')}</RouteLink>
             {publicBlogEnabled() && <RouteLink to="/blog">{t('footer.blog')}</RouteLink>}
             <RouteLink to="/security">{t('footer.security')}</RouteLink>
-            <RouteLink to="/changelog">{t('footer.changelog')}</RouteLink>
             {statusPageUrl() && <PageLink href={statusPageUrl()!} external>{t('footer.status')}</PageLink>}
             <RouteLink to="/contact">{t('footer.talkToUs')}</RouteLink>
             <RouteLink to="/privacy">{t('footer.privacy')}</RouteLink>
@@ -191,7 +191,7 @@ export function Footer() {
               <img src="/badges/saashub-approved-color.png" alt="Railhook on SaaSHub" width={150} height={50} className="dark:hidden" />
               <img src="/badges/saashub-approved-dark.png" alt="Railhook on SaaSHub" width={150} height={50} className="hidden dark:block" />
             </a>
-            <ThemeToggle className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:grid max-sm:h-10 max-sm:w-10 max-sm:place-items-center" />
+            <ThemeToggle className="border border-input p-2 text-muted-foreground transition-colors hover:border-foreground hover:text-foreground max-sm:grid max-sm:h-10 max-sm:w-10 max-sm:place-items-center" />
           </div>
         </div>
       </div>

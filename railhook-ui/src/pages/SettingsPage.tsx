@@ -323,7 +323,7 @@ export default function SettingsPage() {
                 />
               </div>
               {passwordError && (
-                <p role="alert" className="max-w-sm rounded-md border border-halt/30 bg-halt-soft px-3 py-2 text-sm text-halt">
+                <p role="alert" className="max-w-sm border border-halt/30 bg-halt-soft px-3 py-2 text-sm text-halt">
                   {passwordError}
                 </p>
               )}
@@ -458,7 +458,7 @@ function EraseAccount() {
   };
 
   return (
-    <section className="rounded-xl border border-halt/30 bg-halt-soft/50 p-5">
+    <section className="border border-halt/30 bg-halt-soft/50 p-5">
       <div className="flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-halt" aria-hidden />
         <h3 className="text-[15px] font-medium text-halt">{t('settings.erase.title')}</h3>

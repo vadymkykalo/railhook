@@ -208,10 +208,10 @@ function DeliverySheet({
                 {(attempts.data ?? []).map((attempt) => {
                   const ok = attempt.httpStatusCode != null && attempt.httpStatusCode >= 200 && attempt.httpStatusCode < 300;
                   return (
-                    <li key={attempt.id} className="rounded-md border border-rail p-3">
+                    <li key={attempt.id} className="border border-rail p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold">
+                          <span className="text-sm font-medium">
                             {t('deliveryDetails.attemptNumber', { number: attempt.attemptNumber })}
                           </span>
                           {attempt.httpStatusCode != null && (

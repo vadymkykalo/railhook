@@ -240,7 +240,7 @@ export default function IncomingSourcesPage() {
                       <button
                         type="button"
                         onClick={() => openSource(source)}
-                        className="text-left text-[13px] font-medium hover:text-primary hover:underline"
+                        className="text-left text-[13px] font-medium hover:link-ink"
                       >
                         {source.name}
                       </button>
@@ -389,7 +389,7 @@ export default function IncomingSourcesPage() {
               </div>
 
               {formVerification === 'NONE' && (
-                <div className="flex items-start gap-2.5 rounded-lg border border-retry/30 bg-retry-soft p-3">
+                <div className="flex items-start gap-2.5 border border-retry/30 bg-retry-soft p-3">
                   <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
                   <div>
                     <p className="text-sm font-medium text-retry">{t('incomingSources.security.noVerificationTitle')}</p>

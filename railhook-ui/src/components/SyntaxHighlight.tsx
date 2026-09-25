@@ -31,9 +31,10 @@ import { useMemo, type ReactNode } from 'react';
  *
  * The palette is its own: the `--code-*` tokens in `index.css`, declared for
  * paper, for the dark page and for the ink code surface. It is an IDE's
- * palette — a hue per kind of token, so a reader finds the types, the calls and
- * the strings without reading every word — built outward from the brand
- * cobalt, which the keywords wear. Two rules keep it inside the product: none
+ * palette kept close to the monochrome system: ink keywords and calls, greys
+ * for types and punctuation, and three muted hues (olive keys, terracotta
+ * strings, raspberry numbers) for what a reader scans for. Two rules keep it
+ * inside the product: none
  * of the four status hues is used (a string is never "ok green", a number never
  * "halt red"), and every colour clears WCAG AA against the surface it is
  * declared for. Comments and punctuation are the recessive tier.

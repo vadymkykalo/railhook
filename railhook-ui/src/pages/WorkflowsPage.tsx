@@ -99,7 +99,7 @@ export default function WorkflowsPage() {
       />
 
       {showCreate && (
-        <div className="animate-scale-in mb-5 rounded-lg border border-rail bg-card p-4">
+        <div className="animate-scale-in mb-5 border border-rail bg-card p-4">
           <h3 className="mb-3 text-[15px] font-medium">{t('workflows.createWorkflow')}</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -149,7 +149,7 @@ export default function WorkflowsPage() {
           }
         />
       ) : (
-        <div className="divide-y divide-rail overflow-hidden rounded-lg border border-rail bg-card">
+        <div className="divide-y divide-rail overflow-hidden border border-rail bg-card">
           {workflows.map((wf: WorkflowResponse) => (
             <div
               key={wf.id}

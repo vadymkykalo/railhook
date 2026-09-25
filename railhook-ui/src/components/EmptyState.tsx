@@ -21,8 +21,8 @@ interface EmptyStateProps {
 export default function EmptyState({ icon: Icon, title, description, action, docsLink, className }: EmptyStateProps) {
   const { t, i18n } = useTranslation();
   return (
-    <div className={cn('flex flex-col items-center justify-center rounded-lg border border-dashed border-rail py-16', className)}>
-      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-rail bg-card">
+    <div className={cn('flex flex-col items-center justify-center border border-dashed border-rail py-16', className)}>
+      <div className="mb-5 flex h-11 w-11 items-center justify-center border border-rail bg-card">
         <Icon className="h-5 w-5 text-muted-foreground" />
       </div>
       <h3 className="mb-1.5 text-[15px] font-medium">{title}</h3>
@@ -79,9 +79,9 @@ export function ErrorState({
     <div
       data-testid={testId}
       role="alert"
-      className={className ?? 'flex flex-col items-center justify-center rounded-lg border border-dashed border-halt/30 py-16'}
+      className={className ?? 'flex flex-col items-center justify-center border border-dashed border-halt/30 py-16'}
     >
-      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-halt/30 bg-halt-soft">
+      <div className="mb-5 flex h-11 w-11 items-center justify-center border border-halt/30 bg-halt-soft">
         <AlertTriangle className="h-5 w-5 text-halt" />
       </div>
       <h3 className="mb-1.5 text-[15px] font-medium">{title ?? t('common.loadErrorTitle')}</h3>

@@ -225,9 +225,9 @@ export function EventsAgainstLimit({ current, limit }: { current: number; limit:
         {formatNumber(current)}
         <span className="text-muted-foreground"> / {formatNumber(limit)}</span>
       </div>
-      <div className="mt-1 h-1 w-full rounded-full bg-secondary" aria-hidden>
+      <div className="mt-1 h-1 w-full bg-secondary" aria-hidden>
         <div
-          className={cn('h-1 rounded-full', percent >= 100 ? 'bg-halt' : percent >= 80 ? 'bg-retry' : 'bg-primary')}
+          className={cn('h-1', percent >= 100 ? 'bg-halt' : percent >= 80 ? 'bg-retry' : 'bg-primary')}
           style={{ width: `${percent}%` }}
         />
       </div>

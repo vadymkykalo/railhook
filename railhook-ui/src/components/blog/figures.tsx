@@ -65,7 +65,7 @@ export function Figure({
 }) {
   return (
     <figure className="my-9">
-      <div className="overflow-x-auto rounded-xl border border-rail bg-card p-4 sm:p-6">
+      <div className="overflow-x-auto border border-rail bg-card p-4 sm:p-6">
         <svg
           role="img"
           aria-label={label}
@@ -142,7 +142,7 @@ function ProviderRetries() {
       {lanes.map((lane) => (
         <g key={lane.key}>
           <image href={`/logos/brand/${lane.logo}.svg`} x={12} y={lane.y - 18} width={16} height={16} />
-          <text x={36} y={lane.y - 5} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+          <text x={36} y={lane.y - 5} fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
             {f(`${lane.key}.name`)}
           </text>
           <text x={36} y={lane.y + 10} fill={SOFT} className={MONO}>
@@ -205,7 +205,7 @@ function ProviderRetries() {
       </g>
       {/* Right-anchored like the other two lanes' outcomes, so the longest label cannot run off
           the drawing. */}
-      <text x={X1} y={lanes[2].y - 16} textAnchor="end" fill={SERIES.halt} className={cn(MONO, 'font-semibold')}>
+      <text x={X1} y={lanes[2].y - 16} textAnchor="end" fill={SERIES.halt} className={cn(MONO, 'font-medium')}>
         {f('shopify.end')}
       </text>
       <text x={timeX(0) + 6} y={lanes[2].y - 12} fill={CHROME.ink} className={LABEL}>
@@ -236,7 +236,7 @@ function RetryLadder() {
         return (
           <g key={seconds}>
             <rect x={x} y={baseline - height} width={width} height={height} rx={4} fill={SERIES.brand} opacity={0.85} />
-            <text x={x + width / 2} y={baseline - height - 8} textAnchor="middle" fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
+            <text x={x + width / 2} y={baseline - height - 8} textAnchor="middle" fill={CHROME.ink} className={cn(MONO, 'font-medium')}>
               {f(`wait.${index}`)}
             </text>
             <text x={x + width / 2} y={baseline + 16} textAnchor="middle" fill={SOFT} className={MONO}>
@@ -288,7 +288,7 @@ function GatewayPipeline() {
             stroke={box.key === 'gateway' ? SERIES.brand : CHROME.rail}
             strokeWidth={box.key === 'gateway' ? 1.5 : 1}
           />
-          <text x={box.x + box.width / 2} y={y + 28} textAnchor="middle" fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+          <text x={box.x + box.width / 2} y={y + 28} textAnchor="middle" fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
             {f(`${box.key}.title`)}
           </text>
           <text x={box.x + box.width / 2} y={y + 48} textAnchor="middle" fill={SOFT} className={MONO}>
@@ -333,7 +333,7 @@ function GatewayPipeline() {
         strokeWidth={1.5}
         markerEnd="url(#blog-arrow)"
       />
-      <text x={489} y={y + height + 48} textAnchor="middle" fill={SERIES.retry} className={cn(MONO, 'font-semibold')}>
+      <text x={489} y={y + height + 48} textAnchor="middle" fill={SERIES.retry} className={cn(MONO, 'font-medium')}>
         {f('loop')}
       </text>
     </Figure>

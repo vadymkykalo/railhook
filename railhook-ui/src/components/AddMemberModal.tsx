@@ -152,7 +152,7 @@ export default function AddMemberModal({ orgId, open, onClose, onSuccess }: AddM
                 <p className="pt-1 text-xs text-muted-foreground">{t('members.addModal.ownerNote')}</p>
               </div>
 
-              <p className="flex items-start gap-2 rounded-md border border-rail bg-secondary/50 p-3 text-[13px] text-muted-foreground">
+              <p className="flex items-start gap-2 border border-rail bg-secondary/50 p-3 text-[13px] text-muted-foreground">
                 {emailDelivered
                   ? <Mail className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" aria-hidden />
                   : <MailX className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" aria-hidden />}

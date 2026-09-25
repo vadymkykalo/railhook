@@ -251,7 +251,7 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
             <li
               key={s}
               className={cn(
-                'h-1 flex-1 rounded-full transition-colors',
+                'h-1 flex-1 transition-colors',
                 i < stepIndex ? 'bg-primary' : i === stepIndex ? 'bg-primary/60' : 'bg-rail'
               )}
             />
@@ -305,7 +305,7 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
                   <p className="text-xs text-muted-foreground">{t('connectionSetup.secret.standardHint')}</p>
                 </>
               )}
-              <div className="flex items-start gap-2.5 rounded-lg border border-retry/30 bg-retry-soft p-3">
+              <div className="flex items-start gap-2.5 border border-retry/30 bg-retry-soft p-3">
                 <KeyRound className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
                 <p className="text-xs text-retry">{t('connectionSetup.steps.secret.warning')}</p>
               </div>
@@ -329,7 +329,7 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
             {t('connectionSetup.steps.test.send')}
           </Button>
           {testResult && (
-            <div className="rounded-lg border border-rail p-3">
+            <div className="border border-rail p-3">
               <StatusBadge
                 kind={testResult.success ? 'ok' : 'halt'}
                 label={testResult.success ? t('connectionSetup.steps.test.passed') : t('connectionSetup.steps.test.failed')}
@@ -361,7 +361,7 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
                     prev.includes(type) ? prev : [...prev.filter((v) => v.trim()), type]
                   )
                 }
-                className="rounded-md border border-rail px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                className="border border-rail px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
               >
                 + {type}
               </button>
@@ -440,7 +440,7 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
             />
             <p className="text-xs text-muted-foreground">{t('connectionSetup.steps.retry.delaysHint')}</p>
           </div>
-          <div className="rounded-lg border border-rail p-4">
+          <div className="border border-rail p-4">
             <div className="mono-label mb-2">{t('connectionSetup.steps.retry.preview')}</div>
             <AttemptRail
               attempts={ticks}

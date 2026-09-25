@@ -1,16 +1,7 @@
 /**
  * The Markdown a blog post is written in, read into data the article page renders.
  *
- * Not a Markdown library, for the reason `src/lib/changelog.ts` states about its own parser: the
- * output here is plain data, so nothing from a file is ever inserted as HTML, and
- * `react/no-danger` stays an error across the app. This one is the richer of the two because an
- * article needs what a changelog does not — fenced code with a language, tables, block quotes,
- * images, and a `:::figure` line that hands a slot to a hand-drawn SVG.
- *
- * It is a separate parser rather than a widening of `changelog.ts` because the two resolve links
- * differently: a relative link in CHANGELOG.md means a file in the repository and is rewritten to
- * GitHub, while a relative link in a post means a page of this site. Merging them would need that
- * difference passed in on every call, which is more machinery than either saves.
+ * Plain data rather than HTML, so `react/no-danger` stays an error across the app.
  *
  * The subset, and nothing else:
  *   `## h2` / `### h3`      — each gets an id, which is what the table of contents links to

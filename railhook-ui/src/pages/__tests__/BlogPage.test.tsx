@@ -9,7 +9,7 @@ import { blogPosts } from '../../lib/blog';
 
 /**
  * The blog's index, built from the files in `src/content/blog/` — so it cannot fall behind
- * them, the same way /changelog cannot fall behind CHANGELOG.md.
+ * them.
  */
 function renderBlog() {
   return renderPage(<BlogPage />, {

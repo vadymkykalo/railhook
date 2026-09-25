@@ -77,7 +77,7 @@ export default function OAuthConsentPage() {
   if (errorCode || !requestId) {
     return (
       <AuthLayout title={t('mcpConsent.errorTitle')} subtitle={t('mcpConsent.errorSubtitle')}>
-        <div role="alert" className="rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+        <div role="alert" className="border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
           {errorDescription || t('mcpConsent.missingRequest')}
         </div>
       </AuthLayout>
@@ -92,7 +92,7 @@ export default function OAuthConsentPage() {
   if (leavingTo) {
     return (
       <AuthLayout title={t('mcpConsent.returningTitle')} subtitle={t('mcpConsent.returningSubtitle', { host: leavingTo })}>
-        <div className="flex items-center gap-3 rounded-xl border border-rail bg-card p-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3 border border-rail bg-card p-4 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
           {t('mcpConsent.returning', { host: leavingTo })}
         </div>
@@ -103,7 +103,7 @@ export default function OAuthConsentPage() {
   if (consent.isLoading) {
     return (
       <AuthLayout title={t('mcpConsent.loadingTitle')}>
-        <div className="flex items-center gap-3 rounded-xl border border-rail bg-card p-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3 border border-rail bg-card p-4 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
           {t('common.loading')}
         </div>
@@ -114,7 +114,7 @@ export default function OAuthConsentPage() {
   if (consent.isError || !request) {
     return (
       <AuthLayout title={t('mcpConsent.expiredTitle')} subtitle={t('mcpConsent.expiredSubtitle')}>
-        <p className="rounded-xl border border-rail bg-card p-4 text-sm text-muted-foreground">
+        <p className="border border-rail bg-card p-4 text-sm text-muted-foreground">
           {t('mcpConsent.expiredHint')}
         </p>
       </AuthLayout>
@@ -165,15 +165,15 @@ export default function OAuthConsentPage() {
       footer={t('mcpConsent.footer')}
     >
       <div className="space-y-5">
-        <div className="flex items-center gap-3 rounded-xl border border-rail bg-card p-4">
+        <div className="flex items-center gap-3 border border-rail bg-card p-4">
           <span
             aria-hidden
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 font-mono text-base font-semibold text-primary"
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center bg-primary/10 font-mono text-base font-medium text-primary"
           >
             {request.clientName.charAt(0).toUpperCase()}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">{request.clientName}</p>
+            <p className="truncate text-sm font-medium text-foreground">{request.clientName}</p>
             <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
               <Lock className="h-3 w-3 flex-shrink-0" aria-hidden />
               <span className="truncate">
@@ -203,7 +203,7 @@ export default function OAuthConsentPage() {
         <div className="space-y-1.5">
           <Label htmlFor="consent-project">{t('mcpConsent.project')}</Label>
           {noProjects ? (
-            <p className="rounded-md border border-retry/25 bg-retry-soft p-3 text-sm text-retry">
+            <p className="border border-retry/25 bg-retry-soft p-3 text-sm text-retry">
               {t('mcpConsent.noProjects')}
             </p>
           ) : (
@@ -236,8 +236,8 @@ export default function OAuthConsentPage() {
                   disabled={busy || locked}
                   onClick={() => setScope(s)}
                   className={cn(
-                    'rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
-                    scope === s ? 'border-primary bg-accent/40' : 'border-rail bg-card hover:border-primary/40'
+                    'border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
+                    scope === s ? 'border-primary bg-secondary' : 'border-rail bg-card hover:border-primary/40'
                   )}
                 >
                   <span className="flex items-center gap-2 text-sm font-medium">
@@ -256,7 +256,7 @@ export default function OAuthConsentPage() {
           )}
         </div>
 
-        <div className="flex gap-2.5 rounded-md border border-rail bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
+        <div className="flex gap-2.5 border border-rail bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
           <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" aria-hidden />
           <span>{t('mcpConsent.trustNote', { host: request.redirectHost })}</span>
         </div>

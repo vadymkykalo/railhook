@@ -21,7 +21,7 @@ import { cn } from '../lib/utils';
 /** The counts strip above a rule list. Values are machine facts, so mono. */
 export function RuleStats({ items }: { items: { label: string; value: ReactNode }[] }) {
   return (
-    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-rail bg-rail sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-px overflow-hidden border border-rail bg-rail sm:grid-cols-4">
       {items.map((item) => (
         <div key={item.label} className="bg-card px-4 py-3">
           <div className="mono-label">{item.label}</div>
@@ -53,7 +53,7 @@ export function RuleActionChip({
   detail?: ReactNode;
 }) {
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-rail bg-secondary/60 px-2 py-1 text-xs">
+    <span className="inline-flex min-w-0 items-center gap-1.5 border border-rail bg-secondary/60 px-2 py-1 text-xs">
       <Icon className="h-3 w-3 flex-shrink-0 text-muted-foreground" aria-hidden />
       <span className="truncate font-medium">{label}</span>
       {detail && <span className="truncate font-mono text-[11px] text-muted-foreground">{detail}</span>}
@@ -87,7 +87,7 @@ export function RuleRow({
   return (
     <div
       className={cn(
-        'rounded-xl border border-rail bg-card shadow-card transition-shadow',
+        'border border-rail bg-card shadow-card transition-shadow',
         muted && 'opacity-65',
         className,
       )}

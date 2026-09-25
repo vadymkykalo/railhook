@@ -131,7 +131,7 @@ export default function AnalyticsPage() {
         <div
           role="group"
           aria-label={t('analytics.periodLabel')}
-          className="inline-flex rounded-lg border border-rail bg-card p-0.5"
+          className="inline-flex border border-rail bg-card p-0.5"
         >
           {PERIODS.map((p) => (
             <button
@@ -140,7 +140,7 @@ export default function AnalyticsPage() {
               onClick={() => setPeriod(p)}
               aria-pressed={period === p}
               className={cn(
-                'rounded-md px-3 py-1.5 font-mono text-xs transition-colors',
+                'px-3 py-1.5 font-mono text-xs transition-colors',
                 period === p
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'

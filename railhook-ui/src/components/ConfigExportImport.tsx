@@ -239,7 +239,7 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
           <p className="text-xs text-muted-foreground">{t('configExport.hint')}</p>
 
           {importResult && (
-            <div className={`rounded-lg border p-3 text-sm ${importResult.errors.length > 0 ? 'border-retry/30 bg-retry-soft' : 'border-ok/30 bg-ok-soft'}`}>
+            <div className={`border p-3 text-sm ${importResult.errors.length > 0 ? 'border-retry/30 bg-retry-soft' : 'border-ok/30 bg-ok-soft'}`}>
               <div className="mb-1 flex items-center gap-2">
                 {importResult.errors.length > 0
                   ? <AlertTriangle className="h-4 w-4 text-retry" aria-hidden />
@@ -263,7 +263,7 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
           )}
 
           {importResult && importResult.secrets.length > 0 && (
-            <div className="space-y-3 rounded-lg border border-rail p-3">
+            <div className="space-y-3 border border-rail p-3">
               <div>
                 <p className="text-sm font-medium">{t('configExport.newSecrets.title')}</p>
                 <p className="text-xs text-muted-foreground">{t('configExport.newSecrets.hint')}</p>

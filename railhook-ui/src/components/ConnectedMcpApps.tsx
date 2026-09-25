@@ -38,18 +38,18 @@ export default function ConnectedMcpApps({ projectId }: { projectId: string }) {
   return (
     <section aria-labelledby="mcp-apps-heading" className="mt-10">
       <div className="mb-3">
-        <h2 id="mcp-apps-heading" className="text-base font-semibold tracking-tight">{t('mcpApps.title')}</h2>
+        <h2 id="mcp-apps-heading" className="text-base font-medium tracking-tight">{t('mcpApps.title')}</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{t('mcpApps.description')}</p>
       </div>
 
       {isLoading ? (
-        <div className="h-20 animate-pulse rounded-xl border border-rail bg-card" aria-hidden />
+        <div className="h-20 animate-pulse border border-rail bg-card" aria-hidden />
       ) : isError ? (
-        <p role="alert" className="rounded-xl border border-halt/25 bg-halt-soft p-4 text-sm text-halt">
+        <p role="alert" className="border border-halt/25 bg-halt-soft p-4 text-sm text-halt">
           {t('mcpApps.loadFailed')}
         </p>
       ) : grants.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-rail p-5 text-sm text-muted-foreground">
+        <div className="border border-dashed border-rail p-5 text-sm text-muted-foreground">
           <p>{t('mcpApps.empty')}</p>
           <p className="mt-2 text-xs">
             {t('mcpApps.emptyHint')}{' '}
@@ -65,14 +65,14 @@ export default function ConnectedMcpApps({ projectId }: { projectId: string }) {
                   <div className="flex min-w-0 flex-1 gap-3">
                     <span
                       aria-hidden
-                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center bg-primary/10 text-primary"
                     >
                       <Bot className="h-4 w-4" />
                     </span>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-medium">{grant.clientName}</p>
-                        <span className="rounded-md border border-rail px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                        <span className="border border-rail px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
                           {t(grant.scope === 'READ_ONLY' ? 'apiKeys.scopeReadOnly' : 'apiKeys.scopeReadWrite')}
                         </span>
                       </div>

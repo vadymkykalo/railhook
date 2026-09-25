@@ -53,7 +53,7 @@ export default function JsonBlock({
 
   if (!collapsible) {
     return (
-      <div className={cn('overflow-hidden rounded-lg border border-rail', className)}>
+      <div className={cn('overflow-hidden border border-rail', className)}>
         <div className="flex items-center justify-between gap-2 border-b border-rail bg-muted/40 px-2.5 py-1.5">
           <span className="mono-label">{label}</span>
           {copyButton}
@@ -64,7 +64,7 @@ export default function JsonBlock({
   }
 
   return (
-    <details className={cn('group overflow-hidden rounded-lg border border-rail', className)}>
+    <details className={cn('group overflow-hidden border border-rail', className)}>
       <summary className="flex cursor-pointer items-center justify-between gap-2 border-b border-transparent bg-muted/40 px-2.5 py-1.5 group-open:border-rail">
         <span className="flex items-center gap-1.5">
           <ChevronRight className="h-3 w-3 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden />

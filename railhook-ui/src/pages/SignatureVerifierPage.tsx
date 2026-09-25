@@ -75,10 +75,10 @@ function ProviderPicker({ value, onChange }: { value: Provider; onChange: (provi
             />
             <span
               className={cn(
-                'inline-flex min-h-10 items-center rounded-lg border px-3.5 text-sm font-medium transition-colors',
+                'inline-flex min-h-10 items-center border px-3.5 text-sm font-medium transition-colors',
                 'peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background',
                 value === provider.id
-                  ? 'border-primary bg-accent text-primary'
+                  ? 'border-primary bg-accent text-accent-foreground'
                   : 'border-rail bg-card text-muted-foreground hover:border-muted-foreground hover:text-foreground',
               )}
             >
@@ -97,13 +97,13 @@ function ExpectedSignature({ value }: { value: string }) {
   return (
     <div className="mt-5">
       <p className="mono-label mb-1.5">{t('webhookSignature.result.expected')}</p>
-      <div className="flex items-start gap-2 rounded-lg border border-rail bg-muted p-2.5">
+      <div className="flex items-start gap-2 border border-rail bg-muted p-2.5">
         <code className="min-w-0 flex-1 break-all font-mono text-[12.5px] text-foreground">{value}</code>
         <button
           type="button"
           onClick={() => copy(value)}
           aria-label={copied ? t('tester.copied') : t('tester.copy')}
-          className="grid h-8 w-8 flex-none place-items-center rounded-md text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+          className="grid h-8 w-8 flex-none place-items-center text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
         >
           {copied ? <Check className="h-3.5 w-3.5 text-ok" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
         </button>
@@ -132,7 +132,7 @@ function TimestampNote({ check }: { check: TimestampCheck }) {
 
 function Result({ result }: { result: VerifyResult }) {
   const { t } = useTranslation();
-  const heading = 'font-display text-[1.2rem] font-bold tracking-[-0.01em]';
+  const heading = 'text-[1.2rem] font-medium tracking-[-0.01em]';
 
   if (result.status === 'incomplete') {
     return <p className="text-muted-foreground">{t('webhookSignature.result.incomplete')}</p>;
@@ -232,7 +232,7 @@ export default function SignatureVerifierPage() {
   return (
     <>
       <PageIntro eyebrow={t('webhookSignature.eyebrow')} title={t('webhookSignature.title')} lead={t('webhookSignature.lead')}>
-        <p className="inline-flex max-w-full items-start gap-2 rounded-xl border border-primary/30 bg-accent px-3.5 py-2.5 text-sm font-medium text-foreground">
+        <p className="inline-flex max-w-full items-start gap-2 border border-primary bg-accent px-3.5 py-2.5 text-sm font-medium text-accent-foreground">
           <ShieldCheck className="mt-0.5 h-4 w-4 flex-none text-primary" aria-hidden="true" />
           {t('webhookSignature.private')}
         </p>
@@ -309,7 +309,7 @@ export default function SignatureVerifierPage() {
               aria-live="polite"
               aria-label={t('webhookSignature.result.label')}
               className={cn(
-                'rounded-2xl border bg-card p-6 transition-colors sm:p-7',
+                'border bg-card p-6 transition-colors sm:p-7',
                 result.status === 'valid' ? 'border-ok/50' : result.status === 'invalid' ? 'border-halt/50' : 'border-rail',
               )}
             >
@@ -324,7 +324,7 @@ export default function SignatureVerifierPage() {
         <dl className="grid gap-x-10 gap-y-7 md:grid-cols-2">
           {PROVIDERS.map((p) => (
             <div key={p.id}>
-              <dt className="font-semibold text-foreground">{t(`webhookSignature.providers.${p.id}`)}</dt>
+              <dt className="font-medium text-foreground">{t(`webhookSignature.providers.${p.id}`)}</dt>
               <dd className="mt-1.5 text-[15px] leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
                 {t(`webhookSignature.how.${p.id}`)}
               </dd>
@@ -336,7 +336,7 @@ export default function SignatureVerifierPage() {
       <Band labelledBy="verifier-cta">
         <div className="flex flex-col items-start justify-between gap-5 md:flex-row md:items-center">
           <div className="max-w-2xl">
-            <h2 id="verifier-cta" className="font-display text-[1.6rem] font-bold tracking-[-0.02em] text-foreground">
+            <h2 id="verifier-cta" className="text-[1.75rem] font-normal leading-[1.16] tracking-[-0.02em] sm:text-[2rem] text-foreground">
               {t('webhookSignature.cta.title')}
             </h2>
             <p className="mt-2 text-muted-foreground">{t('webhookSignature.cta.body')}</p>

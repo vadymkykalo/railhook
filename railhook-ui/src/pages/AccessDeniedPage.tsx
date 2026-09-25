@@ -17,7 +17,7 @@ export default function AccessDeniedPage() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center p-4 lg:p-6">
       <div className="w-full max-w-md">
-        <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-rail bg-card">
+        <div className="mb-5 flex h-11 w-11 items-center justify-center border border-rail bg-card">
           <ShieldOff className="h-5 w-5 text-muted-foreground" aria-hidden />
         </div>
         <p className="mono-label">403</p>

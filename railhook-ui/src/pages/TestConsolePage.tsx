@@ -386,7 +386,7 @@ export default function TestConsolePage() {
         </div>
 
         {eventType.trim() && (
-          <div className="rounded-lg border border-rail p-3">
+          <div className="border border-rail p-3">
             <p className="mono-label mb-2">{t('testConsole.expectedDeliveries')}</p>
             {matchingSubscriptions.length === 0 ? (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -626,7 +626,7 @@ function ResultsPanel({
 
   if (busy && !lastEvent && !pingResult) {
     return (
-      <div className="min-h-[320px] space-y-3 rounded-xl border border-dashed border-rail p-4" aria-busy="true">
+      <div className="min-h-[320px] space-y-3 border border-dashed border-rail p-4" aria-busy="true">
         <p className="text-sm text-muted-foreground">{t('testConsole.processing')}</p>
         <SkeletonRows count={3} height="h-20" />
       </div>
@@ -651,7 +651,7 @@ function ResultsPanel({
         }
       >
         {pingResult.message && (
-          <div className="rounded-lg border border-rail bg-muted/40 p-3">
+          <div className="border border-rail bg-muted/40 p-3">
             <p className="mono-label mb-1">{t('testConsole.message')}</p>
             <p className="text-sm">{pingResult.message}</p>
           </div>
@@ -675,7 +675,7 @@ function ResultsPanel({
           </OutputBlock>
         )}
         {pingResult.errorMessage && (
-          <div className="rounded-lg border border-halt/30 bg-halt-soft p-3">
+          <div className="border border-halt/30 bg-halt-soft p-3">
             <p className="mono-label mb-1">{t('testConsole.error')}</p>
             <p className="text-sm text-halt">{pingResult.errorMessage}</p>
           </div>
@@ -741,7 +741,7 @@ function ResultsPanel({
           ))}
         </div>
       ) : !polling && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-rail bg-muted/40 p-3">
+        <div className="flex items-start gap-2.5 border border-rail bg-muted/40 p-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
           <div>
             <p className="text-sm font-medium">{t('testConsole.noDeliveries')}</p>
@@ -772,7 +772,7 @@ function DeliveryCard({
   const ticks = railTicks(delivery);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-rail">
+    <div className="overflow-hidden border border-rail">
       <button
         type="button"
         onClick={onToggle}
@@ -839,7 +839,7 @@ function AttemptDetail({
   const isSuccess = attempt.httpStatusCode != null && attempt.httpStatusCode >= 200 && attempt.httpStatusCode < 300;
 
   return (
-    <div className="space-y-2 rounded-lg border border-rail bg-card p-3">
+    <div className="space-y-2 border border-rail bg-card p-3">
       <div className="flex items-center gap-2 text-xs">
         <StatusBadge
           kind={isSuccess ? 'ok' : attempt.httpStatusCode != null || attempt.errorMessage ? 'halt' : 'idle'}

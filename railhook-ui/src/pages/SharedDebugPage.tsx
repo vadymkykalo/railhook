@@ -15,7 +15,7 @@ import { formatJson } from '../lib/json';
  */
 function Fact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-lg border border-rail bg-card p-3.5">
+    <div className="border border-rail bg-card p-3.5">
       <p className="mono-label mb-1.5">{label}</p>
       <p className={`truncate text-sm ${mono ? 'font-mono' : ''}`}>{value}</p>
     </div>
@@ -80,7 +80,7 @@ export default function SharedDebugPage() {
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-4xl p-4 lg:p-6">
         <div className="flex items-start gap-3 pb-5">
-          <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-rail bg-card">
+          <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center border border-rail bg-card">
             <Shield className="h-4 w-4 text-primary" aria-hidden />
           </div>
           <div className="min-w-0">
@@ -106,7 +106,7 @@ export default function SharedDebugPage() {
           </span>
         </div>
 
-        <section className="overflow-hidden rounded-lg border border-rail bg-card">
+        <section className="overflow-hidden border border-rail bg-card">
           <div className="flex items-center gap-2 border-b border-rail px-4 py-2.5">
             <Shield className="h-3.5 w-3.5 text-primary" aria-hidden />
             <h2 className="mono-label">{t('sharedDebug.sanitizedPayload')}</h2>

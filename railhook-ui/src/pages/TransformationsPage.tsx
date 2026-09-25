@@ -275,12 +275,12 @@ export default function TransformationsPage() {
                   </TableCell>
                   <TableCell>
                     {item.kind === 'JAVASCRIPT' ? (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-rail bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-medium">
+                      <span className="inline-flex items-center gap-1 border border-rail bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-medium">
                         <Code2 className="h-3 w-3" aria-hidden="true" />
                         {t('transformations.kindJavascript')}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-rail px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 border border-rail px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                         <Wand2 className="h-3 w-3" aria-hidden="true" />
                         {t('transformations.kindTemplate')}
                       </span>
@@ -463,7 +463,7 @@ export default function TransformationsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 rounded-lg border border-rail p-3">
+            <div className="flex items-center gap-3 border border-rail p-3">
               <Switch id="tf-enabled" checked={formEnabled} onCheckedChange={setFormEnabled} />
               <div>
                 <Label htmlFor="tf-enabled" className="cursor-pointer">{t('common.enabled')}</Label>

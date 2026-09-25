@@ -58,7 +58,7 @@ function AttentionRow({
   return (
     <Link
       to={to}
-      className="group flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/60"
+      className="group flex items-center justify-between gap-3 px-2 py-2.5 transition-colors hover:bg-secondary/60"
     >
       <span className="flex min-w-0 items-center gap-2.5">
         <Icon
@@ -216,11 +216,11 @@ export default function DashboardPage() {
               <div>
                 <div className="mono-label">{t('dashboard.verdict.label')}</div>
                 {statsLoading ? (
-                  <div className="mt-3 h-12 w-32 animate-pulse rounded-lg bg-muted" aria-hidden />
+                  <div className="mt-3 h-12 w-32 animate-pulse bg-muted" aria-hidden />
                 ) : (
                   <p
                     data-testid="delivery-health-figure"
-                    className="mt-2 text-[3rem] font-semibold leading-none tracking-tight"
+                    className="mt-2 text-[3rem] font-medium leading-none tracking-tight"
                   >
                     {stats.totalDeliveries > 0 ? `${formatRate(stats.successRate)}%` : '—'}
                   </p>
@@ -424,7 +424,7 @@ export default function DashboardPage() {
                       <li key={endpoint.id}>
                         <Link
                           to={`/admin/projects/${selectedProjectId}/endpoints`}
-                          className="group block rounded-lg px-2 py-1.5 transition-colors hover:bg-secondary/60"
+                          className="group block px-2 py-1.5 transition-colors hover:bg-secondary/60"
                         >
                           <span className="flex items-baseline justify-between gap-3">
                             <span className="truncate font-mono text-xs text-foreground">{endpoint.url}</span>
@@ -433,9 +433,9 @@ export default function DashboardPage() {
                             </span>
                           </span>
                           <span className="mt-1.5 flex items-center gap-2">
-                            <span className="relative h-1 flex-1 overflow-hidden rounded-full bg-muted">
+                            <span className="relative h-1 flex-1 overflow-hidden bg-muted">
                               <span
-                                className={cn('absolute inset-y-0 left-0 rounded-full', STATUS_FILL[kind])}
+                                className={cn('absolute inset-y-0 left-0', STATUS_FILL[kind])}
                                 style={{ width: `${Math.min(Math.max(endpoint.successRate, 0), 100)}%` }}
                               />
                             </span>
@@ -482,7 +482,7 @@ export default function DashboardPage() {
                     <li key={event.id}>
                       <Link
                         to={`/admin/projects/${selectedProjectId}/events`}
-                        className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-secondary/60"
+                        className="flex items-center justify-between gap-3 px-2 py-2 transition-colors hover:bg-secondary/60"
                       >
                         <span className="min-w-0">
                           <span className="block truncate font-mono text-xs text-foreground">{event.type}</span>

@@ -9,29 +9,6 @@ import { parseFrontMatter } from './src/lib/frontMatter'
 import { renderFeed, type FeedItem } from './src/lib/blogFeed'
 
 /**
- * The repository's CHANGELOG.md as `virtual:changelog`, for the /changelog page.
- *
- * A virtual module rather than a `?raw` import of `../CHANGELOG.md`: the file sits outside this
- * app, and Vite's dev server would only serve it with the whole repository, `.env` included, on
- * its allow list. The Dockerfile copies the file next to the app for the same reason.
- */
-function changelog(): Plugin {
-  const id = 'virtual:changelog'
-  const resolved = `\0${id}`
-  const file = fileURLToPath(new URL('../CHANGELOG.md', import.meta.url))
-  return {
-    name: 'railhook-changelog',
-    resolveId: (source) => (source === id ? resolved : undefined),
-    load(loaded) {
-      if (loaded !== resolved) return undefined
-      this.addWatchFile(file)
-      return `export default ${JSON.stringify(readFileSync(file, 'utf8'))};`
-    },
-  }
-}
-
-
-/**
  * The blog's feed, written to `dist/blog/rss.xml` at build time.
  *
  * Read from the same directory and through the same front-matter parser `src/lib/blog.ts` uses,
@@ -80,7 +57,7 @@ function blogRss(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), changelog(), blogRss()],
+  plugins: [react(), blogRss()],
   define: {
     // Which build an error came from. package.json's version is one of the seven places
     // `make version-set` writes and `make version-check` verifies, so this cannot drift from

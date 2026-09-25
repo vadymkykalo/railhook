@@ -168,7 +168,7 @@ export default function OrgSettingsPage() {
             </div>
             <Link
               to="/admin/members"
-              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm link-ink"
             >
               {t('orgSettings.manageMembers', { count: members.length })}
               <ArrowRight className="h-3.5 w-3.5" aria-hidden />
@@ -277,7 +277,7 @@ function DangerZone({
   };
 
   return (
-    <section className="rounded-xl border border-halt/30 bg-halt-soft/50 p-5">
+    <section className="border border-halt/30 bg-halt-soft/50 p-5">
       <div className="flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-halt" aria-hidden />
         <h3 className="text-[15px] font-medium text-halt">{t('orgSettings.dangerZone')}</h3>

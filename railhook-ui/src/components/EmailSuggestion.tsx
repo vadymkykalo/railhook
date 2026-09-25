@@ -29,7 +29,7 @@ export default function EmailSuggestion({
           <button
             type="button"
             onClick={() => onAccept(suggestion)}
-            className="font-mono font-medium text-foreground underline underline-offset-2 hover:text-primary"
+            className="font-mono font-medium text-foreground underline underline-offset-2 hover:text-foreground"
           />
         ),
       }}

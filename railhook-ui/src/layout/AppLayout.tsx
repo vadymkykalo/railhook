@@ -138,7 +138,7 @@ export default function AppLayout() {
     <div className="min-h-screen bg-background">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[100] focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
       >
         {t('nav.skipToContent')}
       </a>
@@ -245,7 +245,7 @@ export default function AppLayout() {
                 </div>
               </div>
               {changingEmail && (
-                <div className="mt-3 rounded-md border border-rail bg-card p-3">
+                <div className="mt-3 border border-rail bg-card p-3">
                   <ChangeEmailForm
                     unverified
                     hasPassword={user.hasPassword !== false}

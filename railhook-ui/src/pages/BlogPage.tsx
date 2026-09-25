@@ -13,8 +13,7 @@ import { Band, PageIntro, panel } from './landing/primitives';
 /**
  * The blog's index: what has been published, newest first.
  *
- * Posts are files in `src/content/blog/`, so this page cannot fall behind them — the same
- * relationship /changelog has with CHANGELOG.md. The feed at /blog/rss.xml is written by the
+ * Posts are files in `src/content/blog/`, so this page cannot fall behind them. The feed at /blog/rss.xml is written by the
  * `blogRss()` plugin in `vite.config.ts` from the same directory, and announced here as the
  * page's alternate representation, which is how a feed reader finds it.
  */
@@ -86,7 +85,7 @@ export default function BlogPage() {
       <PageIntro eyebrow={t('blog.eyebrow')} title={t('blog.title')} lead={t('blog.lead')}>
         <a
           href={BLOG_FEED_PATH}
-          className="inline-flex min-h-10 items-center gap-2 text-sm font-medium text-primary hover:underline"
+          className="inline-flex min-h-10 items-center gap-2 text-sm font-medium link-ink"
         >
           <Rss className="h-4 w-4" aria-hidden="true" />
           {t('blog.feed')}
@@ -119,11 +118,11 @@ export default function BlogPage() {
                     <span aria-hidden="true">·</span>
                     <ReadingTime minutes={post.readingMinutes} />
                   </div>
-                  <h3 className="mt-3 font-display text-[1.45rem] font-bold leading-[1.15] tracking-[-0.025em] text-foreground [text-wrap:balance]">
+                  <h3 className="mt-3 text-[1.45rem] font-medium leading-[1.15] tracking-[-0.025em] text-foreground [text-wrap:balance]">
                     <Link
                       to={`/blog/${post.slug}`}
                       data-stretched-link
-                      className="transition-colors after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none group-hover:text-primary"
+                      className="transition-colors after:absolute after:inset-0 after:content-[''] focus-visible:outline-none group-hover:underline"
                     >
                       {post.title}
                     </Link>

@@ -30,10 +30,6 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 # Copy UI source files
 COPY railhook-ui/ .
 
-# The /changelog page is built from the repository's CHANGELOG.md, which vite.config.ts reads
-# from one level above the app — /CHANGELOG.md here, the repository root in a checkout.
-COPY CHANGELOG.md /CHANGELOG.md
-
 # Vite inlines import.meta.env.VITE_* at build time, so these have to arrive
 # here as build args — passing them as runtime env to the nginx stage does
 # nothing. Empty is the normal case: nginx.conf proxies /api/, /ws/tunnel,

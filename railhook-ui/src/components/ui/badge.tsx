@@ -4,11 +4,11 @@ import { cn } from "../../lib/utils"
 
 /**
  * Status variants draw from the reserved status tokens and nothing else.
- * `default` is the only variant that uses the brand colour, so a badge tinted
- * like a primary button always means "brand", never "this delivery is fine".
+ * `default` is ink like a primary button and `info` wears the highlight, so
+ * neither can be read as "this delivery is fine".
  */
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+  "inline-flex items-center gap-1.5 border px-2 py-0.5 text-xs font-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
   {
     variants: {
       variant: {

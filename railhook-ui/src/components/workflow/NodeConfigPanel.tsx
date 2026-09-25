@@ -54,7 +54,7 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
   return (
     // A 320px column beside a 375px canvas is the whole screen, so on a phone the panel comes up
     // over the canvas as a sheet instead of taking the space the canvas needs.
-    <div className="fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col overflow-y-auto rounded-t-lg border-t border-rail bg-card shadow-elevated lg:static lg:h-full lg:max-h-none lg:w-80 lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none">
+    <div className="fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col overflow-y-auto border-t border-rail bg-card shadow-elevated lg:static lg:h-full lg:max-h-none lg:w-80 lg:border-l lg:border-t-0 lg:shadow-none">
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-rail bg-card px-4 py-3">
         <h3 className="mono-label">{t('workflows.builder.configureNode')}</h3>
         <Button variant="ghost" size="icon-sm" onClick={onClose} title={t('common.close')} aria-label={t('common.close')}>
@@ -336,7 +336,7 @@ function EndpointSelector({ value, onChange }: { value: string; onChange: (val: 
           {t('workflows.nodeConfig.createEndpoint')}
         </Button>
       ) : (
-        <div className="space-y-2 rounded-md border border-rail bg-secondary/30 p-3">
+        <div className="space-y-2 border border-rail bg-secondary/30 p-3">
           <p className="mono-label">{t('workflows.nodeConfig.newEndpoint')}</p>
           <Field label="URL" required error={showCreate && !newUrl ? t('workflows.validation.required') : undefined}>
             <input
@@ -431,12 +431,12 @@ function TransformSource({ transformationId, template, onUseSaved, onUseInline }
   return (
     <>
       <Field label={t('workflows.nodeConfig.transformSource')} hint={t('workflows.nodeConfig.transformSourceHint')}>
-        <div role="group" aria-label={t('workflows.nodeConfig.transformSource')} className="flex gap-0.5 rounded-lg border border-rail p-0.5">
+        <div role="group" aria-label={t('workflows.nodeConfig.transformSource')} className="flex gap-0.5 border border-rail p-0.5">
           <button
             type="button"
             aria-pressed={usingSaved}
             onClick={() => onUseSaved(transformations?.[0]?.id ?? '')}
-            className={cn('flex-1 rounded-md px-2 py-1 text-xs transition-colors',
+            className={cn('flex-1 px-2 py-1 text-xs transition-colors',
               usingSaved ? 'bg-primary font-medium text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
           >
             {t('workflows.nodeConfig.transformSourceSaved')}
@@ -445,7 +445,7 @@ function TransformSource({ transformationId, template, onUseSaved, onUseInline }
             type="button"
             aria-pressed={!usingSaved}
             onClick={() => onUseInline(template || '{}')}
-            className={cn('flex-1 rounded-md px-2 py-1 text-xs transition-colors',
+            className={cn('flex-1 px-2 py-1 text-xs transition-colors',
               !usingSaved ? 'bg-primary font-medium text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
           >
             {t('workflows.nodeConfig.transformSourceInline')}
@@ -489,7 +489,7 @@ function TransformSource({ transformationId, template, onUseSaved, onUseInline }
               {t('workflows.nodeConfig.createTransformation')}
             </Button>
           ) : (
-            <div className="space-y-2 rounded-md border border-rail bg-secondary/30 p-3">
+            <div className="space-y-2 border border-rail bg-secondary/30 p-3">
               <p className="mono-label">{t('workflows.nodeConfig.newTransformation')}</p>
               <Field label={t('workflows.nodeConfig.transformationName')} required error={!newName ? t('workflows.validation.required') : undefined}>
                 <input
@@ -591,7 +591,7 @@ function ApiKeyInfo() {
   const activeKeys = keys?.filter(k => !k.revokedAt) || [];
 
   return (
-    <div className="space-y-2 rounded-md border border-rail bg-secondary/30 p-3">
+    <div className="space-y-2 border border-rail bg-secondary/30 p-3">
       <div className="flex items-center gap-1.5">
         <Key className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="mono-label">
@@ -601,7 +601,7 @@ function ApiKeyInfo() {
 
       {/* Created key banner — shown once */}
       {createdKey && (
-        <div className="space-y-1 rounded-md border border-ok/30 bg-ok-soft p-2">
+        <div className="space-y-1 border border-ok/30 bg-ok-soft p-2">
           <p className="text-[10px] font-medium text-ok">{t('workflows.nodeConfig.apiKeyCopyWarning')}</p>
           <div className="flex items-center gap-1">
             <code className="flex-1 text-[10px] font-mono bg-background rounded px-1.5 py-0.5 truncate select-all">{createdKey}</code>
@@ -715,7 +715,7 @@ function SubscriptionInfo() {
   const activeSubs = subscriptions?.filter(s => s.enabled) || [];
 
   return (
-    <div className="space-y-2 rounded-md border border-rail bg-secondary/30 p-3">
+    <div className="space-y-2 border border-rail bg-secondary/30 p-3">
       <p className="mono-label">
         {t('workflows.nodeConfig.subscriptions')}
       </p>
@@ -804,13 +804,13 @@ function EndpointQuickFill({ onSelect }: { onSelect: (url: string) => void }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="text-[10px] text-primary hover:underline flex items-center gap-1"
+        className="text-[10px] link-ink flex items-center gap-1"
       >
         <ExternalLink className="h-3 w-3" />
         {t('workflows.nodeConfig.pickFromEndpoints')}
       </button>
       {open && endpoints && endpoints.length > 0 && (
-        <div className="mt-1 border rounded-md bg-background max-h-28 overflow-y-auto">
+        <div className="mt-1 border bg-background max-h-28 overflow-y-auto">
           {endpoints.map(ep => (
             <button
               key={ep.id}

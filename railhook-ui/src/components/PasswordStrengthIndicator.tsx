@@ -73,7 +73,7 @@ export default function PasswordStrengthIndicator({ password, className }: Passw
             <div
               key={i}
               className={cn(
-                'h-1 flex-1 rounded-full transition-colors duration-200',
+                'h-1 flex-1 transition-colors duration-200',
                 i < strength ? style.bar : 'bg-rail',
               )}
             />

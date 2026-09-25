@@ -593,7 +593,7 @@ export default function EndpointsPage() {
             <DialogDescription>{t('endpoints.testDialog.description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="flex items-center gap-3 rounded-lg border border-rail p-4">
+            <div className="flex items-center gap-3 border border-rail p-4">
               <StatusBadge
                 kind={testResult?.success ? 'ok' : 'halt'}
                 label={testResult?.success ? t('endpoints.testDialog.success') : t('endpoints.testDialog.failed')}
@@ -607,7 +607,7 @@ export default function EndpointsPage() {
             {testResult?.responseBody && (
               <div className="space-y-1.5">
                 <div className="mono-label">{t('endpoints.testDialog.responseBody')}</div>
-                <pre className="max-h-48 overflow-auto rounded-md border border-rail bg-secondary/40 p-3 font-mono text-xs">
+                <pre className="max-h-48 overflow-auto border border-rail bg-secondary/40 p-3 font-mono text-xs">
                   {testResult.responseBody}
                 </pre>
               </div>
@@ -616,7 +616,7 @@ export default function EndpointsPage() {
             {testResult?.errorMessage && (
               <div className="space-y-1.5">
                 <div className="mono-label">{t('endpoints.testDialog.errorMessage')}</div>
-                <p className="rounded-md border border-halt/30 bg-halt-soft p-3 text-sm text-halt">
+                <p className="border border-halt/30 bg-halt-soft p-3 text-sm text-halt">
                   {testResult.errorMessage}
                 </p>
               </div>

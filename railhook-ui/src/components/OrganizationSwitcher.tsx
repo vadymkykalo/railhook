@@ -87,7 +87,7 @@ export default function OrganizationSwitcher({ collapsed }: { collapsed?: boolea
   const menu = open && (
     <div
       className={cn(
-        'absolute bottom-full z-50 mb-1 overflow-hidden rounded-lg border border-rail bg-popover shadow-elevated animate-scale-in',
+        'absolute bottom-full z-50 mb-1 overflow-hidden border border-rail bg-popover shadow-elevated animate-scale-in',
         collapsed ? 'left-0 w-56' : 'left-0 right-0'
       )}
     >
@@ -103,9 +103,9 @@ export default function OrganizationSwitcher({ collapsed }: { collapsed?: boolea
                 onClick={() => handleSwitch(organization.id)}
                 disabled={!!switchingTo}
                 className={cn(
-                  'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60',
+                  'flex w-full items-center gap-2.5 px-2 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60',
                   current
-                    ? 'bg-accent/60 font-medium text-foreground'
+                    ? 'bg-accent font-medium text-accent-foreground'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 )}
               >

@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react';
  * An in-page tab strip.
  *
  * Hand-rolled rather than another Radix package, because the visual language
- * already exists — `ModeSwitch` in `Workbench.tsx` is the same pill — and what
+ * already exists — `ModeSwitch` in `Workbench.tsx` is the same control — and what
  * `ModeSwitch` is missing is only the ARIA roles and the arrow-key behaviour
  * that make a *tab* strip a tab strip. `ModeSwitch` stays what it is: a choice
  * of mode, where each option changes what the page does. These are views of one
@@ -63,7 +63,7 @@ export function Tabs<T extends string>({
         role="tablist"
         aria-label={ariaLabel}
         onKeyDown={onKeyDown}
-        className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-lg bg-muted/60 p-1"
+        className="flex min-w-0 flex-1 items-center overflow-x-auto border-b border-rail"
       >
         {tabs.map((tab) => {
           const selected = tab.value === value;
@@ -78,17 +78,17 @@ export function Tabs<T extends string>({
               aria-controls={`${baseId}-panel-${tab.value}`}
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(tab.value)}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
                 selected
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'border-foreground text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               {Icon ? <Icon className="h-3.5 w-3.5" aria-hidden="true" /> : null}
               <span>{tab.label}</span>
               {tab.badge !== undefined && tab.badge !== null ? (
                 <span
-                  className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                  className={`ml-0.5 px-1.5 py-0.5 text-[10px] font-medium tabular-nums ${
                     tab.badgeAlarming
                       ? 'bg-halt/15 text-halt'
                       : 'bg-muted text-muted-foreground'

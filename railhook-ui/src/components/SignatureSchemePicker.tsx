@@ -69,9 +69,9 @@ export default function SignatureSchemePicker({ value, onChange, disabled }: Sig
               disabled={disabled}
               onClick={() => onChange(scheme)}
               className={cn(
-                'block w-full rounded-lg border p-3 text-left transition-colors',
+                'block w-full border p-3 text-left transition-colors',
                 active
-                  ? 'border-primary bg-accent'
+                  ? 'border-primary bg-secondary'
                   : 'border-rail bg-card hover:border-primary/40 hover:bg-secondary/50',
                 disabled && 'cursor-not-allowed opacity-60 hover:border-rail hover:bg-card'
               )}

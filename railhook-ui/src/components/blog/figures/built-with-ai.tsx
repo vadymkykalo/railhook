@@ -94,7 +94,7 @@ function HarnessLoop() {
               strokeWidth={style.width}
               strokeDasharray={style.dash}
             />
-            <text x={left + 10} y={box.y + 22} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+            <text x={left + 10} y={box.y + 22} fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
               {f(`box.${box.key}.title`)}
             </text>
             <text x={left + 10} y={box.y + 41} fill={SOFT} className={MONO}>
@@ -156,7 +156,7 @@ function HarnessLoop() {
         strokeWidth={1.5}
         markerEnd="url(#ai-loop-arrow-retry)"
       />
-      <text x={x(2) + width / 2 + 6} y={rowBottom - 42} fill={SERIES.retry} className={cn(MONO, 'font-semibold')}>
+      <text x={x(2) + width / 2 + 6} y={rowBottom - 42} fill={SERIES.retry} className={cn(MONO, 'font-medium')}>
         {f('refused')}
       </text>
 
@@ -176,7 +176,7 @@ function HarnessLoop() {
         y={incident.y + 25}
         textAnchor="middle"
         fill={CHROME.ink}
-        className={cn(LABEL, 'font-semibold')}
+        className={cn(LABEL, 'font-medium')}
       >
         {f('incident')}
       </text>
@@ -193,7 +193,7 @@ function HarnessLoop() {
         strokeWidth={1.5}
         markerEnd="url(#ai-loop-arrow-brand)"
       />
-      <text x={724} y={incident.y + incident.height / 2 - 8} textAnchor="end" fill={SERIES.brand} className={cn(MONO, 'font-semibold')}>
+      <text x={724} y={incident.y + incident.height / 2 - 8} textAnchor="end" fill={SERIES.brand} className={cn(MONO, 'font-medium')}>
         {f('feedback')}
       </text>
     </Figure>
@@ -227,7 +227,7 @@ function BugGuardrail() {
         const y = top + index * row;
         return (
           <g key={bug}>
-            <text x={columns.bug} y={y + 12} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+            <text x={columns.bug} y={y + 12} fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
               {f(`row.${bug}.bug`)}
             </text>
             <text x={columns.bug} y={y + 28} fill={SOFT} className={MONO}>
@@ -244,7 +244,7 @@ function BugGuardrail() {
               stroke={SERIES.brand}
               markerEnd="url(#ai-bug-arrow)"
             />
-            <text x={columns.guard} y={y + 12} fill={SERIES.brand} className={cn(MONO, 'font-semibold')}>
+            <text x={columns.guard} y={y + 12} fill={SERIES.brand} className={cn(MONO, 'font-medium')}>
               {f(`row.${bug}.guard`)}
             </text>
             <text x={columns.guard} y={y + 28} fill={SERIES.brand} className={MONO}>

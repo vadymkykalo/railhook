@@ -35,14 +35,14 @@ export default function Meter({ label, current, limit, percentUsed, className }:
   const filled = unlimited ? 0 : Math.min(Math.max(percentUsed, 0), 100);
 
   return (
-    <div className={cn('rounded-xl border border-rail bg-card p-4 shadow-card', className)}>
+    <div className={cn('border border-rail bg-card p-4 shadow-card', className)}>
       <div className="flex items-start justify-between gap-2">
         <span className="mono-label">{label}</span>
         {kind === 'approaching' && <StatusBadge kind="retry" label={t('usage.quota.approaching')} />}
         {kind === 'over' && <StatusBadge kind="halt" label={t('usage.quota.over')} />}
       </div>
 
-      <p className="mt-2 text-2xl font-semibold leading-none tracking-tight">{formatCompact(current)}</p>
+      <p className="mt-2 text-2xl font-medium leading-none tracking-tight">{formatCompact(current)}</p>
       <p className="mt-1.5 font-mono text-xs text-muted-foreground">
         {unlimited
           ? t('usage.quota.unlimited')
@@ -50,10 +50,10 @@ export default function Meter({ label, current, limit, percentUsed, className }:
       </p>
 
       {!unlimited && (
-        <div className="relative mt-3 h-2 w-full overflow-hidden rounded-full" role="presentation">
-          <div className="absolute inset-0 rounded-full" style={{ backgroundColor: FILL[kind], opacity: 0.18 }} />
+        <div className="relative mt-3 h-2 w-full overflow-hidden" role="presentation">
+          <div className="absolute inset-0" style={{ backgroundColor: FILL[kind], opacity: 0.18 }} />
           <div
-            className="absolute inset-y-0 left-0 rounded-full"
+            className="absolute inset-y-0 left-0"
             style={{ width: `${filled}%`, backgroundColor: FILL[kind] }}
           />
         </div>

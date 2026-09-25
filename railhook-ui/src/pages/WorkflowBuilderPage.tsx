@@ -293,7 +293,7 @@ function WorkflowBuilderInner() {
   if (isLoading) {
     return (
       <PageSkeleton maxWidth="max-w-none">
-        <div className="h-[70vh] animate-pulse rounded-lg border border-rail bg-muted" />
+        <div className="h-[70vh] animate-pulse border border-rail bg-muted" />
       </PageSkeleton>
     );
   }
@@ -402,7 +402,7 @@ function WorkflowBuilderInner() {
                   e.dataTransfer.setData('application/workflow-node', JSON.stringify(template));
                   e.dataTransfer.effectAllowed = 'move';
                 }}
-                className="flex flex-shrink-0 cursor-grab items-center gap-2 rounded-md border border-rail bg-card px-2.5 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50 active:cursor-grabbing lg:w-full"
+                className="flex flex-shrink-0 cursor-grab items-center gap-2 border border-rail bg-card px-2.5 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50 active:cursor-grabbing lg:w-full"
               >
                 <span className="text-sm">{template.icon}</span>
                 <div className="min-w-0">
@@ -439,7 +439,7 @@ function WorkflowBuilderInner() {
               position="bottom-right"
               /* A map of the canvas is worth less than the canvas itself on a phone, where it
                  covers a quarter of it. */
-              className="!hidden !rounded-lg !border !border-rail !bg-card sm:!block"
+              className="!hidden !border !border-rail !bg-card sm:!block"
               maskColor="hsl(var(--muted) / 0.6)"
               nodeColor="hsl(var(--muted-foreground))"
               nodeStrokeColor="hsl(var(--rail))"
@@ -543,7 +543,7 @@ function WorkflowBuilderInner() {
       {/* Manual trigger dialog */}
       {showTriggerDialog && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowTriggerDialog(false)}>
-          <div className="w-[480px] max-w-[90vw] space-y-4 rounded-lg border border-rail bg-card p-5 shadow-elevated" onClick={(e) => e.stopPropagation()}>
+          <div className="w-[480px] max-w-[90vw] space-y-4 border border-rail bg-card p-5 shadow-elevated" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[15px] font-medium">{t('workflows.builder.testRun')}</h3>
             <p className="text-xs text-muted-foreground">{t('workflows.builder.testRunHint')}</p>
             <textarea
@@ -621,7 +621,7 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
           {steps && steps.length > 0 ? (
             <div className="space-y-0.5">
               {steps.map((step, i) => (
-                <div key={step.id} className="rounded-md border border-rail bg-secondary/30">
+                <div key={step.id} className="border border-rail bg-secondary/30">
                   <div
                     className="flex cursor-pointer flex-wrap items-center gap-x-2 gap-y-1 px-2.5 py-1.5 text-[11px] transition-colors hover:bg-secondary/60"
                     onClick={(e) => { e.stopPropagation(); setExpandedStep(expandedStep === step.id ? null : step.id); }}

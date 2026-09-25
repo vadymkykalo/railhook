@@ -27,14 +27,14 @@ const cardPadding = cva("", {
 })
 
 const cardVariants = cva(
-  "rounded-xl border bg-card text-card-foreground shadow-card transition-shadow duration-200",
+  "border bg-card text-card-foreground transition-colors duration-200",
   {
     variants: {
       /* The lift used to be unconditional, so a static summary card rose under
          the cursor as if it were a link. Most cards here are read-only, so the
          affordance is opt-in and only cards that go somewhere ask for it. */
       interactive: {
-        true: "hover:shadow-card-hover",
+        true: "hover:border-foreground",
         false: "",
       },
     },

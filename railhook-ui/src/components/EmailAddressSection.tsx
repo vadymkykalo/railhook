@@ -69,7 +69,7 @@ export default function EmailAddressSection() {
 
   if (pending) {
     return (
-      <div role="status" className="rounded-md border border-retry/30 bg-retry-soft p-3 text-sm">
+      <div role="status" className="border border-retry/30 bg-retry-soft p-3 text-sm">
         <p>
           <Trans
             i18nKey="emailChange.pending"

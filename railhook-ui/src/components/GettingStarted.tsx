@@ -60,13 +60,13 @@ function StepRow({ step, index, onLaunch }: { step: Step; index: number; onLaunc
         onClick={onLaunch}
         className={cn(
           'flex w-full items-start gap-3 px-1 py-3 text-left transition-colors',
-          step.done ? 'hover:bg-secondary/40' : 'hover:bg-accent/60'
+          step.done ? 'hover:bg-secondary/40' : 'hover:bg-secondary'
         )}
       >
         <span
           aria-hidden
           className={cn(
-            'mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border font-mono text-[10px]',
+            'mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center border font-mono text-[10px]',
             step.done
               ? 'border-transparent bg-ok-soft text-ok'
               : 'border-rail text-muted-foreground'
@@ -158,7 +158,7 @@ export default function GettingStarted({ projectId }: { projectId: string | unde
       <Card className="mb-4 p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold">{t('onboarding.title')}</h3>
+            <h3 className="text-sm font-medium">{t('onboarding.title')}</h3>
             {track && !progress.allDone && (
               <p className="mt-0.5 text-[13px] text-muted-foreground">{t('onboarding.subtitle')}</p>
             )}
@@ -191,7 +191,7 @@ export default function GettingStarted({ projectId }: { projectId: string | unde
           </div>
         ) : progress.allDone ? (
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ok-soft">
+            <span className="flex h-8 w-8 items-center justify-center bg-ok-soft">
               <Check className="h-4 w-4 text-ok" aria-hidden />
             </span>
             <p className="text-sm font-medium">{t('onboarding.allDone')}</p>

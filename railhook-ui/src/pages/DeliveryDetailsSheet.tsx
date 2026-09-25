@@ -233,7 +233,7 @@ export default function DeliveryDetailsSheet({
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               {t('deliveryDetails.diagnosis.category')}
             </span>
-            <p className="text-sm font-semibold mt-0.5">{t(classification.labelKey)}</p>
+            <p className="text-sm font-medium mt-0.5">{t(classification.labelKey)}</p>
           </div>
           <div>
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
@@ -270,13 +270,13 @@ export default function DeliveryDetailsSheet({
             <div className="space-y-6 mt-6">
               {/* Status Banner */}
               {delivery.status === 'PROCESSING' && (
-                <div className="flex items-center gap-3 rounded-lg border border-retry/30 bg-retry-soft p-3">
+                <div className="flex items-center gap-3 border border-retry/30 bg-retry-soft p-3">
                   <Loader2 className="h-4 w-4 animate-spin text-retry" aria-hidden />
                   <span className="text-sm font-medium text-retry">{t('deliveries.statusExplain.PROCESSING')}</span>
                 </div>
               )}
               {delivery.status === 'PENDING' && (
-                <div className="flex items-center gap-3 rounded-lg border border-retry/30 bg-retry-soft p-3">
+                <div className="flex items-center gap-3 border border-retry/30 bg-retry-soft p-3">
                   <Clock className="h-4 w-4 text-retry" aria-hidden />
                   <span className="text-sm font-medium text-retry">
                     {delivery.attemptCount > 0 && delivery.nextRetryAt
@@ -286,13 +286,13 @@ export default function DeliveryDetailsSheet({
                 </div>
               )}
               {delivery.status === 'SUCCESS' && (
-                <div className="flex items-center gap-3 rounded-lg border border-ok/30 bg-ok-soft p-3">
+                <div className="flex items-center gap-3 border border-ok/30 bg-ok-soft p-3">
                   <CheckCircle2 className="h-4 w-4 text-ok" aria-hidden />
                   <span className="text-sm font-medium text-ok">{t('deliveries.statusExplain.SUCCESS')}</span>
                 </div>
               )}
               {(delivery.status === 'FAILED' || delivery.status === 'DLQ') && (
-                <div className="flex items-center gap-3 rounded-lg border border-halt/30 bg-halt-soft p-3">
+                <div className="flex items-center gap-3 border border-halt/30 bg-halt-soft p-3">
                   <XCircle className="h-4 w-4 text-halt" aria-hidden />
                   <span className="text-sm font-medium text-halt">
                     {delivery.status === 'DLQ'
@@ -325,7 +325,7 @@ export default function DeliveryDetailsSheet({
                       ...(requestId ? [{ label: t('deliveryDetails.requestId'), value: requestId, link: null }] : []),
                     ];
                     return traceItems.map(({ label, value, link }) => (
-                      <div key={label} className="group flex items-center justify-between gap-2 p-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors">
+                      <div key={label} className="group flex items-center justify-between gap-2 p-2 -mx-2 hover:bg-muted/50 transition-colors">
                         <span className="text-xs font-medium text-muted-foreground shrink-0">{label}</span>
                         <div className="flex items-center gap-1.5 min-w-0">
                           <code className="text-xs font-mono truncate" title={value}>{value}</code>
@@ -419,7 +419,7 @@ export default function DeliveryDetailsSheet({
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">{t('deliveryDetails.nextRetry')}</span>
                         <div className="text-right">
-                          <span className="text-sm font-semibold text-retry">{formatRelativeFuture(delivery.nextRetryAt)}</span>
+                          <span className="text-sm font-medium text-retry">{formatRelativeFuture(delivery.nextRetryAt)}</span>
                           <span className="text-[11px] text-muted-foreground block">{formatDateTime(delivery.nextRetryAt)}</span>
                         </div>
                       </div>
@@ -526,9 +526,9 @@ export default function DeliveryDetailsSheet({
                     const rightBody = right.responseBody || '';
                     const bodyChanged = leftBody !== rightBody;
                     return (
-                      <div className="mb-4 space-y-3 rounded-lg border border-rail p-4">
+                      <div className="mb-4 space-y-3 border border-rail p-4">
                         <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1.5 text-sm font-semibold">
+                          <span className="flex items-center gap-1.5 text-sm font-medium">
                             <GitCompare className="h-4 w-4 text-primary" aria-hidden />
                             {t('deliveryDetails.compare.versus', {
                               left: t('deliveryDetails.attemptNumber', { number: compareLeft }),
@@ -606,7 +606,7 @@ export default function DeliveryDetailsSheet({
                             <div className="flex gap-3">
                               {/* Timeline dot + line */}
                               <div className="flex flex-col items-center pt-1">
-                                <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
+                                <div className={`flex h-4 w-4 shrink-0 items-center justify-center border-2 ${
                                   isSuccess
                                     ? 'border-ok bg-ok-soft'
                                     : isFail
@@ -623,7 +623,7 @@ export default function DeliveryDetailsSheet({
                               {/* Attempt content */}
                               <div className="flex-1 pb-4 min-w-0">
                                 <div
-                                  className={`border rounded-lg p-4 space-y-2 ${
+                                  className={`border p-4 space-y-2 ${
                                     compareMode
                                       ? `cursor-pointer transition-all ${
                                           compareLeft === attempt.attemptNumber ? 'ring-2 ring-halt/50' :
@@ -648,7 +648,7 @@ export default function DeliveryDetailsSheet({
                                   <div className="flex items-center justify-between flex-wrap gap-2">
                                     <div className="flex items-center gap-2">
                                       {compareMode && (
-                                        <span className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase ${
+                                        <span className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase ${
                                           compareLeft === attempt.attemptNumber ? 'bg-halt-soft text-halt' :
                                           compareRight === attempt.attemptNumber ? 'bg-ok-soft text-ok' :
                                           'bg-secondary text-muted-foreground'
@@ -656,7 +656,7 @@ export default function DeliveryDetailsSheet({
                                           {compareLeft === attempt.attemptNumber ? 'A' : compareRight === attempt.attemptNumber ? 'B' : '·'}
                                         </span>
                                       )}
-                                      <span className="font-semibold text-sm">
+                                      <span className="font-medium text-sm">
                                         {t('deliveryDetails.attemptNumber', { number: attempt.attemptNumber })}
                                       </span>
                                       {attempt.httpStatusCode && (

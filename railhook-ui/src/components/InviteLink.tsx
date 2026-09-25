@@ -44,7 +44,7 @@ export default function InviteLink({ email, url, emailDelivered }: InviteLinkPro
   const Icon = emailDelivered ? Mail : MailX;
 
   return (
-    <div className="space-y-2.5 rounded-md border border-rail bg-secondary/50 p-3">
+    <div className="space-y-2.5 border border-rail bg-secondary/50 p-3">
       <p className="flex items-start gap-2 text-[13px] text-muted-foreground">
         <Icon className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" aria-hidden />
         <span>

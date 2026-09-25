@@ -190,7 +190,7 @@ export function SelectionBar({
   const { t } = useTranslation();
   if (count === 0) return null;
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+    <div className="mb-3 flex flex-wrap items-center gap-3 border border-primary/30 bg-primary/5 px-3 py-2">
       <span className="font-mono text-[13px] text-foreground">
         {t('common.selectedCount', { count })}
       </span>

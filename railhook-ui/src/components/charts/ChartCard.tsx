@@ -64,7 +64,7 @@ export default function ChartCard({
             testId="chart-error"
           />
         ) : isLoading ? (
-          <div className="h-full w-full animate-pulse rounded-lg bg-muted" aria-hidden />
+          <div className="h-full w-full animate-pulse bg-muted" aria-hidden />
         ) : isEmpty ? (
           <p className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
             {emptyLabel ?? t('charts.empty')}

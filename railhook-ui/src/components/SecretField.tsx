@@ -33,7 +33,7 @@ export default function SecretField({ secret, label }: { secret: string; label?:
         {/* w-0 + break-all: a 64-character secret must wrap inside the row,
             never widen the dialog it sits in. */}
         <code
-          className="w-0 min-w-0 flex-1 break-all rounded-md border border-rail bg-secondary/50 px-3 py-2 font-mono text-xs leading-6"
+          className="w-0 min-w-0 flex-1 break-all border border-rail bg-secondary/50 px-3 py-2 font-mono text-xs leading-6"
           data-testid="signing-secret"
         >
           {revealed ? secret : '•'.repeat(Math.min(secret.length, 48))}

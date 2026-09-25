@@ -44,7 +44,7 @@ export default function CancelEmailChangePage() {
   if (status === 'loading') {
     return (
       <AuthLayout title={t('emailChange.links.cancelling')} subtitle={t('verifyEmail.pleaseWait')}>
-        <div className="flex items-center gap-3 rounded-md border border-rail bg-card p-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3 border border-rail bg-card p-4 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
           {t('emailChange.links.cancelling')}
         </div>
@@ -56,7 +56,7 @@ export default function CancelEmailChangePage() {
     return (
       <AuthLayout title={t('emailChange.links.cancelErrorTitle')} subtitle={t('emailChange.links.cancelFailed')}>
         <div className="space-y-5">
-          <div role="alert" className="rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+          <div role="alert" className="border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
             {errorMessage}
           </div>
           <Button className="h-10 w-full" onClick={() => navigate('/login')}>{t('verifyEmail.goToLogin')}</Button>

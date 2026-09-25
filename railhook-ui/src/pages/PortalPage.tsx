@@ -92,7 +92,7 @@ function Notice({ icon: Icon, title, description }: { icon: React.ElementType; t
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className={cn(panel(), 'w-full max-w-md p-7 text-center')} role="alert">
         <Icon className="mx-auto mb-3 h-6 w-6 text-muted-foreground" aria-hidden />
-        <h1 className="font-display text-lg font-bold tracking-[-0.02em]">{title}</h1>
+        <h1 className="text-lg font-medium tracking-[-0.02em]">{title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{description}</p>
       </div>
     </div>
@@ -169,12 +169,12 @@ export default function PortalPage() {
           {params.logo ? (
             <img src={params.logo} alt="" className="h-8 max-w-[160px] object-contain" referrerPolicy="no-referrer" />
           ) : (
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-rail bg-card">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center border border-rail bg-card">
               <Webhook className="h-4 w-4 text-primary" aria-hidden />
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="truncate font-display text-[1.45rem] font-bold leading-tight tracking-[-0.025em]">
+            <h1 className="truncate text-[1.45rem] font-medium leading-tight tracking-[-0.025em]">
               {t('portal.title')}
             </h1>
             <p className="truncate text-sm text-muted-foreground">

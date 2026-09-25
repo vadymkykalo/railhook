@@ -71,7 +71,7 @@ export default function LoginPage() {
       footer={
         <>
           {t('auth.login.noAccount')}{' '}
-          <Link to={returnTo ? `/register?redirect=${encodeURIComponent(returnTo)}` : '/register'} className="font-medium text-primary hover:underline">
+          <Link to={returnTo ? `/register?redirect=${encodeURIComponent(returnTo)}` : '/register'} className="font-medium link-ink">
             {t('auth.login.createAccount')}
           </Link>
         </>
@@ -99,7 +99,7 @@ export default function LoginPage() {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">{t('auth.login.password')}</Label>
-            <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+            <Link to="/forgot-password" className="text-xs link-ink">
               {t('auth.login.forgotPassword')}
             </Link>
           </div>
@@ -116,7 +116,7 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div role="alert" className="animate-scale-in rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+          <div role="alert" className="animate-scale-in border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
             {error}
           </div>
         )}

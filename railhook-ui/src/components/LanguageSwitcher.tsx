@@ -6,9 +6,9 @@ import { cn } from '../lib/utils';
  *
  * Emoji flags were the previous design and they are unreliable: Windows renders
  * them as bare letter pairs, so the control looked different on every other
- * machine. A language is also not a country. Two mono labels in a rail-ruled
- * track show both choices at once and say which one is active, which a
- * single-button toggle never did.
+ * machine. A language is also not a country. Two mono labels in a hairline
+ * box show both choices at once, the active one in ink, which a single-button
+ * toggle never did.
  */
 
 const LANGUAGES = [
@@ -38,7 +38,7 @@ export default function LanguageSwitcher({ variant = 'icon', className }: Langua
             onClick={() => i18n.changeLanguage(lang.code)}
             aria-current={i === activeIndex ? 'true' : undefined}
             className={cn(
-              'flex items-center gap-2 rounded-md px-3 py-2 text-left text-[13px] transition-colors',
+              'flex items-center gap-2 px-3 py-2 text-left text-[13px] transition-colors',
               i === activeIndex
                 ? 'bg-secondary font-medium text-foreground'
                 : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
@@ -57,17 +57,11 @@ export default function LanguageSwitcher({ variant = 'icon', className }: Langua
       role="group"
       aria-label={t('settings.language')}
       className={cn(
-        // Each half is a 40px tap target on a phone; the track is 28px from sm, as before.
-        'relative inline-flex h-7 items-center rounded-md border border-rail bg-card p-0.5 max-sm:h-auto',
+        // Each half is a 40px tap target on a phone; the track is 32px from sm.
+        'inline-flex h-8 items-stretch border border-input max-sm:h-10',
         className
       )}
     >
-      {/* The indicator slides rather than snapping, so the change reads as one control. */}
-      <span
-        aria-hidden
-        className="absolute inset-y-0.5 w-[calc(50%-2px)] rounded-[5px] bg-secondary transition-transform duration-200 ease-out"
-        style={{ transform: `translateX(${activeIndex * 100}%)` }}
-      />
       {LANGUAGES.map((lang) => {
         const active = LANGUAGES[activeIndex].code === lang.code;
         return (
@@ -79,8 +73,8 @@ export default function LanguageSwitcher({ variant = 'icon', className }: Langua
             aria-pressed={active}
             title={lang.name}
             className={cn(
-              'relative z-10 px-2 font-mono text-[11px] font-medium tracking-wider transition-colors max-sm:h-10 max-sm:px-3.5',
-              active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+              'px-2.5 font-mono text-[12px] font-medium leading-none transition-colors max-sm:px-3.5',
+              active ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'
             )}
           >
             {lang.label}

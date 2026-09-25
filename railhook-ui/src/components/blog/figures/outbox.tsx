@@ -62,7 +62,7 @@ function DualWrite() {
     <Figure label={f('aria')} caption={f('caption')} viewBox="0 0 620 352" className={NARROW}>
       {lanes.map((lane) => (
         <g key={lane.key}>
-          <text x={16} y={lane.y - 44} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+          <text x={16} y={lane.y - 44} fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
             {f(`${lane.key}.title`)}
           </text>
           <text
@@ -70,7 +70,7 @@ function DualWrite() {
             y={lane.y - 44}
             textAnchor="end"
             fill={toneColour(lane.outcome)}
-            className={cn(MONO, 'font-semibold')}
+            className={cn(MONO, 'font-medium')}
           >
             {f(`${lane.key}.outcome`)}
           </text>
@@ -140,7 +140,7 @@ function OutboxPipeline() {
         stroke={strong ? SERIES.brand : CHROME.rail}
         strokeWidth={strong ? 1.5 : 1}
       />
-      <text x={x + 14} y={y + 22} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+      <text x={x + 14} y={y + 22} fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
         {f(`${key}.title`)}
       </text>
     </g>
@@ -160,7 +160,7 @@ function OutboxPipeline() {
       <text x={22} y={78} fill={SOFT} className={MONO}>
         {f('api.line1')}
       </text>
-      <text x={22} y={116} fill={SERIES.brand} className={cn(MONO, 'font-semibold')}>
+      <text x={22} y={116} fill={SERIES.brand} className={cn(MONO, 'font-medium')}>
         {f('api.line2')}
       </text>
 
@@ -212,7 +212,7 @@ function OutboxPipeline() {
       <text x={212} y={281} fill={SOFT} className={MONO}>
         {f('worker.line1')}
       </text>
-      <text x={212} y={310} fill={SERIES.retry} className={cn(MONO, 'font-semibold')}>
+      <text x={212} y={310} fill={SERIES.retry} className={cn(MONO, 'font-medium')}>
         {f('worker.line2')}
       </text>
 
@@ -239,7 +239,7 @@ function OutboxPipeline() {
 
       {/* The worker proves ownership against the rows the API wrote. */}
       <line x1={290} y1={218} x2={290} y2={174} stroke={SERIES.brand} strokeWidth={1.5} markerEnd={arrow} />
-      <text x={298} y={200} fill={SERIES.brand} className={cn(MONO, 'font-semibold')}>
+      <text x={298} y={200} fill={SERIES.brand} className={cn(MONO, 'font-medium')}>
         {f('arrow.claim')}
       </text>
     </Figure>
@@ -278,7 +278,7 @@ function OrderingHold() {
       {lanes.map((y, index) => (
         <g key={y}>
           <line x1={ORDER_X0} y1={y} x2={ORDER_X1} y2={y} stroke={CHROME.rail} strokeWidth={1} strokeDasharray="2 4" />
-          <text x={16} y={y + 4} fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
+          <text x={16} y={y + 4} fill={CHROME.ink} className={cn(MONO, 'font-medium')}>
             {t('blog.figures.orderingHold.seq', { number: index + 1 })}
           </text>
         </g>
@@ -342,7 +342,7 @@ function OrderingHold() {
         strokeWidth={1.2}
         strokeDasharray="4 4"
       />
-      <text x={secondsX(gapTimeoutAt) + 6} y={18} fill={SERIES.halt} className={cn(MONO, 'font-semibold')}>
+      <text x={secondsX(gapTimeoutAt) + 6} y={18} fill={SERIES.halt} className={cn(MONO, 'font-medium')}>
         {f('timeout.title')}
       </text>
       <text x={secondsX(gapTimeoutAt) + 6} y={lanes[2] + 2} fill={SOFT} className={MONO}>
@@ -393,12 +393,12 @@ function DeliverySemantics() {
         stroke={CHROME.muted}
         strokeWidth={1}
       />
-      <text x={(columns[0] + columns[1]) / 2} y={14} textAnchor="middle" fill={CHROME.ink} className={cn(MONO, 'font-semibold')}>
+      <text x={(columns[0] + columns[1]) / 2} y={14} textAnchor="middle" fill={CHROME.ink} className={cn(MONO, 'font-medium')}>
         {f('sees')}
       </text>
       {['lost', 'ackLost'].map((column, index) => (
         <g key={column}>
-          <text x={columns[index]} y={52} textAnchor="middle" fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+          <text x={columns[index]} y={52} textAnchor="middle" fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
             {f(`${column}.title`)}
           </text>
           <text x={columns[index]} y={68} textAnchor="middle" fill={SOFT} className={MONO}>
@@ -410,7 +410,7 @@ function DeliverySemantics() {
 
       {rows.map((row) => (
         <g key={row.key}>
-          <text x={16} y={row.y - 2} fill={row.strong ? SERIES.brand : CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+          <text x={16} y={row.y - 2} fill={row.strong ? SERIES.brand : CHROME.ink} className={cn(LABEL, 'font-medium')}>
             {f(`${row.key}.name`)}
           </text>
           <text x={16} y={row.y + 13} fill={SOFT} className={MONO}>
@@ -433,7 +433,7 @@ function DeliverySemantics() {
                   y={row.y + 2}
                   textAnchor="middle"
                   fill={toneColour(tone)}
-                  className={cn(MONO, 'font-semibold')}
+                  className={cn(MONO, 'font-medium')}
                 >
                   {f(`${row.key}.cell${index}`)}
                 </text>
@@ -483,10 +483,10 @@ function LostAck() {
       </defs>
 
       {/* The two parties. */}
-      <text x={16} y={top + 4} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+      <text x={16} y={top + 4} fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
         {f('worker')}
       </text>
-      <text x={16} y={bottom + 4} fill={CHROME.ink} className={cn(LABEL, 'font-semibold')}>
+      <text x={16} y={bottom + 4} fill={CHROME.ink} className={cn(LABEL, 'font-medium')}>
         {f('receiver')}
       </text>
       <line x1={116} y1={top} x2={604} y2={top} stroke={CHROME.rail} strokeWidth={1.5} />
@@ -512,7 +512,7 @@ function LostAck() {
       {/* Its 200 dies on the way back. */}
       <line x1={334} y1={bottom - 8} x2={362} y2={140} stroke={CHROME.muted} strokeDasharray="4 3" />
       <Cross x={368} y={132} />
-      <text x={354} y={128} textAnchor="end" fill={SERIES.halt} className={cn(MONO, 'font-semibold')}>
+      <text x={354} y={128} textAnchor="end" fill={SERIES.halt} className={cn(MONO, 'font-medium')}>
         {f('lost')}
       </text>
 
@@ -522,7 +522,7 @@ function LostAck() {
         {f('silence')}
       </text>
       <circle cx={456} cy={top} r={5} fill={SERIES.retry} />
-      <text x={456} y={top - 30} textAnchor="middle" fill={SERIES.retry} className={cn(MONO, 'font-semibold')}>
+      <text x={456} y={top - 30} textAnchor="middle" fill={SERIES.retry} className={cn(MONO, 'font-medium')}>
         {f('timeout')}
       </text>
       <text x={456} y={top - 16} textAnchor="middle" fill={CHROME.muted} className={MONO}>
@@ -538,7 +538,7 @@ function LostAck() {
         {f('retryId')}
       </text>
       <circle cx={520} cy={bottom} r={5} fill={SERIES.ok} />
-      <text x={604} y={bottom + 28} textAnchor="end" fill={SERIES.ok} className={cn(MONO, 'font-semibold')}>
+      <text x={604} y={bottom + 28} textAnchor="end" fill={SERIES.ok} className={cn(MONO, 'font-medium')}>
         {f('dedupe')}
       </text>
     </Figure>

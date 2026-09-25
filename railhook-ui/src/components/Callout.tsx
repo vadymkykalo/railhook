@@ -22,7 +22,7 @@ export default function Callout({ children, tone = 'warning', className }: Callo
     : 'border-rail bg-secondary/50 text-muted-foreground';
 
   return (
-    <div className={cn('flex items-start gap-2 rounded-lg border p-3', palette, className)}>
+    <div className={cn('flex items-start gap-2 border p-3', palette, className)}>
       <Icon className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
       <p className="text-sm">{children}</p>
     </div>

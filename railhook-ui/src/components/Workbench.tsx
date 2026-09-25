@@ -54,7 +54,7 @@ export function WorkbenchPanel({
   bodyClassName?: string;
 }) {
   return (
-    <section className={cn('rounded-xl border border-rail bg-card shadow-card', className)}>
+    <section className={cn('border border-rail bg-card shadow-card', className)}>
       {(title || eyebrow || actions) && (
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-rail px-4 py-2.5">
           <div className="min-w-0">
@@ -126,7 +126,7 @@ export function ResultFrame({
   className?: string;
 }) {
   return (
-    <section className={cn('rounded-xl border border-rail bg-card shadow-card', className)}>
+    <section className={cn('border border-rail bg-card shadow-card', className)}>
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-rail px-4 py-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <StatusBadge kind={kind} label={statusLabel} />
@@ -172,8 +172,8 @@ export function ResultPlaceholder({
   hint?: string;
 }) {
   return (
-    <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-rail px-6 text-center">
-      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-rail bg-card">
+    <div className="flex min-h-[320px] flex-col items-center justify-center border border-dashed border-rail px-6 text-center">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center border border-rail bg-card">
         <Icon className="h-5 w-5 text-muted-foreground" />
       </div>
       <p className="text-[15px] font-medium">{title}</p>
@@ -192,7 +192,7 @@ export function OutputBlock({
   className?: string;
 }) {
   return (
-    <div className={cn('overflow-hidden rounded-lg border border-rail', className)}>
+    <div className={cn('overflow-hidden border border-rail', className)}>
       <div className="flex items-center justify-between gap-2 border-b border-rail bg-muted/40 px-2.5 py-1.5">
         <span className="mono-label">{label}</span>
         {actions}
@@ -212,7 +212,7 @@ export function ModeSwitch<T extends string>({
   ariaLabel: string;
 }) {
   return (
-    <div role="group" aria-label={ariaLabel} className="flex gap-1 rounded-lg border border-rail bg-muted/50 p-1">
+    <div role="group" aria-label={ariaLabel} className="flex gap-1 border border-rail bg-muted/50 p-1">
       {options.map((option) => {
         const Icon = option.icon;
         const active = option.value === value;
@@ -223,7 +223,7 @@ export function ModeSwitch<T extends string>({
             aria-pressed={active}
             onClick={() => onChange(option.value)}
             className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] transition-colors',
+              'flex flex-1 items-center justify-center gap-1.5 px-3 py-1.5 text-[13px] transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               active
                 ? 'bg-card font-medium text-foreground shadow-card'

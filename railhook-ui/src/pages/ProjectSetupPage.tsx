@@ -49,7 +49,7 @@ export default function ProjectSetupPage() {
   return (
     <div className="p-4 lg:p-6">
       <Card className="mx-auto mt-4 max-w-xl p-6 sm:p-8">
-        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-primary">
+        <div className="flex h-11 w-11 items-center justify-center bg-accent text-accent-foreground">
           <Icon className="h-5 w-5" aria-hidden />
         </div>
         <h2 className="mt-4 text-title">{t(section.nameKey)}</h2>

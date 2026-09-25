@@ -57,7 +57,7 @@ export default function SchemaListPanel({
   };
 
   return (
-    <section className="rounded-xl border border-rail bg-card shadow-card">
+    <section className="border border-rail bg-card shadow-card">
       <header className="flex items-center justify-between gap-2 border-b border-rail px-4 py-2.5">
         <div>
           <div className="mono-label">{t('schemas.catalogEyebrow')}</div>
@@ -145,10 +145,10 @@ export default function SchemaListPanel({
                   aria-current={selected?.id === et.id}
                   onClick={() => onSelect(et)}
                   className={cn(
-                    'w-full rounded-lg border px-3 py-2 text-left transition-colors',
+                    'w-full border px-3 py-2 text-left transition-colors',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     selected?.id === et.id
-                      ? 'border-primary/30 bg-accent'
+                      ? 'border-primary bg-secondary'
                       : 'border-transparent hover:bg-secondary',
                   )}
                 >

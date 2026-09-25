@@ -326,7 +326,7 @@ export default function ConsumersPage() {
             ) : (
               <ul className="space-y-2">
                 {(consumerEndpoints.data ?? []).map((endpoint) => (
-                  <li key={endpoint.id} className="flex items-center justify-between gap-3 rounded-md border border-rail p-3">
+                  <li key={endpoint.id} className="flex items-center justify-between gap-3 border border-rail p-3">
                     <div className="min-w-0">
                       <div className="truncate font-mono text-[13px]" title={endpoint.url}>{endpoint.url}</div>
                       {endpoint.description && (

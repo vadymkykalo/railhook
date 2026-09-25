@@ -24,8 +24,6 @@ docker-compose*.yml
 
 # Documentation and scripts
 *.md
-# The UI builds its /changelog page from it.
-!CHANGELOG.md
 LICENSE
 backups/
 scripts/

@@ -166,7 +166,7 @@ export default function EventDetailsSheet({
                 <Button variant="ghost" size="sm" className="absolute right-2 top-2 z-10" onClick={() => handleCopy(formatPayload(event.payload))}>
                   <Copy className="h-3 w-3" /> {t('common.copy')}
                 </Button>
-                <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-rail p-4 font-mono text-xs">
+                <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words border border-rail p-4 font-mono text-xs">
                   {formatPayload(event.payload) || <span className="italic text-muted-foreground">{t('events.details.noPayload')}</span>}
                 </pre>
               </div>
@@ -181,7 +181,7 @@ export default function EventDetailsSheet({
                     <Button variant="ghost" size="sm" className="absolute right-2 top-2 z-10" onClick={() => handleCopy(formatPayload(sanitizedPayload))}>
                       <Copy className="h-3 w-3" /> {t('common.copy')}
                     </Button>
-                    <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-rail p-4 font-mono text-xs">
+                    <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words border border-rail p-4 font-mono text-xs">
                       {formatPayload(sanitizedPayload)}
                     </pre>
                   </>
@@ -212,7 +212,7 @@ export default function EventDetailsSheet({
                   deliveries.map((d) => {
                     const rail = railFromCounts(d.attemptCount, d.maxAttempts, d.status);
                     return (
-                      <div key={d.id} className="flex items-center justify-between gap-3 rounded-lg border border-rail px-3 py-2.5">
+                      <div key={d.id} className="flex items-center justify-between gap-3 border border-rail px-3 py-2.5">
                         <div className="min-w-0 space-y-1.5">
                           <div className="flex items-center gap-2">
                             <StatusBadge kind={kindOfDeliveryStatus(d.status)} label={t(`deliveries.status.${d.status}`)} />
