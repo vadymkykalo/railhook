@@ -22,12 +22,6 @@ import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
 
-/**
- * The profile form. Each section answers one question and carries its own save
- * control in the same place, because the page it replaced was a single stack of
- * inputs with save buttons wherever they happened to fit.
- */
-
 const COMMON_TIMEZONES = [
   'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
   'America/Sao_Paulo', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Kyiv',
@@ -35,11 +29,6 @@ const COMMON_TIMEZONES = [
   'Australia/Sydney', 'Pacific/Auckland',
 ];
 
-/**
- * One titled section of a settings form: what it is on the left, the fields on
- * the right, and — when the section can be saved — its control on the same
- * baseline every other section uses.
- */
 export function FormSection({
   title, description, children, footer,
 }: {
@@ -66,7 +55,6 @@ export function FormSection({
   );
 }
 
-/** The save control, in the same place in every section, with what it did. */
 export function SaveControl({
   label, savingLabel, saving, disabled, saved, onClick, type = 'button',
 }: {
@@ -74,7 +62,6 @@ export function SaveControl({
   savingLabel: string;
   saving: boolean;
   disabled?: boolean;
-  /** True once a save landed and nothing has changed since. */
   saved?: boolean;
   onClick?: () => void;
   type?: 'button' | 'submit';
@@ -96,7 +83,6 @@ export function SaveControl({
   );
 }
 
-/** A read-only fact about the signed-in person: the product said it, so it is mono. */
 function FactRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-rail py-2.5 last:border-b-0">
@@ -179,11 +165,7 @@ export default function SettingsPage() {
 
   const verified = user?.user?.status !== 'PENDING_VERIFICATION';
 
-  // Everything below reads out of the auth store. Until the session restore in
-  // App.tsx lands, that store is empty and the form would render as blank
-  // fields with a blank email beside them. There is no error branch to pair
-  // with this: a restore that fails clears the session and routes to login, so
-  // this page never sees a failure it could report.
+  // Empty until App.tsx restores the session; a failed restore routes to login, so no error branch.
   if (!user) {
     return (
       <PageSkeleton maxWidth="max-w-4xl">
@@ -323,7 +305,7 @@ export default function SettingsPage() {
                 />
               </div>
               {passwordError && (
-                <p role="alert" className="max-w-sm rounded-md border border-halt/30 bg-halt-soft px-3 py-2 text-sm text-halt">
+                <p role="alert" className="max-w-sm border border-halt/30 bg-halt-soft px-3 py-2 text-sm text-halt">
                   {passwordError}
                 </p>
               )}
@@ -426,16 +408,7 @@ export default function SettingsPage() {
   );
 }
 
-/**
- * The right to erasure, where the person exercising it can reach it. The API had it before this
- * did, which meant the answer to "delete my account" was "write to support" — and a right you
- * have to ask a human for is one most people never exercise.
- *
- * <p>Confirmation runs through DangerConfirmDialog like every other irreversible action here, so
- * the ritual is the one the user has already seen. The 409 — last owner of an organization other
- * people still belong to — is shown as the backend words it, because it names the thing they
- * have to do first.
- */
+/** The 409 (last owner of a shared organization) is shown as the backend words it: it names what to do first. */
 function EraseAccount() {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
@@ -458,7 +431,7 @@ function EraseAccount() {
   };
 
   return (
-    <section className="rounded-xl border border-halt/30 bg-halt-soft/50 p-5">
+    <section className="border border-halt/30 bg-halt-soft/50 p-5">
       <div className="flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-halt" aria-hidden />
         <h3 className="text-[15px] font-medium text-halt">{t('settings.erase.title')}</h3>

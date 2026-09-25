@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-/** Every SVG shipped as a file: the app's public/ and the docs site's public/ and assets. */
 const ROOTS = ['railhook-ui/public', 'railhook-docs/public', 'railhook-docs/src/assets'];
 
 function svgFiles(dir: string): string[] {
@@ -17,14 +16,7 @@ function svgFiles(dir: string): string[] {
   });
 }
 
-/**
- * A standalone SVG is XML, and a browser that meets a well-formedness error renders nothing.
- *
- * The favicon shipped with `--primary` inside a comment, and `--` is not allowed in an XML
- * comment. Inlined into HTML the same markup is forgiven, so it looked right in the app; as
- * /favicon.svg every browser refused it, and the tab went on showing the previous icon out of
- * its cache, which read as a caching problem rather than a broken file.
- */
+/** `--` inside an XML comment made browsers reject the favicon while inline HTML forgave it. */
 describe('SVG assets are well-formed XML', () => {
   const files = ROOTS.flatMap((root) => svgFiles(join(repoRoot, root)));
 

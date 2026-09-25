@@ -34,16 +34,6 @@ import {
 } from '../components/ui/table';
 import { TablePagination } from '../components/ui/table-pagination';
 
-/**
- * Consumers — the customer's own users — and the portal each of them can be handed.
- *
- * The everyday path is the customer's backend: it creates a Consumer when one of its users turns
- * on webhooks and opens a portal session each time that user visits the page embedding it. This
- * screen is for everything around that: seeing who has what, opening a Consumer's portal to look
- * at what they see, and getting an embed snippet to try before writing any backend code.
- */
-
-/** The same shapes the API accepts for a session's allowed origin. */
 const ORIGIN_PATTERN =
   /^(https:\/\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*|http:\/\/(?:localhost|127\.0\.0\.1))(?::[0-9]{1,5})?$/;
 
@@ -102,11 +92,7 @@ export default function ConsumersPage() {
     }
   };
 
-  /*
-   * The tab is opened before the request, synchronously inside the click, and pointed at the
-   * portal once the session exists: a window.open() after an await is no longer a response to
-   * the click, and browsers block it as a pop-up.
-   */
+  /* Opened synchronously in the click: a window.open() after an await is blocked as a pop-up. */
   const handleOpenPortal = async (consumer: ConsumerResponse) => {
     const tab = window.open('', '_blank');
     setOpeningId(consumer.id);
@@ -326,7 +312,7 @@ export default function ConsumersPage() {
             ) : (
               <ul className="space-y-2">
                 {(consumerEndpoints.data ?? []).map((endpoint) => (
-                  <li key={endpoint.id} className="flex items-center justify-between gap-3 rounded-md border border-rail p-3">
+                  <li key={endpoint.id} className="flex items-center justify-between gap-3 border border-rail p-3">
                     <div className="min-w-0">
                       <div className="truncate font-mono text-[13px]" title={endpoint.url}>{endpoint.url}</div>
                       {endpoint.description && (

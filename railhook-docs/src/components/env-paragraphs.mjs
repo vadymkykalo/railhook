@@ -1,10 +1,5 @@
+// An indented line is an example, kept verbatim as code; prose lines are rejoined.
 /**
- * A `.env.dist` comment, hard-wrapped at ~95 columns, back into readable blocks.
- *
- * Blank-line paragraphs become separate blocks and their wrapped lines are rejoined. An
- * indented line is an example (`  WEBHOOK_TRUSTED_PROXIES=10.0.0.5,…`), so a run of them is
- * kept verbatim as code while the prose around it is rejoined.
- *
  * @param {string} text
  * @returns {Array<{ code: boolean, text: string }>}
  */
@@ -28,11 +23,7 @@ export function envParagraphs(text) {
   return blocks;
 }
 
-/**
- * The anchor id for a section heading: `Retry scheduler` → `env-retry-scheduler`.
- *
- * @param {string} title
- */
+/** @param {string} title */
 export function envSectionId(title) {
   return 'env-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }

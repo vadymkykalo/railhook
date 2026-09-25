@@ -2,14 +2,14 @@
 title: Kubernetes
 description: Встановіть Railhook у Kubernetes за допомогою Helm-чарта й підключіть його до власних PostgreSQL, Kafka та Redis.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-Helm-чарт запускає API, воркер і панель керування. Бази даних, брокера й кешу в ньому немає, тож їх ви надаєте самі.
+Helm-чарт запускає API, воркер і панель керування. PostgreSQL, Kafka і Redis надаєте ви.
 
 ## Що потрібно
 
 - Kubernetes 1.24+ і Helm 3.8+
-- PostgreSQL 16+, Kafka 3.7+ і Redis 7+ — керовані або розгорнуті вами. Проєкт тестується з образами `postgres:16-alpine`, `apache/kafka:3.7.0` і `redis:7-alpine`.
+- PostgreSQL 16+, Kafka 3.7+ і Redis 7+, керовані або розгорнуті вами. Проєкт тестується з образами `postgres:16-alpine`, `apache/kafka:3.7.0` і `redis:7-alpine`.
 
 ## Встановлення
 
@@ -68,7 +68,7 @@ Helm-чарт запускає API, воркер і панель керуван�
 
 3. **Встановіть чарт**
 
-   Чарт публікується в GHCR з кожним релізом. Його версія — номер релізу без `v`:
+   Чарт є в GHCR для кожного релізу; його версія дорівнює номеру релізу без `v`:
 
    ```bash
    helm install railhook oci://ghcr.io/vadymkykalo/charts/railhook \
@@ -85,7 +85,7 @@ Helm-чарт запускає API, воркер і панель керуван�
 </Steps>
 
 <Aside type="danger">
-Зробіть резервні копії `encryption-key` і `encryption-salt` і ніколи не змінюйте сіль на робочому інстансі. Сіль бере участь у виведенні ключа, тож після її зміни кожен збережений секрет ендпоінта розшифровуватиметься в сміття.
+Зробіть резервні копії `encryption-key` і `encryption-salt` і ніколи не змінюйте сіль на робочому інстансі. Сіль бере участь у виведенні ключа, тож після її зміни кожен збережений секрет ендпоінта розшифровується в сміття.
 </Aside>
 
 ## Пошта
@@ -129,10 +129,3 @@ helm upgrade railhook oci://ghcr.io/vadymkykalo/charts/railhook --version <versi
 ```bash
 helm uninstall railhook -n railhook
 ```
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Конфігурація" description="Змінні середовища, які стоять за значеннями чарта." href="/docs/uk/self-hosting/configuration/" />
-  <LinkCard title="Моніторинг" description="ServiceMonitor, правила сповіщень і дашборди." href="/docs/uk/self-hosting/monitoring/" />
-</CardGrid>

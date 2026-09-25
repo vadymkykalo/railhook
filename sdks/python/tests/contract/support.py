@@ -1,11 +1,5 @@
-"""Shared bootstrap for the python SDK's contract suite.
-
-Same pattern as sdks/node/tests/contract/support.ts and
-load/lib/setup.js: the Railhook client is API-key scoped only (no
-register/login/create-project surface — see railhook/client.py), so
-bootstrapping a throwaway tenant needs a couple of raw `requests` calls
-against the JWT-authenticated endpoints before the SDK proper takes over.
-"""
+"""The client is API-key scoped with no register/login/create-project surface, so the
+throwaway tenant is bootstrapped with raw ``requests`` calls."""
 import os
 import time
 import uuid
@@ -26,17 +20,8 @@ class ContractContext:
 
 
 def is_api_reachable() -> bool:
-    """Probe with an intentionally invalid login: any HTTP response proves the
-    API is answering.
-
-    Deliberately does NOT hit /actuator/health/liveness: under ``make up``
-    (docker-compose.yml), actuator is served on its own MANAGEMENT_PORT (8082)
-    which is never published to the host — and on the main port
-    /actuator/health is a 500, not a 404, because nothing maps it. Nor
-    /v3/api-docs: springdoc is only permitAll when ``SWAGGER_ENABLED=true``
-    (SecurityConfig.java) and .env.dist ships it false, so probing it reports
-    a perfectly healthy stack as unreachable and silently skips this whole
-    suite. /api/v1/auth/login is permitAll unconditionally.
+    """A login probe: actuator is not published to the host and /v3/api-docs is off by default,
+    so either would silently skip the suite on a healthy stack.
     """
     try:
         requests.post(f"{BASE_URL}/api/v1/auth/login", json={}, timeout=3)

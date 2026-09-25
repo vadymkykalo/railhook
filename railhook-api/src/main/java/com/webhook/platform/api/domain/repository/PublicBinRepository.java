@@ -24,7 +24,7 @@ public interface PublicBinRepository extends JpaRepository<PublicBin, UUID> {
     @Query("UPDATE PublicBin b SET b.requestCount = b.requestCount + 1 WHERE b.id = :id")
     void incrementRequestCount(@Param("id") UUID id);
 
-    /** Deletes expired URLs; their requests go with them (ON DELETE CASCADE). */
+    /** Requests go with them through ON DELETE CASCADE. */
     @Modifying
     @Query("DELETE FROM PublicBin b WHERE b.expiresAt <= :now")
     int deleteExpired(@Param("now") Instant now);

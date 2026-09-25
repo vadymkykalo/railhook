@@ -4,17 +4,7 @@ import type {
   PortalEndpointResponse, PortalSessionInfoResponse,
 } from '../types/api.types';
 
-/**
- * The customer portal's own client, deliberately not the dashboard's `http.ts`.
- *
- * That one carries a dashboard session: a bearer token from the auth store and, on a 401, a
- * refresh through the `refresh_token` cookie. The portal has neither and must never borrow them
- * — it runs for someone who is not a Railhook user, possibly inside another site's iframe. Its
- * one credential is the portal session token, held here in memory only: not in localStorage, not
- * in a cookie, so it ends with the page and no other page on this origin can read it.
- *
- * A 401 is final. There is nothing to refresh with; the customer's page opens a new session.
- */
+/** Not http.ts: the portal has no dashboard session, and its token lives in memory only. */
 let token: string | null = null;
 
 const client: AxiosInstance = axios.create({
@@ -40,7 +30,6 @@ export function setPortalToken(value: string | null) {
   token = value;
 }
 
-/** Called on any 401: the session expired or was revoked, and nothing can renew it from here. */
 export function onPortalUnauthorized(callback: (() => void) | null) {
   onUnauthorized = callback;
 }

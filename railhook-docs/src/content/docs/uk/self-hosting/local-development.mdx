@@ -2,9 +2,9 @@
 title: Локальна розробка
 description: Зберіть і запустіть Railhook із клону репозиторію та перезбирайте сервіси по одному.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-Ця сторінка — для тих, хто працює над самим Railhook. Тут API, воркер і панель керування збираються з вашого робочого дерева й запускаються за тією самою схемою з одним портом, що й у справжньому розгортанні.
+Для роботи над самим Railhook: API, воркер і панель керування збираються з вашого робочого дерева й запускаються за тією самою схемою з одним портом, що й справжнє розгортання.
 
 ## Що потрібно
 
@@ -107,10 +107,3 @@ make test-ui                              # dashboard unit tests
 cd railhook-ui && npm run lint && npm run typecheck
 mvn clean compile -B
 ```
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Конфігурація" description="Усі змінні з .env." href="/docs/uk/self-hosting/configuration/" />
-  <LinkCard title="Моніторинг" description="Запустіть Prometheus і Grafana поруч зі стеком." href="/docs/uk/self-hosting/monitoring/" />
-</CardGrid>

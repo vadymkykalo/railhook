@@ -4,11 +4,7 @@ import { clientErrorsApi } from '../../api/clientErrors.api';
 import { http } from '../../api/http';
 import { reportClientError, resetClientErrorReporterForTests } from '../reportClientError';
 
-/**
- * This runs on a page that has already failed, which decides most of its design: it must not
- * throw, it must not retry, and it must not be able to make things worse by talking more than
- * the person looking at the screen can act on.
- */
+/** Runs on an already-failed page: must not throw, retry, or talk more than the user can act on. */
 describe('reportClientError', () => {
   beforeEach(() => {
     resetClientErrorReporterForTests();

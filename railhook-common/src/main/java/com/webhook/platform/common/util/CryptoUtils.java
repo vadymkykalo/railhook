@@ -18,28 +18,17 @@ import java.time.Duration;
 public class CryptoUtils {
 
     /**
-     * Derived keys, kept because deriving them is the expensive part and the answer never changes.
-     *
-     * <p>PBKDF2 at {@link #PBKDF2_ITERATIONS} iterations is meant to cost something — that is the
-     * whole point of it, applied once, when a key is established. It was being applied on every
-     * encrypt and every decrypt instead, against a salt that is one process-wide configuration
-     * value, so the same bytes were recomputed from scratch thousands of times a second for no
-     * result that differed.
-     *
-     * <p>It also made the cost bookable by a stranger: the ingress path decrypts a source's HMAC
-     * secret in order to check the signature, so the derivation ran before the request had been
-     * shown to be genuine.
-     *
-     * <p>Bounded and expiring, though the live population is the handful of configured key
-     * versions: a map that can only grow is a map that eventually matters. Holding derived keys
-     * in memory adds no exposure — the master key they come from is already there.
+     * PBKDF2 is deliberately slow and was running on every encrypt and decrypt against one fixed
+     * salt. Ingress decrypts a source's HMAC secret before the signature is checked, so that cost
+     * was also triggerable by unauthenticated requests. Caching adds no exposure: the master key
+     * is already in memory.
      */
     private static final Cache<DerivationKey, SecretKey> DERIVED_KEYS = Caffeine.newBuilder()
             .maximumSize(64)
             .expireAfterAccess(Duration.ofHours(1))
             .build();
 
-    /** Both halves, kept apart: concatenating them lets one pair spell another. */
+    /** Two fields, not one concatenated string, so distinct pairs cannot collide. */
     private record DerivationKey(String masterKey, String salt) {
     }
 

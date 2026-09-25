@@ -1,45 +1,9 @@
-# Railhook — Prometheus Alert Rules
-# Deploy alongside Prometheus via configmap or PrometheusRule CRD.
-#
-# Metrics sources:
-#   - delivery_queue_depth{status=pending|processing|dlq}     (QueueDepthMetricsExporter)
-#   - incoming_forward_queue_depth{status=pending|processing|dlq}
-#   - retry_governor_pending_count{scheduler=outgoing|incoming-forward}
-#   - retry_governor_effective_batch{scheduler=...}
-#   - retry_governor_consecutive_failures{scheduler=...}
-#   - retry_governor_cooldown_remaining{scheduler=...}
-#   - webhook_dlq_depth{topic=deliveries.dlq}         (DlqMonitoringService; actionable
-#     backlog -- deliveries still in DeliveryStatus.DLQ, returns to 0 once retried/purged.
-#     this used to be a Kafka latest-earliest offset count that never returned to 0;
-#     see webhook_dlq_topic_retained_total below for that raw, non-actionable signal)
-#   - webhook_dlq_topic_retained_total{topic=deliveries.dlq}  (informational only, do not alert)
-#   - incoming_forward_dlq_depth{topic=incoming.forward.dlq}  (DlqMonitoringService; the
-#     incoming counterpart -- Forwards still in ForwardAttemptStatus.DLQ)
-#   - incoming_forward_dlq_topic_retained_total{topic=incoming.forward.dlq}  (informational
-#     only, do not alert)
-#   - webhook_delivery_attempts_total{result=success|failure|error}
-#   - incoming_forward_attempts_total{result=success|failure|error}
-#   - circuit_breaker_state_transitions_total
-#   - circuit_breaker_rejected_total
-#   - circuit_breaker_degraded_total
-#   - http_server_requests_seconds_count{status=~"5.."}
-#   - outbox_queue_depth{status=pending|sending|failed|dead}  (OutboxPublisherService, api)
-#   - outbox_oldest_pending_age_seconds                       (OutboxPublisherService, api)
-#   - delivery_oldest_pending_age_seconds                     (StaleDeliveryEscalationService)
-#   - forward_oldest_pending_age_seconds                      (StaleForwardEscalationService)
-#   - up{job=railhook-api|railhook-worker}                    (Prometheus itself)
+# webhook_dlq_topic_retained_total and incoming_forward_dlq_topic_retained_total count raw Kafka
+# topic volume, which never returns to 0 — do not alert on them.
 
 groups:
-  # ── Outbox ───────────────────────────────────────────────────
-  # The first place work can go missing. An Event is written to the outbox in the same
-  # transaction as the work itself, so a row stuck here is a webhook the caller was told
-  # was accepted and which no per-endpoint metric will ever show you: it has not become a
-  # Delivery yet, so delivery_queue_depth cannot see it either.
   - name: railhook.outbox
     rules:
-      # Accepted but unannounced. This is the third of the three signals
-      # the observability guide tells an operator to alert on if they alert on nothing
-      # else — and until now it was the only one of the three with no rule behind it.
       - alert: OutboxOldestPendingAgeHigh
         expr: |
           outbox_oldest_pending_age_seconds > 300
@@ -55,9 +19,6 @@ groups:
             running, not keeping up, or failing to reach the broker. Nothing downstream can
             see this backlog: the work has not become a Delivery yet.
 
-      # SENDING is a transient state the publisher recovers from after
-      # outbox.publisher.sending-recovery-seconds (default 300s). A sustained depth means
-      # recovery is not keeping up, or is failing outright.
       - alert: OutboxSendingStuck
         expr: |
           outbox_queue_depth{status="sending"} > 0
@@ -73,10 +34,8 @@ groups:
             poll — recovery back to PENDING should already have happened. Check API logs for
             recoverStuckSendingMessages() and Kafka broker health.
 
-  # ── Retry Backlog ────────────────────────────────────────────
   - name: railhook.retry_backlog
     rules:
-      # Pending delivery queue growing fast (>500 increase in 15 min)
       - alert: DeliveryPendingBacklogGrowing
         expr: |
           delta(delivery_queue_depth{status="pending"}[15m]) > 500
@@ -90,7 +49,6 @@ groups:
             Pending deliveries increased by {{ $value | printf "%.0f" }} in 15 min.
             Check downstream endpoint health and worker scaling.
 
-      # Pending deliveries above absolute threshold
       - alert: DeliveryPendingBacklogHigh
         expr: |
           delivery_queue_depth{status="pending"} > 5000
@@ -104,7 +62,6 @@ groups:
             {{ $value | printf "%.0f" }} deliveries pending for >10 min.
             Consider scaling workers or investigating failing endpoints.
 
-      # Critical: pending backlog above hard threshold
       - alert: DeliveryPendingBacklogCritical
         expr: |
           delivery_queue_depth{status="pending"} > 20000
@@ -118,7 +75,6 @@ groups:
             {{ $value | printf "%.0f" }} deliveries pending.
             Hard-cap auto-DLQ escalation may trigger. Immediate investigation required.
 
-      # Incoming forward pending backlog
       - alert: IncomingForwardPendingBacklogHigh
         expr: |
           incoming_forward_queue_depth{status="pending"} > 3000
@@ -131,10 +87,8 @@ groups:
           description: |
             {{ $value | printf "%.0f" }} incoming forwards pending for >10 min.
 
-  # ── DLQ ──────────────────────────────────────────────────────
   - name: railhook.dlq
     rules:
-      # DLQ depth growing
       - alert: DlqDepthGrowing
         expr: |
           delta(delivery_queue_depth{status="dlq"}[1h]) > 100
@@ -147,7 +101,6 @@ groups:
           description: |
             DLQ entries increasing. Check endpoint availability and delivery logs.
 
-      # DLQ rate above SLO threshold (>3% of deliveries)
       - alert: DlqRateHigh
         expr: |
           sum(rate(webhook_delivery_attempts_total{result=~"error|failure"}[1h])) / sum(rate(webhook_delivery_attempts_total[1h]))
@@ -161,10 +114,6 @@ groups:
           description: |
             {{ $value | humanizePercentage }} failure rate. SLO target: <5% DLQ rate.
 
-      # The incoming counterpart of DlqRateHigh. Same expression shape, same threshold and
-      # the same 10m window -- a Forward failing repeatedly ends up in DLQ exactly as a
-      # Delivery does, and until this rule existed nothing watched
-      # incoming_forward_attempts_total at all.
       - alert: IncomingForwardFailureRateHigh
         expr: |
           sum(rate(incoming_forward_attempts_total{result=~"error|failure"}[1h])) / sum(rate(incoming_forward_attempts_total[1h]))
@@ -178,9 +127,6 @@ groups:
           description: |
             {{ $value | humanizePercentage }} failure rate. SLO target: <5% DLQ rate.
 
-      # Actionable DLQ backlog (deliveries still in DeliveryStatus.DLQ -- this is
-      # DB-backed and genuinely returns to 0 once retried/purged via DlqService, unlike the
-      # old Kafka-offset-based computation it replaced)
       - alert: DlqActionableBacklog
         expr: |
           webhook_dlq_depth > 0
@@ -194,9 +140,6 @@ groups:
             Deliveries awaiting manual retry or purge via DlqService. Not tied to Kafka
             topic retention -- see webhook_dlq_topic_retained_total for raw topic volume.
 
-      # The incoming counterpart of DlqActionableBacklog. A Forward that exhausts its retry
-      # ladder used to write status = DLQ on its incoming_forward_attempts row and nothing
-      # else, so no number an operator could see ever moved.
       - alert: IncomingForwardDlqActionableBacklog
         expr: |
           incoming_forward_dlq_depth > 0
@@ -210,10 +153,8 @@ groups:
             Forwards awaiting manual retry or purge. Not tied to Kafka topic retention --
             see incoming_forward_dlq_topic_retained_total for raw topic volume.
 
-  # ── Retry Governor ───────────────────────────────────────────
   - name: railhook.retry_governor
     rules:
-      # Governor in sustained cooldown (indicating persistent downstream failures)
       - alert: RetryGovernorCooldown
         expr: |
           retry_governor_cooldown_remaining > 0
@@ -227,7 +168,6 @@ groups:
             Governor entered cooldown after sustained failures.
             Cooldown remaining: {{ $value }} polls. Check downstream health.
 
-      # Consecutive failures above threshold
       - alert: RetryGovernorConsecutiveFailures
         expr: |
           retry_governor_consecutive_failures > 5
@@ -241,10 +181,8 @@ groups:
             Persistent Kafka send failures or downstream unavailability.
             Check Kafka broker health, worker logs, and network connectivity.
 
-  # ── Circuit Breaker ──────────────────────────────────────────
   - name: railhook.circuit_breaker
     rules:
-      # Many circuit breakers tripping
       - alert: CircuitBreakerTripsHigh
         expr: |
           rate(circuit_breaker_state_transitions_total[5m]) > 1
@@ -258,7 +196,6 @@ groups:
             {{ $value | printf "%.1f" }} circuit breaker transitions/sec.
             Multiple endpoints may be failing. Check endpoint health dashboard.
 
-      # High rejection rate
       - alert: CircuitBreakerRejectionsHigh
         expr: |
           rate(circuit_breaker_rejected_total[5m]) > 10
@@ -271,7 +208,6 @@ groups:
           description: |
             Many deliveries being skipped due to open circuit breakers.
 
-      # The breaker cannot trip if it cannot count
       - alert: CircuitBreakerDegraded
         expr: |
           rate(circuit_breaker_degraded_total[5m]) > 0.1
@@ -289,12 +225,10 @@ groups:
             way because nothing is measuring it. Check Redis before trusting the breaker
             dashboards.
 
-  # ── API Availability (from SLOs) ─────────────────────────────
   - name: railhook.api
     rules:
-      # Tunnel traffic is left out: a tunnel relays what the customer's own machine answers, and
-      # answers 503 while nobody is connected. Their dev server failing is not the API failing.
-      # The floor of five errors keeps a quiet deployment's two or three from paging as 1%.
+      # Tunnels are excluded: they relay the customer's own machine. The five-error floor keeps a
+      # quiet deployment's two or three from paging.
       - alert: ApiErrorRateHigh
         expr: |
           (sum(rate(http_server_requests_seconds_count{status=~"5..", uri!~"/tunnel/.*"}[5m])) or vector(0)) /
@@ -311,10 +245,8 @@ groups:
             {{ $value | humanizePercentage }} of requests returning 5xx.
             SLO target: <0.1% over 30d. Investigate API logs immediately.
 
-  # ── Oldest Pending Age ───────────────────────────────────────
   - name: railhook.staleness
     rules:
-      # Oldest pending delivery is stale (metric exposed by StaleDeliveryEscalationService)
       - alert: OldestPendingDeliveryStale
         expr: |
           delivery_oldest_pending_age_seconds > 3600
@@ -341,9 +273,6 @@ groups:
             A delivery has been in PENDING state for {{ $value | printf "%.0f" }}s.
             Hard-cap escalation should have moved this to DLQ. Investigate immediately.
 
-      # The incoming counterpart. StaleForwardEscalationService exports the gauge exactly as
-      # its outgoing twin does; only the alert was missing, so a Forward could sit pending
-      # indefinitely while the identical Delivery condition paged someone.
       - alert: OldestPendingForwardStale
         expr: |
           forward_oldest_pending_age_seconds > 3600
@@ -357,10 +286,6 @@ groups:
             An incoming forward has been pending for over 1 hour.
             This may indicate a stuck forward or scheduler issue.
 
-  # ── Is it running at all ─────────────────────────────────────
-  # Everything above measures what the platform is doing. Nothing measured whether it was
-  # doing anything: a worker that died outright tripped no rule directly, and only showed up
-  # five to ten minutes later as a backlog someone had to interpret.
   - name: railhook.infrastructure
     rules:
       - alert: ApiDown

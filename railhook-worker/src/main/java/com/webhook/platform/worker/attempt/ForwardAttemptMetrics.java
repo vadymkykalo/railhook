@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
-/** The Incoming direction's metric family, with the names it had before the Runner existed. */
+/** Metric names predate the Runner and must not change: dashboards and alerts use them. */
 @Component
 public class ForwardAttemptMetrics implements AttemptMetrics {
 
@@ -27,9 +27,7 @@ public class ForwardAttemptMetrics implements AttemptMetrics {
                 .tag("result", "error").register(registry);
         this.transformFailedCounter = Counter.builder("transform_failed_total")
                 .tag("component", "incoming_forward").register(registry);
-        // A separate family from transform_failed_total, not a tag on it: one is an
-        // error rate somebody is paged for and the other is a filter doing its job, and
-        // an alert that cannot tell them apart fires on working configuration.
+        // Not a tag on transform_failed_total, so an error-rate alert ignores working filters.
         this.transformCancelledCounter = Counter.builder("transform_cancelled_total")
                 .tag("component", "incoming_forward").register(registry);
         this.latency = Timer.builder("incoming_forward_latency_ms").register(registry);

@@ -28,6 +28,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import com.webhook.platform.api.dto.MtlsConfigRequest;
 
 @Slf4j
 @RestController
@@ -133,9 +134,7 @@ public class EndpointController {
         return ResponseEntity.ok(response);
     }
 
-    // Fires a real outbound request from the platform, signed with the endpoint's own
-    // secret — the same capability rotate-secret above is guarded for, so it carries the same
-    // scope and role requirements a Viewer or a READ_ONLY key cannot meet.
+    // Sends a real request signed with the endpoint's secret, so it is guarded like rotate-secret.
     @Operation(summary = "Test endpoint", description = "Sends a test webhook to verify endpoint connectivity")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
@@ -159,7 +158,7 @@ public class EndpointController {
     public ResponseEntity<EndpointResponse> configureMtls(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
-            @Valid @RequestBody com.webhook.platform.api.dto.MtlsConfigRequest request,
+            @Valid @RequestBody MtlsConfigRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
@@ -192,7 +191,6 @@ public class EndpointController {
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
-        // Mutates verification_status, exactly like skip-verification below.
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         var result = verificationService.verify(projectId, id);
@@ -240,7 +238,6 @@ public class EndpointController {
         return ResponseEntity.ok(endpointService.getEndpoint(projectId, id));
     }
 
-    /** @param reason a failure the UI explains in its own words; absent for any other outcome */
     public record VerificationResponse(boolean success, String message, String status,
             EndpointVerificationService.FailureReason reason) {}
     public record SkipVerificationRequest(String reason) {}

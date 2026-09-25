@@ -31,20 +31,6 @@ import SchemasPage from '../SchemasPage';
 import { schemasApi } from '../../api/schemas.api';
 import { projectsApi } from '../../api/projects.api';
 
-/**
- * The registry, and the two project settings that sit on top of it.
- *
- * <p>The settings are why this page gets a test. `BLOCK` means an event that does not match its
- * schema is refused at ingest — the customer's producer gets a 4xx and the event does not exist.
- * That is the correct behaviour to offer and a very expensive one to turn on by accident, so
- * what is held down is that the three-way choice shows the project's real setting, that changing
- * one setting does not carry the other along with it, and that opening the page changes neither.
- *
- * <p>The `isError` branch has its own assertion because the failure it guards is specific: the
- * catalogue request failing used to fall through `data = []` and draw "0 event types" over an
- * empty list, which is a down backend wearing the face of a project that has no schemas.
- */
-
 const now = new Date('2026-08-01T00:00:00Z').toISOString();
 
 const PROJECT: ProjectResponse = {
@@ -77,12 +63,6 @@ function renderSchemas() {
   });
 }
 
-/**
- * The segmented control for one setting, found by the group label it carries.
- *
- * Its segments are toggle buttons with `aria-pressed` rather than radios — one deliberate
- * consequence being that they Tab like buttons, which is what they are.
- */
 function choiceGroup(name: RegExp): HTMLElement {
   return screen.getByRole('group', { name });
 }
@@ -114,8 +94,6 @@ describe('SchemasPage', () => {
 
     const group = await waitFor(() => choiceGroup(/validation|валідац/i));
     const chosen = selected(group);
-    // WARN, not BLOCK and not OFF — reading it wrong in either direction misstates whether
-    // a malformed event is being refused right now.
     expect(chosen?.textContent).toMatch(/warn|попередж/i);
   });
 
@@ -130,13 +108,11 @@ describe('SchemasPage', () => {
       TEST_PROJECT_ID,
       expect.objectContaining({ schemaValidationEnabled: true, schemaValidationPolicy: 'BLOCK' }),
     ));
-    // The idempotency policy is a separate decision and must not ride along on this one.
     expect(vi.mocked(projectsApi.update).mock.calls[0][1]).not.toHaveProperty('idempotencyPolicy');
   });
 
   it('changing the idempotency policy does not restate the validation settings', async () => {
-    // The API leaves a null field alone, so omitting them is how this stays a one-setting
-    // change. Sending a stale copy of them back is how one panel silently undoes the other.
+    // The API leaves a null field alone, so omitting it keeps this a one-setting change.
     renderSchemas();
     const group = await waitFor(() => choiceGroup(/idempot|ідемпот/i));
 
@@ -155,8 +131,6 @@ describe('SchemasPage', () => {
     renderSchemas();
 
     await waitFor(() => expect(schemasApi.listEventTypes).toHaveBeenCalled());
-    // "0 event types" over an empty list is a down backend wearing the face of an empty
-    // project, and this branch exists so it cannot happen again.
     await waitFor(() => expect(document.body.textContent).not.toMatch(/\b0\b/));
   });
 

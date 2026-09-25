@@ -7,16 +7,9 @@ import { renderPage } from '../../test/renderPage';
 import BlogPostPage from '../BlogPostPage';
 import { blogPosts } from '../../lib/blog';
 
-/**
- * One article: the Markdown from `src/content/blog/<slug>/<locale>.md`, rendered as elements,
- * with the byline, contents, call to action and neighbours the site supplies around it.
- *
- * The post asserted on is the newest one rather than a fixture, so these hold the real pages
- * to the contract instead of holding a copy of it.
- */
+/** Asserts on the newest real post, not a fixture. */
 const POST = blogPosts('en')[0];
 
-/** The provider comparison, for the assertions that are about its content rather than the contract. */
 const PROVIDERS = 'stripe-github-shopify-when-your-endpoint-is-down';
 
 function renderPost(slug = POST.slug, signedIn = false) {

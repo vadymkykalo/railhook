@@ -2,17 +2,12 @@ package com.webhook.platform.api.dto.validation;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Locale;
 
 /**
- * Address endings that can never receive mail, and the ending that was meant.
- *
- * <p>A real account was registered as {@code wheelet1228@gmail.con}, and every verification mail
- * to it bounced. {@code @Email} accepts that address: it is well-formed, just undeliverable.
- *
- * <p>Only endings no registry has delegated are listed, so nothing here can refuse an address
- * that works. A typo of a popular domain ({@code gmial.com}) is a registrable name and is left to
- * the dashboard to suggest. {@code railhook-ui/src/lib/emailTypos.ts} keeps the same list, and a
- * test there fails when the two drift.
+ * Only TLDs no registry has delegated are listed, so nothing here can refuse a working address.
+ * A typo like {@code gmial.com} is registrable and is left to the dashboard to suggest. The UI
+ * keeps the same list, and a test there fails when the two drift.
  */
 public final class EmailTypoPolicy {
 
@@ -35,7 +30,6 @@ public final class EmailTypoPolicy {
     private EmailTypoPolicy() {
     }
 
-    /** The address with its ending corrected, when the ending is one that cannot receive mail. */
     public static Optional<String> impossibleTldCorrection(String email) {
         if (email == null) {
             return Optional.empty();
@@ -46,12 +40,12 @@ public final class EmailTypoPolicy {
         if (at <= 0 || dot < at) {
             return Optional.empty();
         }
-        String tld = trimmed.substring(dot + 1).toLowerCase(java.util.Locale.ROOT);
+        String tld = trimmed.substring(dot + 1).toLowerCase(Locale.ROOT);
         String meant = IMPOSSIBLE_TLDS.get(tld);
         if (meant == null) {
             return Optional.empty();
         }
-        String domain = trimmed.substring(at + 1, dot + 1).toLowerCase(java.util.Locale.ROOT);
+        String domain = trimmed.substring(at + 1, dot + 1).toLowerCase(Locale.ROOT);
         return Optional.of(trimmed.substring(0, at) + "@" + domain + meant);
     }
 }

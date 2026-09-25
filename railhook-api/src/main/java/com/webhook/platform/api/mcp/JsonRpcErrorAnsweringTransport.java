@@ -10,16 +10,9 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 /**
- * Answers a protocol error as JSON-RPC instead of letting the HTTP transport turn it into a 500.
- *
- * <p>The SDK reports an unknown method, or bad params, as an {@link McpError} carrying the
- * JSON-RPC error to send — and Spring AI's stateless WebMVC transport answers every error from
- * the handler with HTTP 500. That is wrong by the spec, and it counted towards the API's 5xx
- * alert: claude.ai probes {@code server/discover}, which the SDK does not implement, so each
- * connection paged the owner.
- *
- * <p>Only an {@code McpError} with a JSON-RPC error is converted. Anything else is a real
- * failure and still reaches the transport, which answers it with a 500.
+ * Spring AI's WebMVC transport answers every handler error with HTTP 500, including an unknown
+ * method that clients probe routinely. Only an {@link McpError} carrying a JSON-RPC error is
+ * converted; anything else is a real failure and stays a 500.
  */
 final class JsonRpcErrorAnsweringTransport implements McpStatelessServerTransport {
 

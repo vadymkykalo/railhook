@@ -9,20 +9,18 @@ import { cn } from '../lib/utils';
 interface EmptyStateProps {
   icon: LucideIcon;
   title: string;
-  /** ReactNode, not string: some descriptions name the record in <strong>. */
+  /** ReactNode: some descriptions name the record in <strong>. */
   description?: ReactNode;
   action?: ReactNode;
-  /** A docs page slug, e.g. `outgoing/retries`. Opened in the reader's language. */
   docsLink?: string;
-  /** Merged with the centred layout, so a caller can change the spacing without losing it. */
   className?: string;
 }
 
 export default function EmptyState({ icon: Icon, title, description, action, docsLink, className }: EmptyStateProps) {
   const { t, i18n } = useTranslation();
   return (
-    <div className={cn('flex flex-col items-center justify-center rounded-lg border border-dashed border-rail py-16', className)}>
-      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-rail bg-card">
+    <div className={cn('flex flex-col items-center justify-center border border-dashed border-rail py-16', className)}>
+      <div className="mb-5 flex h-11 w-11 items-center justify-center border border-rail bg-card">
         <Icon className="h-5 w-5 text-muted-foreground" />
       </div>
       <h3 className="mb-1.5 text-[15px] font-medium">{title}</h3>
@@ -41,27 +39,17 @@ export default function EmptyState({ icon: Icon, title, description, action, doc
 }
 
 interface ErrorStateProps {
-  /** The caught error, if any — used to derive a specific, human-readable cause. */
   error?: unknown;
-  /** i18n key used as a last-resort message when the error carries no server message. */
   fallbackKey?: string;
-  /** Overrides the derived message entirely (skips resolveErrorMessage). */
   description?: string;
   title?: string;
-  /** Refetch/retry callback. Renders a "Retry" button when provided. */
   onRetry?: () => void;
-  /** True while a retry is in flight — disables the button and shows a spinner. */
   retrying?: boolean;
   className?: string;
   testId?: string;
 }
 
-/**
- * The "something is wrong, here's why, here's how to recover" state.
- * Distinct from EmptyState (which means "this loaded fine and there's just
- * nothing here yet") — never render EmptyState when a request actually failed,
- * or a down backend looks identical to an empty account.
- */
+/** Never EmptyState for a failed request, or a down backend looks like an empty account. */
 export function ErrorState({
   error,
   fallbackKey = 'common.error',
@@ -79,9 +67,9 @@ export function ErrorState({
     <div
       data-testid={testId}
       role="alert"
-      className={className ?? 'flex flex-col items-center justify-center rounded-lg border border-dashed border-halt/30 py-16'}
+      className={className ?? 'flex flex-col items-center justify-center border border-dashed border-halt/30 py-16'}
     >
-      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-halt/30 bg-halt-soft">
+      <div className="mb-5 flex h-11 w-11 items-center justify-center border border-halt/30 bg-halt-soft">
         <AlertTriangle className="h-5 w-5 text-halt" />
       </div>
       <h3 className="mb-1.5 text-[15px] font-medium">{title ?? t('common.loadErrorTitle')}</h3>

@@ -12,17 +12,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * This module's half of the template-language parity check.
- *
- * <p>The worker runs the same corpus against {@code PayloadTransformService} in
- * {@code TemplateLanguageParityTest} of its own, because the two modules are siblings in the
- * reactor and neither is on the other's classpath. Same expected values, two implementations: a
- * case that only one of them gets right fails in exactly one module, which names the drift.
- *
- * <p>{@link TemplateLanguageConformance} says why there are two implementations and where they
- * are allowed to differ.
- */
+// The worker runs the same corpus against PayloadTransformService; neither module sees the other.
 @DisplayName("TemplateTransformer conforms to the shared template-language corpus")
 class TemplateLanguageParityTest {
 
@@ -46,11 +36,7 @@ class TemplateLanguageParityTest {
     @Test
     @DisplayName("the one deliberate difference: a malformed path is null here, and throws in the worker")
     void malformedPathIsNullHere() throws Exception {
-        // Not in the shared corpus, because the corpus is what both sides must agree on. This is
-        // the agreed disagreement: a preview has to render something for a template someone is
-        // still typing, while a delivery must not ship a body with a hole in it. Saving a
-        // transformation compiles every path (TransformationService.validateTemplate), so a stored
-        // template cannot reach the worker in this state in the first place.
+        // The agreed disagreement: a preview renders a half-typed template, a delivery must not.
         JsonNode result = transformer.apply("{\"x\":\"${$.[[nope}\"}", objectMapper.readTree("{\"a\":1}"));
 
         assertThat(result.get("x").isNull()).isTrue();

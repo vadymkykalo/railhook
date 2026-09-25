@@ -2,32 +2,7 @@
 
 declare(strict_types=1);
 
-/**
- * Live-API smoke check for the PHP SDK.
- *
- * NOT a unit test. phpunit.xml's only testsuite is the `tests` directory, and
- * this file lives under `scripts/`, so PHPUnit never collects it — the unit
- * suite must stay green with no backend running, and this file must never be
- * the reason it isn't.
- *
- * What it does: registers a throwaway org against a REAL running API, then
- * drives the whole send-and-inspect workflow through the SDK's own public
- * methods and asserts what actually comes back — status codes, field names,
- * pagination envelope, error envelope, and a signature the server itself
- * produced. Stubbed-cURL unit tests are structurally unable to catch a renamed
- * field; this is what catches it.
- *
- * Usage:
- *   make up                                      # from the repo root
- *   cd sdks/php && php scripts/live-api-smoke.php
- *   # or, with no local PHP:
- *   docker run --rm -v "$PWD":/app -w /app php:8.2-cli php scripts/live-api-smoke.php
- *
- * Env:
- *   SMOKE_API_BASE_URL   target API (default http://localhost:8080)
- *
- * Exit code is 0 only if every check passed.
- */
+// Against a running API (`make up`); outside tests/ so PHPUnit, which needs no backend, skips it.
 
 // Composer's autoloader when the dev deps are installed; otherwise a two-line
 // PSR-4 shim, so this runs against a bare checkout with no `composer install`.
@@ -110,11 +85,7 @@ function truthy(bool $cond, string $what): void
     }
 }
 
-/**
- * Raw HTTP, used ONLY to bootstrap a tenant. The SDK is API-key scoped by
- * design — it has no register/login/create-project surface (see src/Railhook.php)
- * — so these three calls cannot go through it. Everything after this point does.
- */
+/** Only for bootstrapping a tenant: the SDK is API-key scoped and cannot register or create projects. */
 function raw(string $baseUrl, string $method, string $path, ?array $body = null, array $headers = []): mixed
 {
     $ch = curl_init($baseUrl . $path);
@@ -144,10 +115,7 @@ function raw(string $baseUrl, string $method, string $path, ?array $body = null,
 
 function apiIsUp(string $baseUrl): bool
 {
-    // An intentionally invalid login: any HTTP response at all proves the API is
-    // answering. Deliberately NOT /v3/api-docs — springdoc is only exposed when
-    // SWAGGER_ENABLED=true (SecurityConfig.java), and it is false by default, so
-    // probing it reports a healthy stack as unreachable.
+    // Any response to an invalid login proves the API is up; /v3/api-docs is off by default.
     $ch = curl_init($baseUrl . '/api/v1/auth/login');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -185,7 +153,6 @@ if (!apiIsUp($baseUrl)) {
     exit(2);
 }
 
-// ── Bootstrap (raw HTTP: register / project / API key) ──
 $suffix = sprintf('%d-%d', (int) (microtime(true) * 1000), random_int(0, 999999));
 $auth = raw($baseUrl, 'POST', '/api/v1/auth/register', [
     'email' => "php-smoke-{$suffix}@php-smoke.invalid",
@@ -210,7 +177,6 @@ $apiKey = raw($baseUrl, 'POST', "/api/v1/projects/{$project['id']}/api-keys", [
 $projectId = $project['id'];
 $client = new Railhook($apiKey['key'], $baseUrl);
 
-// ── Endpoints ──
 echo "\nendpoints:\n";
 $endpoint = $client->endpoints->create($projectId, [
     'url' => 'https://example.com/php-smoke',
@@ -251,7 +217,6 @@ $check('endpoints.rotateSecret returns a different secret', static function () u
     truthy($rotated['secret'] !== $endpoint['secret'], 'secret did not change');
 });
 
-// ── Subscriptions ──
 echo "\nsubscriptions:\n";
 $subscription = $client->subscriptions->create($projectId, [
     'endpointId' => $endpoint['id'],
@@ -271,7 +236,6 @@ $check('subscriptions.list returns a bare array (it is NOT paginated)', static f
     truthy(in_array($subscription['id'], array_column($subs, 'id'), true), 'created subscription missing');
 });
 
-// ── Events ──
 echo "\nevents:\n";
 $event = $client->events->send('order.completed', ['orderId' => 'ord_12345', 'amount' => 99.99], "php-smoke-{$suffix}");
 $check('events.send returns eventId / type / createdAt / deliveriesCreated', static function () use ($event) {
@@ -281,7 +245,6 @@ $check('events.send returns eventId / type / createdAt / deliveriesCreated', sta
     eqv($event['deliveriesCreated'], 1, 'deliveriesCreated');
 });
 
-// ── Deliveries ──
 echo "\ndeliveries:\n";
 $page = poll(
     static fn () => $client->deliveries->list($projectId, ['size' => 5]),
@@ -322,7 +285,6 @@ $check('deliveries.getAttempts returns httpStatusCode/durationMs/createdAt', sta
     truthy(array_key_exists('createdAt', $a), 'createdAt missing');
 });
 
-// ── Incoming ──
 echo "\nincoming:\n";
 $source = $client->incomingSources->create($projectId, [
     'name' => 'PHP Smoke Source',
@@ -356,8 +318,7 @@ $check('listDestinations returns a page envelope', static function () use ($dest
     truthy(in_array($destination['id'], array_column($destPage['content'], 'id'), true), 'created destination missing');
 });
 
-// Push a webhook through the source's own ingress URL — the only way to make an
-// Incoming Event exist. permitAll, no credentials (SecurityConfig.java).
+// The ingress URL is the only way to make an Incoming Event exist.
 raw($baseUrl, 'POST', "/ingress/{$source['ingressPathToken']}", ['hello' => 'incoming']);
 
 $incoming = poll(
@@ -389,7 +350,6 @@ if (count($incoming['content']) > 0) {
     });
 }
 
-// ── Errors ──
 echo "\nerrors:\n";
 $badClient = new Railhook('not-a-real-key', $baseUrl);
 $expectError(
@@ -427,7 +387,6 @@ $expectError(
     }
 );
 
-// ── Signature verification against a signature the SERVER produced ──
 echo "\nsignature:\n";
 $dryRun = $client->post("/api/v1/projects/{$projectId}/transform-preview/delivery-dry-run", [
     'payload' => json_encode(['orderId' => 'ord_12345']),
@@ -435,8 +394,7 @@ $dryRun = $client->post("/api/v1/projects/{$projectId}/transform-preview/deliver
     'eventType' => 'order.completed',
 ]);
 $signature = $dryRun['signature'];
-// Signed over the *transformed* payload the endpoint would actually receive,
-// which is pretty-printed — not over what we sent in.
+// Signed over the transformed, pretty-printed payload, not over what we sent.
 $signedBody = $dryRun['transformedPayload'];
 
 $check('the server produces X-Signature as t=<unix-ms>,v1=<hex>', static function () use ($signature) {
@@ -460,7 +418,6 @@ $expectError(
     static fn (\Throwable $e) => eqv($e instanceof RailhookException ? $e->getErrorCode() : null, 'timestamp_expired', 'error code')
 );
 
-// ── Cleanup ──
 $client->subscriptions->delete($projectId, $subscription['id']);
 $client->endpoints->delete($projectId, $endpoint['id']);
 $client->incomingSources->delete($projectId, $source['id']);

@@ -1,45 +1,6 @@
 #!/usr/bin/env bash
-# Shared Postgres backup logic for Railhook.
-#
-# One script, two Compose callers:
-#   - `make backup-db`                          (Makefile, embedded or external DB)
-#   - the `db-backup` sidecar in docker-compose.yml (scheduled, embedded DB only)
-#
-# The Kubernetes path (deploy/helm/railhook/templates/db-backup-cronjob.yaml)
-# cannot `source` this file directly: Helm only packages files that live inside
-# the chart directory, and this script intentionally lives at the repo root so
-# the Makefile/Compose paths (which are NOT packaged/shipped) can use it without
-# duplicating it into the chart. Keep the pg_dump flags identical
-# (`-Fc --no-owner --no-privileges`) in both places if either one changes —
-# BackupFlagParityTest (`make ratchets`) fails the build if they diverge.
-#
-# Produces a custom-format (`-Fc`) dump, restorable with pg_restore / db-restore.sh.
-#
-# Modes (set DB_MODE):
-#   embedded  - pg_dump runs via `docker exec` against a local Postgres container
-#               (default container name: webhook-postgres). Used by `make backup-db`
-#               from the host.
-#   external  - pg_dump runs via a throwaway `postgres:16-alpine` container that
-#               connects out to DB_HOST:DB_PORT. No local pg_dump binary required.
-#               Used by `make backup-db DB_MODE=external` from the host.
-#   direct    - pg_dump runs in-process against DB_HOST:DB_PORT using whatever
-#               pg_dump binary is already on PATH. No docker socket, no docker
-#               CLI. Used by the `db-backup` Compose sidecar (its image is
-#               postgres:16-alpine, so pg_dump ships with the container — it
-#               reaches Postgres directly over the webhook-network, it does not
-#               need to control sibling containers).
-#
-# Env vars:
-#   DB_MODE                required: embedded | external | direct
-#   BACKUP_DIR              default: ./backups
-#   BACKUP_RETENTION_DAYS   default: 30 (0 disables pruning)
-#   POSTGRES_CONTAINER      embedded mode only, default: webhook-postgres
-#   POSTGRES_USER           embedded mode only, default: webhook_user
-#   POSTGRES_DB             embedded mode only, default: webhook_platform
-#   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD   external/direct modes (required)
-#   DOCKER_NETWORK          external mode, optional: attach the throwaway
-#                           dumper container to this docker network (needed if
-#                           DB_HOST is only resolvable on a compose network)
+# The chart's CronJob cannot source this file. Keep the pg_dump flags identical
+# (`-Fc --no-owner --no-privileges`) in both places. DB_MODE: embedded | external | direct.
 set -euo pipefail
 
 DB_MODE="${DB_MODE:-}"

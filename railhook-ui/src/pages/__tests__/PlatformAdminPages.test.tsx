@@ -157,10 +157,6 @@ describe('PlatformOverviewPage', () => {
 const LONG_EMAIL = 'olena.shulha.operations-escalations-team@railhook-enterprise-customers-europe.example.com';
 const LONG_ORG = 'Товариство з обмеженою відповідальністю «Київські цифрові платіжні сервіси та інтеграції»';
 
-/**
- * A long address is cut with an ellipsis, never broken mid-word, and the whole of it is one hover
- * away; a long name keeps its full text for the same reason.
- */
 function expectShortenedWithFullValue(element: HTMLElement, full: string) {
   expect(element).toHaveAttribute('title', full);
   expect(element).toHaveClass('truncate');

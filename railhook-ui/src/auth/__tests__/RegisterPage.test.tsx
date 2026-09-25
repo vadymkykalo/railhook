@@ -15,12 +15,6 @@ const USER = {
   role: 'OWNER',
 } as unknown as CurrentUserResponse;
 
-/**
- * The first thing anyone does with the product, and the only screen where a failure means the
- * person never becomes a user at all. The case worth guarding is the error path: the API
- * answers a rejected field with fieldErrors, and a version of this page that showed only the
- * generic summary told people "Invalid request parameters" and nothing they could act on.
- */
 describe('RegisterPage', () => {
   let login: Mock<AuthState['login']>;
 
@@ -154,8 +148,6 @@ describe('RegisterPage', () => {
   });
 
   it('says which password rule is still missing instead of a silently disabled button', async () => {
-    // Seen on production: a password with everything but a special character left the button
-    // disabled, the missing rule drawn as a faint grey cross, and the person with no idea why.
     const user = userEvent.setup();
     renderRegister();
     await user.type(screen.getByLabelText(/^password/i), 'Abcdefgh12');

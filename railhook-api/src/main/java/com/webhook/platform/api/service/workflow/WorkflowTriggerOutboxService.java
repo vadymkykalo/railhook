@@ -21,13 +21,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 
-/**
- * Polls {@code workflow_trigger_outbox} and executes workflow triggers durably.
- *
- * <p>Guarantees at-least-once execution: rows are written in the same transaction
- * as the event + deliveries, so a crash between commit and async trigger
- * no longer loses workflows.</p>
- */
+/** Written in the event's transaction, so a crash cannot lose a trigger. At least once. */
 @Service
 @Slf4j
 public class WorkflowTriggerOutboxService {
@@ -42,7 +36,6 @@ public class WorkflowTriggerOutboxService {
     private final int maxConcurrentPerProject;
     private final int stalledAfterMinutes;
 
-    /** One project's share of the shared executor pool, so it cannot take everybody else's. */
     private final ProjectConcurrencyLimiter projectConcurrency;
 
     public WorkflowTriggerOutboxService(
@@ -67,8 +60,8 @@ public class WorkflowTriggerOutboxService {
         this.projectConcurrency = new ProjectConcurrencyLimiter(maxConcurrentPerProject);
     }
 
-    // The first poll waits one interval too: with no initial delay it fired as the context came
-    // up, on whatever the scheduler thread got to first — including a row a test had just written.
+    // The first poll waits one interval too. Without it the poll fired during context startup and
+    // could pick up a row a test had just written.
     @SystemTenant
     @Scheduled(fixedDelayString = "${workflow.trigger-outbox.poll-interval-ms:2000}",
             initialDelayString = "${workflow.trigger-outbox.poll-interval-ms:2000}")
@@ -83,7 +76,6 @@ public class WorkflowTriggerOutboxService {
             UUID projectId = row.getProjectId();
 
             if (!projectConcurrency.tryAdmit(projectId)) {
-                // Project already at max concurrent workflows — defer to next poll
                 log.debug("Project {} at max concurrent workflows ({}), deferring outbox row: id={}",
                         projectId, maxConcurrentPerProject, row.getId());
                 deferToNextPoll(row);
@@ -107,17 +99,7 @@ public class WorkflowTriggerOutboxService {
         }
     }
 
-    /**
-     * Returns a row nobody has attempted yet to the queue.
-     *
-     * <p>Both callers are backpressure: the workflow pool would not take the task, or the
-     * project is already running as many workflows as it may. Neither is the workflow
-     * failing, so neither may spend its retry budget — {@code claimBatch} charges
-     * {@code attempts = attempts + 1} on every claim, and without giving that back a busy
-     * project burnt all {@code maxAttempts} on deferrals alone. The first genuine exception
-     * then found {@code attempts >= maxAttempts} and marked the row FAILED having never once
-     * run the workflow.</p>
-     */
+    // claimBatch charges an attempt; backpressure must give it back or deferrals use up maxAttempts.
     private void deferToNextPoll(WorkflowTriggerOutbox row) {
         row.setStatus(WorkflowTriggerOutboxStatus.PENDING);
         row.setAttempts(Math.max(0, row.getAttempts() - 1));
@@ -162,19 +144,7 @@ public class WorkflowTriggerOutboxService {
         }
     }
 
-    /**
-     * Recovers rows that were claimed and then abandoned.
-     *
-     * <p>A row goes PROCESSING the moment {@code claimBatch} hands it out, and returns to
-     * PENDING or DONE only if the poller that took it lived long enough to say so. A pod that
-     * dies mid-workflow — or, before the executor learnt to throw, a task the pool dropped
-     * without telling anyone — leaves the row PROCESSING with nothing in the system able to
-     * pick it up again: claimBatch reads PENDING, cleanup deletes DONE. The workflow is
-     * simply lost, and quietly.</p>
-     *
-     * <p>The threshold has to exceed the longest legitimate workflow run. Fifteen minutes is
-     * well past that and still short enough that a lost trigger recovers the same hour.</p>
-     */
+    // Nothing else picks up a row whose poller died. The threshold must exceed the longest run.
     @SystemTenant
     @Scheduled(fixedDelayString = "${workflow.trigger-outbox.stalled-sweep-ms:300000}",
             initialDelayString = "${workflow.trigger-outbox.stalled-sweep-ms:300000}")

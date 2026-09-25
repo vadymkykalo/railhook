@@ -2,7 +2,7 @@
 title: Schema registry
 description: Keep a versioned JSON Schema per event type, see what each version changed, and choose whether events that do not match are refused.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
 The schema registry holds a JSON Schema for each event type in a project. Uploading a version compares it with the one before and refuses changes that break the compatibility you promised. Turn validation on, and events are checked against the active version when they arrive, before they are stored.
 
@@ -63,11 +63,3 @@ Each version carries a compatibility mode, checked against the previous version 
 <Aside type="tip">
 The changes between versions are recorded. List them for one event type with `GET /api/v1/projects/{projectId}/schemas/{eventTypeId}/changes`, or for the whole project with `GET /api/v1/projects/{projectId}/schemas/changes`.
 </Aside>
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Endpoints and subscriptions" href="/docs/outgoing/endpoints-subscriptions/" description="Event type patterns and what a subscription matches." />
-  <LinkCard title="Errors and limits" href="/docs/platform/errors-limits/" description="What a rejected event looks like to the sender." />
-  <LinkCard title="API reference" href="/docs/api-reference/" description="Every schema registry request and response." />
-</CardGrid>

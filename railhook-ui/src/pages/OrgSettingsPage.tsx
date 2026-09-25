@@ -20,10 +20,6 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
 
-/**
- * The organization form. Everything a customer owns hangs off exactly one
- * Organization, so this page is where its name, its people and its ending live.
- */
 export default function OrgSettingsPage() {
   const { t } = useTranslation();
   const { user, updateUser } = useAuth();
@@ -87,8 +83,7 @@ export default function OrgSettingsPage() {
     );
   }
 
-  // The danger zone spells out what deleting costs from these two counts. A
-  // failed fetch would render that as "0 projects, 0 members" — an invitation.
+  // A failed fetch would read as "0 projects, 0 members" in the danger zone.
   if (membersFailed || projectsFailed) {
     return (
       <div className="p-4 lg:p-6">
@@ -168,7 +163,7 @@ export default function OrgSettingsPage() {
             </div>
             <Link
               to="/admin/members"
-              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm link-ink"
             >
               {t('orgSettings.manageMembers', { count: members.length })}
               <ArrowRight className="h-3.5 w-3.5" aria-hidden />
@@ -245,11 +240,6 @@ function GdprExportSection({ orgId }: { orgId: string }) {
   );
 }
 
-/**
- * The one action on this page that cannot be undone, kept away from the fields
- * that can. Confirmation runs through DangerConfirmDialog like every other
- * destructive action in the product, so the ritual is always the same one.
- */
 function DangerZone({
   orgId, orgName, projectCount, memberCount,
 }: {
@@ -277,7 +267,7 @@ function DangerZone({
   };
 
   return (
-    <section className="rounded-xl border border-halt/30 bg-halt-soft/50 p-5">
+    <section className="border border-halt/30 bg-halt-soft/50 p-5">
       <div className="flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-halt" aria-hidden />
         <h3 className="text-[15px] font-medium text-halt">{t('orgSettings.dangerZone')}</h3>

@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -33,11 +34,7 @@ public class AuditLogService {
     private static final String CSV_HEADER =
             "Time,Action,Resource Type,Resource ID,User,Status,Duration (ms),IP,Error";
 
-    /**
-     * The filters a caller may narrow the log by. Dates are inclusive whole days in UTC, and a date
-     * that does not parse is rejected rather than dropped: a silently ignored filter reads as an
-     * empty result nobody can explain.
-     */
+    // Inclusive whole UTC days. A bad date is rejected: a silently ignored filter confuses.
     public record Query(String action, String status, String resourceType, String from, String to) {
 
         Specification<AuditLog> asSpecification(UUID organizationId) {
@@ -74,7 +71,6 @@ public class AuditLogService {
         return raw.map(entry -> toResponse(entry, emails));
     }
 
-    /** Streams in batches: an organization's whole history does not fit in one page. */
     public void writeCsv(Query query, PrintWriter writer) {
         Specification<AuditLog> spec = query.asSpecification(TenantContext.require());
         writer.println(CSV_HEADER);
@@ -130,7 +126,7 @@ public class AuditLogService {
     private Map<UUID, String> resolveEmails(List<AuditLog> entries) {
         Set<UUID> userIds = entries.stream()
                 .map(AuditLog::getUserId)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         return userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, User::getEmail));

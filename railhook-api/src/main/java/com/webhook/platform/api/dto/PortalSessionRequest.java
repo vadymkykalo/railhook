@@ -9,18 +9,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Opening a portal session for one Consumer. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class PortalSessionRequest {
 
-    /**
-     * The only shapes an embedding page can have: an https origin, or plain http on the loopback
-     * host while the customer develops against it. A path, a query or any other scheme is not an
-     * origin, and would never match what the browser compares it with.
-     */
+    /** An https origin, or plain http on loopback for local development. No path. */
     public static final String ORIGIN_PATTERN =
             "^(https://[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*"
                     + "|http://(?:localhost|127\\.0\\.0\\.1))(?::[0-9]{1,5})?$";

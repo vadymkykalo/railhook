@@ -6,17 +6,7 @@ import com.webhook.platform.api.exception.ForbiddenException;
 
 import java.util.UUID;
 
-/**
- * Unified authentication context resolved from either JWT or API Key.
- * Controllers declare this as a method parameter — Spring resolves it
- * automatically via {@link AuthContextArgumentResolver}.
- *
- * <ul>
- *   <li>JWT auth → userId + organizationId + role from token, apiKeyProjectId = null, apiKeyScope = null</li>
- *   <li>API Key auth → userId = null, organizationId from project lookup, role = API_KEY,
- *       apiKeyProjectId = key's project, apiKeyScope = key's scope</li>
- * </ul>
- */
+/** For an API key, userId is null and apiKeyProjectId and apiKeyScope are set; for a JWT, the reverse. */
 public record AuthContext(
         UUID userId,
         UUID organizationId,
@@ -33,10 +23,7 @@ public record AuthContext(
         RbacUtil.requireOwnerAccess(role);
     }
 
-    /**
-     * For API Key auth: validates that the requested projectId matches the key's project.
-     * For JWT auth: no-op (org-level validation happens in the service layer).
-     */
+    /** A no-op for a JWT, which is scoped by organization membership instead. */
     public void validateProjectAccess(UUID requestedProjectId) {
         if (apiKeyProjectId != null && !apiKeyProjectId.equals(requestedProjectId)) {
             throw new ForbiddenException("API key does not have access to this project");
@@ -47,10 +34,6 @@ public record AuthContext(
         return role == MembershipRole.API_KEY;
     }
 
-    /**
-     * Returns userId or throws if this is an API Key context (userId is null).
-     * Use in endpoints that require a real user identity (e.g. org membership, profile).
-     */
     public UUID requireUserId() {
         if (userId == null) {
             throw new ForbiddenException("This operation requires user authentication (JWT). API keys are not supported.");
@@ -58,11 +41,6 @@ public record AuthContext(
         return userId;
     }
 
-    /**
-     * Ensures the request is authenticated via JWT (not an API key).
-     * Use on org-level endpoints that should never be accessible by project-scoped API keys
-     * (e.g. billing, audit log, member management).
-     */
     public void requireJwt() {
         if (isApiKey()) {
             throw new ForbiddenException("This endpoint requires user authentication (JWT). API keys are not permitted.");

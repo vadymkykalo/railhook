@@ -19,14 +19,7 @@ public class Endpoint {
     @Id
     private UUID id;
 
-    /**
-     * Tenant discriminator, mapped but not enforced here: the api filters on this column via
-     * {@code @TenantId}, the worker deliberately does not — it has no {@code AuthContext} and
-     * every consumer is a system path. It is mapped rather than ignored because the attempt
-     * stores have to carry the tenant across from the parent row, and because
-     * {@code EntityMappingParityIntegrationTest} requires both modules to map every column of a
-     * shared table.
-     */
+    /** Not tenant-filtered here: the worker has no request tenant. Mapped so attempt rows can copy it. */
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
 
@@ -43,10 +36,7 @@ public class Endpoint {
     @Column(name = "secret_iv", nullable = false, columnDefinition = "TEXT")
     private String secretIv;
 
-    /*
-     * The rotation grace window. While now() is inside secretRotatedAt plus the grace period,
-     * the store signs with both secrets so a receiver still holding the old one keeps verifying.
-     */
+    // During the rotation grace window both secrets sign, so receivers with the old one still verify.
     @Column(name = "secret_previous_encrypted", columnDefinition = "TEXT")
     private String secretPreviousEncrypted;
 
@@ -66,11 +56,7 @@ public class Endpoint {
     @Column(name = "rate_limit_per_second")
     private Integer rateLimitPerSecond;
 
-    /**
-     * The current unbroken run of failed Attempts. The worker owns these two: it is the only
-     * thing that knows how an Attempt ended, and it writes them at the shared attempt seam
-     * ({@code AttemptStore#recordTargetOutcome}). The api reads them and decides.
-     */
+    /** The current run of failed Attempts. Written by the worker, read by the api to auto-disable. */
     @Column(name = "failing_since")
     private Instant failingSince;
 
@@ -78,19 +64,14 @@ public class Endpoint {
     @Column(name = "consecutive_failures", nullable = false)
     private Integer consecutiveFailures = 0;
 
-    /**
-     * Set when Railhook turned this endpoint off for continuous failure, and null when its
-     * owner did. The store reads it to decide what happens to Deliveries already queued: an
-     * endpoint its owner turned off fails them, an auto-disabled one hands them to the DLQ,
-     * where a person can retry them once the receiver is fixed.
-     */
+    /** Null when the owner disabled it. Decides whether queued Deliveries fail or go to the DLQ. */
     @Column(name = "auto_disabled_at")
     private Instant autoDisabledAt;
 
     @Column(name = "auto_disabled_reason", columnDefinition = "TEXT")
     private String autoDisabledReason;
 
-    /** {@code BOTH} by default, so neither an old nor a new receiver has to know about the other. */
+    /** {@code BOTH} by default, so old and new receivers both verify. */
     @Enumerated(EnumType.STRING)
     @Column(name = "signature_scheme", nullable = false, length = 20)
     @Builder.Default
@@ -125,10 +106,7 @@ public class Endpoint {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
-    /**
-     * Soft-delete marker; {@code enabled} is left alone. Unmapped here, the worker went on
-     * delivering queued events to a deleted endpoint for the whole retry ladder.
-     */
+    /** Soft delete leaves {@code enabled} alone, so this must be checked separately. */
     @Column(name = "deleted_at")
     private Instant deletedAt;
 

@@ -4,12 +4,6 @@ import { screen } from '@testing-library/react';
 import NotFoundPage from '../NotFoundPage';
 import { renderPage } from '../../test/renderPage';
 
-/**
- * This page decided where to send you by reading localStorage['auth_token'] — a key nothing
- * in the codebase writes. The session is auth_user plus a token held in memory, so the check
- * was always false, and a signed-in user who mistyped a path inside the dashboard was offered
- * the marketing site as the way back.
- */
 describe('NotFoundPage', () => {
   function renderAt(entry: string, auth?: { isAuthenticated: boolean }) {
     return renderPage(<NotFoundPage />, { path: '*', initialEntry: entry, auth });

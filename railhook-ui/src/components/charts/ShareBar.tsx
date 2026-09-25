@@ -5,19 +5,10 @@ export interface ShareSegment {
   key: string;
   label: string;
   value: number;
-  /** Only ever a status token here: every segment of this bar *is* an outcome. */
   token: Extract<SeriesToken, 'ok' | 'retry' | 'halt' | 'idle'>;
 }
 
-/**
- * Part-to-whole for one total, as a single stacked bar rather than four
- * unrelated progress bars each against its own maximum — which is what the
- * page used to draw, and made 88 abandoned deliveries look like the same
- * quantity as 182,710 delivered ones.
- *
- * Segments are separated by a 2px gap in the surface colour, never by a stroke
- * around each fill, and a non-zero segment never rounds away to nothing.
- */
+/** A single stacked bar: separate bars made 88 abandoned look like 182,710 delivered. */
 export default function ShareBar({
   segments, total, className,
 }: {
@@ -29,11 +20,11 @@ export default function ShareBar({
 
   return (
     <div className={cn('space-y-3', className)}>
-      <div className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-muted" role="presentation">
+      <div className="flex h-2.5 w-full gap-0.5 overflow-hidden bg-muted" role="presentation">
         {present.map((segment) => (
           <span
             key={segment.key}
-            className="h-full rounded-full first:rounded-l-full last:rounded-r-full"
+            className="h-full"
             style={{
               backgroundColor: SERIES[segment.token],
               width: `${Math.max(share(segment.value, total), 0.75)}%`,
@@ -48,14 +39,14 @@ export default function ShareBar({
             <span className="flex min-w-0 items-center gap-2">
               <span
                 aria-hidden
-                className="h-2 w-2 flex-shrink-0 rounded-sm"
+                className="h-2 w-2 flex-shrink-0"
                 style={{ backgroundColor: SERIES[segment.token] }}
               />
               <span className="truncate text-muted-foreground">{segment.label}</span>
             </span>
             <span className="flex-shrink-0 font-mono text-[13px] tabular-nums">
               {formatCompact(segment.value)}
-              {/* A real separator, not only a margin: read as text, "1" and "50%" became "150%". */}
+              {/* A real separator: read as text, "1" and "50%" became "150%". */}
               <span className="text-muted-foreground"> · {formatRate(share(segment.value, total))}%</span>
             </span>
           </li>

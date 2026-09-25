@@ -68,14 +68,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
-/**
- * A Project the api has deleted, or an Organization an operator has suspended, sends nothing —
- * including for Deliveries and Forwards already queued or partway through their Ladder.
- *
- * <p>Against the api's real migrations rather than a schema Hibernate derives from the worker's
- * entities: the worker keeps no entity for {@code projects}, {@code organizations} or
- * {@code incoming_sources}, so a derived schema would not contain what is being read.
- */
+// Real migrations: the worker has no entity for projects, organizations or incoming_sources.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -164,8 +157,6 @@ class ProjectStatusAttemptIntegrationTest {
         server.stop(0);
     }
 
-    // ── Outgoing ────────────────────────────────────────────────────────────────────────
-
     @Test
     void aDeliveryOfAnActiveProjectIsSent() {
         UUID org = organization();
@@ -213,11 +204,9 @@ class ProjectStatusAttemptIntegrationTest {
         assertThat(deferred.getNextRetryAt()).isAfter(Instant.now().plusSeconds(60));
 
         jdbc.update("UPDATE organizations SET suspended_at = NULL, suspension_reason = NULL WHERE id = ?", org);
-        // The recheck comes due. Before it, a copy of the dispatch message claims nothing: the
-        // Delivery is waiting on its next_retry_at, which the RetryGovernor hands out.
+        // Before the recheck, a copy of the dispatch message claims nothing.
         assertThat(runDelivery(delivery).getAttemptCount()).isZero();
-        // Through the entity, the way the application writes it: the column has no time zone,
-        // so the database's own now() is not the clock the claim compares against.
+        // The column has no time zone, so write through the entity, not the database's now().
         new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
             Delivery row = deliveryRepository.findById(delivery).orElseThrow();
             row.setNextRetryAt(Instant.now().minusSeconds(1));
@@ -229,8 +218,6 @@ class ProjectStatusAttemptIntegrationTest {
         assertThat(resumed.getStatus()).isEqualTo(Delivery.DeliveryStatus.SUCCESS);
         assertThat(resumed.getAttemptCount()).isEqualTo(1);
     }
-
-    // ── Incoming ────────────────────────────────────────────────────────────────────────
 
     @Test
     void aForwardOfAnActiveProjectIsSent() {
@@ -277,8 +264,6 @@ class ProjectStatusAttemptIntegrationTest {
         assertThat(resumed.getStatus()).isEqualTo(ForwardAttemptStatus.SUCCESS);
         assertThat(resumed.getAttemptNumber()).isEqualTo(1);
     }
-
-    // ── fixtures ────────────────────────────────────────────────────────────────────────
 
     private UUID organization() {
         UUID id = UUID.randomUUID();
@@ -346,7 +331,6 @@ class ProjectStatusAttemptIntegrationTest {
         return id;
     }
 
-    /** A Forward's first Attempt, PENDING; returns the attempt row's id. */
     private UUID pendingForward(UUID organizationId, UUID sourceId) {
         IncomingEvent event = incomingEventRepository.save(IncomingEvent.builder()
                 .id(UUID.randomUUID())
@@ -444,9 +428,7 @@ class ProjectStatusAttemptIntegrationTest {
         }
     }
 
-    /**
-     * Built lazily inside itself, so a test that never runs a script never brings GraalJS up.
-     */
+    // Built lazily so a test that never runs a script never starts GraalJS.
     private static com.webhook.platform.common.transform.JavaScriptTransformEngine scriptEngine() {
         return new com.webhook.platform.common.transform.JavaScriptTransformEngine(
                 new ObjectMapper(), com.webhook.platform.common.transform.ScriptLimits.defaults());

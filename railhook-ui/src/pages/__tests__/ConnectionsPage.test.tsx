@@ -114,10 +114,7 @@ describe('ConnectionsPage — signature scheme', () => {
   });
 
   it('still opens the setup flow from "New connection" after the dialog moved out of this page', async () => {
-    // The dialog chrome now lives in ConnectionSetupDialog so the dashboard can
-    // open the same flow. This guards the extraction, and in particular the
-    // `open &&` mount guard: without it the flow keeps the previous attempt's
-    // step, endpoint id and secret.
+    // Guards the `open &&` mount guard: without it the flow keeps the previous attempt's state.
     arrange();
     const user = userEvent.setup();
     renderConnections();

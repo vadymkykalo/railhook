@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Duration;
@@ -17,13 +18,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Covers the retry-ladder arithmetic and, more importantly, the refusal to guess.
- *
- * <p>Replaces the ladder half of the worker's {@code RetryPolicyTest}, which asserted the
- * opposite contract: that a malformed ladder falls back to a hardcoded array. That fallback
- * is the behaviour this type exists to remove.
- */
 class RetryLadderTest {
 
     @Nested
@@ -39,22 +33,11 @@ class RetryLadderTest {
         }
 
         @ParameterizedTest
-        @ValueSource(strings = { "", "   ", "abc", "10,notanumber,30", "10,,30", "10,20,", "1.5,2" })
-        @DisplayName("a malformed ladder throws instead of substituting a default")
+        @ValueSource(strings = { "", "   ", "abc", "10,notanumber,30", "10,,30", "10,20,", "1.5,2",
+                "0", "-60", "60,0,900", "60,-1" })
+        @NullSource
+        @DisplayName("a malformed, null or non-positive ladder throws instead of substituting a default")
         void malformedThrows(String delays) {
-            assertThrows(IllegalArgumentException.class, () -> RetryLadder.parse(delays, 3));
-        }
-
-        @Test
-        @DisplayName("null throws — the row always carries a ladder, so null is a bug not a default")
-        void nullThrows() {
-            assertThrows(IllegalArgumentException.class, () -> RetryLadder.parse(null, 3));
-        }
-
-        @ParameterizedTest
-        @ValueSource(strings = { "0", "-60", "60,0,900", "60,-1" })
-        @DisplayName("a non-positive tier throws")
-        void nonPositiveTierThrows(String delays) {
             assertThrows(IllegalArgumentException.class, () -> RetryLadder.parse(delays, 3));
         }
 
@@ -169,15 +152,10 @@ class RetryLadderTest {
         }
 
         @Test
-        @DisplayName("the shipped outgoing ladder fits inside the shipped 96h cap")
-        void outgoingFitsShippedCap() {
+        @DisplayName("both shipped ladders fit inside the shipped 96h cap")
+        void shippedLaddersFitShippedCap() {
             assertDoesNotThrow(() -> RetryLadderDefaults.outgoing()
                     .requireFitsWithin(Duration.ofHours(96).getSeconds(), "outgoing", "cap"));
-        }
-
-        @Test
-        @DisplayName("the shipped incoming ladder fits too")
-        void incomingFitsShippedCap() {
             assertDoesNotThrow(() -> RetryLadderDefaults.incoming()
                     .requireFitsWithin(Duration.ofHours(96).getSeconds(), "incoming", "cap"));
         }

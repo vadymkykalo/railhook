@@ -9,16 +9,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * The addresses of the people who run this deployment ({@code PLATFORM_ADMIN_EMAILS}).
- *
- * <p>Membership in this list is necessary and never sufficient: {@link
- * com.webhook.platform.api.service.PlatformAdminAccessService} also demands a verified address,
- * an active account and a recent sign-in. Kept as its own type so "is this address listed" has
- * one answer — exact, case-insensitive, whitespace-trimmed — and nothing does a {@code contains}
- * on the raw string, where {@code ops@example.com} would match {@code xops@example.com}.
- *
- * <p>Empty by default, and empty means nobody: a self-hosted install gets no panel until its
- * operator names themselves.
+ * Necessary, never sufficient: access also needs a verified address, an active account and a
+ * recent sign-in. Matching is exact, so {@code ops@example.com} never matches
+ * {@code xops@example.com}. Empty means nobody.
  */
 @Component
 public class PlatformAdminEmails {

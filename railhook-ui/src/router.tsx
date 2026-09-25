@@ -7,7 +7,6 @@ import ProtectedRoute from './auth/ProtectedRoute';
 import RouteErrorScreen from './components/RouteErrorScreen';
 import { publicBlogEnabled } from './lib/runtimeConfig';
 
-// Lazy-loaded pages — each becomes its own chunk
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const LoginPage = lazy(() => import('./auth/LoginPage'));
 const RegisterPage = lazy(() => import('./auth/RegisterPage'));
@@ -27,7 +26,6 @@ const DemoPage = lazy(() => import('./pages/DemoPage'));
 const SignatureVerifierPage = lazy(() => import('./pages/SignatureVerifierPage'));
 const SecurityPage = lazy(() => import('./pages/SecurityPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
-const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
 const BlogPage = lazy(() => import('./pages/BlogPage'));
 const BlogPostPage = lazy(() => import('./pages/BlogPostPage'));
 const PrivacyPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.PrivacyPage })));
@@ -92,11 +90,7 @@ function S({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
 
-/**
- * The blog is railhook.io's own content, off unless the deployment turns it on (BLOG_ENABLED).
- * Off, nginx already answers 404 for /blog; this renders the same not-found page when the app
- * gets there without asking nginx — a client-side navigation.
- */
+/** Covers client-side navigation; with the blog off nginx already answers 404 for /blog. */
 function BlogOnly({ children }: { children: React.ReactNode }) {
   return publicBlogEnabled() ? children : <NotFoundPage />;
 }
@@ -139,17 +133,10 @@ export const router = createBrowserRouter([
             element: <S><AboutPage /></S>,
           },
           {
-            path: '/changelog',
-            element: <S><ChangelogPage /></S>,
-          },
-          {
             path: '/blog',
             element: <S><BlogOnly><BlogPage /></BlogOnly></S>,
           },
-          /* One route for every post. The slugs are the directories under
-             src/content/blog/, which scripts/public-routes.mjs enumerates for the sitemap and
-             the prerender; an unknown slug renders the post's not-found state, and nginx has
-             already answered 404 for it. */
+          /* Slugs are the directories under src/content/blog/, enumerated by scripts/public-routes.mjs. */
           {
             path: '/blog/:slug',
             element: <S><BlogOnly><BlogPostPage /></BlogOnly></S>,
@@ -180,8 +167,7 @@ export const router = createBrowserRouter([
         path: '/verify-email',
         element: <S><VerifyEmailPage /></S>,
       },
-      /* The two links an email change mails: confirm from the new address, "this wasn't me" from
-         the old one. Public, because either can be opened with no session. */
+      /* Public: either email-change link can be opened with no session. */
       {
         path: '/confirm-email-change',
         element: <S><ConfirmEmailChangePage /></S>,
@@ -206,34 +192,21 @@ export const router = createBrowserRouter([
         path: '/device',
         element: <S><DeviceApprovePage /></S>,
       },
-      /* The customer portal: what a customer embeds for their own user. No Railhook session and no
-         layout — its one credential is the portal session token in the URL's fragment. nginx
-         serves it under a location of its own, the one route here another site may frame. */
+      /* The only route another site may frame; its credential is the token in the URL fragment. */
       {
         path: '/portal',
         element: <S><PortalPage /></S>,
       },
-      /* Where an MCP app (claude.ai, ChatGPT) sends a person to connect Railhook. The API's
-         /oauth/authorize parks the request and redirects here; signed out, the page goes through
-         /login and back. */
       {
         path: '/oauth/consent',
         element: <S><OAuthConsentPage /></S>,
       },
-      /* Where the API sends the browser after "Continue with Google", with a one-time code to trade
-         for a session. */
       {
         path: '/auth/callback',
         element: <S><AuthCallbackPage /></S>,
       },
-      /* No /docs route: the docs are a separate static site (railhook-docs/) that nginx
-         serves at /docs/ from this same image, so a link to them is a full page load,
-         never a router navigation. */
-      /* No child route below states a role. `/admin` requires a session, and what
-         each destination requires beyond that is declared once in nav.config's
-         `requiredRoleFor` — which AppLayout applies around the outlet, and which the
-         sidebar and tab strip filter from. Two hand-kept lists is how the personal
-         profile page came to be shown to everyone and guarded at OWNER. */
+      /* No /docs route: nginx serves the separate docs site, so a link to it is a full page load. */
+      /* Roles are declared once in nav.config's requiredRoleFor, never per route: two lists drifted before. */
       {
         path: '/admin',
         element: (
@@ -255,7 +228,6 @@ export const router = createBrowserRouter([
             element: <S><ProjectsPage /></S>,
           },
           {
-            // A section opened before the organization has a project: say what it is for and make one.
             path: 'start/:segment',
             element: <S><ProjectSetupPage /></S>,
           },
@@ -403,9 +375,7 @@ export const router = createBrowserRouter([
             path: 'billing',
             element: <S><BillingPage /></S>,
           },
-          /* The platform admin panel: for the people who run the deployment, not an organization
-             role. The gate reads `platformAdmin` from /auth/me; the API checks it again, with the
-             sign-in's age, on every request. */
+          /* The API re-checks platformAdmin, with the sign-in's age, on every request. */
           {
             path: 'platform',
             element: <S><PlatformAdminGate><PlatformOverviewPage /></PlatformAdminGate></S>,

@@ -51,16 +51,7 @@ public class TransformationService {
     private final ObjectMapper objectMapper;
     private final JavaScriptTransformEngine scriptEngine;
 
-    /**
-     * How many published templates one transformation keeps.
-     *
-     * <p>Capped rather than unbounded: a template is up to 64 KB, an edit is one click, and a
-     * person tuning a mapping makes dozens of them in an afternoon — history that only ever grows
-     * is a slow leak in a table nothing else prunes. Capped at fifty rather than at five because
-     * the cap has to be past the point where anyone would still scroll: what a rollback reaches
-     * for is one of the last few, and fifty of them is under 3 MB in the worst case. The oldest
-     * fall off first, and the current version can never be among them.
-     */
+    /** Templates are up to 64 KB and nothing else prunes this table. Fifty is under 3 MB. */
     private final int versionHistoryLimit;
 
     public TransformationService(TransformationRepository transformationRepository,
@@ -82,36 +73,20 @@ public class TransformationService {
         this.jsonDiffCalculator = jsonDiffCalculator;
         this.objectMapper = objectMapper;
         this.scriptEngine = scriptEngine;
-        // Floored at one: a zero or negative cap would trim the version the transformation is
-        // currently using, and a misconfigured number must not be able to delete live data.
+        // A zero or negative cap would trim the version currently in use.
         this.versionHistoryLimit = Math.max(1, versionHistoryLimit);
     }
 
-    // `[^{}]` rather than `[^}]`: with no closing brace, the old class rescanned to the end of the
-    // template from every `${`, which is quadratic on a template of repeated "${{" (CodeQL
+    // [^{}] rather than [^}]: the latter is quadratic on repeated "${{" (CodeQL
     // java/polynomial-redos). A JSONPath expression never contains a brace.
     private static final Pattern EXPRESSION_PATTERN = Pattern.compile("\\$\\{([^{}]*)\\}");
 
-    /**
-     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
-     * lookup only sees projects inside the caller's organization: a foreign project id is
-     * indistinguishable from a missing one, which is intended.
-     */
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
     }
 
-    /**
-     * Refuses a transformation the author cannot have meant, at the one moment they are looking
-     * at it.
-     *
-     * <p>Both languages are checked here and for the same reason: whatever is wrong is wrong once
-     * per attempt, for every event, forever, and the author is the only person who can fix it. A
-     * script is compiled and its {@code handler} is looked for; its top level runs, inside the
-     * same sandbox and under the same limits a real Delivery gets, so a script that loops while
-     * defining itself is refused here rather than on a worker.
-     */
+    // A broken source would fail every attempt of every event, so it is refused here, in the same sandbox.
     private void validateSource(TransformationKind kind, String source) {
         if (kind == TransformationKind.JAVASCRIPT) {
             validateScript(source);
@@ -141,7 +116,6 @@ public class TransformationService {
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid template: not valid JSON - " + e.getMessage());
         }
-        // Validate ${...} expressions — each must start with $.
         Matcher matcher = EXPRESSION_PATTERN.matcher(template);
         while (matcher.find()) {
             String expr = matcher.group(1).trim();
@@ -151,11 +125,7 @@ public class TransformationService {
             if (!expr.startsWith("$")) {
                 throw new IllegalArgumentException("Invalid template: expression '" + expr + "' must start with '$' (JSONPath)");
             }
-            // Compiled, not merely prefix-checked. "$" plus nonsense used to pass here and
-            // fail at delivery time, once per attempt, for every event — and before the worker
-            // was taught to fail loudly it did not even do that: it substituted a JSON null and
-            // delivered a body full of holes. The author is the only person who can fix a typo
-            // in their own path, and this is the one moment they are looking at it.
+            // Compiled, not prefix-checked: "$" plus nonsense used to fail every delivery instead.
             try {
                 JsonPath.compile(expr);
             } catch (Exception e) {
@@ -199,7 +169,6 @@ public class TransformationService {
         return mapToResponse(transformation);
     }
 
-    /** Another project's transformation is "not found", like a missing one - the URL names the project. */
     private Transformation requireTransformation(UUID projectId, UUID id) {
         return transformationRepository.findByIdAndProjectId(id, projectId)
                 .orElseThrow(() -> new NotFoundException("Transformation not found"));
@@ -239,14 +208,7 @@ public class TransformationService {
         if (request.getDescription() != null) {
             transformation.setDescription(request.getDescription());
         }
-        // The template is required by the request DTO, so the edit form sends the whole thing back
-        // whether or not it was touched: renaming a transformation and rewriting its mapping arrive
-        // here as the same call. The counter used to go up for both, which — now that the counter
-        // has a history behind it — would fill that history with identical entries nobody made.
-        //
-        // The language counts as part of the template for all of this. The same text validated
-        // as a script and as a template gives different answers, and an edit that only switches
-        // the language is as much a new published version as one that rewrites the text.
+        // A rename also sends the template, so only a real change publishes a new version.
         TransformationKind kind = request.getKind() != null
                 ? request.getKind() : transformation.getKind();
         boolean templateChanged = (request.getTemplate() != null
@@ -287,14 +249,11 @@ public class TransformationService {
             throw new ConflictException("Cannot delete transformation: it is referenced by " + String.join(" and ", refs));
         }
 
-        // The history goes with it: transformation_versions cascades from transformations.
+        // transformation_versions cascades from transformations.
         transformationRepository.delete(transformation);
         log.info("Deleted transformation: id={}", id);
     }
 
-    // ── Version history ──────────────────────────────────────────────
-
-    /** Every template this transformation has published, newest first. */
     @Transactional(readOnly = true)
     public List<TransformationVersionResponse> listVersions(UUID projectId, UUID id) {
         Transformation transformation = requireTransformation(projectId, id);
@@ -306,7 +265,6 @@ public class TransformationService {
                 .collect(Collectors.toList());
     }
 
-    /** One published template, whole. */
     @Transactional(readOnly = true)
     public TransformationVersionResponse getVersion(UUID projectId, UUID id, int version) {
         Transformation transformation = requireTransformation(projectId, id);
@@ -314,7 +272,6 @@ public class TransformationService {
         return mapVersion(stored, transformation, resolveAuthorEmails(List.of(stored)), true);
     }
 
-    /** What changed between two published templates. */
     @Transactional(readOnly = true)
     public TransformationVersionDiffResponse diffVersions(UUID projectId, UUID id, int left, int right) {
         requireTransformation(projectId, id);
@@ -331,24 +288,14 @@ public class TransformationService {
                 .rightTemplate(rightVersion.getTemplate())
                 .leftKind(leftVersion.getKind())
                 .rightKind(rightVersion.getKind())
-                // A field-by-field diff is a thing you can do to two JSON documents and not to
-                // two scripts. Rather than hand back nonsense — every line of a script reads as
-                // one unparseable "field" — a script version carries no field diff and the UI
-                // diffs the two texts, which is what a person reading a script wants anyway.
+                // A field diff makes no sense for scripts; the UI diffs the two texts instead.
                 .diffs(isScript(leftVersion) || isScript(rightVersion)
                         ? List.of()
                         : jsonDiffCalculator.diff(leftVersion.getTemplate(), rightVersion.getTemplate()))
                 .build();
     }
 
-    /**
-     * Puts an earlier template back by publishing it again.
-     *
-     * <p>The history is not rewound: the versions published after the one being restored stay
-     * exactly where they are, and the restored template becomes the next version, marked with the
-     * one it came from. Rewinding — deleting the versions after it — would make the record of what
-     * was live at any past moment disagree with what actually was.
-     */
+    // Republishes as the next version rather than rewinding history.
     @Auditable(action = AuditAction.RESTORE, resourceType = "Transformation")
     @Transactional
     public TransformationResponse restoreVersion(UUID projectId, UUID id, int version, UUID actorUserId) {
@@ -361,9 +308,7 @@ public class TransformationService {
         }
 
         transformation.setTemplate(source.getTemplate());
-        // The language goes back with the text. Without this, restoring a template published
-        // before the transformation was rewritten as a script would put JSON back into a row
-        // still marked JAVASCRIPT — and the next delivery would fail to compile it.
+        // Otherwise restored JSON could sit in a row still marked JAVASCRIPT and fail to compile.
         transformation.setKind(source.getKind());
         transformation.setVersion(transformation.getVersion() + 1);
         transformation = transformationRepository.saveAndFlush(transformation);
@@ -384,11 +329,6 @@ public class TransformationService {
                         "Version " + version + " not found for this transformation"));
     }
 
-    /**
-     * Writes the transformation's current template into its history, then trims the history back
-     * to {@link #versionHistoryLimit}. Called only where the template actually changed, so a row
-     * here always stands for an edit somebody made.
-     */
     private void publishVersion(Transformation transformation, Integer restoredFromVersion, UUID actorUserId) {
         transformationVersionRepository.saveAndFlush(TransformationVersion.builder()
                 .transformationId(transformation.getId())
@@ -402,9 +342,7 @@ public class TransformationService {
         List<Integer> published =
                 transformationVersionRepository.findVersionNumbersDesc(transformation.getId());
         if (published.size() > versionHistoryLimit) {
-            // The oldest version still kept. Expressed as a cut rather than as "drop the last
-            // one", because a cap lowered in configuration has to bring the history down to the
-            // new number on the next publish rather than one row per edit forever.
+            // A cut rather than "drop the last one", so a lowered cap takes effect on the next publish.
             Integer oldestKept = published.get(versionHistoryLimit - 1);
             List<TransformationVersion> expired = transformationVersionRepository
                     .findByTransformationIdAndVersionLessThan(transformation.getId(), oldestKept);
@@ -433,8 +371,7 @@ public class TransformationService {
                 .id(version.getId())
                 .transformationId(version.getTransformationId())
                 .version(version.getVersion())
-                // The list is an index: a project with fifty 64 KB templates in one history would
-                // otherwise be a 3 MB response nobody reads.
+                // Fifty 64 KB templates would make the list a 3 MB response.
                 .template(includeTemplate ? version.getTemplate() : null)
                 .kind(version.getKind())
                 .current(Objects.equals(transformation.getVersion(), version.getVersion()))

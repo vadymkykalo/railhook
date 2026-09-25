@@ -8,12 +8,7 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * One abandoned Forward. The Incoming counterpart of {@link DlqItemResponse}: a Destination
- * where that names an Endpoint, an Incoming Event where that names an Event, and the Attempt
- * row's own id as the handle, because Incoming keeps one row per Attempt rather than one row
- * per obligation.
- */
+/** The id is the Attempt row's, because Incoming keeps one row per Attempt, not per Forward. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

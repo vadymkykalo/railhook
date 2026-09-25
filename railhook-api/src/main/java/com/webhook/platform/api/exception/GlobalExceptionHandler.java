@@ -141,9 +141,8 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * A unique or foreign-key constraint the service's own pre-check did not catch, almost always
-     * two requests racing to create the same name. The message names the constraint and carries
-     * the SQL, so it stays in the log.
+     * Usually two requests racing past the service's pre-check. The message carries the SQL, so
+     * it stays in the log.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
@@ -157,7 +156,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
-    /** {@code ?sort=} naming a property the entity does not have. */
     @ExceptionHandler(PropertyReferenceException.class)
     public ResponseEntity<ErrorResponse> handlePropertyReference(
             PropertyReferenceException ex, WebRequest request) {
@@ -170,26 +168,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
-    /**
-     * A URL the SSRF validator rejected is the caller's mistake, not ours.
-     *
-     * InvalidUrlException is a RuntimeException, so without this it fell to the
-     * catch-all below and came back as 500 "An unexpected error occurred".
-     * EndpointService validates on create and on update without catching (only
-     * testEndpoint catches), so anyone who typed a host that does not resolve
-     * was told the server had broken, with nothing naming the URL.
-     */
-    /**
-     * A path that matches no handler is a 404, not a server error.
-     *
-     * Spring raises NoResourceFoundException for an unmapped path, and with no
-     * handler for it that fell to the catch-all below — so *every* unknown URL
-     * on this port answered 500 "An unexpected error occurred". The symptom
-     * that surfaced it was GET /actuator/health returning 500: actuator binds
-     * to the management port, so on 8080 the path simply matches nothing.
-     * Anything probing this service for liveness reads a 500 and concludes the
-     * API is broken.
-     */
+    /** Actuator lives on the management port, so /actuator/health on this port lands here. */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleNoResourceFound(
             NoResourceFoundException ex, WebRequest request) {
@@ -202,14 +181,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
-    /**
-     * The rest of the family the NoResourceFoundException handler above belongs
-     * to: requests Spring rejects before any controller sees them. Left to the
-     * catch-all RuntimeException handler they all came back as 500, which tells
-     * the caller the server is broken and — for anything with a retry policy,
-     * including this platform's own ladder — tells it to try again. A malformed
-     * request will be just as malformed the second time.
-     */
+    /** Requests Spring rejects before a controller must not fall to the 500 catch-all, or clients retry them. */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleMethodNotSupported(
             HttpRequestMethodNotSupportedException ex, WebRequest request) {
@@ -220,8 +192,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.METHOD_NOT_ALLOWED.value()
         );
         ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
-        // Saying which methods are allowed is what makes the 405 actionable, and
-        // it is required of a 405 response by RFC 9110.
+        // RFC 9110 requires Allow on a 405.
         Set<HttpMethod> allowed = ex.getSupportedHttpMethods();
         if (allowed != null && !allowed.isEmpty()) {
             response.allow(allowed.toArray(new HttpMethod[0]));
@@ -232,9 +203,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadableBody(
             HttpMessageNotReadableException ex, WebRequest request) {
-        // Deliberately not echoing ex.getMessage(): Jackson puts a fragment of
-        // the offending payload in it, and this endpoint family carries
-        // credentials and customer payloads.
+        // Not ex.getMessage(): Jackson quotes part of the payload, which can hold credentials.
         log.debug("Unreadable request body: {}", ex.getMostSpecificCause().getClass().getSimpleName());
         ErrorResponse error = new ErrorResponse(
                 "malformed_request",

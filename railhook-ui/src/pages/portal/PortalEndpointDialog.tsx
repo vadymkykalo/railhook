@@ -11,7 +11,6 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../../components/ui/dialog';
 
-/** Everything, whatever the project sends now or later. */
 export const ALL_EVENT_TYPES = '**';
 
 /** The API's own rule for an event type, wildcards included. */
@@ -20,9 +19,7 @@ const EVENT_TYPE_PATTERN = /^(\*{1,2}|[a-z][a-z0-9_]*)(\.([a-z][a-z0-9_]*|\*{1,2
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** What the session says this project sends. */
   eventTypes: string[];
-  /** Present when editing; absent when registering a new endpoint. */
   endpoint?: PortalEndpointResponse;
   saving: boolean;
   onSubmit: (data: PortalEndpointRequest) => void;
@@ -109,7 +106,7 @@ export default function PortalEndpointDialog({ open, onOpenChange, eventTypes, e
             </div>
 
             {endpoint && (
-              <div className="flex items-center justify-between rounded-md border border-rail p-3">
+              <div className="flex items-center justify-between border border-rail p-3">
                 <Label htmlFor="portal-endpoint-enabled">{t('portal.endpointDialog.enabled')}</Label>
                 <Switch id="portal-endpoint-enabled" checked={enabled} onCheckedChange={setEnabled} disabled={saving} />
               </div>
@@ -125,7 +122,7 @@ export default function PortalEndpointDialog({ open, onOpenChange, eventTypes, e
                 {t('portal.eventTypes.all')}
               </label>
               {!everything && (
-                <div className="max-h-48 space-y-1 overflow-auto rounded-md border border-rail p-2">
+                <div className="max-h-48 space-y-1 overflow-auto border border-rail p-2">
                   {offered.length === 0 && (
                     <p className="text-xs text-muted-foreground">{t('portal.endpointDialog.noKnownTypes')}</p>
                   )}

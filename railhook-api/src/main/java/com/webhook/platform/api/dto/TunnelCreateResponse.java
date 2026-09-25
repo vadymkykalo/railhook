@@ -9,10 +9,7 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Response returned only at tunnel creation time.
- * Contains the tunnelToken which is never exposed again.
- */
+/** The only response that carries the tunnel token. */
 @Data
 @Builder
 @NoArgsConstructor

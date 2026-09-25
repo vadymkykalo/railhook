@@ -21,21 +21,9 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Hard-cap escalation policy for deliveries stuck in PENDING state beyond a configurable threshold.
- *
- * <p>Addresses the scenario where downstream endpoints are degraded for extended periods,
- * causing the retry backlog to grow unboundedly even with governor/circuit-breaker protections.
- *
- * <h3>Behaviour</h3>
- * <ol>
- *   <li>Periodically computes the age of the oldest pending delivery and exports it as a Prometheus gauge
- *       ({@code delivery_oldest_pending_age_seconds}) for alerting.</li>
- *   <li>Finds deliveries in PENDING state that have been on their retry ladder longer than the
- *       hard-cap threshold (default 96h, comfortably past the default retry ladder's ~83h worst
- *       case) and escalates them to DLQ status. The ladder starts at {@code created_at}, and again
- *       at {@code ladder_resumed_at} when a person retried the delivery by hand.</li>
- *   <li>Publishes a DLQ notification to Kafka for each escalated delivery (best-effort).</li>
- * </ol>
+ * Moves Deliveries that have been on their retry ladder longer than the hard cap to DLQ. The
+ * default 96h clears the default ladder's worst case of about 83h. The ladder starts at
+ * {@code created_at}, and again at {@code ladder_resumed_at} after a manual retry.
  */
 @Service
 @Slf4j
@@ -124,13 +112,9 @@ public class StaleDeliveryEscalationService {
 
             escalatedCounter.increment(escalated.size());
 
-            // Best-effort DLQ notifications
             for (Delivery d : escalated) {
-                // An escalated Delivery is never attempted again, so the endpoint's ordering
-                // cursor has to move past it — exactly as it does when the Runner abandons
-                // one. This path bypasses the Runner entirely, and used to release nothing:
-                // one hard-capped Delivery froze an ordering-enabled endpoint at its sequence
-                // and nothing behind it was ever delivered.
+                // This path bypasses the Runner, so it must move the ordering cursor itself. It
+                // once did not, and one hard-capped Delivery froze an ordered endpoint for good.
                 releaseOrdering(d);
                 try {
                     DeliveryMessage msg = DeliveryMessage.builder()
@@ -155,7 +139,7 @@ public class StaleDeliveryEscalationService {
         }
     }
 
-    /** Mirrors OutgoingAttemptStore#onAbandoned: this obligation is over, let the next one through. */
+    /** Same as the Runner's abandon path: the obligation is over, let the next one through. */
     private void releaseOrdering(Delivery delivery) {
         if (!Boolean.TRUE.equals(delivery.getOrderingEnabled()) || delivery.getSequenceNumber() == null) {
             return;

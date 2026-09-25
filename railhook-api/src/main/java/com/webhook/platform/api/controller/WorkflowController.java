@@ -141,8 +141,6 @@ public class WorkflowController {
         return ResponseEntity.ok(workflowService.manualTrigger(projectId, id, testPayload));
     }
 
-    // ── Executions ──────────────────────────────────────────────────────
-
     @Operation(summary = "List workflow executions",
             description = "Runs of this workflow, newest first, with the status each finished in.")
     @GetMapping("/{id}/executions")

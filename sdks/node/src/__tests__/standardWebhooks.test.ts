@@ -3,11 +3,7 @@ import { RailhookError } from '../errors';
 import * as crypto from 'crypto';
 import type { IncomingHttpHeaders } from 'http';
 
-/**
- * The point of this scheme is that a receiver can verify with a library they already have,
- * so the first test is the reference algorithm rather than a round-trip against ourselves —
- * a round-trip would only prove we agree with our own bug.
- */
+// The reference algorithm, not a round-trip: a round-trip would only prove we agree with our own bug.
 describe('verifyStandardWebhook', () => {
   const id = 'msg_p5jXN8AQM9LWM0D4loKWxJek';
   const payload = '{"test": 2432232314}';

@@ -7,10 +7,6 @@ import { renderPage } from '../../test/renderPage';
 import BlogPage from '../BlogPage';
 import { blogPosts } from '../../lib/blog';
 
-/**
- * The blog's index, built from the files in `src/content/blog/` — so it cannot fall behind
- * them, the same way /changelog cannot fall behind CHANGELOG.md.
- */
 function renderBlog() {
   return renderPage(<BlogPage />, {
     path: '/blog',
@@ -54,8 +50,7 @@ describe('BlogPage', () => {
   });
 
   it('makes the whole card one link: a single link per card, stretched over it', () => {
-    // jsdom does not hit-test a pseudo-element, so the click on the card body is verified in a
-    // browser; what can drift here is the structure the stretched link depends on.
+    // jsdom does not hit-test pseudo-elements; this checks the structure the stretched link needs.
     renderBlog();
     for (const post of posts) {
       const link = screen.getByRole('link', { name: post.title });

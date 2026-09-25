@@ -22,7 +22,6 @@ export const transformationsApi = {
   delete: (projectId: string, id: string): Promise<void> =>
     http.delete<void>(`/api/v1/projects/${projectId}/transformations/${id}`),
 
-  /** Newest first, without the templates — fetch one version to read it. */
   listVersions: (projectId: string, id: string): Promise<TransformationVersionResponse[]> =>
     http.get<TransformationVersionResponse[]>(`/api/v1/projects/${projectId}/transformations/${id}/versions`),
 

@@ -38,16 +38,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * An API key for project A, calling project A's own URL, naming a resource that lives in project
- * B of the same organization.
- *
- * <p>The interceptor compares {@code {projectId}} with the key's project, so the URL passes. What
- * decides the answer is whether the service looks the resource up <em>in that project</em> or only
- * in the organization: the latter handed out B's plaintext signing secret on rotate-secret and let
- * a PUT re-point B's endpoint. Every case here must read as "no such resource" — a 404, nothing
- * changed in B, nothing of B's in the body.
- */
+// Looking the resource up in the org rather than the project once leaked B's signing secret.
 public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
 
     private static final String B_URL = "https://prod.example.com/webhook";
@@ -111,8 +102,6 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
                 .get("key").asText();
     }
 
-    // ── Endpoints ──
-
     @Test
     void endpointOfAnotherProjectIsNotFound() throws Exception {
         UUID endpointB = createEndpoint(projectB, B_URL);
@@ -166,8 +155,6 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
         return json(asJwt(get(b("/endpoints/" + endpointB)), null)).get("verificationStatus").asText();
     }
 
-    // ── Subscriptions ──
-
     @Test
     void subscriptionOfAnotherProjectIsNotFound() throws Exception {
         UUID subscriptionB = createSubscription();
@@ -190,8 +177,6 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
         asJwt(get(b("/subscriptions/" + subscriptionB)), null);
     }
 
-    // ── Rules ──
-
     @Test
     void ruleOfAnotherProjectIsNotFoundForEveryOperation() throws Exception {
         UUID ruleB = id(asJwt(post(b("/rules")), "{\"name\":\"rule-" + UUID.randomUUID() + "\"}"));
@@ -202,8 +187,6 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
         JsonNode rule = json(asJwt(get(b("/rules/" + ruleB)), null));
         assertTrue(rule.get("enabled").asBoolean());
     }
-
-    // ── Transformations ──
 
     @Test
     void transformationOfAnotherProjectIsNotFoundForEveryOperation() throws Exception {
@@ -225,8 +208,6 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
         assertFalse(dryRun.get("success").asBoolean(), dryRun.toString());
     }
 
-    // ── Schemas ──
-
     @Test
     void eventTypeOfAnotherProjectIsNotFoundForEveryOperation() throws Exception {
         UUID eventTypeB = id(asJwt(post(b("/schemas")), "{\"name\":\"order." + letters() + "\"}"));
@@ -246,8 +227,6 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
         expectNotFound(delete(a("/schemas/" + eventTypeB)));
         asJwt(get(b("/schemas/" + eventTypeB)), null);
     }
-
-    // ── Workflows ──
 
     @Test
     void workflowOfAnotherProjectIsNotFoundForEveryOperation() throws Exception {
@@ -286,8 +265,6 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
         expectNotFound(post(a("/workflows")), workflowBody(definition));
     }
 
-    // ── Incoming sources and destinations ──
-
     @Test
     void incomingSourceOfAnotherProjectIsNotFoundForEveryOperation() throws Exception {
         UUID sourceB = createSource(projectB);
@@ -325,8 +302,6 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
                 null)).get("url").asText());
     }
 
-    // ── DLQ and deliveries ──
-
     @Test
     void dlqItemOfAnotherProjectIsNotFound() throws Exception {
         UUID deliveryB = seedDelivery(DeliveryStatus.DLQ).getId();
@@ -340,8 +315,6 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
                 null));
         assertEquals(0, page.get("content").size(), page.toString());
     }
-
-    // ── Positive control ──
 
     @Test
     void ownProjectsResourcesStillWorkThroughTheKey() throws Exception {
@@ -366,8 +339,6 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
         UUID eventTypeA = id(asKey(post(a("/schemas")), "{\"name\":\"own." + letters() + "\"}"));
         assertEquals(200, asKey(get(a("/schemas/" + eventTypeA)), null).getResponse().getStatus());
     }
-
-    // ── helpers ──
 
     private String a(String path) {
         return "/api/v1/projects/" + projectA + path;
@@ -408,7 +379,7 @@ public class ProjectResourceScopeIsolationTest extends AbstractIntegrationTest {
         return result;
     }
 
-    /** Event type names allow lowercase letters, dots and underscores only. */
+    // Event type names allow lowercase letters, dots and underscores only.
     private static String letters() {
         return UUID.randomUUID().toString().replaceAll("[^a-f]", "");
     }

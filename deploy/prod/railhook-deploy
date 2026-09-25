@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Forced command for the CI deploy key: the client's command arrives in SSH_ORIGINAL_COMMAND and
+# is parsed, never executed.
+set -euo pipefail
+
+read -r -a argv <<< "${SSH_ORIGINAL_COMMAND:-}"
+action="${argv[0]:-}"
+version="${argv[1]:-}"
+
+refresh_monitoring() {
+  # The monitoring stack is a separate Compose project; it is only refreshed where it is in use.
+  [ -d monitoring ] || return 0
+  local tmp
+  tmp=$(mktemp -d)
+  if curl -fsSL "https://github.com/vadymkykalo/railhook/archive/refs/tags/${version}.tar.gz" \
+      | tar xz -C "$tmp" --strip-components=1 --wildcards '*/monitoring/*' \
+    && [ -f "$tmp/monitoring/docker-compose.yml" ]; then
+    rm -rf monitoring.previous
+    mv monitoring monitoring.previous
+    mv "$tmp/monitoring" monitoring
+    docker compose -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml up -d --force-recreate
+  else
+    echo "warning: could not download monitoring/ for ${version}; the monitoring stack was left as it was" >&2
+  fi
+  rm -rf "$tmp"
+}
+
+case "$action" in
+  deploy)
+    if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      echo "refusing: '$version' is not a vX.Y.Z tag" >&2
+      exit 64
+    fi
+    cd /opt/railhook
+    # Takes a backup before it migrates and stops if the backup fails.
+    ./railhook upgrade "$version"
+    refresh_monitoring
+    ;;
+  status)
+    cd /opt/railhook && docker compose ps --format '{{.Name}}\t{{.Status}}'
+    ;;
+  *)
+    echo "refusing: only 'deploy <vX.Y.Z>' and 'status' are permitted" >&2
+    exit 64
+    ;;
+esac

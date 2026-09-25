@@ -14,28 +14,15 @@ import {
 import type { ProjectResponse } from '../types/api.types';
 import { cn } from '../lib/utils';
 
-/**
- * ⌘K is the fastest route to anything, and it has to be, because the rail
- * deliberately names only seven destinations and everything else is a tab
- * inside one of them.
- *
- * So the index is *derived* from `nav.config.ts` rather than hand-kept beside
- * it: a tab added to a section shows up here the same day it ships, and a
- * second list cannot drift away from the first. Results are grouped by the
- * section a destination lives in, which is also the answer to "where is this
- * thing?" — the question that sends people to the palette in the first place.
- */
+/** Derived from nav.config.ts so the palette can't drift from the rail. */
 
 interface PaletteItem {
   id: string;
   label: string;
-  /** The section this destination lives in — the group it is filed under. */
   section: string;
-  /** The route segment, shown in mono: it is a machine fact, and it is searchable. */
   hint?: string;
   icon: React.ElementType;
   path: string;
-  /** Outside the app (the docs site): opened with a page load rather than the router. */
   external?: boolean;
 }
 
@@ -87,8 +74,7 @@ export function CommandPalette() {
       path: entry.path(projectId),
     });
 
-    // A section with no tabs is itself the destination; a section with tabs is
-    // a group of them, and the section on its own is not a place you can be.
+    // A section with tabs is a group; only a tabless section is itself a destination.
     const fromSection = (section: typeof SETTINGS_SECTION, keyPrefix: string): PaletteItem[] => {
       const name = t(section.nameKey);
       const tabs = section.tabs.filter(allowed);
@@ -133,7 +119,7 @@ export function CommandPalette() {
     );
   }, [items, query]);
 
-  /** Grouped for display, but numbered flat so one index walks the whole list. */
+  /** Numbered flat so one index walks the whole list. */
   const groups = useMemo(() => {
     const map = new Map<string, { item: PaletteItem; index: number }[]>();
     filtered.forEach((item, index) => {
@@ -236,7 +222,7 @@ export function CommandPalette() {
                         onClick={() => go(item)}
                         onMouseMove={() => setSelectedIndex(index)}
                         className={cn(
-                          'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
+                          'flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors',
                           active ? 'bg-secondary text-foreground' : 'text-muted-foreground'
                         )}
                       >

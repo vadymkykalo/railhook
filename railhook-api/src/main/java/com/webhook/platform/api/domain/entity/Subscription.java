@@ -58,11 +58,7 @@ public class Subscription {
     @Builder.Default
     private String retryDelays = RetryLadderDefaults.OUTGOING_DELAYS;
 
-    /**
-     * Which HTTP statuses are worth another Attempt. Copied onto each Delivery at creation, as
-     * the ladder is, so editing a Subscription does not change the rules an obligation already
-     * in flight is judged by.
-     */
+    /** Copied onto each Delivery at creation, so an edit does not affect Deliveries in flight. */
     @Column(name = "retryable_statuses", nullable = false, columnDefinition = "TEXT")
     @Builder.Default
     private String retryableStatuses = RetryableStatuses.DEFAULT_SPEC;

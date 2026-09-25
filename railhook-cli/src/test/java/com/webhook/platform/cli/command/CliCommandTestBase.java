@@ -17,22 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/**
- * Shared setup for CLI command tests.
- *
- * <p>None of the command classes ({@code StatusCommand}, {@code ReplayCommand}, etc.)
- * take a {@code CliConfigService} via constructor injection — they each do
- * {@code new CliConfigService()} internally, which resolves the config file from
- * (in order) {@code XDG_CONFIG_HOME}, {@code RAILHOOK_CONFIG}, or
- * {@code ~/.config/railhook/config.json}. Neither env var is set in CI or in this
- * sandbox, so redirecting the {@code user.home} system property to a JUnit
- * {@code @TempDir} is the only way to point a command at a throwaway config
- * without touching production code — this must happen *before*
- * {@code new CommandLine(new RailhookCli())}, because picocli eagerly
- * instantiates every declared subcommand (and each one's
- * {@code PrintStream out = System.out} field initializer) while building the
- * command tree, not lazily when a subcommand is actually invoked.
- */
+// Commands build their own CliConfigService, so user.home is redirected before picocli builds the tree.
 abstract class CliCommandTestBase {
 
     @TempDir
@@ -79,14 +64,12 @@ abstract class CliCommandTestBase {
         }
     }
 
-    /** Writes a config file at the redirected ~/.config/railhook/config.json. */
     protected void writeConfig(CliConfig config) throws Exception {
         Path configPath = tempDir.resolve(".config").resolve("railhook").resolve("config.json");
         Files.createDirectories(configPath.getParent());
         CONFIG_MAPPER.writeValue(configPath.toFile(), config);
     }
 
-    /** Builds a config pointed at this test's local stub server, with the given auth state. */
     protected CliConfig authenticatedConfig() {
         CliConfig config = new CliConfig();
         config.setBackendUrl(backendUrl);
@@ -97,7 +80,6 @@ abstract class CliCommandTestBase {
         return config;
     }
 
-    /** Runs the CLI with the given args, capturing System.out/System.err. Returns the exit code. */
     protected int run(String... args) {
         CommandLine cmd = new CommandLine(new RailhookCli());
         return cmd.execute(args);

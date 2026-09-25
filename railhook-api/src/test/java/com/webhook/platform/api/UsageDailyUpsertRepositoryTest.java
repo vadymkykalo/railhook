@@ -13,15 +13,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The nightly usage row is rewritten while its day can still change.
- *
- * <p>It used to be written once, at 00:05 the next morning, with {@code ON CONFLICT DO NOTHING}:
- * every Delivery still on the retry ladder then was missing from that day's success, failed and
- * DLQ counts for good. A recount replaces those three with what the Deliveries say now. The counts
- * of rows created that day can only have gone down since through retention, so a recount never
- * lowers them. Asserted on PostgreSQL because the thing that can be wrong is the SQL.
- */
 class UsageDailyUpsertRepositoryTest extends AbstractIntegrationTest {
 
     private static final LocalDate DAY = LocalDate.of(2026, 9, 10);

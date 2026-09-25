@@ -27,7 +27,6 @@ const UNLIMITED = (n: number) => n < 0;
 function useFormatters() {
   const { t, i18n } = useTranslation();
   const num = (n: number) => n.toLocaleString(i18n.language);
-  /** A quota, or the word for having none. */
   const limit = (n: number) => (UNLIMITED(n) ? t('billing.unlimited') : num(n));
   const compact = (n: number) => {
     if (UNLIMITED(n)) return t('billing.unlimited');
@@ -39,11 +38,6 @@ function useFormatters() {
   return { num, limit, compact, price };
 }
 
-/**
- * How close this organization is to one of its ceilings. Nearing a limit is the
- * same kind of fact as an attempt still owed — it wants attention, not alarm —
- * so it takes the retry token; being over it takes halt.
- */
 function kindOfUsage(percent: number): StatusKind {
   if (percent >= 100) return 'halt';
   if (percent >= 80) return 'retry';
@@ -78,9 +72,9 @@ function UsageMeter({ label, usage }: { label: string; usage: ResourceUsage }) {
         <p className="mt-1.5 text-xs text-muted-foreground">{t('billing.noCeiling')}</p>
       ) : (
         <>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
+          <div className="mt-2 h-1.5 overflow-hidden bg-secondary">
             <div
-              className={cn('h-full rounded-full transition-[width] duration-500', BAR_COLOR[kind])}
+              className={cn('h-full transition-[width] duration-500', BAR_COLOR[kind])}
               style={{ width: `${Math.min(100, percent)}%` }}
               role="progressbar"
               aria-valuenow={percent}
@@ -129,16 +123,7 @@ function PlanLimits({ plan }: { plan: PlanResponse }) {
   );
 }
 
-/**
- * The keys are the plan's `features` jsonb, spelled exactly as the seed and
- * every `@RequireFeature` spell them — `mTLS`, not `mtls`.
- *
- * `sso` used to be here, and V036 seeded it true on enterprise and self_hosted
- * with no SSO anywhere in the codebase, so this list showed a paying Enterprise
- * customer a feature that does not exist. V059 drops the flag; the row goes with
- * it. `tunnels` takes its place — that one is real, gated by
- * EntitlementService.checkTunnelLimit(), and now on for the free plan too.
- */
+/** Spelled exactly as the plan's features jsonb and @RequireFeature spell them (mTLS, not mtls). */
 const FEATURE_KEYS = ['workflows', 'rules', 'replay', 'mTLS', 'tunnels'] as const;
 const FEATURE_LABEL: Record<(typeof FEATURE_KEYS)[number], string> = {
   workflows: 'billing.featureWorkflows',
@@ -194,9 +179,6 @@ export default function BillingPage() {
     onError: (err) => showApiError(err, 'billing.checkoutFailed'),
   });
 
-  // Both of these shipped in billing.api.ts and were never called, which left
-  // billing a one-way door: an organization could start paying from here and
-  // had nowhere in the product to stop.
   const portalMutation = useMutation({
     mutationFn: () => billingApi.createPortal(`${window.location.origin}/admin/billing`),
     onSuccess: (data) => { if (data.url) window.location.href = data.url; },
@@ -261,7 +243,6 @@ export default function BillingPage() {
         />
 
         <div className="space-y-8">
-          {/* What this organization is on */}
           <section>
             <Card>
               <CardContent className="p-5">
@@ -314,7 +295,6 @@ export default function BillingPage() {
             </Card>
           </section>
 
-          {/* How close it is to its ceilings */}
           {usage && (
             <FormSection title={t('billing.usage')} description={t('billing.usageSubtitle')}>
               <div>
@@ -340,10 +320,9 @@ export default function BillingPage() {
             </FormSection>
           )}
 
-          {/* What else it could be on */}
           {!isSelfHosted && plans.some((p) => p.name !== plan?.name) && (
             <FormSection title={t('billing.availablePlans')} description={t('billing.availablePlansDesc')}>
-              <div className="inline-flex items-center gap-1 rounded-lg border border-rail p-1" role="group" aria-label={t('billing.billingInterval')}>
+              <div className="inline-flex items-center gap-1 border border-rail p-1" role="group" aria-label={t('billing.billingInterval')}>
                 {([false, true] as const).map((yearly) => (
                   <button
                     key={String(yearly)}
@@ -351,7 +330,7 @@ export default function BillingPage() {
                     aria-pressed={annual === yearly}
                     onClick={() => setAnnual(yearly)}
                     className={cn(
-                      'rounded-md px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      'px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                       annual === yearly ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'
                     )}
                   >
@@ -372,8 +351,8 @@ export default function BillingPage() {
                     <div
                       key={p.id}
                       className={cn(
-                        'rounded-lg border p-4',
-                        isCurrent ? 'border-primary bg-accent/30' : 'border-rail bg-card'
+                        'border p-4',
+                        isCurrent ? 'border-primary bg-secondary' : 'border-rail bg-card'
                       )}
                     >
                       <div className="flex items-baseline justify-between gap-2">
@@ -396,8 +375,6 @@ export default function BillingPage() {
                         <div className="mt-3">
                           {isCustom ? (
                             <Button asChild size="sm" variant="outline" className="w-full">
-                              {/* Was a mailto to the author's personal Gmail, shipped inside
-                                  the product to whoever clicked Enterprise. */}
                               <Link to="/contact">{t('billing.contactSales')}</Link>
                             </Button>
                           ) : (
@@ -494,7 +471,7 @@ export default function BillingPage() {
           {!isSelfHosted && (
             <FormSection title={t('billing.invoices')} description={t('billing.invoicesDesc')}>
               {invoices.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-rail px-4 py-8 text-center text-sm text-muted-foreground">
+                <p className="border border-dashed border-rail px-4 py-8 text-center text-sm text-muted-foreground">
                   {t('billing.invoicesEmpty')}
                 </p>
               ) : (
@@ -532,7 +509,7 @@ export default function BillingPage() {
                                 href={inv.invoiceUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[13px] text-primary hover:underline"
+                                className="inline-flex items-center gap-1 text-[13px] link-ink"
                               >
                                 {t('billing.invoiceView')}
                                 <ExternalLink className="h-3 w-3" aria-hidden />

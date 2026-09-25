@@ -19,19 +19,6 @@ vi.mock('../../api/piiRules.api', () => ({
 import PiiRulesPage from '../PiiRulesPage';
 import { piiRulesApi } from '../../api/piiRules.api';
 
-/**
- * The rules that keep a customer's personal data out of stored payloads.
- *
- * <p>Everything on this page fails in the same direction, which is why it is worth testing
- * rather than eyeballing: a masking rule that stops applying does not throw, does not turn a
- * screen red and does not appear in any metric. It just means the next event's payload is
- * retained in full, and nobody finds out until somebody reads a stored body.
- *
- * <p>So the three things held down are the three ways that happens by accident — a built-in
- * rule deleted, any rule deleted without agreeing to it, and a disabled rule that looks like
- * an enabled one.
- */
-
 const now = new Date('2026-08-01T00:00:00Z').toISOString();
 
 const BUILTIN: PiiMaskingRuleResponse = {
@@ -66,7 +53,6 @@ function renderPii() {
   });
 }
 
-/** The row a rule renders into, found by the pattern name that is unique to it. */
 function rowFor(patternName: string): HTMLElement {
   const name = screen.getByText(patternName);
   const row = name.closest('li');
@@ -91,8 +77,6 @@ describe('PiiRulesPage', () => {
     renderPii();
     await screen.findByText('email');
 
-    // The built-ins are the defaults that cover the common fields. Removing one is not an
-    // edit somebody meant to make, so the control is not there to click.
     expect(within(rowFor('email')).queryByRole('button', { name: /delete|видалити/i })).toBeNull();
     expect(within(rowFor('ssn')).getByRole('button', { name: /delete|видалити/i })).toBeInTheDocument();
   });
@@ -103,16 +87,12 @@ describe('PiiRulesPage', () => {
 
     await userEvent.click(within(rowFor('ssn')).getByRole('button', { name: /delete|видалити/i }));
 
-    // The dialog is open. Until its action is clicked, the rule still applies.
-    // (Role is `dialog`: ui/alert-dialog.tsx is built on @radix-ui/react-dialog, so the
-    // destructive-confirmation semantics are the shape, not the announced role.)
+    // Role is dialog: ui/alert-dialog.tsx is built on @radix-ui/react-dialog.
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(piiRulesApi.delete).not.toHaveBeenCalled();
   });
 
   it('shows a disabled rule as disabled', async () => {
-    // A rule that is present but off masks nothing, and is the one state where the page
-    // looking right and the data being wrong coincide.
     vi.mocked(piiRulesApi.list).mockResolvedValue([DISABLED]);
     renderPii();
 
@@ -141,14 +121,11 @@ describe('PiiRulesPage', () => {
     renderPii();
 
     await waitFor(() => expect(piiRulesApi.list).toHaveBeenCalled());
-    // A project with no masking at all is the state worth getting out of in one click.
     expect(await screen.findByRole('button', { name: /default|стандарт|типов/i })).toBeInTheDocument();
     expect(piiRulesApi.seedDefaults).not.toHaveBeenCalled();
   });
 
   it('shows an error state rather than an empty page when the rules fail to load', async () => {
-    // An empty page here reads as "this project masks nothing", which is a different and
-    // much worse statement than "we could not load the rules".
     vi.mocked(piiRulesApi.list).mockRejectedValue(new Error('boom'));
     renderPii();
 

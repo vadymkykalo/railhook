@@ -3,11 +3,6 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../table';
 
-/**
- * On a phone every list table becomes a stack of cards: each row a card, each cell a
- * "label — value" line. The label is the column's header, so the header text has to reach
- * every body cell of that column without twelve pages repeating it by hand.
- */
 function Deliveries({ rows, stack }: { rows: string[]; stack?: boolean }) {
   return (
     <Table stack={stack} data-testid="table">

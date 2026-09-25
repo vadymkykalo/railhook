@@ -6,13 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Creates separate bounded async executors for outgoing deliveries and incoming forwards.
- *
- * <p>Traffic isolation: a flood of incoming forwards cannot starve outgoing deliveries
- * and vice versa. Each pool has its own thread pool, semaphore, and Kafka container
- * pause/resume lifecycle.</p>
- */
+// Separate pools so a flood in one direction cannot starve the other.
 @Configuration
 public class ExecutorConfig {
 

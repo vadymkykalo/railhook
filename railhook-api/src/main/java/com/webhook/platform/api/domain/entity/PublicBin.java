@@ -14,12 +14,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * A webhook tester URL made on the public site without an account.
- *
- * <p>Deliberately not tenant data — there is no organization behind it — so it carries no
- * {@code @TenantId}; the slug is its only identity.
- */
+/** Made without an account, so there is no organization and no {@code @TenantId}. */
 @Entity
 @Table(name = "public_bins")
 @Getter
@@ -42,7 +37,7 @@ public class PublicBin {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
-    /** Who made it, for the per-address cap on live URLs. Never shown. */
+    /** For the per-address cap on live URLs. Never shown. */
     @Column(name = "creator_ip", length = 45)
     private String creatorIp;
 

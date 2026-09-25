@@ -88,7 +88,7 @@ To add one: write the component in `figures.tsx` (or, for a post's own set, in a
   caption — the `Figure` wrapper takes both;
 - colours from `src/components/charts/chartTheme.ts` only (`SERIES`, `CHROME`), never a literal
   hex, so it works on paper and on ink. `ok` / `retry` / `halt` / `idle` are reserved for what
-  they name; anything else takes the brand cobalt;
+  they name; anything else takes ink (`--primary`);
 - every word inside as a translation key in **both** `src/i18n/locales/en.json` and `uk.json`,
   under `blog.figures.<key>`.
 

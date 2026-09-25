@@ -76,7 +76,11 @@ Two rules carry the rest: **never commit or push directly to `main`**, and **nev
 - Branch as `feature/<short-kebab-description>` from an up-to-date `develop`. A hotfix branches
   from `main`, not `develop` — branching it from `develop` drags unreleased work into production.
 - Release: `release/1.x.0` from `develop` → `make version-set VERSION=…` → PR to `main` → tag
-  `v1.x.0` after merge → merge back into `develop`.
+  `v1.x.0` after merge → merge back into `develop`. On the release branch, move the changelog's
+  `[Unreleased]` entries under the new version and add an `UPGRADING.md` step if an operator must act.
+- Production settings live in GitHub (Settings → Environments → production): a variable or secret
+  `DOTENV_<NAME>` becomes `NAME=value` in the host's `.env` on every deploy. A new secret also
+  needs a line in the `env:` of "Collect the production settings" in `deploy-prod.yml`.
 - **Anything that lands on `main` must be merged back into `develop`**, or the fix disappears at
   the next release. That back-merge is local (`git checkout develop && git merge origin/main`),
   not a PR.
@@ -118,4 +122,6 @@ gate. `develop` blocks only force-push and deletion. Commit prefixes: `feat:`, `
   format. A task file is deleted when its branch merges.
 - `railhook-ui/CLAUDE.md` carries the frontend conventions and loads automatically in that
   directory — add UI rules there, not here.
+- Comments explain why, never what: an invariant, a race, a past bug, a library quirk. No comments
+  restating code, no section labels, no links to docs.
 - Operational procedures: `docs/OPERATIONS.md`.

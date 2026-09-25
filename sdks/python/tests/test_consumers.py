@@ -1,5 +1,3 @@
-"""Tests for the Consumers and portal sessions APIs."""
-
 from unittest import mock
 
 import pytest

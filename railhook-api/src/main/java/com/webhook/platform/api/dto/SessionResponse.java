@@ -10,11 +10,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One signed-in device, as a person needs to see it in order to decide whether it is theirs.
- *
- * <p>Carries no token material of any kind — not the refresh jti, not a prefix of it. The list
- * is readable by anything holding an access token for the account, so it must not be a place
- * where a stolen access token can be upgraded into a longer-lived credential.
+ * Carries no token material, not even a prefix: any access token can read this list, and it must
+ * not become a way to upgrade one into a longer-lived credential.
  */
 @Data
 @Builder
@@ -24,10 +21,8 @@ public class SessionResponse {
 
     private UUID id;
 
-    /** WEB for a browser sign-in, CLI for a device-code grant from the command line. */
     private SessionClient client;
 
-    /** The raw User-Agent as sent; the UI is what turns it into "Firefox on macOS". */
     private String userAgent;
 
     private String ipAddress;
@@ -38,6 +33,5 @@ public class SessionResponse {
 
     private Instant expiresAt;
 
-    /** True for the session making the request, which the UI must not offer to revoke silently. */
     private boolean current;
 }

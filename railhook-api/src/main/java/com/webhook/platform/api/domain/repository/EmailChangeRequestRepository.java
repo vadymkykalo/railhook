@@ -21,7 +21,7 @@ public interface EmailChangeRequestRepository extends JpaRepository<EmailChangeR
 
     Optional<EmailChangeRequest> findByCancelTokenHashAndStatus(String cancelTokenHash, EmailChangeStatus status);
 
-    /** Every change asked for since {@code since}, whatever became of it: the cap counts attempts. */
+    /** Counts every request whatever became of it: the cap is on attempts. */
     long countByUserIdAndCreatedAtAfter(UUID userId, Instant since);
 
     /** Settled rows past any cap window. Pending ones stay until they are settled. */

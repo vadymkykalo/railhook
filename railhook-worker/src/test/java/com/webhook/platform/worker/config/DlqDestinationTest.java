@@ -10,17 +10,7 @@ import java.util.function.BiFunction;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Where a record goes once it has failed for the last time.
- *
- * <p>This used to copy the source record's partition onto the DLQ topic, which is only ever
- * correct while the DLQ has at least as many partitions as the topic it shadows. That holds
- * today by coincidence — docker-compose.yml creates every topic in one loop with the same
- * KAFKA_NUM_PARTITIONS — and stops holding the first time somebody repartitions a main topic
- * upward to scale its consumers, which is the ordinary thing to do. From then on every dead
- * letter out of a partition the DLQ does not have fails to publish, and a message that can
- * neither be retried nor parked is simply gone.
- */
+/** Copying the source partition lost every dead letter once a main topic outgrew its DLQ. */
 class DlqDestinationTest {
 
     private static ConsumerRecord<String, String> recordOnPartition(int partition) {
@@ -36,21 +26,12 @@ class DlqDestinationTest {
     @Test
     @DisplayName("the broker picks the partition, so a smaller DLQ cannot swallow a dead letter")
     void partitionIsLeftToTheBroker() {
-        TopicPartition destination = resolve("deliveries.dlq", 11);
+        for (int sourcePartition : new int[]{0, 11, 47}) {
+            TopicPartition destination = resolve("deliveries.dlq", sourcePartition);
 
-        assertEquals("deliveries.dlq", destination.topic());
-        assertTrue(destination.partition() < 0,
-                "a negative partition is how the producer is told to choose; pinning one assumes "
-                        + "the DLQ is at least as wide as the topic it shadows, and nothing enforces that");
-    }
-
-    @Test
-    @DisplayName("the source partition is not carried over, whichever it was")
-    void sourcePartitionIsIgnored() {
-        int high = resolve("deliveries.dlq", 47).partition();
-        int low = resolve("deliveries.dlq", 0).partition();
-
-        assertEquals(low, high, "the destination must not depend on where the record came from");
+            assertEquals("deliveries.dlq", destination.topic());
+            assertTrue(destination.partition() < 0, "source partition " + sourcePartition + " was carried over");
+        }
     }
 
     @Test

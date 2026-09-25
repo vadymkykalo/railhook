@@ -2,8 +2,6 @@ import { http } from './http';
 
 export type ActionType = 'ROUTE' | 'TRANSFORM' | 'DROP' | 'TAG';
 
-// ─── Condition Tree DSL ─────────────────────────────────────────
-
 export type GroupOperator = 'AND' | 'OR' | 'NOT';
 
 export type PredicateOperator =

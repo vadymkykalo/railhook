@@ -15,8 +15,7 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
     private final ApiKeyScope scope;
 
     public ApiKeyAuthenticationToken(String apiKey) {
-        // Cast because Spring Security 7 added a second, builder-taking constructor, which
-        // makes a bare null ambiguous. Still the authorities overload, still "none yet".
+        // Cast because Spring Security 7 added a builder-taking constructor, making a bare null ambiguous.
         super((Collection<? extends GrantedAuthority>) null);
         this.apiKey = apiKey;
         this.projectId = null;
@@ -49,14 +48,7 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
         return projectId;
     }
 
-    /**
-     * The organization that owns the key's project.
-     *
-     * <p>Resolved once, in {@code ApiKeyAuthenticationFilter}, rather than on each use: an API
-     * key names a project and the tenant is one join away, and both {@code TenantContextFilter}
-     * and {@code AuthContextArgumentResolver} need the answer. Carrying it on the token replaces
-     * the per-request lookup the argument resolver used to do.
-     */
+    /** The organization owning the key's project, resolved once at authentication. */
     public UUID getOrganizationId() {
         return organizationId;
     }

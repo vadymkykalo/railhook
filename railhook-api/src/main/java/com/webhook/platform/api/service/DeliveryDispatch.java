@@ -13,20 +13,12 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
-/**
- * Announces a Delivery to the worker, by writing the Outbox row in the same transaction as the
- * Delivery itself.
- *
- * <p>Every path that creates work for the worker goes through here — ingest, replay, bulk replay,
- * DLQ retry, a workflow node. Written out at each of those call sites instead, the block drifted:
- * only the ingest copy carried the correlation id, so a replayed delivery could not be traced
- * across the two services.
- */
+/** Writes the Outbox row in the same transaction as the Delivery. */
 @Component
 @RequiredArgsConstructor
 public class DeliveryDispatch {
 
-    /** What put this Delivery on the wire. Stored on the row, and read by nothing but a human. */
+    /** Stored on the row for humans only; nothing reads it. */
     public enum Reason {
         CREATED("DeliveryCreated"),
         RETRY("DeliveryRetry"),
@@ -45,7 +37,6 @@ public class DeliveryDispatch {
     private final OutboxMessageRepository outboxMessageRepository;
     private final ObjectMapper objectMapper;
 
-    /** Builds the row without saving it, for a caller that saves a batch of them at once. */
     public OutboxMessage outboxFor(Delivery delivery, UUID projectId, Reason reason) {
         try {
             DeliveryMessage message = DeliveryMessage.builder()

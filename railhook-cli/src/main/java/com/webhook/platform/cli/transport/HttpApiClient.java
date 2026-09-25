@@ -18,10 +18,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
 
-/**
- * HTTP client for communicating with the Railhook backend API.
- * Handles authentication headers, token refresh, and JSON serialization.
- */
 public class HttpApiClient {
 
     private static final Logger log = LoggerFactory.getLogger(HttpApiClient.class);
@@ -126,10 +122,8 @@ public class HttpApiClient {
 
         HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
 
-        // Auto-refresh token on 401
         if (response.statusCode() == 401 && config.getRefreshToken() != null) {
             if (tryRefreshToken(config)) {
-                // Retry with new token
                 config = configService.load();
                 builder.header("Authorization", "Bearer " + config.getAccessToken());
                 response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());

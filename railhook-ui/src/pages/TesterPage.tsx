@@ -16,16 +16,7 @@ import { publicTesterEnabled } from '../lib/runtimeConfig';
 import { cn } from '../lib/utils';
 import { Band, WRAP } from './landing/primitives';
 
-/**
- * The webhook tester on the public site: make a URL, point Stripe, GitHub or curl at it, see
- * exactly what arrived. Free and without an account, which is the point — it is the first thing
- * a developer can do with Railhook before deciding to sign up, and what brings them here from a
- * search for "webhook tester".
- *
- * A URL is made only when the reader asks for one, never on load: crawlers and the prerender
- * load this page too. The slug is remembered in this browser, so coming back within the day
- * shows the same URL and what it received; the list is polled while the page is open.
- */
+/** A URL is made only on request, never on load: crawlers and the prerender load this page too. */
 export const STORAGE_KEY = 'railhook.tester.slug';
 const POLL_MS = 3000;
 
@@ -54,7 +45,6 @@ function errorCode(error: unknown): string | undefined {
   return (error as { response?: { data?: { error?: string } } } | null)?.response?.data?.error;
 }
 
-/** Why a URL was not made, in the reader's words. */
 function createErrorKey(error: unknown): string {
   const code = errorCode(error);
   if (code === 'too_many_active_urls') return 'tester.errors.tooManyActive';
@@ -66,12 +56,11 @@ function createErrorKey(error: unknown): string {
 
 const LIMITS = ['lifetime', 'kept', 'rate', 'masked', 'methods'] as const;
 
-/** What the tester does and where it stops, stated before anyone relies on it. */
 function Limits() {
   const { t } = useTranslation();
   return (
     <div>
-      <h2 className="font-display text-[1.35rem] font-bold tracking-[-0.02em] text-foreground">{t('tester.limits.title')}</h2>
+      <h2 className="text-[1.5rem] font-normal tracking-[-0.02em] text-foreground">{t('tester.limits.title')}</h2>
       <ul className="mt-4 grid gap-3 text-muted-foreground sm:grid-cols-2">
         {LIMITS.map((key) => (
           <li key={key} className="flex gap-2.5">
@@ -91,7 +80,7 @@ function CopyButton({ value }: { value: string }) {
     <button
       type="button"
       onClick={() => copy(value)}
-      className="inline-flex flex-none items-center gap-1.5 rounded-lg border border-rail px-2.5 py-1.5 text-[12.5px] font-medium text-foreground transition-colors hover:border-muted-foreground"
+      className="inline-flex flex-none items-center gap-1.5 border border-rail px-2.5 py-1.5 text-[12.5px] font-medium text-foreground transition-colors hover:border-muted-foreground"
     >
       {copied ? <Check className="h-3.5 w-3.5 text-ok" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
       <span aria-live="polite">{copied ? t('tester.copied') : t('tester.copy')}</span>
@@ -100,9 +89,8 @@ function CopyButton({ value }: { value: string }) {
 }
 
 function CodeLine({ value, prompt = false }: { value: string; prompt?: boolean }) {
-  // A prompted line is a shell command and is coloured as one; a bare line is a URL, which is data.
   return (
-    <div className="surface-ink flex items-center gap-3 overflow-hidden rounded-xl border border-rail py-2.5 pl-4 pr-3">
+    <div className="surface-ink flex items-center gap-3 overflow-hidden border border-rail py-2.5 pl-4 pr-3">
       <pre
         className={cn(
           'min-w-0 flex-1 overflow-x-auto whitespace-pre py-1 font-mono text-[13px] [scrollbar-width:thin]',
@@ -116,7 +104,7 @@ function CodeLine({ value, prompt = false }: { value: string; prompt?: boolean }
   );
 }
 
-const METHOD = 'inline-flex min-w-[3.5rem] justify-center rounded-md bg-accent px-1.5 py-0.5 font-mono text-[11px] font-semibold text-primary';
+const METHOD = 'inline-flex min-w-[3.5rem] justify-center bg-accent px-1.5 py-0.5 font-mono text-[11px] font-medium text-accent-foreground';
 
 function RequestDetail({ request }: { request: PublicBinRequest }) {
   const { t, i18n } = useTranslation();
@@ -132,12 +120,12 @@ function RequestDetail({ request }: { request: PublicBinRequest }) {
       {request.query && (
         <div>
           <h3 className="mono-label mb-1.5">{t('tester.query')}</h3>
-          <code className="block break-all rounded-lg border border-rail bg-muted px-3 py-2 font-mono text-[12.5px]">{request.query}</code>
+          <code className="block break-all border border-rail bg-muted px-3 py-2 font-mono text-[12.5px]">{request.query}</code>
         </div>
       )}
       <div>
         <h3 className="mono-label mb-1.5">{t('tester.headers')}</h3>
-        <dl className="grid grid-cols-[minmax(0,12rem)_1fr] gap-x-4 gap-y-1 rounded-lg border border-rail p-3 font-mono text-[12px]">
+        <dl className="grid grid-cols-[minmax(0,12rem)_1fr] gap-x-4 gap-y-1 border border-rail p-3 font-mono text-[12px]">
           {headers.map(([name, value]) => (
             <div key={name} className="contents">
               <dt className="truncate text-muted-foreground">{name}</dt>
@@ -163,17 +151,17 @@ function BinView({ bin, onNew }: { bin: PublicBin; onNew: () => void }) {
     <div className="grid gap-6">
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-foreground">{t('tester.yourUrl')}</h2>
+          <h2 className="text-sm font-medium text-foreground">{t('tester.yourUrl')}</h2>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span>{t('tester.expires', { time: new Date(bin.expiresAt).toLocaleString(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }) })}</span>
-            <button type="button" onClick={onNew} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+            <button type="button" onClick={onNew} className="inline-flex items-center gap-1 font-medium link-ink">
               <RefreshCw className="h-3 w-3" aria-hidden="true" />
               {t('tester.newUrl')}
             </button>
           </div>
         </div>
         <CodeLine value={bin.url} />
-        <h2 className="mt-2 text-sm font-semibold text-foreground">{t('tester.tryIt')}</h2>
+        <h2 className="mt-2 text-sm font-medium text-foreground">{t('tester.tryIt')}</h2>
         <CodeLine
           prompt
           value={`curl -X POST ${bin.url} -H "Content-Type: application/json" -d '{"type":"order.completed","id":42}'`}
@@ -185,9 +173,9 @@ function BinView({ bin, onNew }: { bin: PublicBin; onNew: () => void }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,20rem)_1fr]">
-        <div className="rounded-xl border border-rail bg-card">
+        <div className="border border-rail bg-card">
           <div className="flex items-center justify-between border-b border-rail px-4 py-3">
-            <h2 className="text-sm font-semibold">{t('tester.requests')}</h2>
+            <h2 className="text-sm font-medium">{t('tester.requests')}</h2>
             <span className="font-mono text-xs text-muted-foreground">{t('tester.received', { count: bin.requestCount })}</span>
           </div>
           {bin.requests.length === 0 ? (
@@ -205,7 +193,7 @@ function BinView({ bin, onNew }: { bin: PublicBin; onNew: () => void }) {
                     aria-pressed={selected?.id === r.id}
                     className={cn(
                       'flex w-full items-center gap-2.5 border-b border-rail px-4 py-2.5 text-left text-sm last:border-b-0 hover:bg-muted',
-                      selected?.id === r.id && 'bg-accent/50',
+                      selected?.id === r.id && 'bg-secondary',
                     )}
                   >
                     <span className={METHOD}>{r.method}</span>
@@ -219,7 +207,7 @@ function BinView({ bin, onNew }: { bin: PublicBin; onNew: () => void }) {
             </ul>
           )}
         </div>
-        <div className="min-w-0 rounded-xl border border-rail bg-card p-4">
+        <div className="min-w-0 border border-rail bg-card p-4">
           {selected ? <RequestDetail request={selected} /> : (
             <p className="text-sm text-muted-foreground">{t('tester.select')}</p>
           )}
@@ -263,9 +251,7 @@ export default function TesterPage() {
     onError: () => setCaptchaToken(''),
   });
 
-  /* "New URL" goes back to the form rather than making one straight away: a new URL needs a
-     fresh challenge answer, and the old one keeps counting against this address until it
-     expires, which the form is the place to say. */
+  /* Back to the form: a new URL needs a fresh challenge answer. */
   const startOver = () => {
     writeSlug(null);
     setSlug(null);
@@ -279,8 +265,8 @@ export default function TesterPage() {
     <>
       <section className="pb-2 pt-14 sm:pt-20">
         <div className={WRAP}>
-          <p className="mono-label mb-3 text-primary">{t('tester.eyebrow')}</p>
-          <h1 className="max-w-3xl font-display text-[2.2rem] font-bold leading-[1.05] tracking-[-0.035em] text-foreground [text-wrap:balance] sm:text-[3.2rem]">
+          <p className="mono-label mb-3">{t('tester.eyebrow')}</p>
+          <h1 className="max-w-3xl text-[2.375rem] font-normal leading-[1.16] tracking-[-0.03em] text-foreground [text-wrap:balance] sm:text-[3.5rem]">
             {t('tester.title')}
           </h1>
           <p className="mt-4 max-w-2xl text-[1.1rem] text-muted-foreground">{t('tester.lead')}</p>
@@ -290,13 +276,13 @@ export default function TesterPage() {
       <Band labelledBy="tester-tool">
         <h2 id="tester-tool" className="sr-only">{t('tester.title')}</h2>
         {!enabled ? (
-          <p className="rounded-2xl border border-dashed border-rail p-6 text-muted-foreground sm:p-8">{t('tester.disabled')}</p>
+          <p className="border border-dashed border-rail p-6 text-muted-foreground sm:p-8">{t('tester.disabled')}</p>
         ) : slug && bin.data ? (
           <BinView bin={bin.data} onNew={startOver} />
         ) : slug && bin.isLoading ? (
           <p className="text-sm text-muted-foreground">{t('tester.loading')}</p>
         ) : (
-          <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed border-rail p-6 sm:p-8">
+          <div className="flex flex-col items-start gap-3 border border-dashed border-rail p-6 sm:p-8">
             <p className="max-w-xl text-muted-foreground">{t('tester.createHint')}</p>
             {/* Keyed on the failures so a failed attempt renders a fresh widget and a fresh answer. */}
             <CaptchaWidget key={create.failureCount} onToken={setCaptchaToken} />
@@ -316,7 +302,7 @@ export default function TesterPage() {
       <Band muted labelledBy="tester-cta">
         <div className="flex flex-col items-start justify-between gap-5 md:flex-row md:items-center">
           <div className="max-w-2xl">
-            <h2 id="tester-cta" className="font-display text-[1.6rem] font-bold tracking-[-0.02em] text-foreground">
+            <h2 id="tester-cta" className="text-[1.75rem] font-normal leading-[1.16] tracking-[-0.02em] sm:text-[2rem] text-foreground">
               {t('tester.cta.title')}
             </h2>
             <p className="mt-2 text-muted-foreground">{t('tester.cta.body')}</p>

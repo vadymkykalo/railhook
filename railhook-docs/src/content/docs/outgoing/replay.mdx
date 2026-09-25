@@ -1,10 +1,10 @@
 ---
 title: Replay and Time Machine
-description: Resend one delivery, or rebuild deliveries from stored events for a time range, and know which of the two you need.
+description: Resend one delivery, or rebuild deliveries from stored events for a time range, and which of the two you need.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-Two operations are easy to confuse. Resending a delivery puts the same delivery back on its retry ladder. A **replay** builds new deliveries from events Railhook already stored. The dashboard calls replay the **Time Machine**.
+Resending a delivery puts the same delivery back on its retry ladder. A **replay** builds new deliveries from stored events. The dashboard calls replay the **Time Machine**.
 
 ## Which one you want
 
@@ -19,26 +19,26 @@ Two operations are easy to confuse. Resending a delivery puts the same delivery 
 
 ## Resend one delivery
 
-`POST /api/v1/deliveries/{id}/replay` puts the delivery back to `PENDING` and gives it 3 more attempts, the first sent straight away. It answers `202`. The attempt count and history are kept, so the new attempts are numbered after the old ones and wait at the step of the ladder the delivery already reached. A delivery that already succeeded is refused rather than sent twice, and one with an attempt under way is refused with `409` until that attempt finishes.
+`POST /api/v1/deliveries/{id}/replay` puts the delivery back to `PENDING` and gives it 3 more attempts, the first sent straight away. It answers `202`. The attempt count and history are kept, so new attempts are numbered after the old ones and wait at the ladder step the delivery already reached. A delivery that already succeeded is refused, and one with an attempt under way is refused with `409` until that attempt finishes.
 
-Two query parameters change what it does:
+Query parameters:
 
 | Parameter | Effect |
 |---|---|
 | `dryRun=true` | Sends nothing. Returns the target URL, the event type, the payload, the `Idempotency-Key` that would go out, the previous attempts, and a plan: `WILL_SEND`, `SKIP` when the delivery already succeeded, or `BLOCKED` when the endpoint is disabled. |
 | `fromAttempt=N` | Gives the delivery the attempts it had left from attempt N instead of 3: its maximum attempts minus N-1. N must be between 1 and the number of attempts already made. |
 
-Use `fromAttempt` when 3 attempts are not enough, for example after a receiver was down for hours: `fromAttempt=1` gives back as many attempts as the whole ladder has.
+Use `fromAttempt` when 3 attempts are not enough, for example after a receiver was down for hours: `fromAttempt=1` gives back the whole ladder.
 
 To resend many deliveries at once, use `POST /api/v1/deliveries/bulk-replay` with up to 1000 `deliveryIds`, or with a `projectId` plus `status` and `endpointId` filters and a `limit` of up to 5000. Without `status`, only deliveries that failed or were moved to Failed Messages are resent. A delivery that succeeded or has an attempt under way is always skipped. The response says how many were replayed, how many were skipped, and whether more matched.
 
-To resend deliveries that were abandoned, you can also retry them from Failed Messages, see [Retries and failed messages](/docs/outgoing/retries/#failed-messages).
+Abandoned deliveries can also be retried from Failed Messages: see [Retries and failed messages](/docs/outgoing/retries/#failed-messages).
 
 ## Replay a time range
 
 <Steps>
 
-1. Estimate first. `POST /api/v1/projects/{projectId}/replay/estimate` takes the same body as the replay and creates nothing. It returns how many events match, how many active subscriptions match, patterns included, how many deliveries would be created, and a warning when the range is too large. The estimate does not apply rules, so a `DROP` or `ROUTE` rule makes the real number differ.
+1. Estimate first. `POST /api/v1/projects/{projectId}/replay/estimate` takes the same body as the replay and creates nothing. It returns the matching events, the matching active subscriptions (patterns included), the deliveries that would be created, and a warning when the range is too large. The estimate does not apply rules, so a `DROP` or `ROUTE` rule makes the real number differ.
 
    ```bash
    curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/replay/estimate" \
@@ -53,7 +53,7 @@ To resend deliveries that were abandoned, you can also retry them from Failed Me
 
 </Steps>
 
-A replay decides where each stored event goes the same way a newly sent event is decided: the active subscriptions that match its type, patterns such as `order.*` included, and the project's [rules](/docs/outgoing/rules/) as they are now. A `DROP` rule replays nothing for that event, a `ROUTE` action adds its endpoint, and a `TRANSFORM` action replaces the subscription's transformation. An event that would exceed the [fan-out limit](/docs/platform/errors-limits/#size-and-fan-out-limits) is not replayed to any endpoint and counts as an error on the session. With `endpointId`, only the deliveries to that endpoint are created.
+A replay routes each stored event like a newly sent one: the active subscriptions matching its type (patterns such as `order.*` included) and the project's [rules](/docs/outgoing/rules/) as they are now. A `DROP` rule replays nothing for that event, a `ROUTE` action adds its endpoint, and a `TRANSFORM` action replaces the subscription's transformation. An event that would exceed the [fan-out limit](/docs/platform/errors-limits/#size-and-fan-out-limits) is not replayed to any endpoint and counts as an error on the session. With `endpointId`, only the deliveries to that endpoint are created.
 
 Ordered endpoints get fresh sequence numbers, so replayed deliveries wait behind live ones instead of colliding with them.
 
@@ -63,23 +63,14 @@ Ordered endpoints get fresh sequence numbers, so replayed deliveries wait behind
 | Events in one session | `REPLAY_MAX_EVENTS_PER_SESSION`, default `500000` |
 
 <Aside type="caution" title="The Idempotency-Key changes on a replay">
-A replayed delivery carries no key of its own, so its `Idempotency-Key` is `<event id>-<endpoint id>`. If the original event was sent with a key, the replayed request's header does not match the original one. A receiver that must recognise replays should deduplicate on its own business id or on `X-Event-Id`.
+A replayed delivery's `Idempotency-Key` is `<event id>-<endpoint id>`, so it does not match a key the original event was sent with. A receiver that must recognise replays should deduplicate on its own business id or on `X-Event-Id`.
 </Aside>
 
 ## Replay incoming webhooks
 
-Incoming events can be replayed too, to every destination of their source:
+Incoming events can be replayed to every destination of their source:
 
 - One event: `POST /api/v1/projects/{projectId}/incoming-events/{id}/replay`.
 - Many events: `POST /api/v1/projects/{projectId}/incoming-events/bulk-replay` with a required `sourceId`, and either a list of `eventIds` or a `from` and `to` range, optionally filtered by `verified` and capped by `maxEvents`.
 
 Each replay creates new forwards that start again from attempt 1.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="The ladder a resent delivery walks again." />
-  <LinkCard title="Event diff" href="/docs/outgoing/event-diff/" description="Compare two stored events before you decide what to replay." />
-  <LinkCard title="Ordering" href="/docs/outgoing/ordering/" description="Why a replay goes to the back of the sequence." />
-  <LinkCard title="API reference" href="/docs/api-reference/" description="Full request and response shapes for replay." />
-</CardGrid>

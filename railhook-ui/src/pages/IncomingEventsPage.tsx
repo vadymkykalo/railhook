@@ -32,7 +32,6 @@ import Callout from '../components/Callout';
 import { formatJson } from '../lib/json';
 
 
-/** Verification is the incoming direction's status: did this really come from the source. */
 function verificationOf(event: IncomingEventResponse): { kind: StatusKind; key: string } {
   if (event.verified === true) return { kind: 'ok', key: 'incomingEvents.verified' };
   if (event.verified === false) return { kind: 'halt', key: 'incomingEvents.failed' };
@@ -40,12 +39,6 @@ function verificationOf(event: IncomingEventResponse): { kind: StatusKind; key: 
 }
 
 
-/**
- * Incoming events are the same table as outgoing events, read from the other
- * end: a Source instead of an Endpoint, a Forward instead of a Delivery. The
- * row components are shared with the outgoing side on purpose — a person should
- * not have to learn two tables to answer the same question twice.
- */
 export default function IncomingEventsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
@@ -89,7 +82,6 @@ export default function IncomingEventsPage() {
   } = useIncomingEventAttempts(projectId, selectedEventId ?? undefined);
   const attempts = useMemo(() => attemptsPage?.content ?? [], [attemptsPage]);
 
-  /** Attempts belong to a Forward — one obligation per destination — so they group by it. */
   const forwards = useMemo(() => {
     const byDestination = new Map<string, IncomingForwardAttemptResponse[]>();
     for (const attempt of attempts) {
@@ -228,7 +220,7 @@ export default function IncomingEventsPage() {
             </SelectionBar>
           )}
 
-          <div className="overflow-hidden rounded-lg border border-rail bg-card">
+          <div className="overflow-hidden border border-rail bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -333,7 +325,7 @@ export default function IncomingEventsPage() {
 
           {selectedEvent && (
             <div className="mt-6 space-y-6">
-              <section className="rounded-lg border border-rail">
+              <section className="border border-rail">
                 <h3 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.requestMeta')}</h3>
                 <dl className="divide-y divide-rail text-[13px]">
                   {[
@@ -360,7 +352,7 @@ export default function IncomingEventsPage() {
                 )}
               </section>
 
-              <section className="rounded-lg border border-rail">
+              <section className="border border-rail">
                 <div className="flex items-center justify-between border-b border-rail px-4 py-2.5">
                   <h3 className="text-[13px] font-medium">{t('incomingEvents.detail.forwards')}</h3>
                   {canReplayIncomingEvents && (
@@ -399,7 +391,7 @@ export default function IncomingEventsPage() {
                           />
                           <ul className="space-y-2">
                             {forward.attempts.map((attempt) => (
-                              <li key={attempt.id} className="rounded-md border border-rail p-3 text-[12px]">
+                              <li key={attempt.id} className="border border-rail p-3 text-[12px]">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className="font-medium">{t('incomingEvents.detail.attempt', { number: attempt.attemptNumber })}</span>
                                   {attempt.responseCode != null && (
@@ -418,13 +410,7 @@ export default function IncomingEventsPage() {
                                     {t('incomingEvents.detail.nextRetry', { time: formatDateTime(attempt.nextRetryAt) })}
                                   </p>
                                 )}
-                                {/* What we sent, not only what came back. The Forward's request
-                                    headers and body are recorded server-side — masked through
-                                    HeaderSanitizer and truncated there — and showing them is what
-                                    brings debugging a Forward level with debugging a Delivery,
-                                    which has shown both for as long as it has existed. Collapsed
-                                    by default: the response is what a reader looks at first, and
-                                    "what did we send them" is the second question. */}
+                                {/* Collapsed: the response is what a reader looks at first. */}
                                 {attempt.requestHeadersJson && (
                                   <details className="mt-1.5">
                                     <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground">
@@ -461,7 +447,7 @@ export default function IncomingEventsPage() {
               </section>
 
               {selectedEvent.headersJson && (
-                <section className="rounded-lg border border-rail">
+                <section className="border border-rail">
                   <h3 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.headers')}</h3>
                   <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-[11px]">
                     {formatJson(selectedEvent.headersJson)}
@@ -470,7 +456,7 @@ export default function IncomingEventsPage() {
               )}
 
               {selectedEvent.bodyRaw && (
-                <section className="rounded-lg border border-rail">
+                <section className="border border-rail">
                   <h3 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.body')}</h3>
                   <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-[11px]">
                     {formatJson(selectedEvent.bodyRaw)}

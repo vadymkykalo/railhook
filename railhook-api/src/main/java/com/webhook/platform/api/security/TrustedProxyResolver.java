@@ -11,30 +11,15 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * Resolves the real client IP for a request, honouring {@code X-Forwarded-For} /
- * {@code X-Real-IP} only when the direct TCP peer is a configured trusted proxy.
- *
- * <p>This is the single shared resolver for the whole API module — ingress webhook
- * handling, auth rate limiting, audit logging and the test-endpoint feature all
- * route through this class rather than each re-implementing header parsing.
- *
- * <p>Default is safe: with no {@code webhook.trusted-proxies} configured, nothing is
- * trusted and every caller always gets {@link HttpServletRequest#getRemoteAddr()}.
- * An operator running behind a reverse proxy / load balancer must explicitly list
- * that proxy's address (or CIDR) to enable header-based resolution.
+ * Forwarding headers are honoured only when the direct peer is a configured trusted proxy.
+ * With {@code webhook.trusted-proxies} unset nothing is trusted and the peer address is used.
  */
 @Component
 @Slf4j
 public class TrustedProxyResolver {
 
-    /**
-     * A hop value is only handed to {@link InetAddress#getByName(String)} (which can
-     * fall back to a DNS lookup for non-literal input) once it has passed this literal
-     * IPv4/IPv6 syntax check. X-Forwarded-For hops come from the request when the peer
-     * is trusted, but individual hop values inside the header are still attacker
-     * reachable via a compromised or overly-broad proxy chain, so we never let one
-     * trigger a network DNS query.
-     */
+    // Header hops are attacker-controlled; only literal IPs reach InetAddress, which would
+    // otherwise do a DNS lookup.
     private static final Pattern IPV4_LITERAL = Pattern.compile(
             "^((25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1?\\d?\\d)$");
     private static final Pattern IPV6_CHARSET = Pattern.compile("^[0-9a-fA-F:.]+$");
@@ -47,18 +32,8 @@ public class TrustedProxyResolver {
     }
 
     /**
-     * Resolves the client IP for the given request.
-     *
-     * <p>If the direct peer ({@code getRemoteAddr()}) is not a trusted proxy, the
-     * peer address is returned as-is and no header is consulted.
-     *
-     * <p>If the peer is trusted, {@code X-Forwarded-For} is walked from the right
-     * (nearest hop first); the first hop that is not itself a trusted proxy is
-     * returned as the client IP. This is the reverse of naively taking the
-     * left-most entry, which is always attacker-controlled input on any chain
-     * with a trusted proxy in it. If every hop is trusted (a fully internal
-     * chain), the left-most (original) entry is returned. Falls back to
-     * {@code X-Real-IP}, then to the peer address, if no header is present.
+     * X-Forwarded-For is walked from the right and the first untrusted hop wins: the left-most
+     * entry is whatever the client chose to send.
      */
     public String resolve(HttpServletRequest request) {
         String remoteAddr = request.getRemoteAddr();
@@ -78,8 +53,7 @@ public class TrustedProxyResolver {
                     return hop;
                 }
             }
-            // Every hop in the chain is itself a trusted proxy (fully internal
-            // hop chain) — fall back to the original, left-most entry.
+            // Fully internal chain: every hop is trusted.
             for (String hop : hops) {
                 String trimmed = hop.trim();
                 if (!trimmed.isEmpty()) {
@@ -130,12 +104,6 @@ public class TrustedProxyResolver {
         return false;
     }
 
-    /**
-     * True only for literal IPv4/IPv6 syntax — never for hostnames. Guards every
-     * call site that feeds attacker-influenced strings into {@code InetAddress},
-     * which otherwise silently falls back to a real DNS lookup for anything that
-     * isn't a recognised literal address.
-     */
     static boolean isLiteralIpAddress(String address) {
         if (IPV4_LITERAL.matcher(address).matches()) {
             return true;

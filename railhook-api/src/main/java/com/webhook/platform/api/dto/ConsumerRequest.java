@@ -8,7 +8,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** A Consumer, on create and on update. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

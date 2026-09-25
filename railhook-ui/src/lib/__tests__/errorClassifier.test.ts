@@ -6,14 +6,7 @@ const attempt = (errorMessage: string | undefined, httpStatusCode?: number): Del
   ({ id: 'a', deliveryId: 'd', attemptNumber: 1, errorMessage, httpStatusCode,
     createdAt: new Date().toISOString() } as DeliveryAttemptResponse);
 
-/**
- * The two cases that never reached the network.
- *
- * Both used to fall through every branch below them into UNKNOWN — "something went wrong,
- * check the endpoint" — which points the reader at a receiver that was never asked. They are
- * checked before the connection-level rules for that reason, so these cases pin the order as
- * much as the mapping.
- */
+/** Checked before the connection rules, or these fell into UNKNOWN and blamed the receiver. */
 describe('classifyError, for an attempt that never left the worker', () => {
   it('names a failed transformation, not an unknown error', () => {
     const result = classifyError(attempt(
@@ -29,7 +22,6 @@ describe('classifyError, for an attempt that never left the worker', () => {
       .toBe('TRANSFORM_FAILED');
   });
 
-  /** A cancellation is a filter doing its job. Calling it an error would be a false alarm. */
   it('names a cancellation as information, not as a failure', () => {
     const result = classifyError(attempt('CANCELLED_BY_TRANSFORMATION: test traffic'));
 
@@ -37,10 +29,7 @@ describe('classifyError, for an attempt that never left the worker', () => {
     expect(result.severity).toBe('info');
   });
 
-  /**
-   * A transformation failure carries no status code, which is exactly the shape the timeout and
-   * connection rules match on. Ordering is the whole of this test.
-   */
+  /** No status code: the same shape timeout rules match on, so ordering is the test. */
   it('is not mistaken for a timeout when the word appears in the script\'s own message', () => {
     expect(classifyError(attempt('TRANSFORM_FAILED: Script transformation failed (TIMEOUT): the script was still running')).category)
       .toBe('TRANSFORM_FAILED');

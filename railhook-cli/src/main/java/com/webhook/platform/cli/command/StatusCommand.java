@@ -28,11 +28,9 @@ public class StatusCommand implements Callable<Integer> {
         out.println("═══════════════════════════════════════");
         out.println();
 
-        // Config
         out.println("  Config:     " + configService.getConfigPath());
         out.println("  Backend:    " + config.getBackendUrl());
 
-        // Auth
         if (config.isAuthenticated()) {
             out.println("  Auth:       ✓ authenticated");
             if (config.getUserId() != null) out.println("  User ID:    " + config.getUserId());
@@ -48,7 +46,6 @@ public class StatusCommand implements Callable<Integer> {
         out.println();
         HttpApiClient client = new HttpApiClient(configService);
 
-        // Backend health
         out.print("  Health:     ");
         try {
             JsonNode health = client.getHealth();
@@ -62,7 +59,6 @@ public class StatusCommand implements Callable<Integer> {
             out.println("✗ unreachable (" + e.getMessage() + ")");
         }
 
-        // Active tunnels
         try {
             JsonNode tunnelStatus = client.get("/api/v1/tunnels/status", JsonNode.class);
             int activeTunnels = tunnelStatus.has("activeTunnels") ? tunnelStatus.get("activeTunnels").asInt() : 0;

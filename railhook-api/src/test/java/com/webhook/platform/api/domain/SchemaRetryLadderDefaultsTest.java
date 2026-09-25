@@ -23,34 +23,16 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over the retry ladder's two homes.
- *
- * <p>A ladder default is written down twice by necessity: once in {@link RetryLadderDefaults},
- * which the api services use when a request omits one, and once as a Flyway column default,
- * which applies to any row inserted without the column. SQL cannot reference a Java constant,
- * so nothing but this test keeps the two saying the same thing.
- *
- * <p>They had already drifted once, in the direction this test is aimed at: the worker's two
- * fallback ladders disagreed with each other, and a Destination created without a ladder was
- * abandoned hours earlier than the same customer would have expected from the outgoing side.
- *
- * <p>Deliberately a plain {@code *Test}: it reads the migration files off the classpath and
- * needs no database, so it must run in the no-Docker unit job — see
- * {@code scripts/check-test-routing.sh}.
- */
+// SQL cannot reference a Java constant, so only this keeps column defaults and RetryLadderDefaults equal.
 @Tag("ratchet")
 class SchemaRetryLadderDefaultsTest {
 
-    /** {@code retry_delays TEXT [NOT NULL] DEFAULT '60,300,...'} */
     private static final Pattern RETRY_DELAYS_DEFAULT = Pattern.compile(
             "retry_delays\\s+TEXT\\s+(?:NOT\\s+NULL\\s+)?DEFAULT\\s+'([^']+)'", Pattern.CASE_INSENSITIVE);
 
-    /** {@code max_attempts INTEGER [NOT NULL] DEFAULT 7} */
     private static final Pattern MAX_ATTEMPTS_DEFAULT = Pattern.compile(
             "max_attempts\\s+INTEGER\\s+(?:NOT\\s+NULL\\s+)?DEFAULT\\s+(\\d+)", Pattern.CASE_INSENSITIVE);
 
-    /** {@code retryable_statuses TEXT [NOT NULL] DEFAULT '408,429,500-599'} */
     private static final Pattern RETRYABLE_STATUSES_DEFAULT = Pattern.compile(
             "retryable_statuses\\s+TEXT\\s+(?:NOT\\s+NULL\\s+)?DEFAULT\\s+'([^']+)'", Pattern.CASE_INSENSITIVE);
 
@@ -123,12 +105,7 @@ class SchemaRetryLadderDefaultsTest {
                         + String.join("\n  ", offenders));
     }
 
-    /**
-     * The retryable-status spec has the same two homes for the same reason, and one extra hazard:
-     * it is the only value in the product whose default has to be <em>identical</em> across three
-     * tables, because a Subscription's copy lands on its Deliveries and a Destination's is read
-     * directly. A drift here would give one direction a different idea of what is worth retrying.
-     */
+    // A Subscription's copy lands on its Deliveries and a Destination's is read directly, so all three must agree.
     @Test
     @DisplayName("every retryable_statuses default in the schema matches RetryableStatuses.DEFAULT_SPEC")
     void retryableStatusDefaultsMatchTheConstant() throws IOException {

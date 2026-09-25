@@ -98,7 +98,6 @@ describe('IncomingDlqPage', () => {
     expect(screen.getByText('https://billing.internal/hooks')).toBeInTheDocument();
   });
 
-  /** The whole point of the page: recovery that does not fan out to every destination. */
   it('retries one forward by its own attempt id', async () => {
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
     vi.mocked(incomingDlqApi.list).mockResolvedValue(populatedPage([DLQ_ITEM]));

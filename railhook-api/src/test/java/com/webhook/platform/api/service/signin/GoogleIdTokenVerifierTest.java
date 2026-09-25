@@ -13,6 +13,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -20,10 +21,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * An ID token is the only thing that says who signed in, so every check Google documents for it
- * is a way somebody else's account gets opened when it is skipped.
- */
+// Every check Google documents for an ID token is a way into someone else's account when skipped.
 class GoogleIdTokenVerifierTest {
 
     private static final String CLIENT_ID = "client-123.apps.googleusercontent.com";
@@ -162,7 +160,7 @@ class GoogleIdTokenVerifierTest {
     private static String base64Url(BigInteger value) {
         byte[] bytes = value.toByteArray();
         if (bytes.length > 1 && bytes[0] == 0) {
-            bytes = java.util.Arrays.copyOfRange(bytes, 1, bytes.length);
+            bytes = Arrays.copyOfRange(bytes, 1, bytes.length);
         }
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }

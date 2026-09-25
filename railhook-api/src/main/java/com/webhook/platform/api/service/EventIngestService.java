@@ -79,16 +79,14 @@ public class EventIngestService {
         this.objectMapper = objectMapper;
         this.deliveryDispatch = deliveryDispatch;
         this.meterRegistry = meterRegistry;
-        // Registered here rather than on first use: a counter that does not exist until its first
-        // increment has no series, and a quiet deployment's dashboard read "No data" instead of 0.
+        // Registered eagerly so a quiet deployment exports 0 instead of "No data".
         this.eventsIngestedCounter = Counter.builder("events_ingested_total").tag("direction", "outgoing")
                 .description("Events accepted, by the direction they travel").register(meterRegistry);
         this.duplicateEventsCounter = Counter.builder("events_duplicate_total").register(meterRegistry);
         this.fanoutLimitedCounter = Counter.builder("events_fanout_limited_total").register(meterRegistry);
         this.rulesMatchedCounter = Counter.builder("rules_matched_total").register(meterRegistry);
         this.rulesDroppedCounter = Counter.builder("rules_drop_total").register(meterRegistry);
-        // Not deliveries_created_total: Prometheus drops a trailing "_created" from a counter's name,
-        // so that name was exported as deliveries_total and the dashboard asking for it found nothing.
+        // Not deliveries_created_total: Prometheus strips a trailing "_created" from counter names.
         this.deliveriesCreatedCounter = Counter.builder("deliveries_total")
                 .description("Deliveries created for accepted events").register(meterRegistry);
         this.sequenceGeneratorService = sequenceGeneratorService;
@@ -102,18 +100,9 @@ public class EventIngestService {
     }
 
     public EventIngestResponse ingestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
-        // Populated by doIngestEvent() with ordering-enabled deliveries that were saved
-        // *without* a sequence number. Deliberately generated and assigned only after this
-        // method's transaction has committed (see assignSequenceNumbersPostCommit) so that a
-        // rollback here -- including the DataIntegrityViolationException idempotency-race path
-        // below -- can never burn a sequence number that no delivery ends up carrying.
+        // Applied after commit: neither rolls back, so inside they burned numbers and charged
+        // for aborted ingests.
         List<Delivery> pendingSequenceAssignment = new ArrayList<>();
-        // Set by doIngestEvent() to the Organization that should be charged for this Event,
-        // and left null when nothing new was stored — a duplicate resolved by idempotency
-        // must not be charged twice. Applied only after the commit, for exactly the reason
-        // the sequence numbers are: this counter lives in Redis and is not rolled back with
-        // the transaction, so incrementing it inside meant a rolled-back ingest still
-        // consumed quota. Every abort did it, including the idempotency-race path below.
         AtomicReference<UUID> organizationToCharge = new AtomicReference<>();
         EventIngestResponse response;
         try {
@@ -136,14 +125,7 @@ public class EventIngestService {
         return response;
     }
 
-    /**
-     * Charges the Organization for the Event the transaction just committed.
-     *
-     * <p>Deliberately fire-and-forget and deliberately after the commit: the counter is an
-     * approximate Redis value, so failing to charge is better than failing an ingest that has
-     * already been accepted — but charging for one that never happened is a customer-visible
-     * defect, which is what running this inside the transaction produced.
-     */
+    // Fire-and-forget: missing a charge is better than failing an ingest already accepted.
     private void chargeQuotaPostCommit(UUID organizationId) {
         if (organizationId == null) {
             return;
@@ -156,13 +138,7 @@ public class EventIngestService {
         }
     }
 
-    /**
-     * Generates and persists sequence numbers for ordering-enabled deliveries created by the
-     * ingest transaction that just committed. Each delivery is handled independently: a
-     * failure generating or backfilling one does not affect the others, and simply means that
-     * one delivery proceeds without ordering enforcement (degrades gracefully) rather than
-     * blocking or losing the delivery itself, which was already committed.
-     */
+    // A failure here only means that one delivery goes out without ordering; it is already committed.
     private void assignSequenceNumbersPostCommit(List<Delivery> deliveries) {
         for (Delivery delivery : deliveries) {
             try {
@@ -186,10 +162,8 @@ public class EventIngestService {
 
     private EventIngestResponse doIngestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey,
             List<Delivery> pendingSequenceAssignment, AtomicReference<UUID> organizationToCharge) {
-        // Enforce idempotency policy
-        // Tenant-scoped: a project outside the caller's organization is not found, and the ingest
-        // stops. It used to carry on with a null project, so a workflow's createEvent node naming
-        // another organization's project stored an Event there.
+        // Must throw: continuing with a null project let a workflow store an Event in another
+        // organization's project.
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
         if (project != null && project.getIdempotencyPolicy() == IdempotencyPolicy.REQUIRED && idempotencyKey == null) {
@@ -211,10 +185,7 @@ public class EventIngestService {
             }
         }
 
-        // After the key lookup, as IngressService orders it: the retry of an Event already accepted
-        // stores and charges nothing, so the quota has nothing to refuse. Checked before it, the
-        // client that lost the answer to the Event which took the month's last slot was told it
-        // was over quota for an Event it had.
+        // After the idempotency lookup, so retrying an accepted Event is never refused for quota.
         entitlementService.checkEventQuota();
 
         List<String> schemaWarnings = schemaValidationGate.check(project, projectId, request.getType(), request.getData());
@@ -222,16 +193,12 @@ public class EventIngestService {
         Event event = createEvent(projectId, request, idempotencyKey);
         event = eventRepository.saveAndFlush(event);
         eventsIngestedCounter.increment();
-        // Recorded here, charged after the commit — see chargeQuotaPostCommit.
         if (project != null) {
             organizationToCharge.set(project.getOrganizationId());
         }
         log.info("Created event: {} for project: {}", event.getId(), projectId);
 
-        // ── Decide, then commit ────────────────────────────────────────
-        // EventIntake gathers the rules and Subscriptions and turns them into a decision with no
-        // writes of its own; everything below carries that decision out. Replay decides through
-        // the same code, so a replayed Event goes where this one went.
+        // Replay decides through the same EventIntake, so a replayed Event goes where this one went.
         EventIntake.Decision decision;
         try {
             decision = eventIntake.decide(event);
@@ -271,7 +238,6 @@ public class EventIngestService {
         log.info("Created {} deliveries for event: {} (rules matched: {})",
                 deliveriesCreated, event.getId(), decision.rulesMatched());
 
-        // ── Workflow trigger outbox — durable, same TX as event + deliveries ──
         int depth = WorkflowTriggerService.getCurrentDepth() + 1;
         workflowTriggerOutboxRepository.save(WorkflowTriggerOutbox.builder()
                 .projectId(projectId)
@@ -295,7 +261,6 @@ public class EventIngestService {
                                 + maxPayloadSizeBytes + " bytes)");
             }
 
-            // Compress large payloads to reduce DB storage
             PayloadCompressionUtil.CompressionResult compression = 
                     PayloadCompressionUtil.compress(payload, compressionThresholdBytes);
             

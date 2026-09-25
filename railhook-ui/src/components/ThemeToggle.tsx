@@ -19,7 +19,7 @@ export default function ThemeToggle({ variant = 'icon', className }: ThemeToggle
       <button
         type="button"
         onClick={toggle}
-        className={className ?? 'flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent w-full'}
+        className={className ?? 'flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors hover:bg-secondary w-full'}
         title={t('nav.toggleTheme')}
       >
         {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -32,7 +32,7 @@ export default function ThemeToggle({ variant = 'icon', className }: ThemeToggle
     <button
       type="button"
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(); }}
-      className={className ?? 'p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors'}
+      className={className ?? 'p-2 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors'}
       title={t('nav.toggleTheme')}
       aria-label={t('nav.toggleTheme')}
     >

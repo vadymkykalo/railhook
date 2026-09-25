@@ -21,15 +21,7 @@ import { cn } from '../lib/utils';
 import { Band, FactCard, PageIntro, panel, SectionHeading } from './landing/primitives';
 import { REPO_URL } from './landing/plans';
 
-/**
- * Who builds Railhook and why, for the reader who wants to know what is behind the product
- * before relying on it.
- *
- * Facts only: the maintainer and his GitHub profile, the licence, the reasons the project exists
- * as the README and the landing page already state them, and the stack. No team size, customer
- * logos, location or funding — none of them is true yet, and an about page is where a reader
- * goes to find out whether the rest of the site is.
- */
+/** Facts only: no team size, logos or funding — none of them is true yet. */
 const MAINTAINER_URL = 'https://github.com/vadymkykalo';
 
 function LinkCard({
@@ -46,7 +38,7 @@ function LinkCard({
   const content = (
     <>
       <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
-      <span className="mt-3 block text-[15px] font-semibold text-foreground">{title}</span>
+      <span className="mt-3 block text-[15px] font-medium text-foreground">{title}</span>
       <span className="mt-2 block text-[15px] leading-relaxed text-muted-foreground">{body}</span>
     </>
   );
@@ -72,7 +64,7 @@ export default function AboutPage() {
 
       <Band muted labelledBy="about-who">
         <div className={cn('max-w-3xl p-6 sm:p-8', panel())}>
-          <h2 id="about-who" className="font-display text-[1.6rem] font-bold tracking-[-0.02em] text-foreground">
+          <h2 id="about-who" className="text-[1.75rem] font-normal leading-[1.16] tracking-[-0.02em] sm:text-[2rem] text-foreground">
             {t('about.who.title')}
           </h2>
           <p className="mt-3 text-[1.05rem] leading-relaxed text-muted-foreground">{t('about.who.body')}</p>
@@ -82,7 +74,7 @@ export default function AboutPage() {
                 href={MAINTAINER_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-10 items-center gap-2 text-sm font-medium text-primary hover:underline"
+                className="inline-flex min-h-10 items-center gap-2 text-sm font-medium link-ink"
               >
                 <Github className="h-4 w-4" aria-hidden="true" />
                 {t('about.who.github')}
@@ -93,7 +85,7 @@ export default function AboutPage() {
                 href={REPO_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-10 items-center gap-2 text-sm font-medium text-primary hover:underline"
+                className="inline-flex min-h-10 items-center gap-2 text-sm font-medium link-ink"
               >
                 {t('about.who.repo')}
               </a>
@@ -125,7 +117,9 @@ export default function AboutPage() {
             {(className, content) => <a href={docsUrl(i18n.language)} className={className}>{content}</a>}
           </LinkCard>
           <LinkCard icon={History} title={t('about.links.changelog.title')} body={t('about.links.changelog.body')}>
-            {(className, content) => <Link to="/changelog" className={className}>{content}</Link>}
+            {(className, content) => (
+              <a href={`${REPO_URL}/blob/main/CHANGELOG.md`} target="_blank" rel="noopener noreferrer" className={className}>{content}</a>
+            )}
           </LinkCard>
           <LinkCard icon={MessageSquare} title={t('about.links.contact.title')} body={t('about.links.contact.body')}>
             {(className, content) => <Link to="/contact" className={className}>{content}</Link>}

@@ -1,13 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { PROJECT_SECTIONS, sectionFor, segmentOf } from '../nav.config';
 
-/**
- * Seen on production, from a brand-new account: "I can't click anything on the left until I
- * create a project." Every rail entry resolved to `/admin/projects` when there was no project, so
- * six links all landed on the page the person was already on. With no project, an entry now leads
- * to its own setup screen, which says what the section is for and creates the project that
- * unlocks it.
- */
 describe('navigation without a project', () => {
   const projectScoped = PROJECT_SECTIONS.filter((section) => section.path('project-1').includes('/projects/'));
 

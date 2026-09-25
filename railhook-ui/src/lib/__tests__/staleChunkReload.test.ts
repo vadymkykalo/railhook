@@ -31,7 +31,6 @@ describe('installStaleChunkReload', () => {
     const second = preloadError();
 
     expect(reload).toHaveBeenCalledTimes(1);
-    // Not prevented: the error goes on to the route's error screen instead.
     expect(second.defaultPrevented).toBe(false);
     uninstall();
   });

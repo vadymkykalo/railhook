@@ -23,7 +23,6 @@ import {
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
 
-/** A tunnel lives only as long as a CLI stays connected, so the page is a live roster. */
 export default function TunnelsPage() {
   const { t } = useTranslation();
   const { canManageEndpoints: canCloseTunnels } = usePermissions();
@@ -92,7 +91,7 @@ export default function TunnelsPage() {
       />
 
       {status && (
-        <dl className="mb-6 grid grid-cols-3 divide-x divide-rail rounded-lg border border-rail bg-card">
+        <dl className="mb-6 grid grid-cols-3 divide-x divide-rail border border-rail bg-card">
           {([
             ['tunnels.stats.active', status.activeTunnels],
             ['tunnels.stats.pending', status.pendingRequests],

@@ -21,17 +21,10 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * A retention run has to end before its ShedLock does.
- *
- * <p>Each loop deleted until a batch came back short. Against a backlog, or a batch that takes a
- * minute because it scans the whole table, that outlived {@code lockAtMostFor}: the lock expired
- * under a run still deleting, and the next replica's run started on top of it.
- */
+// A retention run that outlived lockAtMostFor let the next replica's run start on top of it.
 class DataRetentionTimeBudgetTest {
 
     private static final int BATCH = 1000;
-    /** Far more batches than any budget allows, so a loop with no budget fails instead of spinning. */
     private static final int RUNAWAY = 500;
 
     private final MutableClock clock = new MutableClock(Instant.parse("2026-09-17T02:00:00Z"));

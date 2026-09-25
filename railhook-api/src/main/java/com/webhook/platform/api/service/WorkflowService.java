@@ -42,31 +42,17 @@ public class WorkflowService {
     private final ObjectMapper objectMapper;
     private final WorkflowEngine workflowEngine;
 
-    /**
-     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
-     * lookup only sees projects inside the caller's organization: a foreign project id is
-     * indistinguishable from a missing one, which is intended.
-     */
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
     }
 
-    /** Another project's workflow is "not found", like a missing one - the URL names the project. */
     private Workflow requireWorkflow(UUID projectId, UUID id) {
         return workflowRepository.findByIdAndProjectId(id, projectId)
                 .orElseThrow(() -> new NotFoundException("Workflow not found"));
     }
 
-    /**
-     * What a node reaches outside the workflow has to be inside the workflow's own project.
-     *
-     * <p>The executors run with only the organization in scope, so a createEvent node would emit
-     * into, and a delivery node deliver to, any project of the organization. Checked here, where
-     * the project is known: a key confined to one project could otherwise save a workflow that
-     * writes Events into another, or sends its data to another project's endpoint. A reference
-     * outside the project reads as not found, like the id of another organization's project.
-     */
+    // Executors run with only the organization in scope, so this stops cross-project nodes.
     private void validateNodeProjects(Object definition, UUID projectId) {
         if (definition == null) {
             return;
@@ -140,7 +126,6 @@ public class WorkflowService {
                 .collect(Collectors.toList());
     }
 
-    /** What a workflow's execution history amounts to: the three states a listing shows. */
     private record ExecutionCounts(long succeeded, long failed, long running) {
 
         static final ExecutionCounts NONE = new ExecutionCounts(0, 0, 0);
@@ -172,7 +157,6 @@ public class WorkflowService {
         Workflow workflow = requireWorkflow(projectId, id);
         validateNodeProjects(request.getDefinition(), projectId);
 
-        // Check name uniqueness if changed
         if (!workflow.getName().equals(request.getName()) &&
                 workflowRepository.existsByProjectIdAndName(workflow.getProjectId(), request.getName())) {
             throw new ConflictException("Workflow with this name already exists");
@@ -215,8 +199,6 @@ public class WorkflowService {
         return mapToResponse(workflow);
     }
 
-    // ── Manual trigger ───────────────────────────────────────────────────
-
     public WorkflowExecutionResponse manualTrigger(UUID projectId, UUID workflowId, Object testPayload) {
         Workflow workflow = requireWorkflow(projectId, workflowId);
 
@@ -243,12 +225,9 @@ public class WorkflowService {
             WorkflowTriggerService.clearCurrentDepth();
         }
 
-        // Re-fetch to get updated status
         execution = executionRepository.findById(execution.getId()).orElse(execution);
         return getExecution(projectId, workflowId, execution.getId());
     }
-
-    // ── Executions ──────────────────────────────────────────────────────
 
     public Page<WorkflowExecutionResponse> listExecutions(UUID projectId, UUID workflowId, int page, int size) {
         Workflow workflow = requireWorkflow(projectId, workflowId);
@@ -272,8 +251,6 @@ public class WorkflowService {
         response.setSteps(steps.stream().map(this::mapStepToResponse).collect(Collectors.toList()));
         return response;
     }
-
-    // ── Mapping ─────────────────────────────────────────────────────────
 
     private WorkflowResponse mapToResponse(Workflow w) {
         return mapToResponse(w, new ExecutionCounts(
@@ -330,8 +307,6 @@ public class WorkflowService {
                 .completedAt(s.getCompletedAt())
                 .build();
     }
-
-    // ── JSON helpers ────────────────────────────────────────────────────
 
     private String serializeJson(Object obj) {
         if (obj == null) return "{}";

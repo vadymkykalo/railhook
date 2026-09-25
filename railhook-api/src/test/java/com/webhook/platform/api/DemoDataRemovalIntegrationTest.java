@@ -24,14 +24,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Turning the demo off takes its rows with it: an installation that ran the demo once and then
- * disabled it is left with nothing of the demo's, and nothing of anyone else's is touched.
- *
- * <p>This context has the demo off, as a restart after {@code DEMO_ENABLED=false} would. The
- * demo's rows are put in place by a seeder built by hand, which is what the earlier boot with the
- * demo on left behind.
- */
 class DemoDataRemovalIntegrationTest extends AbstractIntegrationTest {
 
     private static final List<String> DEMO_TABLES = List.of(
@@ -96,14 +88,7 @@ class DemoDataRemovalIntegrationTest extends AbstractIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM users WHERE email = ?", "demo-removal-neighbour@example.com")).isOne();
     }
 
-    /**
-     * The demo's JavaScript Transformation, there and back again.
-     *
-     * <p>A Transformation is the first thing the seeder inserts that something else points at —
-     * a Subscription's {@code transformation_id} — and that foreign key is {@code ON DELETE SET
-     * NULL}, so a remover that forgot it would leave the row behind quietly rather than fail.
-     * Hence a case of its own: seeded, wired, gone.
-     */
+    // Its FK is ON DELETE SET NULL, so a remover that forgot it would leave the row silently.
     @Test
     void theJavaScriptTransformationIsSeededWiredAndThenRemoved() throws Exception {
         registerNeighbourWithAnEvent();
@@ -154,7 +139,7 @@ class DemoDataRemovalIntegrationTest extends AbstractIntegrationTest {
             assertThat(count("SELECT COUNT(*) FROM memberships WHERE user_id = ? AND organization_id = ?",
                     DemoTenant.USER_ID, neighbourOrganization)).isOne();
         } finally {
-            // The other tests share this database and start from a demo person that is the demo's alone.
+            // Other tests share this database and expect the demo user to belong to the demo alone.
             jdbc.update("DELETE FROM memberships WHERE user_id = ?", DemoTenant.USER_ID);
             jdbc.update("DELETE FROM users WHERE id = ?", DemoTenant.USER_ID);
         }

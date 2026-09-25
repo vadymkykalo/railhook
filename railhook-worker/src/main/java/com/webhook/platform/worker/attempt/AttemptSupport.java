@@ -6,10 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * What both Attempt Stores do identically. Copies of these drifted apart once already, which is
- * how the two directions ended up fencing a Claim on different rules.
- */
+/** Shared by both stores. Separate copies once drifted and fenced Claims by different rules. */
 @Slf4j
 final class AttemptSupport {
 
@@ -20,23 +17,12 @@ final class AttemptSupport {
     private AttemptSupport() {
     }
 
-    /**
-     * Does a Claim still own the row it is about to write?
-     *
-     * <p>The status cannot answer it: a claim swept as abandoned and re-claimed by another
-     * attempt leaves the row in the same state, for somebody else. An unfenced Claim — one whose
-     * retry message predates the token — matches only a row that carries no token either.
-     */
+    /** An unfenced Claim (from an older retry message) matches only a row with no token. */
     static boolean fenceMatches(UUID rowToken, UUID claimFence) {
         return rowToken == null ? claimFence == null : rowToken.equals(claimFence);
     }
 
-    /**
-     * A Delivery's or Destination's custom headers, into a map the caller still owns — a store
-     * records what it sent, so it needs the headers before they disappear into the request
-     * builder. Host, Content-Length and Transfer-Encoding belong to the transport, not to the
-     * caller, and are left out.
-     */
+    /** Host, Content-Length and Transfer-Encoding belong to the transport and are skipped. */
     @SuppressWarnings("unchecked")
     static void collectCustomHeaders(Map<String, String> into, String customHeadersJson,
             ObjectMapper objectMapper) {

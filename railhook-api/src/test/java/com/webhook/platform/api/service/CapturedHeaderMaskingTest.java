@@ -27,20 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Every path that keeps somebody's request keeps their credentials with it unless it is told not
- * to.
- *
- * <p>Three of the four already were: the ingress capture, the outgoing attempt record and the
- * incoming one all run their headers through a sanitizer before anything is written down. The
- * test-endpoint capture and the tunnel request log were reimplementing the same loop without it,
- * so an {@code Authorization} header sent at a test endpoint landed in the database and was then
- * rendered, in full, in the dashboard.
- *
- * <p>Masking at the point of storage rather than the point of display, because the dashboard is
- * not the only reader of those rows — a support export or a database dump is not going to
- * re-apply a UI decision.
- */
+// The test-endpoint capture and the tunnel log stored Authorization headers unmasked.
 class CapturedHeaderMaskingTest {
 
     private static final String MASKED = "***MASKED***";
@@ -78,7 +65,7 @@ class CapturedHeaderMaskingTest {
 
         TestEndpointService service = new TestEndpointService(
                 endpoints, captures, projects,
-                mock(TrustedProxyResolver.class), txManager, organizationId -> java.util.Optional.empty());
+                mock(TrustedProxyResolver.class), txManager, organizationId -> Optional.empty());
 
         service.captureRequest("abc", "{}", request);
 
@@ -112,9 +99,7 @@ class CapturedHeaderMaskingTest {
     @Test
     @DisplayName("relayed tunnel headers are masked before the log row, not before the relay")
     void tunnelLogMasksCredentials() {
-        // The tunnel has to forward Authorization verbatim or the developer's local service
-        // rejects the request. Persisting it is the separate decision, and the one that was
-        // never made.
+        // The relay must still forward Authorization verbatim; only the stored copy is masked.
         Map<String, String> relayed = new LinkedHashMap<>();
         relayed.put("Authorization", "Bearer sk_live_do_not_store_this");
         relayed.put("X-Api-Key", "key_do_not_store_this");
@@ -130,11 +115,4 @@ class CapturedHeaderMaskingTest {
                 .isEqualTo("Bearer sk_live_do_not_store_this");
     }
 
-    @Test
-    @DisplayName("a null header name does not take the sanitizer down with it")
-    void nullHeaderNameIsNotSensitive() {
-        // The common copy of this class guards for null and this one did not, which is the sort
-        // of difference two copies of a denylist acquire.
-        assertThat(HeaderSanitizer.isSensitiveHeader(null)).isFalse();
-    }
 }

@@ -3,41 +3,23 @@ import { useTranslation } from 'react-i18next';
 import type { SignatureScheme } from '../types/api.types';
 import { cn } from '../lib/utils';
 
-/**
- * Which signature headers an endpoint is sent.
- *
- * The three options are told apart by their words and by the header names they
- * list, never by colour — the status hues mean something else everywhere else in
- * the dashboard, and none of these is a failure.
- *
- * `BOTH` leads because it is the column default and the only choice that costs
- * nothing: a receiver ignores the headers it does not read, so an endpoint sent
- * both sets keeps verifying whichever one it already knows.
- */
+/** BOTH leads: it is the column default, and receivers ignore headers they do not read. */
 const OPTIONS: { scheme: SignatureScheme; headers: string }[] = [
   { scheme: 'BOTH', headers: 'X-Signature · webhook-id / webhook-timestamp / webhook-signature' },
   { scheme: 'STANDARD', headers: 'webhook-id / webhook-timestamp / webhook-signature' },
   { scheme: 'LEGACY', headers: 'X-Signature' },
 ];
 
-/** The translation key stem for one option — `BOTH` lives under `signatureScheme.both`. */
 function optionKey(scheme: SignatureScheme): string {
   return scheme.toLowerCase();
 }
 
-/**
- * Whether this scheme puts the Standard Webhooks headers on a delivery, and so
- * whether the `whsec_…` secret is one the receiver has any use for.
- *
- * Undefined is the column default: an endpoint that predates
- * `V062__endpoint_signature_scheme.sql` is sent both header sets.
- */
+/** Undefined is the column default (BOTH), so it sends both header sets. */
 export function sendsStandardHeaders(scheme: SignatureScheme | undefined): boolean {
   return (scheme ?? 'BOTH') !== 'LEGACY';
 }
 
 interface SignatureSchemePickerProps {
-  /** Undefined reads as the column default, `BOTH`, rather than as no choice. */
   value: SignatureScheme | undefined;
   onChange: (scheme: SignatureScheme) => void;
   disabled?: boolean;
@@ -69,9 +51,9 @@ export default function SignatureSchemePicker({ value, onChange, disabled }: Sig
               disabled={disabled}
               onClick={() => onChange(scheme)}
               className={cn(
-                'block w-full rounded-lg border p-3 text-left transition-colors',
+                'block w-full border p-3 text-left transition-colors',
                 active
-                  ? 'border-primary bg-accent'
+                  ? 'border-primary bg-secondary'
                   : 'border-rail bg-card hover:border-primary/40 hover:bg-secondary/50',
                 disabled && 'cursor-not-allowed opacity-60 hover:border-rail hover:bg-card'
               )}

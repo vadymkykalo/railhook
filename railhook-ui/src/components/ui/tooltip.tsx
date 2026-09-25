@@ -39,7 +39,7 @@ export function Tooltip({ content, children, side = 'top', className, enabled = 
         <div
           role="tooltip"
           className={cn(
-            "absolute z-50 px-2.5 py-1.5 text-xs font-medium rounded-md",
+            "absolute z-50 px-2.5 py-1.5 text-xs font-medium",
             "bg-popover text-popover-foreground border shadow-md",
             "whitespace-nowrap pointer-events-none animate-in fade-in-0 zoom-in-95",
             positionClasses[side],

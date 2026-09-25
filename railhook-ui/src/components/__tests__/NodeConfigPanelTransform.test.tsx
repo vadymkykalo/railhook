@@ -22,7 +22,7 @@ vi.mock('../../api/schemas.api', () => ({
   schemasApi: { listEventTypes: vi.fn().mockResolvedValue([]) },
 }));
 
-// CodeMirror does not run in jsdom; the editor is a textarea here.
+// CodeMirror does not run in jsdom.
 vi.mock('../JsonEditor', () => ({
   default: ({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) => (
     <textarea aria-label={placeholder ?? 'template'} value={value} onChange={(e) => onChange(e.target.value)} />
@@ -31,21 +31,6 @@ vi.mock('../JsonEditor', () => ({
 
 import NodeConfigPanel from '../workflow/NodeConfigPanel';
 import { transformationsApi } from '../../api/transformations.api';
-
-/**
- * A transform node can reach the project's transformation library.
- *
- * <p>It could not, and the gap was invisible: the node offered one box for a template, the
- * Transformations page offered a library of named ones, and nothing on the canvas said the two
- * were related — or that they are written in different languages. `${$.customer.email}` typed
- * into the node's box is a literal string; `{{data.customer}}` saved as a transformation is a
- * literal string. Neither errors.
- *
- * <p>So the source is an explicit choice, and choosing the library does not send anyone away to
- * fill it. What the tests below hold down is that the choice actually switches which field the
- * node carries — because the executor resolves a reference over a leftover template, and a
- * toggle that only changed the panel would leave the node running the wrong one.
- */
 
 const TRANSFORMATION: TransformationResponse = {
   id: 'transformation-1',
@@ -93,8 +78,7 @@ describe('the transform node’s source', () => {
   });
 
   it('clears the reference when switching back to an inline template', async () => {
-    // The executor runs the reference over any template left in the config, so a switch that
-    // did not clear it would keep running the saved one while the panel showed the box.
+    // The executor prefers a reference over a leftover template, so switching must clear it.
     const onUpdate = renderPanel(transformNode({ transformationId: TRANSFORMATION.id }));
     await screen.findByRole('option', { name: /Flatten the customer/ });
 
@@ -121,7 +105,6 @@ describe('the transform node’s source', () => {
     const onUpdate = renderPanel(transformNode({ transformationId: TRANSFORMATION.id }));
 
     await userEvent.click(await screen.findByRole('button', { name: /new transformation|нова трансформац/i }));
-    // The accessible name carries the required marker, so it is "Name *", not "Name".
     await userEvent.type(screen.getByLabelText(/^(name|назва)\s*\*?$/i), 'Strip PII');
     await userEvent.click(screen.getByRole('button', { name: /^create$|^створити$/i }));
 
@@ -129,7 +112,6 @@ describe('the transform node’s source', () => {
       TEST_PROJECT_ID,
       expect.objectContaining({ name: 'Strip PII' }),
     ));
-    // Created and left selected — otherwise the node still points at the old one.
     await waitFor(() => expect(onUpdate).toHaveBeenCalledWith('node-1', expect.objectContaining({
       transformationId: 'transformation-new',
     })));

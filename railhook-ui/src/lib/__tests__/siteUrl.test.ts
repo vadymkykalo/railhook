@@ -2,12 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { siteUrl } from '../siteUrl';
 
-/**
- * This used to be a constant naming a domain the project does not own, so every
- * self-hosted install published a `rel="canonical"` crediting a stranger's site
- * and an `og:image` hosted by them. The two cases below are what stops that
- * coming back: unconfigured must resolve to *this* deployment, never a guess.
- */
+/** Unconfigured must resolve to this deployment, never a guessed domain. */
 describe('siteUrl', () => {
   afterEach(() => {
     delete window.__RAILHOOK__;

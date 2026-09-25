@@ -15,14 +15,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Bounded async executor that applies backpressure by pausing the Kafka listener containers
- * rather than blocking the consumer thread, so {@code max.poll.interval.ms} is never breached.
- *
- * <p>Pause/resume CASes on an {@link AtomicBoolean} and re-checks, to close the race where a
- * permit is released between a failed {@code trySubmit()} and the {@code pause()} that follows.
- *
- * <p>A message is acked only after successful processing. A failure or a pool-full rejection
- * leaves it unacked, to be redelivered or re-polled.
+ * Applies backpressure by pausing the Kafka containers instead of blocking the consumer thread,
+ * so {@code max.poll.interval.ms} is never breached. A message is acked only after it succeeds.
  */
 @Slf4j
 public class BoundedAsyncExecutor {
@@ -35,7 +29,6 @@ public class BoundedAsyncExecutor {
     private final AtomicInteger inFlight = new AtomicInteger(0);
     private final AtomicBoolean containersPaused = new AtomicBoolean(false);
 
-    /** Kafka listener containers managed by this executor for pause/resume. */
     private final CopyOnWriteArrayList<MessageListenerContainer> managedContainers = new CopyOnWriteArrayList<>();
 
     public BoundedAsyncExecutor(
@@ -77,13 +70,12 @@ public class BoundedAsyncExecutor {
                 name, poolSize, shutdownTimeoutSeconds);
     }
 
-    /** Call after startup, once the containers exist. */
     public void registerContainer(MessageListenerContainer container) {
         managedContainers.add(container);
         log.info("{} executor registered Kafka container: {}", name, container);
     }
 
-    /** @return false when the executor is full, in which case the caller must NOT ack. */
+    /** Returns false when full, and the caller must then not ack. */
     public boolean trySubmit(Runnable task, Acknowledgment ack, String id) {
         if (!semaphore.tryAcquire()) {
             pauseContainers();
@@ -102,9 +94,8 @@ public class BoundedAsyncExecutor {
                     task.run();
                     ack.acknowledge();
                 } catch (Exception e) {
-                    // Do not ack. With asyncAcks on, an unacked record stalls this partition
-                    // until a rebalance rather than losing the work: a visible, recoverable
-                    // failure beats silent data loss.
+                    // With asyncAcks an unacked record stalls the partition until a rebalance.
+                    // Visible and recoverable, unlike losing the work.
                     log.error("{}: async task failed, not acking (partition will stall until restart/rebalance): id={}, error={}",
                             name, id, e.getMessage(), e);
                 } finally {

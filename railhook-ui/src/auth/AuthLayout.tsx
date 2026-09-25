@@ -6,27 +6,7 @@ import { RailhookIcon } from '../components/icons/RailhookIcon';
 import AttemptRail from '../components/AttemptRail';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
-/**
- * One shell for all seven auth screens, which each used to draw their own.
- *
- * The left panel shows the product's actual material — a signed request and the
- * ladder it was delivered on — rather than a gradient and three adjectives. It
- * is the first thing a developer sees, and a real signature header says more
- * about what this is than any tagline.
- */
-
-/**
- * The headers a real outgoing attempt carries, copied from
- * OutgoingAttemptStore: X-Signature, X-Event-Id, X-Delivery-Id, X-Timestamp,
- * X-Sequence-Number, Idempotency-Key. The signature format is
- * `t=<unix-ms>,v1=<hex>` from WebhookSignatureUtils.buildSignatureHeader.
- *
- * This panel used to invent `x-railhook-signature: sha256=…` and
- * `x-railhook-attempt: 4 of 8` — headers the product does not send, in a
- * format the docs teach differently, over an attempt count the outgoing ladder
- * does not have. It is the first thing a developer sees on all seven auth
- * screens; a fabricated wire format is the most expensive kind of wrong.
- */
+/** Real headers, as OutgoingAttemptStore sends them; an invented format is the costliest kind of wrong. */
 const SAMPLE = [
   ['POST', '/webhooks/orders'],
   ['host', 'api.acme.com'],
@@ -49,15 +29,13 @@ export default function AuthLayout({
     <div className="flex min-h-screen">
       <aside className="surface-ink relative hidden overflow-hidden lg:flex lg:w-[46%] lg:flex-col lg:justify-between lg:p-12">
         <Link to="/" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15">
-            <RailhookIcon className="h-4 w-4" />
-          </div>
-          <span className="text-[15px] font-semibold tracking-tight">Railhook</span>
+          <RailhookIcon className="h-6 w-6" aria-hidden="true" />
+          <span className="text-[20px] font-medium tracking-[-0.03em]">Railhook</span>
         </Link>
 
         <div>
           <p className="mono-label mb-4 text-muted-foreground">{t('auth.panel.eyebrow')}</p>
-          <div className="rounded-lg border border-rail bg-card p-5 font-mono text-[12px] leading-relaxed">
+          <div className="border border-rail bg-card p-5 font-mono text-[12px] leading-relaxed">
             {SAMPLE.map(([k, v]) => (
               <div key={k} className="flex gap-3">
                 <span className="w-[9.5rem] flex-shrink-0 text-muted-foreground">{k}</span>
@@ -102,12 +80,10 @@ export default function AuthLayout({
           <div className="animate-fade-in-up w-full max-w-[400px]">
             <div className="mb-7">
               <Link to="/" className="mb-6 flex items-center gap-2.5 lg:hidden">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-                  <RailhookIcon className="h-4 w-4 text-primary-foreground" />
-                </div>
-                <span className="text-[15px] font-semibold">Railhook</span>
+                <RailhookIcon className="h-6 w-6" aria-hidden="true" />
+                <span className="text-[20px] font-medium tracking-[-0.03em]">Railhook</span>
               </Link>
-              <h1 className="text-title">{title}</h1>
+              <h1 className="text-[1.75rem] font-normal leading-tight tracking-[-0.02em]">{title}</h1>
               {subtitle && <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>}
             </div>
 

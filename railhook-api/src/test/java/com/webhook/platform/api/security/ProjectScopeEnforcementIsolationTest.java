@@ -39,44 +39,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * API-key project scoping was enforced by an opt-in, per-handler call
- * ({@code AuthContext.validateProjectAccess}) that roughly a third of
- * {@code {projectId}} routes never made. Because {@code AuthContext.organizationId}
- * is derived from an API key's own project, the service-layer check that only
- * compares organization IDs passed for <b>any</b> project in the same org — so a
- * key scoped to one project could reach another project's resources in routes
- * that forgot the call. Worst case: {@code POST
- * /api/v1/projects/{projectId}/endpoints/{id}/rotate-secret} never called it,
- * so a key scoped to "staging" could rotate a "production" endpoint's signing
- * secret and receive the new secret back in plaintext.
- *
- * <p>The fix moves the check into {@link ScopeEnforcementInterceptor}: it now runs
- * for every request, reads the resolved {@code projectId} path variable straight
- * off the servlet request (not off whatever the handler method happens to bind),
- * and confines API-key auth to that project unless the handler carries the
- * explicit {@link ProjectScopeExempt} opt-out.
- *
- * <p>This class has two halves:
- * <ul>
- *   <li>{@link #everyProjectIdRouteIsCoveredOrExplicitlyExempt()} — the
- *       structural guarantee. It scans every {@code @RestController} in the
- *       {@code controller} package by reflection, resolves each handler's full
- *       path (class-level {@code @RequestMapping} + method-level mapping,
- *       combined — {@code DeliveryController} puts {@code {projectId}} only in
- *       a method-level mapping, so checking the class annotation alone is not
- *       enough), and asserts every route containing {@code {projectId}} is
- *       either unexempt (default: enforced) or carries a reasoned
- *       {@link ProjectScopeExempt}. This is what stops the regression coming
- *       back — a new controller with a forgotten check fails this test the
- *       moment it's added, with no HTTP call required.</li>
- *   <li>The remaining {@code @Test} methods are behavioural, end-to-end
- *       reproductions against the previously-uncovered controllers (Schema,
- *       IncomingDestination), a re-verification of TestEndpointController
- *       (already fixed directly by TestEndpointController's own per-handler calls; this asserts the
- *       interceptor now also covers it), and the rotate-secret worst case.</li>
- * </ul>
- */
+// The project check was opt-in per handler, and a third of the routes never made it.
 @AutoConfigureMockMvc
 public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTest {
 
@@ -87,14 +50,11 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
     private ObjectMapper objectMapper;
 
     private String jwt;
-    private UUID projectAId; // owns the API key below
-    private UUID projectBId; // a different project in the SAME org
+    private UUID projectAId;
+    private UUID projectBId; // same org as A
     private String apiKeyForProjectA;
 
-    // Endpoint creation runs real webhook-URL validation (SSRF guard), which
-    // does a live DNS lookup unless the host is allow-listed. Allow-list the
-    // fixed hostnames used below instead of depending on outbound DNS/network
-    // access being available wherever this test runs.
+    // Allow-listed so endpoint validation needs no live DNS lookup.
     @DynamicPropertySource
     static void urlValidationProperties(DynamicPropertyRegistry registry) {
         registry.add("webhook.url-validation.allowed-hosts", () -> "prod.example.com,staging.example.com");
@@ -153,26 +113,12 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
         return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Structural test — the actual point of this class.
-    // ─────────────────────────────────────────────────────────────────────
-
     private record RouteHandler(Class<?> controller, Method method, String fullPath) {
         String label() {
             return controller.getSimpleName() + "." + method.getName();
         }
     }
 
-    /**
-     * Every {@code {projectId}} route, found by classpath scan, must be either
-     * unexempt (the interceptor enforces it automatically) or carry an explicit,
-     * reasoned {@link ProjectScopeExempt}. Also sanity-checks that the scan
-     * itself still finds a realistic number of routes and that every one of
-     * them lives under the path pattern ({@code /api/**}) that
-     * {@code WebConfig} actually registers the interceptor against — a route
-     * added outside that pattern would silently bypass the guard no matter
-     * what the annotation says.
-     */
     @Test
     public void everyProjectIdRouteIsCoveredOrExplicitlyExempt() {
         List<RouteHandler> projectScopedRoutes = scanControllerPackageForProjectIdRoutes();
@@ -196,15 +142,9 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
                 if (reason == null || reason.isBlank()) {
                     exemptWithoutReason.add(route.label());
                 }
-                // Exempt with a reason: deliberate, reviewable opt-out. Covered.
             }
-            // Not exempt: covered by default, unconditional enforcement in
-            // ScopeEnforcementInterceptor. Nothing further to assert per-route —
-            // that behaviour is what the tests below exercise end-to-end.
 
-            // WebConfig registers the interceptor on "/api/**"; every discovered
-            // {projectId} route must live under that prefix or the annotation
-            // (or its absence) is meaningless — the interceptor never runs.
+            // A route outside /api/** bypasses the interceptor whatever its annotation says.
             if (!route.fullPath().startsWith("/api/")) {
                 outsideInterceptorPattern.add(route.label() + " (" + route.fullPath() + ")");
             }
@@ -216,9 +156,7 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
                 "{projectId} route(s) outside the interceptor's registered \"/api/**\" pattern "
                         + "(WebConfig) — the automatic guard cannot reach these: " + outsideInterceptorPattern);
 
-        // Pin down that specific, previously-vulnerable handlers are actually
-        // found by the scan and are not exempt — this ties the structural
-        // guarantee back to the concrete defects it protects against.
+        // Ties the scan to the handlers that were actually vulnerable.
         Set<String> mustBeCoveredAndUnexempt = Set.of(
                 "EndpointController.rotateSecret",
                 "SchemaController.listEventTypes",
@@ -327,13 +265,6 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
         return "/" + c + "/" + m;
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Behavioural — previously-zero controllers (Schema, IncomingDestination),
-    // TestEndpoint re-verification, and the rotate-secret worst case.
-    // ─────────────────────────────────────────────────────────────────────
-
-    // ── Schema (was 0/12) ──
-
     @Test
     public void apiKey_schema_listEventTypes_crossProject_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/projects/" + projectBId + "/schemas")
@@ -357,8 +288,6 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
                         .header("X-API-Key", apiKeyForProjectA))
                 .andExpect(status().isOk());
     }
-
-    // ── IncomingDestination (was 0/5) ──
 
     @Test
     public void apiKey_incomingDestination_list_crossProject_forbidden() throws Exception {
@@ -398,10 +327,6 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
         return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
     }
 
-    // ── TestEndpoint (was 0/6, fixed directly by its own per-handler calls; re-verify the
-    //    interceptor also covers it now, redundantly with those per-handler
-    //    calls — full coverage lives in TestEndpointIsolationTest) ──
-
     @Test
     public void apiKey_testEndpoint_list_crossProject_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/projects/" + projectBId + "/test-endpoints")
@@ -409,13 +334,7 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
                 .andExpect(status().isForbidden());
     }
 
-    // ── Rotate-secret: the worst concrete case from the task ──
-    // A key scoped to "project A" (stand-in for staging) rotates the signing
-    // secret of an endpoint that belongs to "project B" (stand-in for
-    // production) in the SAME org. Unfixed: EndpointController.rotateSecret
-    // never called validateProjectAccess, and EndpointService.rotateSecret
-    // only checks organizationId — so this succeeded, rotated prod's secret,
-    // and handed it back in plaintext to a key that should never have seen it.
+    // Unfixed, a staging key rotated prod's secret and got it back in plaintext.
 
     @Test
     public void apiKey_rotateSecret_crossProjectSameOrg_forbidden() throws Exception {

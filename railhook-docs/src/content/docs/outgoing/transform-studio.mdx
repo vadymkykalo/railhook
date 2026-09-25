@@ -1,85 +1,75 @@
 ---
 title: Transform Studio
-description: Run a template or a script against a real payload and see the body, headers and signature an endpoint would receive — without sending anything.
+description: Run a template or a script against a real payload and see the body, headers and signature an endpoint would receive, without sending anything.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-Transform Studio answers two questions before a transformation ever touches a delivery: *what does this transformation turn my payload into*, and *what exactly would my endpoint receive*. Running it sends nothing, so you can run it against a production transformation as often as you like.
+Transform Studio shows what a transformation turns a payload into, and what an endpoint would receive. Running it sends nothing, so it is safe on a production transformation.
 
-It is **Develop → Transform Studio** in the dashboard, and two endpoints under the API — `POST /api/v1/projects/{projectId}/transform-preview` and `POST /api/v1/projects/{projectId}/transform-preview/delivery-dry-run`. See [API reference](/docs/api-reference/) for their request and response shapes.
+In the dashboard it is **Develop → Transform Studio**. In the API it is `POST /api/v1/projects/{projectId}/transform-preview` and `POST /api/v1/projects/{projectId}/transform-preview/delivery-dry-run`; see the [API reference](/docs/api-reference/).
 
 ## Two modes
 
 | Mode | What it answers | What it needs |
 |---|---|---|
 | **Preview** | What the transformation produces from this payload. | An input payload, and a saved transformation, a template or a script. |
-| **Dry run** | What the HTTP request to a given endpoint would look like — body, headers and signature. | The same, plus an endpoint. |
+| **Dry run** | What the HTTP request to a given endpoint would look like: body, headers and signature. | The same, plus an endpoint. |
 
-Preview never touches an endpoint, so it needs nothing beyond read access. A dry run returns a **valid signature** computed with the endpoint's real signing secret, which is enough to mint a body that endpoint will accept as genuine — so it requires write access and a `READ_WRITE` API key. See [Authentication](/docs/platform/authentication/).
+Preview needs only read access. A dry run returns a **valid signature** made with the endpoint's real signing secret, enough to forge a body that endpoint accepts, so it requires write access and a `READ_WRITE` API key. See [Authentication](/docs/platform/authentication/).
 
 ## Preview a template
 
 <Steps>
 
-1. **Put a payload in.** Either paste one, or press **Load Event** and pick a real event from the project — the payload as your application sent it, which is the one that finds the mistakes a hand-written sample never does.
+1. **Put a payload in.** Paste one, or press **Load Event** and pick a real event from the project. A real payload finds mistakes a hand-written sample does not.
 
-2. **Choose what to run.** Pick a saved transformation, or write a template into the expression box:
+2. **Choose what to run.** Pick a saved transformation, or write into the expression box:
 
-   - A box that starts with `{` or `[` is treated as a **JSON template**, the same `${$.path}` template a transformation carries. See [Transformations](/docs/outgoing/transformations/#the-template).
-   - Anything else is treated as a **single extraction**, such as `$.data` — the same simple form a destination's `payloadTransform` takes.
-   - Empty is pass-through: the payload is returned formatted and unchanged.
+   - A box that starts with `{` or `[` is a **JSON template**, the same `${$.path}` template a transformation carries. See [Transformations](/docs/outgoing/transformations/#the-template).
+   - Anything else is a **single extraction**, such as `$.data`, the form a destination's `payloadTransform` takes.
+   - Empty is pass-through: the payload comes back formatted and unchanged.
 
-3. **Run it.** The output panel shows the result, whether it differs from the input at all, and any errors. An extraction that matched nothing says so and returns `null`, because a path that matches nothing is not an error in a template and the studio is where you want to notice it anyway.
+3. **Run it.** The output panel shows the result, whether it differs from the input, and any errors. An extraction that matched nothing returns `null` and says so: in a template that is not an error, so this is where you notice it.
 
 </Steps>
 
 <Aside type="tip" title="The expression box is not full JSONPath">
-A single extraction is resolved as a plain path into the document: `$.data.customer` reaches that object, and `$` returns the whole payload. Filters, wildcards and array predicates belong in a JSON template, where every `${…}` is evaluated as JSONPath proper.
+A single extraction is a plain path: `$.data.customer` reaches that object, and `$` returns the whole payload. Filters, wildcards and array predicates belong in a JSON template, where every `${…}` is evaluated as JSONPath.
 </Aside>
 
 ## Run a JavaScript transformation
 
-The **Language** switch chooses between **Template** and **JavaScript**. In JavaScript mode the expression box becomes a code editor, and the studio runs exactly the engine a worker runs — the same sandbox, the same `TRANSFORM_SCRIPT_*` limits — so a script that works here is a script that works on a delivery. [The JavaScript contract](/docs/outgoing/transformations/#the-javascript-contract) says what `handler(webhook)` is given and what it must return.
+The **Language** switch chooses **Template** or **JavaScript**. In JavaScript mode the box becomes a code editor, and the studio runs the worker's engine with the same sandbox and `TRANSFORM_SCRIPT_*` limits, so a script that works here works on a delivery. [The JavaScript contract](/docs/outgoing/transformations/#the-javascript-contract) says what `handler(webhook)` gets and must return.
 
 - **⌘/Ctrl+Enter** runs, **⌘/Ctrl+S** saves.
-- Four tabs: **Input**, **Output**, **Diff** and **Console**. A run that succeeds opens Output; a run that fails opens Console.
-- `console.log`, `info`, `warn`, `error` and `debug` land in the Console tab instead of going anywhere near your endpoint — including whatever a script logged before it threw, which is often the only clue there is.
-- A failure names its reason and highlights the line in your own script.
-- A script that returns `{ cancel: true }` is reported as a cancellation, not an error, with the reminder that on a real delivery nothing would be sent, nothing would be retried, and nothing would land in Failed Messages.
+- Four tabs: **Input**, **Output**, **Diff** and **Console**. A successful run opens Output; a failed one opens Console.
+- `console.log`, `info`, `warn`, `error` and `debug` go to the Console tab, including what a script logged before it threw.
+- A failure names its reason and highlights the line in your script.
+- A script that returns `{ cancel: true }` is reported as a cancellation, not an error. On a real delivery nothing would be sent, retried or put in Failed Messages.
 
 ## Dry-run a delivery
 
-Switch the mode to **Dry run** and pick a target endpoint. The result is the request that endpoint would have received:
+Switch the mode to **Dry run** and pick a target endpoint. The result is the request it would receive:
 
 - the transformed body,
-- the headers, including any custom headers you added,
-- the `X-Signature` over that body, computed with the endpoint's current signing secret,
-- the endpoint's URL, and the name and version of the transformation that was applied.
+- the headers, including your custom headers,
+- the `X-Signature` over that body, made with the endpoint's current signing secret,
+- the endpoint's URL, and the name and version of the applied transformation.
 
-Nothing is sent. A disabled endpoint is dry-run all the same, with a warning saying so — which is usually what you want, since a disabled endpoint is often one you are in the middle of fixing.
+Nothing is sent. A disabled endpoint can be dry-run too, with a warning.
 
 ## Save it back
 
-Running changes nothing; saving is a separate, deliberate press.
+Running changes nothing; saving is a separate press.
 
-- **Save script** writes the editor's contents back into the selected transformation. That publishes a new version, exactly as saving through the API does — see [version history](/docs/outgoing/transformations/#version-history).
-- **Save as transformation** creates a new one in this project from whatever is in the editor, under a name you give it. Subscriptions and destinations can then point at it.
-- With no transformation selected and nothing saved, what you type is a scratch draft and disappears with the page.
+- **Save script** writes the editor back into the selected transformation. That publishes a new version, as saving through the API does; see [version history](/docs/outgoing/transformations/#version-history).
+- **Save as transformation** creates a new one in this project under a name you give. Subscriptions and destinations can then use it.
+- With no transformation selected, what you type is a scratch draft and is lost with the page.
 
 ## What it cannot do
 
-This is the honest list, and each line is something people expect it to do.
-
-- **It does not work out which transformation a real delivery would pick.** It applies the one you name. Subscription settings and [rules](/docs/outgoing/rules/) are not consulted, so a rule that would override the transformation for matching events is invisible here.
-- **A dry run is not a byte-for-byte rehearsal of the request.** A real delivery also carries `X-Event-Id`, `X-Delivery-Id`, `X-Sequence-Number` and `Idempotency-Key`, none of which exist until there is a delivery to give them values. Use it to check the body and the signing secret, not to predict every header.
-- **The signature is always the `t=…,v1=…` form.** An endpoint set to the Standard Webhooks scheme is signed with `webhook-id`, `webhook-timestamp` and `webhook-signature` instead, and the dry run does not produce those. See [Signatures](/docs/outgoing/signatures/).
-- **Nothing is sent, so nothing is confirmed.** The dry run cannot tell you whether the endpoint accepts the body, only what it would be asked to accept. To make a real request, use the test console or send a test event.
-- **The endpoint has to be in this project.** An endpoint id from a sibling project is reported as not found, deliberately: the same answer another organization's endpoint gets, so the dry run cannot be used to discover which ids exist.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Transformations" href="/docs/outgoing/transformations/" description="The template language, the JavaScript contract, and where a transformation attaches." />
-  <LinkCard title="Signatures" href="/docs/outgoing/signatures/" description="What the signature the dry run shows actually covers." />
-  <LinkCard title="Event diff" href="/docs/outgoing/event-diff/" description="Compare two stored events field by field." />
-</CardGrid>
+- **It does not pick the transformation a real delivery would use.** It applies the one you name. Subscription settings and [rules](/docs/outgoing/rules/) are not consulted, so a rule that overrides the transformation is invisible here.
+- **A dry run is not byte-for-byte.** A real delivery also carries `X-Event-Id`, `X-Delivery-Id`, `X-Sequence-Number` and `Idempotency-Key`, which exist only once there is a delivery. Use it to check the body and signing secret.
+- **The signature is always the `t=…,v1=…` form.** An endpoint on the Standard Webhooks scheme is signed with `webhook-id`, `webhook-timestamp` and `webhook-signature`, which the dry run does not produce. See [Signatures](/docs/outgoing/signatures/).
+- **Nothing is sent, so nothing is confirmed.** It cannot tell you whether the endpoint accepts the body. For a real request, use the test console or send a test event.
+- **The endpoint has to be in this project.** An endpoint from a sibling project is reported as not found, the same answer another organization's endpoint gets, so the dry run cannot be used to discover which ids exist.

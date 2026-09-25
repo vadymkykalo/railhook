@@ -8,34 +8,7 @@ import { docsUrl } from '../lib/docsUrl';
 import { contactDomain } from '../lib/runtimeConfig';
 import ContactForm from '../components/site/ContactForm';
 
-/**
- * The route that replaces a mailto to a personal Gmail address.
- *
- * Two places on the pricing section used to link
- * `mailto:vadymkykalo@gmail.com?subject=Railhook Enterprise` — the largest deal
- * on the page priced at "Custom" and then routed to an inbox that reads as a
- * side project, with the address itself published for anything that scrapes.
- *
- * Addresses are role accounts and are assembled at render rather than written
- * into the markup, which stops the cheapest scrapers without hiding anything
- * from a reader or a screen reader.
- *
- * The domain comes from RAILHOOK_CONTACT_DOMAIN on the UI container and there
- * is no default. It was once a constant naming a domain this project does not
- * own, so every self-hosted install invited its users to write to a stranger
- * about a product that stranger has never heard of.
- *
- * It is read at runtime, not inlined at build: the published image is the same
- * one the hosted cloud runs and every self-hosted install pulls. As a build
- * argument the choice was between no addresses on the cloud's own site or the
- * cloud's addresses on everyone's deployment.
- *
- * With the variable unset the two mail cards are not rendered at all, rather
- * than falling back to the repository. A deployment someone runs for their own
- * company has no sales desk, and an address that reaches nobody is worse than
- * an absent one — the reader who needs a human still has the issues card and
- * the docs card, which are true everywhere.
- */
+/** Assembled at render rather than in the markup, which stops the cheapest scrapers. */
 function mailto(mailbox: string, domain: string): string {
   return `mailto:${mailbox}@${domain}`;
 }
@@ -54,14 +27,14 @@ function Card({
   return (
     <div className={cn('flex h-full flex-col p-6', panel(true))}>
       <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
-      <h2 className="mt-3 text-[15px] font-semibold text-foreground">{title}</h2>
+      <h2 className="mt-3 text-[15px] font-medium text-foreground">{title}</h2>
       <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{body}</p>
       <div className="mt-auto pt-5">{action}</div>
     </div>
   );
 }
 
-const LINK = 'text-sm font-medium text-primary hover:underline';
+const LINK = 'text-sm font-medium link-ink';
 
 export default function ContactPage() {
   const { t, i18n } = useTranslation();
@@ -72,7 +45,7 @@ export default function ContactPage() {
     <Section ruled={false}>
       <Reveal>
         <div className="max-w-2xl">
-          <h1 className="font-display text-3xl leading-[1.1] tracking-tight text-foreground sm:text-headline">
+          <h1 className="text-[2.375rem] font-normal leading-[1.16] tracking-[-0.03em] text-foreground sm:text-[3.5rem]">
             {t('contact.title')}
           </h1>
           <p className="mt-4 text-body-lg text-muted-foreground">{t('contact.subtitle')}</p>
@@ -83,7 +56,7 @@ export default function ContactPage() {
       {domain && (
         <Reveal>
           <div className={cn('mt-10 p-6 sm:p-8', panel())}>
-            <h2 className="font-display text-[1.35rem] font-bold tracking-[-0.02em] text-foreground">{t('site.contact.formTitle')}</h2>
+            <h2 className="text-[1.5rem] font-normal tracking-[-0.02em] text-foreground">{t('site.contact.formTitle')}</h2>
             <p className="mt-1.5 text-muted-foreground">{t('site.contact.formLead')}</p>
             <div className="mt-6">
               <ContactForm />

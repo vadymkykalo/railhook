@@ -12,35 +12,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * delivery_attempts must cascade from deliveries — on every partition.
- *
- * <p>V001 declared {@code delivery_id ... REFERENCES deliveries(id) ON DELETE CASCADE}. V052
- * rebuilt the table as a partitioned parent, faithfully re-creating every column and every
- * index, and dropped the foreign key without saying so — its own comment enumerates what it
- * changed and does not mention it. The constraint survived only on delivery_attempts_legacy,
- * the attached pre-cutover partition, so rows written before the cutover still cascaded and
- * rows written after it did not.</p>
- *
- * <p>{@code DlqService.purgeAllDlq} therefore deleted deliveries and left their attempts
- * standing — request and response bodies included — with nothing able to reach them again:
- * {@code delivery_id} is the only way in. Dropping a monthly partition eventually reclaimed
- * the space, which is why it went unnoticed, but a purge did not mean what it said.</p>
- *
- * <p>This asserts the schema, not Postgres's cascade semantics: the regression to guard
- * against is a migration rebuilding this table and forgetting the constraint again, which is
- * precisely what happened. Behaviour was confirmed separately against PostgreSQL 16 —
- * including that a partition created later inherits the constraint from the parent, so
- * PartitionMaintenanceService needs no change.</p>
- */
+// V052 once dropped this FK silently; guards a migration forgetting it again.
 public class DeliveryAttemptCascadeRepositoryTest extends AbstractIntegrationTest {
 
     @PersistenceContext
     private EntityManager entityManager;
 
-    // A TransactionTemplate rather than @Transactional on the method: the test-context
-    // transaction would open before AbstractIntegrationTest's @BeforeEach enters the system
-    // tenant scope, and the tenant resolver refuses to build an EntityManager without one.
+    // TransactionTemplate: a test transaction would open before the tenant scope is entered.
     @Autowired
     private TransactionTemplate transactionTemplate;
 
@@ -64,8 +42,6 @@ public class DeliveryAttemptCascadeRepositoryTest extends AbstractIntegrationTes
                 "the foreign key belongs on the partitioned parent, so every partition — "
                         + "including ones PartitionMaintenanceService creates later — inherits it");
 
-        // The parent's constraint is mirrored onto each partition. Any partition without one
-        // is a partition whose rows outlive the delivery they belong to.
         @SuppressWarnings("unchecked")
         List<String> partitions = (List<String>) transactionTemplate.execute(tx ->
                 entityManager.createNativeQuery("""
@@ -85,8 +61,7 @@ public class DeliveryAttemptCascadeRepositoryTest extends AbstractIntegrationTes
         }
 
         for (Object[] row : constraints) {
-            // 'c' = ON DELETE CASCADE. 'a' (no action) would leave the purge failing instead
-            // of cleaning up, which is a different bug, not a fix.
+            // 'c' = ON DELETE CASCADE.
             assertEquals('c', ((Character) row[1]).charValue(),
                     row[0] + " must cascade, as V001 declared");
         }

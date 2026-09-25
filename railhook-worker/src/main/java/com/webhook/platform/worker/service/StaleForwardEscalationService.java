@@ -22,36 +22,9 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Hard-cap escalation for Forwards that have been outstanding too long — the Incoming
- * counterpart of {@link StaleDeliveryEscalationService}.
- *
- * <p>Until this existed the Incoming direction had only {@link StuckForwardRecoveryService},
- * which resets an Attempt stuck in PROCESSING back to PENDING. Nothing ever gave up: a Forward
- * whose Destination stayed unreachable, or whose Attempt row was stranded PENDING, sat there
- * indefinitely with no terminal state and no notification.
- *
- * <h2>Why the age is measured from the Forward's attempt 1</h2>
- *
- * <p>Incoming inserts a new {@code incoming_forward_attempts} row per Attempt, so the newest
- * row's {@code created_at} is freshly stamped even for a Forward that has been retrying since
- * yesterday. Escalating on it would only ever catch the last few minutes of a long failure.
- *
- * <p>Nor is it the Incoming Event's {@code received_at}, which it once was. A Failed Messages
- * retry and a Replay each start a new Forward — its own session, its own attempt 1 — for a
- * webhook that may have arrived last week, and ageing that Forward from the webhook's arrival sent
- * it straight back to the DLQ on the next cycle, before a single Attempt. The attempt-1 row of the
- * same session is when this obligation was taken on: the true analogue of
- * {@code deliveries.created_at} on the Outgoing side.
- *
- * <h2>Its own cap, not the Delivery one</h2>
- *
- * <p>The Incoming Retry Ladder is deliberately shorter — five Attempts topping out at 6h,
- * against Outgoing's seven to 24h, because relaying somebody else's webhook is a different
- * promise from delivering the customer's own event (see {@code RetryLadderDefaults}). Its
- * worst-case span with full jitter is ~11h, so a 96h cap borrowed from the Outgoing side would
- * leave a dead Forward sitting for three days after its ladder was exhausted. The default here
- * is 24h, and {@code RetrySchedulerService} validates the Incoming ladder against <em>this</em>
- * cap at startup.
+ * Age counts from the attempt-1 row of the Forward's session. The Event's {@code received_at}
+ * sent a Replay of an old webhook straight back to the DLQ. The cap is 24h, not the Outgoing 96h,
+ * because the Incoming ladder spans only about 11h.
  */
 @Service
 @Slf4j
@@ -90,11 +63,7 @@ public class StaleForwardEscalationService {
                 hardCapHours, escalationBatchSize);
     }
 
-    /**
-     * Unlocked deliberately: {@code findStaleForwardAttemptIds} claims with
-     * {@code FOR UPDATE … SKIP LOCKED}, so replicas are handed disjoint rows by Postgres and
-     * cannot emit duplicate notifications for the same Forward.
-     */
+    // Unlocked on purpose: the query claims with FOR UPDATE SKIP LOCKED, so replicas get disjoint rows.
     @Scheduled(fixedDelayString = "${forward.escalation.interval-ms:300000}")
     public void runEscalation() {
         refreshOldestPendingAge();
@@ -139,9 +108,7 @@ public class StaleForwardEscalationService {
             }
             escalatedCounter.increment(escalated.size());
 
-            // Best-effort, and outside the transaction on purpose: a Kafka failure here must not
-            // roll back the DLQ write that already committed. The database is the source of
-            // truth; the Kafka record is a notification.
+            // Outside the transaction: a Kafka failure must not roll back the committed DLQ write.
             for (IncomingForwardAttempt attempt : escalated) {
                 publishDlqNotification(attempt);
             }

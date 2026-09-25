@@ -50,16 +50,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * A paid checkout end to end, through the real WayForPay adapter and the real schema: checkout →
- * pending subscription → signed payment callback on the public webhook endpoint → paid plan.
- *
- * <p>Needs the database for three things mocks cannot show: the one-open-subscription-per-
- * organization index against Hibernate's flush order when a checkout supersedes another, the
- * system-tenant webhook finding a row a tenant-scoped checkout wrote, and a refund finding the
- * paid payment of an order that also holds a declined one. WayForPay's HTTP API is stubbed at the
- * WebClient's exchange function — nothing leaves the process.
- */
+// WayForPay's HTTP API is stubbed at the WebClient's exchange function.
 @TestPropertySource(properties = "billing.enabled=true")
 class PaidCheckoutIntegrationTest extends AbstractIntegrationTest {
 
@@ -118,7 +109,7 @@ class PaidCheckoutIntegrationTest extends AbstractIntegrationTest {
         assertThat(first.getExternalSubscriptionId()).startsWith("railhook_" + orgId + "_");
         assertThat(planOf(orgId)).isEqualTo("free");
 
-        // The customer backs out and starts again: one open checkout, never two.
+        // One open checkout, never two.
         Thread.sleep(2); // order references are millisecond-stamped
         checkout();
         BillingSubscription second = onlyOpenSubscription();
@@ -127,14 +118,13 @@ class PaidCheckoutIntegrationTest extends AbstractIntegrationTest {
                 .isEqualTo(SubscriptionStatus.EXPIRED);
         String orderRef = second.getExternalSubscriptionId();
 
-        // A declined card leaves the checkout open and the organization untouched.
         deliver(orderRef, "Declined", "1101");
         assertThat(subscriptionRepository.findById(second.getId()).orElseThrow().getStatus())
                 .isEqualTo(SubscriptionStatus.PENDING);
         assertThat(planOf(orgId)).isEqualTo("free");
         assertThat(billingStatusOf(orgId)).isEqualTo(BillingStatus.ACTIVE);
 
-        // The retry is approved — for an amount with kopecks, which used to fail the signature.
+        // An amount with kopecks used to fail the signature.
         deliver(orderRef, "Approved", "1100");
         BillingSubscription paid = subscriptionRepository.findById(second.getId()).orElseThrow();
         assertThat(paid.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
@@ -145,7 +135,7 @@ class PaidCheckoutIntegrationTest extends AbstractIntegrationTest {
         assertThat(planOf(orgId)).isEqualTo("starter");
         assertThat(billingStatusOf(orgId)).isEqualTo(BillingStatus.ACTIVE);
 
-        // WayForPay retries a callback until it is acknowledged: the replay changes nothing.
+        // WayForPay retries a callback until it is acknowledged.
         deliver(orderRef, "Approved", "1100");
         List<BillingPayment> payments = paymentRepository.findByOrganizationIdOrderByCreatedAtDesc(orgId);
         assertThat(payments).extracting(BillingPayment::getStatus)
@@ -159,11 +149,9 @@ class PaidCheckoutIntegrationTest extends AbstractIntegrationTest {
                 .extracting(BillingPayment::getStatus)
                 .containsExactlyInAnyOrder(PaymentStatus.REFUNDED, PaymentStatus.FAILED);
 
-        // A month later the scheduler charges the card token for what the checkout charged, in
-        // UAH — not the catalog's USD cents — and extends the period from where it ended.
+        // Renewal charges what the checkout charged, in UAH, from where the period ended.
         BillingSubscription due = subscriptionRepository.findById(second.getId()).orElseThrow();
-        // Microsecond precision up front: Postgres rounds a nanosecond timestamp rather than
-        // truncating it, so a CI clock with nanoseconds made the comparison below miss by one.
+        // Postgres rounds nanoseconds rather than truncating, so compare at microseconds.
         Instant lapsedAt = Instant.now().minus(Duration.ofHours(1)).truncatedTo(ChronoUnit.MICROS);
         due.setCurrentPeriodEnd(lapsedAt);
         subscriptionRepository.save(due);

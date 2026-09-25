@@ -62,11 +62,6 @@ const TUNNEL_ENDPOINT: EndpointResponse = {
   updatedAt: NOW,
 };
 
-/*
- * A tunnel with no `railhook tunnel` client answers 503, and the toast used to print that raw:
- * "Verification failed: Verification request failed: 503 Service Unavailable from POST …". The
- * server now names the cause, and the page says what to do about it in the reader's language.
- */
 describe('ConnectionsPage — verifying an endpoint', () => {
   beforeEach(() => {
     vi.clearAllMocks();

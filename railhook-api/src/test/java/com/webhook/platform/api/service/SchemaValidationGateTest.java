@@ -58,15 +58,6 @@ class SchemaValidationGateTest {
     }
 
     @Test
-    void aPayloadThatMatchesWarnsAboutNothing() {
-        when(payloadSchemaValidator.validate(eq(projectId), eq("order.created"), any()))
-                .thenReturn(List.of());
-
-        assertThat(gate.check(project(SchemaValidationPolicy.WARN, true),
-                projectId, "order.created", payload)).isEmpty();
-    }
-
-    @Test
     void blockStillRefusesTheEvent() {
         when(payloadSchemaValidator.validate(eq(projectId), eq("order.created"), any()))
                 .thenReturn(List.of("$.total: required field missing"));

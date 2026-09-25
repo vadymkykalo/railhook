@@ -23,14 +23,12 @@ public class ReplaySessionResponse {
     private UUID createdBy;
     private ReplaySessionStatus status;
 
-    // Filter criteria
     private Instant fromDate;
     private Instant toDate;
     private String eventType;
     private UUID endpointId;
     private DeliveryStatus sourceStatus;
 
-    // Progress
     private Integer totalEvents;
     private Integer processedEvents;
     private Integer deliveriesCreated;
@@ -38,7 +36,6 @@ public class ReplaySessionResponse {
     private Double progressPercent;
     private String errorMessage;
 
-    // Timing
     private Instant startedAt;
     private Instant completedAt;
     private Instant cancelledAt;

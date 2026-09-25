@@ -16,10 +16,6 @@ import java.util.UUID;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/**
- * Integration tests verifying that both JWT (Bearer token) and API Key (X-API-Key)
- * authentication work correctly across all controller endpoints via AuthContext.
- */
 public class AuthContextIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -88,8 +84,6 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
         apiKey = apiKeyJson.get("key").asText();
     }
 
-    // ── JWT auth: project-scoped endpoints ──
-
     @Test
     public void jwt_listProjects() throws Exception {
         mockMvc.perform(get("/api/v1/projects")
@@ -147,8 +141,6 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    // ── JWT auth: user-scoped endpoints ──
-
     @Test
     public void jwt_currentUser() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me")
@@ -165,8 +157,6 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
     }
-
-    // ── API Key auth: project-scoped endpoints ──
 
     @Test
     public void apiKey_listEndpoints() throws Exception {
@@ -217,8 +207,6 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    // ── API Key restrictions: user-scoped endpoints return 403 ──
-
     @Test
     public void apiKey_currentUser_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me")
@@ -233,10 +221,7 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
-    // ── API Key restrictions: a key cannot manage keys ──
-    //
-    // A leaked READ_WRITE key could otherwise mint fresh, non-expiring keys for its project,
-    // or rotate the legitimate ones away, and outlive its own revocation.
+    // A leaked READ_WRITE key could otherwise mint keys and outlive its own revocation.
 
     @Test
     public void apiKey_createApiKey_forbidden() throws Exception {
@@ -295,8 +280,6 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
         return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
     }
 
-    // ── API Key restrictions: cross-project access denied ──
-
     @Test
     public void apiKey_crossProject_forbidden() throws Exception {
         UUID otherProjectId = UUID.randomUUID();
@@ -304,8 +287,6 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
                         .header("X-API-Key", apiKey))
                 .andExpect(status().isForbidden());
     }
-
-    // ── JWT auth: org-scoped MemberController with @RequireOrgAccess ──
 
     @Test
     public void jwt_listMembers() throws Exception {
@@ -321,8 +302,6 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isForbidden());
     }
-
-    // ── API Key restrictions: org-level endpoints return 403 ──
 
     @Test
     public void apiKey_listMembers_forbidden() throws Exception {
@@ -366,8 +345,6 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
-    // ── JWT auth: org-level endpoints should still work ──
-
     @Test
     public void jwt_billingOrganization() throws Exception {
         mockMvc.perform(get("/api/v1/billing/organization")
@@ -388,8 +365,6 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isOk());
     }
-
-    // ── No auth → 401 ──
 
     @Test
     public void noAuth_projects_unauthorized() throws Exception {
@@ -414,8 +389,6 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/orgs"))
                 .andExpect(status().isUnauthorized());
     }
-
-    // ── Billing webhook: must NOT return 401 (provider callback, no auth) ──
 
     @Test
     public void noAuth_billingWebhook_stripe_notUnauthorized() throws Exception {

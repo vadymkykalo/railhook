@@ -43,7 +43,6 @@ public class UsageService {
 
         historyDays = Math.min(historyDays, 90);
 
-        // Use materialized view for delivery stats (refreshed every 5 min)
         Instant since30d = Instant.now().minus(30, ChronoUnit.DAYS);
         Map<String, Long> statusCounts = materializedViewRepository.getDeliveryStatsByProject(projectId);
 
@@ -75,7 +74,6 @@ public class UsageService {
                 .activeAlertRules(activeAlertRules)
                 .build();
 
-        // Historical daily snapshots
         LocalDate today = LocalDate.now();
         LocalDate from = today.minusDays(historyDays);
         List<UsageDaily> dailyRecords = usageDailyRepository

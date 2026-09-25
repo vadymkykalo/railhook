@@ -6,9 +6,7 @@ namespace Railhook\Api;
 
 use Railhook\Railhook;
 
-/**
- * Consumers: your own users, and the endpoints registered for them.
- */
+/** Consumers: your own users, and the endpoints registered for them. */
 class Consumers
 {
     private Railhook $client;
@@ -32,9 +30,7 @@ class Consumers
         );
     }
 
-    /**
-     * Get consumer by ID.
-     */
+    /** Get consumer by ID. */
     public function get(string $projectId, string $consumerId): array
     {
         return $this->client->request(
@@ -73,9 +69,7 @@ class Consumers
         );
     }
 
-    /**
-     * Delete the consumer, delete its endpoints and end its portal sessions.
-     */
+    /** Delete the consumer, delete its endpoints and end its portal sessions. */
     public function delete(string $projectId, string $consumerId): void
     {
         $this->client->request(
@@ -84,9 +78,7 @@ class Consumers
         );
     }
 
-    /**
-     * The endpoints registered for this consumer.
-     */
+    /** The endpoints registered for this consumer. */
     public function listEndpoints(string $projectId, string $consumerId): array
     {
         return $this->client->request(

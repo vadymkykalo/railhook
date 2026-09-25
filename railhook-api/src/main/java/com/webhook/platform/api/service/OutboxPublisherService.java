@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @Slf4j
@@ -40,15 +41,9 @@ public class OutboxPublisherService {
     static final int CLEANUP_PUBLISHED_BATCH = 5000;
     static final int CLEANUP_DEAD_BATCH = 1000;
 
-    /**
-     * How many batches one hourly cleanup run deletes of each status before it stops: a million
-     * PUBLISHED rows an hour. Enough to keep up with any rate this publisher can reach, and a
-     * bound on the run so a backlog of millions finishes well inside the job's ten-minute
-     * {@code lockAtMostFor}; whatever is left goes to the next run.
-     */
+    /** Bounds one run well inside its ten-minute lockAtMostFor; the rest goes to the next run. */
     static final int CLEANUP_MAX_BATCHES = 200;
 
-    /** Wall-clock bound on one run, half its {@code lockAtMostFor}, for a database slower than the batch count assumes. */
     static final Duration CLEANUP_TIME_BUDGET = Duration.ofMinutes(5);
 
     private final OutboxMessageRepository outboxMessageRepository;
@@ -61,39 +56,13 @@ public class OutboxPublisherService {
     private final long batchSendTimeoutSeconds;
     private final int maxPerProject;
 
-    /**
-     * How many rows sharing one Kafka key - that is, bound for one endpoint - may go in a batch.
-     *
-     * <p>The per-endpoint announcement ceiling, and it binds harder than it looks: at the default
-     * poll interval of 1s this is ten events a second for a single hot endpoint, whatever
-     * {@code batch-size} says. {@code load/ingest.js} drains at exactly that rate against one
-     * endpoint.
-     *
-     * <p>The fairness is the point - one endpoint's burst must not stall every other endpoint's
-     * announcement - so the default stays where it was. It was a literal in the two call sites
-     * while the bounds either side of it were both configurable, which meant an operator with one
-     * busy endpoint had a ceiling they could neither see nor move.
-     */
+    // Rows per endpoint per batch, so one endpoint's burst cannot stall the others.
     private final int maxPerKey;
 
-    /**
-     * Sampled by the publisher poll, read by the gauge.
-     *
-     * <p>The gauge used to run {@code findOldestPendingCreatedAt()} inside its own lambda, so
-     * every Prometheus scrape — from every replica, and on the management port, which is
-     * deliberately outside the auth chain — issued a query. Scrape frequency is a monitoring
-     * decision made elsewhere; it should not be able to set database load. The poll already
-     * runs every second, which is finer than any scrape interval, so sampling there costs
-     * nothing extra and the gauge becomes a memory read. Same shape as
-     * StaleDeliveryEscalationService.</p>
-     */
+    // Sampled by the poll: querying in the gauge let every scrape set database load.
     private final AtomicLong oldestPendingAgeSeconds = new AtomicLong(0);
 
-    /**
-     * Kafka outcomes that arrived after their batch stopped waiting, held for
-     * {@link #settleLateOutcomes}. Settling them on the callback itself would put a database round
-     * trip on the producer's network thread, which every other send in this JVM is queued behind.
-     */
+    // Late outcomes are settled by a poll, not on the callback: that would block the producer's network thread.
     private final Queue<UUID> latePublished = new ConcurrentLinkedQueue<>();
     private final Map<UUID, String> lateFailed = new ConcurrentHashMap<>();
     private final Timer publishLatency;
@@ -134,9 +103,7 @@ public class OutboxPublisherService {
                 .tag("status", "pending")
                 .register(meterRegistry);
 
-        // SENDING was previously invisible to outbox_queue_depth entirely, so a batch
-        // of messages stuck SENDING (in-flight past batch-send-timeout-seconds) produced no
-        // metric signal at all. The OutboxSendingStuck alert is what reads this tag.
+        // The OutboxSendingStuck alert reads this tag.
         Gauge.builder("outbox_queue_depth", outboxMessageRepository,
                         repo -> countAcrossOrganizations(repo, OutboxStatus.SENDING))
                 .description("Number of outbox messages by status")
@@ -160,11 +127,8 @@ public class OutboxPublisherService {
                 .register(meterRegistry);
     }
 
-    /**
-     * The outbox belongs to no organization, and a gauge is read on the scraping request's
-     * thread, which no tenant filter has entered. Without the system scope the count is refused,
-     * Micrometer exports NaN, and the alerts on this gauge can never fire.
-     */
+    // Without the system scope the scrape thread's count is refused, Micrometer exports NaN,
+    // and the alerts on this gauge never fire.
     private static double countAcrossOrganizations(OutboxMessageRepository repo, OutboxStatus status) {
         return TenantContext.callAsSystem(() -> repo.countByStatus(status));
     }
@@ -186,7 +150,7 @@ public class OutboxPublisherService {
     public void publishPendingMessages() {
         sampleOldestPendingAge();
 
-        // Phase 1: fast claim — SELECT FOR UPDATE + mark SENDING, commit immediately
+        // Claim and commit first, so no row lock is held while Kafka is slow.
         List<OutboxMessage> claimed = txTemplate.execute(status -> {
             List<OutboxMessage> batch = outboxMessageRepository
                     .findPendingBatchForUpdate(OutboxStatus.PENDING.name(), batchSize, maxPerKey, maxPerProject);
@@ -200,7 +164,6 @@ public class OutboxPublisherService {
             return;
         }
 
-        // Phase 2: publish to Kafka outside transaction — no DB locks held
         log.info("Publishing {} pending outbox messages", claimed.size());
         publishBatchAsync(claimed, false);
     }
@@ -209,17 +172,10 @@ public class OutboxPublisherService {
     @Scheduled(fixedDelayString = "${outbox.publisher.retry-interval-ms:30000}")
     @SchedulerLock(name = "outbox-publisher-retry", lockAtLeastFor = "PT5S", lockAtMostFor = "PT2M")
     public void retryFailedMessages() {
-        // Recover stuck SENDING rows here, on the 30s retry cycle, instead of the
-        // hourly cleanupOldMessages() job. A message that stays SENDING past
-        // batch-send-timeout-seconds (in-flight when publishBatchAsync's wait times out) used to
-        // wait up to ~59 extra minutes for the hourly job to reclaim it — worst case ~1h of an
-        // undelivered webhook with nothing visibly wrong (no SENDING gauge existed either; see
-        // the outbox_queue_depth{status="sending"} gauge registered below).
-        // Before recovery, so a row whose send did land is marked rather than handed back.
+        // Settle before recovery, so a row whose send did land is marked rather than handed back.
         settleLateOutcomes();
         recoverStuckSendingMessages();
 
-        // Phase 1: claim inside short transaction — SELECT FOR UPDATE + mark SENDING, commit immediately
         List<OutboxMessage> messagesToRetry = txTemplate.execute(status -> {
             List<OutboxMessage> failedMessages = outboxMessageRepository
                     .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), maxRetries, batchSize, maxPerKey, maxPerProject);
@@ -249,11 +205,9 @@ public class OutboxPublisherService {
             return;
         }
 
-        // Phase 2: publish to Kafka outside transaction — no DB locks held
         log.info("Retrying {} failed outbox messages", messagesToRetry.size());
         publishBatchAsync(messagesToRetry, true);
 
-        // Phase 3: promote FAILED messages that exceeded maxRetries to DEAD
         promoteExhaustedToDead();
     }
 
@@ -261,8 +215,6 @@ public class OutboxPublisherService {
     @Scheduled(fixedDelayString = "${outbox.publisher.cleanup-interval-ms:3600000}")
     @SchedulerLock(name = "outbox-cleanup", lockAtLeastFor = "PT30S", lockAtMostFor = "PT10M")
     public void cleanupOldMessages() {
-        // Stuck-SENDING recovery moved to the 30s retryFailedMessages() cycle — see
-        // recoverStuckSendingMessages() below. Not duplicated here; this job just does deletes.
         Instant deadline = Instant.now().plus(CLEANUP_TIME_BUDGET);
         long deletedPublished = deleteInBatches(OutboxStatus.PUBLISHED,
                 Instant.now().minus(Duration.ofDays(3)), CLEANUP_PUBLISHED_BATCH, deadline);
@@ -280,12 +232,7 @@ public class OutboxPublisherService {
         }
     }
 
-    /**
-     * Deletes rows of one status older than the cutoff until none are left or the run's budget
-     * is spent. It used to be one capped delete an hour — at most 120k PUBLISHED rows a day, so
-     * an installation publishing more than that grew the table for ever. Each batch commits on
-     * its own, so a long run never holds locks on what it has already deleted.
-     */
+    // One capped delete an hour let a busy table grow forever. Each batch commits on its own.
     private long deleteInBatches(OutboxStatus status, Instant cutoff, int batchSize, Instant deadline) {
         long total = 0;
         for (int batch = 0; batch < CLEANUP_MAX_BATCHES && Instant.now().isBefore(deadline); batch++) {
@@ -302,17 +249,8 @@ public class OutboxPublisherService {
         return total;
     }
 
-    /**
-     * Settles the rows whose Kafka outcome outlived their batch's wait.
-     *
-     * <p>Without this such an outcome was added to a collection nobody read again: the row stayed
-     * SENDING, recovery handed it back to PENDING, and a message Kafka had already accepted was
-     * published a second time. The update carries the same {@code status = 'SENDING'} guard as a
-     * batch's own, so an outcome that arrives after recovery changes nothing.
-     *
-     * <p>No {@code @SchedulerLock}: the outcomes live in this instance's memory, and a replica
-     * that did not win the publisher lock is still the only one that can settle them.
-     */
+    // Otherwise recovery republishes a message Kafka already accepted. No SchedulerLock: the
+    // outcomes live in this instance's memory.
     @SystemTenant("settles outbox rows, which belong to no organization")
     @Scheduled(fixedDelayString = "${outbox.publisher.poll-interval-ms:1000}")
     public void settleLateOutcomes() {
@@ -335,15 +273,7 @@ public class OutboxPublisherService {
         batchUpdateResults(published, failed, false);
     }
 
-    /**
-     * Recovers outbox messages stuck in SENDING (claimed but the app crashed, or the Kafka
-     * send never got a callback, before {@link #publishBatchAsync} could mark them
-     * PUBLISHED/FAILED) back to PENDING so the next {@link #publishPendingMessages} poll can
-     * reclaim them. Default {@code sendingRecoverySeconds}=300s provides margin over Kafka's
-     * delivery.timeout.ms (default 120s). Runs on the 30s retry cycle rather than the
-     * hourly cleanup job so a transient broker hiccup doesn't leave messages stuck for up to an
-     * hour with no visibility (see the "sending" outbox_queue_depth gauge registered above).
-     */
+    // The 300s default leaves margin over Kafka's 120s delivery.timeout.ms.
     private void recoverStuckSendingMessages() {
         Instant sendingCutoff = Instant.now().minusSeconds(sendingRecoverySeconds);
         int[] dead = new int[1];
@@ -364,7 +294,7 @@ public class OutboxPublisherService {
 
     private long calculateBackoff(int retryCount) {
         long base = (long) Math.min(Math.pow(2, retryCount) * 10, 600);
-        long jitter = java.util.concurrent.ThreadLocalRandom.current().nextLong(0, base / 4 + 1);
+        long jitter = ThreadLocalRandom.current().nextLong(0, base / 4 + 1);
         return base + jitter;
     }
 
@@ -373,7 +303,6 @@ public class OutboxPublisherService {
         Timer.Sample sample = Timer.start();
         List<CompletableFuture<Void>> completionFutures = new ArrayList<>();
 
-        // Thread-safe collections to track per-message results
         List<UUID> publishedIds = Collections.synchronizedList(new ArrayList<>());
         Map<UUID, String> failedMap = new ConcurrentHashMap<>();
         // Guarded by publishedIds' monitor: once set, an outcome goes to the late queues instead.
@@ -383,8 +312,6 @@ public class OutboxPublisherService {
             try {
                 Object payload = deserializePayload(message);
 
-                // Use persisted correlation ID from OutboxMessage (set during event ingestion)
-                // Fallback to new UUID only if not set (e.g., manual replay, old messages)
                 String correlationId = message.getCorrelationId();
                 if (correlationId == null || correlationId.isEmpty()) {
                     correlationId = UUID.randomUUID().toString();
@@ -398,8 +325,6 @@ public class OutboxPublisherService {
                 );
                 record.headers().add(new RecordHeader("X-Correlation-ID", correlationId.getBytes(StandardCharsets.UTF_8)));
 
-                // Use handle() callback to collect results based on the ACTUAL Kafka outcome.
-                // Batch DB updates happen after allOf() — avoids N individual save() calls.
                 CompletableFuture<Void> done = kafkaTemplate.send(record)
                         .<Void>handle((result, ex) -> {
                             if (ex != null) {
@@ -435,9 +360,8 @@ public class OutboxPublisherService {
             }
         }
 
-        // Wait for all send callbacks to complete (bounded). An outcome still in flight after the
-        // timeout is settled by settleLateOutcomes() when it arrives; one that never arrives is
-        // recovered back to PENDING after sendingRecoverySeconds.
+        // An outcome still in flight after the timeout is settled by settleLateOutcomes(); one
+        // that never arrives is recovered to PENDING after sendingRecoverySeconds.
         if (!completionFutures.isEmpty()) {
             try {
                 CompletableFuture.allOf(completionFutures.toArray(new CompletableFuture[0]))
@@ -449,10 +373,8 @@ public class OutboxPublisherService {
             }
         }
 
-        // ── Batch DB updates (2-3 queries instead of N individual saves) ──
-        // A snapshot, taken under the list's own monitor. Handing the live collector to the
-        // repository means Spring Data iterates it to bind the IN clause without holding that
-        // monitor, while a callback that arrived after the wait above may still be adding to it.
+        // Snapshot under the monitor: Spring Data iterates the list to bind the IN clause, and a
+        // late callback may still be adding to it.
         List<UUID> settled;
         Map<UUID, String> failed;
         synchronized (publishedIds) {
@@ -465,16 +387,7 @@ public class OutboxPublisherService {
         sample.stop(publishLatency);
     }
 
-    /**
-     * An error message that is safe to put in a map.
-     *
-     * <p>{@code ConcurrentHashMap} refuses a null value and {@code Throwable.getMessage()} is
-     * null for plenty of what turns up here - an NPE inside a serializer most of all. In the
-     * send callback that NPE completed the future exceptionally and was then swallowed one level
-     * up as the benign "did not fully complete", leaving the row SENDING to be published again
-     * 300s later. In the preparation catch it propagated out of the poll cycle altogether and
-     * abandoned every row claimed in that batch.
-     */
+    // ConcurrentHashMap refuses nulls, and getMessage() is often null.
     private static String describe(Throwable t) {
         String message = t.getMessage();
         return message != null ? message : t.getClass().getName();
@@ -493,8 +406,6 @@ public class OutboxPublisherService {
         }
 
         if (!failedMap.isEmpty()) {
-            // Group by error message to batch updates — typically 1-2 distinct errors per cycle
-            // (e.g. "Broker unavailable") instead of N individual transactions.
             Map<String, List<UUID>> byError = new HashMap<>();
             for (Map.Entry<UUID, String> entry : failedMap.entrySet()) {
                 byError.computeIfAbsent(entry.getValue(), k -> new ArrayList<>()).add(entry.getKey());
@@ -514,16 +425,7 @@ public class OutboxPublisherService {
         }
     }
 
-    /**
-     * Says so when the status guard refused a row.
-     *
-     * <p>A shortfall means a callback outlived the batch that started it: by the time it was
-     * settled the row had been recovered and re-claimed, and the guard in
-     * {@code batchMarkPublished} / {@code batchMarkFailed} declined to stamp a stale outcome over
-     * a live one. That is the guard working, but it is also the only visible sign that the send
-     * timeout is tuned below what the broker actually takes — silent, it would just look like a
-     * queue that will not drain.
-     */
+    // A shortfall is the only visible sign the send timeout is shorter than the broker needs.
     private void reportStragglers(String outcome, int attempted, Integer settled) {
         int applied = settled != null ? settled : 0;
         if (applied < attempted) {
@@ -544,11 +446,7 @@ public class OutboxPublisherService {
     }
 
 
-    /**
-     * Promote FAILED messages that exceeded maxRetries to DEAD in bulk.
-     * Called by retryFailedMessages cleanup — runs after retry cycle.
-     * Uses txTemplate instead of @Transactional to avoid self-invocation proxy bypass.
-     */
+    // txTemplate, not @Transactional: a self-invocation bypasses the proxy.
     private void promoteExhaustedToDead() {
         txTemplate.executeWithoutResult(status -> {
             int promoted = outboxMessageRepository.promoteExhaustedToDead(maxRetries);

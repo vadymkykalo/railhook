@@ -12,26 +12,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Deletes the public demo's rows from an installation that no longer runs the demo.
- *
- * <p>The counterpart to {@link DemoDataSeeder}, and present exactly where the seeder is not:
- * with {@code demo.enabled} false, each API start removes whatever an earlier boot with the demo
- * on left behind. Where there is nothing — every installation that never enabled the demo — it
- * reads two rows and returns.
- *
- * <p>Everything is deleted by the fixed ids in {@link DemoTenant} and nothing else: the history
- * through the seeder's own statements, then the structure the seeder inserted, then the
- * organization, whose foreign keys cascade to anything else it owns. The demo person goes last,
- * and only when no membership anywhere still names them. One transaction, under the seeder's
- * advisory lock, so replicas starting together remove it once and the rest find nothing.
- */
+/** Deletes only by the fixed demo ids, under the seeder's advisory lock so replicas remove it once. */
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "demo.enabled", havingValue = "false", matchIfMissing = true)
 public class DemoDataRemover {
 
-    /** What one run removed. {@code organization} and {@code user} say whether those rows went. */
     public record Removed(boolean organization, boolean user, int events, int deliveries, int attempts,
                           int incomingEvents, int forwards, int workflowExecutions, int transformations) {
 
@@ -57,13 +43,11 @@ public class DemoDataRemover {
         try {
             removeIfPresent();
         } catch (RuntimeException e) {
-            // Leftover demo rows are harmless — nothing can sign in to them — so failing to remove
-            // them must not take the API down. The next start tries again.
+            // Leftover demo rows are harmless, so this must not stop the API from starting.
             log.error("Could not remove the disabled demo's data: {}", e.getMessage(), e);
         }
     }
 
-    /** Deletes the demo's rows if any are there. Safe to call any number of times. */
     @SystemTenant("deletes the demo organization's rows by their fixed ids")
     public Removed removeIfPresent() {
         if (!demoRowsExist()) {
@@ -92,18 +76,14 @@ public class DemoDataRemover {
     }
 
     private Removed remove() {
-        // The seeder writes no outbox rows; a message here would be for a Delivery about to go.
         jdbc.update("DELETE FROM outbox_messages WHERE project_id = ?", DemoTenant.PROJECT_ID);
         DeletedHistory history = DemoDataSeeder.deleteHistory(jdbc);
 
-        // The structure the seeder inserted, children first; the organization's cascades would
-        // reach all of it, but an explicit order does not depend on every foreign key saying so.
+        // Children first, explicitly, rather than relying on every foreign key cascading.
         jdbc.update("DELETE FROM workflows WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         jdbc.update("DELETE FROM incoming_destinations WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         jdbc.update("DELETE FROM incoming_sources WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         jdbc.update("DELETE FROM subscriptions WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
-        // After the two things that point at one, so the count is what went rather than what the
-        // ON DELETE SET NULL left behind.
         int transformations = jdbc.update("DELETE FROM transformations WHERE organization_id = ?",
                 DemoTenant.ORGANIZATION_ID);
         jdbc.update("DELETE FROM endpoints WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
@@ -111,9 +91,7 @@ public class DemoDataRemover {
         jdbc.update("DELETE FROM projects WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         boolean organization = jdbc.update("DELETE FROM organizations WHERE id = ?", DemoTenant.ORGANIZATION_ID) > 0;
 
-        // The demo address is on a reserved domain nobody can sign up with, and the row is matched
-        // on it as well as the id. A membership elsewhere means someone made this row part of a
-        // real organization; it stays.
+        // A membership elsewhere means someone made this user part of a real organization; keep it.
         boolean user = jdbc.update("DELETE FROM users WHERE id = ? AND email = ? "
                         + "AND NOT EXISTS (SELECT 1 FROM memberships WHERE user_id = ?)",
                 DemoTenant.USER_ID, DemoDataSeeder.DEMO_EMAIL, DemoTenant.USER_ID) > 0;

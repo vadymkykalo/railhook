@@ -48,10 +48,7 @@ public class AlertRuleRequest {
 
     private String webhookUrl;
 
-    /**
-     * Comma-separated. Each address must also belong to a verified member of the rule's
-     * organization, which only the service can check.
-     */
+    /** Comma-separated. The service also checks each address is a verified member's. */
     @EmailRecipientList(max = AlertRuleRequest.MAX_EMAIL_RECIPIENTS)
     private String emailRecipients;
 

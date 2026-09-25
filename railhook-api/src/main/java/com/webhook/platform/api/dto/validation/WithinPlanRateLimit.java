@@ -10,12 +10,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * A per-second rate limit an organization sets on something it owns, refused above its plan's
- * own {@code rate_limit_per_second}. Without it, the plan's limit was a number on the billing
- * page that any organization could raise for itself by typing a bigger one here.
- *
- * <p>Only checked when billing is enabled: a self-hosted install has no plan to be held to.
- * Null passes.
+ * Refuses a rate limit above the plan's {@code rate_limit_per_second}. Only checked when billing
+ * is enabled; null passes.
  */
 @Documented
 @Constraint(validatedBy = WithinPlanRateLimitValidator.class)

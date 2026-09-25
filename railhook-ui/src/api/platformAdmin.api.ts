@@ -1,15 +1,6 @@
 import { http } from './http';
 import type { PageResponse } from '../types/api.types';
 
-/**
- * The platform admin API: every organization and account on the deployment.
- *
- * Reached only by a person whose verified address is in PLATFORM_ADMIN_EMAILS and who signed in
- * within the last 12 hours — the server checks all of it on every request, so nothing here is a
- * gate, only a client.
- */
-
-/** `PASSWORD`, or an identity provider's name such as `GOOGLE`. */
 export type SignInMethod = string;
 export type AdminUserStatus = 'ACTIVE' | 'PENDING_VERIFICATION' | 'DISABLED';
 export type AdminRole = 'OWNER' | 'DEVELOPER' | 'VIEWER' | 'API_KEY';
@@ -28,13 +19,11 @@ export interface AdminSignup {
 }
 
 export interface PlatformDay {
-  /** `YYYY-MM-DD`. */
   date: string;
   signups: number;
   events: number;
 }
 
-/** How far the last 30 days' sign-ups got; each figure is a subset of the one before it. */
 export interface PlatformActivation {
   signups: number;
   verified: number;
@@ -56,7 +45,6 @@ export interface PlatformOverview {
   deliveriesFailed24h: number;
   activeTunnels: number;
   organizationsNearQuota: number;
-  /** Oldest first, one entry for each of the last 30 days, today included. */
   daily30d: PlatformDay[];
   activation30d: PlatformActivation;
   recentSignups: AdminSignup[];
@@ -107,7 +95,6 @@ export interface AdminMember {
   signInMethods: SignInMethod[];
   joinedAt: string;
   lastSeenAt: string | null;
-  /** Listed in PLATFORM_ADMIN_EMAILS, verified and active — decided by the server. */
   platformAdmin: boolean;
 }
 
@@ -138,7 +125,6 @@ export interface AdminUser {
   organizations: { id: string; name: string; role: AdminRole }[];
   createdAt: string;
   lastSeenAt: string | null;
-  /** Listed in PLATFORM_ADMIN_EMAILS, verified and active — decided by the server. */
   platformAdmin: boolean;
 }
 
@@ -184,10 +170,7 @@ export const platformAdminApi = {
     http.get<PageResponse<AdminUser>>(`/api/v1/admin/users?${query({ page, size, search })}`),
 };
 
-/**
- * The one refusal worth telling apart: everything about the account holds, but the sign-in is
- * older than the panel accepts. Signing in again fixes it, and "access denied" would not say so.
- */
+/** A stale sign-in: signing in again fixes it, which "access denied" wouldn't say. */
 export function isReauthenticationRequired(error: unknown): boolean {
   const response = (error as { response?: { status?: number; data?: { error?: string } } } | null)?.response;
   return response?.status === 403 && response.data?.error === 'reauthentication_required';

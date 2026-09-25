@@ -6,10 +6,6 @@ import '../../i18n';
 import i18n from '../../i18n';
 import RetryJitterNote from '../RetryJitterNote';
 
-/**
- * QA saw a retry arrive after 32 seconds on a ladder that said 60 and filed it as a bug. It is
- * the full jitter RetryLadder applies on purpose — every place a ladder is drawn now says so.
- */
 describe('RetryJitterNote', () => {
   it('states the jitter the worker actually applies', () => {
     const ladder = readFileSync(resolve(__dirname,

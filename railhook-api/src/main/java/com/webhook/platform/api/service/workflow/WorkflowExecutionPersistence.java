@@ -15,11 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Separate bean for transactional persistence of workflow execution state.
- * Extracted from WorkflowEngine so that Spring AOP proxy intercepts
- * {@code @Transactional} — self-invocation within the same class would bypass it.
- */
+// A separate bean so @Transactional is not bypassed by self-invocation inside WorkflowEngine.
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -29,18 +25,7 @@ public class WorkflowExecutionPersistence {
     private final WorkflowStepExecutionRepository stepRepository;
     private final ObjectMapper objectMapper;
 
-    /**
-     * Atomically update execution status + completedAt + durationMs + errorMessage.
-     * findById + save run in a single transaction — no partial writes on crash.
-     */
-    /**
-     * Parks an execution until {@code resumeAt}, keeping everything needed to continue it.
-     *
-     * <p>The counterpart of {@link #completeExecution}: the execution is neither finished nor
-     * running, so it must leave RUNNING — otherwise {@code WorkflowExecutionRecoveryJob} would
-     * find a five-minute delay indistinguishable from a hung execution and fail it. That job
-     * sweeps RUNNING only, which is what makes WAITING safe.
-     */
+    // Must leave RUNNING: the recovery job sweeps RUNNING and would fail a long delay as hung.
     @Transactional
     public void suspendExecution(UUID executionId, Instant resumeAt, JsonNode state, long workingMs) {
         executionRepository.findById(executionId).ifPresent(exec -> {
@@ -50,8 +35,7 @@ public class WorkflowExecutionPersistence {
             try {
                 exec.setResumeState(objectMapper.writeValueAsString(state));
             } catch (Exception e) {
-                // A snapshot that cannot be written is an execution that cannot be resumed, so
-                // fail it now rather than leaving a row that WAITING will never wake from.
+                // Without a snapshot it can never resume, so fail it now.
                 log.error("Could not serialise resume state for execution {}: {}", executionId, e.getMessage());
                 exec.setStatus(ExecutionStatus.FAILED);
                 exec.setErrorMessage("Could not persist resume state: " + e.getMessage());
@@ -74,9 +58,6 @@ public class WorkflowExecutionPersistence {
         });
     }
 
-    /**
-     * Save a step execution record transactionally (single DB write including duration).
-     */
     @Transactional
     public WorkflowStepExecution saveStep(UUID executionId, String nodeId, String nodeType,
                                            JsonNode input, StepResult result, int durationMs) {

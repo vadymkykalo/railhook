@@ -8,22 +8,12 @@ import sitemap from '@astrojs/sitemap';
 import { API_REFERENCE, SIDEBAR_GROUPS } from './src/data/slugs.mjs';
 import { lastmodFor, socialImageHead } from './scripts/seo.mjs';
 
-/**
- * The docs are served from the UI image at /docs/, next to the dashboard, so every URL here
- * carries that base and a trailing slash — which is also how internal links are written.
- */
-
 const FONTS =
-  'https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
+  'https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap';
 
 const DOCS_DIR = new URL('./src/content/docs/', import.meta.url);
 
-/**
- * The slug contract (src/data/slugs.mjs) lists pages that are still being written. Starlight
- * refuses to build with a sidebar slug that has no page, so the sidebar lists only the contract
- * slugs whose English page exists; a page appears in the sidebar the moment its file lands,
- * with no edit here. The parity check keeps the Ukrainian twin from lagging behind.
- */
+// Starlight fails the build on a sidebar slug with no page, so only written pages are listed.
 const pageExists = (slug) => ['.mdx', '.md'].some((ext) => existsSync(new URL(`${slug}${ext}`, DOCS_DIR)));
 
 const sidebar = [
@@ -40,16 +30,14 @@ const sidebar = [
 ];
 
 export default defineConfig({
-  // A placeholder origin, not an address: the image is built once for every deployment. nginx
-  // rewrites it to the UI container's RAILHOOK_SITE_URL (or to nothing, a relative URL) when it
-  // serves the pages and the sitemap.
+  // Placeholder: one image serves every deployment, nginx rewrites it to RAILHOOK_SITE_URL.
   site: 'https://site-url.railhook.invalid',
   base: '/docs',
   trailingSlash: 'always',
   integrations: [
     starlight({
       title: 'Railhook Docs',
-      logo: { src: './src/assets/railhook-mark.svg', alt: 'Railhook' },
+      logo: { light: './src/assets/railhook-mark.svg', dark: './src/assets/railhook-mark-dark.svg', alt: 'Railhook' },
       favicon: '/favicon.svg',
       defaultLocale: 'root',
       locales: {
@@ -61,7 +49,6 @@ export default defineConfig({
       lastUpdated: true,
       sidebar,
       customCss: ['./src/styles/theme.css'],
-      // The header's theme and language pickers, drawn like the dashboard's instead of as native selects.
       components: {
         Header: './src/components/Header.astro',
         ThemeSelect: './src/components/ThemeToggle.astro',
@@ -72,50 +59,50 @@ export default defineConfig({
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' } },
         { tag: 'link', attrs: { rel: 'stylesheet', href: FONTS } },
         ...socialImageHead,
-        // Cloudflare Web Analytics, shared with the app: /config.js carries the container's
-        // token, /analytics.js adds the beacon only when there is one (railhook-ui/public/).
+        // analytics.js adds the Cloudflare beacon only when config.js carries a token.
         { tag: 'script', attrs: { src: '/config.js' } },
         { tag: 'script', attrs: { src: '/analytics.js', defer: true } },
       ],
-      // The code surface is dark in both site themes, as it is on the landing page and in
-      // the dashboard: one theme, no light/dark switch for code.
+      // Code is near-black in both site themes, so one code theme and no switch.
       expressiveCode: {
         themes: ['github-dark'],
         useStarlightDarkModeSwitch: false,
         useStarlightUiThemeColors: false,
         styleOverrides: {
-          borderRadius: '12px',
-          borderColor: '#23263A',
-          codeBackground: '#0E1020',
-          codeForeground: '#E6E8F2',
+          borderRadius: '0',
+          borderColor: '#2E2E2E',
+          codeBackground: '#111111',
+          codeForeground: '#EDEDED',
           codeFontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
-          uiFontFamily: "'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif",
+          uiFontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+          uiFontSize: '0.75rem',
           frames: {
             frameBoxShadowCssValue: 'none',
-            editorBackground: '#0E1020',
-            editorTabBarBackground: '#0E1020',
-            editorTabBarBorderBottomColor: '#23263A',
-            editorActiveTabBackground: '#0E1020',
-            editorActiveTabForeground: '#E6E8F2',
-            editorActiveTabIndicatorBottomColor: '#1D4BFF',
-            // github-dark paints the top indicator in a red-orange — a status hue on chrome.
+            editorBackground: '#111111',
+            editorTabBarBackground: '#111111',
+            editorTabBarBorderBottomColor: '#2E2E2E',
+            editorActiveTabBackground: '#111111',
+            editorActiveTabForeground: '#EDEDED',
+            editorActiveTabIndicatorBottomColor: '#7FE7FF',
+            // github-dark paints this red-orange, a status hue.
             editorActiveTabIndicatorTopColor: 'transparent',
-            terminalBackground: '#0E1020',
-            terminalTitlebarBackground: '#0E1020',
-            terminalTitlebarForeground: '#8A90A6',
-            terminalTitlebarBorderBottomColor: '#23263A',
-            terminalTitlebarDotsForeground: '#8A90A6',
-            inlineButtonForeground: '#E6E8F2',
-            inlineButtonBorder: '#23263A',
+            terminalBackground: '#111111',
+            terminalTitlebarBackground: '#111111',
+            terminalTitlebarForeground: '#9C9C9C',
+            terminalTitlebarBorderBottomColor: '#2E2E2E',
+            terminalTitlebarDotsForeground: '#474747',
+            terminalTitlebarDotsOpacity: '1',
+            inlineButtonForeground: '#EDEDED',
+            inlineButtonBorder: '#2E2E2E',
+            tooltipSuccessBackground: '#7FE7FF',
+            tooltipSuccessForeground: '#000000',
           },
         },
       },
-      // The API reference is a custom page (Scalar), which the validator cannot see into; the
-      // pages themselves exist, so links to them are excluded rather than reported.
+      // The validator cannot see the custom Scalar page, so links to it would be false reports.
       plugins: [starlightLinksValidator({ exclude: ['/docs/api-reference/', '/docs/uk/api-reference/', '/api-reference/', '/uk/api-reference/'] })],
     }),
-    // Starlight adds this integration itself unless one is already configured; declared here
-    // with the same i18n alternates so every entry can also say when its page last changed.
+    // Declared by hand (Starlight otherwise adds its own) only to add lastmod.
     sitemap({
       i18n: { defaultLocale: 'root', locales: { root: 'en', uk: 'uk' } },
       serialize: (item) => ({ ...item, lastmod: lastmodFor(item.url).toISOString() }),

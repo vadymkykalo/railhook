@@ -19,10 +19,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * The address an account signs in with. {@link EmailChangeService} has the rules; this adds the
- * per-address and per-IP limits that sit in front of every auth form.
- */
 @RestController
 @RequestMapping("/api/v1/auth/email-change")
 @Tag(name = "Authentication")

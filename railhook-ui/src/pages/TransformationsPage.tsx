@@ -75,7 +75,6 @@ export default function TransformationsPage() {
   const templateIsJson = templateHasContent && isValidJson(formTemplate);
   const exprCount = (formTemplate.match(/\$\{[^}]*\}/g) || []).length;
 
-  /** What the sample event would come out as, resolved locally. */
   const livePreview = useMemo(() => {
     if (!templateHasContent || !templateIsJson) return null;
     try {
@@ -120,21 +119,13 @@ export default function TransformationsPage() {
     setShowDialog(true);
   };
 
-  /**
-   * A JavaScript transformation is not editable in a dialog with a JSON box in
-   * it, and pretending otherwise is how somebody saves a script they have never
-   * run. Both the edit button and the flask send it to the Studio, which loads
-   * it by id, runs it against a real event and saves it back.
-   */
+  /** Scripts are edited in the Studio: a JSON box lets someone save a script they never ran. */
   const openInStudio = (item: TransformationResponse) => {
     navigate(`/admin/projects/${projectId}/transform-studio?transformation=${item.id}`);
   };
 
   const handleDuplicate = (item: TransformationResponse) => {
-    // A script cannot be duplicated through this dialog: its guard requires valid JSON, so the
-    // Save button would simply never enable and the reader would be left wondering. The Studio
-    // is where a script is copied — it opens holding this one, and "Save as" asks for the new
-    // name, which is what duplicating is.
+    // Not through this dialog: its JSON guard would never enable Save for a script.
     if (item.kind === 'JAVASCRIPT') {
       openInStudio(item);
       return;
@@ -190,8 +181,7 @@ export default function TransformationsPage() {
 
   if (loading) return <PageSkeleton />;
 
-  // A failed fetch used to render "project not found", which reads as a
-  // deleted project rather than a backend that is down.
+  // A failed fetch is not a missing project, so it must not read "project not found".
   if (projectFailed || listFailed || !project) {
     return (
       <div className="p-4 lg:p-6">
@@ -275,20 +265,18 @@ export default function TransformationsPage() {
                   </TableCell>
                   <TableCell>
                     {item.kind === 'JAVASCRIPT' ? (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-rail bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-medium">
+                      <span className="inline-flex items-center gap-1 border border-rail bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-medium">
                         <Code2 className="h-3 w-3" aria-hidden="true" />
                         {t('transformations.kindJavascript')}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-rail px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 border border-rail px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                         <Wand2 className="h-3 w-3" aria-hidden="true" />
                         {t('transformations.kindTemplate')}
                       </span>
                     )}
                   </TableCell>
                   <TableCell>
-                    {/* The version number is a link because it is a claim about the past:
-                        every template this transformation has published is behind it. */}
                     <Link
                       to={`/projects/${projectId}/transformations/${item.id}/history`}
                       className="font-mono text-xs underline-offset-2 hover:underline"
@@ -362,7 +350,6 @@ export default function TransformationsPage() {
         </Card>
       )}
 
-      {/* Create / edit */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
@@ -463,7 +450,7 @@ export default function TransformationsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 rounded-lg border border-rail p-3">
+            <div className="flex items-center gap-3 border border-rail p-3">
               <Switch id="tf-enabled" checked={formEnabled} onCheckedChange={setFormEnabled} />
               <div>
                 <Label htmlFor="tf-enabled" className="cursor-pointer">{t('common.enabled')}</Label>
@@ -486,7 +473,6 @@ export default function TransformationsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

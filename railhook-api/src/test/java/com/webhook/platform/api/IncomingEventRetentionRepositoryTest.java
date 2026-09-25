@@ -13,15 +13,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/**
- * Incoming Event retention must not delete a Forward partway through its Ladder.
- *
- * <p>{@code incoming_forward_attempts.incoming_event_id} cascades, so deleting an expired Incoming
- * Event takes its Forward's rows with it. A Replay or a Failed Messages retry starts a fresh
- * Forward for a webhook that may have arrived close to the cutoff, and the nightly purge wiped
- * those rows mid-ladder: the worker's next claim matched nothing and the Forward vanished without
- * reaching the DLQ. Events retention has kept in-flight Deliveries out of its delete all along.
- */
 class IncomingEventRetentionRepositoryTest extends AbstractIntegrationTest {
 
     @PersistenceContext

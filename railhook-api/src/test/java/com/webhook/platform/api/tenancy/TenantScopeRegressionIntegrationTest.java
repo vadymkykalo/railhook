@@ -39,38 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Pins the three tenancy failures that produced no error anybody would see.
- *
- * <p>{@code CrossTenantIsolationTest} proves the filter confines rows. These are the other
- * direction: work that is <em>supposed</em> to reach rows, and stopped. Each one failed silently —
- * two into a {@code catch (Exception)} that logged the wrong cause, and one by returning a
- * plausible-looking answer with rows missing from it — which is why none of them had a test and
- * why the build stayed green.
- *
- * <ul>
- *   <li><b>Workflow executions.</b> The outbox poller is {@code @SystemTenant}, and under
- *       Hibernate's root tenant nothing is stamped on insert. {@code workflow_executions
- *       .organization_id} went NOT NULL in V056, so every trigger became a constraint violation
- *       caught as "concurrent duplicate".</li>
- *   <li><b>Audit log.</b> Written on a pool this codebase builds by hand, so
- *       {@code TenantPropagatingTaskDecorator} never wraps it and the writer thread has no scope
- *       at all — every audited action, login and CRUD alike, wrote nothing.</li>
- *   <li><b>Organization list.</b> {@code Membership} took {@code @TenantId}, so the "every
- *       organization you belong to" read was filtered to the one the current token names.</li>
- * </ul>
- *
- * <p>Each of the three is now also held by a guard, and this class carries a case per guard
- * rather than a case per endpoint: the transaction guard in {@link TenantContext#callAs} and the
- * propagation {@link TenantPropagatingTaskDecorator#wrap} gives a hand-built pool, both exercised
- * here against a real transaction manager and a real session rather than a set flag. The third
- * guard — {@code NativeQueryTenantPredicateTest} — has no runtime counterpart on purpose: it
- * asserts on the SQL string, because a runtime check would only ever cover the queries some test
- * happens to call.
- *
- * <p>Named {@code *IntegrationTest} so it routes to the Docker-backed job — see
- * {@code scripts/check-test-routing.sh}.
- */
+// Three tenancy failures that were silent: workflow executions, the audit log, the organization list.
 class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private OrganizationRepository organizationRepository;
@@ -120,8 +89,6 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
                         .userId(userId).organizationId(orgB).role(MembershipRole.DEVELOPER).build()));
     }
 
-    // ── 1. Workflow executions ──────────────────────────────────────
-
     @Test
     @DisplayName("a workflow triggered by the system-scoped poller is stamped with the workflow's organization")
     void workflowExecutionGetsTheWorkflowsOrganization() {
@@ -135,9 +102,7 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
 
         UUID eventId = UUID.randomUUID();
 
-        // Exactly how WorkflowTriggerOutboxService.poll calls it: no ambient organization, only
-        // the system scope. Nothing here tells the trigger service whose row to write except the
-        // workflow it just read.
+        // As WorkflowTriggerOutboxService.poll calls it: only the system scope, no ambient organization.
         TenantContext.runAsSystem(() -> workflowTriggerService.triggerWorkflowsSync(
                 projectA, eventId, "order.created", "{\"id\":1}", 0));
 
@@ -167,24 +132,19 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
         TenantContext.runAsSystem(() -> workflowTriggerService.triggerWorkflowsSync(
                 projectA, UUID.randomUUID(), "order.created", "{\"id\":2}", 0));
 
-        // A row stamped with the sentinel would be invisible here even though it exists, which is
-        // what "the dashboard shows no runs" would have looked like.
+        // A row stamped with the sentinel would be invisible here even though it exists.
         TenantContext.runAs(orgA, () ->
                 assertThat(workflowExecutionRepository.findAll())
                         .extracting(WorkflowExecution::getWorkflowId)
                         .contains(workflowId));
     }
 
-    // ── 2. Audit log ────────────────────────────────────────────────
-
     @Test
     @DisplayName("the audit writer thread, which starts with no tenant scope, still writes the row")
     void auditLogIsWrittenFromAnUnscopedThread() throws Exception {
         UUID resourceId = UUID.randomUUID();
 
-        // The aspect hands saveAuditLog to a single-thread pool it builds itself, so the writer
-        // thread never sees TenantPropagatingTaskDecorator and starts with nothing. A plain
-        // Thread reproduces that condition without reaching into the aspect's private executor.
+        // The aspect's own pool starts with no scope; a plain Thread reproduces that.
         runUnscoped(() -> auditLogAspect.saveAuditLog(
                 "PROJECT_CREATE", "Project", resourceId, userId, orgA, "SUCCESS", null, 7, "127.0.0.1", null));
 
@@ -213,26 +173,17 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
                     .filter(a -> resourceId.equals(a.getResourceId()))
                     .toList();
             assertThat(written).hasSize(1);
-            // The point of this case is that the row is written at all. The sentinel is now
-            // chosen in the aspect rather than left to Hibernate's @TenantId generator, but the
-            // value is the same one it used to fill in: the nil UUID, which matches no
-            // organization, so a tenant-scoped reader sees this row no more than it saw the
-            // the older SQL NULL. Pinned because it is a real difference from that NULL.
+            // The nil-UUID sentinel matches no organization; the point is that the row is written at all.
             assertThat(written.get(0).getOrganizationId()).isEqualTo(TenantContext.SYSTEM);
         });
     }
-
-    // ── 2b. The guards that turned each of these into a build failure ───
 
     @Test
     @DisplayName("entering a tenant scope inside an open transaction fails instead of mis-stamping")
     void tenantScopeInsideAnOpenTransactionIsRejected() {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
 
-        // The shape the guard exists for: the transaction is already open, so Hibernate has
-        // already resolved the tenant for this session and the scope change cannot reach it.
-        // Before the guard this wrote a row belonging to whoever was in scope when the
-        // transaction began, and said nothing.
+        // The transaction is open, so Hibernate already resolved this session's tenant.
         assertThatThrownBy(() -> TenantContext.runAsSystem(() ->
                 transaction.executeWithoutResult(status ->
                         TenantContext.runAs(orgA, () -> projectRepository.count()))))
@@ -245,8 +196,7 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
     void wrappedPoolStampsTheSubmittersOrganization() throws Exception {
         ExecutorService pool = TenantPropagatingTaskDecorator.wrap(Executors.newSingleThreadExecutor());
         try {
-            // organizationId is left unset on purpose: the whole claim is that the worker thread
-            // inherited orgA's scope and Hibernate stamped the row from it.
+            // organizationId unset on purpose: the worker thread must inherit orgA's scope.
             UUID projectId = TenantContext.callAs(orgA, () -> {
                 try {
                     return pool.submit(() -> projectRepository.save(
@@ -269,14 +219,10 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
         }
     }
 
-    // ── 3. Organization list ────────────────────────────────────────
-
     @Test
     @DisplayName("a user in two organizations sees both, from inside either one's scope")
     void getUserOrganizationsSpansEveryMembership() {
-        // The scope matters: this is a request from a token that names orgA, and the answer must
-        // not be filtered to it. Running the same call under the system scope would pass even
-        // with the bug present.
+        // Under the system scope this would pass even with the bug present.
         List<OrganizationResponse> fromA = TenantContext.callAs(orgA, () ->
                 organizationService.getUserOrganizations(userId));
         List<OrganizationResponse> fromB = TenantContext.callAs(orgB, () ->
@@ -286,7 +232,6 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
         assertThat(fromB).extracting(OrganizationResponse::getId).containsExactlyInAnyOrder(orgA, orgB);
     }
 
-    /** Runs {@code body} on a fresh thread with no tenant scope, rethrowing whatever it threw. */
     private static void runUnscoped(Runnable body) throws Exception {
         AtomicReference<Throwable> failure = new AtomicReference<>();
         Thread thread = new Thread(() -> {

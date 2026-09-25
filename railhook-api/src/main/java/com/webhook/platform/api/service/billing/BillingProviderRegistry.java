@@ -4,10 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
 
-/**
- * Registry of all configured billing providers.
- * Allows lookup by provider code and routing webhooks to the correct provider.
- */
 @Slf4j
 public class BillingProviderRegistry {
 

@@ -33,17 +33,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * A Forward the consumer has already finished is not the scheduler's to hand back.
- *
- * <p>A retry send the scheduler could not confirm may still land. The consumer then claims the
- * row and finalises it, while the scheduler still holds its Phase 1 snapshot — PROCESSING, no
- * token. Writing that snapshot back put the row PENDING again, so the scheduler picked it up and
- * the Destination received the webhook a second time. {@code IncomingForwardAttempt} carries no
- * version, so nothing noticed.
- *
- * <p>Real Postgres, real transactions: the overwrite only exists across commits.
- */
+// Writing the scheduler's stale snapshot back re-queued a finished Forward; the entity has no version.
 @DataJpaTest
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -83,8 +73,7 @@ class IncomingForwardRetrySchedulerHandBackConcurrencyTest {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
 
         KafkaTemplate<String, IncomingForwardMessage> kafka = mock(KafkaTemplate.class);
-        // The send is reported as failed, but it did reach the consumer, which claimed the row
-        // on the scheduler's started_at and delivered it before the scheduler looked at the result.
+        // Reported failed, but it reached the consumer, which delivered it before the scheduler looked.
         when(kafka.send(anyString(), eq(lateSend.getDestinationId().toString()), any(IncomingForwardMessage.class)))
                 .thenAnswer(invocation -> {
                     IncomingForwardMessage message = invocation.getArgument(2);

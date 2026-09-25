@@ -9,15 +9,7 @@ import ConfirmDialog from './ConfirmDialog';
 import { Button } from './ui/button';
 import type { SessionResponse } from '../api/auth.api';
 
-/**
- * Everything that is currently signed in to this account, and the two ways to end it.
- *
- * A refresh token is a self-contained JWT, so until sessions were recorded there was nothing
- * to show here at all: a laptop that walked off stayed signed in for the life of its token and
- * nobody could see that it existed. The CLI grants are the ones worth looking at hardest — a
- * device-code login outlives the machine it was issued to far more often than a browser tab
- * does — which is why the client is named on every row rather than inferred from a User-Agent.
- */
+/** The client is named on every row: CLI grants outlive their machines far more often than tabs. */
 export default function ActiveSessions() {
   const { t } = useTranslation();
   const { logout } = useAuth();
@@ -34,9 +26,7 @@ export default function ActiveSessions() {
       onSuccess: () => {
         setPendingRevoke(null);
         showSuccess(t('settings.sessions.revoked'));
-        // Signing out the session you are using leaves the tab holding a token the API will
-        // refuse on its very next request, so take it to the login screen rather than let it
-        // discover that as a string of failures.
+        // The tab's token is now refused, so go to login rather than fail request by request.
         if (wasCurrent) logout();
       },
       onError: (error) => showApiError(error, 'settings.sessions.revokeFailed'),

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import java.util.List;
 
 @Service
 @Slf4j
@@ -33,28 +34,17 @@ public class EndpointVerificationService {
 
     private final EndpointRepository endpointRepository;
 
-    /**
-     * A TransactionTemplate rather than {@code @Transactional} on the two helpers, for the reason
-     * {@code OutboxPublisherService} gives: {@code verify} calls them on itself, and a
-     * self-invocation never goes through the proxy, so the annotation would be decoration. The
-     * same trap that makes it easy to *think* the wait is outside a transaction.
-     */
+    // Not @Transactional helpers: verify calls them on itself, which bypasses the proxy.
     private final TransactionTemplate txTemplate;
 
-    /**
-     * Built once. {@code HttpClient.create()} with no provider hands every invocation its own
-     * connection pool, which nothing reuses and nothing reclaims on a schedule the caller
-     * controls - one per verification, for as long as the process lives.
-     */
+    // Built once: HttpClient.create() per call leaks a connection pool each time.
     private final WebClient webClient;
 
     private static final int VERIFICATION_TIMEOUT_SECONDS = 10;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** Why a verification failed, where the UI has something better to say than the raw error. */
     public enum FailureReason {
-        /** The URL is a Railhook tunnel with no {@code railhook tunnel} client connected. */
         TUNNEL_OFFLINE
     }
 
@@ -62,7 +52,7 @@ public class EndpointVerificationService {
             EndpointRepository endpointRepository,
             WebClient.Builder webClientBuilder,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts,
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
             PlatformTransactionManager transactionManager) {
         this.endpointRepository = endpointRepository;
         this.txTemplate = new TransactionTemplate(transactionManager);
@@ -88,18 +78,7 @@ public class EndpointVerificationService {
         return endpointRepository.save(endpoint);
     }
 
-    /**
-     * Sends the challenge and records what came back.
-     *
-     * <p>Deliberately not {@code @Transactional}. The wait here is up to ten seconds against a
-     * URL the customer chose, and it used to sit inside a transaction that had already dirtied
-     * the entity - so every call held a Hikari connection and a row lock on {@code endpoints}
-     * for its whole duration. It is reachable from a user-facing endpoint, so a handful of
-     * concurrent verifications against slow targets drained the pool for the entire instance.
-     *
-     * <p>Three steps instead: a short transaction to claim the attempt, the call with nothing
-     * held, and a short transaction to write the verdict.
-     */
+    // Not @Transactional: a slow customer URL held a connection and row lock and drained the pool.
     public VerificationResult verify(UUID projectId, UUID endpointId) {
         Endpoint endpoint = beginVerificationAttempt(projectId, endpointId);
 
@@ -133,8 +112,7 @@ public class EndpointVerificationService {
                     recordVerificationOutcome(endpointId, VerificationStatus.FAILED), null);
 
         } catch (WebClientResponseException e) {
-            // A tunnel nobody is connected to answers 503 with this body. Reported raw, it read as
-            // the server being down, when the fix is on the caller's own machine.
+            // A raw 503 from an offline tunnel looks like our outage; the fix is on the caller's machine.
             if (isOfflineTunnel(e)) {
                 log.info("Endpoint {} verification failed - tunnel not connected", endpointId);
                 return new VerificationResult(false,
@@ -152,10 +130,6 @@ public class EndpointVerificationService {
         }
     }
 
-    /**
-     * Claims the attempt: stamps when it started and mints a token if there is not one already.
-     * Short, and over before anything is sent.
-     */
     public Endpoint beginVerificationAttempt(UUID projectId, UUID endpointId) {
         return txTemplate.execute(tx -> {
             Endpoint endpoint = requireEndpoint(projectId, endpointId);
@@ -172,11 +146,7 @@ public class EndpointVerificationService {
         });
     }
 
-    /**
-     * Writes the verdict. Re-reads rather than saving the detached instance the call started
-     * with: the row may have been touched while the request was in flight, which is the cost of
-     * not holding it - and the cheaper half of the trade.
-     */
+    /** Re-reads rather than saving the detached instance: the row may have changed during the call. */
     public Endpoint recordVerificationOutcome(UUID endpointId, VerificationStatus status) {
         return txTemplate.execute(tx -> {
             Endpoint endpoint = endpointRepository.findById(endpointId)
@@ -203,33 +173,25 @@ public class EndpointVerificationService {
         return endpoint;
     }
 
-    /** Another project's endpoint is "not found", like a missing one - the URL names the project. */
     private Endpoint requireEndpoint(UUID projectId, UUID endpointId) {
         return endpointRepository.findByIdAndProjectId(endpointId, projectId)
                 .orElseThrow(() -> new NotFoundException("Endpoint not found"));
     }
 
-    /**
-     * Strict challenge verification:
-     * 1. Try JSON parse — look for {"challenge": "..."} exact match
-     * 2. Fallback to exact trim().equals() for plain-text responses
-     */
     private boolean verifyChallengeResponse(String response, String expectedToken) {
         if (response == null || expectedToken == null) {
             return false;
         }
 
-        // Try JSON parse first
         try {
             JsonNode json = MAPPER.readTree(response);
             if (json.has("challenge")) {
                 return expectedToken.equals(json.get("challenge").asText());
             }
         } catch (Exception e) {
-            // Not valid JSON, fall through to plain-text check
+            // Not JSON: fall through to the plain-text check.
         }
 
-        // Fallback: exact match on trimmed response
         return expectedToken.equals(response.trim());
     }
 
@@ -244,7 +206,6 @@ public class EndpointVerificationService {
         }
     }
 
-    /** @param reason set when the failure has a known cause the UI explains itself; null otherwise */
     public record VerificationResult(boolean success, String message, Endpoint endpoint, FailureReason reason) {
     }
 }

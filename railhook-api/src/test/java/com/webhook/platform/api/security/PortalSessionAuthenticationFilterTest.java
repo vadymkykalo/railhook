@@ -30,10 +30,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * The portal token's filter, without a database: which requests it looks at, which sessions it
- * accepts, and what it does to a session that is over its rate limit.
- */
 class PortalSessionAuthenticationFilterTest {
 
     private static final Instant NOW = Instant.parse("2026-09-18T12:00:00Z");

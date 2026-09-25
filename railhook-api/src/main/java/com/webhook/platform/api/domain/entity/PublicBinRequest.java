@@ -16,7 +16,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.Instant;
 import java.util.UUID;
 
-/** One request sent to a {@link PublicBin}, as it arrived, with credentials masked. */
+/** Stored as it arrived, with credentials masked. */
 @Entity
 @Table(name = "public_bin_requests")
 @Getter

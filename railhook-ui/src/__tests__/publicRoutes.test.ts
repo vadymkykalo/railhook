@@ -8,23 +8,13 @@ import { blogSlugs } from '../lib/blog';
 const uiRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (p: string) => readFileSync(join(uiRoot, p), 'utf8');
 
-/**
- * The public paths spelled out in scripts/public-routes.mjs (read as text: it is untyped JS).
- *
- * The blog's articles are not among them — the module enumerates those from the content
- * directory — and that is deliberate: a post is reached from /blog, which is in the footer, not
- * from a footer link of its own.
- */
+/** Posts are reached from /blog, not from footer links of their own. */
 const publicPaths = [...read('scripts/public-routes.mjs').matchAll(/\{\s*path:\s*'([^']+)'/g)].map((m) => m[1]);
 
-/**
- * A public page lives in four places: the router, the route list the prerender and the sitemap
- * read, the committed sitemap, and the footer that lets a reader find it. A page missing from
- * any one of them is either unreachable, unindexed or rendered empty to a crawler.
- */
+/** A page missing from any of these is unreachable, unindexed or empty to crawlers. */
 describe('every public page', () => {
   it('includes the trust pages and the signature verifier', () => {
-    expect(publicPaths).toEqual(expect.arrayContaining(['/security', '/about', '/changelog', '/tools/webhook-signature']));
+    expect(publicPaths).toEqual(expect.arrayContaining(['/security', '/about', '/tools/webhook-signature']));
   });
 
   it('is a route under the public layout', () => {
@@ -51,12 +41,6 @@ describe('every public page', () => {
 });
 
 
-/**
- * A post is a directory under src/content/blog/, and three places have to agree about it: the
- * app (which globs the directory), the sitemap and the prerender (which read the route list).
- * Enumerating rather than hand-listing is what keeps them from drifting — but only if the
- * enumeration actually reaches the same slugs the app does.
- */
 describe('every blog post', () => {
   const routed = publicRoutes().map((r: { path: string }) => r.path);
 

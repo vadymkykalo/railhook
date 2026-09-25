@@ -12,10 +12,7 @@ import java.time.Instant;
 @Repository
 public interface SignInHandoffRepository extends JpaRepository<SignInHandoff, String> {
 
-    /**
-     * Claims the code, compare-and-set: only the one caller that flips {@code consumed_at} from
-     * null gets a session. A replay, or a second tab racing the first, updates nothing.
-     */
+    /** Compare-and-set: only the caller that flips {@code consumed_at} from null gets a session. */
     @Modifying(clearAutomatically = true)
     @Query("update SignInHandoff h set h.consumedAt = :now "
             + "where h.codeHash = :codeHash and h.consumedAt is null and h.expiresAt > :now")

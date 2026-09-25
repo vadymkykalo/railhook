@@ -41,26 +41,17 @@ public class Organization {
     private Instant createdAt;
 
     /**
-     * When an operator suspended this organization, or null.
-     *
-     * <p>Deliberately not {@code billingStatus.SUSPENDED}. That value belongs to the payment
-     * state machine — the dunning scheduler writes it when a grace period expires, and the
-     * subscription lifecycle overwrites it on the next sync — so an abuse suspension stored
-     * there would be lifted by a successful payment. It is also read by nothing, which is the
-     * other half of why suspension did not suspend anything.
+     * Separate from {@code BillingStatus.SUSPENDED}, which the billing sync overwrites, so a
+     * successful payment would lift an abuse suspension stored there.
      */
     @Column(name = "suspended_at")
     private Instant suspendedAt;
 
-    /** Why, in the operator's words. Shown to the tenant in the refusal. */
+    /** Shown to the tenant in the refusal. */
     @Column(name = "suspension_reason")
     private String suspensionReason;
 
-    /**
-     * Who suspended it, as free text. The platform-admin credential is one shared token with no
-     * identity of its own, so this is whatever the operator chose to write down — worth having
-     * anyway, because the alternative is a suspension nobody can attribute.
-     */
+    /** Free text: the platform-admin credential is a shared token with no identity. */
     @Column(name = "suspended_by")
     private String suspendedBy;
 

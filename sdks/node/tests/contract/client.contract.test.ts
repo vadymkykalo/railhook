@@ -1,18 +1,5 @@
-// Contract tests: run the node SDK against a REAL API instance and assert
-// its request/response shapes still match what the API actually does. The
-// cases in src/__tests__/ stub the HTTP layer entirely — they'd stay
-// green even if the API renamed a field out from under this SDK. These
-// exist to catch that drift instead of a user finding it in production.
-//
-// Run with: npm run test:contract (requires CONTRACT_API_BASE_URL reachable
-// — defaults to http://localhost:8080, i.e. `make up`). See
-// tests/contract/README.md.
-//
-// The repo now commits an OpenAPI spec (openapi.yaml at the repo root);
-// generating these expectations from the spec would be preferable to
-// hand-asserting field-by-field, since it would catch drift at build time
-// rather than only when this suite happens to run. This hand-asserted
-// suite is the accepted fallback until that generation exists.
+// Runs against a real API: the unit tests stub HTTP and would stay green if the API renamed a
+// field out from under this SDK.
 import { Railhook } from '../../src/index';
 import { bootstrapContractProject, isApiReachable, BASE_URL, ContractContext } from './support';
 
@@ -67,10 +54,7 @@ describe('Railhook client contract', () => {
     expect(typeof subscription.enabled).toBe('boolean');
     expect(typeof subscription.orderingEnabled).toBe('boolean');
     expect(typeof subscription.maxAttempts).toBe('number');
-    // transformationId / transformationName are part of SubscriptionResponse
-    // and the SDK's Subscription type now declares both. Asserted as *present*
-    // (they are null for a subscription with no transformation) so the mirror
-    // cannot quietly fall behind the response again.
+    // Asserted present even though null here, so the type cannot fall behind the response again.
     expect('transformationId' in subscription).toBe(true);
     expect('transformationName' in subscription).toBe(true);
   });

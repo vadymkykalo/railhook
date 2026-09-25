@@ -18,11 +18,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * The two things the ingest path asks of the schema registry. Separate from
- * {@link SchemaRegistryService}, which is the dashboard's CRUD over the same tables: this runs on
- * every event of a project with validation on.
- */
+/** The ingest path's view of the schema registry; runs on every event of a validating project. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -33,10 +29,7 @@ public class PayloadSchemaValidator {
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
 
-    /**
-     * Records an unseen event type and infers a DRAFT schema from the first payload it carries.
-     * Never blocks ingestion: a project that has not declared its types still gets its events.
-     */
+    // Never blocks ingestion: a project that has not declared its types still gets its events.
     @Transactional
     public void autoDiscover(UUID projectId, String eventTypeName, String payloadJson) {
         try {
@@ -70,7 +63,6 @@ public class PayloadSchemaValidator {
         }
     }
 
-    /** Empty when the type is unknown or has no active schema: there is nothing to validate against. */
     public List<String> validate(UUID projectId, String eventTypeName, String payloadJson) {
         Optional<EventSchemaVersion> activeSchema = catalogRepository
                 .findByProjectIdAndName(projectId, eventTypeName)

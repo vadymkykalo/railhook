@@ -21,18 +21,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/**
- * Core workflow execution engine.
- * Executes a DAG of nodes in topological order, piping each node's output
- * as the next node's input. Supports branching (fan-out) and filtering (skip downstream).
- *
- * Reliability:
- * - Overall execution timeout (configurable, default 10 minutes)
- * - Per-node timeout (configurable per type)
- * - Thread interrupt awareness for graceful shutdown
- * - Transactional completion status writes
- * - Graceful shutdown: waits for in-flight nodes, then interrupts
- */
 @Service
 @Slf4j
 public class WorkflowEngine implements DisposableBean {
@@ -42,12 +30,7 @@ public class WorkflowEngine implements DisposableBean {
     private final long defaultNodeTimeoutMs;
     private final int shutdownAwaitSeconds;
 
-    /**
-     * Bounded thread pool for per-node timeout enforcement, wrapped so a node runs in the tenant
-     * of the workflow that scheduled it — node executors read endpoints and write deliveries, all
-     * {@code @TenantId} entities, and this pool is built here rather than in {@code AsyncConfig},
-     * so nothing else would give it a scope.
-     */
+    // Wrapped so a node runs in its workflow's tenant; built here, so nothing else would scope it.
     private final ExecutorService nodeTimeoutExecutor;
 
     /** The same pool, undecorated: {@code nodeTimeoutExecutor} hides its saturation counters. */
@@ -94,9 +77,7 @@ public class WorkflowEngine implements DisposableBean {
         pool.allowCoreThreadTimeOut(true);
         this.nodeTimeoutPool = pool;
         this.nodeTimeoutExecutor = TenantPropagatingTaskDecorator.wrap(pool);
-        // No "delay" entry any more: a delay node returns a due time in microseconds instead
-        // of sleeping, so the 305-second allowance it needed — and the config knob that set it —
-        // measured something that no longer happens.
+        // No "delay" entry: a delay node returns a due time instead of sleeping.
         this.nodeTimeouts = Map.of(
                 "http", httpTimeoutSeconds * 1000L,
                 "slack", slackTimeoutSeconds * 1000L,
@@ -121,29 +102,12 @@ public class WorkflowEngine implements DisposableBean {
         log.info("WorkflowEngine shutdown complete");
     }
 
-    /**
-     * Execute a workflow definition for a given execution.
-     *
-     * @param executionId  the persisted WorkflowExecution ID
-     * @param definitionJson the workflow definition JSON string
-     * @param triggerData  the trigger event payload
-     */
     public void execute(UUID executionId, String definitionJson, JsonNode triggerData) {
         run(executionId, definitionJson, triggerData, null, 0L);
     }
 
-    /**
-     * Continues an execution that suspended at a delay node.
-     *
-     * <p>Called by {@code WorkflowResumeJob} once {@code resumeAt} has passed. {@code state} is
-     * the snapshot {@link #execute} wrote — the outputs produced before the delay, the nodes
-     * already skipped, and the node to continue from. Replaying the prefix instead of restoring
-     * it would be the failure mode that makes a naive resume worse than sleeping: an http node
-     * would post twice and a createEvent node would emit twice.
-     *
-     * @param workingMsSoFar milliseconds of actual node execution before the suspension, so the
-     *                       global timeout stays a budget for work rather than wall-clock
-     */
+    // Resumes from the snapshot execute() wrote. Replaying the prefix would repeat side effects.
+    // workingMsSoFar keeps the global timeout a budget for work, not wall-clock time.
     public void resume(UUID executionId, String definitionJson, JsonNode triggerData,
                        JsonNode state, long workingMsSoFar) {
         run(executionId, definitionJson, triggerData, state, workingMsSoFar);
@@ -162,7 +126,6 @@ public class WorkflowEngine implements DisposableBean {
                 return;
             }
 
-            // Parse nodes and edges
             Map<String, JsonNode> nodesById = new LinkedHashMap<>();
             for (JsonNode node : nodesArray) {
                 nodesById.put(node.get("id").asText(), node);
@@ -180,11 +143,8 @@ public class WorkflowEngine implements DisposableBean {
                 }
             }
 
-            // Topological sort
             List<String> order = topologicalSort(nodesById.keySet(), incomingEdges);
 
-            // Build reverse lookup: for each (source→target) edge, store the sourceHandle
-            // so we can check branch routing
             Map<String, Map<String, String>> edgeSourceHandles = new HashMap<>(); // target → (source → sourceHandle)
             if (edgesArray != null && edgesArray.isArray()) {
                 for (JsonNode edge : edgesArray) {
@@ -196,7 +156,6 @@ public class WorkflowEngine implements DisposableBean {
                 }
             }
 
-            // Execute nodes in order, from the beginning or from where a suspension left off.
             Map<String, JsonNode> outputs = new HashMap<>();
             Set<String> skippedNodes = new HashSet<>();
             String resumeFrom = null;
@@ -215,8 +174,7 @@ public class WorkflowEngine implements DisposableBean {
             boolean skippingToResumePoint = resumeFrom != null;
 
             for (String nodeId : order) {
-                // Everything before the resume point already ran, and its output is restored
-                // above. Re-running it would repeat side effects the execution already had.
+                // Everything before the resume point already ran and its output is restored above.
                 if (skippingToResumePoint) {
                     if (nodeId.equals(resumeFrom)) {
                         skippingToResumePoint = false;
@@ -225,7 +183,6 @@ public class WorkflowEngine implements DisposableBean {
                     }
                 }
 
-                // ── Global timeout check ─────────────────────────
                 long elapsed = workingMsSoFar + (System.currentTimeMillis() - startTime);
                 if (elapsed > maxExecutionMs) {
                     String msg = String.format("Workflow execution timeout after %ds (max %ds)",
@@ -235,7 +192,6 @@ public class WorkflowEngine implements DisposableBean {
                     return;
                 }
 
-                // ── Thread interrupt check (graceful shutdown) ───
                 if (Thread.currentThread().isInterrupted()) {
                     log.warn("Execution {} interrupted (shutdown?)", executionId);
                     persistence.completeExecution(executionId, ExecutionStatus.CANCELLED,
@@ -247,12 +203,10 @@ public class WorkflowEngine implements DisposableBean {
                 String nodeType = nodeDef.get("type").asText();
                 JsonNode nodeData = nodeDef.has("data") ? nodeDef.get("data") : objectMapper.createObjectNode();
 
-                // Check if all parents are skipped or branch-blocked → skip this node too
                 List<String> parents = incomingEdges.getOrDefault(nodeId, List.of());
                 boolean allParentsBlocked = !parents.isEmpty() && parents.stream().allMatch(parentId -> {
                     if (skippedNodes.contains(parentId)) return true;
-                    // Check branch routing: if parent output has _branchHandle,
-                    // only allow this edge if its sourceHandle matches
+                    // A parent that set _branchHandle only passes along the edge with that handle.
                     JsonNode parentOutput = outputs.get(parentId);
                     if (parentOutput != null && parentOutput.has("_branchHandle")) {
                         String branchHandle = parentOutput.get("_branchHandle").asText();
@@ -269,10 +223,9 @@ public class WorkflowEngine implements DisposableBean {
                     continue;
                 }
 
-                // Gather input from parent outputs (first non-null, non-branch-blocked parent)
                 JsonNode input;
                 if (parents.isEmpty()) {
-                    input = triggerData; // root node gets trigger data
+                    input = triggerData;
                 } else {
                     input = parents.stream()
                             .filter(p -> !skippedNodes.contains(p))
@@ -292,7 +245,6 @@ public class WorkflowEngine implements DisposableBean {
                             .orElse(triggerData);
                 }
 
-                // Find executor
                 NodeExecutor executor = executors.get(nodeType);
                 if (executor == null) {
                     log.warn("No executor for node type '{}', skipping node {}", nodeType, nodeId);
@@ -302,19 +254,16 @@ public class WorkflowEngine implements DisposableBean {
                     continue;
                 }
 
-                // ── Execute with per-node timeout ────────────────
                 log.debug("Executing node {} (type={})", nodeId, nodeType);
                 long nodeStart = System.currentTimeMillis();
                 StepResult result = executeWithTimeout(executor, nodeType, nodeData, input);
                 long nodeDuration = System.currentTimeMillis() - nodeStart;
 
-                // Save step (single DB write including duration)
                 persistence.saveStep(executionId, nodeId, nodeType, input, result, (int) nodeDuration);
 
                 if (result.status() == StepStatus.WAITING) {
-                    // The node has nothing to do but wait. Write down where we are, hand the
-                    // thread back, and let WorkflowResumeJob pick it up when it is due —
-                    // rather than parking a pool thread on a clock.
+                    // Persist the position and hand the thread back; WorkflowResumeJob resumes it
+                    // when due, instead of parking a pool thread on a clock.
                     outputs.put(nodeId, result.output());
                     long workedThisSegment = workingMsSoFar + (System.currentTimeMillis() - startTime);
                     persistence.suspendExecution(executionId, result.resumeAt(),
@@ -344,32 +293,20 @@ public class WorkflowEngine implements DisposableBean {
             try {
                 persistence.completeExecution(executionId, ExecutionStatus.FAILED, e.getMessage(), startTime);
             } catch (Exception pe) {
-                // DB unreachable — execution stays RUNNING, recovery job will mark it FAILED after threshold
+                // DB unreachable: the execution stays RUNNING and the recovery job fails it later.
                 log.error("Failed to persist FAILED status for execution {} (recovery job will handle): {}",
                         executionId, pe.getMessage());
             }
         }
     }
 
-    /**
-     * The node to continue from, or null when the delay was the last node in the order.
-     *
-     * <p>Null means the resumed run finds nothing left to do and completes, which is the correct
-     * outcome for a workflow that ends on a delay.
-     */
+    // Null when the delay was the last node.
     private String nextNodeAfter(List<String> order, String nodeId) {
         int i = order.indexOf(nodeId);
         return (i >= 0 && i + 1 < order.size()) ? order.get(i + 1) : null;
     }
 
-    /**
-     * Everything needed to put the execution back together, and no more.
-     *
-     * <p>Deliberately not the whole engine state: the definition and trigger data are already
-     * persisted on the row, and the edge maps are derived from the definition, so re-deriving
-     * them on resume is cheaper than storing them and cannot go stale against an edited
-     * workflow.
-     */
+    // Edge maps are not stored, so they cannot go stale against an edited workflow.
     private JsonNode snapshot(Map<String, JsonNode> outputs, Set<String> skipped, String resumeFrom) {
         ObjectNode state = objectMapper.createObjectNode();
         ObjectNode out = objectMapper.createObjectNode();
@@ -384,19 +321,11 @@ public class WorkflowEngine implements DisposableBean {
         return state;
     }
 
-    // ── Per-node timeout enforcement ────────────────────────────────────
-
-    /**
-     * Execute a node with a per-type timeout.
-     * If the node takes too long, returns FAILED with a timeout message.
-     */
     private StepResult executeWithTimeout(NodeExecutor executor, String nodeType,
                                            JsonNode nodeData, JsonNode input) {
         long timeoutMs = nodeTimeouts.getOrDefault(nodeType, defaultNodeTimeoutMs);
-        // Capture depth from calling thread (workflow-* pool) and propagate
-        // to nodeTimeoutExecutor thread — critical for recursion guard in CreateEventNodeExecutor.
-        // The tenant crosses the same boundary for the same reason, but that half is the pool's
-        // job: nodeTimeoutExecutor is wrapped in TenantPropagatingTaskDecorator.
+        // The depth must cross to the timeout thread: CreateEventNodeExecutor's recursion guard
+        // reads it. The tenant crosses via the pool's TenantPropagatingTaskDecorator.
         int callerDepth = WorkflowTriggerService.getCurrentDepth();
         Future<StepResult> future;
         try {
@@ -417,7 +346,7 @@ public class WorkflowEngine implements DisposableBean {
         try {
             return future.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
-            future.cancel(true); // interrupt the node thread
+            future.cancel(true);
             return StepResult.failed(String.format("Node timeout: %s exceeded %ds limit",
                     nodeType, timeoutMs / 1000));
         } catch (InterruptedException e) {
@@ -431,9 +360,6 @@ public class WorkflowEngine implements DisposableBean {
         }
     }
 
-    /**
-     * Topological sort (Kahn's algorithm) for DAG execution order.
-     */
     private List<String> topologicalSort(Set<String> nodeIds, Map<String, List<String>> incomingEdges) {
         Map<String, Integer> inDegree = new HashMap<>();
         for (String id : nodeIds) {
@@ -460,7 +386,6 @@ public class WorkflowEngine implements DisposableBean {
             visited.add(current);
             result.add(current);
 
-            // Find nodes that depend on current
             for (Map.Entry<String, List<String>> entry : incomingEdges.entrySet()) {
                 if (entry.getValue().contains(current) && nodeIds.contains(entry.getKey())) {
                     int newDegree = inDegree.get(entry.getKey()) - 1;
@@ -472,7 +397,6 @@ public class WorkflowEngine implements DisposableBean {
             }
         }
 
-        // Add any unvisited nodes (isolated) at end
         for (String id : nodeIds) {
             if (!visited.contains(id)) {
                 result.add(id);

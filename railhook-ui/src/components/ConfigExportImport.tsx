@@ -24,7 +24,7 @@ interface ExportedConfig {
     enabled: boolean;
     rateLimitPerSecond?: number;
     allowedSourceIps?: string;
-    /** Absent in files exported before the scheme was; the server default then applies. */
+    /** Absent in older exports; the server default then applies. */
     signatureScheme?: SignatureScheme;
   }>;
   subscriptions: Array<{
@@ -48,7 +48,7 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
     endpoints: number;
     subscriptions: number;
     errors: string[];
-    /** A secret is never exported, so each imported endpoint gets a new one — shown here, once. */
+    /** Secrets are never exported, so each imported endpoint gets a new one, shown once. */
     secrets: Array<{ url: string; secret: string }>;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -122,12 +122,10 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
         return;
       }
 
-      // Fetch existing endpoints to avoid duplicates and resolve subscription references
       const existingEndpoints = await endpointsApi.list(projectId);
       const existingUrls = new Set(existingEndpoints.map(e => e.url));
       const urlToEndpointId = new Map(existingEndpoints.map(e => [e.url, e.id]));
 
-      // Import endpoints
       for (const ep of config.endpoints) {
         if (existingUrls.has(ep.url)) {
           errors.push(t('configExport.toast.endpointSkipped', { url: ep.url }));
@@ -154,7 +152,6 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
         }
       }
 
-      // Import subscriptions
       for (const sub of config.subscriptions) {
         const endpointId = urlToEndpointId.get(sub.endpointUrl);
         if (!endpointId) {
@@ -239,7 +236,7 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
           <p className="text-xs text-muted-foreground">{t('configExport.hint')}</p>
 
           {importResult && (
-            <div className={`rounded-lg border p-3 text-sm ${importResult.errors.length > 0 ? 'border-retry/30 bg-retry-soft' : 'border-ok/30 bg-ok-soft'}`}>
+            <div className={`border p-3 text-sm ${importResult.errors.length > 0 ? 'border-retry/30 bg-retry-soft' : 'border-ok/30 bg-ok-soft'}`}>
               <div className="mb-1 flex items-center gap-2">
                 {importResult.errors.length > 0
                   ? <AlertTriangle className="h-4 w-4 text-retry" aria-hidden />
@@ -263,7 +260,7 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
           )}
 
           {importResult && importResult.secrets.length > 0 && (
-            <div className="space-y-3 rounded-lg border border-rail p-3">
+            <div className="space-y-3 border border-rail p-3">
               <div>
                 <p className="text-sm font-medium">{t('configExport.newSecrets.title')}</p>
                 <p className="text-xs text-muted-foreground">{t('configExport.newSecrets.hint')}</p>

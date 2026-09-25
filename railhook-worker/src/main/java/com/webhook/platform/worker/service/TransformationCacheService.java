@@ -29,7 +29,6 @@ public class TransformationCacheService {
                 .build();
     }
 
-    /** Local cache, 30s TTL. */
     public Optional<Transformation> findById(UUID id) {
         return cache.get(id, key -> {
             log.debug("Cache miss for transformation {}, loading from DB", key);
@@ -38,13 +37,8 @@ public class TransformationCacheService {
     }
 
     /**
-     * A transformation's language and text together.
-     *
-     * <p>They travel as one because they only mean anything together: the same TEXT column holds
-     * a JSON template and a JavaScript script, and which it is cannot be worked out by looking.
-     *
-     * @param kind   the language, never null — a row written before V083 reads as TEMPLATE
-     * @param source the template or the script; null or blank means "no transformation"
+     * The same TEXT column holds a JSON template or a script, and which one cannot be told by
+     * looking, so the kind always travels with the source. A blank source means no transformation.
      */
     public record Resolved(TransformationKind kind, String source) {
 
@@ -57,7 +51,6 @@ public class TransformationCacheService {
         }
     }
 
-    /** Null when the transformation is missing or disabled. */
     public Resolved findEnabled(UUID id) {
         return findById(id)
                 .filter(Transformation::getEnabled)
@@ -67,7 +60,6 @@ public class TransformationCacheService {
                 .orElse(null);
     }
 
-    /** Null when the transformation is missing or disabled. */
     public String findEnabledTemplate(UUID id) {
         Resolved resolved = findEnabled(id);
         return resolved == null ? null : resolved.source();

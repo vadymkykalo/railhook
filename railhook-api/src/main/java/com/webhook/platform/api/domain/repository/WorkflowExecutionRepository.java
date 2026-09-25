@@ -24,7 +24,6 @@ public interface WorkflowExecutionRepository extends JpaRepository<WorkflowExecu
 
     long countByWorkflowIdAndStatus(UUID workflowId, WorkflowExecution.ExecutionStatus status);
 
-    /** Counts for a whole page at once, so listing does not run one query per workflow per status. */
     @Query("SELECT e.workflowId, e.status, COUNT(e) FROM WorkflowExecution e "
             + "WHERE e.workflowId IN :workflowIds GROUP BY e.workflowId, e.status")
     List<Object[]> countByWorkflowIdsGroupedByStatus(@Param("workflowIds") Collection<UUID> workflowIds);
@@ -34,16 +33,8 @@ public interface WorkflowExecutionRepository extends JpaRepository<WorkflowExecu
     @Query("SELECT e FROM WorkflowExecution e WHERE e.status = 'RUNNING' AND e.startedAt < :cutoff")
     List<WorkflowExecution> findStuckExecutions(@Param("cutoff") Instant cutoff);
 
-    /**
-     * Suspended executions whose delay has expired, oldest first.
-     *
-     * <p>Backed by the partial index {@code idx_wf_exec_resume_due} (V065): almost every row in
-     * this table is a finished execution that will never be WAITING again.
-     *
-     * <p>Note {@code findStuckExecutions} above matches RUNNING only. That is what makes a
-     * five-minute delay safe: without it the recovery job could not tell a suspended execution
-     * from a hung one and would fail every workflow that used a delay node.
-     */
+    // findStuckExecutions matching RUNNING only is what keeps a suspended execution from being
+    // failed as hung.
     @Query("SELECT e FROM WorkflowExecution e WHERE e.status = 'WAITING' AND e.resumeAt <= :now "
             + "ORDER BY e.resumeAt ASC")
     List<WorkflowExecution> findDueForResume(@Param("now") Instant now, Pageable pageable);

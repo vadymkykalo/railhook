@@ -29,18 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
-/**
- * A finalisation only writes a row its Claim still owns at the moment of writing, not at the
- * moment it looked.
- *
- * <p>{@code finalise} reads the row, checks the fence, and saves. The save is an UPDATE by id, so
- * a stuck sweep committed between the read and the write was overwritten — the swept row went
- * terminal again under an Attempt that no longer owned it, and a Retry inserted a successor beside
- * the one the sweep had just handed back to the ladder.
- *
- * <p>Real Postgres, real transactions: the sweep commits in its own transaction, interleaved right
- * after the store has read the row.
- */
+// A sweep committed between finalise's read and its UPDATE was overwritten.
 @DataJpaTest
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

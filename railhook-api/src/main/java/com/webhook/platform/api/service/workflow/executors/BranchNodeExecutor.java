@@ -14,11 +14,7 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * Branch node — evaluates conditions and outputs which handle to follow.
- * Config: conditions (ConditionNode tree).
- * If conditions match → output includes _branchHandle = "true"
- * If not matched → output includes _branchHandle = "false"
- * The WorkflowEngine uses _branchHandle to route to the correct downstream edge.
+ * Sets {@code _branchHandle} to "true" or "false"; the engine follows the edge with that handle.
  */
 @Component
 @Slf4j
@@ -47,11 +43,9 @@ public class BranchNodeExecutor implements NodeExecutor {
             }
 
             ObjectNode output = objectMapper.createObjectNode();
-            // Copy input data to output
             if (input != null && input.isObject()) {
                 output.setAll((ObjectNode) input.deepCopy());
             }
-            // Add branch decision metadata
             output.put("_branchHandle", matched ? "true" : "false");
             output.put("_branchResult", matched);
 

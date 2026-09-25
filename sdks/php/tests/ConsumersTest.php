@@ -9,10 +9,6 @@ use Railhook\Api\Consumers;
 use Railhook\Api\PortalSessions;
 use Railhook\Railhook;
 
-/**
- * Consumers and portal sessions, with the transport replaced: each call is
- * checked for the method, path, body and query it hands to Railhook::request.
- */
 class ConsumersTest extends TestCase
 {
     private const PROJECT = 'proj-123';

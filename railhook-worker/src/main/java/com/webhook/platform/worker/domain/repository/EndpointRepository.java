@@ -14,14 +14,8 @@ import java.util.UUID;
 public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
 
     /**
-     * Extends the current run of failures, starting one if there is none.
-     *
-     * <p>Native and unconditional so that two workers failing against the same endpoint at the
-     * same time both count: read-modify-write through the entity would have the later write
-     * overwrite the earlier one, and the run would grow at the rate of one worker.
-     *
-     * <p>{@code updated_at} is deliberately left alone — a run of failures is not somebody
-     * editing the endpoint, and the dashboard shows that column as "last changed".
+     * A single UPDATE so concurrent workers both count; read-modify-write loses increments.
+     * {@code updated_at} is left alone because the dashboard shows it as "last changed".
      */
     @Modifying
     @Query(value = """
@@ -32,11 +26,7 @@ public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
             """, nativeQuery = true)
     int recordAttemptFailed(@Param("endpointId") UUID endpointId, @Param("at") Instant at);
 
-    /**
-     * Ends the run. The {@code WHERE} clause is what makes the healthy path free: an endpoint
-     * that has never failed matches nothing, so a working deployment writes to this table
-     * exactly as often as its endpoints recover, and not once per delivery.
-     */
+    /** The WHERE clause keeps the healthy path free of writes. */
     @Modifying
     @Query(value = """
             UPDATE endpoints

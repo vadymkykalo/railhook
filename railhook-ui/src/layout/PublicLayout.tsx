@@ -10,18 +10,7 @@ import SiteOverlays from '../components/site/SiteOverlays';
 import { REPO_URL } from '../pages/landing/plans';
 import { WRAP } from '../pages/landing/primitives';
 
-/**
- * A new public page starts at the top of itself.
- *
- * <p>`createBrowserRouter` leaves the scroll offset alone across a navigation, which is right
- * for an app shell whose panes scroll independently and wrong for a set of long marketing
- * pages: following a link from halfway down the home page landed on the next page at the
- * same offset. The page looked like it had lost its top.
- *
- * <p>The landing page keeps its own effect because it has something extra to do — the nav
- * links to `#run` and friends, and a hash has to win over this. Scrolling on layout rather
- * than after paint so the jump is never drawn.
- */
+/** The router keeps the scroll offset across navigation; the landing page handles its own hash links. */
 function useScrollToTopOnNavigate() {
   const { pathname, hash } = useLocation();
   useLayoutEffect(() => {
@@ -30,33 +19,30 @@ function useScrollToTopOnNavigate() {
   }, [pathname, hash]);
 }
 
-/**
- * The chrome every public page shares. `nav` is opt-in because the documentation brings its
- * own; the footer is not.
- */
 export default function PublicLayout({ nav = true }: { nav?: boolean }) {
   useScrollToTopOnNavigate();
   return (
     <div className="flex min-h-screen flex-col">
       {nav && <LandingNav />}
-      <div className="flex-1">
-        <Outlet />
+      <div className="mx-auto flex w-full max-w-[1336px] flex-1 flex-col border-x border-rail max-sm:border-x-0">
+        <div className="flex-1">
+          <Outlet />
+        </div>
+        <Footer />
       </div>
-      <Footer />
       <SiteOverlays />
     </div>
   );
 }
 
-/* Below sm a link is a 40px row, so a thumb hits the one it meant; from sm the column is as dense
-   as it always was. */
-const LINK = 'text-sm text-muted-foreground transition-colors hover:text-foreground max-sm:flex max-sm:min-h-10 max-sm:items-center';
+/* Below sm a link is a 40px row, so a thumb hits the one it meant. */
+const LINK = 'text-[14.5px] text-[#555] transition-colors hover:text-foreground dark:text-muted-foreground max-sm:flex max-sm:min-h-10 max-sm:items-center';
 
 function Column({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h2 className="mono-label mb-3 max-sm:mb-1">{title}</h2>
-      <ul className="space-y-2 max-sm:space-y-0">{children}</ul>
+      <h2 className="mb-3.5 text-sm font-medium leading-none text-foreground max-sm:mb-1">{title}</h2>
+      <ul className="space-y-2.5 max-sm:space-y-0">{children}</ul>
     </div>
   );
 }
@@ -71,7 +57,7 @@ function RouteLink({ to, children }: { to: string; children: ReactNode }) {
   );
 }
 
-/** Docs are a separate static site, so a full navigation, not a router link. */
+/** Docs are a separate static site, so a full navigation. */
 function PageLink({ href, external = false, children }: { href: string; external?: boolean; children: ReactNode }) {
   return (
     <li>
@@ -82,11 +68,6 @@ function PageLink({ href, external = false, children }: { href: string; external
   );
 }
 
-/**
- * Only accounts that exist: the repository always, support mail only where the deployment has a
- * contact domain — the same rule as the contact page, since a self-hosted install has no support
- * desk. Another account is one more entry in `links`.
- */
 function ConnectWithUs() {
   const { t } = useTranslation();
   const captionId = useId();
@@ -109,7 +90,7 @@ function ConnectWithUs() {
               href={href}
               aria-label={label}
               title={label}
-              className="grid h-9 w-9 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground max-sm:h-10 max-sm:w-10"
+              className="grid h-9 w-9 place-items-center text-muted-foreground transition-colors hover:text-foreground max-sm:h-10 max-sm:w-10"
               {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             >
               <Icon className="h-5 w-5" aria-hidden="true" />
@@ -121,27 +102,18 @@ function ConnectWithUs() {
   );
 }
 
-/**
- * The theme toggle lives here rather than in the header: it is set once, and the header is kept
- * to the places a reader goes. The language switch used to sit beside it and does not any more —
- * a reader who cannot read the page should not have to scroll past all of it to say so, so it
- * moved into the header (`LandingNav`).
- */
 export function Footer() {
   const { t } = useTranslation();
   return (
-    <footer className="border-t border-rail bg-background">
-      <div className={`${WRAP} py-12`}>
-        {/* Two columns of links on a phone, with the brand across the top, instead of one long list. */}
-        <div className="grid gap-10 max-sm:grid-cols-2 max-sm:gap-x-6 max-sm:gap-y-8 sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(4,minmax(0,1fr))]">
+    <footer className="lp-rule bg-background">
+      <div className={`${WRAP} pb-12 pt-14`}>
+        <div className="grid gap-[30px] max-sm:grid-cols-2 max-sm:gap-x-6 max-sm:gap-y-8 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(4,minmax(0,1fr))]">
           <div className="max-sm:col-span-2">
-            <Link to="/" className="mb-4 flex items-center gap-2.5 max-sm:min-h-10">
-              <span aria-hidden="true" className="grid h-7 w-7 place-items-center rounded-md bg-primary">
-                <RailhookIcon className="h-4 w-4 text-primary-foreground" />
-              </span>
-              <span className="font-semibold text-foreground">Railhook</span>
+            <Link to="/" className="mb-3.5 flex items-center gap-2 text-[22px] font-medium leading-none tracking-[-0.03em] text-foreground max-sm:min-h-10">
+              <RailhookIcon className="h-[22px] w-[22px]" aria-hidden="true" />
+              Railhook
             </Link>
-            <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">{t('footer.tagline')}</p>
+            <p className="max-w-[16rem] text-[13.5px] leading-relaxed text-[#777] dark:text-muted-foreground">{t('footer.tagline')}</p>
           </div>
           <Column title={t('footer.product')}>
             <RouteLink to="/#product">{t('footer.overview')}</RouteLink>
@@ -169,7 +141,6 @@ export function Footer() {
             <RouteLink to="/about">{t('footer.about')}</RouteLink>
             {publicBlogEnabled() && <RouteLink to="/blog">{t('footer.blog')}</RouteLink>}
             <RouteLink to="/security">{t('footer.security')}</RouteLink>
-            <RouteLink to="/changelog">{t('footer.changelog')}</RouteLink>
             {statusPageUrl() && <PageLink href={statusPageUrl()!} external>{t('footer.status')}</PageLink>}
             <RouteLink to="/contact">{t('footer.talkToUs')}</RouteLink>
             <RouteLink to="/privacy">{t('footer.privacy')}</RouteLink>
@@ -191,7 +162,7 @@ export function Footer() {
               <img src="/badges/saashub-approved-color.png" alt="Railhook on SaaSHub" width={150} height={50} className="dark:hidden" />
               <img src="/badges/saashub-approved-dark.png" alt="Railhook on SaaSHub" width={150} height={50} className="hidden dark:block" />
             </a>
-            <ThemeToggle className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:grid max-sm:h-10 max-sm:w-10 max-sm:place-items-center" />
+            <ThemeToggle className="border border-input p-2 text-muted-foreground transition-colors hover:border-foreground hover:text-foreground max-sm:grid max-sm:h-10 max-sm:w-10 max-sm:place-items-center" />
           </div>
         </div>
       </div>

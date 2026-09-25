@@ -51,21 +51,18 @@ public class WebhookCaptureController {
     @RequestMapping(value = "/{slug}", method = { RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
             RequestMethod.PATCH, RequestMethod.DELETE })
     @Operation(summary = "Capture webhook request", description = "Captures any HTTP request sent to this test endpoint")
-    // Documented as the String it used to be bound as: the wire format is unchanged.
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             content = @Content(mediaType = "application/json", schema = @Schema(type = "string")))
     public ResponseEntity<WebhookCaptureResponse> captureRequest(
             @PathVariable("slug") String slug,
             HttpServletRequest request) throws IOException {
-        // Not @RequestBody String: for a form POST that is a body Spring rebuilt from parsed
-        // parameters, and a capture has to show what was sent. IngressRawBodyFilter kept it; it
-        // is stored as text, decoded with the charset the request declares.
+        // Not @RequestBody String: for a form POST Spring rebuilds the body from parsed
+        // parameters, and a capture has to show what was sent.
         byte[] raw = rawBody(request);
         String body = raw == null ? null : new String(raw, charsetOf(request));
 
-        // Early check: reject unknown slugs before allocating a rate-limit bucket.
-        // Unscoped on purpose: /hook/** is public, so nothing has established a tenant yet and
-        // the slug is what identifies the endpoint's owner.
+        // Before the rate limiter, so unknown slugs allocate no bucket. System scope because
+        // /hook/** is public and the slug is what identifies the owner.
         if (!TenantContext.callAsSystem(() -> testEndpointRepository.existsBySlug(slug))) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(WebhookCaptureResponse.builder()
@@ -75,7 +72,6 @@ public class WebhookCaptureController {
                             .build());
         }
 
-        // Rate limit per slug (10 req/s) — Redis-backed for multi-instance consistency
         if (!rateLimiterService.tryAcquireForSlug(slug, RATE_LIMIT_PER_SECOND)) {
             log.warn("Rate limit exceeded for test endpoint slug: {}", slug);
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -86,8 +82,6 @@ public class WebhookCaptureController {
                             .build());
         }
 
-        // Auto-respond to verification challenges BEFORE slug lookup
-        // so verification works even if the test endpoint expired or was deleted
         if (body != null && !body.isEmpty()) {
             try {
                 JsonNode json = objectMapper.readTree(body);
@@ -103,11 +97,10 @@ public class WebhookCaptureController {
                     }
                 }
             } catch (Exception e) {
-                // Not JSON or parsing failed, continue with normal capture flow
+                // Not JSON: capture it as is.
             }
         }
 
-        // The body was read once, above; the request stream is spent and cannot give it again.
         CapturedRequestResponse captured = testEndpointService.captureRequest(slug, body, request);
 
         return ResponseEntity.ok(WebhookCaptureResponse.builder()

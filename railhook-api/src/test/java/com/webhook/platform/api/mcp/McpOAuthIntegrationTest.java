@@ -50,16 +50,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Connecting an AI app to {@code /mcp} the way claude.ai and ChatGPT do it: discover the
- * authorization server from the 401, register as a client, send a person through the consent
- * screen, trade the code for tokens with PKCE, and call tools with the access token.
- *
- * <p>What matters beyond the happy path is that a grant is exactly an API key in disguise — one
- * project, one scope — and that every way a grant should stop working actually stops it: a
- * READ_ONLY grant cannot write, a rotated refresh token cannot be replayed, a revoked grant and a
- * suspended approver authenticate nothing.
- */
 class McpOAuthIntegrationTest extends AbstractIntegrationTest {
 
     private static final String BASE = "https://railhook.test";
@@ -109,8 +99,6 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         projectB = createProject("OAuth B " + suffix);
     }
 
-    // ── discovery ────────────────────────────────────────────────────────
-
     @Test
     void answersAnUnauthenticatedMcpCallWithTheResourceMetadataUrl() throws Exception {
         MvcResult result = mockMvc.perform(mcpPost(rpcBody("tools/list", Map.of())))
@@ -151,8 +139,6 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         assertThat(server.get("authorization_response_iss_parameter_supported").asBoolean()).isTrue();
     }
 
-    // ── registration ─────────────────────────────────────────────────────
-
     @Test
     void registersPublicClientsAndRefusesRedirectsThatCouldLeakACode() throws Exception {
         JsonNode client = registerClient(List.of(REDIRECT, "http://127.0.0.1:33418/callback"), "none");
@@ -175,8 +161,6 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         assertThat(confidential.get("client_secret").asText()).isNotBlank();
     }
 
-    // ── the whole connection ─────────────────────────────────────────────
-
     @Test
     void connectsAnAppEndToEndAndEveryWayOfEndingItWorks() throws Exception {
         String clientId = registerClient(List.of(REDIRECT), "none").get("client_id").asText();
@@ -196,7 +180,6 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         assertThat(decode(redirect.getQueryParams().getFirst("iss"))).isEqualTo(BASE);
         String code = redirect.getQueryParams().getFirst("code");
 
-        // The request was answered; it cannot be answered a second time.
         mockMvc.perform(post("/api/v1/oauth/requests/" + requestId + "/approve")
                         .header("Authorization", "Bearer " + jwt)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -219,10 +202,9 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         // A code is single use.
         assertThat(tokenError(form("grant_type", "authorization_code", "code", code, "redirect_uri", REDIRECT,
                 "client_id", clientId, "code_verifier", verifier)).get("error").asText()).isEqualTo("invalid_grant");
-        // ...and replaying it revokes what it was exchanged for, as OAuth 2.1 asks.
+        // Replaying it revokes what it was exchanged for, as OAuth 2.1 asks.
         rpcStatus(access, "tools/list", 401);
 
-        // Start over: a fresh approval, this time exchanged once.
         String verifier2 = verifier();
         String requestId2 = authorize(clientId, REDIRECT, challenge(verifier2), "s2", "mcp:read mcp:write");
         String code2 = approve(requestId2, projectA, "READ_WRITE").getQueryParams().getFirst("code");
@@ -240,7 +222,6 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         assertThat(created.path("isError").asBoolean(false)).as(text(created)).isFalse();
         assertThat(objectMapper.readTree(text(created)).get("projectId").asText()).isEqualTo(projectA.toString());
 
-        // The connection is listed on the project it was granted for, and on no other.
         JsonNode grants = getJson("/api/v1/projects/" + projectA + "/mcp-grants", jwt);
         assertThat(grants).hasSize(1);
         assertThat(grants.get(0).get("clientName").asText()).isEqualTo("Claude");
@@ -249,8 +230,7 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         assertThat(getJson("/api/v1/projects/" + projectB + "/mcp-grants", jwt)).isEmpty();
         String grantId = grants.get(0).get("id").asText();
 
-        // Refresh rotates: the new pair works, the old refresh token is refused, and presenting it
-        // again is taken as theft — the whole grant goes.
+        // Refresh rotates, and presenting the old refresh token again is taken as theft.
         JsonNode refreshed = token(form("grant_type", "refresh_token", "refresh_token", refresh, "client_id", clientId));
         String access2 = refreshed.get("access_token").asText();
         String refresh2 = refreshed.get("refresh_token").asText();
@@ -259,12 +239,10 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         rpcStatus(access, "tools/list", 401);
         assertThat(rpc(access2, "tools/list", Map.of()).has("result")).isTrue();
 
-        // Another client cannot use this client's refresh token.
         String otherClient = registerClient(List.of(REDIRECT), "none").get("client_id").asText();
         assertThat(tokenError(form("grant_type", "refresh_token", "refresh_token", refresh2, "client_id", otherClient))
                 .get("error").asText()).isEqualTo("invalid_grant");
 
-        // Revoked from project settings: the token stops working at once.
         mockMvc.perform(delete("/api/v1/projects/" + projectA + "/mcp-grants/" + grantId)
                         .header("Authorization", "Bearer " + jwt))
                 .andExpect(status().isNoContent());
@@ -273,7 +251,6 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
                 .get("error").asText()).isEqualTo("invalid_grant");
         assertThat(getJson("/api/v1/projects/" + projectA + "/mcp-grants", jwt)).isEmpty();
 
-        // Connecting and disconnecting are in the organization's audit log, under the person.
         List<AuditLog> audit = awaitAudit(grantId, 2);
         assertThat(audit).extracting(AuditLog::getAction).contains("CREATE", "REVOKE");
         assertThat(audit).allSatisfy(row -> {
@@ -283,7 +260,7 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         });
     }
 
-    /** Audit rows are written on their own thread; wait for the ones naming this grant. */
+    // Audit rows are written on their own thread.
     private List<AuditLog> awaitAudit(String grantId, int atLeast) throws InterruptedException {
         List<AuditLog> rows = List.of();
         for (int i = 0; i < 50 && rows.size() < atLeast; i++) {
@@ -339,7 +316,6 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         JsonNode page = objectMapper.readTree(text(callTool(accessA, "list_endpoints", Map.of())));
         assertThat(page.get("totalElements").asInt()).isZero();
 
-        // A project of another organization cannot be picked on the consent screen at all.
         String otherJwt = register("oauth-other-" + UUID.randomUUID().toString().substring(0, 8) + "@test.com",
                 "Other Org").get("accessToken").asText();
         String verifier = verifier();
@@ -412,8 +388,7 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
     void refusesAnAuthorizationRequestThatBreaksTheRules() throws Exception {
         String clientId = registerClient(List.of(REDIRECT), "none").get("client_id").asText();
 
-        // An unregistered redirect is never redirected to: the browser goes to the consent page's
-        // error state instead.
+        // An unregistered redirect is never redirected to.
         MvcResult wrongRedirect = mockMvc.perform(get("/oauth/authorize")
                         .param("response_type", "code").param("client_id", clientId)
                         .param("redirect_uri", "https://evil.example.com/cb")
@@ -423,7 +398,6 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         assertThat(wrongRedirect.getResponse().getHeader("Location"))
                 .startsWith(BASE + "/oauth/consent?error=invalid_request");
 
-        // A registered redirect without PKCE gets the error at the app.
         MvcResult noPkce = mockMvc.perform(get("/oauth/authorize")
                         .param("response_type", "code").param("client_id", clientId)
                         .param("redirect_uri", REDIRECT).param("state", "q"))
@@ -488,7 +462,7 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
                 .filter(g -> g.getProjectId().equals(projectA) && g.getRevokedAt() == null
                         && g.getActivatedAt() != null)).isEmpty();
 
-        // An unknown token is not an error (RFC 7009 §2.2).
+        // RFC 7009 §2.2: an unknown token is not an error.
         mockMvc.perform(post("/oauth/revoke")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .content(form("token", "nonsense", "client_id", clientId)))
@@ -506,8 +480,6 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         String apiKey = objectMapper.readTree(key.getResponse().getContentAsString()).get("key").asText();
         assertThat(rpc(apiKey, "tools/list", Map.of()).has("result")).isTrue();
     }
-
-    // ── helpers ──────────────────────────────────────────────────────────
 
     private JsonNode connect(String clientId, UUID projectId, String scope) throws Exception {
         String verifier = verifier();
@@ -531,7 +503,6 @@ class McpOAuthIntegrationTest extends AbstractIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString());
     }
 
-    /** Opens /oauth/authorize as a browser would and returns the consent request it lands on. */
     private String authorize(String clientId, String redirectUri, String challenge, String state, String scope)
             throws Exception {
         MvcResult result = mockMvc.perform(get("/oauth/authorize")

@@ -30,8 +30,6 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
             @Param("now") Instant now,
             PageRequest pageRequest);
 
-    // ── The Incoming DLQ: Forwards whose Retry Ladder was exhausted ──────────────────
-
     @Query(value = "SELECT a FROM IncomingForwardAttempt a "
             + "JOIN IncomingEvent e ON a.incomingEventId = e.id "
             + "JOIN IncomingSource s ON e.incomingSourceId = s.id "
@@ -69,14 +67,9 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
     List<IncomingForwardAttempt> findByIdInAndStatus(List<UUID> ids, ForwardAttemptStatus status);
 
     /**
-     * One batch of a purge, deliberately not the whole thing: a project with a large Incoming DLQ
-     * used to mean a single unbounded DELETE holding row locks across every matching Attempt.
-     *
-     * <p>{@code organization_id} is in the predicate because {@code @TenantId} does not reach
-     * native SQL: without it this deletes every organization's abandoned Forwards. The caller
-     * validates project ownership first; this is the second lock on the door.
-     *
-     * @return how many rows this call removed, so the caller stops when a batch comes back short
+     * Batched so a large DLQ is not one unbounded DELETE holding row locks. The explicit
+     * {@code organization_id} predicate is needed because {@code @TenantId} does not reach
+     * native SQL.
      */
     @Modifying
     @Query(value = """
@@ -93,8 +86,6 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
     int deleteDlqBatchByProjectId(@Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("batchSize") int batchSize);
-
-    // ── Usage aggregation ────────────────────────────────────────────────────────────
 
     @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a " +
             "JOIN IncomingEvent e ON a.incomingEventId = e.id " +

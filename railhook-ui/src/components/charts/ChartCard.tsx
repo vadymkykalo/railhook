@@ -8,34 +8,22 @@ import ChartLegend, { type LegendItem } from './ChartLegend';
 interface ChartCardProps {
   title: string;
   description?: string;
-  /** Machine facts about the slice being plotted — the period, the bucket size. */
   eyebrow?: ReactNode;
   action?: ReactNode;
   legend?: LegendItem[];
-  /**
-   * Height of the plot body. Size it to include the x-axis band: a height that
-   * fits only the plot gives the card a nested scrollbar instead of an axis.
-   */
+  /** Include the x-axis band, or the card grows a nested scrollbar instead of an axis. */
   bodyClass?: string;
   isLoading?: boolean;
   error?: unknown;
   onRetry?: () => void;
   isEmpty?: boolean;
   emptyLabel?: string;
-  /** True while the same slice is being refetched — hold the frame, don't flash. */
   isRefetching?: boolean;
   children: ReactNode;
   className?: string;
 }
 
-/**
- * The frame every chart in the product sits in, so that a page of four charts
- * reads as one instrument rather than four widgets: same header, same legend
- * position, same loading, empty and error treatments, same body height.
- *
- * A failed request renders `ErrorState` and never the empty treatment — an
- * unreachable backend must not look like an account with no traffic.
- */
+/** A failed request renders ErrorState: an unreachable backend must not look like no traffic. */
 export default function ChartCard({
   title, description, eyebrow, action, legend, bodyClass = 'h-[260px]',
   isLoading, error, onRetry, isEmpty, emptyLabel, isRefetching, children, className,
@@ -64,7 +52,7 @@ export default function ChartCard({
             testId="chart-error"
           />
         ) : isLoading ? (
-          <div className="h-full w-full animate-pulse rounded-lg bg-muted" aria-hidden />
+          <div className="h-full w-full animate-pulse bg-muted" aria-hidden />
         ) : isEmpty ? (
           <p className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
             {emptyLabel ?? t('charts.empty')}

@@ -4,41 +4,24 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!--
-      These are the defaults a crawler and a link unfurler see before React
-      mounts. Every route then overwrites title, description, og:* and the
-      canonical through `useDocumentMeta`, so this block describes the landing
-      page and nothing else relies on it.
-
-      https://site-url.railhook.invalid is a placeholder, not an address: the
-      image is built once for every deployment, so the build cannot know the
-      origin. nginx replaces it when serving with the container's
-      RAILHOOK_SITE_URL, or with nothing - a relative URL - when none is set.
-      `.invalid` is reserved, so a placeholder that ever escaped points nowhere
-      real rather than at somebody else's site.
-    -->
-    <meta name="description" content="Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start." />
+    <!-- Defaults before React mounts; nginx replaces site-url.railhook.invalid with RAILHOOK_SITE_URL. -->
+    <meta name="description" content="Open-source webhook gateway. Send webhooks to your customers and receive them from Stripe, GitHub and the rest, with retries, signatures and every attempt on record. In our cloud or self-hosted." />
     <link rel="canonical" href="https://site-url.railhook.invalid/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Railhook" />
     <meta property="og:title" content="Railhook — Open-source webhook gateway" />
-    <meta property="og:description" content="Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start." />
+    <meta property="og:description" content="Open-source webhook gateway. Send webhooks to your customers and receive them from Stripe, GitHub and the rest, with retries, signatures and every attempt on record. In our cloud or self-hosted." />
     <meta property="og:url" content="https://site-url.railhook.invalid/" />
     <meta property="og:image" content="https://site-url.railhook.invalid/social-card.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Railhook — Open-source webhook gateway" />
-    <meta name="twitter:description" content="Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start." />
+    <meta name="twitter:description" content="Open-source webhook gateway. Send webhooks to your customers and receive them from Stripe, GitHub and the rest, with retries, signatures and every attempt on record. In our cloud or self-hosted." />
     <meta name="twitter:image" content="https://site-url.railhook.invalid/social-card.png" />
     <title>Railhook — Open-source webhook gateway</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-    <!--
-      The cloud's free plan is a real offer, so it is listed at 0. There are no
-      paid plans, so nothing else is. No aggregateRating, no review: there are
-      none, and structured data is the one place a made-up number is machine
-      readable.
-    -->
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <!-- No aggregateRating or review: there are none. -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -49,7 +32,7 @@
             "applicationCategory": "DeveloperApplication",
             "operatingSystem": "Any",
             "url": "https://site-url.railhook.invalid/",
-            "description": "Open-source webhook gateway: send and receive webhooks with every delivery on record, in the cloud or self-hosted. Free to start.",
+            "description": "Open-source webhook gateway. Send webhooks to your customers and receive them from Stripe, GitHub and the rest, with retries, signatures and every attempt on record. In our cloud or self-hosted.",
             "license": "https://opensource.org/licenses/MIT",
             "codeRepository": "https://github.com/vadymkykalo/railhook",
             "publisher": { "@id": "https://site-url.railhook.invalid/#organization" },
@@ -68,18 +51,8 @@
         ]
       }
     </script>
-    <!--
-      Settings that belong to the running container rather than to the image
-      (window.__RAILHOOK__), written when the container starts. A classic
-      script, so it has run before the deferred app module reads it. The copy
-      in public/ is an empty placeholder for the dev server and the prerender.
-    -->
+    <!-- A classic script, so it runs before the deferred app module reads window.__RAILHOOK__. -->
     <script src="/config.js"></script>
-    <!--
-      Cloudflare Web Analytics, only when the container was given a token
-      (RAILHOOK_WEB_ANALYTICS_TOKEN); otherwise it adds nothing. Shared with the
-      docs site, which loads the same two files.
-    -->
     <script src="/analytics.js" defer></script>
   </head>
   <body>

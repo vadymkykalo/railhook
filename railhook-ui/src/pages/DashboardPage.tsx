@@ -44,7 +44,6 @@ function SkeletonDashboard() {
   );
 }
 
-/** One row of the "needs a human" list: a count, what it means, and where it lives. */
 function AttentionRow({
   to, icon: Icon, label, count, kind,
 }: {
@@ -58,7 +57,7 @@ function AttentionRow({
   return (
     <Link
       to={to}
-      className="group flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/60"
+      className="group flex items-center justify-between gap-3 px-2 py-2.5 transition-colors hover:bg-secondary/60"
     >
       <span className="flex min-w-0 items-center gap-2.5">
         <Icon
@@ -120,13 +119,11 @@ export default function DashboardPage() {
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
-  // The page's own failure. A project's stats or its charts failing is reported
-  // inside the card that wanted them, not by blanking the whole dashboard.
+  // A card's own failure is reported in the card, not by blanking the dashboard.
   const pageIsError = projectsIsError || statsIsError;
   const retryPage = () => { refetchProjects(); refetchStats(); };
 
-  // Every read of the payload goes through here: the dashboard is the first
-  // screen a new account sees, and it has to render before the data does.
+  // Coerced: the first screen a new account sees must render before the data does.
   const stats = coerceDeliveryStats(dashboardStats?.deliveryStats);
   const recentEvents = dashboardStats?.recentEvents ?? [];
   const endpointHealth = dashboardStats?.endpointHealth ?? [];
@@ -210,17 +207,16 @@ export default function DashboardPage() {
         <FirstProjectCard />
       ) : (
         <div className="animate-fade-in space-y-4">
-          {/* The answer, then the evidence. */}
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="flex flex-col justify-between p-5">
               <div>
                 <div className="mono-label">{t('dashboard.verdict.label')}</div>
                 {statsLoading ? (
-                  <div className="mt-3 h-12 w-32 animate-pulse rounded-lg bg-muted" aria-hidden />
+                  <div className="mt-3 h-12 w-32 animate-pulse bg-muted" aria-hidden />
                 ) : (
                   <p
                     data-testid="delivery-health-figure"
-                    className="mt-2 text-[3rem] font-semibold leading-none tracking-tight"
+                    className="mt-2 text-[3rem] font-medium leading-none tracking-tight"
                   >
                     {stats.totalDeliveries > 0 ? `${formatRate(stats.successRate)}%` : '—'}
                   </p>
@@ -265,7 +261,6 @@ export default function DashboardPage() {
             </ChartCard>
           </div>
 
-          {/* The totals, after the answer rather than instead of it. */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <StatTile
               label={t('dashboard.stats.deliveries')}
@@ -296,7 +291,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* What needs a human. */}
             <Card className="p-5">
               <div className="mb-1 flex items-start justify-between gap-3">
                 <div>
@@ -337,7 +331,6 @@ export default function DashboardPage() {
               </div>
             </Card>
 
-            {/* Anything still walking the ladder. */}
             <Card className="p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
@@ -391,7 +384,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* Endpoint health — the "where is it failing" half of the question. */}
             <Card className="p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
@@ -424,7 +416,7 @@ export default function DashboardPage() {
                       <li key={endpoint.id}>
                         <Link
                           to={`/admin/projects/${selectedProjectId}/endpoints`}
-                          className="group block rounded-lg px-2 py-1.5 transition-colors hover:bg-secondary/60"
+                          className="group block px-2 py-1.5 transition-colors hover:bg-secondary/60"
                         >
                           <span className="flex items-baseline justify-between gap-3">
                             <span className="truncate font-mono text-xs text-foreground">{endpoint.url}</span>
@@ -433,9 +425,9 @@ export default function DashboardPage() {
                             </span>
                           </span>
                           <span className="mt-1.5 flex items-center gap-2">
-                            <span className="relative h-1 flex-1 overflow-hidden rounded-full bg-muted">
+                            <span className="relative h-1 flex-1 overflow-hidden bg-muted">
                               <span
-                                className={cn('absolute inset-y-0 left-0 rounded-full', STATUS_FILL[kind])}
+                                className={cn('absolute inset-y-0 left-0', STATUS_FILL[kind])}
                                 style={{ width: `${Math.min(Math.max(endpoint.successRate, 0), 100)}%` }}
                               />
                             </span>
@@ -451,7 +443,6 @@ export default function DashboardPage() {
               )}
             </Card>
 
-            {/* What arrived. */}
             <Card className="p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
@@ -482,7 +473,7 @@ export default function DashboardPage() {
                     <li key={event.id}>
                       <Link
                         to={`/admin/projects/${selectedProjectId}/events`}
-                        className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-secondary/60"
+                        className="flex items-center justify-between gap-3 px-2 py-2 transition-colors hover:bg-secondary/60"
                       >
                         <span className="min-w-0">
                           <span className="block truncate font-mono text-xs text-foreground">{event.type}</span>

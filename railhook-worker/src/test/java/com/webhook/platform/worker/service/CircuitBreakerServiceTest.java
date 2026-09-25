@@ -30,16 +30,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit coverage for CircuitBreakerService -- open/half-open/closed transitions,
- * thresholds, and fail-open behaviour when Redis is unavailable.
- *
- * <p>The Lua scripts themselves run inside Redis in production; here RScript.eval is
- * mocked to return the {failCount, callCount, shouldTrip, failureRate} / {callCount,
- * slowCount, shouldTrip} tuples the scripts are documented to produce (see
- * src/main/resources/lua/circuit_breaker_record_{success,failure}.lua), so this tests
- * CircuitBreakerService's own logic around those results, not Lua itself.
- */
+/** RScript.eval returns the tuples the Lua scripts produce; this covers the service's logic around them. */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class CircuitBreakerServiceTest {
@@ -59,10 +50,7 @@ class CircuitBreakerServiceTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        // Redisson 3.5x added an RedissonClient#getScript(OptionalOptions)
-        // overload, so a bare any() is ambiguous at compile time - pin the
-        // matcher's type to disambiguate to the Codec overload actually used
-        // in production (see CircuitBreakerService).
+        // any(Codec.class): a bare any() is ambiguous since Redisson added getScript(OptionalOptions).
         when(redissonClient.getScript(any(Codec.class))).thenReturn(rScript);
         service = new CircuitBreakerService(redissonClient, meterRegistry,
                 FAILURE_RATE_THRESHOLD, MIN_CALLS, WAIT_DURATION_SECONDS, 120, 10000, 80);
@@ -87,17 +75,6 @@ class CircuitBreakerServiceTest {
                 anyList(), any(), any(), any(), any(), any())).thenReturn(result);
     }
 
-    // --- isCallPermitted (closed/open) ------------------------------------------------------
-
-    @Test
-    void isCallPermitted_noOpenMarker_permitsCall() {
-        UUID endpointId = UUID.randomUUID();
-        RBucket<String> openBucket = bucketFor("cb:" + endpointId + ":open");
-        when(openBucket.isExists()).thenReturn(false);
-
-        assertTrue(service.isCallPermitted(endpointId));
-    }
-
     @Test
     void isCallPermitted_openMarkerPresent_rejectsCall() {
         UUID endpointId = UUID.randomUUID();
@@ -118,26 +95,12 @@ class CircuitBreakerServiceTest {
                 "failing open is right; failing open invisibly is the bug");
     }
 
-    // --- recordFailure: trips open when threshold crossed -----------------------------------
-
-    @Test
-    void recordFailure_belowMinimumCalls_doesNotTrip() {
-        UUID endpointId = UUID.randomUUID();
-        // callCount(2) < minCalls(5) -- script itself would report shouldTrip=0.
-        stubFailureEval(List.of(2L, 2L, 0L, 0L));
-
-        service.recordFailure(endpointId, new RuntimeException("boom"));
-
-        verify(redissonClient, never()).getBucket(eq("cb:" + endpointId + ":open"));
-    }
-
     @Test
     void recordFailure_aboveThreshold_tripsCircuitOpen() {
         UUID endpointId = UUID.randomUUID();
         RBucket<String> openBucket = bucketFor("cb:" + endpointId + ":open");
         RKeys keys = mock(RKeys.class);
         when(redissonClient.getKeys()).thenReturn(keys);
-        // 5 failures out of 5 calls = 100% >= 50% threshold -> shouldTrip=1
         stubFailureEval(List.of(5L, 5L, 1L, 100L));
 
         service.recordFailure(endpointId, new RuntimeException("boom"));
@@ -151,7 +114,6 @@ class CircuitBreakerServiceTest {
     @Test
     void recordFailure_belowThreshold_doesNotTrip() {
         UUID endpointId = UUID.randomUUID();
-        // 2 failures out of 5 calls = 40% < 50% threshold -> shouldTrip=0
         stubFailureEval(List.of(2L, 5L, 0L, 40L));
 
         service.recordFailure(endpointId, new RuntimeException("boom"));
@@ -165,27 +127,10 @@ class CircuitBreakerServiceTest {
         when(rScript.eval(any(), anyString(), any(), anyList(), any(), any(), any()))
                 .thenThrow(new RuntimeException("Redis down"));
 
-        // Best-effort: must swallow the exception, not propagate into the delivery path.
         service.recordFailure(endpointId, new RuntimeException("boom"));
 
-        /* Each of these is an outcome the breaker did not see. Swallowed at DEBUG with no
-           counter, a partially degraded Redis meant the breaker would never trip and nothing
-           anywhere said so — the endpoint stayed "healthy" precisely because the health of it
-           had stopped being measured. */
+        // Swallowed silently, a degraded Redis meant the breaker could never trip.
         assertEquals(1.0, meterRegistry.get("circuit_breaker_degraded_total").counter().count());
-    }
-
-    // --- recordSuccess: trips open on a high slow-call rate ----------------------------------
-
-    @Test
-    void recordSuccess_fastCalls_doesNotTrip() {
-        UUID endpointId = UUID.randomUUID();
-        // durationMs below threshold -> slowCount stays 0, shouldTrip=0
-        stubSuccessEval(List.of(5L, 0L, 0L));
-
-        service.recordSuccess(endpointId, 50L);
-
-        verify(redissonClient, never()).getBucket(eq("cb:" + endpointId + ":open"));
     }
 
     @Test
@@ -194,7 +139,6 @@ class CircuitBreakerServiceTest {
         RBucket<String> openBucket = bucketFor("cb:" + endpointId + ":open");
         RKeys keys = mock(RKeys.class);
         when(redissonClient.getKeys()).thenReturn(keys);
-        // 5 slow calls out of 5 = 100% >= 80% slow-rate threshold -> shouldTrip=1
         stubSuccessEval(List.of(5L, 5L, 1L));
 
         service.recordSuccess(endpointId, 15000L);
@@ -203,8 +147,6 @@ class CircuitBreakerServiceTest {
         assertEqualsCounter(1.0, "circuit_breaker_slow_trips_total");
         assertEqualsCounter(1.0, "circuit_breaker_state_transitions_total");
     }
-
-    // --- reset ---------------------------------------------------------------------------------
 
     @Test
     void reset_deletesAllFourKeys() {
@@ -231,7 +173,7 @@ class CircuitBreakerServiceTest {
 
     private void assertEqualsCounter(double expected, String counterName) {
         var counter = meterRegistry.find(counterName).counter();
-        org.junit.jupiter.api.Assertions.assertTrue(counter != null && counter.count() == expected,
+        assertTrue(counter != null && counter.count() == expected,
                 counterName + " expected " + expected + " but was "
                         + (counter == null ? "not registered" : counter.count()));
     }

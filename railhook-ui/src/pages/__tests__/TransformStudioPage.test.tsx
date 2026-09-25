@@ -56,8 +56,7 @@ function open(path = `/projects/${TEST_PROJECT_ID}/transform-studio`) {
 
 const runButton = () => screen.getByRole('button', { name: /run preview/i });
 
-// The studio mounts three CodeMirror instances; the default 5s budget is too
-// tight for that on a loaded CI runner.
+// Three CodeMirror instances outrun the default 5s on a loaded CI runner.
 describe('TransformStudioPage', { timeout: 20_000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -81,16 +80,11 @@ describe('TransformStudioPage', { timeout: 20_000 }, () => {
     expect(request.kind).toBe('JAVASCRIPT');
     expect(request.template).toContain('function handler(webhook)');
 
-    // A successful run lands on Output, because that is what was asked for.
     await waitFor(() => {
       expect(screen.getByRole('tab', { name: /output/i })).toHaveAttribute('aria-selected', 'true');
     });
   });
 
-  /**
-   * The failure belongs in the Console tab, with its line. It used to be a toast
-   * that disappeared while you were still reading the stack.
-   */
   it('puts a failing script in the Console tab, with its line, and does not toast it away', async () => {
     vi.mocked(transformApi.preview).mockResolvedValue(previewOf({
       success: false,
@@ -155,11 +149,9 @@ describe('TransformStudioPage', { timeout: 20_000 }, () => {
     expect(await screen.findByText('"order": "ord_9001"')).toBeInTheDocument();
   });
 
-  /** The thing the studio could not do at all before. */
   it('saves the script back into the transformation it was opened with', async () => {
     open(`/projects/${TEST_PROJECT_ID}/transform-studio?transformation=tr-js`);
 
-    // The saved script is loaded by id, so the button says "save", not "save as".
     const save = await screen.findByRole('button', { name: /^save script$/i });
     fireEvent.click(save);
 
@@ -171,11 +163,6 @@ describe('TransformStudioPage', { timeout: 20_000 }, () => {
     expect(body.template).toBe(SCRIPT_TRANSFORMATION.template);
   });
 
-  /**
-   * The loop is only worth having if it shows you the thing you are looking at. Sending the
-   * saved transformation's id while the editor holds something else runs the old script and
-   * reports it as this one's output.
-   */
   it('runs the saved transformation by id only while the editor still matches it', async () => {
     vi.mocked(transformApi.preview).mockResolvedValue(previewOf({ outputPayload: '{}' }));
 

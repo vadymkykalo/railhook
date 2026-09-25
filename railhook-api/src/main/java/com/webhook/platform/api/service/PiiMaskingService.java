@@ -90,11 +90,7 @@ public class PiiMaskingService {
         log.info("Deleted PII masking rule '{}' from project {}", rule.getPatternName(), projectId);
     }
 
-    /**
-     * The organization comes off the project row and is set explicitly, so the rules land in the
-     * right one even when the project was created outside a tenant scope (the first project of an
-     * account made by Google sign-in).
-     */
+    // From the project row: a first project may be created outside any tenant scope.
     @Transactional
     public void seedDefaultRules(UUID projectId) {
         if (!ruleRepository.findByProjectId(projectId).isEmpty()) {
@@ -119,9 +115,6 @@ public class PiiMaskingService {
         log.info("Seeded default PII masking rules for project {}", projectId);
     }
 
-    /**
-     * Sanitizes a JSON payload by applying all enabled rules for the project.
-     */
     @Transactional(readOnly = true)
     public String sanitizePayload(UUID projectId, String payload) {
         List<PiiMaskingRule> rules = ruleRepository.findByProjectIdAndEnabledTrue(projectId);

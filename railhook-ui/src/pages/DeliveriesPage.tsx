@@ -55,9 +55,7 @@ function dateRangeOptions(t: (key: string) => string) {
   return DATE_RANGE_VALUES.map((value) => ({ value, label: t(labelKeys[value]) }));
 }
 
-/** Trailing window: the lower bound moves on a minute grain so the key does not change on
- * every render, and there is no upper bound, so a delivery created after the last tick — in the
- * current minute — is not cut off. */
+/** Minute-grained lower bound keeps the query key stable; no upper bound, so new deliveries are not cut off. */
 function dateRangeBounds(dateRange: string, nowMinute: number): { fromDate?: string } {
   const spanMs: Record<string, number> = {
     '24h': 24 * 60 * 60 * 1000,
@@ -69,7 +67,6 @@ function dateRangeBounds(dateRange: string, nowMinute: number): { fromDate?: str
   return { fromDate: new Date(nowMinute * 60_000 - span).toISOString() };
 }
 
-/** What the status badge says under itself: why this delivery is where it is. */
 function explainOf(delivery: DeliveryResponse): { key: string; values?: Record<string, string | number> } | null {
   if (delivery.status === 'PENDING' && delivery.attemptCount > 0 && delivery.nextRetryAt) {
     return { key: 'deliveries.statusExplain.PENDING_RETRY', values: { time: formatRelativeFuture(delivery.nextRetryAt) } };
@@ -82,10 +79,7 @@ function explainOf(delivery: DeliveryResponse): { key: string; values?: Record<s
   return null;
 }
 
-/**
- * A delivered obligation has nothing left to replay, and neither has a cancelled one: the
- * transformation would run again over the same payload and reach the same answer.
- */
+/** A delivered or cancelled one would only reach the same answer again. */
 const isReplayable = (d: DeliveryResponse) => d.status !== 'SUCCESS' && d.status !== 'CANCELLED';
 
 export default function DeliveriesPage() {
@@ -112,8 +106,6 @@ export default function DeliveriesPage() {
 
   useEffect(() => setPage(0), [debouncedSearch]);
 
-  // Advances once a minute so the trailing date-range window keeps including
-  // newly-created deliveries without recomputing (and re-fetching) every render.
   const [nowMinute, setNowMinute] = useState(() => Math.floor(Date.now() / 60_000));
   useEffect(() => {
     const id = setInterval(() => setNowMinute(Math.floor(Date.now() / 60_000)), 60_000);
@@ -142,9 +134,7 @@ export default function DeliveriesPage() {
   const totalElements = deliveriesData?.totalElements ?? 0;
   const totalPages = deliveriesData?.totalPages ?? 0;
 
-  // The skeleton is for the first load only. A later key change (filter, page, the minute tick)
-  // keeps the previous rows via keepPreviousData, so the open details sheet and the bulk replay
-  // dialog below stay mounted instead of being unmounted with the page.
+  // Skeleton on first load only, so the open sheet and replay dialog stay mounted on refetch.
   const loading = (projectLoading && !project) || (deliveriesLoading && !deliveriesData);
   const isError = (projectIsError && !project) || (deliveriesIsError && !deliveriesData);
   const retry = () => { refetchProject(); refetchDeliveries(); };
@@ -242,7 +232,7 @@ export default function DeliveriesPage() {
       />
 
       {eventIdFilter && (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-rail bg-secondary/50 px-3 py-2">
+        <div className="mb-4 flex flex-wrap items-center gap-2 border border-rail bg-secondary/50 px-3 py-2">
           <Send className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />
           <span className="text-sm text-muted-foreground">{t('deliveries.filteringByEvent')}</span>
           <code className="font-mono text-[13px]">{eventIdFilter.substring(0, 8)}</code>
@@ -318,7 +308,7 @@ export default function DeliveriesPage() {
             </SelectionBar>
           </PermissionGate>
 
-          <div className="overflow-hidden rounded-lg border border-rail bg-card">
+          <div className="overflow-hidden border border-rail bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -376,8 +366,6 @@ export default function DeliveriesPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        {/* The type, not the id: "order.created" says what a row is, where an id
-                            said only that the rows differ. The id stays where the type is absent. */}
                         {delivery.eventType ? (
                           <Link
                             to={`/admin/projects/${projectId}/events/${delivery.eventId}`}

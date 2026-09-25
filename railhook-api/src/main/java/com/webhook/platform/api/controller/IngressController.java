@@ -35,7 +35,6 @@ import static com.webhook.platform.api.filter.IngressRawBodyFilter.rawBody;
 @Tag(name = "Ingress", description = "Public incoming webhook ingress endpoint")
 public class IngressController {
 
-    /** How long an organization over its quota tells a provider to wait; see {@link #quotaExceeded}. */
     static final String QUOTA_RETRY_AFTER_SECONDS = "3600";
 
     private final IngressService ingressService;
@@ -66,11 +65,8 @@ public class IngressController {
             @ApiResponse(responseCode = "429", description = "Rate limit or monthly event quota exceeded",
                     content = @Content(schema = @Schema(implementation = IngressResponse.class)))
     })
-    // Described as a plain string, not as what springdoc infers from byte[]. It would write
-    // `format: byte`, which in OpenAPI means base64 — and a provider reading that would encode a
-    // payload nobody asked them to encode. The body is read as raw bytes so the signature is
-    // checked against what was sent; the wire format is unchanged and the documentation has to
-    // keep saying so.
+    // A plain string: springdoc would document raw bytes as `format: byte`, which OpenAPI reads
+    // as base64.
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             description = "The provider's payload, exactly as they send it. Signatures are "
                     + "verified over these bytes, so nothing re-encodes them in transit.",
@@ -79,14 +75,9 @@ public class IngressController {
     public ResponseEntity<?> receiveWebhook(
             @PathVariable("token") String token,
             HttpServletRequest request) throws IOException {
-        // Bytes, not a String: Spring decodes a String parameter with whatever charset the
-        // Content-Type declares, and every verifier then encoded it back as UTF-8 — so a sender
-        // that used anything else had its genuine signature rejected. And not @RequestBody byte[]
-        // either: for a form POST that is a body Spring rebuilt from parsed parameters rather than
-        // the one that was signed. IngressRawBodyFilter kept the original.
+        // Signatures are checked over the exact bytes sent. A String would be charset-decoded,
+        // and @RequestBody byte[] on a form POST is rebuilt from the parsed parameters.
         IngressOutcome outcome = ingressService.receiveWebhook(token, rawBody(request), request);
-        // Slack enables a Request URL only once it has echoed the challenge; a 202 without it
-        // left a SLACK Source impossible to connect to the Events API.
         if (outcome instanceof IngressOutcome.SlackUrlVerification handshake) {
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_JSON)
@@ -111,9 +102,9 @@ public class IngressController {
     }
 
     /**
-     * 403, not the 410 a disabled Source answers: providers such as Zapier delete a subscription for
-     * good on 410, and a suspension can be lifted. The reason stays out of the body, since the
-     * sender is a third-party provider, not the customer it was written for.
+     * 403, not 410: providers such as Zapier delete a subscription for good on 410, and a
+     * suspension can be lifted. The reason stays out of the body because the sender is a third
+     * party.
      */
     @ExceptionHandler(OrganizationSuspendedException.class)
     ResponseEntity<IngressResponse> organizationSuspended(OrganizationSuspendedException e) {
@@ -136,14 +127,9 @@ public class IngressController {
     }
 
     /**
-     * 429 rather than the 402 an authenticated caller gets, and with no detail: the sender is a
-     * third-party provider, not the customer, and it has no business learning which plan the
-     * customer is on or how much of it they have used.
-     *
-     * <p>{@code Retry-After} is an hour, not the time until the month rolls over. The refusal ends
-     * either then or the moment the customer changes plan, and nothing here can know which; days
-     * would push a provider that honours the header past its own retry window, and without one it
-     * guessed, and the providers that give up dropped the webhook.
+     * 429 with no detail rather than 402: the third-party sender has no business learning the
+     * customer's plan. Retry-After is an hour because the customer may upgrade at any time, and a
+     * wait of days would push providers past their own retry window.
      */
     @ExceptionHandler(QuotaExceededException.class)
     ResponseEntity<IngressResponse> quotaExceeded(QuotaExceededException e) {

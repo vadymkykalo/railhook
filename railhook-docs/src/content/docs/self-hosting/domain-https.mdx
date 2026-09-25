@@ -2,9 +2,9 @@
 title: Domain and HTTPS
 description: Serve Railhook on your own domain with a certificate that renews itself, or behind a proxy you already run.
 ---
-import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-Before your instance faces the internet, give it a domain and HTTPS. The installer can do this for you, or you can put Railhook behind a reverse proxy you already run.
+Give an internet-facing instance a domain and HTTPS, either through the installer or behind a reverse proxy you already run.
 
 <Tabs syncKey="https">
   <TabItem label="Built-in HTTPS">
@@ -48,7 +48,7 @@ Before your instance faces the internet, give it a domain and HTTPS. The install
        curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --behind-proxy
        ```
 
-       You get every setting from the built-in HTTPS table except the TLS terminator. No Caddy runs, and your proxy keeps the certificate. The dashboard's nginx listens on `127.0.0.1:8080`. Use `--port` to pick another loopback port.
+       Every setting from the built-in HTTPS table applies except the TLS terminator: no Caddy runs and your proxy keeps the certificate. The dashboard's nginx listens on `127.0.0.1:8080` (change it with `--port`).
 
     2. **Proxy everything to 127.0.0.1:8080**
 
@@ -60,7 +60,7 @@ Before your instance faces the internet, give it a domain and HTTPS. The install
 
 ## In production mode
 
-With `APP_ENV=production` the API refuses to start, rather than run, when:
+With `APP_ENV=production` the API refuses to start when:
 
 - a secret still holds a placeholder or a shipped default,
 - `WEBHOOK_ALLOW_PRIVATE_IPS=true`,
@@ -68,10 +68,3 @@ With `APP_ENV=production` the API refuses to start, rather than run, when:
 - `CORS_ALLOWED_ORIGINS` still contains `localhost`.
 
 `./railhook doctor` checks these ahead of time. It also warns if `APP_BASE_URL` still points at localhost, or if `EMAIL_ENABLED` is off: with email off, accounts are created already verified and nobody can be invited.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Configuration" description="Email, secrets and the rest of the settings." href="/docs/self-hosting/configuration/" />
-  <LinkCard title="Upgrade and backup" description="Keep the instance current and recoverable." href="/docs/self-hosting/upgrade-backup/" />
-</CardGrid>

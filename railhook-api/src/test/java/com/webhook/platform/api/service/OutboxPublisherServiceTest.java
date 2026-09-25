@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,12 +15,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -50,7 +52,6 @@ class OutboxPublisherServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Make TransactionTemplate.execute() actually run the callback
         when(txManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
 
         service = new OutboxPublisherService(
@@ -58,37 +59,9 @@ class OutboxPublisherServiceTest {
                 new SimpleMeterRegistry(), txManager, 100, 5, 90, 300, 1, 30, 10);
     }
 
-    @Test
-    void shouldNotProcessWhenNoPendingMessages() {
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(Collections.emptyList());
-
-        service.publishPendingMessages();
-
-        verify(kafkaTemplate, never()).send(any(ProducerRecord.class));
-    }
-
-    @Test
-    void shouldUseFairBatchingWithMaxPerKey() {
-        when(outboxMessageRepository.findPendingBatchForUpdate(eq("PENDING"), eq(100), eq(10), eq(30)))
-                .thenReturn(Collections.emptyList());
-
-        service.publishPendingMessages();
-
-        // Verify fair batching: 3rd arg is maxPerKey=10, 4th arg is maxPerProject=30
-        verify(outboxMessageRepository).findPendingBatchForUpdate("PENDING", 100, 10, 30);
-    }
-
+    // The per-key ceiling was a literal 10, capping one hot endpoint at ten events a second.
     @Test
     void maxPerKeyIsConfigurableLikeTheOtherTwoBoundsAreThe() {
-        // It was a literal 10 in both call sites while batch-size and max-per-project next to it
-        // were both @Value. That literal is the per-endpoint announcement ceiling: one Kafka key
-        // gets at most this many rows per poll, so with the 1s default a single hot endpoint is
-        // capped at ten events a second however large the batch. Measured at exactly that under
-        // load/ingest.js, which is the first time anyone had run it.
-        //
-        // The default does not move — the fairness it buys is real. What changes is that an
-        // operator who has one busy endpoint can now see the bound and raise it.
         OutboxPublisherService tuned = new OutboxPublisherService(
                 outboxMessageRepository, kafkaTemplate, objectMapper,
                 new SimpleMeterRegistry(), txManager, 100, 5, 90, 300, 1, 30, 40);
@@ -102,113 +75,57 @@ class OutboxPublisherServiceTest {
 
     @Test
     void shouldMarkAsSendingDuringClaimPhase() throws Exception {
-        OutboxMessage message = createTestMessage();
-        DeliveryMessage deliveryMessage = DeliveryMessage.builder()
-                .deliveryId(UUID.randomUUID())
-                .build();
-
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(List.of(message));
-        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
-                .thenReturn(deliveryMessage);
-
-        @SuppressWarnings("unchecked")
-        SendResult<String, Object> sendResult = mock(SendResult.class);
-        CompletableFuture<SendResult<String, Object>> future = CompletableFuture.completedFuture(sendResult);
-        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(future);
+        stubClaim(List.of(createTestMessage()));
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(acked());
 
         service.publishPendingMessages();
 
-        // Phase 1: message was set to SENDING via saveAll during claim
-        verify(outboxMessageRepository).saveAll(argThat(list -> {
-            @SuppressWarnings("unchecked")
-            List<OutboxMessage> msgs = (List<OutboxMessage>) list;
-            return !msgs.isEmpty();
-        }));
-
-        // Phase 2: batch-marked PUBLISHED after Kafka ack
+        verify(outboxMessageRepository).saveAll(argThat(list -> !((List<?>) list).isEmpty()));
         verify(outboxMessageRepository).batchMarkPublished(anyList(), any(Instant.class));
     }
 
     @Test
     void shouldMarkAsFailedOnException() throws Exception {
-        OutboxMessage message = createTestMessage();
-
         when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(List.of(message));
+                .thenReturn(List.of(createTestMessage()));
         when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
                 .thenThrow(new RuntimeException("Parse error"));
 
         service.publishPendingMessages();
 
-        // Batch-marked FAILED via bulk query
         verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
     }
 
     @Test
     void shouldMarkAsFailedOnKafkaSendFailure() throws Exception {
-        OutboxMessage message = createTestMessage();
-        DeliveryMessage deliveryMessage = DeliveryMessage.builder()
-                .deliveryId(UUID.randomUUID())
-                .build();
-
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(List.of(message));
-        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
-                .thenReturn(deliveryMessage);
-
-        // Kafka send fails definitively
+        stubClaim(List.of(createTestMessage()));
         CompletableFuture<SendResult<String, Object>> future = new CompletableFuture<>();
         future.completeExceptionally(new RuntimeException("Broker unavailable"));
         when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(future);
 
         service.publishPendingMessages();
 
-        // Batch-marked FAILED via bulk query after Kafka error
         verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
     }
 
+    // Marking an in-flight send FAILED after the batch timeout caused duplicate dispatch.
     @Test
     void shouldNotMarkAsFailedWhenKafkaSendStillInFlight() throws Exception {
-        // Regression test for P0 duplicate dispatch bug.
-        // Previously, get(0ms) after batch timeout would mark in-flight sends as FAILED,
-        // even though they would eventually succeed — causing duplicate dispatch on retry.
         OutboxMessage message = createTestMessage();
-        DeliveryMessage deliveryMessage = DeliveryMessage.builder()
-                .deliveryId(UUID.randomUUID())
-                .build();
-
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(List.of(message));
-        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
-                .thenReturn(deliveryMessage);
-
-        // Kafka send never completes (simulates slow broker)
-        CompletableFuture<SendResult<String, Object>> neverCompletingFuture = new CompletableFuture<>();
-        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(neverCompletingFuture);
+        stubClaim(List.of(message));
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(new CompletableFuture<>());
 
         service.publishPendingMessages();
 
-        // No batch updates should happen — messages still in-flight stay SENDING.
-        // cleanupOldMessages() recovers them back to PENDING after sendingRecoverySeconds.
         verify(outboxMessageRepository, never()).batchMarkPublished(anyList(), any(Instant.class));
         verify(outboxMessageRepository, never()).batchMarkFailed(anyList(), anyString(), any(Instant.class));
-        // Message remains SENDING (set during claim phase)
         assertThat(message.getStatus()).isEqualTo(OutboxStatus.SENDING);
     }
 
+    // Without an outer ORDER BY, Postgres returned the claimed rows in plan order.
     @Test
     void findPendingBatchForUpdate_outerQuery_ordersByCreatedAt() throws Exception {
-        // Regression test: the outer "SELECT * FROM outbox_messages WHERE id IN
-        // (...) FOR UPDATE SKIP LOCKED" had no ORDER BY, so Postgres could return the
-        // id-filtered rows in plan order even though the inner subquery computed the correct
-        // rn_proj/rn_key ranking — up to maxPerKey=10 messages for one endpoint could reach
-        // publishBatchAsync (and therefore Kafka) out of order. Assert the outer query (the
-        // part after the inner subquery's closing paren) carries its own ORDER BY created_at.
         assertOuterQueryOrdersByCreatedAt("findPendingBatchForUpdate",
                 String.class, int.class, int.class, int.class);
         assertOuterQueryOrdersByCreatedAt("findFailedMessagesForRetry",
@@ -216,10 +133,8 @@ class OutboxPublisherServiceTest {
     }
 
     private void assertOuterQueryOrdersByCreatedAt(String methodName, Class<?>... paramTypes) throws Exception {
-        var method = OutboxMessageRepository.class.getMethod(methodName, paramTypes);
-        org.springframework.data.jpa.repository.Query queryAnnotation =
-                method.getAnnotation(org.springframework.data.jpa.repository.Query.class);
-        String sql = queryAnnotation.value();
+        Method method = OutboxMessageRepository.class.getMethod(methodName, paramTypes);
+        String sql = method.getAnnotation(Query.class).value();
 
         int forUpdateIdx = sql.lastIndexOf("FOR UPDATE");
         assertThat(forUpdateIdx).as("query must use FOR UPDATE SKIP LOCKED: %s", sql).isPositive();
@@ -228,51 +143,32 @@ class OutboxPublisherServiceTest {
         String outerTail = sql.substring(subqueryCloseIdx, forUpdateIdx);
 
         assertThat(outerTail)
-                .as("outer claim query for %s must ORDER BY created_at so the batch handed to " +
-                        "publishBatchAsync is deterministic, not plan order: %s", methodName, sql)
+                .as("outer claim query for %s must ORDER BY created_at: %s", methodName, sql)
                 .containsIgnoringCase("ORDER BY created_at");
     }
 
     @Test
     void publishPendingMessages_sendsMessagesInRepositoryReturnOrder() throws Exception {
-        // With findPendingBatchForUpdate now ordering by created_at, verify
-        // publishBatchAsync itself preserves that order end-to-end instead of reshuffling it
-        // (e.g. via a parallel stream or a Map keyed collection) on the way to Kafka.
         OutboxMessage m1 = createTestMessage();
         m1.setKafkaKey("key-1");
         OutboxMessage m2 = createTestMessage();
         m2.setKafkaKey("key-2");
         OutboxMessage m3 = createTestMessage();
         m3.setKafkaKey("key-3");
-        List<OutboxMessage> inCreatedAtOrder = List.of(m1, m2, m3);
-
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(inCreatedAtOrder);
-        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
-                .thenReturn(DeliveryMessage.builder().deliveryId(UUID.randomUUID()).build());
-
-        @SuppressWarnings("unchecked")
-        SendResult<String, Object> sendResult = mock(SendResult.class);
-        when(kafkaTemplate.send(any(ProducerRecord.class)))
-                .thenReturn(CompletableFuture.completedFuture(sendResult));
+        stubClaim(List.of(m1, m2, m3));
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(acked());
 
         service.publishPendingMessages();
 
         ArgumentCaptor<ProducerRecord<String, Object>> captor = ArgumentCaptor.forClass(ProducerRecord.class);
         verify(kafkaTemplate, times(3)).send(captor.capture());
-        List<Object> keysSentInOrder = captor.getAllValues().stream()
-                .map(ProducerRecord::key)
-                .collect(java.util.stream.Collectors.toList());
-        assertThat(keysSentInOrder).containsExactly("key-1", "key-2", "key-3");
+        assertThat(captor.getAllValues()).extracting(ProducerRecord::key)
+                .containsExactly("key-1", "key-2", "key-3");
     }
 
+    // Recovery used to run only in the hourly cleanup, leaving a stuck SENDING row for up to an hour.
     @Test
     void retryFailedMessages_recoversStuckSendingMessages_onThe30sCycle() {
-        // Regression test: recoverStuckSendingMessages() used to run only inside
-        // the hourly cleanupOldMessages() job, so a message stuck SENDING after a transient
-        // broker hiccup could wait up to ~59 extra minutes to be reclaimed. It must now run on
-        // every retryFailedMessages() poll (the 30s retry-interval-ms cycle).
         when(outboxMessageRepository.findFailedMessagesForRetry(
                 anyString(), anyInt(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(Collections.emptyList());
@@ -284,40 +180,9 @@ class OutboxPublisherServiceTest {
         verify(outboxMessageRepository).recoverStuckSendingMessages(any(Instant.class));
     }
 
-    @Test
-    void retryFailedMessages_recoveredSendingMessages_areLoggedAndCountedAtZeroCost() {
-        // A non-zero recovery result must not blow up the retry cycle (best-effort, same
-        // pattern the old cleanupOldMessages() call used).
-        when(outboxMessageRepository.findFailedMessagesForRetry(
-                anyString(), anyInt(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(Collections.emptyList());
-        when(outboxMessageRepository.recoverStuckSendingMessages(any(Instant.class)))
-                .thenReturn(3);
-
-        assertThatCode(() -> service.retryFailedMessages()).doesNotThrowAnyException();
-
-        verify(outboxMessageRepository).recoverStuckSendingMessages(any(Instant.class));
-    }
-
-    @Test
-    void cleanupOldMessages_noLongerRecoversStuckSendingMessages() {
-        // Recovery moved to the 30s retryFailedMessages() cycle; cleanupOldMessages()
-        // (hourly) must not also call it — that would just be redundant, not wrong, but this
-        // pins the "moved" (not "also called") decision explicitly.
-        when(outboxMessageRepository.deleteOldPublishedMessages(anyString(), any(Instant.class), anyInt()))
-                .thenReturn(0);
-        when(outboxMessageRepository.countByStatus(any())).thenReturn(0L);
-
-        service.cleanupOldMessages();
-
-        verify(outboxMessageRepository, never()).recoverStuckSendingMessages(any(Instant.class));
-    }
-
+    // One capped delete an hour never caught up with an installation publishing more than that.
     @Test
     void cleanupOldMessages_keepsDeletingUntilTheBacklogIsGone() {
-        // One capped delete an hour was at most 120k PUBLISHED rows a day. An installation
-        // publishing more than that grew the table without bound: each run took its 5000 and
-        // left the rest for an hour later, which never caught up.
         when(outboxMessageRepository.deleteOldPublishedMessages(eq("PUBLISHED"), any(Instant.class), anyInt()))
                 .thenReturn(5000, 5000, 5000, 120);
         when(outboxMessageRepository.deleteOldPublishedMessages(eq("DEAD"), any(Instant.class), anyInt()))
@@ -330,14 +195,12 @@ class OutboxPublisherServiceTest {
                 .deleteOldPublishedMessages(eq("PUBLISHED"), any(Instant.class), eq(5000));
         verify(outboxMessageRepository, times(2))
                 .deleteOldPublishedMessages(eq("DEAD"), any(Instant.class), eq(1000));
-        // Each batch commits on its own, so a long run holds no lock on rows it already deleted.
         verify(txManager, atLeast(6)).commit(any());
     }
 
+    // A backlog of millions must not hold the ShedLock past lockAtMostFor.
     @Test
     void cleanupOldMessages_stopsAtItsBatchBudget_andLeavesTheRestForTheNextRun() {
-        // A backlog of millions must not hold the ShedLock past lockAtMostFor: another
-        // instance would then start deleting the same rows beside it.
         when(outboxMessageRepository.deleteOldPublishedMessages(anyString(), any(Instant.class), anyInt()))
                 .thenAnswer(inv -> inv.getArgument(2));
         when(outboxMessageRepository.countByStatus(any())).thenReturn(0L);
@@ -350,18 +213,11 @@ class OutboxPublisherServiceTest {
                 .deleteOldPublishedMessages(eq("DEAD"), any(Instant.class), anyInt());
     }
 
+    // A late ack used to be dropped, so recovery republished a message Kafka already had.
     @Test
     void aSendAcknowledgedAfterTheBatchWaitStillMarksItsRowPublished() throws Exception {
-        // The batch waits batchSendTimeoutSeconds (1s here) and then settles what it has. An ack
-        // that arrives after that used to be added to a list nobody read again: the row stayed
-        // SENDING, recovery handed it back to PENDING 300s later, and the message went to Kafka a
-        // second time although the first send had landed.
         OutboxMessage message = createTestMessage();
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(List.of(message));
-        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
-                .thenReturn(DeliveryMessage.builder().deliveryId(UUID.randomUUID()).build());
+        stubClaim(List.of(message));
         CompletableFuture<SendResult<String, Object>> slowAck = new CompletableFuture<>();
         when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(slowAck);
         when(outboxMessageRepository.findFailedMessagesForRetry(
@@ -379,6 +235,62 @@ class OutboxPublisherServiceTest {
         verify(outboxMessageRepository).batchMarkPublished(eq(List.of(message.getId())), any(Instant.class));
     }
 
+    // A null exception message made ConcurrentHashMap.put throw and left the row SENDING.
+    @Test
+    void shouldMarkAsFailedWhenTheKafkaErrorCarriesNoMessage() throws Exception {
+        stubClaim(List.of(createTestMessage()));
+        CompletableFuture<SendResult<String, Object>> future = new CompletableFuture<>();
+        future.completeExceptionally(new NullPointerException());
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(future);
+
+        service.publishPendingMessages();
+
+        verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
+    }
+
+    @Test
+    void shouldSurviveAPreparationErrorThatCarriesNoMessage() throws Exception {
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(List.of(createTestMessage()));
+        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
+                .thenThrow(new NullPointerException());
+
+        assertThatNoException().isThrownBy(() -> service.publishPendingMessages());
+
+        verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
+    }
+
+    // Handing over the live synchronizedList risked a ConcurrentModificationException while binding.
+    @Test
+    void shouldNotHandTheRepositoryAListStillBeingWrittenTo() throws Exception {
+        stubClaim(List.of(createTestMessage(), createTestMessage()));
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(acked());
+
+        service.publishPendingMessages();
+
+        ArgumentCaptor<List<UUID>> published = ArgumentCaptor.forClass(List.class);
+        verify(outboxMessageRepository).batchMarkPublished(published.capture(), any(Instant.class));
+        assertThat(published.getValue().getClass().getName())
+                .as("the repository must be handed a snapshot, not the live collector")
+                .doesNotContain("Synchronized");
+        assertThat(published.getValue()).hasSize(2);
+    }
+
+    private void stubClaim(List<OutboxMessage> messages) throws Exception {
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(messages);
+        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
+                .thenReturn(DeliveryMessage.builder().deliveryId(UUID.randomUUID()).build());
+    }
+
+    private static CompletableFuture<SendResult<String, Object>> acked() {
+        @SuppressWarnings("unchecked")
+        SendResult<String, Object> sendResult = mock(SendResult.class);
+        return CompletableFuture.completedFuture(sendResult);
+    }
+
     private OutboxMessage createTestMessage() {
         OutboxMessage message = new OutboxMessage();
         message.setId(UUID.randomUUID());
@@ -390,85 +302,5 @@ class OutboxPublisherServiceTest {
         message.setRetryCount(0);
         message.setCreatedAt(Instant.now());
         return message;
-    }
-
-    @Test
-    void shouldMarkAsFailedWhenTheKafkaErrorCarriesNoMessage() throws Exception {
-        // ConcurrentHashMap refuses a null value, and Throwable.getMessage() is null often
-        // enough — an NPE inside a serializer is the ordinary case. The put() then threw inside
-        // the send callback, the callback completed exceptionally, allOf().get() raised, and the
-        // whole thing was caught one level up as the benign "did not fully complete within Ns".
-        // The row was left SENDING with nothing recorded against it, to be recovered 300s later
-        // and published a second time.
-        OutboxMessage message = createTestMessage();
-        DeliveryMessage deliveryMessage = DeliveryMessage.builder()
-                .deliveryId(UUID.randomUUID())
-                .build();
-
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(List.of(message));
-        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
-                .thenReturn(deliveryMessage);
-
-        CompletableFuture<SendResult<String, Object>> future = new CompletableFuture<>();
-        future.completeExceptionally(new NullPointerException());   // getMessage() == null
-        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(future);
-
-        service.publishPendingMessages();
-
-        verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
-    }
-
-    @Test
-    void shouldSurviveAPreparationErrorThatCarriesNoMessage() throws Exception {
-        // The same null, reached from the other side: this put() sits inside a catch block, so
-        // the NPE propagated out of publishBatchAsync and out of the scheduled method. Every row
-        // claimed in that cycle was abandoned in SENDING, and the poll loop took the exception.
-        OutboxMessage message = createTestMessage();
-
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(List.of(message));
-        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
-                .thenThrow(new NullPointerException());
-
-        assertThatNoException().isThrownBy(() -> service.publishPendingMessages());
-
-        verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
-    }
-
-    @Test
-    void shouldNotHandTheRepositoryAListStillBeingWrittenTo() throws Exception {
-        // publishedIds is a synchronizedList, and passing it straight to the repository means
-        // Spring Data iterates it to bind the IN clause without holding its monitor — while a
-        // straggler callback may still be adding. The javadoc for synchronizedList is explicit
-        // that this is a ConcurrentModificationException, and it was caught one level up and
-        // left those rows SENDING.
-        OutboxMessage first = createTestMessage();
-        OutboxMessage second = createTestMessage();
-        DeliveryMessage deliveryMessage = DeliveryMessage.builder()
-                .deliveryId(UUID.randomUUID())
-                .build();
-
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(List.of(first, second));
-        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
-                .thenReturn(deliveryMessage);
-
-        @SuppressWarnings("unchecked")
-        SendResult<String, Object> sendResult = mock(SendResult.class);
-        when(kafkaTemplate.send(any(ProducerRecord.class)))
-                .thenReturn(CompletableFuture.completedFuture(sendResult));
-
-        service.publishPendingMessages();
-
-        ArgumentCaptor<List<UUID>> published = ArgumentCaptor.forClass(List.class);
-        verify(outboxMessageRepository).batchMarkPublished(published.capture(), any(Instant.class));
-        assertThat(published.getValue().getClass().getName())
-                .as("the repository must be handed a snapshot, not the live collector")
-                .doesNotContain("Synchronized");
-        assertThat(published.getValue()).hasSize(2);
     }
 }

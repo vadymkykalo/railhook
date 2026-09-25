@@ -1,17 +1,9 @@
 import * as React from "react"
 import { cn } from "../../lib/utils"
 
-/** What a checkbox header is recorded as while columns are collected; never a real header text. */
 const SELECT_COLUMN = "__select__"
 
-/**
- * Copies each column's header text onto its body cells as `data-label`, which is what the phone
- * layout (`.rh-table-stack` in index.css) prints in front of every value. A column whose header
- * holds a checkbox is the selection column (`data-cell="select"`), a header with no text is an
- * actions column (`data-cell="actions"`), and a cell spanning columns — an empty state, a
- * loading row — is `data-cell="wide"`. Attributes only, so observing child and text changes
- * cannot loop on its own writes.
- */
+/** Writes attributes only, so observing child and text changes cannot loop on its own writes. */
 function labelCells(table: HTMLTableElement) {
   const headRow = table.tHead?.rows[0]
   if (!headRow) return
@@ -44,7 +36,6 @@ function labelCells(table: HTMLTableElement) {
 }
 
 interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
-  /** Below `sm`, lay the rows out as cards. On by default; a table that reads fine narrow can opt out. */
   stack?: boolean
 }
 

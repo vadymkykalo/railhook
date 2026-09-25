@@ -3,34 +3,10 @@ import { useTranslation } from 'react-i18next';
 
 import { siteUrl } from '../lib/siteUrl';
 
-/**
- * Per-route title, description, canonical, social image and document language.
- *
- * The app is a single HTML file, so before this every route inherited the
- * landing page's `<title>` and description from `index.html` — /docs, /pricing
- * and /register all shared one. `<html lang>` was likewise frozen at "en" no
- * matter which locale the reader had chosen, which is wrong for a screen reader
- * and wrong for a translation tool.
- *
- * Deliberately not react-helmet: a handful of DOM writes in an effect need no library,
- * and a library here would be a dependency on every route.
- *
- * `path` is the canonical path, not the current URL — that keeps query strings
- * and a trailing hash out of the canonical, which is the whole point of it.
- *
- * Most routes name translation keys. A blog post cannot: its title is written in a Markdown
- * file, not in the locale bundles, so it passes the strings themselves. One or the other, never
- * both — the union below is what enforces that.
- *
- * No hreflang alternates are written, here or anywhere else: this site serves one URL per page
- * in both languages and chooses the language in the browser, so there is no second URL to point
- * a crawler at. `og:locale` says which language the crawled copy is in, and that is the whole of
- * the app's i18n contract with a crawler.
- */
+/** No hreflang: one URL serves both languages, chosen in the browser; og:locale is the whole contract. */
 
 type Keyed = {
   titleKey: string;
-  /** Interpolation for the title, e.g. the documentation section's own name. */
   titleParams?: Record<string, string>;
   descriptionKey: string;
   title?: never;
@@ -47,14 +23,10 @@ type Literal = {
 
 type DocumentMeta = (Keyed | Literal) & {
   path: string;
-  /**
-   * The social card for this page, as a site-absolute path. Always written, so a reader who
-   * leaves an article for the landing page does not leave the article's card behind in the head.
-   */
+  /** Always written, so leaving an article does not leave its card in the head. */
   image?: string;
 };
 
-/** What `index.html` names, and what every page without one of its own falls back to. */
 const DEFAULT_IMAGE = '/social-card.png';
 
 function upsertMeta(selector: string, attr: 'name' | 'property', key: string, content: string) {

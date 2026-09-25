@@ -26,12 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * A tunnel URL is a base, not an endpoint: a developer points Stripe at
- * {@code /tunnel/<slug>/webhooks/stripe} and expects {@code /webhooks/stripe} on localhost.
- * Only the bare slug was mapped, so every path below it answered the API's own 404 and never
- * reached the CLI — found on production, where deliveries to a tunnel sub-path failed with 404.
- */
+// Only the bare slug was mapped, so tunnel sub-paths answered 404.
 class TunnelIngressControllerTest {
 
     private TunnelIngressService tunnelIngressService;
@@ -61,11 +56,7 @@ class TunnelIngressControllerTest {
         assertEquals("{\"id\":\"evt_1\"}", sent.getValue().getBody());
     }
 
-    /**
-     * A tunnel whose CLI is not connected is temporarily unavailable, not a broken upstream. It
-     * answered 502, which a CDN replaces with its own "Bad gateway" page — on production the
-     * dead tunnel looked like the whole site was down — and which providers do not all retry.
-     */
+    // It answered 502, which a CDN replaces with its own "Bad gateway" page.
     @Test
     void anOfflineTunnelAnswers503() throws Exception {
         when(tunnelIngressService.forward(anyString(), any(), any()))
@@ -86,12 +77,7 @@ class TunnelIngressControllerTest {
         assertEquals("", sent.getValue().getPath());
     }
 
-    /**
-     * A Slack slash command or a Twilio callback is a form POST, signed over the bytes on the
-     * wire. Binding the body as a String let Spring rebuild it from parsed parameters —
-     * {@code %20} became {@code +}, {@code %2f} became {@code %2F} — so the developer's own
-     * signature check refused a request that was genuine.
-     */
+    // Binding the body as a String let Spring rebuild it from parsed parameters.
     @Test
     void aFormBodyReachesTheTunnelByteForByte() throws Exception {
         byte[] form = "text=a%20b&token=X%2fY".getBytes(StandardCharsets.US_ASCII);

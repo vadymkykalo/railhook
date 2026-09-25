@@ -1,29 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-/**
- * load-receiver: a stand-in "customer server" for the k6 load harness.
- *
- * It is the target the platform delivers webhooks to. Unlike a real customer
- * endpoint, its behaviour is remote-controlled over a small HTTP control API,
- * so a k6 scenario can flip it between healthy / slow / down mid-run (for
- * the failure-recovery scenario) or make it fail the first N attempts for a
- * given delivery (to force the retries that back up an ordered subscription
- * in the ordering scenario — see load/ordering.js).
- *
- * Zero npm dependencies on purpose: it runs as `node load/receiver/server.js`
- * inside a plain `node:*-alpine` container (see load/docker-compose.load.yml)
- * with nothing to `npm install`.
- *
- * Routes:
- *   ANY  /webhook*            - delivery target. Behaviour depends on current mode.
- *   POST /_control/mode       - { mode: "healthy"|"slow"|"down", latencyMs? }
- *   POST /_control/fail-next  - { count: N } - next N /webhook requests return 500
- *   POST /_control/reset      - clears the received-request log and fail/mode state
- *   GET  /_control/received   - JSON array of everything /webhook has seen so far
- *   GET  /_control/summary    - counts + basic ordering stats over the received log
- *   GET  /_control/health     - liveness probe for the control API itself
- */
+// No npm dependencies: it runs in a plain node:*-alpine container.
 
 const http = require('http');
 
@@ -55,7 +33,6 @@ function readBody(req) {
     let data = '';
     req.on('data', (chunk) => {
       data += chunk;
-      // Guard against a runaway body in a load test.
       if (data.length > 5 * 1024 * 1024) {
         reject(new Error('body too large'));
         req.destroy();
@@ -79,22 +56,14 @@ function handleWebhook(req, res, body, requestPath) {
   try {
     parsed = body ? JSON.parse(body) : null;
   } catch (e) {
-    // Not all deliveries are guaranteed valid JSON in general; the load
-    // harness always sends JSON, so this is logged rather than fatal.
     parsed = null;
   }
 
-  // The load harness stamps outgoing events with data.seq and data.sentAtMs
-  // so the receiver can compute an end-to-end latency proxy and check
-  // ordering without needing to know anything about the platform's internal
-  // sequence numbers (see load/lib/setup.js and load/ordering.js).
   const seq = parsed && parsed.data && parsed.data.seq !== undefined ? parsed.data.seq : (parsed ? parsed.seq : undefined);
   const sentAtMs = parsed && parsed.data && parsed.data.sentAtMs !== undefined ? parsed.data.sentAtMs : (parsed ? parsed.sentAtMs : undefined);
 
   const entry = {
-    // Which URL the delivery was sent to. A scenario subscribes its endpoint to a path of its
-    // own, and that — not the payload, which carries no event type — is what tells two
-    // scenarios' deliveries apart inside one receiver.
+    // The path, not the payload, tells two scenarios' deliveries apart.
     path: requestPath,
     seq,
     receivedAtMs,
@@ -108,9 +77,7 @@ function handleWebhook(req, res, body, requestPath) {
   };
   state.received.push(entry);
 
-  // A forced failure belongs to the scenario that asked for it. Without the type guard the
-  // next request to arrive consumed it — including a retry still draining from the scenario
-  // before — and the probe that meant to induce one failure induced none, then passed.
+  // Without the type guard a stranger's retry could consume the forced failure.
   if (state.failRemaining > 0
       && (!state.failPath || state.failPath === entry.path)
       && (!state.failType || state.failType === entry.type)) {
@@ -134,14 +101,8 @@ function handleWebhook(req, res, body, requestPath) {
   sendJson(res, 200, { ok: true });
 }
 
-/**
- * Counts over the received log, for one event type when asked.
- *
- * A run drives several scenarios through one receiver, and deliveries from the one before keep
- * arriving after the next one resets — a retry ladder outlives the scenario that started it. Two
- * unrelated streams interleaved look exactly like broken ordering, so a probe asks for its own
- * path rather than for everything the receiver has seen.
- */
+// A retry ladder outlives its scenario, and two interleaved streams look like broken ordering, so a
+// probe summarises its own path only.
 function summarize({ path, type } = {}) {
   const received = state.received.filter(
     (r) => (!path || r.path === path) && (!type || r.type === type),

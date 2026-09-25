@@ -5,14 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
 import { Button } from './ui/button';
 
-/**
- * The platform admin pages' own refusal, for a person `/auth/me` does not call a platform admin.
- *
- * Not the control — the API refuses every such request whatever renders here — but without it a
- * pasted `/admin/platform` link would show an organization owner a page of load errors instead of
- * telling them this panel is not theirs. Separate from AccessDeniedPage, which explains
- * organization roles: no role leads here.
- */
+/** Without it a pasted admin link shows an org owner load errors, not a refusal. */
 export default function PlatformAdminGate({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -22,7 +15,7 @@ export default function PlatformAdminGate({ children }: { children: ReactNode })
   return (
     <div className="flex min-h-[60vh] items-center justify-center p-4 lg:p-6">
       <div className="w-full max-w-md">
-        <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-rail bg-card">
+        <div className="mb-5 flex h-11 w-11 items-center justify-center border border-rail bg-card">
           <ShieldOff className="h-5 w-5 text-muted-foreground" aria-hidden />
         </div>
         <p className="mono-label">403</p>

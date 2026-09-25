@@ -79,7 +79,6 @@ public class IncidentService {
 
         incident = incidentRepository.save(incident);
 
-        // Add initial timeline entry
         IncidentTimeline entry = IncidentTimeline.builder()
                 .incidentId(incident.getId())
                 .entryType(IncidentTimelineType.STATUS_CHANGE)
@@ -113,7 +112,6 @@ public class IncidentService {
 
         incident = incidentRepository.save(incident);
 
-        // Add status change timeline entry if status changed
         if (request.getStatus() != null && request.getStatus() != oldStatus) {
             IncidentTimeline entry = IncidentTimeline.builder()
                     .incidentId(incidentId)
@@ -146,13 +144,6 @@ public class IncidentService {
         return getIncident(projectId, incidentId);
     }
 
-    /**
-     * All three counts in one call, because they are read together and shown together.
-     *
-     * <p>Three queries rather than one grouped scan: the page asks for this once on load and
-     * again after a status change, the row counts are small, and a grouped query would have to
-     * be reassembled into the same three numbers anyway.
-     */
     @Transactional(readOnly = true)
     public IncidentCountsResponse countUnresolved(UUID projectId) {
         validateProjectAccess(projectId);

@@ -1,28 +1,5 @@
 #!/usr/bin/env node
-/**
- * Live-API smoke check for the Node SDK.
- *
- * NOT a unit test. `npm test` (jest.config.js) roots at `src/` and matches
- * `**\/__tests__\/**\/*.test.ts`, so nothing here is ever collected by it —
- * the unit suite must stay green with no backend running, and this file must
- * never be the reason it isn't.
- *
- * What it does: registers a throwaway org against a REAL running API, then
- * drives the whole send-and-inspect workflow through the SDK's own public
- * methods and asserts what actually comes back — status codes, field names,
- * pagination envelope, error envelope, and a signature the server itself
- * produced. Stubbed-transport unit tests are structurally unable to catch a
- * renamed field; this is what catches it.
- *
- * Usage:
- *   make up                       # from the repo root
- *   cd sdks/node && npm run smoke:live
- *
- * Env:
- *   SMOKE_API_BASE_URL  target API (default http://localhost:8080)
- *
- * Exit code is 0 only if every check passed.
- */
+// Against a running API (`make up`, then `npm run smoke:live`); kept out of `npm test`.
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -68,11 +45,7 @@ function eq(actual, expected, what) {
   );
 }
 
-/**
- * Raw HTTP, used ONLY to bootstrap a tenant. The SDK is API-key scoped by
- * design — it has no register/login/create-project surface (see src/client.ts)
- * — so these three calls cannot go through it. Everything after this point does.
- */
+// Only for bootstrapping a tenant: the SDK is API-key scoped and cannot register or create projects.
 async function raw(method, path, body, headers = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
@@ -88,10 +61,7 @@ async function raw(method, path, body, headers = {}) {
 
 async function apiIsUp() {
   try {
-    // An intentionally invalid login: any HTTP response at all proves the API
-    // is answering. Deliberately NOT /v3/api-docs — springdoc is only exposed
-    // when SWAGGER_ENABLED=true (SecurityConfig.java), and it is false by
-    // default, so probing it reports a healthy stack as unreachable.
+    // Any response to an invalid login proves the API is up; /v3/api-docs is off by default.
     const res = await fetch(`${BASE_URL}/api/v1/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -112,7 +82,6 @@ async function main() {
     process.exit(2);
   }
 
-  // ── Bootstrap (raw HTTP: register / project / API key) ──
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const auth = await raw('POST', '/api/v1/auth/register', {
     email: `node-smoke-${suffix}@node-smoke.invalid`,
@@ -140,7 +109,6 @@ async function main() {
   const projectId = project.id;
   const client = new Railhook({ apiKey: apiKey.key, baseUrl: BASE_URL });
 
-  // ── Endpoints ──
   console.log('\nendpoints:');
   const endpoint = await client.endpoints.create(projectId, {
     url: 'https://example.com/node-smoke',
@@ -180,7 +148,6 @@ async function main() {
     assert(rotated.secret !== endpoint.secret, 'secret did not change');
   });
 
-  // ── Subscriptions ──
   console.log('\nsubscriptions:');
   const subscription = await client.subscriptions.create(projectId, {
     endpointId: endpoint.id,
@@ -203,7 +170,6 @@ async function main() {
     assert(subs.some((s) => s.id === subscription.id), 'created subscription missing');
   });
 
-  // ── Events ──
   console.log('\nevents:');
   const event = await client.events.send(
     { type: 'order.completed', data: { orderId: 'ord_12345', amount: 99.99 } },
@@ -216,7 +182,6 @@ async function main() {
     eq(event.deliveriesCreated, 1, 'deliveriesCreated');
   });
 
-  // ── Deliveries ──
   console.log('\ndeliveries:');
   let page = { content: [] };
   for (let i = 0; i < 20 && page.content.length === 0; i++) {
@@ -260,7 +225,6 @@ async function main() {
     assert('createdAt' in a, 'createdAt missing (the SDK used to call it attemptedAt)');
   });
 
-  // ── Incoming ──
   console.log('\nincoming:');
   const source = await client.incomingSources.create(projectId, {
     name: 'Node Smoke Source',
@@ -294,8 +258,7 @@ async function main() {
   check('listDestinations returns a page envelope', () =>
     assert(destPage.content.some((d) => d.id === destination.id), 'created destination missing'));
 
-  // Push a webhook through the source's own ingress URL — the only way to make
-  // an Incoming Event exist. permitAll, no credentials (SecurityConfig.java).
+  // The ingress URL is the only way to make an Incoming Event exist.
   await raw('POST', `/ingress/${source.ingressPathToken}`, { hello: 'incoming' });
 
   let incoming = { content: [] };
@@ -328,7 +291,6 @@ async function main() {
     });
   }
 
-  // ── Errors ──
   console.log('\nerrors:');
   const badClient = new Railhook({ apiKey: 'not-a-real-key', baseUrl: BASE_URL });
   await expectRejection(
@@ -366,7 +328,6 @@ async function main() {
     }
   );
 
-  // ── Signature verification against a signature the SERVER produced ──
   console.log('\nsignature:');
   const dryRun = await client.post(`/api/v1/projects/${projectId}/transform-preview/delivery-dry-run`, {
     payload: JSON.stringify({ orderId: 'ord_12345' }),
@@ -377,8 +338,7 @@ async function main() {
     assert(/^t=\d{13},v1=[0-9a-f]{64}$/.test(dryRun.signature), `unexpected signature format: ${dryRun.signature}`);
   });
   check('verifySignature accepts the signature the server computed', () => {
-    // Signed over the *transformed* payload the endpoint would actually
-    // receive, which is pretty-printed — not over what we sent in.
+    // Signed over the transformed, pretty-printed payload, not over what we sent.
     eq(verifySignature(dryRun.transformedPayload, dryRun.signature, rotated.secret), true, 'verifySignature');
   });
   check('verifySignature rejects a tampered body', () => {
@@ -401,7 +361,6 @@ async function main() {
     assert(threw, 'a 301s-old signature was accepted (the server tolerance is 300s)');
   });
 
-  // ── Cleanup ──
   await client.subscriptions.delete(projectId, subscription.id);
   await client.endpoints.delete(projectId, endpoint.id);
   await client.incomingSources.delete(projectId, source.id);

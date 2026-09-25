@@ -9,10 +9,7 @@ import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The state of a sign-in in flight lives in a signed cookie rather than on the server, so the
- * signature and the expiry are the whole of what stops a forged or replayed callback.
- */
+// The signed cookie's signature and expiry are all that stop a forged or replayed callback.
 class OAuthStateCodecTest {
 
     private static final String SECRET = "test_jwt_secret_key_minimum_32_chars_required_here";

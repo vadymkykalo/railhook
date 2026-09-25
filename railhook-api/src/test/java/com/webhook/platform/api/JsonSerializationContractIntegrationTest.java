@@ -19,33 +19,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Three properties of the JSON this API exchanges, held down because Spring Boot 4 moved the
- * floor they stood on.
- *
- * <p>Boot 4 serializes HTTP through Jackson 3. This project holds it on Jackson 2 with two
- * things that look like housekeeping and are not: a bridge module Spring has already deprecated,
- * and {@code spring.http.converters.preferred-json-mapper} in {@code application.yml}. Why
- * Jackson 2 at all is written on that dependency in the pom — briefly, one of the two DTOs that
- * would otherwise have to change is backed by a JSONB column.
- *
- * <p>The two directions fail separately, which is the reason both are here. Take the property
- * away and *reading* a body into a Jackson 2 {@code JsonNode} answers 500 with a type definition
- * error, while writing one still works — so a test that only checked responses would have called
- * the property dead configuration and invited its removal. {@code EventIngestRequest.data} is
- * such a field, so the direction that breaks first is every event the platform ingests.
- *
- * <p>The timestamp case guards something the mappers happen to agree on today and would not
- * announce if that changed: the difference between {@code "2026-09-04T15:04:05Z"} and
- * {@code 1757000645.123} is every SDK, the generated TypeScript types and every customer
- * integration breaking at once. The type check fails loudly — "expected String, got Double" says
- * why in one line; the pattern catches the quieter version, still a string but a local time, or
- * one without the {@code Z} that OpenAPI's {@code format: date-time} promises.
- */
+// Boot 4 defaults to Jackson 3; this pins the Jackson 2 bridge and preferred-json-mapper.
 @AutoConfigureMockMvc
 public class JsonSerializationContractIntegrationTest extends AbstractIntegrationTest {
 
-    /** ISO-8601 with a UTC designator, which is what OpenAPI's {@code format: date-time} means. */
     private static final String ISO_8601_UTC = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z";
 
     @Autowired
@@ -59,8 +36,6 @@ public class JsonSerializationContractIntegrationTest extends AbstractIntegratio
         String token = registerAndReturnAccessToken("json-contract-ingest@example.com");
         String projectId = createProject(token);
 
-        // Nested object and array on purpose: the failure is in resolving the JsonNode type at
-        // all, but a payload with structure is what a customer actually sends.
         mockMvc.perform(post("/api/v1/projects/" + projectId + "/events/test")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -71,8 +46,6 @@ public class JsonSerializationContractIntegrationTest extends AbstractIntegratio
 
     @Test
     public void aResponseBodyCarryingAJsonNodeFieldSerializes() throws Exception {
-        // The plan catalog is public and seeded by migration, so this needs no fixture — and
-        // PlanResponse.features is the JSONB-backed JsonNode of the pair.
         mockMvc.perform(get("/api/v1/billing/plans"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].features").exists())

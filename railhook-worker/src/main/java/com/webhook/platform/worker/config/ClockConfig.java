@@ -5,7 +5,6 @@ import org.springframework.context.annotation.Configuration;
 
 import java.time.Clock;
 
-/** The clock anything that decides on time reads; a test substitutes a fixed one. */
 @Configuration
 public class ClockConfig {
 

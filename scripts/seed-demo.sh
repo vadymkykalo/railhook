@@ -1,43 +1,6 @@
 #!/usr/bin/env bash
-# Seed a believable demo into a running Railhook, through the public API only.
-#
-# What it creates, in the signed-in user's organization:
-#   - project "Production" and an API key "Checkout service";
-#   - four outgoing endpoints (Billing service, Analytics pipeline, Slack notifier,
-#     Legacy warehouse), each subscribed to realistic event types;
-#   - two incoming sources (Stripe, GitHub), each with a destination;
-#   - a few incoming events posted to the sources' ingress URLs;
-#   - SEED_EVENTS outgoing events (default 200) spread over SEED_DURATION_SECONDS
-#     (default 210), in uneven bursts so the charts have a shape.
-#
-# The mix of outcomes comes from two tiny receivers on the stack's Docker network:
-#   railhook-demo-ok     answers 200 after 20-250 ms (Billing, Analytics, both destinations)
-#   railhook-demo-flaky  /slack answers 503 about a third of the time, so those deliveries
-#                        sit in retry on the default ladder; /warehouse answers 503 four
-#                        times out of five on a short ladder, so most land in Failed Messages.
-# Endpoints name them by network aliases (billing.northwind.internal and friends) so the
-# screens show believable URLs; the aliases resolve only inside the stack's network.
-# The script starts them itself when they are not running (SEED_START_RECEIVERS=0 to skip).
-# Stop them with:   docker rm -f railhook-demo-ok railhook-demo-flaky
-# Start them alone: SEED_EVENTS=0 scripts/seed-demo.sh   (setup only, nothing ingested)
-#
-# The receivers have private addresses, so the api and the worker must run with
-# WEBHOOK_ALLOW_PRIVATE_IPS=true — a development machine only, never production.
-#
-# Re-running: the project, endpoints, subscriptions, sources and destinations are matched
-# by name / description / event type / URL and reused, so a second run adds only events.
-# The API key is shown once at creation, so each run revokes the previous
-# "Checkout service" key and creates a fresh one.
-#
-# Environment:
-#   RAILHOOK_URL            default http://localhost:8080
-#   RAILHOOK_EMAIL          default demo@railhook.local
-#   RAILHOOK_PASSWORD       default Demo12345!
-#   SEED_PROJECT            default Production
-#   SEED_EVENTS             default 200
-#   SEED_DURATION_SECONDS   default 210
-#   SEED_START_RECEIVERS    default 1
-#   SEED_DOCKER_NETWORK     default: the network whose name ends in webhook-network
+# The demo receivers have private addresses, so this needs WEBHOOK_ALLOW_PRIVATE_IPS=true: a
+# development machine only. The API key is shown once, so each run replaces the previous one.
 set -euo pipefail
 
 RAILHOOK_URL="${RAILHOOK_URL:-http://localhost:8080}"
@@ -60,10 +23,6 @@ die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 command -v curl >/dev/null || die "curl is required"
 command -v jq >/dev/null || die "jq is required (apt install jq / brew install jq)"
-
-# ---------------------------------------------------------------------------------------
-# Receivers
-# ---------------------------------------------------------------------------------------
 
 read -r -d '' OK_RECEIVER <<'PY' || true
 import http.server, random, time
@@ -102,7 +61,6 @@ class H(http.server.BaseHTTPRequestHandler):
 http.server.ThreadingHTTPServer(("", 80), H).serve_forever()
 PY
 
-# start_receiver NAME CODE NETWORK ALIAS...
 start_receiver() {
   local name=$1 code=$2 network=$3; shift 3
   if [ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null || true)" = "true" ]; then
@@ -124,10 +82,6 @@ if [ "$SEED_START_RECEIVERS" = "1" ]; then
   start_receiver "$OK_CONTAINER" "$OK_RECEIVER" "$network" "${OK_ALIASES[@]}"
   start_receiver "$FLAKY_CONTAINER" "$FLAKY_RECEIVER" "$network" "${FLAKY_ALIASES[@]}"
 fi
-
-# ---------------------------------------------------------------------------------------
-# API helpers
-# ---------------------------------------------------------------------------------------
 
 TOKEN=""
 
@@ -154,10 +108,6 @@ TOKEN=$(curl -sS -X POST "$RAILHOOK_URL/api/v1/auth/login" -H 'Content-Type: app
   | jq -r '.accessToken // empty')
 [ -n "$TOKEN" ] || die "login failed for $RAILHOOK_EMAIL"
 
-# ---------------------------------------------------------------------------------------
-# Project and API key
-# ---------------------------------------------------------------------------------------
-
 PROJECT_ID=$(api GET /api/v1/projects | jq -r --arg n "$SEED_PROJECT" '[.[] | select(.name == $n)][0].id // empty')
 if [ -z "$PROJECT_ID" ]; then
   PROJECT_ID=$(api POST /api/v1/projects "$(jq -n --arg n "$SEED_PROJECT" \
@@ -175,10 +125,6 @@ done
 API_KEY=$(api POST "$P/api-keys" '{"name":"Checkout service","scope":"READ_WRITE"}' | jq -r .key)
 [ -n "$API_KEY" ] && [ "$API_KEY" != "null" ] || die "API key creation returned no key"
 log "created API key Checkout service"
-
-# ---------------------------------------------------------------------------------------
-# Outgoing: endpoints and subscriptions
-# ---------------------------------------------------------------------------------------
 
 ENDPOINTS_JSON=$(api GET "$P/endpoints?size=100")
 SUBSCRIPTIONS_JSON=$(api GET "$P/subscriptions")
@@ -223,10 +169,6 @@ WAREHOUSE=$(ensure_endpoint "Legacy warehouse" "http://warehouse.northwind.inter
 # A short ladder, so a delivery the warehouse keeps refusing reaches Failed Messages
 # inside the seed run instead of a day later.
 for t in order.created order.shipped; do ensure_subscription "$WAREHOUSE" "$t" 3 "15,30"; done
-
-# ---------------------------------------------------------------------------------------
-# Incoming: sources, destinations, a few incoming events
-# ---------------------------------------------------------------------------------------
 
 SOURCES_JSON=$(api GET "$P/incoming-sources?size=100")
 
@@ -275,10 +217,6 @@ for i in 1 2 3 4; do
       pusher:{name:"release-bot"}, commits:[{id:$sha, message:"Deploy storefront"}]}')" \
     -H 'X-GitHub-Event: push' -H "X-GitHub-Delivery: demo-$RANDOM-$i"
 done
-
-# ---------------------------------------------------------------------------------------
-# Outgoing events
-# ---------------------------------------------------------------------------------------
 
 [ "$SEED_EVENTS" -gt 0 ] || { log "SEED_EVENTS=0, setup done"; exit 0; }
 

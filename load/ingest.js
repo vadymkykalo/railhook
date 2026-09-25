@@ -1,19 +1,4 @@
-// Scenario: sustained ingestion at a target RPS.
-//
-// One project, one endpoint, one subscription. Every iteration POSTs an
-// event through the standard API-key ingestion path
-// (POST /api/v1/events -> EventController -> EventIngestService -> outbox).
-// Each event is stamped with data.seq/data.sentAtMs; load-receiver on the
-// other end turns those into a p99 end-to-end latency figure and an
-// in-order/out-of-order count (see load/receiver/server.js).
-//
-// Usage:
-//   k6 run load/ingest.js
-//   k6 run -e TARGET_RPS=200 -e DURATION=5m load/ingest.js
-//
-// After the run, check http://localhost:9000/_control/summary for delivery
-// stats and read outbox depth with load/scripts/outbox-depth.sh — see
-// load/README.md "Reading results" for what to record where.
+// Sustained ingestion at TARGET_RPS through the API-key path.
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Counter, Trend } from 'k6/metrics';
@@ -37,9 +22,7 @@ export const options = {
     },
   },
   thresholds: {
-    // Soft target, not a hard gate — see load/README.md "Target numbers".
-    // Failing this doesn't fail CI (see load-tests.yml), it just surfaces in
-    // the summary as a signal worth investigating.
+    // A soft target: it surfaces in the summary but does not fail CI.
     ingest_errors: ['count<1'],
   },
 };
@@ -50,9 +33,7 @@ export function setup() {
   const ctx = bootstrapProject('ingest');
   createSubscribedEndpoint(ctx, EVENT_TYPE);
 
-  // Reset the receiver so a previous run's captures don't skew this one's
-  // summary. Best-effort: if the receiver isn't up, ingestion still runs —
-  // useful for measuring API-side throughput even without delivery numbers.
+  // Best-effort: without a receiver, ingestion still measures API-side throughput.
   const resetRes = http.post(`${RECEIVER_CONTROL_URL}/_control/reset`);
   if (resetRes.status !== 200) {
     console.warn(`load-receiver not reachable at ${RECEIVER_CONTROL_URL} (status ${resetRes.status}) — delivery-side metrics will be unavailable this run`);

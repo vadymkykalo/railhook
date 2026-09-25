@@ -33,36 +33,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Proves a backup can be restored, on the rows where that is not obvious.
- *
- * <p>{@code BackupFlagParityTest} already checks that the three places which run {@code pg_dump}
- * — the Makefile script, the Compose sidecar, the Helm CronJob — pass the same flags. That is
- * worth having and it is not this: it compares two strings, and says nothing about whether the
- * output is restorable or whether what comes back still works.
- *
- * <p>Three things here are not obvious and are what an operator finds out at the worst moment:
- *
- * <ul>
- *   <li>Secrets are encrypted with a key that lives in {@code WEBHOOK_ENCRYPTION_KEY}, outside
- *       the database. A dump without that key restores unreadable columns — which is why the
- *       installer says to keep {@code .env} with it, and why this asserts the round-tripped
- *       ciphertext still decrypts rather than merely that the bytes came back.</li>
- *   <li>A Delivery caught mid-flight restores as {@code PROCESSING} holding a {@code claim_token}
- *       whose worker no longer exists. Nothing in Kafka will drive it, so whether it ever moves
- *       again depends entirely on the stuck sweep finding it.</li>
- *   <li>An Outbox row restores {@code PENDING}, which is what makes the accepted-but-unannounced
- *       Event recoverable at all.</li>
- * </ul>
- *
- * <p>Restores into a <em>separate database on the same server</em> rather than over the source.
- * The Postgres container is shared by every integration test in the JVM; dropping its schema to
- * prove a point would be a destructive check run outside an isolated environment, and the
- * round-trip is proved either way.
- */
+// Restores into a separate database: the Postgres container is shared by every integration test.
 class BackupRestoreRoundTripIntegrationTest extends AbstractIntegrationTest {
 
-    /** The same three flags db-backup.sh, the Compose sidecar and the chart's CronJob all use. */
     private static final String[] DUMP_FLAGS = {"-Fc", "--no-owner", "--no-privileges"};
 
     private static final String RESTORED_DB = "restore_check";
@@ -99,7 +72,6 @@ class BackupRestoreRoundTripIntegrationTest extends AbstractIntegrationTest {
                 .organizationId(org.getId()).projectId(project.getId())
                 .eventType("payment.succeeded").payload("{\"amount\":1000}").build());
 
-        // Caught mid-attempt: PROCESSING, holding a fence token, with no worker left to finish it.
         UUID fence = UUID.randomUUID();
         Delivery inFlight = deliveryRepository.save(Delivery.builder()
                 .organizationId(org.getId()).eventId(event.getId()).endpointId(endpoint.getId())
@@ -142,8 +114,7 @@ class BackupRestoreRoundTripIntegrationTest extends AbstractIntegrationTest {
                     .as("an accepted Event that was never announced is still announceable")
                     .isEqualTo("PENDING");
 
-            // The stuck sweep is the only thing that will ever move that delivery again: Kafka
-            // knows nothing about a database that went back in time.
+            // Only the stuck sweep will move it: Kafka knows nothing of a database that went back in time.
             try (Statement sweep = restored.createStatement()) {
                 int recovered = sweep.executeUpdate(
                         "UPDATE deliveries SET status = 'PENDING', claim_token = NULL, next_retry_at = now() "

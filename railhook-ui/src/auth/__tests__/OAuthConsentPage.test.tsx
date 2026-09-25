@@ -55,11 +55,6 @@ function renderConsent(search = '?request=req-1') {
   return renderPage(<OAuthConsentPage />, { path: '/oauth/consent', initialEntry: `/oauth/consent${search}` });
 }
 
-/**
- * The screen a person lands on from claude.ai or ChatGPT. It must say plainly which app is asking
- * and where the connection goes, let them pick one project and the access, and only then send the
- * browser back — to the address the API returns, never one the page made up.
- */
 describe('OAuthConsentPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -75,7 +70,6 @@ describe('OAuthConsentPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Connect Claude to Railhook' })).toBeInTheDocument();
     expect(screen.getAllByText('claude.ai').length).toBeGreaterThan(0);
-    // The app asked for write access and this person may grant it, so that is preselected.
     expect(screen.getByRole('radio', { name: /Read & Write/ })).toHaveAttribute('aria-checked', 'true');
 
     await user.click(screen.getByRole('radio', { name: /Read Only/ }));

@@ -36,11 +36,7 @@ export const endpointsApi = {
     return http.delete<void>(`/api/v1/projects/${projectId}/endpoints/${id}`);
   },
 
-  /**
-   * Turns the endpoint back on and clears an auto-disable. Its own call rather than a PUT with
-   * `enabled: true`, because the update request requires a URL - every caller that has toggled
-   * through it has quietly dropped a field it did not rebuild.
-   */
+  /** Not a PUT: the update requires every field, and callers dropped ones they didn't rebuild. */
   enable: (projectId: string, id: string): Promise<EndpointResponse> => {
     return http.post<EndpointResponse>(`/api/v1/projects/${projectId}/endpoints/${id}/enable`);
   },
@@ -80,6 +76,5 @@ export interface VerificationResponse {
   success: boolean;
   message: string;
   status: 'PENDING' | 'VERIFIED' | 'FAILED' | 'SKIPPED';
-  /** Set when the failure has a known cause the UI explains itself. */
   reason?: 'TUNNEL_OFFLINE';
 }

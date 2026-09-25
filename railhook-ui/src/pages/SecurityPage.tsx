@@ -29,14 +29,7 @@ import { contactDomain } from '../lib/runtimeConfig';
 import { Band, FactCard, PageIntro, SectionHeading } from './landing/primitives';
 import { FREE_PLAN, REPO_URL } from './landing/plans';
 
-/**
- * What protects the data, for the reader deciding whether to trust Railhook with webhooks.
- *
- * Every card states something the code, the docs or the privacy policy already commits to — the
- * processors are the policy's, the storage claims are CryptoUtils' and the password encoder's, the
- * isolation claim is Hibernate's tenant scoping. No certification is named because there is none:
- * a badge this project does not hold is the one line on the page a careful reader would check.
- */
+/** No certification is named because there is none. */
 function Grid({ children, columns = 'sm:grid-cols-2' }: { children: React.ReactNode; columns?: string }) {
   return <div className={`grid gap-4 ${columns}`}>{children}</div>;
 }
@@ -108,7 +101,7 @@ export default function SecurityPage() {
           <FactCard icon={Ban} title={t('security.data.noSale.title')}>{t('security.data.noSale.body')}</FactCard>
         </Grid>
         <p className="mt-6">
-          <Link to="/privacy" className="text-sm font-medium text-primary hover:underline">
+          <Link to="/privacy" className="text-sm font-medium link-ink">
             {t('security.data.privacyCta')}
           </Link>
         </p>
@@ -116,7 +109,7 @@ export default function SecurityPage() {
 
       <Band muted labelledBy="security-report">
         <div className="max-w-2xl">
-          <h2 id="security-report" className="font-display text-[1.6rem] font-bold tracking-[-0.02em] text-foreground">
+          <h2 id="security-report" className="text-[1.75rem] font-normal leading-[1.16] tracking-[-0.02em] sm:text-[2rem] text-foreground">
             {t('security.report.title')}
           </h2>
           <p className="mt-2 text-muted-foreground">{t('security.report.body')}</p>
@@ -136,7 +129,7 @@ export default function SecurityPage() {
           {domain && (
             <p className="mt-4 text-sm text-muted-foreground">
               {t('security.report.email')}{' '}
-              <a href={`mailto:support@${domain}`} className="font-medium text-primary hover:underline">
+              <a href={`mailto:support@${domain}`} className="font-medium link-ink">
                 {`support@${domain}`}
               </a>
             </p>

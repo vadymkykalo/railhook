@@ -59,13 +59,6 @@ function renderMembers() {
   return renderPage(<MembersPage />, { path: '/members', initialEntry: '/members' });
 }
 
-/**
- * An invite in the shipped configuration (EMAIL_ENABLED=false) is never delivered:
- * the token reaches the API container's log and nowhere else. So the owner has to be
- * told that, handed the link, and left able to re-issue or revoke it — none of which
- * the page could do while it showed a green "Invited" toast and a badge with no
- * actions beside it.
- */
 describe('MembersPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -189,7 +182,6 @@ describe('MembersPage', () => {
     await screen.findByText('owner@example.com');
     expect(screen.queryByRole('button', { name: /suspend owner@example\.com/i })).toBeNull();
   });
-  // The list arrives as one unpaginated array, so scrolling was the only way to find anyone.
   it('filters the list by email', async () => {
     vi.mocked(membersApi.list).mockResolvedValue([OWNER, ACTIVE_MEMBER]);
     renderMembers();

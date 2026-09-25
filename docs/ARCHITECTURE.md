@@ -1,39 +1,15 @@
 # Architecture
 
-How Railhook is put together, and why it is put together that way.
+Terms (Event, Delivery, Forward, Claim, Attempt, Deferral) are defined in
+[`CONTEXT.md`](../CONTEXT.md).
 
-For the vocabulary these diagrams use — Event, Delivery, Forward, Claim, Attempt, Deferral —
-read [`CONTEXT.md`](../CONTEXT.md) first. Each term there carries a list of near-synonyms
-deliberately not used, and this document holds to them: a Claim is never a lock, a Deferral is
-never a failure, and the Ordering Buffer is never a queue.
-
-Railhook carries traffic in two directions, and they are not mirror images. Outgoing, Railhook
-is the sender and signs what it sends. Incoming, Railhook is the receiver and verifies what it
-receives. They share one attempt lifecycle and differ everywhere else — different ladders,
-different ordering guarantees, different failure semantics. Most of this document is about that
-shared lifecycle, because that is where the subtlety lives.
-
-## Contents
-
-- [The two directions](#the-two-directions)
-- [Services](#services)
-- [Data model](#data-model)
-- [Outgoing delivery flow](#outgoing-delivery-flow)
-- [Incoming ingress flow](#incoming-ingress-flow)
-- [The attempt lifecycle](#the-attempt-lifecycle)
-- [Ordering](#ordering)
-- [Replay is not retry](#replay-is-not-retry)
-- [Tenancy](#tenancy)
-- [Consistency, partitioning and failure modes](#consistency-partitioning-and-failure-modes)
-- [Production topology](#production-topology)
-- [CLI tunnel flow](#cli-tunnel-flow)
+Railhook moves traffic in two directions. Outgoing, it sends the customer's Events and signs
+them. Incoming, it receives providers' webhooks and verifies them. Both use one attempt
+lifecycle; ladders, ordering and failure handling differ.
 
 ## The two directions
 
-Drawn separately on purpose. One combined graph hides the fact that the two paths share only
-Kafka, the worker and the attempt lifecycle — everything before and after differs.
-
-### Outgoing — the customer's own Event travels out
+### Outgoing: the customer's own Event travels out
 
 ```mermaid
 graph LR
@@ -62,7 +38,7 @@ graph LR
     Worker -->|"POST + HMAC"| EP2
 ```
 
-### Incoming — a provider's webhook travels in
+### Incoming: a provider's webhook travels in
 
 ```mermaid
 graph LR
@@ -91,12 +67,8 @@ graph LR
     Worker -->|"POST + destination auth"| Svc2
 ```
 
-Two asymmetries are visible here and are deliberate:
-
-- The incoming direction has **no Ordering Buffer**. Railhook did not originate these events and
-  cannot know what order the provider intended, so it does not pretend to.
-- The incoming direction has a **shorter Retry Ladder**. Relaying somebody else's webhook for a
-  day is not a service to anyone; the provider will usually have given up long before.
+Incoming has no Ordering Buffer (Railhook cannot know the provider's intended order) and a
+shorter Retry Ladder.
 
 ## Services
 
@@ -111,12 +83,8 @@ Two asymmetries are visible here and are deliberate:
 
 ## Data model
 
-The obligations, not the whole schema — billing, workflows, alerts and the schema registry hang
-off `projects` the same way and are left out so the delivery path stays readable.
-
-Note the symmetry across the dashed line: `deliveries` is to `events` what
-`incoming_forward_attempts` is to `incoming_events`. That is the Delivery/Forward pairing from
-`CONTEXT.md` made concrete.
+Delivery-path tables only. `deliveries` is to `events` what `incoming_forward_attempts` is to
+`incoming_events`.
 
 ```mermaid
 erDiagram
@@ -216,8 +184,8 @@ erDiagram
     }
 ```
 
-Every table above except `users` carries an `organization_id` that nothing in application code
-ever writes into a `WHERE` clause — see [Tenancy](#tenancy).
+Every table except `users` has an `organization_id`, applied by Hibernate, never written by hand.
+See [Tenancy](#tenancy).
 
 ## Outgoing delivery flow
 
@@ -232,7 +200,7 @@ sequenceDiagram
     participant EP as Endpoint
 
     App->>API: POST /api/v1/events
-    API->>DB: INSERT Event + one Delivery per matching Subscription<br/>+ Outbox row — one transaction
+    API->>DB: INSERT Event + one Delivery per matching Subscription<br/>+ Outbox row, one transaction
     API-->>App: 201 Created
 
     Note over API,DB: The Outbox row is written in the same breath as the work,<br/>so the two cannot disagree about whether it happened.
@@ -256,17 +224,15 @@ sequenceDiagram
         W->>K: produce to deliveries.retry.1m
     else other 4xx
         EP-->>W: 400
-        W->>DB: FAILED — retrying cannot fix a rejected request
+        W->>DB: FAILED, retrying cannot fix a rejected request
     else Ladder exhausted
         W->>K: produce to deliveries.dlq
         W->>DB: DLQ
     end
 ```
 
-The six retry topics are real Kafka topics, one per tier —
-`deliveries.retry.1m`, `.5m`, `.15m`, `.1h`, `.6h`, `.24h` — not one topic with a delay header.
-A tier is a topic because a consumer that sleeps holds a partition; a topic that is polled on a
-schedule does not.
+Each retry tier is its own Kafka topic (`deliveries.retry.1m`, `.5m`, `.15m`, `.1h`, `.6h`,
+`.24h`), because a sleeping consumer would hold a partition.
 
 ## Incoming ingress flow
 
@@ -284,14 +250,14 @@ sequenceDiagram
     API->>DB: load the Source by token
 
     alt signature verification enabled
-        API->>API: verify — GitHub / GitLab / Stripe / Shopify / Slack / Twilio / generic HMAC
+        API->>API: verify, GitHub / GitLab / Stripe / Shopify / Slack / Twilio / generic HMAC
     end
 
     alt signature invalid
         API->>DB: INSERT Incoming Event, verified = false
         API-->>P: 401 Unauthorized
     else valid
-        API->>DB: INSERT Incoming Event (headers, body, IP, verified)<br/>+ one Forward per enabled Destination + Outbox — one transaction
+        API->>DB: INSERT Incoming Event (headers, body, IP, verified)<br/>+ one Forward per enabled Destination + Outbox, one transaction
         API-->>P: 202 Accepted
         API->>K: produce to incoming.forward.dispatch
         K->>W: consume
@@ -305,25 +271,20 @@ sequenceDiagram
     end
 ```
 
-The Incoming Event is stored **before** the verdict is known, and a rejected one is stored too.
-An operator debugging "the provider says it sent it" needs to see the request that failed
-verification, not an absence.
+The Incoming Event is stored before verification, and kept if it fails, so an operator can see
+the rejected request.
 
 ## The attempt lifecycle
 
-Both directions run the same `AttemptRunner`. Everything that differs is behind an
-`AttemptStore`, of which there is one per direction. The Runner cannot read a fence token — the
-Claim is a type parameter to it — which is what stops one direction's ownership rules leaking
-into the other.
-
-`AttemptRunner`'s javadoc states five invariants, each of which was once correct on one
-direction and wrong on the other. Read it before changing anything here.
+Both directions run `AttemptRunner`, with one `AttemptStore` per direction. The Claim is a type
+parameter, so the Runner cannot read a fence token. Read the Runner's javadoc (five invariants)
+before changing anything here.
 
 ### Claim and fence
 
-A Claim is exclusive ownership of one Delivery or Forward for the duration of one Attempt.
-It is revocable, because the holder can die. The fence token is what makes revocation safe:
-a finalisation only lands if it still matches.
+A Claim is exclusive, revocable ownership of one Delivery or Forward for one Attempt. A write
+only lands if the fence token still matches, so a worker that lost its Claim cannot overwrite the
+outcome.
 
 ```mermaid
 sequenceDiagram
@@ -334,9 +295,9 @@ sequenceDiagram
     participant Sweep as Stuck sweep
 
     W1->>DB: UPDATE … SET status=PROCESSING, claim_token=T1<br/>WHERE status=PENDING
-    DB-->>W1: 1 row — Claim held
+    DB-->>W1: 1 row, Claim held
     W2->>DB: same statement
-    DB-->>W2: 0 rows — already claimed, go away
+    DB-->>W2: 0 rows, already claimed, go away
 
     Note over W1: Worker A stops responding.
 
@@ -344,20 +305,15 @@ sequenceDiagram
     W2->>DB: claims it, token T2
 
     W1->>DB: UPDATE … WHERE claim_token = T1
-    DB-->>W1: 0 rows — the fence rejects the zombie
+    DB-->>W1: 0 rows, the fence rejects the zombie
     W2->>DB: UPDATE … WHERE claim_token = T2
-    DB-->>W2: 1 row — this one counts
+    DB-->>W2: 1 row, this one counts
 ```
-
-Without the fence, the recovered worker's late write would overwrite an outcome that a live
-worker had already recorded — the shape of every duplicate-delivery bug this design exists to
-prevent.
 
 ### Admission, and what a Deferral is
 
-Once the Claim is held, five limits are checked in a fixed order. Any of them ends the Attempt
-before a request is built — and that is a **Deferral**, not a failure: nothing was tried, so
-nothing is charged against the Ladder.
+After the Claim, five limits are checked in order. Failing any of them is a **Deferral**: nothing
+was sent, so the Ladder does not advance.
 
 ```mermaid
 flowchart TD
@@ -380,29 +336,24 @@ flowchart TD
     D5 --> R
 ```
 
-The order is not arbitrary. The breaker is first because it is the only check that costs
-nothing and rejects the most. Every path that takes a permit releases it, including the ones
-that throw before the request exists — invariant 3.
-
-The circuit-breaker check is the one exception to "a Deferral records nothing": it writes an
-Attempt row with `CIRCUIT_BREAKER_OPEN`, because an endpoint that has gone quiet should show an
-operator *why* it went quiet rather than simply stopping.
+Every path that takes a permit releases it. The breaker is the one Deferral that records an
+Attempt (`CIRCUIT_BREAKER_OPEN`), so an operator sees why the endpoint went quiet.
 
 ### Delivery and Forward states
 
-Identical state sets on both sides — `PENDING`, `PROCESSING`, `SUCCESS`, `FAILED`, `DLQ`.
+Same states on both sides: `PENDING`, `PROCESSING`, `SUCCESS`, `FAILED`, `DLQ`.
 
 ```mermaid
 stateDiagram-v2
     [*] --> PENDING : created with its Event
 
     PENDING --> PROCESSING : Claim taken
-    PROCESSING --> PENDING : Deferral — nothing tried
+    PROCESSING --> PENDING : Deferral, nothing tried
     PROCESSING --> PENDING : stuck sweep revokes a lost Claim
 
     PROCESSING --> SUCCESS : 2xx
     PROCESSING --> FAILED : 4xx that retrying cannot fix
-    PROCESSING --> PENDING : retryable — Ladder advanced, next tier scheduled
+    PROCESSING --> PENDING : retryable, Ladder advanced, next tier scheduled
 
     PENDING --> DLQ : Ladder exhausted
     PENDING --> DLQ : still pending after the 96h hard cap
@@ -413,36 +364,24 @@ stateDiagram-v2
     FAILED --> [*]
 ```
 
-Three transitions carry the whole design:
-
-- `PROCESSING → PENDING` happens for three unrelated reasons — a Deferral, a revoked Claim, and
-  an ordinary retry. Only the third advances the Ladder.
-- `PENDING → DLQ` has a second cause beyond the Ladder. `StaleDeliveryEscalationService` sweeps
-  anything still `PENDING` past a hard cap (default 96h, comfortably past the default Ladder's
-  ~83h worst case) so a long-degraded endpoint cannot grow the backlog without bound. It also
-  exports `delivery_oldest_pending_age_seconds`, which is the gauge to alert on.
-- `DLQ → PENDING` is a human decision. The DLQ is where an obligation is abandoned by Railhook
-  and kept for a person to decide about — the UI calls it **Failed Messages** on purpose,
-  because "DLQ" is vocabulary you have to already know.
-
-`PENDING → DLQ` has a third cause now: an Endpoint or Destination that has answered nothing but
-failures for a whole window is turned off, and everything already made out to it is abandoned
-rather than failed. The distinction is who decided. A target its owner turned off ends its
-queued obligations `FAILED` — nobody can make them succeed, because nobody asked for them to.
-A target *Railhook* turned off ends them in the DLQ, because fixing the receiver and re-enabling
-it is exactly the human decision the DLQ exists for. The worker keeps the run of failures on the
-target's row at the shared seam (`AttemptStore#recordTargetOutcome`); the api's
-`EndpointAutoDisableService` reads it and decides.
+- `PROCESSING -> PENDING` has three causes: a Deferral, a revoked Claim, a retry. Only a retry
+  advances the Ladder.
+- `PENDING -> DLQ`: the Ladder ran out, or `StaleDeliveryEscalationService` hit the hard cap
+  (default 96h, above the ladder's ~83h worst case). Alert on
+  `delivery_oldest_pending_age_seconds`.
+- `PENDING -> DLQ` also happens when Railhook auto-disables a target after a window of only
+  failures (`EndpointAutoDisableService`, fed by `AttemptStore#recordTargetOutcome`). If the
+  owner disabled the target, its queued work ends `FAILED` instead.
+- `DLQ -> PENDING` is a human decision, from **Failed Messages** in the UI.
 
 ### The two ladders
 
-Declared once, in `RetryLadderDefaults`. There is no fallback ladder anywhere — a Subscription
-or Destination may override the delays, the attempt count and which statuses are worth another
-Attempt (`RetryableStatuses`, default `408,429,500-599`), and nothing else.
+Declared once, in `RetryLadderDefaults`. No fallback ladder. A Subscription or Destination may
+override delays, attempt count and retryable statuses (`RetryableStatuses`, default
+`408,429,500-599`).
 
-A receiver answering 429 or 503 may also push one Attempt later with `Retry-After`. It is
-honoured on those two statuses only, may never pull an Attempt in front of the Ladder, and is
-clamped by `WEBHOOK_RETRY_AFTER_MAX_SECONDS` (6h — the largest tier both ladders share).
+`Retry-After` on a 429 or 503 can push one Attempt later, never earlier, capped by
+`WEBHOOK_RETRY_AFTER_MAX_SECONDS` (6h).
 
 | | Outgoing | Incoming |
 |---|---|---|
@@ -452,27 +391,25 @@ clamped by `WEBHOOK_RETRY_AFTER_MAX_SECONDS` (6h — the largest tier both ladde
 
 ```mermaid
 flowchart LR
-    subgraph O["Outgoing — 7 attempts, reaching ~24h"]
+    subgraph O["Outgoing, 7 attempts, reaching ~24h"]
         direction LR
         O1["try 1<br/>now"] -->|"1m"| O2["try 2"] -->|"5m"| O3["try 3"] -->|"15m"| O4["try 4"] -->|"1h"| O5["try 5"] -->|"6h"| O6["try 6"] -->|"24h"| O7["try 7"] --> OD(["Failed Messages"])
     end
-    subgraph I["Incoming — 5 attempts, reaching ~1h"]
+    subgraph I["Incoming, 5 attempts, reaching ~1h"]
         direction LR
         I1["try 1<br/>now"] -->|"1m"| I2["try 2"] -->|"5m"| I3["try 3"] -->|"15m"| I4["try 4"] -->|"1h"| I5["try 5"] --> ID(["Failed Messages"])
     end
 ```
 
-They differ on purpose. Do not "fix" that into agreement.
+They differ on purpose. Do not make them agree.
 
-Separately from the Ladder, `RetryPolicy` computes an exponential backoff with 25% jitter. That
-is used **only** for rescheduling a Deferral, never for a failed Attempt. Conflating the two is
-how a deferred delivery ends up consuming its Ladder.
+`RetryPolicy` (exponential backoff, 25% jitter) is only for rescheduling a Deferral, never a
+failed Attempt.
 
 ## Ordering
 
-Outgoing only, opt-in per Subscription. Every Delivery to an endpoint is stamped with an
-endpoint-scoped Sequence Number at creation; a Delivery whose predecessors have not resolved
-waits in the Ordering Buffer.
+Outgoing only, opt-in per Subscription. Each Delivery gets an endpoint-scoped Sequence Number at
+creation. A Delivery whose predecessors have not resolved waits in the Ordering Buffer.
 
 ```mermaid
 sequenceDiagram
@@ -491,9 +428,9 @@ sequenceDiagram
     W->>OB: advance to 42, release what was waiting on it
 
     W->>OB: may Delivery 44 go?
-    OB-->>W: no — 43 has not resolved
+    OB-->>W: no, 43 has not resolved
     Note over W,OB: The Gap is the whole range 43..43, not just "the one before".<br/>Checking only n-1 let 44 sail through whenever 43 was already terminal.
-    W->>DB: park — Claim released, token cleared, back to the Ladder
+    W->>DB: park, Claim released, token cleared, back to the Ladder
 
     alt 43 resolves
         OB-->>W: 44 may go
@@ -502,45 +439,34 @@ sequenceDiagram
     end
 ```
 
-Parking hands the row back to the Ladder, so the Claim is genuinely over and the fence token is
-cleared rather than left stale for a later writer to match. How fast a parked burst drains is
-governed by the retry scheduler's poll cadence, not by the buffer's own delay.
+Parking releases the Claim and clears the fence token. Drain speed of a parked burst depends on
+the retry scheduler's poll cadence, not the buffer's delay.
 
 ## Replay is not retry
 
-Both words describe getting an Event to an endpoint a second time, and they are different
-operations with different failure modes.
-
 ```mermaid
 flowchart LR
-    subgraph Retry["Retry — the same obligation"]
-        D1["Delivery #7<br/>sequence 42"] --> A1["Attempt 1 — 503"]
-        A1 --> A2["Attempt 2 — 503"]
-        A2 --> A3["Attempt 3 — 200"]
+    subgraph Retry["Retry, the same obligation"]
+        D1["Delivery #7<br/>sequence 42"] --> A1["Attempt 1, 503"]
+        A1 --> A2["Attempt 2, 503"]
+        A2 --> A3["Attempt 3, 200"]
         A3 --> S1["Delivery #7 = SUCCESS"]
     end
 
-    subgraph Replay["Replay — a new obligation"]
-        E["Event, already stored"] --> D2["Delivery #7<br/>sequence 42 — DLQ"]
+    subgraph Replay["Replay, a new obligation"]
+        E["Event, already stored"] --> D2["Delivery #7<br/>sequence 42, DLQ"]
         E --> D3["Delivery #91<br/>sequence 58, fresh"]
-        D3 --> A4["Attempt 1 — 200"]
+        D3 --> A4["Attempt 1, 200"]
     end
 ```
 
-A retry is the next Attempt on the *same* Delivery, and it advances that Delivery's Ladder.
-A replay builds a **fresh** Delivery from an Event already in the store, with the same content
-and a new Sequence Number, and leaves the original where it is. The UI calls replay
-**Time Machine**; `ReplaySession` records the batch so it can be estimated, watched and
-cancelled.
-
-The new Sequence Number is the part that matters: a replayed Delivery takes its place at the
-*end* of the endpoint's order, not back at position 42 where it would block everything since.
+A retry is the next Attempt on the same Delivery and advances its Ladder. A replay (UI: **Time
+Machine**, recorded as a `ReplaySession`) creates a new Delivery from the stored Event with a new
+Sequence Number, so it goes to the end of the endpoint's order.
 
 ## Tenancy
 
-Everything a customer owns hangs off exactly one Organization. That scoping is not enforced by
-application code and is not reviewable in application code — it is a Hibernate `@TenantId` on
-~35 entities, resolved per request.
+Scoping to an Organization is a Hibernate `@TenantId` on about 35 entities, resolved per request.
 
 ```mermaid
 flowchart TD
@@ -552,65 +478,47 @@ flowchart TD
 
     B -.->|"no Organization bound"| X["Throws.<br/>The only sanctioned exception is<br/>TenantContext.runAsSystem"]
 
-    C --> N["findById included —<br/>a guessed UUID from another org<br/>returns empty, not a 403"]
+    C --> N["findById included -<br/>a guessed UUID from another org<br/>returns empty, not a 403"]
 ```
 
-The consequence is a rule the build enforces: **never hand-roll an org check.** A service method
-that takes an `organizationId` parameter fails the build, because it is either redundant with
-the `@TenantId` or it is a second, weaker mechanism that will eventually disagree with it.
-
-What `@TenantId` does *not* cover is what the ratchets exist for: work with no request behind it
-needs a scope entered explicitly and outside the transaction, native queries bypass the filter,
-and your own thread pool does not inherit the binding.
+**Never hand-roll an org check.** A service method taking an `organizationId` fails the build.
+`@TenantId` does not cover work without a request (enter a scope explicitly, outside the
+transaction), native queries, or your own thread pools. The ratchets check these.
 
 ## Consistency, partitioning and failure modes
 
 ### What is guaranteed
 
-**Delivery is at-least-once, never exactly-once.** An Attempt can succeed at the endpoint and
-fail to record — the response arrives, the process dies before the `SUCCESS` write lands, the
-stuck sweep hands the obligation to another worker, and the endpoint sees the Event twice. This
-is not a defect to be engineered away; it is the honest cost of not running a transaction across
-HTTP. It is why every Event carries a stable id, why the Standard Webhooks `webhook-id` header
-is the Delivery id and does not change between Attempts, and why receivers are told to dedupe on
-it.
-
-**The Outbox makes acceptance and announcement agree.** The Event, its Deliveries and the Outbox
-row are one transaction. Either the customer got a 201 and the work will be announced, or they
-got an error and none of it exists. A separate announcer polls the Outbox — so Kafka being down
-delays delivery and never loses an accepted Event.
-
-**Ordering is per endpoint, opt-in, and outgoing only.** With `ordering_enabled` off — the
-default — Deliveries to one endpoint may overtake each other freely, which is what makes the
-throughput.
+- **At-least-once delivery.** An Attempt can succeed at the endpoint and fail to record, so the
+  endpoint may see it twice. The `webhook-id` header is the Delivery id and stays the same across
+  Attempts; receivers dedupe on it.
+- **The Outbox makes acceptance and announcement agree.** Event, Deliveries and Outbox row are
+  one transaction. If Kafka is down, delivery is late, not lost.
+- **Ordering is per endpoint, opt-in, outgoing only.** Off by default.
 
 ### Partitioning
 
-Kafka messages are keyed so that all work for one endpoint lands on one partition, which is what
-lets the Ordering Buffer be a cheap Redis check rather than a distributed sort. The cost is the
-usual one: a single very busy endpoint is bounded by one partition's consumer, and adding
-partitions rebalances that boundary without removing it. `delivery_attempts` and
-`tunnel_request_log` are partitioned in Postgres too, by time, which is what makes retention a
-detach rather than a delete.
+Kafka messages are keyed by endpoint, so one hot endpoint is limited to one consumer.
+`delivery_attempts` and `tunnel_request_log` are time-partitioned in Postgres, so retention is a
+partition detach.
 
 ### Failure modes worth knowing
 
 | What breaks | What happens | Where to look |
 |---|---|---|
-| **Redis unreachable** | The circuit breaker **fails open** — calls are permitted rather than blocked, because refusing every delivery is worse than losing a safety net. It is counted, not silent. | `circuit_breaker_degraded_total` |
-| **An endpoint is degraded for days** | The Ladder runs out, and anything still `PENDING` past the hard cap is escalated to Failed Messages. Backlog is bounded. | `delivery_oldest_pending_age_seconds` |
-| **Retry storm after a mass outage** | `RetryGovernor` applies AIMD congestion control to the scheduler's batch size, plus a queue-depth admission gate and a consecutive-failure cooldown. | governor gauges |
-| **A worker dies mid-Attempt** | The Claim is revoked by the stuck sweep and the fence token stops the zombie's late write. The endpoint may see a duplicate. | see at-least-once, above |
-| **Kafka consumer lag** | Deliveries are late, not lost — the Outbox already recorded them. | consumer lag dashboard |
-| **A transformation template breaks** | Treated as **retryable**, and the raw payload is never sent in its place. A template fixed within the Ladder still gets the Event out. | invariant 4 |
-| **Postgres restored from backup** | Postgres, Kafka and Redis can disagree about what has been delivered. **There is no written reconciliation procedure for this** — see `OPERATIONS.md`. | known limitation |
+| **Redis unreachable** | The circuit breaker fails open: calls are allowed and counted. | `circuit_breaker_degraded_total` |
+| **An endpoint is degraded for days** | The Ladder runs out; anything `PENDING` past the hard cap goes to Failed Messages. | `delivery_oldest_pending_age_seconds` |
+| **Retry storm after a mass outage** | `RetryGovernor` applies AIMD to the scheduler batch size, a queue-depth gate and a failure cooldown. | governor gauges |
+| **A worker dies mid-Attempt** | The stuck sweep revokes the Claim; the fence blocks the late write. The endpoint may see a duplicate. | at-least-once, above |
+| **Kafka consumer lag** | Deliveries are late, not lost. | consumer lag dashboard |
+| **A transformation template breaks** | Retryable; the raw payload is never sent instead. | invariant 4 |
+| **Postgres restored from backup** | Postgres, Kafka and Redis disagree. Flush Redis, leave Kafka, let the stuck sweep re-queue. | [OPERATIONS.md](./OPERATIONS.md#disaster-recovery) |
 
 ### Scaling limits
 
-API and worker are stateless and scale horizontally; both have an HPA in the chart. The binding
-constraints, in the order they are usually hit: Postgres write throughput on
-`delivery_attempts`, partition count for a single hot endpoint, and Redis round-trips per Attempt
-on the ordering path.
+API and worker are stateless and have an HPA in the chart. Limits, in the order usually hit:
+Postgres writes on `delivery_attempts`, partition count for one hot endpoint, Redis round-trips
+per Attempt on the ordering path.
 
 ## Production topology
 
@@ -627,7 +535,7 @@ flowchart TB
         NP["NetworkPolicy"]
     end
 
-    subgraph Data["Data services — external by default"]
+    subgraph Data["Data services, external by default"]
         PG[("PostgreSQL")]
         KafkaC["Kafka"]
         RedisC[("Redis")]
@@ -649,16 +557,13 @@ flowchart TB
     WorkerPods --> RedisC
     Topics --> KafkaC
     Backup --> PG
-    SM -.->|"scrapes :8080 and :8081"| APIPods
+    SM -.->|"scrapes :8082 and :8081"| APIPods
     SM -.-> WorkerPods
     PR -.-> SM
     Graf -.-> SM
 ```
 
-The chart ships no database. Postgres, Kafka and Redis are configured as external services
-because an operator who is going to run this in production already has opinions about all three,
-and a bundled subchart mostly serves to make the first `helm install` look easy and the first
-upgrade look impossible.
+The chart ships no database. Postgres, Kafka and Redis are external.
 
 ## CLI tunnel flow
 

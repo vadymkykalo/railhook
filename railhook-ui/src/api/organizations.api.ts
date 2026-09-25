@@ -8,11 +8,6 @@ export interface OrganizationResponse {
 }
 
 export const organizationsApi = {
-  /**
-   * Every organization the caller belongs to. The endpoint has always existed and nothing
-   * called it, which is why a second membership was invisible: the switcher is what turns the
-   * answer into something you can act on.
-   */
   list: (): Promise<OrganizationResponse[]> => {
     return http.get<OrganizationResponse[]>('/api/v1/orgs');
   },

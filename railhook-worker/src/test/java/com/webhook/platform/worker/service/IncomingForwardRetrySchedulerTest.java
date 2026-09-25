@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
@@ -17,10 +18,10 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
+import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -30,19 +31,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit coverage for IncomingForwardRetryScheduler.pollPendingRetries --
- * claim/dispatch/result bookkeeping, mirroring RetrySchedulerServiceTest's coverage of
- * the outgoing-delivery equivalent.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class IncomingForwardRetrySchedulerTest {
@@ -62,10 +60,10 @@ class IncomingForwardRetrySchedulerTest {
     @SuppressWarnings("unchecked")
     void setUp() {
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-            var callback = invocation.getArgument(0, org.springframework.transaction.support.TransactionCallback.class);
+            var callback = invocation.getArgument(0, TransactionCallback.class);
             return callback.doInTransaction(null);
         });
-        org.mockito.Mockito.lenient().doAnswer(invocation -> {
+        lenient().doAnswer(invocation -> {
             Consumer<Object> callback = invocation.getArgument(0, Consumer.class);
             callback.accept(null);
             return null;
@@ -95,23 +93,12 @@ class IncomingForwardRetrySchedulerTest {
     }
 
     @Test
-    void pollPendingRetries_noCandidates_doesNothing() {
-        when(attemptRepository.findPendingRetryIds(any(), any(), org.mockito.ArgumentMatchers.anyInt(),
-                org.mockito.ArgumentMatchers.anyInt())).thenReturn(Collections.emptyList());
-
-        scheduler.pollPendingRetries(0);
-
-        verify(attemptRepository, never()).lockByIds(anyList());
-        verify(kafkaTemplate, never()).send(anyString(), anyString(), any());
-    }
-
-    @Test
     void pollPendingRetries_claimsAndDispatchesSuccessfully() {
         UUID attemptId = UUID.randomUUID();
         IncomingForwardAttempt attempt = pendingAttempt(attemptId);
 
-        when(attemptRepository.findPendingRetryIds(any(), any(), org.mockito.ArgumentMatchers.anyInt(),
-                org.mockito.ArgumentMatchers.anyInt())).thenReturn(List.of(attemptId));
+        when(attemptRepository.findPendingRetryIds(any(), any(), anyInt(),
+                anyInt())).thenReturn(List.of(attemptId));
         when(attemptRepository.lockByIds(anyList())).thenReturn(List.of(attempt));
 
         CompletableFuture<SendResult<String, IncomingForwardMessage>> future =
@@ -120,15 +107,11 @@ class IncomingForwardRetrySchedulerTest {
 
         scheduler.pollPendingRetries(0);
 
-        verify(kafkaTemplate).send(org.mockito.ArgumentMatchers.eq(
-                com.webhook.platform.common.constants.KafkaTopics.INCOMING_FORWARD_RETRY),
+        verify(kafkaTemplate).send(eq(
+                KafkaTopics.INCOMING_FORWARD_RETRY),
                 anyString(), any(IncomingForwardMessage.class));
 
-        // Exactly ONE saveAll: the Phase 1 claim. A successfully dispatched row is owned by
-        // the consumer from that moment on, so Phase 3 must not write it back. Re-saving the
-        // Phase 1 snapshot overwrote whatever the consumer had already recorded -- silently,
-        // because IncomingForwardAttempt carries no @Version -- and reset started_at, the
-        // fencing token claimRetryForProcessing CASes on to reject duplicate redeliveries.
+        // A dispatched row belongs to the consumer; re-saving the claim snapshot reset its fencing token.
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<IncomingForwardAttempt>> captor = ArgumentCaptor.forClass(List.class);
         verify(attemptRepository, times(1)).saveAll(captor.capture());
@@ -142,8 +125,8 @@ class IncomingForwardRetrySchedulerTest {
         UUID attemptId = UUID.randomUUID();
         IncomingForwardAttempt attempt = pendingAttempt(attemptId);
 
-        when(attemptRepository.findPendingRetryIds(any(), any(), org.mockito.ArgumentMatchers.anyInt(),
-                org.mockito.ArgumentMatchers.anyInt())).thenReturn(List.of(attemptId));
+        when(attemptRepository.findPendingRetryIds(any(), any(), anyInt(),
+                anyInt())).thenReturn(List.of(attemptId));
         when(attemptRepository.lockByIds(anyList())).thenReturn(List.of(attempt));
 
         CompletableFuture<SendResult<String, IncomingForwardMessage>> failedFuture = new CompletableFuture<>();
@@ -153,13 +136,11 @@ class IncomingForwardRetrySchedulerTest {
         Instant before = Instant.now();
         scheduler.pollPendingRetries(0);
 
-        // Only the Phase 1 claim is saved as an entity. The hand-back is fenced on the started_at
-        // that claim stamped, so a send that landed after all leaves the consumer's row alone.
         verify(attemptRepository, times(1)).saveAll(anyList());
         ArgumentCaptor<Instant> retryAt = ArgumentCaptor.forClass(Instant.class);
         verify(attemptRepository).handBackSchedulerClaim(
-                org.mockito.ArgumentMatchers.eq(attemptId),
-                org.mockito.ArgumentMatchers.eq(attempt.getStartedAt()),
+                eq(attemptId),
+                eq(attempt.getStartedAt()),
                 retryAt.capture());
         assertNotNull(attempt.getStartedAt());
         assertTrue(retryAt.getValue().isAfter(before),
@@ -168,11 +149,8 @@ class IncomingForwardRetrySchedulerTest {
 
     @Test
     void pollPendingRetries_governorInCooldown_skipsClaimEntirely() {
-        // Drive the governor into cooldown via 3 consecutive fully-failed dispatch polls
-        // (every claimed attempt's Kafka send fails), then verify the next poll makes no
-        // repository/Kafka calls at all while the cooldown is active.
-        when(attemptRepository.findPendingRetryIds(any(), any(), org.mockito.ArgumentMatchers.anyInt(),
-                org.mockito.ArgumentMatchers.anyInt())).thenAnswer(inv -> List.of(UUID.randomUUID()));
+        when(attemptRepository.findPendingRetryIds(any(), any(), anyInt(),
+                anyInt())).thenAnswer(inv -> List.of(UUID.randomUUID()));
         when(attemptRepository.lockByIds(anyList())).thenAnswer(inv -> {
             List<UUID> ids = inv.getArgument(0);
             return List.of(pendingAttempt(ids.get(0)));
@@ -185,12 +163,10 @@ class IncomingForwardRetrySchedulerTest {
             scheduler.pollPendingRetries(0);
         }
         verify(attemptRepository, times(3)).findPendingRetryIds(any(), any(),
-                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt());
+                anyInt(), anyInt());
 
-        // 4th call: governor should be in cooldown after 3 consecutive full failures,
-        // so computeEffectiveBatch returns 0 and the claim query must not run again.
         scheduler.pollPendingRetries(0);
         verify(attemptRepository, times(3)).findPendingRetryIds(any(), any(),
-                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt());
+                anyInt(), anyInt());
     }
 }

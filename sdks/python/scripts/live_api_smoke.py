@@ -1,28 +1,5 @@
 #!/usr/bin/env python3
-"""Live-API smoke check for the Python SDK.
-
-NOT a unit test. ``pytest.ini`` sets ``testpaths = tests`` and
-``python_files = test_*.py``; this file is neither under ``tests/`` nor named
-``test_*``, so ``pytest`` never collects it — the unit suite must stay green
-with no backend running, and this file must never be the reason it isn't.
-
-What it does: registers a throwaway org against a REAL running API, then
-drives the whole send-and-inspect workflow through the SDK's own public
-methods and asserts what actually comes back — status codes, field names,
-pagination envelope, error envelope, and a signature the server itself
-produced. Stubbed-transport unit tests are structurally unable to catch a
-renamed field; this is what catches it.
-
-Usage::
-
-    make up                        # from the repo root
-    cd sdks/python && python scripts/live_api_smoke.py
-
-Env:
-    SMOKE_API_BASE_URL   target API (default http://localhost:8080)
-
-Exit code is 0 only if every check passed.
-"""
+"""Against a running API (``make up``); outside ``tests/`` so pytest, which needs no backend, skips it."""
 
 from __future__ import annotations
 
@@ -97,12 +74,7 @@ def eq(actual: Any, expected: Any, what: str) -> None:
 
 
 def raw(method: str, path: str, body: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> Any:
-    """Raw HTTP, used ONLY to bootstrap a tenant.
-
-    The SDK is API-key scoped by design — it has no register/login/create-project
-    surface (see ``railhook/client.py``) — so these three calls cannot go through
-    it. Everything after this point does.
-    """
+    """Only for bootstrapping a tenant: the SDK is API-key scoped and cannot register or create projects."""
     res = requests.request(method, f"{BASE_URL}{path}", json=body, headers=headers, timeout=15)
     if res.status_code >= 400:
         raise RuntimeError(f"{method} {path} -> HTTP {res.status_code} {res.text}")
@@ -111,10 +83,7 @@ def raw(method: str, path: str, body: Optional[Dict[str, Any]] = None, headers: 
 
 def api_is_up() -> bool:
     try:
-        # An intentionally invalid login: any HTTP response at all proves the API
-        # is answering. Deliberately NOT /v3/api-docs — springdoc is only exposed
-        # when SWAGGER_ENABLED=true (SecurityConfig.java), and it is false by
-        # default, so probing it reports a healthy stack as unreachable.
+        # Any response to an invalid login proves the API is up; /v3/api-docs is off by default.
         requests.post(f"{BASE_URL}/api/v1/auth/login", json={}, timeout=5)
         return True
     except requests.RequestException:
@@ -138,7 +107,6 @@ def main() -> int:
         print(f"{BASE_URL} is not answering. Start the stack with `make up` from the repo root.", file=sys.stderr)
         return 2
 
-    # ── Bootstrap (raw HTTP: register / project / API key) ──
     suffix = f"{int(time.time() * 1000)}-{random.randint(0, 999999)}"
     auth = raw(
         "POST",
@@ -172,7 +140,6 @@ def main() -> int:
     project_id = project["id"]
     client = Railhook(api_key=api_key["key"], base_url=BASE_URL)
 
-    # ── Endpoints ──
     print("\nendpoints:")
     endpoint = client.endpoints.create(
         project_id,
@@ -222,7 +189,6 @@ def main() -> int:
         ),
     )
 
-    # ── Subscriptions ──
     print("\nsubscriptions:")
     subscription = client.subscriptions.create(
         project_id,
@@ -247,7 +213,6 @@ def main() -> int:
         ),
     )
 
-    # ── Events ──
     print("\nevents:")
     event = client.events.send(
         Event(type="order.completed", data={"orderId": "ord_12345", "amount": 99.99}),
@@ -263,7 +228,6 @@ def main() -> int:
         ),
     )
 
-    # ── Deliveries ──
     print("\ndeliveries:")
     page = poll(lambda: client.deliveries.list(project_id), lambda p: len(p.content) > 0)
     check(
@@ -303,7 +267,6 @@ def main() -> int:
         ),
     )
 
-    # ── Incoming ──
     print("\nincoming:")
     source = client.incoming_sources.create(
         project_id,
@@ -349,8 +312,7 @@ def main() -> int:
         lambda: eq(any(d.id == destination.id for d in dest_page.content), True, "created destination present"),
     )
 
-    # Push a webhook through the source's own ingress URL — the only way to make
-    # an Incoming Event exist. permitAll, no credentials (SecurityConfig.java).
+    # The ingress URL is the only way to make an Incoming Event exist.
     raw("POST", f"/ingress/{source.ingress_path_token}", {"hello": "incoming"})
 
     incoming = poll(
@@ -387,7 +349,6 @@ def main() -> int:
             ),
         )
 
-    # ── Errors ──
     print("\nerrors:")
     bad_client = Railhook(api_key="not-a-real-key", base_url=BASE_URL)
 
@@ -433,7 +394,6 @@ def main() -> int:
         _forbidden,
     )
 
-    # ── Signature verification against a signature the SERVER produced ──
     print("\nsignature:")
     dry_run = client.post(
         f"/api/v1/projects/{project_id}/transform-preview/delivery-dry-run",
@@ -444,8 +404,7 @@ def main() -> int:
         },
     )
     signature = dry_run["signature"]
-    # Signed over the *transformed* payload the endpoint would actually receive,
-    # which is pretty-printed — not over what we sent in.
+    # Signed over the transformed, pretty-printed payload, not over what we sent.
     body = dry_run["transformedPayload"]
 
     import re
@@ -471,7 +430,6 @@ def main() -> int:
         lambda exc: eq(getattr(exc, "code", None), "timestamp_expired", "code"),
     )
 
-    # ── Cleanup ──
     client.subscriptions.delete(project_id, subscription.id)
     client.endpoints.delete(project_id, endpoint.id)
     client.incoming_sources.delete(project_id, source.id)

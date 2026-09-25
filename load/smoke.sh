@@ -1,15 +1,6 @@
 #!/usr/bin/env bash
-# Smoke check of the core paths against a live deployment, from an existing account.
-#
-# One of each, verified end to end rather than by status code alone:
-#   1. an Event sent over the API reaches a subscribed Endpoint exactly once
-#   2. the same Idempotency-Key sent again creates no second Delivery
-#   3. a signed webhook to an incoming Source is forwarded to its Destination
-#   4. a webhook with a wrong signature is refused with 401
-#   5. a request to a test endpoint is captured, body included
-#
-# Needs: BASE_URL, ACCESS_TOKEN, PROJECT_ID, RECEIVER_INTERNAL_URL (public URL of the
-# load-receiver, e.g. a `railhook listen 9000` tunnel), RECEIVER_CONTROL_URL (local).
+# Needs BASE_URL, ACCESS_TOKEN, PROJECT_ID, RECEIVER_INTERNAL_URL (public URL of the receiver, e.g.
+# a `railhook listen 9000` tunnel) and RECEIVER_CONTROL_URL.
 set -uo pipefail
 
 : "${BASE_URL:?}" "${ACCESS_TOKEN:?}" "${PROJECT_ID:?}" "${RECEIVER_INTERNAL_URL:?}"
@@ -44,7 +35,6 @@ wait_for_seq() {
 
 curl -s -X POST "${RECEIVER_CONTROL_URL}/_control/reset" >/dev/null
 
-# --- setup -------------------------------------------------------------------------------
 r=$(post "${auth[@]}" "${api}/api-keys" -d "{\"name\":\"smoke-${suffix}\",\"scope\":\"READ_WRITE\"}")
 [ "$(code_of "$r")" = 201 ] || { echo "setup: api key $(code_of "$r") $(body_of "$r")"; exit 2; }
 api_key=$(body_of "$r" | jq -r .key)
@@ -59,7 +49,6 @@ r=$(post "${auth[@]}" "${api}/subscriptions" \
   -d "{\"endpointId\":\"${endpoint_id}\",\"eventType\":\"smoke.test\",\"enabled\":true}")
 [ "$(code_of "$r")" = 201 ] || { echo "setup: subscription $(code_of "$r") $(body_of "$r")"; exit 2; }
 
-# --- 1 + 2: outgoing Event, then the same Idempotency-Key again --------------------------
 seq=$((suffix * 1000 + 1))
 event="{\"type\":\"smoke.test\",\"data\":{\"seq\":${seq},\"sentAtMs\":$(date +%s%3N)}}"
 r=$(post -H "X-API-Key: ${api_key}" -H 'Content-Type: application/json' -H "Idempotency-Key: smoke-${suffix}" \
@@ -74,7 +63,6 @@ sleep 10
 n=$(received_seq_ok "$seq")
 if [ "$n" = 1 ]; then pass "idempotent resend delivered once"; else fail "idempotent resend: seq answered 2xx ${n} times"; fi
 
-# --- 3 + 4: incoming Source with generic HMAC --------------------------------------------
 secret="smoke-secret-${suffix}"
 r=$(post "${auth[@]}" "${api}/incoming-sources" \
   -d "{\"name\":\"smoke-${suffix}\",\"providerType\":\"GENERIC\",\"verificationMode\":\"HMAC_GENERIC\",\"hmacSecret\":\"${secret}\",\"hmacHeaderName\":\"X-Signature\"}")
@@ -98,7 +86,6 @@ r=$(post -H 'Content-Type: application/json' -H "X-Signature: deadbeef" "$ingres
   -d "{\"type\":\"smoke.incoming\",\"data\":{\"seq\":$((suffix * 1000 + 3))}}")
 if [ "$(code_of "$r")" = 401 ]; then pass "wrong signature refused (401)"; else fail "wrong signature: HTTP $(code_of "$r")"; fi
 
-# --- 5: test endpoint capture ------------------------------------------------------------
 r=$(post "${auth[@]}" "${api}/test-endpoints" -d "{\"name\":\"smoke-${suffix}\",\"ttlHours\":1}")
 case "$(code_of "$r")" in 200|201) ;; *) false;; esac || { echo "setup: test endpoint $(code_of "$r") $(body_of "$r")"; exit 2; }
 te_id=$(body_of "$r" | jq -r .id)

@@ -29,24 +29,14 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-    # Actuator. Prometheus runs in its own namespace (kube-prometheus-stack's
-    # by convention), so this admits the management port from anywhere in the
-    # cluster rather than guessing that namespace's labels. Without it the
-    # ServiceMonitor this chart also ships is scraping a port the policy drops
-    # — enabled together in values-production.yaml, so the pairing is the
-    # normal case, not an exotic one.
+    # Actuator from any namespace: Prometheus runs in its own, whose labels we cannot guess.
     - from:
         - namespaceSelector: {}
       ports:
         - protocol: TCP
           port: {{ include "railhook.api.managementPort" . }}
   egress:
-    # DNS. Without this rule nothing else here works: every address below is a name
-    # first, and kube-dns lives in another namespace, so a podSelector cannot reach it.
-    # A policy with an egress section denies everything it does not list, and this was
-    # not listed — on any CNI that enforces policy the whole stack failed at resolution
-    # before it failed at anything interesting. kind's kindnet does not enforce, which
-    # is why the smoke test never saw it.
+    # DNS: kube-dns is in another namespace, and an egress section denies what it does not list.
     - to:
         - namespaceSelector: {}
       ports:
@@ -54,7 +44,7 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # PostgreSQL, Kafka and Redis inside this namespace — a self-managed StatefulSet.
+    # PostgreSQL, Kafka and Redis inside this namespace.
     - to:
         - podSelector: {}
       ports:
@@ -64,11 +54,7 @@ spec:
           port: 9092
         - protocol: TCP
           port: 6379
-    # The same three ports outside the namespace, which is where the chart expects them:
-    # it ships none of the three, and values-production.yaml turns all three off in favour
-    # of a managed RDS / MSK / ElastiCache. Those sit in the cluster's own VPC, so the
-    # default here is the private ranges the rule below deliberately excludes. Narrow it
-    # to your database's address, or widen it, with networkPolicy.dependencyEgressCidrs.
+    # The same three outside it (managed services in the VPC): networkPolicy.dependencyEgressCidrs.
     {{- with .Values.networkPolicy.dependencyEgressCidrs }}
     - to:
         {{- range . }}
@@ -83,8 +69,7 @@ spec:
         - protocol: TCP
           port: 6379
     {{- end }}
-    # Delivery itself: customer endpoints on the public internet, private ranges excluded
-    # to match the SSRF guard.
+    # Customer endpoints on the public internet; private ranges excluded to match the SSRF guard.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -111,9 +96,7 @@ spec:
       app.kubernetes.io/component: worker
   policyTypes:
     {{- toYaml .Values.networkPolicy.policyTypes | nindent 4 }}
-  # policyTypes includes Ingress, and a policy with no ingress rules denies
-  # all of it — which included the worker's own metrics. The worker still
-  # accepts nothing else: this is the actuator port only.
+  # Ingress is in policyTypes, so without a rule even the worker's metrics were denied.
   ingress:
     - from:
         - namespaceSelector: {}
@@ -121,12 +104,7 @@ spec:
         - protocol: TCP
           port: {{ include "railhook.worker.managementPort" . }}
   egress:
-    # DNS. Without this rule nothing else here works: every address below is a name
-    # first, and kube-dns lives in another namespace, so a podSelector cannot reach it.
-    # A policy with an egress section denies everything it does not list, and this was
-    # not listed — on any CNI that enforces policy the whole stack failed at resolution
-    # before it failed at anything interesting. kind's kindnet does not enforce, which
-    # is why the smoke test never saw it.
+    # DNS: kube-dns is in another namespace, and an egress section denies what it does not list.
     - to:
         - namespaceSelector: {}
       ports:
@@ -134,7 +112,7 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # PostgreSQL, Kafka and Redis inside this namespace — a self-managed StatefulSet.
+    # PostgreSQL, Kafka and Redis inside this namespace.
     - to:
         - podSelector: {}
       ports:
@@ -144,11 +122,7 @@ spec:
           port: 9092
         - protocol: TCP
           port: 6379
-    # The same three ports outside the namespace, which is where the chart expects them:
-    # it ships none of the three, and values-production.yaml turns all three off in favour
-    # of a managed RDS / MSK / ElastiCache. Those sit in the cluster's own VPC, so the
-    # default here is the private ranges the rule below deliberately excludes. Narrow it
-    # to your database's address, or widen it, with networkPolicy.dependencyEgressCidrs.
+    # The same three outside it (managed services in the VPC): networkPolicy.dependencyEgressCidrs.
     {{- with .Values.networkPolicy.dependencyEgressCidrs }}
     - to:
         {{- range . }}
@@ -163,8 +137,7 @@ spec:
         - protocol: TCP
           port: 6379
     {{- end }}
-    # Delivery itself: customer endpoints on the public internet, private ranges excluded
-    # to match the SSRF guard.
+    # Customer endpoints on the public internet; private ranges excluded to match the SSRF guard.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0

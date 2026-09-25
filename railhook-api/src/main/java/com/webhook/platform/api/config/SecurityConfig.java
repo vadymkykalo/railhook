@@ -69,12 +69,9 @@ public class SecurityConfig {
         public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
                 http
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
-                                // Nothing a browser attaches on its own authorizes a request: JWTs
-                                // and API keys arrive in headers. The one ambient credential, the
-                                // refresh_token cookie (AuthCookies), is SameSite, scoped to
-                                // /api/v1/auth, and alone only mints a token into a response the
-                                // CORS allowlist keeps a foreign origin from reading. The Google
-                                // sign-in code is bound to its browser by a cookie of its own.
+                                // JWTs and API keys arrive in headers. The one cookie, refresh_token,
+                                // is SameSite, scoped to /api/v1/auth, and only mints a token into a
+                                // response CORS keeps a foreign origin from reading.
                                 .csrf(csrf -> csrf.disable())
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -87,35 +84,14 @@ public class SecurityConfig {
                                                 .frameOptions(frame -> frame.deny()))
                                 .authorizeHttpRequests(auth -> {
                                         auth
-                                                        // These matchers only apply when actuator is served
-                                                        // from THIS filter chain, i.e. management.server.port is
-                                                        // unset or equal to server.port (the default — true for
-                                                        // tests, plain `mvn spring-boot:run`, and any deployment
-                                                        // that hasn't opted into the port split). The Compose
-                                                        // deployment sets MANAGEMENT_PORT to a separate port so
-                                                        // Prometheus can reach /actuator/prometheus without a
-                                                        // JWT/API-key — see application.yml `management.server.*`
-                                                        // and monitoring/README.md "Metrics-scrape auth". The Helm
-                                                        // chart splits the port the same way and its ServiceMonitor
-                                                        // scrapes the management port by name; before it did, every
-                                                        // scrape in Kubernetes got a 401 and the alert rules fired
-                                                        // on no data.
-                                                        // Everything arriving on the actuator's own port, when
-                                                        // one is configured. That port is never published to the
-                                                        // host — the Compose deployment exposes only nginx, and
-                                                        // nginx proxies health from it and nothing else — so it
-                                                        // is reachable exactly by things already inside the
-                                                        // network, which is what "Prometheus scrapes without a
-                                                        // JWT" requires. See ManagementPortRequestMatcher for why
-                                                        // this is not automatic: Boot copies this filter chain
-                                                        // into the management child context, so without it
-                                                        // /actuator/prometheus answers 401 on the one port that
-                                                        // exists for it to answer on.
+                                                        // The separate management port is never published, so
+                                                        // Prometheus scrapes it without credentials. Boot copies
+                                                        // this chain into the management context, so without
+                                                        // this matcher that port would answer 401 too.
                                                         .requestMatchers(new ManagementPortRequestMatcher(environment))
                                                         .permitAll()
-                                                        // On the main port — the published one — only the probes
-                                                        // are anonymous. Metrics are not: they leak endpoint
-                                                        // names, tenant cardinality and traffic volume.
+                                                        // On the published port only the probes are anonymous:
+                                                        // metrics leak endpoint names and traffic volume.
                                                         .requestMatchers("/actuator/health", "/actuator/health/**",
                                                                         "/actuator/info")
                                                         .permitAll()
@@ -125,32 +101,24 @@ public class SecurityConfig {
                                                         .requestMatchers("/tunnel/**").permitAll()
                                                         .requestMatchers("/ws/tunnel").permitAll()
                                                         .requestMatchers("/api/v1/public/**").permitAll()
-                                                        // The customer portal: a portal session and
-                                                        // nothing else. A JWT or an API key here is
-                                                        // a 403, and a portal token anywhere else is
-                                                        // anonymous — its filter never looks at it.
+                                                        // Portal session only. A portal token anywhere else
+                                                        // is anonymous.
                                                         .requestMatchers("/api/v1/portal/**")
                                                                         .hasAuthority(PortalSessionAuthenticationToken.AUTHORITY)
                                                         .requestMatchers("/api/v1/billing/plans").permitAll()
                                                         .requestMatchers("/api/v1/billing/webhook/**").permitAll()
-                                                        // Re-encrypting every tenant's secrets: the operator
-                                                        // token only, never a signed-in platform admin.
+                                                        // Re-encrypts every tenant's secrets: operator token
+                                                        // only, never a signed-in platform admin.
                                                         .requestMatchers("/api/v1/admin/encryption/**")
                                                                         .hasAuthority(PlatformAdminAuthenticationToken.OPERATOR_TOKEN_AUTHORITY)
-                                                        // Cluster-operator routes — gated on the
-                                                        // PLATFORM_ADMIN authority, granted by
-                                                        // PlatformAdminAuthenticationFilter (operator token) or
-                                                        // PlatformAdminAccessFilter (a verified, active, recently
-                                                        // signed-in address in PLATFORM_ADMIN_EMAILS) — never by
-                                                        // tenant JWT/API-key role (org OWNER is not platform admin).
+                                                        // An organization OWNER is not a platform admin.
                                                         .requestMatchers("/api/v1/admin/**")
                                                                         .hasAuthority(PlatformAdminAuthenticationToken.AUTHORITY)
                                                         .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login",
                                                                         "/api/v1/auth/refresh",
                                                                         "/api/v1/auth/verify-email",
                                                                         "/api/v1/auth/resend-verification",
-                                                                        // Opened from mail: the link is the proof,
-                                                                        // and the old address may have no session.
+                                                                        // Opened from mail, possibly with no session.
                                                                         "/api/v1/auth/email-change/confirm",
                                                                         "/api/v1/auth/email-change/cancel",
                                                                         "/api/v1/auth/forgot-password",
@@ -168,7 +136,6 @@ public class SecurityConfig {
                                                         .requestMatchers("/api/v1/projects/**").authenticated()
                                                         .requestMatchers("/api/v1/deliveries/**").authenticated();
 
-                                        // Swagger access only when explicitly enabled
                                         if (swaggerEnabled) {
                                                 auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html",
                                                                 "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll();
@@ -196,13 +163,9 @@ public class SecurityConfig {
                                                 UsernamePasswordAuthenticationFilter.class)
                                 .addFilterBefore(portalSessionAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class)
-                                // After both identities are known: it may turn a JWT into the
-                                // platform-admin authority, and it must see the operator token too
-                                // to rate-limit and audit it.
+                                // Needs both the JWT and the operator token identity already resolved.
                                 .addFilterAfter(platformAdminAccessFilter, PlatformAdminAuthenticationFilter.class)
-                                // Last on purpose: it reads the identity the others establish and
-                                // turns it into the tenant scope every query in the request then
-                                // runs under.
+                                // Last: turns the established identity into the tenant scope.
                                 .addFilterAfter(tenantContextFilter, PlatformAdminAccessFilter.class);
 
                 return http.build();

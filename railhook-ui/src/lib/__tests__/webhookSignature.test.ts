@@ -2,11 +2,7 @@ import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { exampleHeaders, readHeaderValue, verifySignature, PROVIDERS, type Provider } from '../webhookSignature';
 
-/**
- * Every vector here is computed independently, with Node's own HMAC, from the scheme as each
- * provider documents it and as Railhook's backend verifiers read it — never with the code under
- * test — so a mistake in the scheme cannot agree with itself.
- */
+/** Vectors computed with Node's HMAC, never the code under test, so a scheme bug cannot agree with itself. */
 const BODY = '{"id":"evt_1","type":"order.completed","amount":4200}';
 const NOW_S = 1_760_000_000;
 const NOW_MS = NOW_S * 1000;
@@ -87,7 +83,7 @@ describe('Railhook X-Signature', () => {
 describe('Stripe', () => {
   const secret = 'whsec_test_stripe_secret';
   const t = String(NOW_S);
-  // Stripe keys the HMAC with the whole secret string, whsec_ included.
+  // Stripe keys the HMAC with the whole secret, whsec_ included.
   const sig = hmac(secret, `${t}.${BODY}`).digest('hex');
 
   it('accepts hex HMAC over t.body keyed with the secret as written', async () => {
@@ -114,7 +110,6 @@ describe('Stripe', () => {
 
 describe('GitHub', () => {
   const secret = "It's a Secret to Everybody";
-  // GitHub's own documented example.
   const payload = 'Hello, World!';
   const documented = 'sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17';
 

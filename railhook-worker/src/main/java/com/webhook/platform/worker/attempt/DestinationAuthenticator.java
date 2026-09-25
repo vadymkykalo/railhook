@@ -9,10 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.Base64;
 import java.util.Map;
 
-/**
- * Authenticates a Forward to its Destination. The Outgoing counterpart is {@link DeliverySigner}:
- * Railhook signs what it sends and proves who it is when relaying onward.
- */
 @Slf4j
 class DestinationAuthenticator {
 
@@ -27,10 +23,6 @@ class DestinationAuthenticator {
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * Puts the credentials into the header map rather than straight onto the request: the caller
-     * has to record what it sent, and a header applied to the request builder cannot be read back.
-     */
     @SuppressWarnings("unchecked")
     void authenticate(Map<String, String> headers) {
         if (destination.getAuthType() == IncomingAuthType.NONE || destination.getAuthConfigEncrypted() == null) {

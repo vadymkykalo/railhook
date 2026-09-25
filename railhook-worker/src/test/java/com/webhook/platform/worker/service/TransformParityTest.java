@@ -14,15 +14,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * The worker half of the parity check.
- *
- * <p>Its twin lives in {@code railhook-api} under the same name and runs the same script, from
- * the same fixture — {@code transform/contract-example.json}, shipped in common — through the
- * preview path instead. Neither module depends on the other, so the fixture is what holds the
- * two call sites together: a delivery that stopped producing the bytes the preview shows would
- * turn this red while the other stayed green, which is the whole point.
- */
+// Its api twin runs the same fixture through the preview path; neither module depends on the other.
 class TransformParityTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

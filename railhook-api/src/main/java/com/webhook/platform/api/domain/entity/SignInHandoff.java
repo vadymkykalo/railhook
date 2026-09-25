@@ -8,8 +8,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A completed provider sign-in waiting for the dashboard to collect it. Holds the hash of a code
- * that is valid once, for a minute; see the V071 migration for why a code and not a token.
+ * A completed provider sign-in waiting for the dashboard to collect it, by a hashed code valid
+ * once, for a minute.
  */
 @Entity
 @Table(name = "sign_in_handoffs")
@@ -27,7 +27,6 @@ public class SignInHandoff {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    /** Whether this sign-in created the account, so the dashboard can welcome a new person. */
     @Column(name = "account_created", nullable = false)
     private boolean accountCreated;
 

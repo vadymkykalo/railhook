@@ -19,20 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over the two places an alert rule is written down.
- *
- * <p>A Compose deployment reads {@code monitoring/prometheus/alerts.yml}; a Kubernetes one
- * reads the PrometheusRule this chart renders. The two describe the same platform and nothing
- * connects them, so they drifted — and a third file,
- * {@code deploy/prometheus/alerts.yml}, sat between them being mounted by nobody while looking
- * authoritative enough that a missing rule appeared to exist.
- *
- * <p>What that cost: the Helm set was four rules short, and
- * {@code outbox_oldest_pending_age_seconds} — the third of the three signals
- * the observability guide tells an operator to alert on if they alert on nothing
- * else — had no rule in any of the three. This test makes the two surviving sets one set.
- */
+// Compose reads alerts.yml, Kubernetes the chart's PrometheusRule; nothing else connects them.
 @Tag("ratchet")
 class AlertRuleParityTest {
 

@@ -36,8 +36,6 @@ export default function RegisterPage() {
   const { login } = useAuth();
   useLeaveDemo();
   const [searchParams] = useSearchParams();
-  // An invite or a CLI approval sent the visitor here to make an account first; they carry on
-  // there once it exists. Only a path on this site counts.
   const requested = searchParams.get('redirect');
   const redirect = requested && safeDestination(requested, '') ? requested : null;
 
@@ -52,8 +50,6 @@ export default function RegisterPage() {
         password,
         fullName,
         organizationName,
-        // Absent unless the deployment configured a challenge; the API accepts a registration
-        // without one in exactly that case.
         ...(captchaToken ? { captchaToken } : {}),
       });
       http.setToken(authResponse.accessToken);
@@ -66,9 +62,7 @@ export default function RegisterPage() {
       }
       setRegistered(true);
     } catch (err: any) {
-      // The API answers a rejected field with fieldErrors {field: reason} and a
-      // generic "Invalid request parameters" summary. Showing the summary threw
-      // away the only part that says what to change.
+      // The API's summary is generic; fieldErrors say what to change.
       const data = err.response?.data;
       const fieldDetail = data?.fieldErrors
         ? Object.values(data.fieldErrors as Record<string, string>).join('. ')
@@ -113,7 +107,7 @@ export default function RegisterPage() {
         subtitle={<Trans i18nKey="auth.register.verificationSent" values={{ email }} components={{ strong: <strong className="font-medium text-foreground" /> }} />}
       >
         <div className="space-y-3">
-          <div className="flex items-center gap-3 rounded-md border border-rail bg-card p-3">
+          <div className="flex items-center gap-3 border border-rail bg-card p-3">
             <Mail className="h-4 w-4 flex-shrink-0 text-primary" aria-hidden />
             <span className="truncate font-mono text-[13px]">{email}</span>
           </div>
@@ -137,7 +131,7 @@ export default function RegisterPage() {
       footer={
         <>
           {t('auth.register.hasAccount')}{' '}
-          <Link to={redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login'} className="font-medium text-primary hover:underline">
+          <Link to={redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login'} className="font-medium link-ink">
             {t('auth.register.signIn')}
           </Link>
         </>
@@ -202,8 +196,7 @@ export default function RegisterPage() {
             autoComplete="new-password"
           />
           <PasswordStrengthIndicator password={password} />
-          {/* The submit button stays disabled until every rule is met; say which one is left
-              rather than leave a disabled button to be puzzled over. */}
+          {/* Say which rule is left rather than leave a puzzling disabled button. */}
           {password && !passwordMeetsPolicy(password) && (
             <p role="status" className="text-xs font-medium text-halt">
               {t('passwordStrength.missing', {
@@ -214,7 +207,7 @@ export default function RegisterPage() {
         </div>
 
         {error && (
-          <div role="alert" className="animate-scale-in rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+          <div role="alert" className="animate-scale-in border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
             {error}
           </div>
         )}

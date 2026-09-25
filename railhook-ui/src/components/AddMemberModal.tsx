@@ -27,15 +27,7 @@ interface AddMemberModalProps {
   onSuccess: () => void;
 }
 
-/**
- * Inviting somebody is granting them a role, so the role is chosen from cards
- * that say what it lets them do rather than from a dropdown of three words.
- *
- * The dialog does not close on success. An invite to a brand-new person comes back
- * with the accept-invite link, and with `EMAIL_ENABLED=false` — the shipped default —
- * that link is the only copy anybody will ever see; closing on a green "Invited"
- * toast is what made invites undeliverable in a default install.
- */
+/** Stays open on success: with email off, the invite link shown here is the only copy. */
 export default function AddMemberModal({ orgId, open, onClose, onSuccess }: AddMemberModalProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -64,7 +56,6 @@ export default function AddMemberModal({ orgId, open, onClose, onSuccess }: AddM
       setEmailError(t('members.addModal.emailInvalid'));
       return false;
     }
-    // EmailSuggestion under the field already says why and offers the fix.
     if (hasImpossibleTld(email)) return false;
     setEmailError('');
     return true;
@@ -79,12 +70,9 @@ export default function AddMemberModal({ orgId, open, onClose, onSuccess }: AddM
       const response = await membersApi.add(orgId, { email: email.trim(), role });
       onSuccess();
       if (response.inviteUrl) {
-        // A pending invite: stay open on the link rather than claim it was sent.
         setIssued(response);
         return;
       }
-      // Somebody who already had a Railhook account: they are a member as of now,
-      // there is no invite to accept and nothing to hand over.
       showSuccess(t('members.toast.added'));
       handleClose();
     } catch (err: any) {
@@ -152,7 +140,7 @@ export default function AddMemberModal({ orgId, open, onClose, onSuccess }: AddM
                 <p className="pt-1 text-xs text-muted-foreground">{t('members.addModal.ownerNote')}</p>
               </div>
 
-              <p className="flex items-start gap-2 rounded-md border border-rail bg-secondary/50 p-3 text-[13px] text-muted-foreground">
+              <p className="flex items-start gap-2 border border-rail bg-secondary/50 p-3 text-[13px] text-muted-foreground">
                 {emailDelivered
                   ? <Mail className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" aria-hidden />
                   : <MailX className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" aria-hidden />}

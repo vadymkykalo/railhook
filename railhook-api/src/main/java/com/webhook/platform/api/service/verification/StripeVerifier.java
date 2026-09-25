@@ -8,12 +8,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Stripe webhook signature verifier.
- * Stripe sends: Stripe-Signature: t=<timestamp>,v1=<hex-hmac-sha256>
- * Signed payload = "<timestamp>.<body>"
- * Tolerance: 5 minutes (300 seconds).
- */
+/** Stripe-Signature: t=timestamp,v1=hex HMAC-SHA256 of "timestamp.body". */
 public class StripeVerifier implements WebhookVerificationStrategy {
 
     private static final String HEADER = "Stripe-Signature";
@@ -27,9 +22,8 @@ public class StripeVerifier implements WebhookVerificationStrategy {
         }
 
         String timestamp = null;
-        // Every v1, not the last one: while a secret is being rolled Stripe signs with each live
-        // secret and sends one v1 per secret, in no order this Source can rely on. Keeping only
-        // the last refused a genuine event whenever the matching signature came earlier.
+        // Every v1, not the last: during a secret roll Stripe sends one per live secret, in no
+        // particular order.
         List<String> signatures = new ArrayList<>();
 
         for (String part : header.split(",")) {
@@ -47,7 +41,6 @@ public class StripeVerifier implements WebhookVerificationStrategy {
             return VerificationResult.failure("Invalid Stripe-Signature format: missing t or v1");
         }
 
-        // Timestamp tolerance check
         try {
             long ts = Long.parseLong(timestamp);
             long now = Instant.now().getEpochSecond();
@@ -58,12 +51,11 @@ public class StripeVerifier implements WebhookVerificationStrategy {
             return VerificationResult.failure("Invalid Stripe timestamp: " + timestamp);
         }
 
-        // Stripe signs: "<timestamp>.<body>" — joined as bytes, so the body is not re-encoded.
+        // Joined as bytes so the body is not re-encoded.
         byte[] computed = GenericHmacVerifier.computeHmacSha256(secret, timestamp + ".", body)
                 .getBytes(StandardCharsets.UTF_8);
 
-        // No early exit: each candidate is compared in constant time and the loop runs over all
-        // of them, so the response time says nothing about which one matched.
+        // No early exit, so timing does not reveal which candidate matched.
         boolean valid = false;
         for (String signature : signatures) {
             valid |= MessageDigest.isEqual(computed, signature.getBytes(StandardCharsets.UTF_8));

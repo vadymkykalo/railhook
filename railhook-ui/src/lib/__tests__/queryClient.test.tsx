@@ -24,7 +24,6 @@ function wrapperFor() {
   };
 }
 
-/** Lets the mutation settle and any deferred fallback run. */
 async function settle() {
   await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
 }

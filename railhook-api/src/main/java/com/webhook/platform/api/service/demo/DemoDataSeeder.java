@@ -36,32 +36,18 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Keeps the public demo's organization in place and its history recent.
- *
- * <p>Two halves, both idempotent. The organization, its one member, project "Acme Shop", its
- * Endpoints, Subscriptions, Sources, Destinations and Workflows are inserted with fixed ids and
- * {@code ON CONFLICT}: seeding twice finds them there and changes nothing. The traffic is
- * replaced — the demo's Events, Deliveries, Attempts, Incoming Events, Forwards and workflow runs
- * are deleted and {@link DemoHistory} written again, ending at the current time — so the dashboard and the
- * analytics always show the last day rather than the day the server started.
- *
- * <p>JDBC rather than the entities: the history needs its own timestamps, which
- * {@code @CreationTimestamp} would overwrite, and fixed ids, which a generated id would not take.
- * Every row names the demo organization explicitly, which is also why this runs as the system
- * tenant: there is no request, and no tenant filter to apply to plain JDBC.
- *
- * <p>Only exists where {@code demo.enabled} is true. Where it is false, {@link DemoDataRemover}
- * takes its place and deletes whatever an earlier boot with the demo on left behind.
+ * Idempotent: fixed ids with ON CONFLICT, traffic regenerated to end now. Plain JDBC because
+ * {@code @CreationTimestamp} would overwrite the history's timestamps.
  */
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "demo.enabled", havingValue = "true")
 public class DemoDataSeeder {
 
-    /** "RAILDEMO": serialises seeding across API replicas that start together. */
+    /** "RAILDEMO". Serialises seeding across API replicas that start together. */
     static final long ADVISORY_LOCK_KEY = 0x5241494c44454d4fL;
 
-    /** Before any real sign-up could have happened, so no signup or activation window counts them. */
+    /** Before any real sign-up, so no signup or activation window counts them. */
     private static final Timestamp PINNED_CREATED_AT = Timestamp.from(Instant.parse("2024-01-01T00:00:00Z"));
 
     static final String DEMO_EMAIL = "visitor@demo.railhook.invalid";
@@ -90,8 +76,7 @@ public class DemoDataSeeder {
         try {
             seed();
         } catch (RuntimeException e) {
-            // A broken demo must not take the API down with it: the session endpoint answers 503
-            // until a refresh succeeds.
+            // A broken demo must not take the API down; the session endpoint answers 503 until a refresh succeeds.
             log.error("Could not seed the public demo: {}", e.getMessage(), e);
         }
     }
@@ -104,7 +89,6 @@ public class DemoDataSeeder {
         seed();
     }
 
-    /** Puts the demo in place and rewrites its history to end now. Safe to call any number of times. */
     @SystemTenant("writes the demo organization's rows by their fixed ids")
     public void seed() {
         Instant now = Instant.now(clock);
@@ -131,16 +115,14 @@ public class DemoDataSeeder {
             throw new IllegalStateException("Plan '" + planName + "' not found; the demo organization needs one");
         }
 
-        // No password: the demo person cannot sign in, only be handed a demo session. The
-        // onboarding mails are marked sent, so the nudge scheduler never writes to them.
+        // No password, and onboarding mails marked sent so the nudge scheduler skips it.
         Timestamp sent = Timestamp.from(now);
         jdbc.update("INSERT INTO users (id, email, full_name, password_hash, status, email_verified, "
                         + "failed_login_attempts, onboarding_welcome_sent_at, onboarding_nudge_sent_at, created_at) "
                         + "VALUES (?, ?, 'Demo visitor', NULL, 'ACTIVE', true, 0, ?, ?, ?) ON CONFLICT (id) DO NOTHING",
                 DemoTenant.USER_ID, DEMO_EMAIL, sent, sent, PINNED_CREATED_AT);
 
-        // Exactly one member, a Viewer — reasserted on every run rather than trusted, because the
-        // demo's safety is argued from it.
+        // Exactly one Viewer member, reasserted on every run because the demo's safety depends on it.
         jdbc.update("INSERT INTO memberships (id, user_id, organization_id, role, status, created_at, updated_at) "
                         + "VALUES (?, ?, ?, 'VIEWER', 'ACTIVE', ?, ?) ON CONFLICT (id) DO NOTHING",
                 DemoCatalog.id(0x04), DemoTenant.USER_ID, DemoTenant.ORGANIZATION_ID, PINNED_CREATED_AT, PINNED_CREATED_AT);
@@ -173,9 +155,7 @@ public class DemoDataSeeder {
                     subscription.endpoint().id(), subscription.eventType(), subscription.maxAttempts(),
                     subscription.retryDelays(), PINNED_CREATED_AT, PINNED_CREATED_AT);
         }
-        // Brought back in line with the catalog when it differs, like a workflow and for the same
-        // reason: it is published material — the script is what the Studio shows a visitor — and
-        // nobody can have edited it, so there is no change of anybody's to overwrite.
+        // Updated when it differs from the catalog: the Studio shows this script, and no visitor can edit it.
         for (DemoTransformation transformation : DemoCatalog.TRANSFORMATIONS) {
             jdbc.update("INSERT INTO transformations (id, organization_id, project_id, name, description, template, "
                             + "kind, version, enabled, created_at, updated_at) "
@@ -188,9 +168,7 @@ public class DemoDataSeeder {
                             + "EXCLUDED.description, EXCLUDED.template, 'JAVASCRIPT', true)",
                     transformation.id(), DemoTenant.ORGANIZATION_ID, DemoTenant.PROJECT_ID, transformation.name(),
                     transformation.description(), transformation.script(), PINNED_CREATED_AT, PINNED_CREATED_AT);
-            // Its own history, or the version number the list shows would link to an empty page
-            // — the one thing V083's backfill existed to prevent, reintroduced by a row inserted
-            // after it ran.
+            // Version 1 must exist, or the version shown in the list links to an empty page.
             jdbc.update("INSERT INTO transformation_versions (organization_id, transformation_id, version, "
                             + "template, kind, created_at) VALUES (?, ?, 1, ?, 'JAVASCRIPT', ?) "
                             + "ON CONFLICT (transformation_id, version) DO UPDATE SET "
@@ -198,8 +176,7 @@ public class DemoDataSeeder {
                             + "WHERE (transformation_versions.template, transformation_versions.kind) "
                             + "IS DISTINCT FROM (EXCLUDED.template, 'JAVASCRIPT')",
                     DemoTenant.ORGANIZATION_ID, transformation.id(), transformation.script(), PINNED_CREATED_AT);
-            // Wired to a Subscription, so the Studio opens on it rather than on an empty editor,
-            // and so the Connection screen shows where a transformation is actually used.
+            // Wired to a Subscription so the Studio opens on it and the Connection screen shows where it is used.
             jdbc.update("UPDATE subscriptions SET transformation_id = ? WHERE id = ? AND organization_id = ? "
                             + "AND transformation_id IS DISTINCT FROM ?",
                     transformation.id(), transformation.subscriptionId(), DemoTenant.ORGANIZATION_ID,
@@ -224,11 +201,7 @@ public class DemoDataSeeder {
                     destination.id(), DemoTenant.ORGANIZATION_ID, destination.source().id(), destination.url(),
                     DemoCatalog.INCOMING_DELAYS, PINNED_CREATED_AT, PINNED_CREATED_AT);
         }
-        // Enabled, because they are shown working; nothing can trigger them, since the demo takes
-        // no events. Unlike the rows above, a workflow is brought back in line with the catalog
-        // when it differs: its history is generated from the catalog's definition, and a demo seeded
-        // by an earlier release would otherwise show runs of nodes its canvas does not have. No
-        // visitor can edit one, so there is no change of anybody's to overwrite.
+        // Kept in sync with the catalog, or an older canvas would not match the generated runs.
         for (DemoWorkflow workflow : DemoCatalog.WORKFLOWS) {
             jdbc.update("INSERT INTO workflows (id, organization_id, project_id, name, description, enabled, definition, "
                             + "trigger_type, trigger_config, version, created_at, updated_at) "
@@ -245,15 +218,11 @@ public class DemoDataSeeder {
         }
     }
 
-    /** The demo's traffic, as deleted: how many rows of each went. */
     record DeletedHistory(int workflowExecutions, int forwards, int incomingEvents, int attempts, int deliveries,
                           int events) {
     }
 
-    /**
-     * Deletes the demo organization's traffic, children first. Every statement names the demo
-     * organization, and nothing else. The caller holds the transaction and the advisory lock.
-     */
+    /** Children first. The caller holds the transaction and the advisory lock. */
     static DeletedHistory deleteHistory(JdbcTemplate jdbc) {
         jdbc.update("DELETE FROM workflow_step_executions WHERE organization_id = ?", DemoTenant.ORGANIZATION_ID);
         int workflowExecutions = jdbc.update("DELETE FROM workflow_executions WHERE organization_id = ?",

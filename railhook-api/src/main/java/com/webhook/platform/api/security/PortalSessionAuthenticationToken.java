@@ -7,18 +7,14 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * A request made from the customer portal, on behalf of one Consumer.
- *
- * <p>Carries no membership role and no API-key scope, so every tenant handler that asks for an
- * {@code AuthContext} refuses it; its one authority is what {@code SecurityConfig} admits on
- * {@code /api/v1/portal/**}, and nowhere else.
+ * Carries no membership role or API-key scope, so tenant handlers taking an AuthContext refuse
+ * it. Its one authority is admitted only on /api/v1/portal/**.
  */
 public class PortalSessionAuthenticationToken extends AbstractAuthenticationToken {
 
-    /** The only authority a portal session holds, and the only one the portal routes accept. */
     public static final String AUTHORITY = "PORTAL_SESSION";
 
-    /** Every portal token starts with this, so it is recognisable in a log or a leaked-secret scan. */
+    /** Makes a portal token recognisable in logs and leaked-secret scans. */
     public static final String TOKEN_PREFIX = "rhp_";
 
     private final UUID sessionId;
@@ -35,7 +31,7 @@ public class PortalSessionAuthenticationToken extends AbstractAuthenticationToke
         setAuthenticated(true);
     }
 
-    /** Never the token: nothing downstream needs it, and a credential kept is a credential logged. */
+    /** Never the token: nothing downstream needs it, and a kept credential ends up logged. */
     @Override
     public Object getCredentials() {
         return null;

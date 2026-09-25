@@ -6,10 +6,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * No-op billing provider for self-hosted deployments.
- * All operations are no-ops that log and return sensible defaults.
- */
 @Slf4j
 public class NoOpBillingProvider implements BillingProvider {
 

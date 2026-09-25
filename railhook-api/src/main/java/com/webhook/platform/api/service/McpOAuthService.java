@@ -54,36 +54,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * The OAuth 2.1 authorization server behind {@code /mcp}: what lets claude.ai, Claude Desktop's
- * connector screen and ChatGPT connect with a browser sign-in instead of a pasted API key.
- *
- * <p><b>Why this is hand-rolled rather than Spring Authorization Server.</b> SAS (now
- * {@code spring-security-oauth2-authorization-server} 7.x) builds against Boot 4.1 and was the
- * first choice; it fits the parts of this flow that are easy and fights the parts that are not:
- * <ul>
- *   <li>Its authorization endpoint expects the person to be a Spring Security principal on the
- *       browser request itself, i.e. an HTTP session. The dashboard has none: it signs in with a
- *       JWT held in memory and a refresh cookie scoped to {@code /api/v1/auth}. Bridging that would
- *       mean adding session login to the API for this one screen.</li>
- *   <li>Its client registration endpoint requires an initial access token; open registration, which
- *       MCP clients need, is a custom authentication provider on top.</li>
- *   <li>Its authorization store is one untyped, untenanted row per authorization. Here a grant is a
- *       tenant-scoped row the dashboard lists and revokes per project, exactly like an API key.</li>
- * </ul>
- * With those replaced, what SAS would still contribute is PKCE, code exchange and refresh rotation
- * — a few hundred lines, all of them pinned by {@code McpOAuthIntegrationTest}. So this is only
- * the subset MCP clients use: authorization code with PKCE S256, refresh tokens with rotation,
- * open registration of public or secret-holding clients, and revocation. No implicit flow, no
- * client credentials, no OpenID Connect.
- *
- * <p><b>Tokens</b> are opaque random strings stored as SHA-256 hashes, like API keys — not JWTs.
- * A token is only ever checked by this service, so there is nothing a signature would save, and
- * an opaque token is revoked the moment its row says so.
- *
- * <p><b>A grant is an API key with a person behind it.</b> It names one project and one
- * {@link ApiKeyScope}, which {@code McpCaller} enforces as it does for a key. Unlike a key it is
- * re-checked against its approver on every use: it stops working when they leave the organization
- * or are suspended, and a READ_WRITE grant stops when they lose the role that may create a key.
+ * OAuth 2.1 for /mcp. Not Spring Authorization Server: it needs an HTTP session the dashboard lacks.
+ * A grant is re-checked against its approver's membership and role on every use.
  */
 @Slf4j
 @Service
@@ -94,7 +66,6 @@ public class McpOAuthService {
     private static final Set<String> GRANT_TYPES = Set.of("authorization_code", "refresh_token");
     private static final Set<MembershipRole> WRITER_ROLES = Set.of(MembershipRole.OWNER, MembershipRole.DEVELOPER);
     private static final int MAX_REDIRECT_URIS = 10;
-    /** last_used_at is for a person reading a list, not an access log: once a minute is plenty. */
     private static final Duration TOUCH_INTERVAL = Duration.ofMinutes(1);
 
     private final McpOAuthSettings settings;
@@ -130,13 +101,7 @@ public class McpOAuthService {
         this.clock = clock;
     }
 
-    // ── dynamic client registration (RFC 7591) ───────────────────────────
-
-    /**
-     * Registers an app. Unknown metadata is ignored, as RFC 7591 §2 asks; grant and response types
-     * are narrowed to the ones served here rather than refused, and the response says what was
-     * actually registered.
-     */
+    /** Unknown metadata is ignored (RFC 7591 §2); unsupported grant types are narrowed, not refused. */
     @SystemTenant("an app registers before any person or organization is involved -- oauth_clients is not tenant-scoped")
     @Transactional
     public Map<String, Object> registerClient(Map<String, Object> metadata) {
@@ -204,23 +169,12 @@ public class McpOAuthService {
         return response;
     }
 
-    // ── authorization endpoint ───────────────────────────────────────────
-
-    /**
-     * Checks an authorization request and parks it for the consent screen. Returns where to send
-     * the browser: the consent screen, or — once the redirect URI is known to be the app's own —
-     * straight back to the app with an error.
-     *
-     * <p>Until the client and its redirect URI are verified, an error is never sent to the
-     * redirect URI: that would make this endpoint an open redirector (RFC 6749 §4.1.2.1). The
-     * consent screen shows it instead.
-     */
+    // Errors reach the redirect URI only once it is verified, or this is an open redirector.
     @SystemTenant("the browser arrives from the app before anyone has signed in -- the request row is not tenant-scoped")
     @Transactional
     public String authorize(Map<String, String> params) {
         Instant now = now();
-        // Housekeeping rides along with the traffic that creates the rows, so abandoned consent
-        // screens and never-exchanged codes do not pile up without a scheduler of their own.
+        // Cleanup rides on the traffic that creates the rows, so no scheduler is needed.
         requestRepository.deleteExpired(now.minus(Duration.ofHours(1)));
         grantRepository.deleteUnexchanged(now.minus(Duration.ofHours(1)));
 
@@ -274,8 +228,6 @@ public class McpOAuthService {
         return settings.consentPage() + "?request=" + request.getId();
     }
 
-    // ── consent (the signed-in person, from the dashboard) ───────────────
-
     @Transactional(readOnly = true)
     public McpConsentRequestResponse describeRequest(UUID requestId, UUID userId) {
         OAuthAuthorizationRequest request = requestRepository.findById(requestId)
@@ -294,11 +246,6 @@ public class McpOAuthService {
                 .build();
     }
 
-    /**
-     * Approves a request for one project of the caller's organization, and hands back where to send
-     * the browser with the code. The project is looked up in the caller's tenant, so a project of
-     * another organization is simply not found.
-     */
     @Transactional
     public McpConsentDecisionResponse approve(UUID requestId, UUID userId, McpConsentApproveRequest decision) {
         OAuthAuthorizationRequest request = requestRepository.findForUpdate(requestId)
@@ -352,14 +299,7 @@ public class McpOAuthService {
                 "The person declined to connect this app", request.getState()));
     }
 
-    // ── token endpoint ───────────────────────────────────────────────────
-
-    /**
-     * Exchanges a code or a refresh token for a new token pair.
-     *
-     * <p>{@code noRollbackFor}, because two of its refusals are also writes that must stick: a
-     * replayed code and a replayed refresh token each revoke the grant they belong to.
-     */
+    /** {@code noRollbackFor}: a replayed code or refresh token revokes its grant, and that must stick. */
     @SystemTenant("called by the app with only its client credentials -- the grant it names decides the organization")
     @Transactional(noRollbackFor = OAuthProtocolException.class)
     public Map<String, Object> token(Map<String, String> params, String authorization) {
@@ -382,8 +322,7 @@ public class McpOAuthService {
                 .filter(g -> g.getClientId().equals(client.getId()))
                 .orElseThrow(() -> OAuthProtocolException.invalidGrant("The code is not valid"));
         if (grant.getCodeUsedAt() != null) {
-            // OAuth 2.1 §4.1.3: a code presented twice means someone else has it too. Whatever it
-            // was exchanged for goes with it.
+            // OAuth 2.1 §4.1.3: a code presented twice means someone else has it too.
             revoke(grant, null, "authorization code presented twice");
             throw OAuthProtocolException.invalidGrant("The code was already used");
         }
@@ -411,8 +350,7 @@ public class McpOAuthService {
         String hash = OAuthSecrets.hash(required(params, "refresh_token"));
         Optional<OAuthGrant> current = grantRepository.findByRefreshTokenHash(hash);
         if (current.isEmpty()) {
-            // A refresh token that was already rotated away. Only a copy of it could still be
-            // presented, so the grant is revoked for its rightful holder too (OAuth 2.1 §4.3.1).
+            // A rotated-away token can only be a stolen copy, so the whole grant is revoked.
             grantRepository.findByPreviousRefreshTokenHash(hash)
                     .filter(g -> g.getRevokedAt() == null)
                     .ifPresent(g -> revoke(g, null, "rotated refresh token presented again"));
@@ -452,13 +390,7 @@ public class McpOAuthService {
         return response;
     }
 
-    // ── revocation endpoint (RFC 7009) ───────────────────────────────────
-
-    /**
-     * Revokes the grant a token belongs to, when that token is this client's. Either token ends the
-     * whole grant: an app asking to be disconnected means all of it. An unknown token is not an
-     * error (§2.2), so the answer does not tell a caller which tokens exist.
-     */
+    /** Either token ends the whole grant. An unknown token is not an error (RFC 7009 §2.2). */
     @SystemTenant("called by the app with only its client credentials -- the token decides the organization")
     @Transactional
     public void revokeToken(Map<String, String> params, String authorization) {
@@ -470,12 +402,6 @@ public class McpOAuthService {
                 .ifPresent(g -> revoke(g, null, "revoked by the app"));
     }
 
-    // ── the resource server: who is calling /mcp ─────────────────────────
-
-    /**
-     * The caller an access token stands for, or empty when it stands for nobody: unknown, expired,
-     * revoked, or approved by someone who no longer has the access it grants.
-     */
     @SystemTenant("authentication precedes tenancy: the grant row is what names the organization")
     @Transactional
     public Optional<McpOAuthAuthenticationToken> authenticate(String accessToken) {
@@ -492,8 +418,6 @@ public class McpOAuthService {
         return found.map(g -> new McpOAuthAuthenticationToken(g.getId(), g.getProjectId(), g.getOrganizationId(),
                 g.getScope()));
     }
-
-    // ── project settings ─────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public List<McpGrantResponse> listGrants(UUID projectId) {
@@ -534,12 +458,6 @@ public class McpOAuthService {
         revoke(grant, userId, "revoked from project settings");
     }
 
-    // ── internals ────────────────────────────────────────────────────────
-
-    /**
-     * Who is calling the token or revocation endpoint. A public client names itself; a client that
-     * registered a secret must present it, in the body or as HTTP Basic (RFC 6749 §2.3.1).
-     */
     private OAuthClient authenticateClient(Map<String, String> params, String authorization) {
         String clientId = params.get("client_id");
         String secret = params.get("client_secret");
@@ -572,10 +490,6 @@ public class McpOAuthService {
         return client;
     }
 
-    /**
-     * Whether the person behind a grant could still approve it today: an active member of its
-     * organization and, for READ_WRITE, in a role that may create an API key.
-     */
     private boolean stillBacked(OAuthGrant grant) {
         return membershipRepository.findByUserIdAndOrganizationId(grant.getUserId(), grant.getOrganizationId())
                 .filter(m -> m.getStatus() == MembershipStatus.ACTIVE)
@@ -632,7 +546,6 @@ public class McpOAuthService {
                 + "Start again from the app.");
     }
 
-    /** READ_WRITE when the app asked for mcp:write, READ_ONLY otherwise: least privilege by default. */
     static ApiKeyScope scopeFromRequest(String scope) {
         if (scope == null) {
             return ApiKeyScope.READ_ONLY;
@@ -712,7 +625,6 @@ public class McpOAuthService {
         }
     }
 
-    /** A display name: control characters out, whitespace collapsed, bounded. */
     private static String clean(String value, int max) {
         if (value == null) {
             return null;

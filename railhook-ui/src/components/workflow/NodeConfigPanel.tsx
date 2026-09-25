@@ -22,8 +22,6 @@ interface NodeConfigPanelProps {
   onClose: () => void;
 }
 
-// The global control style in index.css owns the height, border and focus ring;
-// these only add what a required-but-empty field needs on top of it.
 const inputCls = 'w-full text-sm';
 const inputErrCls = 'w-full text-sm !border-halt focus:!border-halt';
 
@@ -41,7 +39,7 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
     try {
       updateField(key, JSON.parse(raw));
     } catch {
-      // store raw string so user can keep typing
+      // store raw string so the user can keep typing
     }
   };
 
@@ -52,9 +50,8 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
   };
 
   return (
-    // A 320px column beside a 375px canvas is the whole screen, so on a phone the panel comes up
-    // over the canvas as a sheet instead of taking the space the canvas needs.
-    <div className="fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col overflow-y-auto rounded-t-lg border-t border-rail bg-card shadow-elevated lg:static lg:h-full lg:max-h-none lg:w-80 lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none">
+    // On a phone the panel is a sheet over the canvas; a 320px column would fill the screen.
+    <div className="fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col overflow-y-auto border-t border-rail bg-card shadow-elevated lg:static lg:h-full lg:max-h-none lg:w-80 lg:border-l lg:border-t-0 lg:shadow-none">
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-rail bg-card px-4 py-3">
         <h3 className="mono-label">{t('workflows.builder.configureNode')}</h3>
         <Button variant="ghost" size="icon-sm" onClick={onClose} title={t('common.close')} aria-label={t('common.close')}>
@@ -63,7 +60,6 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
       </div>
 
       <div className="p-4 space-y-4 flex-1">
-        {/* Label — all nodes */}
         <Field label={t('workflows.nodeConfig.label')}>
           <input
             value={String(d.label || '')}
@@ -72,7 +68,6 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
           />
         </Field>
 
-        {/* ── Trigger node ────────────────────────────────────────── */}
         {nodeType === 'webhookTrigger' && (
           <>
             <Field label={t('workflows.nodeConfig.eventTypePattern')} hint={t('workflows.nodeConfig.eventTypePatternHint')}>
@@ -87,7 +82,6 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
           </>
         )}
 
-        {/* ── Filter node ─────────────────────────────────────────── */}
         {nodeType === 'filter' && (
           <Field label={t('workflows.nodeConfig.conditions')} hint={t('workflows.nodeConfig.conditionsHint')}>
             <ConditionTreeEditor
@@ -99,7 +93,6 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
           </Field>
         )}
 
-        {/* ── Transform node ──────────────────────────────────────── */}
         {nodeType === 'transform' && (
           <TransformSource
             transformationId={String(d.transformationId || '')}
@@ -109,7 +102,6 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
           />
         )}
 
-        {/* ── HTTP node ───────────────────────────────────────────── */}
         {nodeType === 'http' && (
           <>
             <Field label={t('workflows.nodeConfig.method')}>
@@ -162,7 +154,6 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
           </>
         )}
 
-        {/* ── Slack node ──────────────────────────────────────────── */}
         {nodeType === 'slack' && (
           <>
             <Field label={t('workflows.nodeConfig.webhookUrl')} required error={!d.webhookUrl ? t('workflows.validation.required') : undefined}>
@@ -193,7 +184,6 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
           </>
         )}
 
-        {/* ── Delivery node ───────────────────────────────────────── */}
         {nodeType === 'delivery' && (
           <EndpointSelector
             value={String(d.endpointId || '')}
@@ -201,7 +191,6 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
           />
         )}
 
-        {/* ── Branch node ─────────────────────────────────────────── */}
         {nodeType === 'branch' && (
           <Field label={t('workflows.nodeConfig.conditions')} hint={t('workflows.nodeConfig.branchHint')}>
             <ConditionTreeEditor
@@ -213,7 +202,6 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
           </Field>
         )}
 
-        {/* ── Delay node ──────────────────────────────────────────── */}
         {nodeType === 'delay' && (
           <Field label={t('workflows.nodeConfig.delaySeconds')} hint={t('workflows.nodeConfig.delaySecondsHint')}>
             <input
@@ -227,12 +215,10 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
           </Field>
         )}
 
-        {/* ── Create Event node ───────────────────────────────────── */}
         {nodeType === 'createEvent' && (
           <>
             <Field label={t('workflows.nodeConfig.eventType')} hint={t('workflows.nodeConfig.eventTypeHint')} required error={!d.eventType ? t('workflows.validation.required') : undefined}>
-              {/* Suggestions, not a closed list: the catalogue holds the types somebody has
-                  written a schema for, and emitting one that has no schema yet is allowed. */}
+              {/* Suggestions, not a closed list: emitting a type with no schema yet is allowed. */}
               <input
                 list="workflow-event-types"
                 value={String(d.eventType || '')}
@@ -276,8 +262,6 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
     </div>
   );
 }
-
-// ── Endpoint selector with inline creation ─────────────────────────────
 
 function EndpointSelector({ value, onChange }: { value: string; onChange: (val: string) => void }) {
   const { t } = useTranslation();
@@ -336,7 +320,7 @@ function EndpointSelector({ value, onChange }: { value: string; onChange: (val: 
           {t('workflows.nodeConfig.createEndpoint')}
         </Button>
       ) : (
-        <div className="space-y-2 rounded-md border border-rail bg-secondary/30 p-3">
+        <div className="space-y-2 border border-rail bg-secondary/30 p-3">
           <p className="mono-label">{t('workflows.nodeConfig.newEndpoint')}</p>
           <Field label="URL" required error={showCreate && !newUrl ? t('workflows.validation.required') : undefined}>
             <input
@@ -374,22 +358,7 @@ function EndpointSelector({ value, onChange }: { value: string; onChange: (val: 
   );
 }
 
-// ── API Key info + creation for trigger node ────────────────────────────
-
-/**
- * Where a transform node's reshaping comes from: the project's transformation library, or a
- * template written here.
- *
- * <p>The library was unreachable from the canvas. A project could build up named
- * transformations on the Transformations page, point rule actions at them — and then, in a
- * workflow, have to retype one into a box, in a different syntax, with no error to say the
- * syntaxes differ. A saved transformation is `${$.json.path}`; this node's own template is
- * `{{field.path}}`. Text written for one does nothing in the other.
- *
- * <p>So the choice is explicit rather than inferred from what somebody pasted, and picking the
- * library does not mean leaving the canvas to fill it: a transformation created here is saved
- * to the project and selected, the same way the endpoint selector below already works.
- */
+/** `${$.path}` (library) and `{{field.path}}` (inline) are different syntaxes, so the source is an explicit choice. */
 function TransformSource({ transformationId, template, onUseSaved, onUseInline }: {
   transformationId: string;
   template: string;
@@ -431,12 +400,12 @@ function TransformSource({ transformationId, template, onUseSaved, onUseInline }
   return (
     <>
       <Field label={t('workflows.nodeConfig.transformSource')} hint={t('workflows.nodeConfig.transformSourceHint')}>
-        <div role="group" aria-label={t('workflows.nodeConfig.transformSource')} className="flex gap-0.5 rounded-lg border border-rail p-0.5">
+        <div role="group" aria-label={t('workflows.nodeConfig.transformSource')} className="flex gap-0.5 border border-rail p-0.5">
           <button
             type="button"
             aria-pressed={usingSaved}
             onClick={() => onUseSaved(transformations?.[0]?.id ?? '')}
-            className={cn('flex-1 rounded-md px-2 py-1 text-xs transition-colors',
+            className={cn('flex-1 px-2 py-1 text-xs transition-colors',
               usingSaved ? 'bg-primary font-medium text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
           >
             {t('workflows.nodeConfig.transformSourceSaved')}
@@ -445,7 +414,7 @@ function TransformSource({ transformationId, template, onUseSaved, onUseInline }
             type="button"
             aria-pressed={!usingSaved}
             onClick={() => onUseInline(template || '{}')}
-            className={cn('flex-1 rounded-md px-2 py-1 text-xs transition-colors',
+            className={cn('flex-1 px-2 py-1 text-xs transition-colors',
               !usingSaved ? 'bg-primary font-medium text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
           >
             {t('workflows.nodeConfig.transformSourceInline')}
@@ -489,7 +458,7 @@ function TransformSource({ transformationId, template, onUseSaved, onUseInline }
               {t('workflows.nodeConfig.createTransformation')}
             </Button>
           ) : (
-            <div className="space-y-2 rounded-md border border-rail bg-secondary/30 p-3">
+            <div className="space-y-2 border border-rail bg-secondary/30 p-3">
               <p className="mono-label">{t('workflows.nodeConfig.newTransformation')}</p>
               <Field label={t('workflows.nodeConfig.transformationName')} required error={!newName ? t('workflows.validation.required') : undefined}>
                 <input
@@ -535,12 +504,6 @@ function TransformSource({ transformationId, template, onUseSaved, onUseInline }
   );
 }
 
-/**
- * The event types this project has a schema for, offered to the create-event node as
- * suggestions. A datalist rather than a select: emitting a type the catalogue has never seen
- * is allowed, and turning that into a validation error would be a new rule this node does not
- * have.
- */
 function EventTypeSuggestions() {
   const { projectId } = useParams<{ projectId: string }>();
   const { data: eventTypes } = useEventTypes(projectId);
@@ -591,7 +554,7 @@ function ApiKeyInfo() {
   const activeKeys = keys?.filter(k => !k.revokedAt) || [];
 
   return (
-    <div className="space-y-2 rounded-md border border-rail bg-secondary/30 p-3">
+    <div className="space-y-2 border border-rail bg-secondary/30 p-3">
       <div className="flex items-center gap-1.5">
         <Key className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="mono-label">
@@ -599,9 +562,8 @@ function ApiKeyInfo() {
         </span>
       </div>
 
-      {/* Created key banner — shown once */}
       {createdKey && (
-        <div className="space-y-1 rounded-md border border-ok/30 bg-ok-soft p-2">
+        <div className="space-y-1 border border-ok/30 bg-ok-soft p-2">
           <p className="text-[10px] font-medium text-ok">{t('workflows.nodeConfig.apiKeyCopyWarning')}</p>
           <div className="flex items-center gap-1">
             <code className="flex-1 text-[10px] font-mono bg-background rounded px-1.5 py-0.5 truncate select-all">{createdKey}</code>
@@ -615,7 +577,6 @@ function ApiKeyInfo() {
         </div>
       )}
 
-      {/* Key list */}
       {isLoading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> ...</div>
       ) : activeKeys.length === 0 ? (
@@ -638,7 +599,6 @@ function ApiKeyInfo() {
         </div>
       )}
 
-      {/* Inline create */}
       {!showCreate ? (
         <Button variant="outline" size="sm" className="w-full gap-1.5 text-[10px]" onClick={() => setShowCreate(true)}>
           <Plus className="h-3 w-3" />
@@ -675,8 +635,6 @@ function ApiKeyInfo() {
     </div>
   );
 }
-
-// ── Subscription info for createEvent node ─────────────────────────────
 
 function SubscriptionInfo() {
   const { t } = useTranslation();
@@ -715,7 +673,7 @@ function SubscriptionInfo() {
   const activeSubs = subscriptions?.filter(s => s.enabled) || [];
 
   return (
-    <div className="space-y-2 rounded-md border border-rail bg-secondary/30 p-3">
+    <div className="space-y-2 border border-rail bg-secondary/30 p-3">
       <p className="mono-label">
         {t('workflows.nodeConfig.subscriptions')}
       </p>
@@ -786,8 +744,6 @@ function SubscriptionInfo() {
   );
 }
 
-// ── Endpoint quick-fill for HTTP node ────────────────────────────────────
-
 function EndpointQuickFill({ onSelect }: { onSelect: (url: string) => void }) {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
@@ -804,13 +760,13 @@ function EndpointQuickFill({ onSelect }: { onSelect: (url: string) => void }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="text-[10px] text-primary hover:underline flex items-center gap-1"
+        className="text-[10px] link-ink flex items-center gap-1"
       >
         <ExternalLink className="h-3 w-3" />
         {t('workflows.nodeConfig.pickFromEndpoints')}
       </button>
       {open && endpoints && endpoints.length > 0 && (
-        <div className="mt-1 border rounded-md bg-background max-h-28 overflow-y-auto">
+        <div className="mt-1 border bg-background max-h-28 overflow-y-auto">
           {endpoints.map(ep => (
             <button
               key={ep.id}
@@ -831,17 +787,7 @@ function EndpointQuickFill({ onSelect }: { onSelect: (url: string) => void }) {
   );
 }
 
-// ── Field wrapper with validation ──────────────────────────────────────
-
-/**
- * Attaches the field's id to the one control inside it.
- *
- * <p>The label and the control were siblings with nothing joining them, so every input in this
- * panel — the URL a workflow posts to, the endpoint it delivers through, the delay it waits —
- * was announced as an unlabelled textbox, and clicking a label focused nothing. The id is
- * threaded to the first native control found rather than by wrapping the whole field in the
- * label, because the hint underneath would otherwise be read out as part of the name.
- */
+/** The id goes to the first native control, not a wrapping label, so the hint is not read as the name. */
 function withFieldId(children: React.ReactNode, id: string): React.ReactNode {
   let claimed = false;
   const visit = (node: React.ReactNode): React.ReactNode => {

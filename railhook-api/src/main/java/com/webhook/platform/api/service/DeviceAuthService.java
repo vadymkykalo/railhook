@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.UUID;
+import com.webhook.platform.api.domain.repository.UserRepository;
 
 @Slf4j
 @Service
@@ -36,7 +37,7 @@ public class DeviceAuthService {
 
     private final DeviceAuthCodeRepository deviceAuthCodeRepository;
     private final MembershipRepository membershipRepository;
-    private final com.webhook.platform.api.domain.repository.UserRepository userRepository;
+    private final UserRepository userRepository;
     private final UserSessionService userSessionService;
     private final JwtUtil jwtUtil;
 
@@ -96,19 +97,7 @@ public class DeviceAuthService {
         log.info("Device auth approved: userCode={}, userId={}", userCode, userId);
     }
 
-    /**
-     * The other answer to "a terminal somewhere is asking to log in as you".
-     *
-     * <p>{@code DENIED} was a status the poll path already refused a token for, with a 403 the CLI
-     * already prints as "Authorization denied" — and nothing could ever set it. The verification
-     * screen offered Approve and a Cancel that only reset the form, so a person who did not
-     * recognise the code had no way to say so: the code stayed PENDING and whoever had asked for it
-     * kept polling for the rest of its ten minutes. Denying ends that immediately.
-     *
-     * <p>Only the status is written. The code carries no user and no organization afterwards, so
-     * there is nothing for a later poll to mint a token from even if one reached the APPROVED
-     * branch, and the row does not read as an approval by the person who refused it.
-     */
+    // For a person who does not recognise the code, so whoever asked stops polling.
     @Transactional
     public void denyDeviceCode(String userCode, UUID userId) {
         DeviceAuthCode code = deviceAuthCodeRepository.findByUserCodeAndStatus(userCode, DeviceAuthStatus.PENDING)
@@ -139,46 +128,32 @@ public class DeviceAuthService {
             case EXPIRED:
                 throw new ResponseStatusException(HttpStatus.GONE, "Device code has expired");
             case CONSUMED:
-                // Already exchanged for a token pair by a previous (or racing) poll. Fail
-                // closed rather than minting a second pair for the same approval.
+                // Already exchanged by an earlier or racing poll. Fail closed rather than mint a second pair.
                 throw new ResponseStatusException(HttpStatus.GONE, "Device code has already been used");
             case APPROVED:
                 break;
         }
 
-        // Role MUST come from the same membership row as the organization the code was
-        // approved for — not an arbitrary membership of the user's. A user can be OWNER
-        // of one org and VIEWER of another; picking any membership lets an approval
-        // scoped to the low-privilege org mint a token with the high-privilege role.
-        // Fail closed if the user no longer has (or never had) a membership in that
-        // exact org.
+        // The role comes from the approved organization's membership, or a VIEWER approval could
+        // mint an OWNER token from another org.
         Membership membership = membershipRepository
                 .findByUserIdAndOrganizationId(code.getUserId(), code.getOrganizationId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
                         "User is not a member of the approved organization"));
 
-        // The other place a Membership becomes an authenticated context, and so the other place
-        // a suspension has to be refused (AuthService.membershipToIssueTokenFor is the first).
-        // The approval itself needs a live session, which suspending revokes — but a code
-        // approved just before the suspension is still sitting there waiting to be polled, and
-        // exchanging it would hand out a fresh fifteen minutes of access.
+        // A code approved just before a suspension would otherwise still hand out fresh access.
         if (membership.getStatus() == MembershipStatus.DISABLED) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Your membership in this organization has been suspended");
         }
 
-        // Single-use, compare-and-set: only the caller that actually flips APPROVED ->
-        // CONSUMED gets to mint tokens. A second concurrent poll (or a replay after the
-        // first succeeded) loses the race and is refused rather than minting another
-        // token pair.
+        // Only the caller that flips APPROVED to CONSUMED mints tokens.
         int consumed = deviceAuthCodeRepository.markConsumedIfApproved(code.getId());
         if (consumed == 0) {
             throw new ResponseStatusException(HttpStatus.GONE, "Device code has already been used");
         }
 
-        // A CLI grant is recorded as a session like any browser sign-in, and named CLI so the
-        // dashboard can say what it is. It is the credential most likely to outlive the machine
-        // it was issued to, and before this it was the one a user could neither see nor end.
+        // A session named CLI, so the user can see and end the credential most likely to outlive its machine.
         UUID sessionId = UUID.randomUUID();
         String refreshToken = jwtUtil.generateRefreshToken(code.getUserId(), sessionId);
 
@@ -194,9 +169,6 @@ public class DeviceAuthService {
                 .expiresAt(jwtUtil.getExpirationFromToken(refreshToken).toInstant())
                 .build());
 
-        // A device-code grant is approved from a signed-in browser, so the account behind it
-        // has already been through whatever the dashboard required; the claim still has to
-        // carry the truth rather than an assumption, or a CLI would outrank the browser.
         boolean emailVerified = userRepository.findById(code.getUserId())
                 .map(u -> Boolean.TRUE.equals(u.getEmailVerified()))
                 .orElse(false);
@@ -227,7 +199,7 @@ public class DeviceAuthService {
     }
 
     private String generateUserCode() {
-        // Human-readable 8-char alphanumeric code (easy to type)
+        // No 0/O or 1/I, so the code is easy to type.
         String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         StringBuilder sb = new StringBuilder(8);
         for (int i = 0; i < 8; i++) {

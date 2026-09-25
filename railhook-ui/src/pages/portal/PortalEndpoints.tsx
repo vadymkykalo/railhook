@@ -24,7 +24,6 @@ import {
 } from '../../components/ui/table';
 import PortalEndpointDialog from './PortalEndpointDialog';
 
-/** How many event types a row shows before it says "and N more". */
 const TYPES_SHOWN = 3;
 
 export default function PortalEndpoints({ eventTypes }: { eventTypes: string[] }) {

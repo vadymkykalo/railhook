@@ -22,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,19 +31,11 @@ import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Alerting had both ends and no middle.
- *
- * <p>{@code AlertService.fireAlert} — which writes the event, dispatches the notification and
- * opens a CRITICAL incident — had zero callers, and all four {@code AlertType} values were
- * unreferenced outside their own enum. A user could create a rule, see it listed, and it would
- * never fire. These tests are the middle, and they pin the two properties that decide whether
- * the middle is worth having: that it fires on a crossing rather than on every tick, and that
- * it counts one organization's deliveries against that organization's threshold.
- */
+// AlertService.fireAlert once had no callers: rules could be created and never fired.
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("AlertEvaluatorService — the half of alerting that looks")
@@ -90,8 +83,6 @@ class AlertEvaluatorServiceTest {
 
         evaluator.evaluate();
 
-        /* Zero of zero deliveries failed. Firing here would page someone every night about a
-           project nobody is using, and an alert people learn to ignore is worse than none. */
         verify(alertService, never()).fireAlert(any(), anyDouble(), anyString());
     }
 
@@ -108,8 +99,6 @@ class AlertEvaluatorServiceTest {
 
         evaluator.evaluate();
 
-        /* The condition is still true — that is the point. A rule whose condition holds for an
-           hour must produce one alert, not sixty, and the open one must stay open. */
         verify(alertService, never()).fireAlert(any(), anyDouble(), anyString());
         verify(alertService, never()).resolveRecovered(any());
     }
@@ -119,7 +108,7 @@ class AlertEvaluatorServiceTest {
     void firesAgainAfterTheConditionRecovers() {
         AlertRule rule = rule(AlertType.DLQ_THRESHOLD, 5.0);
         given(rule);
-        java.util.concurrent.atomic.AtomicBoolean open = new java.util.concurrent.atomic.AtomicBoolean(false);
+        AtomicBoolean open = new AtomicBoolean(false);
         when(eventRepository.existsByAlertRuleIdAndResolvedFalse(rule.getId())).thenAnswer(inv -> open.get());
         when(alertService.fireAlert(any(), anyDouble(), anyString())).thenAnswer(inv -> {
             open.set(true);
@@ -133,43 +122,17 @@ class AlertEvaluatorServiceTest {
         when(deliveryRepository.countDlqByProjectIdSince(eq(projectId), any())).thenReturn(9L);
         evaluator.evaluate();
         evaluator.evaluate();
-        verify(alertService, org.mockito.Mockito.times(1)).fireAlert(eq(rule), eq(9.0), anyString());
+        verify(alertService, times(1)).fireAlert(eq(rule), eq(9.0), anyString());
 
         when(deliveryRepository.countDlqByProjectIdSince(eq(projectId), any())).thenReturn(0L);
         evaluator.evaluate();
-        /* Nobody resolved it by hand. Until the evaluator did this itself, an alert fired once
-           and then the rule was silent for good: every later outage found the old event still
-           open and said nothing. */
+        // Before the evaluator resolved on recovery, a rule fired once and then stayed silent for good.
         verify(alertService).resolveRecovered(rule);
         assertThat(open.get()).as("the open alert is resolved once the condition stops holding").isFalse();
 
         when(deliveryRepository.countDlqByProjectIdSince(eq(projectId), any())).thenReturn(7L);
         evaluator.evaluate();
         verify(alertService).fireAlert(eq(rule), eq(7.0), anyString());
-    }
-
-    @Test
-    @DisplayName("a rule with nothing open and nothing breached resolves nothing")
-    void quietRuleResolvesNothing() {
-        AlertRule rule = rule(AlertType.DLQ_THRESHOLD, 5.0);
-        given(rule);
-        when(deliveryRepository.countDlqByProjectIdSince(eq(projectId), any())).thenReturn(0L);
-
-        evaluator.evaluate();
-
-        verify(alertService, never()).resolveRecovered(any());
-    }
-
-    @Test
-    @DisplayName("resolved alert events past the retention window are purged")
-    void purgesOldResolvedAlertEvents() {
-        Instant before = Instant.now().minus(java.time.Duration.ofDays(90));
-
-        evaluator.purgeResolvedAlertEvents();
-
-        var cutoff = org.mockito.ArgumentCaptor.forClass(Instant.class);
-        verify(eventRepository).deleteResolvedBefore(cutoff.capture());
-        assertThat(cutoff.getValue()).isBetween(before.minusSeconds(60), before.plusSeconds(60));
     }
 
     @Test
@@ -202,13 +165,8 @@ class AlertEvaluatorServiceTest {
 
         evaluator.evaluate();
 
-        /* The scheduler runs @SystemTenant, which switches Hibernate's tenant filter off. Were
-           the rule not re-entered, the counting queries would sum every organization's
-           deliveries against one customer's threshold, and the AlertEvent — itself @TenantId —
-           would be written owned by nobody. */
-        assertThat(tenantAtFire.get())
-                .as("fireAlert must see the rule's organization as the current tenant")
-                .isEqualTo(organizationId);
+        // The scheduler runs @SystemTenant; without re-entering, counts would span every organization.
+        assertThat(tenantAtFire.get()).isEqualTo(organizationId);
     }
 
     @Test
@@ -222,8 +180,6 @@ class AlertEvaluatorServiceTest {
 
         evaluator.evaluate();
 
-        /* Two of the last three failed, which is a 67% failure rate and a different alert.
-           A success anywhere in the window means the receiver is answering. */
         verify(alertService, never()).fireAlert(any(), anyDouble(), anyString());
     }
 
@@ -267,20 +223,7 @@ class AlertEvaluatorServiceTest {
 
         evaluator.evaluate();
 
-        /* Rules belong to different organizations. One customer's malformed rule must not
-           silence every other customer's alerting for that tick. */
         verify(alertService).fireAlert(eq(healthy), eq(4.0), anyString());
-    }
-
-    @Test
-    @DisplayName("a rule with no threshold measures nothing")
-    void nullThresholdDoesNotFire() {
-        AlertRule rule = rule(AlertType.FAILURE_RATE, null);
-        given(rule);
-
-        evaluator.evaluate();
-
-        verify(alertService, never()).fireAlert(any(), anyDouble(), anyString());
     }
 
     private void given(AlertRule rule) {

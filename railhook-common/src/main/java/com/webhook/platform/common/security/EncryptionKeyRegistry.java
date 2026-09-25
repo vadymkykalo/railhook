@@ -9,26 +9,13 @@ import jakarta.annotation.PostConstruct;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * Manages versioned encryption keys for zero-downtime key rotation.
- *
- * Configuration:
- * <pre>
- *   # Single key (backward-compatible, treated as version 1):
- *   webhook.encryption-key=my_secret_key
- *
- *   # Multi-key for rotation (format: "version:key,version:key"):
- *   webhook.encryption-keys=1:old_key_here,2:new_key_here
- *   webhook.encryption-key-active-version=2
- * </pre>
- *
- * During rotation:
- * 1. Add new key as version N+1 to webhook.encryption-keys
- * 2. Set webhook.encryption-key-active-version=N+1
- * 3. Deploy — new encryptions use version N+1, old data still decrypts with version N
- * 4. Run re-encryption (POST /api/v1/admin/encryption/rotate)
- * 5. Once all rows migrated, remove old key from config
+ * Versioned encryption keys, so a key can rotate without downtime. Either
+ * {@code webhook.encryption-key} (version 1) or {@code webhook.encryption-keys=1:old,2:new} with
+ * {@code webhook.encryption-key-active-version}. New data uses the active version; older rows
+ * decrypt with their own version until re-encrypted.
  */
 @Component
 @Slf4j
@@ -94,42 +81,36 @@ public class EncryptionKeyRegistry {
                 keyMap.size(), activeVersion);
     }
 
-    /** Returns the active version number for new encryptions. */
     public int getActiveVersion() {
         return activeVersion;
     }
 
-    /** Returns the master key for the active version. */
     public String getActiveKey() {
         return keyMap.get(activeVersion);
     }
 
-    /** Returns the salt (shared across all versions). */
+    /** Shared across all versions. */
     public String getSalt() {
         return salt;
     }
 
-    /** Returns the master key for a specific version, or null if not found. */
     public String getKey(int version) {
         return keyMap.get(version);
     }
 
-    /** Returns true if the given version exists in the registry. */
     public boolean hasVersion(int version) {
         return keyMap.containsKey(version);
     }
 
-    /** Returns all registered version numbers. */
-    public java.util.Set<Integer> getVersions() {
+    public Set<Integer> getVersions() {
         return keyMap.keySet();
     }
 
-    /** Encrypt with the active key version. */
     public CryptoUtils.EncryptedData encrypt(String plaintext) {
         return CryptoUtils.encryptSecret(plaintext, getActiveKey(), salt, activeVersion);
     }
 
-    /** Decrypt using a specific key version. Falls back to active if version <= 0. */
+    /** A version of 0 or less means the active one. */
     public String decrypt(String ciphertext, String iv, int keyVersion) {
         int version = keyVersion > 0 ? keyVersion : activeVersion;
         String key = keyMap.get(version);
@@ -140,7 +121,6 @@ public class EncryptionKeyRegistry {
         return CryptoUtils.decryptSecret(ciphertext, iv, key, salt);
     }
 
-    /** Decrypt trying specified version first, then falling back to all versions. */
     public String decryptWithFallback(String ciphertext, String iv, int keyVersion) {
 
         if (keyVersion > 0 && keyMap.containsKey(keyVersion)) {
@@ -152,11 +132,10 @@ public class EncryptionKeyRegistry {
         }
 
         for (int version : keyMap.keySet().stream().sorted(Collections.reverseOrder()).toList()) {
-            if (version == keyVersion) continue; // already tried
+            if (version == keyVersion) continue;
             try {
                 return CryptoUtils.decryptSecret(ciphertext, iv, keyMap.get(version), salt);
             } catch (Exception ignored) {
-                // try next
             }
         }
 
@@ -164,7 +143,6 @@ public class EncryptionKeyRegistry {
                 "Available versions: " + keyMap.keySet());
     }
 
-    /** Check if data needs re-encryption (encrypted with non-active version). */
     public boolean needsReEncryption(int keyVersion) {
         return keyVersion != activeVersion;
     }

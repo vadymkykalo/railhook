@@ -1,12 +1,5 @@
 name: License & SBOM Report
 
-# Keeps docs/licenses/ honest between manual refreshes. Runs monthly and
-# on demand rather than on every push - the underlying license/SBOM files
-# aren't expected to change often enough to justify committing generated JSON
-# on every PR, and a copyleft dependency sneaking in is exactly the kind of
-# slow-moving risk a monthly check catches in time. See docs/licenses/README.md
-# for the manual regenerate-and-commit flow this mirrors.
-
 on:
   schedule:
     - cron: '0 6 1 * *'  # 06:00 UTC on the 1st of each month

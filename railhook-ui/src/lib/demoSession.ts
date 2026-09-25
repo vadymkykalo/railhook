@@ -1,19 +1,11 @@
 import type { CurrentUserResponse } from '../types/api.types';
 
-/**
- * The live demo's session, kept in this tab.
- *
- * A demo session is an access token and nothing else: no refresh cookie exists for it, so the
- * silent refresh that restores a real session on reload has nothing to present. Keeping the token
- * in sessionStorage is what lets a reload stay in the demo. It is scoped to the tab and ends with
- * it, and the token is worth little — read-only on the server, for half an hour.
- */
+/** No refresh cookie exists for a demo token, so sessionStorage is what survives a reload. */
 
 const KEY = 'railhook_demo_session';
 
 export interface DemoSession {
   token: string;
-  /** ISO instant the token stops working. */
   expiresAt: string;
   user: CurrentUserResponse;
 }
@@ -34,7 +26,6 @@ export function saveDemoSession(session: DemoSession): void {
   }
 }
 
-/** The demo session in this tab, or null when there is none or it has expired. */
 export function readDemoSession(now: number = Date.now()): DemoSession | null {
   try {
     const raw = storage()?.getItem(KEY);

@@ -8,19 +8,19 @@
           "name": "DB_MODE",
           "default": "embedded",
           "example": null,
-          "description": "Options: embedded | external"
+          "description": "Where PostgreSQL runs: embedded (in Docker) | external (managed database)."
         },
         {
           "name": "COMPOSE_PROJECT_NAME",
           "default": "railhook",
           "example": null,
-          "description": "Compose project name. Pinned rather than left to Compose, which otherwise derives it from\nthe name of the directory you cloned into - so the Docker network would be\nrailhook_webhook-network for one person and something else for anyone whose folder is named\ndifferently. The monitoring stack joins that network *by name*, so a derived name silently\nleaves Prometheus with nothing to scrape."
+          "description": "Compose project name. Pinned because the monitoring stack joins this project's network by\nname, and Compose would otherwise derive it from the clone's directory name."
         },
         {
           "name": "DOCKER_REGISTRY",
           "default": null,
           "example": "ghcr.io/yourorg/railhook",
-          "description": "Docker registry prefix for pre-built images (used by docker-compose.yml).\nDefaults to this project's own published images if left unset —\nghcr.io/vadymkykalo/railhook-{api,worker,ui}. Set it to point at your own mirror or fork:"
+          "description": "Registry prefix for the api, worker and ui images; defaults to ghcr.io/vadymkykalo/railhook."
         }
       ]
     },
@@ -31,13 +31,13 @@
           "name": "APP_ENV",
           "default": "development",
           "example": null,
-          "description": "Options: development | staging | production\n\nNote: In production mode, placeholder secrets will cause startup failure"
+          "description": "development | staging | production. Production refuses to start with placeholder secrets."
         },
         {
           "name": "APP_BASE_URL",
           "default": "http://localhost",
           "example": null,
-          "description": "Public frontend URL (used for emails, shared debug links, etc.). The UI container also\nreads it at startup as the origin its pages name about themselves: the canonical link,\nog:url / og:image and the sitemap.\n\nThe default is where this stack publishes the dashboard (RAILHOOK_PORT, 80). Add the port\nwhen you move it, e.g. http://localhost:8080. install.sh writes your real address here."
+          "description": "Public origin of the dashboard, used in emails, shared links, canonical tags and the sitemap.\nInclude the port when it is not 80, e.g. http://localhost:8080."
         }
       ]
     },
@@ -48,25 +48,25 @@
           "name": "POSTGRES_IMAGE",
           "default": "postgres:16-alpine",
           "example": null,
-          "description": "Used when running PostgreSQL in Docker"
+          "description": "Image and credentials of the PostgreSQL container."
         },
         {
           "name": "POSTGRES_DB",
           "default": "webhook_platform",
           "example": null,
-          "description": "Used when running PostgreSQL in Docker"
+          "description": "Image and credentials of the PostgreSQL container."
         },
         {
           "name": "POSTGRES_USER",
           "default": "webhook_user",
           "example": null,
-          "description": "Used when running PostgreSQL in Docker"
+          "description": "Image and credentials of the PostgreSQL container."
         },
         {
           "name": "POSTGRES_PASSWORD",
           "default": "webhook_dev_pass_12345",
           "example": null,
-          "description": "Used when running PostgreSQL in Docker"
+          "description": "Image and credentials of the PostgreSQL container."
         }
       ]
     },
@@ -77,73 +77,73 @@
           "name": "DB_HOST",
           "default": "postgres",
           "example": null,
-          "description": "Used when connecting to external/managed PostgreSQL\nFor embedded mode, leave as 'postgres' (Docker service name)\nFor external mode, change to your database host"
+          "description": "Database connection; DB_HOST stays `postgres` (the Compose service) in embedded mode."
         },
         {
           "name": "DB_PORT",
           "default": "5432",
           "example": null,
-          "description": "Used when connecting to external/managed PostgreSQL\nFor embedded mode, leave as 'postgres' (Docker service name)\nFor external mode, change to your database host"
+          "description": "Database connection; DB_HOST stays `postgres` (the Compose service) in embedded mode."
         },
         {
           "name": "DB_NAME",
           "default": "webhook_platform",
           "example": null,
-          "description": "Used when connecting to external/managed PostgreSQL\nFor embedded mode, leave as 'postgres' (Docker service name)\nFor external mode, change to your database host"
+          "description": "Database connection; DB_HOST stays `postgres` (the Compose service) in embedded mode."
         },
         {
           "name": "DB_USER",
           "default": "webhook_user",
           "example": null,
-          "description": "Used when connecting to external/managed PostgreSQL\nFor embedded mode, leave as 'postgres' (Docker service name)\nFor external mode, change to your database host"
+          "description": "Database connection; DB_HOST stays `postgres` (the Compose service) in embedded mode."
         },
         {
           "name": "DB_PASSWORD",
           "default": "webhook_dev_pass_12345",
           "example": null,
-          "description": "Used when connecting to external/managed PostgreSQL\nFor embedded mode, leave as 'postgres' (Docker service name)\nFor external mode, change to your database host"
+          "description": "Database connection; DB_HOST stays `postgres` (the Compose service) in embedded mode."
         },
         {
           "name": "DB_SSL_MODE",
           "default": "disable",
           "example": null,
-          "description": "Used when connecting to external/managed PostgreSQL\nFor embedded mode, leave as 'postgres' (Docker service name)\nFor external mode, change to your database host\n\nOptions: require | verify-full | disable"
+          "description": "disable | require | verify-full"
         },
         {
           "name": "DB_JDBC_URL",
           "default": "",
           "example": null,
-          "description": "Optional: Override full JDBC URL (if set, DB_HOST/PORT/NAME are ignored)"
+          "description": "Full JDBC URL; when set, DB_HOST, DB_PORT and DB_NAME are ignored."
         },
         {
           "name": "DB_POOL_MAX_SIZE",
           "default": "20",
           "example": null,
-          "description": "Connection pool settings -- API only. The worker has its own WORKER_DB_POOL_MAX_SIZE /\nWORKER_DB_POOL_MIN_IDLE below: these two used to share this same name, which meant\n`make up` silently gave the worker the API's smaller pool instead of its own tuned one, no\nmatter what either service's application.yml default claimed. Keep them separately named."
+          "description": "API connection pool (connections; timeout in ms). Named apart from the worker's on purpose:\na shared name once gave the worker the API's smaller pool."
         },
         {
           "name": "DB_POOL_MIN_IDLE",
           "default": "10",
           "example": null,
-          "description": "Connection pool settings -- API only. The worker has its own WORKER_DB_POOL_MAX_SIZE /\nWORKER_DB_POOL_MIN_IDLE below: these two used to share this same name, which meant\n`make up` silently gave the worker the API's smaller pool instead of its own tuned one, no\nmatter what either service's application.yml default claimed. Keep them separately named."
+          "description": "API connection pool (connections; timeout in ms). Named apart from the worker's on purpose:\na shared name once gave the worker the API's smaller pool."
         },
         {
           "name": "DB_POOL_CONNECTION_TIMEOUT",
           "default": "30000",
           "example": null,
-          "description": "Connection pool settings -- API only. The worker has its own WORKER_DB_POOL_MAX_SIZE /\nWORKER_DB_POOL_MIN_IDLE below: these two used to share this same name, which meant\n`make up` silently gave the worker the API's smaller pool instead of its own tuned one, no\nmatter what either service's application.yml default claimed. Keep them separately named."
+          "description": "API connection pool (connections; timeout in ms). Named apart from the worker's on purpose:\na shared name once gave the worker the API's smaller pool."
         },
         {
           "name": "WORKER_DB_POOL_MAX_SIZE",
           "default": "40",
           "example": null,
-          "description": "Worker connection pool settings. Sized against the number of transactions that can\nactually be holding a connection at once, not the worker's raw thread count -- the worker\nruns ~70 nominal concurrent tasks (webhook.outgoing-pool-size=50 + webhook.incoming-pool-size\n=20 + a handful of scheduler threads), but each delivery attempt's dominant cost is the\noutbound HTTP call, which holds NO connection (WebhookDeliveryService's transactions are the\n3-4 single-row claim/status-transition updates around it, each open for single-digit\nmilliseconds). Retry/incoming-forward claiming is also centralized in one scheduler\ntransaction per cycle (RetrySchedulerService/IncomingForwardRetryScheduler batch-claim, then\nfan out to the executor pool for the HTTP work), not fanned out across all worker threads at\nonce. 40/20 has margin over the realistic simultaneous-holder count under this shape; if a\nfuture change makes worker transactions span the HTTP call (it must not -- see\nWebhookDeliveryService's own comments) or the executor pool sizes grow substantially, re-check\nhikari_connections_pending on /actuator/prometheus under load before assuming this still holds."
+          "description": "Worker connection pool. Smaller than the worker's thread count because no transaction spans\nthe outbound HTTP call; check hikari_connections_pending under load before changing it."
         },
         {
           "name": "WORKER_DB_POOL_MIN_IDLE",
           "default": "20",
           "example": null,
-          "description": "Worker connection pool settings. Sized against the number of transactions that can\nactually be holding a connection at once, not the worker's raw thread count -- the worker\nruns ~70 nominal concurrent tasks (webhook.outgoing-pool-size=50 + webhook.incoming-pool-size\n=20 + a handful of scheduler threads), but each delivery attempt's dominant cost is the\noutbound HTTP call, which holds NO connection (WebhookDeliveryService's transactions are the\n3-4 single-row claim/status-transition updates around it, each open for single-digit\nmilliseconds). Retry/incoming-forward claiming is also centralized in one scheduler\ntransaction per cycle (RetrySchedulerService/IncomingForwardRetryScheduler batch-claim, then\nfan out to the executor pool for the HTTP work), not fanned out across all worker threads at\nonce. 40/20 has margin over the realistic simultaneous-holder count under this shape; if a\nfuture change makes worker transactions span the HTTP call (it must not -- see\nWebhookDeliveryService's own comments) or the executor pool sizes grow substantially, re-check\nhikari_connections_pending on /actuator/prometheus under load before assuming this still holds."
+          "description": "Worker connection pool. Smaller than the worker's thread count because no transaction spans\nthe outbound HTTP call; check hikari_connections_pending under load before changing it."
         }
       ]
     },
@@ -154,31 +154,31 @@
           "name": "REDIS_IMAGE",
           "default": "redis:7-alpine",
           "example": null,
-          "description": ""
+          "description": "Redis image, address, password and memory cap."
         },
         {
           "name": "REDIS_HOST",
           "default": "redis",
           "example": null,
-          "description": ""
+          "description": "Redis image, address, password and memory cap."
         },
         {
           "name": "REDIS_PORT",
           "default": "6379",
           "example": null,
-          "description": ""
+          "description": "Redis image, address, password and memory cap."
         },
         {
           "name": "REDIS_PASSWORD",
           "default": "webhook_redis_pass",
           "example": null,
-          "description": ""
+          "description": "Redis image, address, password and memory cap."
         },
         {
           "name": "REDIS_MAXMEMORY",
           "default": "256mb",
           "example": null,
-          "description": ""
+          "description": "Redis image, address, password and memory cap."
         }
       ]
     },
@@ -189,73 +189,73 @@
           "name": "KAFKA_BOOTSTRAP_SERVERS",
           "default": "kafka:9092",
           "example": null,
-          "description": "For embedded mode, use kafka:9092 (Docker internal)\nFor external mode, use your Kafka cluster URL"
+          "description": "Kafka bootstrap servers: kafka:9092 in embedded mode, your cluster otherwise."
         },
         {
           "name": "KAFKA_IMAGE",
           "default": "apache/kafka:3.7.0",
           "example": null,
-          "description": "For embedded mode, use kafka:9092 (Docker internal)\nFor external mode, use your Kafka cluster URL"
+          "description": "Kafka bootstrap servers: kafka:9092 in embedded mode, your cluster otherwise."
         },
         {
           "name": "KAFKA_NUM_PARTITIONS",
           "default": "12",
           "example": null,
-          "description": "Number of partitions for highload (increase for more parallelism)"
+          "description": "Partitions per topic; the ceiling on consumer parallelism."
         },
         {
           "name": "KAFKA_CONSUMER_GROUP_ID",
           "default": "webhook-worker",
           "example": null,
-          "description": "Consumer group IDs (prefix with env name on shared Kafka clusters, e.g. prod-webhook-worker)"
+          "description": "Consumer group IDs; prefix them with the environment on a shared cluster."
         },
         {
           "name": "KAFKA_INCOMING_GROUP_ID",
           "default": "incoming-forward-worker",
           "example": null,
-          "description": "Consumer group IDs (prefix with env name on shared Kafka clusters, e.g. prod-webhook-worker)"
+          "description": "Consumer group IDs; prefix them with the environment on a shared cluster."
         },
         {
           "name": "KAFKA_DELIVERY_CONCURRENCY",
           "default": "6",
           "example": null,
-          "description": "Worker consumer thread concurrency (should be ≤ KAFKA_NUM_PARTITIONS)\nDelivery consumer: outgoing webhook dispatch (higher = more throughput)"
+          "description": "Outgoing delivery consumer threads; keep at or below KAFKA_NUM_PARTITIONS."
         },
         {
           "name": "KAFKA_INCOMING_CONCURRENCY",
           "default": "3",
           "example": null,
-          "description": "Incoming forward consumer: incoming webhook forwarding"
+          "description": "Incoming forward consumer threads; keep at or below KAFKA_NUM_PARTITIONS."
         },
         {
           "name": "KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS",
           "default": "120000",
           "example": null,
-          "description": "Kafka producer settings (api and worker)\nHow long a single send may keep retrying before it is given up on. The producer is\nidempotent, so retries are unbounded in count and bounded by this instead — a leader\nelection or a rolling broker restart is ridden out rather than failed. A send that does\nexpire costs its outbox row one retry cycle; it is never lost."
+          "description": "How long one producer send may keep retrying (ms); an expired send is retried from the outbox."
         },
         {
           "name": "KAFKA_PRODUCER_MAX_BLOCK_MS",
           "default": "10000",
           "example": null,
-          "description": "How long send() may block waiting for cluster metadata. The outbox publisher calls it\nsynchronously on a scheduled thread, and the api shares eight of those across every\nscheduled job it has — so Kafka's own 60s default takes them out one per poll."
+          "description": "How long send() may block on cluster metadata (ms). Kafka's 60s default would hold the\nshared scheduler threads the outbox publisher runs on."
         },
         {
           "name": "KAFKA_CONSUMER_AUTO_OFFSET_RESET",
           "default": "earliest",
           "example": null,
-          "description": "Kafka consumer settings (worker only)"
+          "description": "Worker consumer offset reset policy and retries on a failed record (interval in ms)."
         },
         {
           "name": "KAFKA_CONSUMER_MAX_RETRIES",
           "default": "3",
           "example": null,
-          "description": "Kafka consumer settings (worker only)"
+          "description": "Worker consumer offset reset policy and retries on a failed record (interval in ms)."
         },
         {
           "name": "KAFKA_CONSUMER_RETRY_INTERVAL_MS",
           "default": "5000",
           "example": null,
-          "description": "Kafka consumer settings (worker only)"
+          "description": "Worker consumer offset reset policy and retries on a failed record (interval in ms)."
         }
       ]
     },
@@ -266,43 +266,43 @@
           "name": "WEBHOOK_ENCRYPTION_KEY",
           "default": "dev_encryption_key_32_chars_min!",
           "example": null,
-          "description": "Webhook secret encryption key (32+ characters, alphanumeric + special chars)\nCHANGE THIS IN PRODUCTION!"
+          "description": "Key that encrypts stored secrets, 32+ characters. Change it in production."
         },
         {
           "name": "WEBHOOK_ENCRYPTION_SALT",
           "default": "dev_encryption_salt_16_chars",
           "example": null,
-          "description": "PBKDF2 salt for AES-256 key derivation (16+ characters, unique per deployment)\nCHANGE THIS IN PRODUCTION!"
+          "description": "PBKDF2 salt for the AES-256 key, 16+ characters, unique per deployment. Change it in production."
         },
         {
           "name": "WEBHOOK_ENCRYPTION_KEYS",
           "default": "",
           "example": null,
-          "description": "Multi-key encryption for zero-downtime key rotation (optional)\nFormat: \"version:key,version:key\" — e.g. \"1:old_key,2:new_key\"\nLeave empty to use single WEBHOOK_ENCRYPTION_KEY as version 1"
+          "description": "Keys for zero-downtime rotation as \"version:key,version:key\"; empty uses WEBHOOK_ENCRYPTION_KEY as version 1."
         },
         {
           "name": "WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION",
           "default": "0",
           "example": null,
-          "description": "Active key version for new encryptions (0 = auto-detect highest version)"
+          "description": "Key version new encryptions use; 0 picks the highest."
         },
         {
           "name": "JWT_SECRET",
           "default": "dev_jwt_secret_key_32_chars_minimum",
           "example": null,
-          "description": "JWT secret for API authentication (32+ characters)\nCHANGE THIS IN PRODUCTION!"
+          "description": "JWT signing secret, 32+ characters. Change it in production."
         },
         {
           "name": "PLATFORM_ADMIN_TOKEN",
           "default": "",
           "example": null,
-          "description": "Platform-admin operator credential for cluster-wide operator endpoints\n(/api/v1/admin/**): the back-office — list and search every organization, see its plan,\nbilling status and counts, and suspend or reinstate it — plus encryption key rotation\nacross ALL tenants.\nDeliberately independent of any org/JWT — org OWNER does NOT grant this.\nPresented via the X-Platform-Admin-Token header. Leave empty to keep the\nadmin endpoints unreachable entirely (fail closed) until an operator needs them.\nCHANGE/SET THIS IN PRODUCTION before using the admin endpoints!"
+          "description": "Token for /api/v1/admin/** (X-Platform-Admin-Token header), including key rotation across all\norganizations; an organization OWNER does not get this. Empty keeps those endpoints closed."
         },
         {
           "name": "PLATFORM_ADMIN_EMAILS",
           "default": "",
           "example": null,
-          "description": "People who may open the platform admin panel (Platform admin in the dashboard's sidebar,\n/admin/platform) with their ordinary sign-in: a comma-separated list of email addresses.\nBeing listed is not enough on its own — the address must be verified, the account active,\nand the sign-in less than 12 hours old; every admin request is rate-limited and written to\nthe audit log. An organization OWNER is not a platform admin unless listed here. Encryption\nkey rotation stays on PLATFORM_ADMIN_TOKEN only.\nEmpty means nobody: no panel, and the admin API refuses every signed-in user. There is no\n\"first account becomes the admin\". install.sh --admin-email <address> sets it at install time\n(or with --refresh); later, pipe PLATFORM_ADMIN_EMAILS=<addresses> into ./railhook settings and\nrun ./railhook start.\nExample: PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com"
+          "description": "Comma-separated emails allowed into the platform admin panel (sign-in under 12 hours old).\nEmpty means nobody."
         }
       ]
     },
@@ -313,7 +313,7 @@
           "name": "API_IMAGE_TAG",
           "default": "latest",
           "example": null,
-          "description": ""
+          "description": "API image tag."
         }
       ]
     },
@@ -324,7 +324,7 @@
           "name": "WORKER_IMAGE_TAG",
           "default": "latest",
           "example": null,
-          "description": ""
+          "description": "Worker image tag."
         }
       ]
     },
@@ -335,7 +335,7 @@
           "name": "SCHEDULING_POOL_SIZE",
           "default": "8",
           "example": null,
-          "description": "Size of the shared @Scheduled thread pool. Spring Boot defaults this to 1, which\nmeans a single slow cron (e.g. the materialized-view REFRESH, or an unbounded\nKafka AdminClient call) blocks every other job on the JVM - including outbox\ndispatch. Keep at 8 or higher."
+          "description": "Threads shared by all scheduled jobs. Keep at 8 or more: with Spring's default of 1, one slow\njob stalls every other one, outbox dispatch included."
         }
       ]
     },
@@ -346,49 +346,49 @@
           "name": "RAILHOOK_PORT",
           "default": "8080",
           "example": null,
-          "description": "The one port published to the host: the dashboard's\nnginx, which also proxies every API path. Set RAILHOOK_BIND=127.0.0.1 and let a\nreverse proxy in front hold 443 — that is what installing with --domain does,\nwith the built-in Caddy, or with --domain --behind-proxy for a proxy you run.\n8080 rather than 80 because this template is what a clone runs, and a\ndeveloper's port 80 usually belongs to something else already. install.sh\nwrites 80 into the .env it generates, since that is what a browser assumes."
+          "description": "Host port and bind address of the dashboard's nginx, the only published port; it also proxies\nthe API. Use RAILHOOK_BIND=127.0.0.1 behind a reverse proxy."
         },
         {
           "name": "RAILHOOK_BIND",
           "default": "0.0.0.0",
           "example": null,
-          "description": "The one port published to the host: the dashboard's\nnginx, which also proxies every API path. Set RAILHOOK_BIND=127.0.0.1 and let a\nreverse proxy in front hold 443 — that is what installing with --domain does,\nwith the built-in Caddy, or with --domain --behind-proxy for a proxy you run.\n8080 rather than 80 because this template is what a clone runs, and a\ndeveloper's port 80 usually belongs to something else already. install.sh\nwrites 80 into the .env it generates, since that is what a browser assumes."
+          "description": "Host port and bind address of the dashboard's nginx, the only published port; it also proxies\nthe API. Use RAILHOOK_BIND=127.0.0.1 behind a reverse proxy."
         },
         {
           "name": "RAILHOOK_DOMAIN",
           "default": "",
           "example": null,
-          "description": "Domain and ACME contact for the built-in TLS terminator. It only runs under\nthe `tls` Compose profile; COMPOSE_PROFILES=tls turns it on."
+          "description": "Domain and ACME contact for the built-in Caddy TLS terminator (COMPOSE_PROFILES=tls)."
         },
         {
           "name": "ACME_EMAIL",
           "default": "",
           "example": null,
-          "description": "Domain and ACME contact for the built-in TLS terminator. It only runs under\nthe `tls` Compose profile; COMPOSE_PROFILES=tls turns it on."
+          "description": "Domain and ACME contact for the built-in Caddy TLS terminator (COMPOSE_PROFILES=tls)."
         },
         {
           "name": "UI_IMAGE_TAG",
           "default": "latest",
           "example": null,
-          "description": "UI_PORT is gone: the dashboard is published on RAILHOOK_PORT above, by both the\npublished-image path and the build overlay. Nothing read UI_PORT."
+          "description": "UI image tag."
         },
         {
           "name": "VITE_API_URL",
           "default": "",
           "example": null,
-          "description": "BUILD-TIME ONLY. Vite inlines VITE_* into the bundle, so these are passed as\nbuild args (docker-compose.build.yml -> ui.build.args) and take effect only when\nthe UI image is rebuilt. On the pre-built images they cannot be changed at all.\n\nLeave VITE_API_URL empty: the UI's nginx proxies /api/, /ws/tunnel, /hook/ and\n/ingress/ to the api service, so the browser talks to its own origin and needs\nno CORS. Set it only when the API is genuinely served from another origin —\nthen add that origin to CORS_ALLOWED_ORIGINS too."
+          "description": "Build-time only: API origin baked into the UI bundle. Leave empty; the UI's nginx proxies the\nAPI on the same origin. If set, add it to CORS_ALLOWED_ORIGINS too."
         },
         {
           "name": "VITE_CSP_EXTRA_CONNECT",
           "default": "",
           "example": null,
-          "description": "Extra origins for CSP connect-src (space-separated). Auto-includes VITE_API_URL + localhost in dev.\nExample for prod: VITE_CSP_EXTRA_CONNECT=https://api.example.com wss://api.example.com"
+          "description": "Build-time only: extra CSP connect-src origins, space-separated."
         },
         {
           "name": "RAILHOOK_CONTACT_DOMAIN",
           "default": "",
           "example": null,
-          "description": "Domain behind the sales@ and support@ addresses on /contact and in the footer,\ne.g. example.com.\n\nNot a VITE_ value: the UI container reads it when it starts, so it works on the\npublished images and takes effect when the ui container is recreated\n(docker compose up -d ui), with no rebuild.\n\nEmpty means no mail addresses are offered at all. That is the right default for\na self-hosted install: a deployment someone runs for their own company has no\nsales desk, and an address that reaches nobody is worse than an absent one. The\nGitHub issues and documentation cards are shown either way, because they are\ntrue everywhere. The hosted cloud sets its own domain here."
+          "description": "Domain for the sales@ and support@ addresses on /contact and in the footer, e.g. example.com.\nEmpty offers no addresses. Read by the ui container at start."
         }
       ]
     },
@@ -399,61 +399,61 @@
           "name": "OUTBOX_POLL_INTERVAL_MS",
           "default": "1000",
           "example": null,
-          "description": "Poll interval for pending outbox messages (ms)"
+          "description": "Poll interval for pending outbox messages (ms)."
         },
         {
           "name": "OUTBOX_RETRY_INTERVAL_MS",
           "default": "30000",
           "example": null,
-          "description": "Retry interval for failed outbox messages (ms)"
+          "description": "Retry interval for failed outbox messages (ms)."
         },
         {
           "name": "OUTBOX_CLEANUP_INTERVAL_MS",
           "default": "3600000",
           "example": null,
-          "description": "Cleanup interval for PUBLISHED/DEAD outbox messages (ms, default 1 hour)"
+          "description": "Cleanup interval for PUBLISHED and DEAD outbox messages (ms)."
         },
         {
           "name": "OUTBOX_BATCH_SIZE",
           "default": "100",
           "example": null,
-          "description": "Batch size per poll cycle"
+          "description": "Messages per poll."
         },
         {
           "name": "OUTBOX_MAX_RETRIES",
           "default": "5",
           "example": null,
-          "description": "Max publish retries before moving to DEAD status"
+          "description": "Publish retries before a message goes DEAD."
         },
         {
           "name": "OUTBOX_DEAD_RETENTION_DAYS",
           "default": "90",
           "example": null,
-          "description": "Days to retain DEAD messages before deletion (allows manual re-drive)"
+          "description": "Days DEAD messages are kept for manual re-drive."
         },
         {
           "name": "OUTBOX_SENDING_RECOVERY_SECONDS",
           "default": "300",
           "example": null,
-          "description": "Seconds before recovering stuck SENDING messages back to PENDING (must exceed Kafka delivery.timeout.ms)"
+          "description": "Seconds before a stuck SENDING message returns to PENDING; must exceed KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS."
         },
         {
           "name": "OUTBOX_BATCH_SEND_TIMEOUT_SECONDS",
           "default": "30",
           "example": null,
-          "description": "Timeout in seconds for waiting on batch Kafka send completion"
+          "description": "Seconds to wait for a batch of Kafka sends to complete."
         },
         {
           "name": "OUTBOX_MAX_PER_PROJECT",
           "default": "30",
           "example": null,
-          "description": "Max outbox messages claimed per project per batch (prevents noisy-neighbor in publishing)"
+          "description": "Messages claimed per project per batch, so one project cannot crowd out the rest."
         },
         {
           "name": "OUTBOX_MAX_PER_KEY",
           "default": "10",
           "example": null,
-          "description": "Max outbox messages claimed per Kafka key — that is, per endpoint — per batch.\nThis is the per-endpoint announcement ceiling, and it binds harder than it reads: with\nOUTBOX_POLL_INTERVAL_MS at 1000 it means ten events per second to any one endpoint, no\nmatter how large OUTBOX_BATCH_SIZE is. Measured at exactly that by load/ingest.js.\nRaise it if you have one very busy endpoint and few others; leave it if you have many,\nbecause what it buys is that one endpoint's burst cannot stall everyone else's."
+          "description": "Messages claimed per endpoint per batch. With a 1000 ms poll this caps one endpoint at 10\nevents/s whatever OUTBOX_BATCH_SIZE is; raise it only when one endpoint dominates."
         }
       ]
     },
@@ -464,61 +464,61 @@
           "name": "DATA_RETENTION_ATTEMPTS_DAYS",
           "default": "90",
           "example": null,
-          "description": "Published outbox rows are not tuned here: OutboxPublisherService owns that\ncleanup and reads OUTBOX_DEAD_RETENTION_DAYS above.\n\nDays to keep delivery attempts (cleanup runs daily at 2 AM)\nDifferential retention: successful attempts (2xx) deleted faster, errors kept longer for debugging"
+          "description": "Days to keep failed and successful (2xx) Attempts, and received incoming events."
         },
         {
           "name": "DATA_RETENTION_SUCCESSFUL_ATTEMPTS_DAYS",
           "default": "14",
           "example": null,
-          "description": "Published outbox rows are not tuned here: OutboxPublisherService owns that\ncleanup and reads OUTBOX_DEAD_RETENTION_DAYS above.\n\nDays to keep delivery attempts (cleanup runs daily at 2 AM)\nDifferential retention: successful attempts (2xx) deleted faster, errors kept longer for debugging"
+          "description": "Days to keep failed and successful (2xx) Attempts, and received incoming events."
         },
         {
           "name": "DATA_RETENTION_INCOMING_EVENTS_DAYS",
           "default": "30",
           "example": null,
-          "description": "Published outbox rows are not tuned here: OutboxPublisherService owns that\ncleanup and reads OUTBOX_DEAD_RETENTION_DAYS above.\n\nDays to keep delivery attempts (cleanup runs daily at 2 AM)\nDifferential retention: successful attempts (2xx) deleted faster, errors kept longer for debugging"
+          "description": "Days to keep failed and successful (2xx) Attempts, and received incoming events."
         },
         {
           "name": "DATA_RETENTION_EVENTS_DAYS",
           "default": "90",
           "example": null,
-          "description": "How long an Event — and, through ON DELETE CASCADE, its Deliveries and their\nAttempts — is kept. Set to -1 to keep everything forever.\n\nThis is the only setting that bounds the two largest tables. Per-plan retention\n(RetentionCleanupScheduler) does nothing while BILLING_ENABLED=false, which is\nthe self-hosted default, so before this existed events and deliveries grew\nwithout limit while delivery_attempts partitions were still dropped at\nDATA_RETENTION_ATTEMPTS_DAYS — losing the detail and keeping the bulk.\n\n90 matches DATA_RETENTION_ATTEMPTS_DAYS on purpose: keeping a delivery longer\nthan the attempts that explain it buys rows nobody can act on."
+          "description": "Days to keep Events and, by cascade, their Deliveries; -1 keeps them forever. The only bound\non those tables when billing is off. Matches DATA_RETENTION_ATTEMPTS_DAYS on purpose."
         },
         {
           "name": "DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY",
           "default": "10",
           "example": null,
-          "description": "Maximum attempts to retain per delivery (keeps most recent N)"
+          "description": "Most recent Attempts kept per Delivery."
         },
         {
           "name": "DATA_RETENTION_BATCH_SIZE",
           "default": "1000",
           "example": null,
-          "description": "Batch size for cleanup operations"
+          "description": "Rows per cleanup batch."
         },
         {
           "name": "DATA_RETENTION_CRON",
           "default": "0 0 2 * * *",
           "example": null,
-          "description": "Cron schedule for cleanup (daily at 2 AM)"
+          "description": "Cleanup schedule (cron, daily at 2 AM)."
         },
         {
           "name": "DATA_RETENTION_LIMIT_CRON",
           "default": "0 */30 * * * *",
           "example": null,
-          "description": "Cron schedule for limit enforcement (every 30 minutes)"
+          "description": "Limit enforcement schedule (cron, every 30 minutes)."
         },
         {
           "name": "DATA_RETENTION_BURST_CLEANUP_CRON",
           "default": "0 0 */4 * * *",
           "example": null,
-          "description": "Burst cleanup cron — catches daytime error spikes (every 4 hours)"
+          "description": "Extra cleanup for daytime error spikes (cron, every 4 hours)."
         },
         {
           "name": "DATA_RETENTION_TABLE_METRICS_INTERVAL_MS",
           "default": "900000",
           "example": null,
-          "description": "How often to refresh table size gauges (ms, default 15 min)"
+          "description": "Table size gauge refresh interval (ms)."
         }
       ]
     },
@@ -529,25 +529,25 @@
           "name": "PARTITION_MAINTENANCE_ENABLED",
           "default": "true",
           "example": null,
-          "description": "(delivery_attempts, tunnel_request_log — see V052/V053\nmigrations and PartitionMaintenanceService). Creates partitions ahead of need and\ndrops ones fully past the DATA_RETENTION_* days above (O(1) DROP TABLE instead of\nDELETE). Safe to leave at the defaults for self-hosters."
+          "description": "Creates delivery_attempts and tunnel_request_log partitions ahead of need and drops those past\nretention; lookahead in months and weeks, schedule as cron."
         },
         {
           "name": "PARTITION_MAINTENANCE_DELIVERY_ATTEMPTS_LOOKAHEAD_MONTHS",
           "default": "3",
           "example": null,
-          "description": "(delivery_attempts, tunnel_request_log — see V052/V053\nmigrations and PartitionMaintenanceService). Creates partitions ahead of need and\ndrops ones fully past the DATA_RETENTION_* days above (O(1) DROP TABLE instead of\nDELETE). Safe to leave at the defaults for self-hosters."
+          "description": "Creates delivery_attempts and tunnel_request_log partitions ahead of need and drops those past\nretention; lookahead in months and weeks, schedule as cron."
         },
         {
           "name": "PARTITION_MAINTENANCE_TUNNEL_LOG_LOOKAHEAD_WEEKS",
           "default": "3",
           "example": null,
-          "description": "(delivery_attempts, tunnel_request_log — see V052/V053\nmigrations and PartitionMaintenanceService). Creates partitions ahead of need and\ndrops ones fully past the DATA_RETENTION_* days above (O(1) DROP TABLE instead of\nDELETE). Safe to leave at the defaults for self-hosters."
+          "description": "Creates delivery_attempts and tunnel_request_log partitions ahead of need and drops those past\nretention; lookahead in months and weeks, schedule as cron."
         },
         {
           "name": "PARTITION_MAINTENANCE_CRON",
           "default": "0 45 1 * * *",
           "example": null,
-          "description": "(delivery_attempts, tunnel_request_log — see V052/V053\nmigrations and PartitionMaintenanceService). Creates partitions ahead of need and\ndrops ones fully past the DATA_RETENTION_* days above (O(1) DROP TABLE instead of\nDELETE). Safe to leave at the defaults for self-hosters."
+          "description": "Creates delivery_attempts and tunnel_request_log partitions ahead of need and drops those past\nretention; lookahead in months and weeks, schedule as cron."
         }
       ]
     },
@@ -558,55 +558,55 @@
           "name": "GLOBAL_RATE_LIMIT_PER_SECOND",
           "default": "5000",
           "example": null,
-          "description": "Global platform rate limit (safety net, per instance, requests/sec)"
+          "description": "Platform-wide request limit per instance (requests/s)."
         },
         {
           "name": "ORG_RATE_LIMIT_ENABLED",
           "default": "false",
           "example": null,
-          "description": "One organization's share of the dashboard/API traffic, separate from the platform-wide limit\nabove. Off by default and meant for a shared installation: with a single global bucket, one\ntenant looping over their deliveries spends everyone's budget and the rest get 429s for\nsomething they did not do. On a self-hosted install every tenant is yours, so this is a Redis\nround trip per request buying nothing — leave it off."
+          "description": "Per-organization request limit (requests/s), for shared installs where one tenant must not spend\neveryone's budget. Costs a Redis round trip per request, so leave it off when self-hosting."
         },
         {
           "name": "ORG_RATE_LIMIT_PER_SECOND",
           "default": "200",
           "example": null,
-          "description": "One organization's share of the dashboard/API traffic, separate from the platform-wide limit\nabove. Off by default and meant for a shared installation: with a single global bucket, one\ntenant looping over their deliveries spends everyone's budget and the rest get 429s for\nsomething they did not do. On a self-hosted install every tenant is yours, so this is a Redis\nround trip per request buying nothing — leave it off."
+          "description": "Per-organization request limit (requests/s), for shared installs where one tenant must not spend\neveryone's budget. Costs a Redis round trip per request, so leave it off when self-hosting."
         },
         {
           "name": "GLOBAL_RATE_LIMIT_ENABLED",
           "default": "true",
           "example": null,
-          "description": "One organization's share of the dashboard/API traffic, separate from the platform-wide limit\nabove. Off by default and meant for a shared installation: with a single global bucket, one\ntenant looping over their deliveries spends everyone's budget and the rest get 429s for\nsomething they did not do. On a self-hosted install every tenant is yours, so this is a Redis\nround trip per request buying nothing — leave it off."
+          "description": "Per-organization request limit (requests/s), for shared installs where one tenant must not spend\neveryone's budget. Costs a Redis round trip per request, so leave it off when self-hosting."
         },
         {
           "name": "EVENT_INGESTION_RATE_LIMIT_PER_SECOND",
           "default": "100",
           "example": null,
-          "description": "Events per second per project (token bucket)"
+          "description": "Events per second per project (token bucket)."
         },
         {
           "name": "AUTH_RATE_LIMIT_LOGIN_PER_MINUTE",
           "default": "10",
           "example": null,
-          "description": "Auth rate limiting (per IP and per email, per minute)"
+          "description": "Sign-in and registration attempts per minute, per IP and per email."
         },
         {
           "name": "AUTH_RATE_LIMIT_REGISTER_PER_MINUTE",
           "default": "5",
           "example": null,
-          "description": "Auth rate limiting (per IP and per email, per minute)"
+          "description": "Sign-in and registration attempts per minute, per IP and per email."
         },
         {
           "name": "AUTH_RATE_LIMIT_REFRESH_PER_TOKEN_PER_MINUTE",
           "default": "30",
           "example": null,
-          "description": "Session refresh has its own budget, apart from sign-in: the dashboard refreshes on page loads,\nand sharing the 10-a-minute sign-in bucket logged people out. Per refresh token, and a per-IP\nceiling well above normal browsing so people behind one NAT are not throttled together."
+          "description": "Session refreshes per minute, per refresh token and per IP. Separate from sign-in, whose budget\npage loads would otherwise exhaust."
         },
         {
           "name": "AUTH_RATE_LIMIT_REFRESH_PER_IP_PER_MINUTE",
           "default": "600",
           "example": null,
-          "description": "Session refresh has its own budget, apart from sign-in: the dashboard refreshes on page loads,\nand sharing the 10-a-minute sign-in bucket logged people out. Per refresh token, and a per-IP\nceiling well above normal browsing so people behind one NAT are not throttled together."
+          "description": "Session refreshes per minute, per refresh token and per IP. Separate from sign-in, whose budget\npage loads would otherwise exhaust."
         }
       ]
     },
@@ -617,13 +617,13 @@
           "name": "AUTH_BCRYPT_STRENGTH",
           "default": "12",
           "example": null,
-          "description": "BCrypt work factor for stored password hashes. A doubling scale: each step is\ntwice the work for an attacker grinding a leaked users table, and twice the\nwork for one login. 12 is roughly a quarter-second on a typical server, paid\nonce per sign-in. BCrypt records the cost inside each hash, so raising or\nlowering this never invalidates hashes already stored -- existing passwords\nkeep verifying at whatever cost they were written with, and are rewritten at\nthe new one the next time they change. Range 4-31; the API refuses to start\noutside it."
+          "description": "BCrypt cost, 4-31; each step doubles the work. Changing it never invalidates stored hashes."
         },
         {
           "name": "AUTH_LOCKOUT_ENABLED",
           "default": "true",
           "example": null,
-          "description": "Account lockout after consecutive failed sign-ins. Rate limiting bounds how\nFAST an account can be guessed at; this bounds HOW MANY. It is held in\nPostgres rather than Redis on purpose: the auth rate limiter falls back to a\nper-instance in-memory bucket when Redis is down, which multiplies its real\nceiling by the replica count, and a lockout with that property is not one.\n\nEvery lockout expires by itself and a password reset clears it immediately,\nso locking a known email address costs its owner minutes, not access -- see\nAccountLockoutService for the full reasoning. Set AUTH_LOCKOUT_ENABLED=false\nonly if something in front of the API already bounds attempts per account."
+          "description": "Lock an account after consecutive failed sign-ins. Held in Postgres, not Redis, so it does not\nweaken when Redis is down. Locks expire on their own and a password reset clears them."
         },
         {
           "name": "AUTH_LOCKOUT_THRESHOLD",
@@ -641,19 +641,19 @@
           "name": "AUTH_LOCKOUT_MAX_SECONDS",
           "default": "900",
           "example": null,
-          "description": "Cap on the doubling. Beyond about this, a longer window stops helping a\ndefender and only helps somebody locking a stranger out."
+          "description": "Cap on the doubling, in seconds; longer only helps someone locking a stranger out."
         },
         {
           "name": "AUTH_LOCKOUT_FAILURE_WINDOW_MINUTES",
           "default": "60",
           "example": null,
-          "description": "Failures older than this are not \"consecutive\" any more and are forgotten,\nso occasional typos months apart never add up to a lockout."
+          "description": "Minutes after which a failure no longer counts toward the lockout."
         },
         {
           "name": "AUTH_SESSION_CLEANUP_INTERVAL_MS",
           "default": "3600000",
           "example": null,
-          "description": "How often expired user_sessions rows are purged. Housekeeping only: an expired\nsession cannot authenticate anything either way."
+          "description": "Interval for purging expired sessions (ms)."
         }
       ]
     },
@@ -664,163 +664,163 @@
           "name": "WEBHOOK_MAX_PAYLOAD_SIZE_BYTES",
           "default": "262144",
           "example": null,
-          "description": "Maximum event payload size in bytes (default 256KB)"
+          "description": "Largest event payload accepted (bytes)."
         },
         {
           "name": "WEBHOOK_MAX_FANOUT_PER_EVENT",
           "default": "100",
           "example": null,
-          "description": "Max deliveries per single event (fanout limit — prevents queue flood)"
+          "description": "Most Deliveries one Event may fan out to."
         },
         {
           "name": "WEBHOOK_PAYLOAD_COMPRESSION_THRESHOLD_BYTES",
           "default": "1024",
           "example": null,
-          "description": "Payload compression threshold - payloads larger than this will be gzip compressed (default 1KB)\nReduces DB storage significantly for large payloads"
+          "description": "Payloads larger than this are stored gzip-compressed (bytes)."
         },
         {
           "name": "ORGANIZATION_SUSPENSION_CACHE_TTL_SECONDS",
           "default": "60",
           "example": null,
-          "description": "How long a suspension decision is cached before a node re-reads it. Suspension is checked\non the write path of every request, ingest included, so this is what keeps that from being\na row read per event. An operator's suspend or reinstate takes effect immediately on the\nnode that served it and within this window on the others."
+          "description": "Seconds an organization's suspension state is cached on each node; other nodes see a change\nwithin this window."
         },
         {
           "name": "WEBHOOK_PROJECT_RATE_LIMIT_PER_SECOND",
           "default": "50",
           "example": null,
-          "description": "Per-project delivery rate limit (deliveries/sec) — prevents noisy-neighbor.\n\nNot the plan's rate limit. A plan's rateLimitPerSecond caps what a customer may send *in*\nand is enforced at ingest; this caps what one project may take *out* of a shared worker\npool, so its right value follows from WEBHOOK_OUTGOING_POOL_SIZE rather than from what\nanyone paid. Raising it for a large tenant lets that tenant starve the others."
+          "description": "Deliveries per second one project may take from the shared worker pool. Not the plan's ingest\nlimit: size it from WEBHOOK_OUTGOING_POOL_SIZE."
         },
         {
           "name": "WEBHOOK_ENDPOINT_VERIFICATION_REQUIRED",
           "default": "false",
           "example": null,
-          "description": "Require endpoint verification before allowing deliveries (default: false)\nSet to true to enforce proof-of-ownership for all new endpoints"
+          "description": "Require new endpoints to prove ownership before they receive deliveries (true | false)."
         },
         {
           "name": "WEBHOOK_INGRESS_REPLAY_WINDOW_MINUTES",
           "default": "5",
           "example": null,
-          "description": "How long a received signature is remembered, so the same webhook is not processed twice.\nFor a provider whose signature carries a timestamp this is duplicate suppression and five\nminutes is generous. For a source verified with a raw-hex generic HMAC it is the only bound\non replay: that shape signs the body alone, so a captured request stays verifiable for as\nlong as the secret lives and nothing else stops it being sent again. Raise it for such a\nsource, at the cost of Redis holding one key per signature for the window."
+          "description": "Minutes a received signature is remembered to reject replays. For a source signed with a plain\nbody HMAC this is the only replay bound; raise it for such sources."
         },
         {
           "name": "WEBHOOK_ALLOW_PRIVATE_IPS",
           "default": "false",
           "example": null,
-          "description": "Allow webhooks to private IPs. Off by default (P0-14c) — a self-hoster who copies\n.env.dist -> .env and runs `make up` should not silently expose an SSRF hole\n(e.g. an endpoint pointed at http://169.254.169.254/ reading cloud metadata).\nSet to true only if you specifically need to forward to internal/private targets\nin local development, and never in production (ProductionSafetyValidator enforces\nthis at startup when APP_ENV=production)."
+          "description": "Allow delivery to private IPs (SSRF risk, e.g. cloud metadata). Development only; refused in production."
         },
         {
           "name": "WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT",
           "default": "5",
           "example": null,
-          "description": "Max concurrent deliveries per endpoint (prevents endpoint overload)"
+          "description": "Concurrent deliveries per endpoint."
         },
         {
           "name": "WEBHOOK_MAX_CONCURRENT_PER_TENANT",
           "default": "20",
           "example": null,
-          "description": "The most attempts one ORGANIZATION may have in flight at once, across every\nendpoint it owns. The per-endpoint cap above bounds one receiver to a slice of\nWEBHOOK_OUTGOING_POOL_SIZE; on its own that does nothing about a tenant with\nmany slow receivers, because each stays inside its own slice and their sum is\nthe whole worker — at which point no other organization is delivered to at all.\n\nA permit is held only while a request is actually in flight, so healthy traffic\nnever reaches this: fast endpoints hand permits straight back. It bites exactly\nwhen calls are slow, which is when it should.\n\nSized against WEBHOOK_OUTGOING_POOL_SIZE: 20 of 50 lets a single tenant use most\nof an idle worker while leaving room for two more to be busy at the same time.\nRaise it if you run one large tenant; lower it if you run many small ones."
+          "description": "Concurrent in-flight attempts per organization across all its endpoints, so one tenant's slow\nreceivers cannot occupy the whole WEBHOOK_OUTGOING_POOL_SIZE."
         },
         {
           "name": "WEBHOOK_CONCURRENCY_PERMIT_LEASE_SECONDS",
           "default": "90",
           "example": null,
-          "description": "Lease time (seconds) on a concurrency permit — bounds how long a crashed/stuck delivery\ncan hold a permit before Redis reclaims it. Must exceed the max per-delivery HTTP timeout\n(60s, see clampTimeout) with margin for pre-request work (decrypt, mTLS setup, transform)."
+          "description": "Seconds a concurrency permit lives before Redis reclaims it; must exceed the 60s maximum\ndelivery timeout plus setup time."
         },
         {
           "name": "WEBHOOK_OUTGOING_POOL_SIZE",
           "default": "50",
           "example": null,
-          "description": "Outgoing webhook delivery pool (isolated from incoming forwards)"
+          "description": "Threads for outgoing deliveries."
         },
         {
           "name": "WEBHOOK_INCOMING_POOL_SIZE",
           "default": "20",
           "example": null,
-          "description": "Incoming forward pool (isolated from outgoing deliveries)"
+          "description": "Threads for incoming forwards."
         },
         {
           "name": "WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS",
           "default": "60",
           "example": null,
-          "description": "Graceful shutdown timeout for in-flight deliveries (seconds)"
+          "description": "Seconds to wait for in-flight deliveries on shutdown."
         },
         {
           "name": "CLIENT_ERROR_REPORTING_ENABLED",
           "default": "true",
           "example": null,
-          "description": "Dashboard error reporting.\n\nWhen the dashboard hits an error it cannot recover from, the browser posts it back here and\nit is written to this installation's own logs — the same logs as everything else, so with\nAPP_ENV=production it arrives as JSON and lands in Loki beside the rest. Nothing is sent to\nany third party; there is no account to create and no DSN to configure.\n\nTurn it off and the endpoint still answers, it just keeps nothing. The per-user cap is what\nstops a component that throws on every render from writing a log line per frame."
+          "description": "Dashboard error reporting.\n\nDashboard errors are posted back and written to this installation's own logs, never to a\nthird party; reports per user per minute."
         },
         {
           "name": "CLIENT_ERROR_REPORTS_PER_USER_PER_MINUTE",
           "default": "20",
           "example": null,
-          "description": "Dashboard error reporting.\n\nWhen the dashboard hits an error it cannot recover from, the browser posts it back here and\nit is written to this installation's own logs — the same logs as everything else, so with\nAPP_ENV=production it arrives as JSON and lands in Loki beside the rest. Nothing is sent to\nany third party; there is no account to create and no DSN to configure.\n\nTurn it off and the endpoint still answers, it just keeps nothing. The per-user cap is what\nstops a component that throws on every render from writing a log line per frame."
+          "description": "Dashboard error reporting.\n\nDashboard errors are posted back and written to this installation's own logs, never to a\nthird party; reports per user per minute."
         },
         {
           "name": "WEBHOOK_MAX_RESPONSE_BODY_BYTES",
           "default": "1048576",
           "example": null,
-          "description": "How much of a receiver's response body to buffer, in bytes. Anything past this is dropped\nand the Attempt is decided by the status code alone — a receiver that accepts the webhook\nand answers 2xx with a huge body is a successful delivery, not a failed one. Only the first\n10 KiB is ever stored, so raising this buys nothing but memory per in-flight attempt."
+          "description": "Receiver response body buffered per attempt (bytes); past it the status code alone decides.\nOnly the first 10 KiB is stored."
         },
         {
           "name": "TRANSFORM_SCRIPT_TIMEOUT_MS",
           "default": "2000",
           "example": null,
-          "description": "Wall clock for one run, in milliseconds. This is per Attempt, on a worker thread that is not\ndoing anything else meanwhile, so it is a throughput setting as much as a safety one: at the\ndefault, a runaway script costs one delivery slot for two seconds and nothing else."
+          "description": "JavaScript transformations.\n\nWall-clock limit per script run (ms); a runaway script holds one delivery slot this long. Exceeding\nany of these limits fails the Delivery, which is retried."
         },
         {
           "name": "TRANSFORM_SCRIPT_MAX_MEMORY_MB",
           "default": "128",
           "example": null,
-          "description": "How much one run may allocate before it is stopped, in MB. Measured as the running thread's\nallocation counter, not as live heap — a script that churns a gigabyte through the collector\nis as expensive to a worker as one that holds it. Raise it only alongside the JVM heap; the\nceiling is not a reservation, it is the point at which a script is presumed to be looping."
+          "description": "Allocation limit per run (MB), counted as total allocation rather than live heap."
         },
         {
           "name": "TRANSFORM_SCRIPT_MAX_OUTPUT_BYTES",
           "default": "1048576",
           "example": null,
-          "description": "The largest body a script may return, in bytes. A transformation that produces more than this\nfails rather than sends: the receiver would have rejected it anyway, and finding out here names\nthe script instead of the endpoint."
+          "description": "Largest body a script may return (bytes)."
         },
         {
           "name": "TRANSFORM_SCRIPT_MAX_CONSOLE_LINES",
           "default": "100",
           "example": null,
-          "description": "How many console.* lines are kept per run and shown in the Transform Studio. Past this the\nrun keeps going and the extra lines are dropped, with the outcome saying so."
+          "description": "console.* lines kept per run for the Transform Studio."
         },
         {
           "name": "TRANSFORM_SCRIPT_MAX_CHARS",
           "default": "65536",
           "example": null,
-          "description": "The largest script the engine will compile, in characters. The API refuses a longer one at\nsave time, so this is the second line rather than the first."
+          "description": "Largest script the engine compiles (characters)."
         },
         {
           "name": "WEBHOOK_POOL_MAX_CONNECTIONS",
           "default": "200",
           "example": null,
-          "description": "HTTP connection pool for outgoing webhook delivery (shared by delivery + incoming forward)"
+          "description": "Outgoing HTTP connection pool shared by deliveries and forwards (connections, seconds)."
         },
         {
           "name": "WEBHOOK_POOL_PENDING_ACQUIRE_TIMEOUT_SECONDS",
           "default": "10",
           "example": null,
-          "description": "HTTP connection pool for outgoing webhook delivery (shared by delivery + incoming forward)"
+          "description": "Outgoing HTTP connection pool shared by deliveries and forwards (connections, seconds)."
         },
         {
           "name": "WEBHOOK_POOL_MAX_IDLE_TIME_SECONDS",
           "default": "60",
           "example": null,
-          "description": "HTTP connection pool for outgoing webhook delivery (shared by delivery + incoming forward)"
+          "description": "Outgoing HTTP connection pool shared by deliveries and forwards (connections, seconds)."
         },
         {
           "name": "WEBHOOK_ALLOWED_HOSTS",
           "default": "",
           "example": null,
-          "description": "Hosts exempted from the private-IP check, comma-separated. Empty is the default and\nmeans no exemption - not \"all allowed\": a public host needs no entry here, and every\nother rule (scheme, cloud-metadata denylist) applies to a listed host regardless.\n\nThis is the supported way to forward to one named internal service while leaving\nWEBHOOK_ALLOW_PRIVATE_IPS=false everywhere else. Entries are matched against the host\nas written in the endpoint URL, so a name, not the address it resolves to."
+          "description": "Comma-separated host names exempt from the private-IP check, matched as written in the endpoint\nURL. Empty exempts nothing; other rules still apply."
         },
         {
           "name": "WEBHOOK_TRUSTED_PROXIES",
           "default": "",
           "example": null,
-          "description": "Trusted reverse-proxy peers (comma-separated IPs and/or CIDR ranges), e.g.\n  WEBHOOK_TRUSTED_PROXIES=10.0.0.5,172.20.0.0/16\nX-Forwarded-For / X-Real-IP are honoured ONLY when the direct TCP connection to the\nAPI comes from one of these addresses; the header is otherwise ignored and the real\nsocket peer address is used. This governs the IP used for auth rate limiting\n(login/register/refresh/reset-password), audit logs, and incoming-webhook source IP\nchecks.\n\nEmpty (default) trusts nothing — safe whenever the API is reachable directly, as in\nthe base docker-compose.yml here. If you put a reverse proxy, load balancer, or\ningress controller in front (as the UI's nginx does), set\nthis to that proxy's address/CIDR, or every request will be bucketed under the\nproxy's own IP instead of the real client's — getting this wrong in either direction\neither defeats rate limiting (trusting an untrusted peer) or breaks it for everyone\nbehind one shared IP (trusting nothing when you should).\n\nBehind a CDN such as Cloudflare, add the CDN's published address ranges as well: the\nchain is client, CDN edge, Caddy, and without the edge ranges every visitor through one\nedge is counted as that edge. The chain is read from the right, so a forged entry a\nclient puts on the left is ignored either way."
+          "description": "Comma-separated proxy IPs/CIDRs whose X-Forwarded-For sets the client IP (rate limits, audit,\nsource IP checks); behind a CDN include its ranges. Empty trusts nothing."
         }
       ]
     },
@@ -831,55 +831,55 @@
           "name": "WEBHOOK_INGRESS_BASE_URL",
           "default": "http://localhost:8080",
           "example": null,
-          "description": "Base URL for ingress endpoint URLs shown in admin UI"
+          "description": "Base URL for ingress URLs shown in the dashboard."
         },
         {
           "name": "WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES",
           "default": "524288",
           "example": null,
-          "description": "Maximum incoming payload size in bytes (default 512KB)"
+          "description": "Largest incoming payload accepted (bytes)."
         },
         {
           "name": "WEBHOOK_INCOMING_RATE_LIMIT_PER_SECOND",
           "default": "100",
           "example": null,
-          "description": "Per-source ingress rate limit for a source that sets none of its own. Without it the only\nbackstop on the public /ingress/{token} path was the single platform-wide bucket\n(GLOBAL_RATE_LIMIT_PER_SECOND), shared by every tenant. Kept equal to\nEVENT_INGESTION_RATE_LIMIT_PER_SECOND: a received webhook costs what an ingested event costs.\nSet to 0 to disable the default (a source's own limit still applies)."
+          "description": "Default ingress limit for a source that sets none (requests/s); 0 disables the default."
         },
         {
           "name": "INCOMING_FORWARD_RETRY_POLL_INTERVAL_MS",
           "default": "10000",
           "example": null,
-          "description": "Incoming forward retry scheduler"
+          "description": "Incoming forward retry scheduler: poll interval (ms), batch size, and per-destination cap."
         },
         {
           "name": "INCOMING_FORWARD_RETRY_BATCH_SIZE",
           "default": "50",
           "example": null,
-          "description": "Incoming forward retry scheduler"
+          "description": "Incoming forward retry scheduler: poll interval (ms), batch size, and per-destination cap."
         },
         {
           "name": "INCOMING_FORWARD_RETRY_MAX_PER_DEST",
           "default": "10",
           "example": null,
-          "description": "Incoming forward retry scheduler"
+          "description": "Incoming forward retry scheduler: poll interval (ms), batch size, and per-destination cap."
         },
         {
           "name": "INCOMING_FORWARD_RETRY_HIGH_WATERMARK",
           "default": "3000",
           "example": null,
-          "description": "Queue depth threshold for incoming forward retry governor"
+          "description": "Pending forward retries above which the governor shrinks batches."
         },
         {
           "name": "DLQ_MONITORING_INTERVAL_MS",
           "default": "60000",
           "example": null,
-          "description": "DLQ monitoring interval (ms)"
+          "description": "DLQ monitoring interval (ms)."
         },
         {
           "name": "DLQ_MONITORING_ADMIN_CLIENT_TIMEOUT_SECONDS",
           "default": "10",
           "example": null,
-          "description": "Timeout for the Kafka AdminClient calls DLQ monitoring makes each cycle (seconds)"
+          "description": "Timeout for DLQ monitoring's Kafka admin calls (seconds)."
         }
       ]
     },
@@ -890,55 +890,55 @@
           "name": "ORDERING_GAP_TIMEOUT_SECONDS",
           "default": "60",
           "example": null,
-          "description": "How long an ordered Delivery waits on the sequences ahead of it before it may be let through\nout of order (seconds). Waiting it out is not enough on its own: the order is only broken once\nnothing in the gap is being attempted, or due to be attempted inside the same window, so an\nordinary retry ahead of it does not disengage ordering."
+          "description": "Seconds an ordered Delivery waits on a gap before going out of order, and only once nothing in\nthe gap is being or about to be attempted."
         },
         {
           "name": "ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS",
           "default": "5",
           "example": null,
-          "description": "Fallback poll interval (seconds) for a delivery parked behind an outstanding sequence.\nThe fast path republishes a buffered delivery the moment the sequence ahead of it\ncompletes; this only covers deliveries that reach the buffer after that trigger fired.\nLower drains an out-of-order burst faster at the cost of more DB polling."
+          "description": "Fallback poll for a Delivery parked behind a missing sequence (seconds)."
         },
         {
           "name": "ORDERING_DELIVERED_SEQ_TTL_HOURS",
           "default": "24",
           "example": null,
-          "description": "TTL for delivered sequence tracking in Redis (hours)"
+          "description": "TTL of delivered-sequence tracking in Redis (hours)."
         },
         {
           "name": "ORDERING_BUFFER_TTL_MINUTES",
           "default": "10",
           "example": null,
-          "description": "TTL for ordering buffer in Redis (minutes)"
+          "description": "TTL of the ordering buffer in Redis (minutes)."
         },
         {
           "name": "ORDERING_BUFFER_GAUGE_RESYNC_MS",
           "default": "30000",
           "example": null,
-          "description": "How often webhook_ordering_buffer_size resyncs against Redis via a key-pattern SCAN (ms).\nSee OrderingBufferService#resyncBufferSizeGauge -- this replaced a per-call gauge\nregistration that only ever reported the first endpoint's buffer, forever."
+          "description": "How often the ordering buffer size gauge resyncs from Redis (ms)."
         },
         {
           "name": "ORDERING_STRANDED_SEQUENCE_AFTER_SECONDS",
           "default": "120",
           "example": null,
-          "description": "An ordered Delivery gets its sequence number just after the ingest transaction commits, not\ninside it: the number comes from Redis, and a Delivery the customer was already told about\nmust not be undone because a counter was unreachable. A process that dies in that window\nleaves the row with no number for ever, and the worker then delivers it unordered without\nsaying so. The reconciler sweeps those and backfills them.\n\nThe delay is what keeps the sweep off rows whose backfill is still in flight. Raise it if\nyour ingest path is slow; lowering it below a few seconds makes the sweep race the ingest.\nWatch webhook_sequence_stranded_total — anything but zero means ingest processes are dying\nmid-request."
+          "description": "Backfills ordered Deliveries left without a sequence number by a process that died after\ncommit; only rows older than this many seconds, per batch. Below a few seconds it races ingest."
         },
         {
           "name": "ORDERING_STRANDED_SEQUENCE_BATCH_SIZE",
           "default": "500",
           "example": null,
-          "description": "An ordered Delivery gets its sequence number just after the ingest transaction commits, not\ninside it: the number comes from Redis, and a Delivery the customer was already told about\nmust not be undone because a counter was unreachable. A process that dies in that window\nleaves the row with no number for ever, and the worker then delivers it unordered without\nsaying so. The reconciler sweeps those and backfills them.\n\nThe delay is what keeps the sweep off rows whose backfill is still in flight. Raise it if\nyour ingest path is slow; lowering it below a few seconds makes the sweep race the ingest.\nWatch webhook_sequence_stranded_total — anything but zero means ingest processes are dying\nmid-request."
+          "description": "Backfills ordered Deliveries left without a sequence number by a process that died after\ncommit; only rows older than this many seconds, per batch. Below a few seconds it races ingest."
         },
         {
           "name": "ORDERING_SEQUENCE_RECONCILIATION_LOOKBACK_HOURS",
           "default": "48",
           "example": null,
-          "description": "How far back the API's periodic sequence/cursor reconciliation job looks for\nrecently-active ordering-enabled endpoints (hours)"
+          "description": "How far back sequence reconciliation looks for active ordered endpoints (hours)."
         },
         {
           "name": "ORDERING_SEQUENCE_RECONCILIATION_INTERVAL_MS",
           "default": "900000",
           "example": null,
-          "description": "How often the API's sequence/cursor reconciliation job runs (milliseconds)"
+          "description": "Sequence reconciliation interval (ms)."
         }
       ]
     },
@@ -949,19 +949,19 @@
           "name": "REPLAY_BATCH_SIZE",
           "default": "200",
           "example": null,
-          "description": "Batch size for cursor-based event scanning (tune for DB load)"
+          "description": "Events read per replay batch."
         },
         {
           "name": "REPLAY_BATCH_DELAY_MS",
           "default": "50",
           "example": null,
-          "description": "Delay in ms between batches (backpressure against Kafka/DB)"
+          "description": "Pause between replay batches (ms)."
         },
         {
           "name": "REPLAY_MAX_EVENTS_PER_SESSION",
           "default": "500000",
           "example": null,
-          "description": "Maximum events per single replay session"
+          "description": "Most events one replay session may cover."
         }
       ]
     },
@@ -972,49 +972,49 @@
           "name": "RETRY_SCHEDULER_BATCH_SIZE",
           "default": "100",
           "example": null,
-          "description": "Batch size for processing pending retries (governor ceiling — actual batch adapts dynamically)"
+          "description": "Largest retry batch; the governor adapts below it."
         },
         {
           "name": "RETRY_SCHEDULER_MAX_PER_ENDPOINT",
           "default": "10",
           "example": null,
-          "description": "Max retries claimed per endpoint per poll (fair scheduling)"
+          "description": "Retries claimed per endpoint per poll."
         },
         {
           "name": "RETRY_SCHEDULER_MAX_PER_PROJECT",
           "default": "30",
           "example": null,
-          "description": "Max retries claimed per project per poll (prevents noisy-neighbor in retry queue)"
+          "description": "Retries claimed per project per poll."
         },
         {
           "name": "RETRY_SCHEDULER_HIGH_WATERMARK",
           "default": "5000",
           "example": null,
-          "description": "Queue depth threshold — when pending retries exceed this, governor caps batch size\nto prevent retry storm after outages (AIMD congestion control)"
+          "description": "Pending retries above which the governor shrinks batches, avoiding a retry storm after an outage."
         },
         {
           "name": "RETRY_SCHEDULER_SEND_TIMEOUT_SECONDS",
           "default": "30",
           "example": null,
-          "description": "Timeout in seconds for Kafka send confirmation"
+          "description": "Seconds to wait for a Kafka send to be confirmed."
         },
         {
           "name": "RETRY_SCHEDULER_RESCHEDULE_DELAY_SECONDS",
           "default": "60",
           "example": null,
-          "description": "Delay in seconds before rescheduling failed sends"
+          "description": "Seconds before a failed send is rescheduled."
         },
         {
           "name": "RETRY_SCHEDULER_POLL_INTERVAL_MS",
           "default": "10000",
           "example": null,
-          "description": "Poll interval in milliseconds. This is the baseline the adaptive governor scales\nfrom, not a fixed period: it polls at this rate under light load, backs off to 3x\nwhen the retry queue is empty, and tightens to 1/2x and 1/5x as the backlog grows."
+          "description": "Baseline poll interval (ms); the governor polls 3x slower when idle and up to 5x faster under backlog."
         },
         {
           "name": "WEBHOOK_RETRY_AFTER_MAX_SECONDS",
           "default": "21600",
           "example": null,
-          "description": "Longest a receiver's own Retry-After header may push the next attempt back (seconds). Honoured\non 429 and 503 only - the two statuses where it means \"I am over capacity, wait\" - and it can\nonly ever push an attempt LATER than the ladder said, never sooner. Default 21600 (6h): the\nlargest tier both default ladders share, so honouring the header never parks an obligation for\nlonger than the ladder itself already can, and seven outgoing attempts at the maximum still fit\ninside DELIVERY_ESCALATION_HARD_CAP_HOURS. Hookdeck allows 7 days; we do not, because a\nweek-long wait would be cut short by that hard cap rather than honoured. Set it to 0 to ignore\nthe header entirely and leave the ladder in sole charge."
+          "description": "Longest a receiver's Retry-After (on 429 and 503) may delay the next attempt (seconds); it only\never delays. 0 ignores the header. Kept within DELIVERY_ESCALATION_HARD_CAP_HOURS."
         }
       ]
     },
@@ -1025,19 +1025,19 @@
           "name": "STUCK_DELIVERY_THRESHOLD_MINUTES",
           "default": "5",
           "example": null,
-          "description": "Threshold in minutes - deliveries stuck in PROCESSING longer than this will be reset"
+          "description": "Minutes after which a Delivery stuck in PROCESSING is reset."
         },
         {
           "name": "STUCK_DELIVERY_STRANDED_PENDING_THRESHOLD_MINUTES",
           "default": "60",
           "example": null,
-          "description": "Threshold in minutes - PENDING deliveries with next_retry_at wiped but never claimed\ninto PROCESSING (belt-and-braces recovery) will be reset. Keep well above the normal\ndispatch window so freshly ingested deliveries are never swept."
+          "description": "Minutes after which an unclaimed PENDING Delivery with no retry time is reset; keep well above\nthe normal dispatch time."
         },
         {
           "name": "STUCK_DELIVERY_CHECK_INTERVAL_MS",
           "default": "60000",
           "example": null,
-          "description": "Check interval in milliseconds"
+          "description": "Check interval (ms)."
         }
       ]
     },
@@ -1048,19 +1048,19 @@
           "name": "STUCK_FORWARD_THRESHOLD_MINUTES",
           "default": "5",
           "example": null,
-          "description": "Threshold in minutes - forward attempts stuck in PROCESSING longer than this will be reset"
+          "description": "Minutes after which a Forward stuck in PROCESSING is reset."
         },
         {
           "name": "STUCK_FORWARD_STRANDED_PENDING_THRESHOLD_MINUTES",
           "default": "60",
           "example": null,
-          "description": "Threshold in minutes - forward attempts left PENDING with next_retry_at never set (the\ndispatch or replay Kafka message was lost) will be handed back to the retry scheduler.\nKeep well above the normal dispatch window so freshly received webhooks are never swept."
+          "description": "Minutes after which a PENDING Forward with no retry time goes back to the retry scheduler; keep\nwell above the normal dispatch time."
         },
         {
           "name": "STUCK_FORWARD_CHECK_INTERVAL_MS",
           "default": "60000",
           "example": null,
-          "description": "Check interval in milliseconds"
+          "description": "Check interval (ms)."
         }
       ]
     },
@@ -1071,31 +1071,31 @@
           "name": "ENDPOINT_AUTO_DISABLE_ENABLED",
           "default": "true",
           "example": null,
-          "description": "A dead receiver used to burn its retry budget forever: every new event started a fresh retry\nladder, the circuit breaker deferred a few attempts and then forgot within two minutes, and\nnothing anywhere said \"this endpoint has been dead since Tuesday\". This turns the endpoint (or\nthe incoming destination) off after a whole window of nothing but failures, tells its owners,\nand records why.\n\nThe worker keeps the run of failures on the target's row; the api sweeps and decides. Both\nservices read this flag and it has to say the same thing in both, or one half runs without the\nother. Set it to false and nothing is counted and nothing is ever disabled automatically."
+          "description": "Turn off an endpoint or destination that has only failed for a whole window, and notify its\nowners. Set it the same on api and worker."
         },
         {
           "name": "ENDPOINT_AUTO_DISABLE_AFTER_HOURS",
           "default": "72",
           "example": null,
-          "description": "How long a target must have been failing without a single success before it is turned off\n(hours). Default 72h - three days. Shorter than DELIVERY_ESCALATION_HARD_CAP_HOURS on purpose,\nso the bleeding stops before the first cohort of deliveries reaches Failed Messages, and long\nenough that a weekend of downtime is caught while a six-hour blip is not. A value below 1 is\nrefused at startup; use ENDPOINT_AUTO_DISABLE_ENABLED=false to turn the feature off."
+          "description": "Hours of failures without a success before disabling, at least 1. Shorter than\nDELIVERY_ESCALATION_HARD_CAP_HOURS on purpose."
         },
         {
           "name": "ENDPOINT_AUTO_DISABLE_MIN_FAILURES",
           "default": "10",
           "example": null,
-          "description": "...and how many failed attempts that run has to contain. Without this, an endpoint that gets\none event a week and failed the last one would be disabled purely for being idle. Both\nconditions have to hold."
+          "description": "Failed attempts that window must also contain, so an idle endpoint is not disabled."
         },
         {
           "name": "ENDPOINT_AUTO_DISABLE_INTERVAL_MS",
           "default": "300000",
           "example": null,
-          "description": "How often the api looks for targets to turn off (ms), and how many it takes per pass. The\nwindow is measured in days, so the sweep's own cadence changes nothing anyone would notice."
+          "description": "Sweep interval (ms) and targets checked per sweep."
         },
         {
           "name": "ENDPOINT_AUTO_DISABLE_BATCH_SIZE",
           "default": "200",
           "example": null,
-          "description": "How often the api looks for targets to turn off (ms), and how many it takes per pass. The\nwindow is measured in days, so the sweep's own cadence changes nothing anyone would notice."
+          "description": "Sweep interval (ms) and targets checked per sweep."
         }
       ]
     },
@@ -1106,37 +1106,37 @@
           "name": "CIRCUIT_BREAKER_FAILURE_RATE_THRESHOLD",
           "default": "50",
           "example": null,
-          "description": "Failure rate percentage threshold to trip the circuit (0-100)"
+          "description": "Failure rate that opens the circuit (percent, 0-100)."
         },
         {
           "name": "CIRCUIT_BREAKER_MINIMUM_CALLS",
           "default": "5",
           "example": null,
-          "description": "Minimum number of calls before evaluating failure rate"
+          "description": "Calls needed before the failure rate is evaluated."
         },
         {
           "name": "CIRCUIT_BREAKER_WAIT_DURATION_SECONDS",
           "default": "30",
           "example": null,
-          "description": "How long the circuit stays OPEN before allowing probes (seconds)"
+          "description": "Seconds the circuit stays open before probing."
         },
         {
           "name": "CIRCUIT_BREAKER_WINDOW_TTL_SECONDS",
           "default": "120",
           "example": null,
-          "description": "TTL for failure/call counters sliding window (seconds)"
+          "description": "Sliding window of the failure counters (seconds)."
         },
         {
           "name": "CIRCUIT_BREAKER_SLOW_CALL_THRESHOLD_MS",
           "default": "10000",
           "example": null,
-          "description": "Latency threshold to classify a call as \"slow\" (ms). Endpoints consistently\nresponding slower than this will trip the circuit even if they return 2xx."
+          "description": "A call slower than this counts as slow, even with a 2xx (ms)."
         },
         {
           "name": "CIRCUIT_BREAKER_SLOW_CALL_RATE_THRESHOLD",
           "default": "80",
           "example": null,
-          "description": "Percentage of slow calls to trip the circuit (0-100)"
+          "description": "Slow call rate that opens the circuit (percent, 0-100)."
         }
       ]
     },
@@ -1147,13 +1147,13 @@
           "name": "DELIVERY_ESCALATION_HARD_CAP_HOURS",
           "default": "96",
           "example": null,
-          "description": "Deliveries stuck in PENDING longer than this are escalated to DLQ (hours), regardless of\nattempt_count/max_attempts. Must stay >= the worst-case span of BOTH default ladders (see\nRetryLadderDefaults) or the last retry tiers never get a chance to fire —\nRetrySchedulerService fails startup if they don't agree. The outgoing ladder's worst case\nwith full jitter is ~83h; 96h leaves headroom."
+          "description": "Hours after which a PENDING Delivery goes to the DLQ. Must cover the outgoing retry ladder's\nworst case (~83h), or startup fails."
         },
         {
           "name": "DELIVERY_ESCALATION_BATCH_SIZE",
           "default": "100",
           "example": null,
-          "description": "Batch size per escalation cycle"
+          "description": "Deliveries per escalation batch."
         }
       ]
     },
@@ -1164,25 +1164,25 @@
           "name": "FORWARD_ESCALATION_HARD_CAP_HOURS",
           "default": "24",
           "example": null,
-          "description": "The Incoming counterpart of DELIVERY_ESCALATION_HARD_CAP_HOURS. Forwards outstanding longer\nthan this — measured from when the webhook arrived, not from the newest attempt row — are\nescalated to DLQ regardless of attempt count. Before this existed the Incoming direction had\nonly a stuck-PROCESSING reset and never gave up on anything.\n\nDeliberately its own cap rather than reusing the delivery one: the incoming ladder is shorter\nby design (5 attempts to 6h, ~11h worst case with full jitter), so the 96h delivery cap would\nleave a dead Forward sitting for three days past ladder exhaustion. RetrySchedulerService\nfails startup if the incoming ladder does not fit inside this."
+          "description": "Hours from receipt after which an outstanding Forward goes to the DLQ; batch size and interval (ms).\nMust cover the incoming retry ladder's worst case (~11h), or startup fails."
         },
         {
           "name": "FORWARD_ESCALATION_BATCH_SIZE",
           "default": "100",
           "example": null,
-          "description": "The Incoming counterpart of DELIVERY_ESCALATION_HARD_CAP_HOURS. Forwards outstanding longer\nthan this — measured from when the webhook arrived, not from the newest attempt row — are\nescalated to DLQ regardless of attempt count. Before this existed the Incoming direction had\nonly a stuck-PROCESSING reset and never gave up on anything.\n\nDeliberately its own cap rather than reusing the delivery one: the incoming ladder is shorter\nby design (5 attempts to 6h, ~11h worst case with full jitter), so the 96h delivery cap would\nleave a dead Forward sitting for three days past ladder exhaustion. RetrySchedulerService\nfails startup if the incoming ladder does not fit inside this."
+          "description": "Hours from receipt after which an outstanding Forward goes to the DLQ; batch size and interval (ms).\nMust cover the incoming retry ladder's worst case (~11h), or startup fails."
         },
         {
           "name": "FORWARD_ESCALATION_INTERVAL_MS",
           "default": "300000",
           "example": null,
-          "description": "The Incoming counterpart of DELIVERY_ESCALATION_HARD_CAP_HOURS. Forwards outstanding longer\nthan this — measured from when the webhook arrived, not from the newest attempt row — are\nescalated to DLQ regardless of attempt count. Before this existed the Incoming direction had\nonly a stuck-PROCESSING reset and never gave up on anything.\n\nDeliberately its own cap rather than reusing the delivery one: the incoming ladder is shorter\nby design (5 attempts to 6h, ~11h worst case with full jitter), so the 96h delivery cap would\nleave a dead Forward sitting for three days past ladder exhaustion. RetrySchedulerService\nfails startup if the incoming ladder does not fit inside this."
+          "description": "Hours from receipt after which an outstanding Forward goes to the DLQ; batch size and interval (ms).\nMust cover the incoming retry ladder's worst case (~11h), or startup fails."
         },
         {
           "name": "DELIVERY_ESCALATION_INTERVAL_MS",
           "default": "300000",
           "example": null,
-          "description": "How often to check for stale deliveries (ms, default 5 min)"
+          "description": "Stale delivery check interval (ms)."
         }
       ]
     },
@@ -1193,13 +1193,13 @@
           "name": "QUEUE_DEPTH_METRICS_INTERVAL_MS",
           "default": "900000",
           "example": null,
-          "description": "How often to refresh queue depth gauges (ms) — default 15 min"
+          "description": "Queue depth gauge refresh interval (ms)."
         },
         {
           "name": "QUEUE_DEPTH_METRICS_RETENTION_DAYS",
           "default": "30",
           "example": null,
-          "description": "Only count records created within this many days (limits scan scope)"
+          "description": "Only rows created within this many days are counted."
         }
       ]
     },
@@ -1210,25 +1210,25 @@
           "name": "TEST_ENDPOINT_BASE_URL",
           "default": null,
           "example": null,
-          "description": "Public origin in front of the test endpoint URLs people copy (…/hook/<slug>). Defaults to\nAPP_BASE_URL; set it only when capture requests arrive on a different public origin. Never an\ninternal name such as http://api:8080 — the URL is used from outside this network."
+          "description": "Public origin of test endpoint URLs (…/hook/<slug>); defaults to APP_BASE_URL. Never an internal name."
         },
         {
           "name": "TEST_ENDPOINT_MAX_PER_PROJECT",
           "default": "10",
           "example": null,
-          "description": "Maximum test endpoints per project"
+          "description": "Test endpoints per project."
         },
         {
           "name": "TEST_ENDPOINT_MAX_TTL_HOURS",
           "default": "72",
           "example": null,
-          "description": "Maximum TTL in hours for test endpoints"
+          "description": "Longest test endpoint lifetime (hours)."
         },
         {
           "name": "TEST_ENDPOINT_CLEANUP_INTERVAL_MS",
           "default": "3600000",
           "example": null,
-          "description": "Cleanup interval for expired endpoints (ms)"
+          "description": "Expired test endpoint cleanup interval (ms)."
         }
       ]
     },
@@ -1239,13 +1239,13 @@
           "name": "RULES_CACHE_REFRESH_MS",
           "default": "30000",
           "example": null,
-          "description": "Cache refresh interval for compiled rules (ms, default 30s)"
+          "description": "Compiled rules cache refresh (ms)."
         },
         {
           "name": "RULES_EXECUTION_LOG_RETENTION_DAYS",
           "default": "7",
           "example": null,
-          "description": "Retention for rule execution logs (days, default 7)"
+          "description": "Rule execution log retention (days)."
         }
       ]
     },
@@ -1256,7 +1256,7 @@
           "name": "TRANSFORMATION_HISTORY_LIMIT",
           "default": "50",
           "example": null,
-          "description": "How many published templates each transformation keeps in its history. Every edit to a\ntemplate publishes one, and any of them can be viewed, compared and restored. When a\ntransformation has more than this, the oldest fall off; the version currently in use never\ndoes. Raise it if you need to reach further back, at roughly 64 KB per version in the worst\ncase. (default 50)"
+          "description": "Published versions kept per transformation (up to ~64 KB each); the one in use is never dropped."
         }
       ]
     },
@@ -1267,133 +1267,133 @@
           "name": "WORKFLOW_POOL_CORE_SIZE",
           "default": "4",
           "example": null,
-          "description": "Thread pool for async workflow execution"
+          "description": "Workflow executor threads and queue capacity."
         },
         {
           "name": "WORKFLOW_POOL_MAX_SIZE",
           "default": "8",
           "example": null,
-          "description": "Thread pool for async workflow execution"
+          "description": "Workflow executor threads and queue capacity."
         },
         {
           "name": "WORKFLOW_POOL_QUEUE_CAPACITY",
           "default": "50",
           "example": null,
-          "description": "Thread pool for async workflow execution"
+          "description": "Workflow executor threads and queue capacity."
         },
         {
           "name": "WORKFLOW_MAX_DURATION_SECONDS",
           "default": "600",
           "example": null,
-          "description": "Maximum total execution time for a single workflow run (seconds)"
+          "description": "Longest a workflow run may take (seconds)."
         },
         {
           "name": "WORKFLOW_MAX_RECURSION_DEPTH",
           "default": "3",
           "example": null,
-          "description": "Maximum recursion depth for workflow chains (workflow→CreateEvent→workflow)"
+          "description": "Deepest workflow → CreateEvent → workflow chain."
         },
         {
           "name": "WORKFLOW_STUCK_THRESHOLD_MINUTES",
           "default": "15",
           "example": null,
-          "description": "Stuck execution recovery: threshold (minutes) and check interval (ms)"
+          "description": "Stuck execution recovery: threshold (minutes) and check interval (ms)."
         },
         {
           "name": "WORKFLOW_RECOVERY_INTERVAL_MS",
           "default": "120000",
           "example": null,
-          "description": "Stuck execution recovery: threshold (minutes) and check interval (ms)"
+          "description": "Stuck execution recovery: threshold (minutes) and check interval (ms)."
         },
         {
           "name": "WORKFLOW_RESUME_INTERVAL_MS",
           "default": "5000",
           "example": null,
-          "description": "A delay node suspends its execution rather than sleeping on a pool thread, and\nthis is how often suspended executions are checked for being due. It is the\nresolution of a delay, so a delay is always \"at least N seconds\", never\nexactly N — which is what a delay in a workflow means anyway."
+          "description": "How often suspended delay nodes are checked for being due (ms); the resolution of a delay."
         },
         {
           "name": "WORKFLOW_RESUME_BATCH_SIZE",
           "default": "50",
           "example": null,
-          "description": "How many due executions one tick resumes. Matters more than the interval: a\nburst all becoming due in the same second must not hand the workflow pool more\nthan it can take, so the remainder spills to the next tick in due order."
+          "description": "Due executions resumed per tick; the rest wait for the next tick."
         },
         {
           "name": "WORKFLOW_NODE_TIMEOUT_DEFAULT_SECONDS",
           "default": "30",
           "example": null,
-          "description": "Per-node timeout limits (seconds)"
+          "description": "Per-node timeouts (seconds) and the timeout thread pool size."
         },
         {
           "name": "WORKFLOW_NODE_TIMEOUT_HTTP_SECONDS",
           "default": "60",
           "example": null,
-          "description": "Per-node timeout limits (seconds)"
+          "description": "Per-node timeouts (seconds) and the timeout thread pool size."
         },
         {
           "name": "WORKFLOW_NODE_TIMEOUT_SLACK_SECONDS",
           "default": "60",
           "example": null,
-          "description": "Per-node timeout limits (seconds)"
+          "description": "Per-node timeouts (seconds) and the timeout thread pool size."
         },
         {
           "name": "WORKFLOW_NODE_TIMEOUT_CREATE_EVENT_SECONDS",
           "default": "30",
           "example": null,
-          "description": "Per-node timeout limits (seconds)"
+          "description": "Per-node timeouts (seconds) and the timeout thread pool size."
         },
         {
           "name": "WORKFLOW_NODE_TIMEOUT_POOL_SIZE",
           "default": "16",
           "example": null,
-          "description": "Per-node timeout limits (seconds)"
+          "description": "Per-node timeouts (seconds) and the timeout thread pool size."
         },
         {
           "name": "WORKFLOW_SHUTDOWN_AWAIT_SECONDS",
           "default": "30",
           "example": null,
-          "description": "Graceful shutdown: how long to wait for in-flight workflows (seconds)"
+          "description": "Seconds to wait for in-flight workflows on shutdown."
         },
         {
           "name": "WORKFLOW_TRIGGER_OUTBOX_POLL_INTERVAL_MS",
           "default": "2000",
           "example": null,
-          "description": "Workflow trigger outbox (durable at-least-once trigger via transactional outbox)"
+          "description": "Workflow trigger outbox: poll interval (ms), batch size, attempts per trigger."
         },
         {
           "name": "WORKFLOW_TRIGGER_OUTBOX_BATCH_SIZE",
           "default": "50",
           "example": null,
-          "description": "Workflow trigger outbox (durable at-least-once trigger via transactional outbox)"
+          "description": "Workflow trigger outbox: poll interval (ms), batch size, attempts per trigger."
         },
         {
           "name": "WORKFLOW_TRIGGER_OUTBOX_MAX_ATTEMPTS",
           "default": "3",
           "example": null,
-          "description": "Workflow trigger outbox (durable at-least-once trigger via transactional outbox)"
+          "description": "Workflow trigger outbox: poll interval (ms), batch size, attempts per trigger."
         },
         {
           "name": "WORKFLOW_TRIGGER_OUTBOX_MAX_PER_PROJECT",
           "default": "5",
           "example": null,
-          "description": "Max workflow triggers claimed per project per batch (prevents one project from starving others)"
+          "description": "Triggers claimed per project per batch."
         },
         {
           "name": "WORKFLOW_TRIGGER_OUTBOX_MAX_CONCURRENT_PER_PROJECT",
           "default": "3",
           "example": null,
-          "description": "Max concurrent workflow executions per project (prevents executor thread exhaustion)"
+          "description": "Concurrent workflow executions per project."
         },
         {
           "name": "WORKFLOW_TRIGGER_OUTBOX_STALLED_AFTER_MINUTES",
           "default": "15",
           "example": null,
-          "description": "A claimed row goes PROCESSING and only its own poller can move it on. If that poller dies\nmid-workflow, nothing else picks the row up: the batch claim reads PENDING and the cleanup\njob deletes DONE. This sweep returns rows abandoned in PROCESSING to the queue. Keep the\nthreshold above the longest workflow you actually run, or a live one gets reclaimed\nunderneath itself and executes twice."
+          "description": "Minutes after which a trigger abandoned in PROCESSING is requeued, and the sweep interval (ms).\nKeep it above your longest workflow, or a live one runs twice."
         },
         {
           "name": "WORKFLOW_TRIGGER_OUTBOX_STALLED_SWEEP_MS",
           "default": "300000",
           "example": null,
-          "description": "A claimed row goes PROCESSING and only its own poller can move it on. If that poller dies\nmid-workflow, nothing else picks the row up: the batch claim reads PENDING and the cleanup\njob deletes DONE. This sweep returns rows abandoned in PROCESSING to the queue. Keep the\nthreshold above the longest workflow you actually run, or a live one gets reclaimed\nunderneath itself and executes twice."
+          "description": "Minutes after which a trigger abandoned in PROCESSING is requeued, and the sweep interval (ms).\nKeep it above your longest workflow, or a live one runs twice."
         }
       ]
     },
@@ -1404,7 +1404,7 @@
           "name": "DEVICE_AUTH_CLEANUP_INTERVAL_MS",
           "default": "300000",
           "example": null,
-          "description": "Cleanup interval for expired device auth codes (ms)"
+          "description": "Expired device code cleanup interval (ms)."
         }
       ]
     },
@@ -1415,67 +1415,67 @@
           "name": "EMAIL_ENABLED",
           "default": "false",
           "example": null,
-          "description": "Enable sending real emails (false = log verification URL to console).\n\nThis also decides whether email verification is enforced at all. With it off, a new\naccount is marked verified the moment it registers: there is no channel that could carry\na token to the address, and a gate with no key is just a locked-out user. With it on,\nregistration leaves the account unverified and the API refuses every write from it until\nthe address is confirmed -- reads still work, so the dashboard can say so.\n\nTurn it on for any deployment where registration is open to strangers. It is the\ndifference between an address someone owns and an address someone typed."
+          "description": "Send real email (false logs links to the console). Also enforces email verification: while\noff, new accounts are marked verified. Turn on wherever registration is open to strangers."
         },
         {
           "name": "EMAIL_FROM",
           "default": "noreply@example.com",
           "example": null,
-          "description": "From address for verification emails.\n\nSet this to a domain you actually own before turning EMAIL_ENABLED on. Mail\nfrom a domain you do not control fails SPF and DKIM at the receiver, so\nverification mail lands in spam or is rejected outright — and the user is\nleft staring at a screen telling them to check an inbox nothing will reach.\nexample.com is a placeholder, not a default that works."
+          "description": "Sender address; use a domain you own, or mail fails SPF/DKIM and lands in spam."
         },
         {
           "name": "EMAIL_SUPPORT_ADDRESS",
           "default": "",
           "example": null,
-          "description": "Where a person is told to write when an email change on their account was not\nthem. It appears in the notice sent to the old address. Leave empty and the\nnotice says to contact the administrator of this installation instead."
+          "description": "Contact address in the notice about an unexpected email change; empty says to contact the administrator."
         },
         {
           "name": "ONBOARDING_EMAILS_ENABLED",
           "default": "false",
           "example": null,
-          "description": "Onboarding mail to new accounts: a welcome once the address is verified, and one\nnudge two days later if the account's organization has still sent and received no\nevents. Each goes at most once per account, replies go to EMAIL_SUPPORT_ADDRESS, and\nnothing is sent unless EMAIL_ENABLED is on too. Accounts that existed before the\nupgrade that introduced this never receive either.\n\nOff by default, and meant to stay off on a self-hosted install: both mails are written\nin the first person by Railhook's author, for Railhook Cloud."
+          "description": "Welcome and follow-up mail to new accounts, written for Railhook Cloud; keep off when self-hosting."
         },
         {
           "name": "CONTACT_DAILY_LIMIT",
           "default": "30",
           "example": null,
-          "description": "The most messages the site's contact form sends per UTC day, across every sender. They spend\nthe same mail-provider quota as verification and password-reset mails (100 a day on Resend's\nfree plan), so a flood from many addresses cannot starve those. Past it the form asks the\nvisitor to write by email."
+          "description": "Contact form messages sent per UTC day, so the form cannot spend the mail quota verification needs."
         },
         {
           "name": "SMTP_HOST",
           "default": "localhost",
           "example": null,
-          "description": "SMTP settings (only used when EMAIL_ENABLED=true)"
+          "description": "SMTP relay, used when EMAIL_ENABLED=true."
         },
         {
           "name": "SMTP_PORT",
           "default": "1025",
           "example": null,
-          "description": "SMTP settings (only used when EMAIL_ENABLED=true)"
+          "description": "SMTP relay, used when EMAIL_ENABLED=true."
         },
         {
           "name": "SMTP_USERNAME",
           "default": "",
           "example": null,
-          "description": "SMTP settings (only used when EMAIL_ENABLED=true)"
+          "description": "SMTP relay, used when EMAIL_ENABLED=true."
         },
         {
           "name": "SMTP_PASSWORD",
           "default": "",
           "example": null,
-          "description": "SMTP settings (only used when EMAIL_ENABLED=true)"
+          "description": "SMTP relay, used when EMAIL_ENABLED=true."
         },
         {
           "name": "SMTP_AUTH",
           "default": "false",
           "example": null,
-          "description": "SMTP settings (only used when EMAIL_ENABLED=true)"
+          "description": "SMTP relay, used when EMAIL_ENABLED=true."
         },
         {
           "name": "SMTP_STARTTLS",
           "default": "false",
           "example": null,
-          "description": "SMTP settings (only used when EMAIL_ENABLED=true)"
+          "description": "SMTP relay, used when EMAIL_ENABLED=true."
         }
       ]
     },
@@ -1486,13 +1486,13 @@
           "name": "ALERTS_NOTIFICATIONS_ENABLED",
           "default": "false",
           "example": null,
-          "description": "Enable sending real alert notifications via Slack/Webhook/Email\n(false = dry-run mode, logs notification details to console)"
+          "description": "Send alert notifications to Slack, webhooks and email (false logs them instead)."
         },
         {
           "name": "ALERTS_EVALUATION_CRON",
           "default": "0 * * * * *",
           "example": null,
-          "description": "How often alert rules are evaluated. Every rule is measured over its own\nwindow, so this is the resolution of \"how late can an alert be\", not the\nwindow itself. A rule fires once per crossing and stays quiet until its\nevent is resolved, so a faster cadence does not mean more notifications."
+          "description": "Alert rule evaluation schedule (cron); how late an alert can be, not its window."
         }
       ]
     },
@@ -1503,13 +1503,13 @@
           "name": "ENTITLEMENT_DEFAULT_RATE_LIMIT",
           "default": "100",
           "example": null,
-          "description": "Default entitlement limits when BILLING_ENABLED=false (self-hosted sane defaults)\nPrevents Integer.MAX_VALUE (effectively no limit) which can cause cascading failures"
+          "description": "Rate limit (events/s) and fan-out applied when BILLING_ENABLED=false, instead of no limit."
         },
         {
           "name": "ENTITLEMENT_DEFAULT_MAX_FANOUT",
           "default": "50",
           "example": null,
-          "description": "Default entitlement limits when BILLING_ENABLED=false (self-hosted sane defaults)\nPrevents Integer.MAX_VALUE (effectively no limit) which can cause cascading failures"
+          "description": "Rate limit (events/s) and fan-out applied when BILLING_ENABLED=false, instead of no limit."
         }
       ]
     },
@@ -1520,25 +1520,25 @@
           "name": "CAPTCHA_SECRET_KEY",
           "default": null,
           "example": null,
-          "description": "Empty is the default and means no challenge at all: a self-hosted registration page has\nnobody to challenge, and sending its visitors to a third party to prove otherwise would be\na worse default than accepting them.\n\nSet it wherever registration is open to strangers. The auth rate limit is per address, and\nan address is the one thing a signup farm has plenty of. With APP_ENV=production and\nBILLING_ENABLED=true the API refuses to start without this.\n\nCloudflare Turnstile by default; hCaptcha speaks the same siteverify shape, so pointing\nCAPTCHA_VERIFY_URL at https://api.hcaptcha.com/siteverify is all that differs.\nVerification fails closed: if the provider is unreachable, registration is refused rather\nthan waved through."
+          "description": "Registration CAPTCHA secret and verify URL (Turnstile by default; hCaptcha works too). Empty means\nno challenge; required with APP_ENV=production and BILLING_ENABLED=true. Fails closed."
         },
         {
           "name": "CAPTCHA_VERIFY_URL",
           "default": null,
           "example": "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-          "description": "Empty is the default and means no challenge at all: a self-hosted registration page has\nnobody to challenge, and sending its visitors to a third party to prove otherwise would be\na worse default than accepting them.\n\nSet it wherever registration is open to strangers. The auth rate limit is per address, and\nan address is the one thing a signup farm has plenty of. With APP_ENV=production and\nBILLING_ENABLED=true the API refuses to start without this.\n\nCloudflare Turnstile by default; hCaptcha speaks the same siteverify shape, so pointing\nCAPTCHA_VERIFY_URL at https://api.hcaptcha.com/siteverify is all that differs.\nVerification fails closed: if the provider is unreachable, registration is refused rather\nthan waved through."
+          "description": "Registration CAPTCHA secret and verify URL (Turnstile by default; hCaptcha works too). Empty means\nno challenge; required with APP_ENV=production and BILLING_ENABLED=true. Fails closed."
         },
         {
           "name": "CAPTCHA_SITE_KEY",
           "default": null,
           "example": null,
-          "description": "The dashboard's half. Without a site key the registration page renders no challenge and\nsends no token, which is what makes the server-side default consistent rather than a\nsubmit button that never works.\n\nRead by the UI container when it starts, so it works on the published image: set it and\nrun `docker compose up -d ui`, no rebuild. Turn both halves on together — CAPTCHA_SECRET_KEY\non the API with no site key on the page means no token is sent and every registration is\nrefused."
+          "description": "Site key and script for the registration page, read by the ui container at start. Set together\nwith CAPTCHA_SECRET_KEY, or every registration is refused."
         },
         {
           "name": "CAPTCHA_SCRIPT_URL",
           "default": null,
           "example": "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit",
-          "description": "The dashboard's half. Without a site key the registration page renders no challenge and\nsends no token, which is what makes the server-side default consistent rather than a\nsubmit button that never works.\n\nRead by the UI container when it starts, so it works on the published image: set it and\nrun `docker compose up -d ui`, no rebuild. Turn both halves on together — CAPTCHA_SECRET_KEY\non the API with no site key on the page means no token is sent and every registration is\nrefused."
+          "description": "Site key and script for the registration page, read by the ui container at start. Set together\nwith CAPTCHA_SECRET_KEY, or every registration is refused."
         }
       ]
     },
@@ -1549,19 +1549,19 @@
           "name": "PUBLIC_TESTER_ENABLED",
           "default": null,
           "example": "false",
-          "description": "/tester on the public site: anyone, without an account, makes a URL that records the requests\nsent to it for a day. It is how railhook.io lets people try Railhook before signing up.\n\nOff by default, so a self-hosted install opens nothing anonymous: the page says the tester is\nnot enabled and the API answers 404. When on, it is bounded — three live URLs per address,\nPUBLIC_TESTER_MAX_ACTIVE live URLs overall, the latest 100 requests within 1 MB per URL — and\nasks for the registration CAPTCHA when one is configured."
+          "description": "The anonymous /tester page; off by default. Live URLs per address and overall when on."
         },
         {
           "name": "PUBLIC_TESTER_PER_ADDRESS",
           "default": null,
           "example": "3",
-          "description": "/tester on the public site: anyone, without an account, makes a URL that records the requests\nsent to it for a day. It is how railhook.io lets people try Railhook before signing up.\n\nOff by default, so a self-hosted install opens nothing anonymous: the page says the tester is\nnot enabled and the API answers 404. When on, it is bounded — three live URLs per address,\nPUBLIC_TESTER_MAX_ACTIVE live URLs overall, the latest 100 requests within 1 MB per URL — and\nasks for the registration CAPTCHA when one is configured."
+          "description": "The anonymous /tester page; off by default. Live URLs per address and overall when on."
         },
         {
           "name": "PUBLIC_TESTER_MAX_ACTIVE",
           "default": null,
           "example": "5000",
-          "description": "/tester on the public site: anyone, without an account, makes a URL that records the requests\nsent to it for a day. It is how railhook.io lets people try Railhook before signing up.\n\nOff by default, so a self-hosted install opens nothing anonymous: the page says the tester is\nnot enabled and the API answers 404. When on, it is bounded — three live URLs per address,\nPUBLIC_TESTER_MAX_ACTIVE live URLs overall, the latest 100 requests within 1 MB per URL — and\nasks for the registration CAPTCHA when one is configured."
+          "description": "The anonymous /tester page; off by default. Live URLs per address and overall when on."
         }
       ]
     },
@@ -1572,31 +1572,31 @@
           "name": "DEMO_ENABLED",
           "default": null,
           "example": "false",
-          "description": "\"Try the live demo\" on the public site: anyone, without an account, opens the real dashboard\nsigned in to a seeded demo organization (\"Acme Shop\") and can look at everything in it. It is\nhow railhook.io shows the product before a sign-up.\n\nOff by default, so a self-hosted install opens nothing anonymous: no demo organization is\ncreated, the entry points are hidden and the API answers 404. When on, the API seeds the demo\norganization at startup and rewrites its history every DEMO_REFRESH_INTERVAL_MINUTES so it\nalways shows the last day. A demo session is read-only on the server — every change is refused\n— and lasts DEMO_SESSION_TTL_MINUTES with no way to extend it. Ten sessions a minute per\naddress, behind the registration CAPTCHA when one is configured. The demo's URLs are on\nreserved .example hosts and nothing is ever delivered to them.\n\nTurning it off again also removes the demo: on its next start the API deletes the demo\norganization and everything in it. Nothing outside the demo is touched.\n\nRead by the UI container too (its entry points), so set it for both and restart both."
+          "description": "Anonymous read-only demo organization; off by default, and turning it off deletes it. Session\nlength and data refresh in minutes. Set on both api and ui."
         },
         {
           "name": "DEMO_SESSION_TTL_MINUTES",
           "default": null,
           "example": "30",
-          "description": "\"Try the live demo\" on the public site: anyone, without an account, opens the real dashboard\nsigned in to a seeded demo organization (\"Acme Shop\") and can look at everything in it. It is\nhow railhook.io shows the product before a sign-up.\n\nOff by default, so a self-hosted install opens nothing anonymous: no demo organization is\ncreated, the entry points are hidden and the API answers 404. When on, the API seeds the demo\norganization at startup and rewrites its history every DEMO_REFRESH_INTERVAL_MINUTES so it\nalways shows the last day. A demo session is read-only on the server — every change is refused\n— and lasts DEMO_SESSION_TTL_MINUTES with no way to extend it. Ten sessions a minute per\naddress, behind the registration CAPTCHA when one is configured. The demo's URLs are on\nreserved .example hosts and nothing is ever delivered to them.\n\nTurning it off again also removes the demo: on its next start the API deletes the demo\norganization and everything in it. Nothing outside the demo is touched.\n\nRead by the UI container too (its entry points), so set it for both and restart both."
+          "description": "Anonymous read-only demo organization; off by default, and turning it off deletes it. Session\nlength and data refresh in minutes. Set on both api and ui."
         },
         {
           "name": "DEMO_REFRESH_INTERVAL_MINUTES",
           "default": null,
           "example": "60",
-          "description": "\"Try the live demo\" on the public site: anyone, without an account, opens the real dashboard\nsigned in to a seeded demo organization (\"Acme Shop\") and can look at everything in it. It is\nhow railhook.io shows the product before a sign-up.\n\nOff by default, so a self-hosted install opens nothing anonymous: no demo organization is\ncreated, the entry points are hidden and the API answers 404. When on, the API seeds the demo\norganization at startup and rewrites its history every DEMO_REFRESH_INTERVAL_MINUTES so it\nalways shows the last day. A demo session is read-only on the server — every change is refused\n— and lasts DEMO_SESSION_TTL_MINUTES with no way to extend it. Ten sessions a minute per\naddress, behind the registration CAPTCHA when one is configured. The demo's URLs are on\nreserved .example hosts and nothing is ever delivered to them.\n\nTurning it off again also removes the demo: on its next start the API deletes the demo\norganization and everything in it. Nothing outside the demo is touched.\n\nRead by the UI container too (its entry points), so set it for both and restart both."
+          "description": "Anonymous read-only demo organization; off by default, and turning it off deletes it. Session\nlength and data refresh in minutes. Set on both api and ui."
         },
         {
           "name": "DEMO_SCRIPT_RUNS_PER_SESSION_PER_MINUTE",
           "default": null,
           "example": "20",
-          "description": "How many JavaScript transformations a demo session may run in a minute. The demo can reach two\nhandlers that execute code — the Transform Studio's preview and the delivery dry-run — and both\nrun the script on the request thread that called them. TRANSFORM_SCRIPT_TIMEOUT_MS bounds one\nrun; these bound how many, which is the part that decides whether a stranger can hold request\nthreads by firing runaway scripts in a loop.\n\nThe arithmetic, at the default 2000 ms timeout: 60 runs a minute is at most 120 seconds of\nscript time per minute, so one address can hold two of Tomcat's 200 request threads and no\nmore. The per-session 20 is the human bound underneath it — pressing Run every three seconds is\ncomfortable editing — and stops one tab spending the whole address's allowance. Raise the\nper-address number only alongside the thread pool; lower the timeout instead if the demo is\nbeing used as a free compute service.\n\nPer session means per demo token: a second tab or a re-opened session gets its own allowance,\nwhich is the same allowance a second visitor would have. Only demo sessions are counted here;\na signed-in caller's runs are attributable to an account already."
+          "description": "JavaScript transformation runs per minute for a demo session and per IP. Runs hold request\nthreads, so at a 2000 ms timeout 60 per IP bounds one address to two threads."
         },
         {
           "name": "DEMO_SCRIPT_RUNS_PER_IP_PER_MINUTE",
           "default": null,
           "example": "60",
-          "description": "How many JavaScript transformations a demo session may run in a minute. The demo can reach two\nhandlers that execute code — the Transform Studio's preview and the delivery dry-run — and both\nrun the script on the request thread that called them. TRANSFORM_SCRIPT_TIMEOUT_MS bounds one\nrun; these bound how many, which is the part that decides whether a stranger can hold request\nthreads by firing runaway scripts in a loop.\n\nThe arithmetic, at the default 2000 ms timeout: 60 runs a minute is at most 120 seconds of\nscript time per minute, so one address can hold two of Tomcat's 200 request threads and no\nmore. The per-session 20 is the human bound underneath it — pressing Run every three seconds is\ncomfortable editing — and stops one tab spending the whole address's allowance. Raise the\nper-address number only alongside the thread pool; lower the timeout instead if the demo is\nbeing used as a free compute service.\n\nPer session means per demo token: a second tab or a re-opened session gets its own allowance,\nwhich is the same allowance a second visitor would have. Only demo sessions are counted here;\na signed-in caller's runs are attributable to an account already."
+          "description": "JavaScript transformation runs per minute for a demo session and per IP. Runs hold request\nthreads, so at a 2000 ms timeout 60 per IP bounds one address to two threads."
         }
       ]
     },
@@ -1607,7 +1607,7 @@
           "name": "BLOG_ENABLED",
           "default": null,
           "example": "false",
-          "description": "/blog, its posts and its feed (/blog/rss.xml): Railhook's own articles, written for\nrailhook.io. The published UI image carries them because railhook.io runs the same image as\nevery self-hosted install, not because an install is meant to publish them.\n\nOff by default, so a self-hosted install serves only its own pages: /blog answers 404, the\nheader and footer carry no Blog link, and /sitemap.xml lists no posts. Only railhook.io turns\nit on. Read by the UI container alone; changing it takes `docker compose up -d ui`."
+          "description": "Serve Railhook's own blog at /blog; off by default. Read by the ui container."
         }
       ]
     },
@@ -1618,13 +1618,13 @@
           "name": "WEB_ANALYTICS_TOKEN",
           "default": null,
           "example": null,
-          "description": "Cloudflare Web Analytics on the public pages, the dashboard and the docs. Cookieless, so it\nneeds no consent banner. Empty is the default and means no analytics script at all — a\nself-hosted install reports nothing to anyone.\n\nThe token is the one Cloudflare shows under Analytics & Logs → Web Analytics → Manage site\n(the JS snippet's \"token\"). Read by the UI container when it starts: set it and run\n`docker compose up -d ui`, no rebuild."
+          "description": "Cloudflare Web Analytics token; empty loads no analytics. Read by the ui container at start."
         },
         {
           "name": "STATUS_PAGE_URL",
           "default": null,
           "example": null,
-          "description": "A public status page (https://…) for the site's footer to link to. Empty is the default and\nmeans no link. Read by the UI container when it starts."
+          "description": "Status page URL linked from the footer; empty shows no link. Read by the ui container at start."
         }
       ]
     },
@@ -1635,13 +1635,13 @@
           "name": "GOOGLE_OAUTH_CLIENT_ID",
           "default": null,
           "example": null,
-          "description": "\"Continue with Google\" on the sign-in and registration pages. Off unless both are set, and\nthen the button is not shown and the endpoints answer 404.\n\nOne button signs in and signs up: a Google account that matches no Railhook account gets one\non the spot, verified by Google, with its own organization named after its Google Workspace\ndomain (or the person, for a personal account). An account that already signed up with a\npassword and the same address gains Google as a second way in.\n\nCreate an OAuth client of type \"Web application\" in Google Cloud Console (APIs & Services →\nCredentials) and add this authorized redirect URI, exactly, built from APP_BASE_URL:\n  <APP_BASE_URL>/api/v1/auth/oauth/google/callback\nThe consent screen needs the openid, email and profile scopes and nothing else."
+          "description": "\"Continue with Google\", off unless both are set. Redirect URI:\n<APP_BASE_URL>/api/v1/auth/oauth/google/callback"
         },
         {
           "name": "GOOGLE_OAUTH_CLIENT_SECRET",
           "default": null,
           "example": null,
-          "description": "\"Continue with Google\" on the sign-in and registration pages. Off unless both are set, and\nthen the button is not shown and the endpoints answer 404.\n\nOne button signs in and signs up: a Google account that matches no Railhook account gets one\non the spot, verified by Google, with its own organization named after its Google Workspace\ndomain (or the person, for a personal account). An account that already signed up with a\npassword and the same address gains Google as a second way in.\n\nCreate an OAuth client of type \"Web application\" in Google Cloud Console (APIs & Services →\nCredentials) and add this authorized redirect URI, exactly, built from APP_BASE_URL:\n  <APP_BASE_URL>/api/v1/auth/oauth/google/callback\nThe consent screen needs the openid, email and profile scopes and nothing else."
+          "description": "\"Continue with Google\", off unless both are set. Redirect URI:\n<APP_BASE_URL>/api/v1/auth/oauth/google/callback"
         }
       ]
     },
@@ -1652,73 +1652,73 @@
           "name": "BILLING_ENABLED",
           "default": "false",
           "example": null,
-          "description": "Enable plan-based quota enforcement (false = self-hosted, all unlimited).\n\nThis flag is the whole of what separates a hosted deployment from a self-hosted one:\nno separate build, no profile, no licence key. With APP_ENV=production, turning it on\nalso requires EMAIL_ENABLED=true and CAPTCHA_SECRET_KEY, and the API refuses to start\notherwise -- a quota-limited tier behind unverified addresses and no challenge is a tier\nanyone can mint accounts on."
+          "description": "Enforce plan quotas (false = self-hosted, unlimited). In production it also requires\nEMAIL_ENABLED=true and CAPTCHA_SECRET_KEY."
         },
         {
           "name": "BILLING_DEFAULT_PROVIDER",
           "default": "noop",
           "example": null,
-          "description": "Default billing provider: noop | stripe | wayforpay\nWhen BILLING_ENABLED=false, provider is ignored (NoOp used automatically).\nWith BILLING_ENABLED=true and noop the deployment runs the free plan only: its quotas are\nenforced, the catalog lists no priced plan, and checkout is refused."
+          "description": "noop | stripe | wayforpay; noop with billing on runs the free plan only."
         },
         {
           "name": "STRIPE_SECRET_KEY",
           "default": null,
           "example": "sk_test_...",
-          "description": "Stripe settings (registered automatically when STRIPE_SECRET_KEY is set)"
+          "description": "Stripe credentials; STRIPE_PRICE_MAP is plan_interval=price_id (interval _monthly or _yearly)."
         },
         {
           "name": "STRIPE_WEBHOOK_SECRET",
           "default": null,
           "example": "whsec_...",
-          "description": "Stripe settings (registered automatically when STRIPE_SECRET_KEY is set)"
+          "description": "Stripe credentials; STRIPE_PRICE_MAP is plan_interval=price_id (interval _monthly or _yearly)."
         },
         {
           "name": "STRIPE_PRICE_MAP",
           "default": null,
           "example": "starter_monthly=price_xxx,starter_yearly=price_xxy,pro_monthly=price_yyy,pro_yearly=price_yyz",
-          "description": "Format: plan_interval=stripe_price_id (interval: _monthly or _yearly)"
+          "description": "Stripe credentials; STRIPE_PRICE_MAP is plan_interval=price_id (interval _monthly or _yearly)."
         },
         {
           "name": "BILLING_RECONCILIATION_CRON",
           "default": "0 0 */6 * * *",
           "example": null,
-          "description": "Billing reconciliation — syncs local state with external provider (Stripe only).\nWayForPay is merchant-initiated so our local state IS the source of truth.\nCron: every 6 hours by default."
+          "description": "Schedule for syncing billing state from Stripe (cron)."
         },
         {
           "name": "WAYFORPAY_MERCHANT_ACCOUNT",
           "default": null,
           "example": "your_merchant_account",
-          "description": "WayForPay settings (registered automatically when WAYFORPAY_MERCHANT_ACCOUNT is set)"
+          "description": "WayForPay credentials; WAYFORPAY_PLAN_PRICES is plan_interval=amount_in_cents."
         },
         {
           "name": "WAYFORPAY_MERCHANT_SECRET",
           "default": null,
           "example": "your_merchant_secret_key",
-          "description": "WayForPay settings (registered automatically when WAYFORPAY_MERCHANT_ACCOUNT is set)"
+          "description": "WayForPay credentials; WAYFORPAY_PLAN_PRICES is plan_interval=amount_in_cents."
         },
         {
           "name": "WAYFORPAY_MERCHANT_DOMAIN",
           "default": null,
           "example": "example.com",
-          "description": "WayForPay settings (registered automatically when WAYFORPAY_MERCHANT_ACCOUNT is set)"
+          "description": "WayForPay credentials; WAYFORPAY_PLAN_PRICES is plan_interval=amount_in_cents."
         },
         {
           "name": "WAYFORPAY_SERVICE_URL",
           "default": null,
           "example": "https://example.com/api/v1/billing/webhook/wayforpay",
-          "description": "WayForPay settings (registered automatically when WAYFORPAY_MERCHANT_ACCOUNT is set)"
+          "description": "WayForPay credentials; WAYFORPAY_PLAN_PRICES is plan_interval=amount_in_cents."
         },
         {
           "name": "WAYFORPAY_PLAN_PRICES",
           "default": null,
           "example": "starter_monthly=2900,starter_yearly=29000,pro_monthly=9900,pro_yearly=99000",
-          "description": "Format: plan_interval=amount_in_cents (interval: _monthly or _yearly)"
+          "description": "WayForPay credentials; WAYFORPAY_PLAN_PRICES is plan_interval=amount_in_cents."
         },
         {
           "name": "PRERENDER_LOCALE",
           "default": "en",
           "example": null,
-          "description": "The locale the UI's public pages are rendered into static HTML as, at image build\ntime. There is one set of URLs for two locales — the language is chosen client-side —\nso this has to be the one the canonical tags and sitemap describe. Build-time only:\nit has no effect on a running container."
+          "description": "Build-time only: locale the public pages are prerendered in."
         }
       ]
     },
@@ -1729,25 +1729,25 @@
           "name": "TUNNEL_INGRESS_BASE_URL",
           "default": "http://localhost:8080",
           "example": null,
-          "description": "Public base URL for incoming-source and tunnel URLs (handed to providers and the CLI).\nLeft unset, docker-compose.yml uses APP_BASE_URL. Set it only when webhooks reach\nRailhook on a different host than the dashboard, e.g. https://hooks.example.com"
+          "description": "Public base URL of incoming-source and tunnel URLs; defaults to APP_BASE_URL."
         },
         {
           "name": "TUNNEL_HEARTBEAT_TIMEOUT_SECONDS",
           "default": "120",
           "example": null,
-          "description": "Heartbeat timeout — tunnel session marked stale after this many seconds without heartbeat"
+          "description": "Seconds without a heartbeat before a tunnel session is stale."
         },
         {
           "name": "TUNNEL_CLEANUP_INTERVAL_MS",
           "default": "60000",
           "example": null,
-          "description": "Stale session cleanup interval (ms)"
+          "description": "Stale session cleanup interval (ms)."
         },
         {
           "name": "TUNNEL_REQUEST_LOG_RETENTION_DAYS",
           "default": "7",
           "example": null,
-          "description": "Tunnel request log retention (days). tunnel_request_log is partitioned weekly,\nso retention is a DROP TABLE of whole expired partitions by the partition\nmaintenance job (PARTITION_MAINTENANCE_CRON), not a row-by-row delete of its own."
+          "description": "Tunnel request log retention (days), enforced by dropping weekly partitions."
         }
       ]
     },
@@ -1758,13 +1758,13 @@
           "name": "MCP_ENABLED",
           "default": "true",
           "example": null,
-          "description": "The remote MCP server at <your origin>/mcp, which lets an AI agent (Claude Code,\nCursor, Claude Desktop) send events and inspect endpoints, subscriptions and\ndeliveries. It authenticates with a project API key and can do nothing that key\ncannot; a READ_ONLY key gets the read tools only. Set to false to turn /mcp off."
+          "description": "Serve the MCP server at /mcp, authenticated with a project API key."
         },
         {
           "name": "MCP_OAUTH_ENABLED",
           "default": "true",
           "example": null,
-          "description": "Sign-in for the MCP server, so claude.ai and ChatGPT can connect it as a custom\nconnector: the app registers itself (OAuth dynamic client registration), the\nperson approves it for one project with read-only or read & write access on a\nconsent screen, and the app gets short-lived tokens for that project. The\nconnections are listed, and revocable, next to the project's API keys. It is\nserved from APP_BASE_URL, which must therefore be the public origin. Set to false\nto accept API keys only."
+          "description": "OAuth sign-in for MCP connectors (claude.ai, ChatGPT); needs APP_BASE_URL to be the public\norigin. false accepts API keys only."
         }
       ]
     },
@@ -1775,7 +1775,7 @@
           "name": "CORS_ALLOWED_ORIGINS",
           "default": "http://localhost:8080,http://localhost:5173",
           "example": null,
-          "description": "The stack is served on RAILHOOK_PORT, so that origin has to be here: the\nbrowser sends `Origin` on same-origin POSTs too, and Spring's allow-list\nrejects anything it does not list — which made a template-default install\nanswer every login with \"Invalid CORS request\". 5173 is the Vite dev server\nfor `npm run dev`; nothing in this stack has ever served on 3000."
+          "description": "Comma-separated allowed origins. Must include the RAILHOOK_PORT origin: browsers send Origin on\nsame-origin POSTs too."
         }
       ]
     },
@@ -1786,13 +1786,13 @@
           "name": "LOG_LEVEL",
           "default": "INFO",
           "example": null,
-          "description": "Log level: TRACE | DEBUG | INFO | WARN | ERROR"
+          "description": "TRACE | DEBUG | INFO | WARN | ERROR"
         },
         {
           "name": "SWAGGER_ENABLED",
           "default": "false",
           "example": null,
-          "description": "Enable/disable Swagger UI (set to false in production)"
+          "description": "Serve Swagger UI; keep false in production."
         }
       ]
     },
@@ -1803,19 +1803,19 @@
           "name": "API_JAVA_OPTS",
           "default": null,
           "example": "-Xms256m -Xmx384m",
-          "description": "Extra JVM flags, APPENDED to the tuning baked into the images\n(G1GC, UseContainerSupport, MaxRAMPercentage=75%, InitialRAMPercentage=50%).\nThey append rather than replace: an explicit -Xmx here still wins over\nMaxRAMPercentage, but leaving these unset cannot erase the container tuning."
+          "description": "Extra JVM flags, appended to the image's container tuning; an explicit -Xmx still wins."
         },
         {
           "name": "WORKER_JAVA_OPTS",
           "default": null,
           "example": "-Xms384m -Xmx512m",
-          "description": "Extra JVM flags, APPENDED to the tuning baked into the images\n(G1GC, UseContainerSupport, MaxRAMPercentage=75%, InitialRAMPercentage=50%).\nThey append rather than replace: an explicit -Xmx here still wins over\nMaxRAMPercentage, but leaving these unset cannot erase the container tuning."
+          "description": "Extra JVM flags, appended to the image's container tuning; an explicit -Xmx still wins."
         },
         {
           "name": "METRICS_ENABLED",
           "default": "true",
           "example": null,
-          "description": "Enable Prometheus metrics export"
+          "description": "Expose Prometheus metrics."
         }
       ]
     },
@@ -1826,226 +1826,226 @@
           "name": "POSTGRES_MEMORY_LIMIT",
           "default": null,
           "example": "1G",
-          "description": "Override memory limits per service (used in docker-compose.yml)"
+          "description": "Container memory limits."
         },
         {
           "name": "KAFKA_MEMORY_LIMIT",
           "default": null,
           "example": "1G",
-          "description": "Override memory limits per service (used in docker-compose.yml)"
+          "description": "Container memory limits."
         },
         {
           "name": "KAFKA_HEAP_OPTS",
           "default": null,
           "example": "-Xms512m -Xmx512m",
-          "description": "The broker's JVM heap. It must fit well inside KAFKA_MEMORY_LIMIT — keep it near\nhalf: Kafka serves data from the page cache, and the rest of the limit is taken\nby metaspace, threads and network buffers. Raise both together."
+          "description": "Kafka JVM heap; keep it near half of KAFKA_MEMORY_LIMIT, the rest serves page cache and buffers."
         },
         {
           "name": "REDIS_MEMORY_LIMIT",
           "default": null,
           "example": "512m",
-          "description": "The broker's JVM heap. It must fit well inside KAFKA_MEMORY_LIMIT — keep it near\nhalf: Kafka serves data from the page cache, and the rest of the limit is taken\nby metaspace, threads and network buffers. Raise both together."
+          "description": "Kafka JVM heap; keep it near half of KAFKA_MEMORY_LIMIT, the rest serves page cache and buffers."
         },
         {
           "name": "API_MEMORY_LIMIT",
           "default": null,
           "example": "768m",
-          "description": "The broker's JVM heap. It must fit well inside KAFKA_MEMORY_LIMIT — keep it near\nhalf: Kafka serves data from the page cache, and the rest of the limit is taken\nby metaspace, threads and network buffers. Raise both together."
+          "description": "Kafka JVM heap; keep it near half of KAFKA_MEMORY_LIMIT, the rest serves page cache and buffers."
         },
         {
           "name": "WORKER_MEMORY_LIMIT",
           "default": null,
           "example": "768m",
-          "description": "The broker's JVM heap. It must fit well inside KAFKA_MEMORY_LIMIT — keep it near\nhalf: Kafka serves data from the page cache, and the rest of the limit is taken\nby metaspace, threads and network buffers. Raise both together."
+          "description": "Kafka JVM heap; keep it near half of KAFKA_MEMORY_LIMIT, the rest serves page cache and buffers."
         },
         {
           "name": "API_REPLICAS",
           "default": "1",
           "example": null,
-          "description": "How many API containers run at once.\n\nOne serves perfectly well, and it is what the smallest supported host has room for.\nTwo is what makes an upgrade seamless: `railhook upgrade` brings the replacement up\nand waits for it to answer before taking the old one out, so there is no gap. With\none there is nothing to carry the traffic meanwhile, and an upgrade costs about\ntwenty seconds of 502 — that is the JVM starting, and no proxy setting shortens it.\n\nCosts roughly another 600MB. Measured on a 4 vCPU / 8GB host: 32s of 502 per upgrade\nat one replica, none at all at two."
+          "description": "API containers. Two make `railhook upgrade` seamless (about 600 MB more); one costs ~30s of 502\nper upgrade while the JVM starts."
         },
         {
           "name": "UI_MEMORY_LIMIT",
           "default": null,
           "example": "128m",
-          "description": ""
+          "description": "UI container memory limit."
         }
       ]
     },
     {
-      "title": "Monitoring stack (monitoring/ — see monitoring/README.md) — optional",
+      "title": "Monitoring stack (optional)",
       "variables": [
         {
           "name": "GRAFANA_ADMIN_PASSWORD",
           "default": "",
           "example": null,
-          "description": "Prometheus, Alertmanager, Grafana, Loki, node-exporter, cAdvisor and\nblackbox-exporter, as a second Compose project: `./railhook monitoring up` on an\ninstall.sh deployment, `make monitoring-up` in a clone. Nothing below does\nanything until it is started. Only Grafana is published, on loopback.\n\nGrafana's admin password. Required: the stack refuses to start without it, or\nwith anything shorter than 16 characters. Generate one with\n`openssl rand -base64 24`. It is re-applied on every start, so changing it\nhere and running `./railhook monitoring up` changes it in Grafana too."
+          "description": "Grafana admin password, 16+ characters; the stack refuses to start without it. Re-applied on\nevery start."
         },
         {
           "name": "GRAFANA_ADMIN_USER",
           "default": "admin",
           "example": null,
-          "description": "Grafana's admin login."
+          "description": "Grafana admin login."
         },
         {
           "name": "GRAFANA_PORT",
           "default": "3001",
           "example": null,
-          "description": "The loopback port Grafana is published on, for an SSH tunnel."
+          "description": "Loopback port Grafana is published on."
         },
         {
           "name": "MONITORING_DOMAIN",
           "default": "",
           "example": null,
-          "description": "A host name to serve Grafana on through the built-in Caddy, e.g.\ngrafana.example.com. Empty keeps it loopback-only. Point DNS at this host and\nput an identity-aware proxy (Cloudflare Access, for one) in front: Grafana's\nlogin alone should not be what stands between the internet and your logs."
+          "description": "Host name to serve Grafana on through the built-in Caddy; empty keeps it loopback-only. Put an\nidentity-aware proxy in front."
         },
         {
           "name": "MONITORING_TLS_CERT",
           "default": "",
           "example": null,
-          "description": "A certificate for MONITORING_DOMAIN that Caddy serves instead of obtaining one,\nfor a host name Let's Encrypt cannot reach through the proxy in front of it\n(Cloudflare with Always Use HTTPS; a Cloudflare origin certificate fits). Paths\nas the Caddy container sees them: copy both files into its data volume, e.g.\n/data/certs/grafana.example.com.pem. Both or neither."
+          "description": "Certificate and key Caddy serves for MONITORING_DOMAIN instead of obtaining one, as paths inside\nthe Caddy container. Both or neither."
         },
         {
           "name": "MONITORING_TLS_KEY",
           "default": "",
           "example": null,
-          "description": "A certificate for MONITORING_DOMAIN that Caddy serves instead of obtaining one,\nfor a host name Let's Encrypt cannot reach through the proxy in front of it\n(Cloudflare with Always Use HTTPS; a Cloudflare origin certificate fits). Paths\nas the Caddy container sees them: copy both files into its data volume, e.g.\n/data/certs/grafana.example.com.pem. Both or neither."
+          "description": "Certificate and key Caddy serves for MONITORING_DOMAIN instead of obtaining one, as paths inside\nthe Caddy container. Both or neither."
         },
         {
           "name": "MONITORING_PROBE_URLS",
           "default": "",
           "example": null,
-          "description": "URLs the uptime probes request from outside, comma-separated. Empty probes\nhttps://RAILHOOK_DOMAIN/, /docs/ and /actuator/health when a domain is set."
+          "description": "Comma-separated URLs for the uptime probes; empty probes RAILHOOK_DOMAIN when set."
         },
         {
           "name": "RAILHOOK_NETWORK",
           "default": "",
           "example": null,
-          "description": "The platform's Docker network the stack joins. Empty finds it by its Compose\nlabel; set it only if that finds the wrong one."
+          "description": "Platform Docker network to join; empty finds it by its Compose label."
         },
         {
           "name": "MONITORING_NODENAME",
           "default": "",
           "example": null,
-          "description": "The server's name as the Host dashboard lists it (node_uname_info nodename).\nEmpty uses this machine's hostname."
+          "description": "Server name shown on the Host dashboard; empty uses the hostname."
         },
         {
           "name": "MONITORING_BACKUP_DIR",
           "default": "../backups",
           "example": null,
-          "description": "The directory the scheduled backups are written to, as seen from monitoring/.\nThe BackupStale alert reads the newest dump's age from here."
+          "description": "Backup directory, relative to monitoring/, read by the BackupStale alert."
         },
         {
           "name": "PROMETHEUS_RETENTION",
           "default": "15d",
           "example": null,
-          "description": "How long Prometheus keeps metrics, and the disk it may use for them."
+          "description": "Prometheus retention time and disk budget."
         },
         {
           "name": "PROMETHEUS_RETENTION_SIZE",
           "default": "4GB",
           "example": null,
-          "description": "How long Prometheus keeps metrics, and the disk it may use for them."
+          "description": "Prometheus retention time and disk budget."
         }
       ]
     },
     {
-      "title": "Alerting (monitoring/alertmanager — see monitoring/README.md) — optional",
+      "title": "Alerting (optional)",
       "variables": [
         {
           "name": "ALERTMANAGER_SLACK_WEBHOOK_URL",
           "default": "",
           "example": null,
-          "description": "Rendered into Alertmanager's config at container start\n(monitoring/alertmanager/render-config.sh). Leave every receiver unset and\nAlertmanager still runs, but alerts reach only Grafana's Alerting page — set at\nleast one for a real deployment.\n\nSlack: an \"Incoming Webhook\" URL from https://api.slack.com/messaging/webhooks"
+          "description": "Alertmanager receivers. With none set, alerts show only in Grafana.\n\nSlack incoming webhook URL and channel."
         },
         {
           "name": "ALERTMANAGER_SLACK_CHANNEL",
           "default": "#railhook-alerts",
           "example": null,
-          "description": "Rendered into Alertmanager's config at container start\n(monitoring/alertmanager/render-config.sh). Leave every receiver unset and\nAlertmanager still runs, but alerts reach only Grafana's Alerting page — set at\nleast one for a real deployment.\n\nSlack: an \"Incoming Webhook\" URL from https://api.slack.com/messaging/webhooks"
+          "description": "Alertmanager receivers. With none set, alerts show only in Grafana.\n\nSlack incoming webhook URL and channel."
         },
         {
           "name": "ALERTMANAGER_WEBHOOK_URL",
           "default": "",
           "example": null,
-          "description": "Generic webhook receiver (e.g. PagerDuty Events API v2, Opsgenie, a custom sink)"
+          "description": "Generic webhook receiver URL (PagerDuty Events v2, Opsgenie, …)."
         },
         {
           "name": "ALERTMANAGER_EMAIL_TO",
           "default": "",
           "example": null,
-          "description": "Email receiver: where alert mail goes. The sender and relay default to the\nEMAIL_FROM and SMTP_* settings above, so alerts go through the relay the\nplatform already sends with; set the ALERTMANAGER_ ones only to use another."
+          "description": "Alert email recipient; sender and relay default to EMAIL_FROM and SMTP_*."
         },
         {
           "name": "ALERTMANAGER_EMAIL_FROM",
           "default": "",
           "example": null,
-          "description": "Email receiver: where alert mail goes. The sender and relay default to the\nEMAIL_FROM and SMTP_* settings above, so alerts go through the relay the\nplatform already sends with; set the ALERTMANAGER_ ones only to use another."
+          "description": "Alert email recipient; sender and relay default to EMAIL_FROM and SMTP_*."
         },
         {
           "name": "ALERTMANAGER_SMTP_HOST",
           "default": "",
           "example": null,
-          "description": "Email receiver: where alert mail goes. The sender and relay default to the\nEMAIL_FROM and SMTP_* settings above, so alerts go through the relay the\nplatform already sends with; set the ALERTMANAGER_ ones only to use another."
+          "description": "Alert email recipient; sender and relay default to EMAIL_FROM and SMTP_*."
         },
         {
           "name": "ALERTMANAGER_SMTP_PORT",
           "default": "",
           "example": null,
-          "description": "Email receiver: where alert mail goes. The sender and relay default to the\nEMAIL_FROM and SMTP_* settings above, so alerts go through the relay the\nplatform already sends with; set the ALERTMANAGER_ ones only to use another."
+          "description": "Alert email recipient; sender and relay default to EMAIL_FROM and SMTP_*."
         },
         {
           "name": "ALERTMANAGER_SMTP_USERNAME",
           "default": "",
           "example": null,
-          "description": "Email receiver: where alert mail goes. The sender and relay default to the\nEMAIL_FROM and SMTP_* settings above, so alerts go through the relay the\nplatform already sends with; set the ALERTMANAGER_ ones only to use another."
+          "description": "Alert email recipient; sender and relay default to EMAIL_FROM and SMTP_*."
         },
         {
           "name": "ALERTMANAGER_SMTP_PASSWORD",
           "default": "",
           "example": null,
-          "description": "Email receiver: where alert mail goes. The sender and relay default to the\nEMAIL_FROM and SMTP_* settings above, so alerts go through the relay the\nplatform already sends with; set the ALERTMANAGER_ ones only to use another."
+          "description": "Alert email recipient; sender and relay default to EMAIL_FROM and SMTP_*."
         },
         {
           "name": "ALERTMANAGER_SMTP_REQUIRE_TLS",
           "default": "",
           "example": null,
-          "description": "true or false. Empty means TLS for any relay except localhost, mailpit and\nmailhog. Port 465 is implicit TLS either way."
+          "description": "true | false; empty requires TLS except for localhost, mailpit and mailhog."
         },
         {
           "name": "ALERTMANAGER_TELEGRAM_BOT_TOKEN",
           "default": "",
           "example": null,
-          "description": "Telegram: a bot token from @BotFather and the numeric chat id to post to\n(negative for a group or channel). Both, or Telegram stays off."
+          "description": "Telegram bot token and chat id (negative for groups); both, or Telegram stays off."
         },
         {
           "name": "ALERTMANAGER_TELEGRAM_CHAT_ID",
           "default": "",
           "example": null,
-          "description": "Telegram: a bot token from @BotFather and the numeric chat id to post to\n(negative for a group or channel). Both, or Telegram stays off."
+          "description": "Telegram bot token and chat id (negative for groups); both, or Telegram stays off."
         },
         {
           "name": "ALERTMANAGER_HEARTBEAT_URL",
           "default": "",
           "example": null,
-          "description": "A heartbeat ping URL (healthchecks.io, Better Stack, Cronitor, …). The always-firing\nWatchdog alert is POSTed here every minute, and that service alerts you when the\npings stop — the one way to hear about this host being down, since every other\nalert is sent from it."
+          "description": "Heartbeat URL pinged every minute by the Watchdog alert, so an outside service notices this\nhost going down."
         },
         {
           "name": "ALERTMANAGER_EXTERNAL_URL",
           "default": "http://localhost:9093",
           "example": null,
-          "description": "Alertmanager's own address, sent in Slack and webhook payloads. Alert mail does not\nuse it: it links to Grafana on MONITORING_DOMAIN, or says how to open Grafana\nthrough an SSH tunnel when there is no domain."
+          "description": "Alertmanager's address in Slack and webhook payloads."
         }
       ]
     },
     {
-      "title": "Log aggregation (monitoring/loki, monitoring/promtail — see monitoring/README.md)",
+      "title": "Log aggregation (Loki)",
       "variables": [
         {
           "name": "LOKI_RETENTION_PERIOD",
           "default": "168h",
           "example": null,
-          "description": "How long Loki keeps ingested log lines before compacting them away (Go duration,\ne.g. 168h = 7d). Independent of the DATA_RETENTION_* days above — those govern\nPostgres tables, this governs the separate log store, so a self-hoster's disk\ndoesn't fill silently."
+          "description": "How long Loki keeps log lines (Go duration, e.g. 168h)."
         }
       ]
     },
@@ -2056,19 +2056,19 @@
           "name": "BACKUP_DIR",
           "default": "./backups",
           "example": null,
-          "description": "Used by `make backup-db` / `make restore-db` (embedded and external DB modes,\nsee deploy/scripts/db-backup.sh) and by the `db-backup` Compose service, which\nruns a backup on this schedule automatically whenever `make up` starts the\nembedded-db profile. Mirrors deploy/helm/railhook/templates/db-backup-cronjob.yaml\nfor the Kubernetes path."
+          "description": "Backup directory and retention (days) for `make backup-db` and the db-backup service."
         },
         {
           "name": "BACKUP_RETENTION_DAYS",
           "default": "30",
           "example": null,
-          "description": "Used by `make backup-db` / `make restore-db` (embedded and external DB modes,\nsee deploy/scripts/db-backup.sh) and by the `db-backup` Compose service, which\nruns a backup on this schedule automatically whenever `make up` starts the\nembedded-db profile. Mirrors deploy/helm/railhook/templates/db-backup-cronjob.yaml\nfor the Kubernetes path."
+          "description": "Backup directory and retention (days) for `make backup-db` and the db-backup service."
         },
         {
           "name": "DB_BACKUP_INTERVAL_SECONDS",
           "default": "86400",
           "example": null,
-          "description": "How often the `db-backup` Compose service runs a backup, in seconds.\nDefault: 86400 (daily), matching the Helm CronJob's default cadence."
+          "description": "Seconds between scheduled backups by the db-backup service."
         }
       ]
     }

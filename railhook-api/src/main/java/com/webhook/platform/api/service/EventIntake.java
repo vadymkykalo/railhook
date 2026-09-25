@@ -18,16 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Decides which Deliveries a stored Event gets: the project's rules, the Subscriptions matching
- * its type — patterns included — and the fan-out limit, put together by {@link IntakePlanner}.
- *
- * <p>Ingest and replay both come through here, so a replayed Event reaches exactly the endpoints,
- * with exactly the transformation, that a fresh ingest of it would. Replay used to keep its own
- * copy of the matching, and it had drifted: an event-type filter skipped pattern Subscriptions,
- * rules were never consulted — a DROP was replayed anyway, a TRANSFORM meant to strip data was
- * bypassed — and no fan-out limit applied.
- */
+/** Shared by ingest and replay; replay's own copy of the matching once drifted from ingest's. */
 @Component
 @Slf4j
 public class EventIntake {
@@ -47,16 +38,11 @@ public class EventIntake {
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * @throws IllegalArgumentException when the Event would exceed the project's fan-out limit —
-     *                                  see {@link IntakePlanner#plan}
-     */
+    /** @throws IllegalArgumentException when the Event would exceed the project's fan-out limit */
     public Decision decide(Event event) {
         UUID projectId = event.getProjectId();
 
-        // A rules-engine failure degrades to "no rules matched" rather than failing an Event the
-        // caller has already been told was accepted: routing is an enhancement, delivery is the
-        // product.
+        // A rules failure means "no rules matched": the Event is already accepted.
         List<RuleEngineService.RuleMatch> ruleMatches = List.of();
         try {
             JsonNode eventJson = objectMapper.readTree(event.getDecompressedPayload());
@@ -74,18 +60,12 @@ public class EventIntake {
         return new Decision(event, plan, subscriptions, ruleMatches.size());
     }
 
-    /**
-     * What {@link #decide} concluded for one Event.
-     *
-     * @param rulesMatched how many rules fired, for the ingest metrics
-     */
     public record Decision(Event event, IntakePlan plan, List<Subscription> subscriptions, int rulesMatched) {
 
         public boolean dropped() {
             return plan.dropped();
         }
 
-        /** Unsaved rows, one per planned Delivery, without sequence numbers. */
         public List<Delivery> deliveries() {
             List<Delivery> deliveries = new ArrayList<>(plan.deliveries().size());
             for (IntakePlan.PlannedDelivery planned : plan.deliveries()) {
@@ -94,11 +74,7 @@ public class EventIntake {
             return deliveries;
         }
 
-        /**
-         * The plan already resolved which transformation applies and whether the endpoint was
-         * reached twice; what is left here is inheriting retry settings from the Subscription,
-         * which a rule ROUTE has none of.
-         */
+        /** A rule ROUTE has no Subscription, so it takes the default retry settings. */
         private Delivery toDelivery(IntakePlan.PlannedDelivery planned) {
             Subscription subscription = planned.subscriptionId() == null ? null
                     : subscriptions.stream()
@@ -117,9 +93,7 @@ public class EventIntake {
                     .subscriptionId(planned.subscriptionId())
                     .status(DeliveryStatus.PENDING)
                     .attemptCount(0)
-                    // Sequence numbers are the caller's: ingest backfills them after its commit,
-                    // replay stamps them in the batch. The worker enforces ordering only once both
-                    // orderingEnabled and sequenceNumber are set.
+                    // Set by the caller: ingest after its commit, replay in the batch.
                     .sequenceNumber(null)
                     .orderingEnabled(planned.orderingEnabled())
                     .transformationId(planned.transformationId())
@@ -136,8 +110,6 @@ public class EventIntake {
                         .payloadTemplate(subscription.getPayloadTemplate())
                         .customHeaders(subscription.getCustomHeaders());
             } else {
-                // A Delivery a Rule routed has no Subscription to take a policy from, so it
-                // gets the declared defaults — including which statuses are worth retrying.
                 builder.deliveryOrigin(DeliveryOrigin.RULE)
                         .maxAttempts(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS)
                         .timeoutSeconds(30)

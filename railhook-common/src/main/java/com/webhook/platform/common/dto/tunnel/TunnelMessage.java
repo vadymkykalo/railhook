@@ -7,18 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Envelope for all tunnel WebSocket messages.
- * The {@code type} field determines the payload structure.
- *
- * <ul>
- *   <li>{@code TUNNEL_REQUEST} — backend → CLI, contains {@link TunnelRequestMessage}</li>
- *   <li>{@code TUNNEL_RESPONSE} — CLI → backend, contains {@link TunnelResponseMessage}</li>
- *   <li>{@code HEARTBEAT} — bidirectional keep-alive ping</li>
- *   <li>{@code TUNNEL_REGISTERED} — backend → CLI, tunnel is active</li>
- *   <li>{@code ERROR} — error notification in either direction</li>
- * </ul>
- */
+/** Envelope for tunnel WebSocket messages; {@code type} says which fields are set. */
 @Data
 @Builder
 @NoArgsConstructor
@@ -35,20 +24,15 @@ public class TunnelMessage {
 
     private String type;
 
-    /** Populated for TUNNEL_REQUEST messages */
     private TunnelRequestMessage request;
 
-    /** Populated for TUNNEL_RESPONSE messages */
     private TunnelResponseMessage response;
 
-    /** Populated for TUNNEL_REGISTERED messages */
     private String tunnelUrl;
     private String tunnelId;
 
-    /** Populated for ERROR messages */
     private String error;
 
-    /** Populated for HEARTBEAT messages */
     private long timestampMs;
 
     public static TunnelMessage heartbeat() {

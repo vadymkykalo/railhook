@@ -17,18 +17,12 @@ import java.util.UUID;
 @Repository
 public interface OAuthGrantRepository extends JpaRepository<OAuthGrant, UUID> {
 
-    /**
-     * Locked, so two exchanges of one code serialize: the second sees {@code code_used_at} the
-     * first wrote and is treated as a replay.
-     */
+    // Locked so two exchanges of one code serialize and the second is seen as a replay.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<OAuthGrant> findByCodeHash(String codeHash);
 
-    /**
-     * Locked for the same reason. Under READ COMMITTED a second refresh racing on the same token
-     * re-reads the row after the first commits, no longer matches, and falls through to the
-     * replay check.
-     */
+    // A racing refresh re-reads the row after the first commits, no longer matches, and falls
+    // through to the replay check.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<OAuthGrant> findByRefreshTokenHash(String refreshTokenHash);
 
@@ -45,7 +39,6 @@ public interface OAuthGrantRepository extends JpaRepository<OAuthGrant, UUID> {
     @Query("UPDATE OAuthGrant g SET g.lastUsedAt = :now WHERE g.id = :id")
     int touch(@Param("id") UUID id, @Param("now") Instant now);
 
-    /** Approvals whose code expired without ever being exchanged: never a connection, never listed. */
     @Modifying
     @Query("DELETE FROM OAuthGrant g WHERE g.activatedAt IS NULL AND g.codeExpiresAt < :cutoff")
     int deleteUnexchanged(@Param("cutoff") Instant cutoff);

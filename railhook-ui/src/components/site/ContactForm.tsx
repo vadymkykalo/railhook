@@ -19,7 +19,6 @@ function errorOf(error: unknown): { status?: number; code?: string } {
   return { status: response?.status, code: response?.data?.error };
 }
 
-/** Why the message did not go, in the reader's words. */
 function errorKey(error: unknown): string {
   const { status, code } = errorOf(error);
   if (code === 'captcha_failed') return 'site.contact.errors.captcha';
@@ -29,11 +28,6 @@ function errorKey(error: unknown): string {
   return 'site.contact.errors.generic';
 }
 
-/**
- * Write to support without leaving the page: the widget in the corner and the contact page both
- * render this. The server mails the deployment's own support address with the visitor's as the
- * Reply-To, so the answer arrives in their inbox like any other mail.
- */
 export default function ContactForm({ compact = false, autoFocus = false }: { compact?: boolean; autoFocus?: boolean }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
@@ -63,10 +57,10 @@ export default function ContactForm({ compact = false, autoFocus = false }: { co
   if (send.isSuccess) {
     return (
       <div role="status" className="flex flex-col items-center px-2 py-8 text-center">
-        <span className="grid h-12 w-12 place-items-center rounded-full bg-accent text-primary">
+        <span className="grid h-12 w-12 place-items-center bg-accent text-accent-foreground">
           <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
         </span>
-        <p className="mt-4 text-[1.05rem] font-semibold text-foreground">{t('site.contact.sentTitle')}</p>
+        <p className="mt-4 text-[1.05rem] font-medium text-foreground">{t('site.contact.sentTitle')}</p>
         <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">{t('site.contact.sentBody', { email: email.trim() })}</p>
         <Button
           variant="outline"
@@ -98,7 +92,7 @@ export default function ContactForm({ compact = false, autoFocus = false }: { co
             <label
               key={value}
               className={cn(
-                'cursor-pointer rounded-full border px-3 py-1 text-sm transition-colors',
+                'cursor-pointer border px-3 py-1 text-sm transition-colors',
                 'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-1',
                 topic === value
                   ? 'border-primary bg-primary text-primary-foreground'

@@ -1,12 +1,5 @@
-// The public status page at status.railhook.io: a Cloudflare Worker with a D1 database.
-//
-// A cron trigger probes each component once a minute from outside the server and records the
-// result per day, so the page shows 90 days of uptime without keeping every probe. Three failed
-// probes in a row open an incident on their own, and the first good probe resolves it, so the
-// page never claims "operational" through an outage nobody had time to post.
-//
-// Deployed through the Cloudflare API (script name `railhook-status`, D1 binding `DB`, cron
-// `* * * * *`, custom domain status.railhook.io). The schema is created on first run.
+// Three failed probes in a row open an incident and the first good one resolves it, so the page
+// never says "operational" through an outage nobody posted.
 
 const COMPONENTS = [
   { id: 'website', name: 'Website', url: 'https://railhook.io/', expect: (r) => r.status === 200 },

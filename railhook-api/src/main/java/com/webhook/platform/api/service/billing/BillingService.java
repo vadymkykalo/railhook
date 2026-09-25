@@ -23,11 +23,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Provider-agnostic billing orchestrator.
- * Routes operations to the correct provider via {@link BillingProviderRegistry}.
- * Subscription lifecycle is managed by {@link SubscriptionLifecycleService}.
- */
 @Service
 @Slf4j
 public class BillingService {
@@ -70,15 +65,7 @@ public class BillingService {
                 billingEnabled, providerRegistry.getDefault().getProviderCode());
     }
 
-    /**
-     * Self-hosted installs have no billing provider, so every organization is moved onto the
-     * {@code self_hosted} plan once the context is up.
-     *
-     * <p>Startup work has no request and therefore no tenant, and the resolver is asked on every
-     * session Hibernate opens — not only for {@code @TenantId} entities. Without this the listener
-     * races {@code TenancyConfig.endStartupTenantGrace} for the same event and, whenever it loses,
-     * fails the whole startup with {@code TenantNotResolvedException}.
-     */
+    // Startup has no tenant; without this the listener can fail startup with TenantNotResolvedException.
     @SystemTenant("startup work that reassigns plans across every organization, before any request exists")
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
@@ -96,8 +83,6 @@ public class BillingService {
 
     public String getDefaultProviderCode() { return providerRegistry.getDefault().getProviderCode(); }
 
-    // ── Plan catalog ────────────────────────────────────────────────
-
     public List<Plan> listActivePlans() {
         return planRepository.findByActiveTrueOrderByPriceMonthlyCentsAsc();
     }
@@ -107,29 +92,12 @@ public class BillingService {
                 .orElseThrow(() -> new NotFoundException("Plan not found: " + name));
     }
 
-    // ── Organization billing ────────────────────────────────────────
-
     public Plan getOrganizationPlan() {
         return entitlementService.getPlan();
     }
 
+    // With billing on, only free or the plan already paid for; anything else goes through checkout.
     @Transactional
-    /**
-     * Assigns a plan directly, without a payment.
-     *
-     * <p>This is the downgrade path, and it used to be the upgrade path too: the endpoint
-     * behind it is `PUT /api/v1/billing/organization/plan`, guarded by nothing but the OWNER
-     * role, and it set whatever plan name it was given. Its own OpenAPI description said "for
-     * paid plans, use checkout instead" — a sentence, not a check. Any customer could
-     * {@code PUT {"planName":"pro"}} and be on Pro, or ask for {@code self_hosted}, which is
-     * seeded active and unlimited on everything.
-     *
-     * <p>So the rule is a whitelist rather than a price test: with billing on, an
-     * organization can move itself to a plan it is already paying for, or to a zero-priced
-     * plan that is actually offered for self-service — which is `free` and nothing else.
-     * Everything else goes through checkout. With billing off there is no money involved and
-     * no reason to refuse.
-     */
     public void assignPlan(String planName) {
         UUID organizationId = TenantContext.require();
         Organization org = findOrg();
@@ -141,10 +109,8 @@ public class BillingService {
         log.info("Plan assigned: org={} plan={}", organizationId, planName);
     }
 
-    /** The only plan an organization may put itself on without paying for it. */
     private static final String SELF_SERVICE_PLAN = "free";
 
-    /** The provider code of a deployment that takes no payments. */
     public static final String NO_PAYMENT_PROVIDER = "noop";
 
     private void requireSelfAssignable(Plan plan, UUID organizationId) {
@@ -165,22 +131,7 @@ public class BillingService {
         }
     }
 
-    // ── Checkout (create payment page) ──────────────────────────────
-
-    /**
-     * Starts a paid checkout and returns the provider's payment page.
-     *
-     * <p>The subscription is created here, {@code PENDING}, before the customer pays: the
-     * organization and plan come from the request, and the row is stored under whatever the
-     * provider's payment callback will carry — WayForPay's signed orderReference, or for Stripe the
-     * customer its first invoice names. The first successful payment finds this row and activates
-     * it ({@link #processWebhook}). Nothing used to create one, so a paid checkout found no
-     * subscription, logged a warning, and left the organization on Free.
-     *
-     * <p>The organization row lock serialises two checkouts started together; a newer checkout
-     * expires the pending one, and a checkout is refused while a subscription is live — a second
-     * would be charged beside the first.
-     */
+    // Stored PENDING under the reference the first payment callback will carry.
     @Transactional
     public String createCheckoutSession(String planName,
                                          String providerCode, String billingInterval,
@@ -189,8 +140,7 @@ public class BillingService {
         Organization org = findOrg();
         Plan plan = getPlanByName(planName);
         BillingProvider provider = providerRegistry.get(providerCode != null ? providerCode : providerRegistry.getDefault().getProviderCode());
-        // The no-op provider's "payment page" is the success URL itself, so a checkout through it
-        // would return the customer from a payment they never made.
+        // The no-op provider's payment page is the success URL, so nothing would be paid.
         if (NO_PAYMENT_PROVIDER.equals(provider.getProviderCode())) {
             throw new ConflictException("Paid plans are not available on this deployment: no payment provider is configured.");
         }
@@ -232,9 +182,7 @@ public class BillingService {
                                "billingInterval", interval.name())
                 ));
 
-        // A managed provider (Stripe) creates its subscription when the session completes, and
-        // its callbacks name that and the customer, never the session. Any other provider's
-        // callbacks carry the reference its payment page was created under.
+        // Stripe's callbacks name the subscription and customer, never the checkout session.
         boolean managed = provider.supports(BillingCapability.MANAGED_SUBSCRIPTIONS);
         lifecycleService.createPending(plan, provider.getProviderCode(), currency, interval, priceCents,
                 externalCustomerId,
@@ -244,8 +192,6 @@ public class BillingService {
         log.info("Checkout created: org={} plan={} provider={}", organizationId, planName, provider.getProviderCode());
         return result.redirectUrl();
     }
-
-    // ── Portal session ──────────────────────────────────────────────
 
     public String createPortalSession(String returnUrl) {
         UUID organizationId = TenantContext.require();
@@ -258,8 +204,6 @@ public class BillingService {
         return provider.createPortalSession(sub.getExternalCustomerId(), returnUrl);
     }
 
-    // ── Cancel subscription ─────────────────────────────────────────
-
     @Transactional
     public void cancelSubscription() {
         UUID organizationId = TenantContext.require();
@@ -268,7 +212,6 @@ public class BillingService {
 
         BillingProvider provider = providerRegistry.get(sub.getProviderCode());
 
-        // Cancel in external system if managed
         if (provider.supports(BillingCapability.MANAGED_SUBSCRIPTIONS) && sub.getExternalSubscriptionId() != null) {
             provider.cancelExternalSubscription(sub.getExternalSubscriptionId());
         }
@@ -277,11 +220,8 @@ public class BillingService {
         log.info("Subscription cancelled: org={} sub={}", organizationId, sub.getId());
     }
 
-    // ── Invoices ────────────────────────────────────────────────────
-
     public List<InvoiceResponse> listInvoices() {
         UUID organizationId = TenantContext.require();
-        // First, check local invoices
         List<BillingInvoice> localInvoices = invoiceRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId);
         if (!localInvoices.isEmpty()) {
             return localInvoices.stream()
@@ -289,7 +229,6 @@ public class BillingService {
                     .collect(Collectors.toList());
         }
 
-        // Fallback: fetch from external provider
         var sub = subscriptionRepository.findActiveByOrganizationId(organizationId).orElse(null);
         if (sub == null || sub.getExternalCustomerId() == null) return List.of();
 
@@ -311,8 +250,6 @@ public class BillingService {
                 .collect(Collectors.toList());
     }
 
-    // ── Webhook processing (per provider) ───────────────────────────
-
     @SystemTenant("called by the payment provider, not by a tenant; the subscription it looks up by external id is what identifies the organization")
     @Transactional
     public void processWebhook(String providerCode, String rawPayload, Map<String, String> headers) {
@@ -327,7 +264,6 @@ public class BillingService {
     }
 
     private void handleWebhookEvent(BillingProvider provider, BillingProvider.BillingWebhookEvent event) {
-        // Find subscription by external IDs
         BillingSubscription sub = null;
         if (event.externalSubscriptionId() != null) {
             sub = subscriptionRepository.findByExternalSubscriptionId(event.externalSubscriptionId()).orElse(null);
@@ -345,8 +281,7 @@ public class BillingService {
                     log.info("Billing webhook: payment {} already recorded as succeeded, ignoring replay",
                             event.externalPaymentId());
                 } else if (subscription != null) {
-                    // Stripe's subscription exists only once the checkout completes; its first
-                    // invoice finds the pending row by customer, and binds it here.
+                    // Stripe's first invoice finds the pending row by customer and binds it here.
                     if (subscription.getExternalSubscriptionId() == null && event.externalSubscriptionId() != null) {
                         lifecycleService.setExternalIds(subscription.getId(),
                                 subscription.getExternalCustomerId() != null
@@ -376,8 +311,7 @@ public class BillingService {
                             return;
                         }
                     } else if (subscription.getStatus() == SubscriptionStatus.ACTIVE) {
-                        // Without periods from the provider, the paid period follows on from the
-                        // current one rather than restarting today.
+                        // Without provider periods, the new period follows the current one.
                         Instant periodStart = event.periodStart() != null ? event.periodStart()
                                 : subscription.getCurrentPeriodEnd() != null ? subscription.getCurrentPeriodEnd()
                                 : Instant.now();
@@ -417,8 +351,7 @@ public class BillingService {
                             .failureMessage(event.failureMessage())
                             .build();
                     paymentRepository.save(payment);
-                    // A declined first payment leaves the checkout open for another attempt.
-                    // Nothing was ever paid, so there is nothing past due and no dunning to start.
+                    // A declined first payment was never owed, so no dunning.
                     if (!isUnpaidCheckout(subscription)) {
                         lifecycleService.markPastDue(subscription.getId(),
                                 "Payment failed: " + event.failureCode());
@@ -451,10 +384,7 @@ public class BillingService {
                 if (event.externalPaymentId() != null) {
                     paymentRepository.findFirstByProviderCodeAndExternalPaymentIdAndStatusInOrderByCreatedAtDesc(
                             provider.getProviderCode(), event.externalPaymentId(), SETTLED_BY_SUCCESS).ifPresent(payment -> {
-                        // A refund for less than the charge is a partial one. This used to record
-                        // the smaller figure in refundedCents and still stamp the row REFUNDED, so
-                        // the status said the customer's money was back and the amount said it was
-                        // not; PARTIALLY_REFUNDED existed for exactly this and was never set.
+                        // A refund smaller than the charge is PARTIALLY_REFUNDED, not REFUNDED.
                         long refunded = event.amountCents() != null ? event.amountCents() : payment.getAmountCents();
                         payment.setRefundedCents(refunded);
                         payment.setStatus(refunded < payment.getAmountCents()
@@ -468,25 +398,13 @@ public class BillingService {
         }
     }
 
-    /**
-     * A checkout that has not been paid: {@code PENDING}, or expired by a newer checkout before
-     * the customer paid this one (it was never activated, so it has no period).
-     */
     private static boolean isUnpaidCheckout(BillingSubscription subscription) {
         return subscription.getStatus() == SubscriptionStatus.PENDING
                 || (subscription.getStatus() == SubscriptionStatus.EXPIRED && subscription.getCurrentPeriodStart() == null);
     }
 
-    /**
-     * The first payment for a checkout: the organization moves to the plan it paid for.
-     *
-     * <p>A customer can open a second checkout and then pay on the first page anyway. That payment
-     * is real, so the checkout it paid for is the one activated and any other open checkout is
-     * expired. If the organization already has a live subscription it has paid twice: the payment
-     * is recorded (the caller already saved it) for a refund, and no second subscription goes live.
-     *
-     * @return whether the checkout was activated
-     */
+    // A payment on an older checkout page is real, so it wins; if a subscription is already live
+    // it is only recorded, for a refund.
     private boolean activateCheckout(BillingSubscription checkout, BillingProvider.BillingWebhookEvent event) {
         UUID organizationId = checkout.getOrganizationId();
         organizationRepository.lockById(organizationId);
@@ -518,14 +436,7 @@ public class BillingService {
         return start.atZone(ZoneOffset.UTC).plus(effective.getPeriod()).toInstant();
     }
 
-    /**
-     * A provider callback is signed but carries no nonce, so the same signed "succeeded" callback
-     * can be delivered again — by the provider's own retries or by anyone who kept a copy — and each
-     * delivery would renew the period once more. The recorded payment is the idempotency record:
-     * a callback for a payment already settled in a way that outranks it is a replay. The
-     * organization row lock serialises concurrent deliveries of the same callback, so the check
-     * and the insert that follows it cannot interleave.
-     */
+    // Callbacks carry no nonce, so a replayed "succeeded" would renew the period again.
     private boolean alreadySettled(BillingProvider provider, BillingSubscription subscription,
                                    BillingProvider.BillingWebhookEvent event, List<PaymentStatus> settledBy) {
         if (event.externalPaymentId() == null) {
@@ -536,8 +447,6 @@ public class BillingService {
                 provider.getProviderCode(), event.externalPaymentId(), settledBy);
     }
 
-    // ── Subscription history ────────────────────────────────────────
-
     public List<BillingSubscription> getSubscriptionHistory() {
         UUID organizationId = TenantContext.require();
         return subscriptionRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId);
@@ -547,8 +456,6 @@ public class BillingService {
         UUID organizationId = TenantContext.require();
         return paymentRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId);
     }
-
-    // ── Internal ────────────────────────────────────────────────────
 
     private BillingInterval parseBillingInterval(String raw) {
         if (raw == null || raw.isBlank()) return BillingInterval.MONTHLY;

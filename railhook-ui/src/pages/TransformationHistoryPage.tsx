@@ -32,13 +32,7 @@ import {
 import { formatJson } from '../lib/json';
 import type { TransformationVersionResponse } from '../types/api.types';
 
-/**
- * Every template this transformation has published, and what to do with them.
- *
- * <p>Restoring is deliberately not "undo": it publishes the old template again as the next
- * version and leaves everything after it in place, so the confirmation says which version the
- * restore will become rather than implying the ones in between go away.
- */
+/** Restore publishes the old template as the next version; it is not undo. */
 export default function TransformationHistoryPage() {
   const { t } = useTranslation();
   const { projectId, transformationId } = useParams<{ projectId: string; transformationId: string }>();
@@ -238,7 +232,6 @@ export default function TransformationHistoryPage() {
         </>
       )}
 
-      {/* One version, whole */}
       <Dialog open={viewing !== null} onOpenChange={(open) => !open && setViewing(null)}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -264,7 +257,6 @@ export default function TransformationHistoryPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Restore */}
       <AlertDialog open={restoring !== null} onOpenChange={(open) => !open && setRestoring(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

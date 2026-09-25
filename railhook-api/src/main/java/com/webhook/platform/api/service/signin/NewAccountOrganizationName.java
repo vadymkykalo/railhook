@@ -2,10 +2,6 @@ package com.webhook.platform.api.service.signin;
 
 import java.util.Locale;
 
-/**
- * The organization name for an account created by signing in with Google, where nobody typed one.
- * It can be renamed on the organization settings page; this only has to be a sensible start.
- */
 public final class NewAccountOrganizationName {
 
     public static final int MAX_LENGTH = 100;
@@ -21,7 +17,6 @@ public final class NewAccountOrganizationName {
         return name.length() <= MAX_LENGTH ? name : name.substring(0, MAX_LENGTH);
     }
 
-    /** {@code acme} from {@code acme.com}: the company, without the registry it bought the name from. */
     private static String firstLabel(String hostedDomain) {
         if (hostedDomain == null || hostedDomain.isBlank()) {
             return null;

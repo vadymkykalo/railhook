@@ -12,19 +12,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-/**
- * What changed between two JSON documents, as a flat list of JSONPath-named entries.
- *
- * <p>Lifted out of {@code EventDiffService}, unchanged, when a second caller appeared: a
- * Transformation's template is JSON too, so comparing two of its versions is the same question
- * about different documents. The service that owns each pair still owns fetching, tenancy and
- * masking; this owns only the comparison.
- *
- * <p>Text that will not parse is not an error here. Two Events can hold anything a customer
- * posted, and a template can be saved by a path that does not validate it, so the fallback is a
- * single whole-document entry rather than a failed request — a diff nobody can read is worse than
- * a coarse one.
- */
+/** Unparseable input falls back to a single whole-document entry rather than an error. */
 @Slf4j
 @Component
 @RequiredArgsConstructor

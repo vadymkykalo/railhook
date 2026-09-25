@@ -90,10 +90,8 @@ public class KafkaConsumerConfig {
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        // A value that does not parse fails inside poll(), where there is no record for the error
-        // handler to dead-letter: the container seeks back and re-polls it forever, and the rest
-        // of its partition waits behind it. Wrapped, the failure travels as a header on a record
-        // with a null value, which the error handler parks on the DLQ with the original bytes.
+        // A value that fails to parse inside poll() has no record to dead-letter, so it was
+        // re-polled forever. Wrapped, it arrives as a null value the error handler can park.
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
         props.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, JsonDeserializer.class);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
@@ -103,8 +101,7 @@ public class KafkaConsumerConfig {
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10);
         props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 300000);
         DefaultKafkaConsumerFactory<String, T> factory = new DefaultKafkaConsumerFactory<>(props);
-        // Spring times the listener call only. Consumer lag, records and bytes consumed, fetch
-        // latency and connections reach Prometheus through this listener or not at all.
+        // Spring times only the listener call; lag, fetch latency and the rest come from here.
         factory.addListener(new MicrometerConsumerListener<>(meterRegistry));
         return factory;
     }
@@ -127,24 +124,8 @@ public class KafkaConsumerConfig {
         return factory;
     }
 
-    /**
-     * Where a record goes when it has failed for the last time.
-     *
-     * <p>The partition is left to the broker rather than copied from the source record. Copying
-     * it assumes the DLQ has at least as many partitions as the topic it shadows, which is true
-     * today only because docker-compose.yml creates every topic in one loop with the same
-     * KAFKA_NUM_PARTITIONS. Repartition the main topic upward — the ordinary way to scale a
-     * consumer — and every dead letter from a partition the DLQ does not have fails to publish.
-     * A message that cannot be retried and cannot be parked is a message that is gone.
-     *
-     * <p>Nothing is lost by giving it up: the record keeps its key, so the broker's default
-     * partitioner puts every dead letter for one delivery in the same partition anyway, which is
-     * the only ordering anyone here depends on.
-     *
-     * <p>The resolver therefore never looks at the record it is handed. It is built once per
-     * topic and returns the same destination for every failure, which is what keeps the old
-     * behaviour from creeping back: there is no source partition in scope to copy.
-     */
+    // Leaves the partition to the broker: copying the source partition fails once the main topic
+    // has more partitions than its DLQ, and the record is lost. The key still groups a delivery.
     static BiFunction<ConsumerRecord<?, ?>, Exception, TopicPartition> dlqDestination(String dlqTopic) {
         TopicPartition destination = new TopicPartition(dlqTopic, -1);
         return (record, exception) -> destination;
@@ -153,13 +134,9 @@ public class KafkaConsumerConfig {
     private <K, V> void configureFactory(ConcurrentKafkaListenerContainerFactory<K, V> factory, int concurrency, String dlqTopic) {
         factory.setConcurrency(concurrency);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
-        // Deliveries are acked from arbitrary BoundedAsyncExecutor pool threads whenever
-        // that particular delivery finishes, not in offset order. Plain MANUAL
-        // acks commit straight to the highest acked offset regardless of order, so a fast
-        // record N acking before a slower record N-k would move the committed offset past
-        // still in-flight work — losing N-k on a hard kill. asyncAcks defers out-of-order
-        // commits until every lower offset in the batch has also been acked, and pauses
-        // the consumer meanwhile so the gap can't grow unbounded.
+        // Acks arrive from pool threads out of offset order. Plain MANUAL would commit past a
+        // slower record still in flight and lose it on a hard kill; asyncAcks waits for every
+        // lower offset and pauses the consumer meanwhile.
         factory.getContainerProperties().setAsyncAcks(true);
         factory.getContainerProperties().setShutdownTimeout(30_000L);
 
@@ -171,10 +148,8 @@ public class KafkaConsumerConfig {
             recoverer,
             new FixedBackOff(retryIntervalMs, maxRetries)
         );
-        // Retry the failed record in place rather than seek the rest of the batch back. The
-        // records behind a seek stay in asyncAcks' list of offsets awaiting an ack, which never
-        // comes because the partition is paused until it does: a record parked on the DLQ left
-        // everything behind it unconsumed until a rebalance.
+        // No seek after an error: records behind a seek wait in asyncAcks' pending list for an
+        // ack that never comes while the partition is paused, until a rebalance.
         errorHandler.setSeekAfterError(false);
 
         errorHandler.setRetryListeners((record, ex, deliveryAttempt) ->

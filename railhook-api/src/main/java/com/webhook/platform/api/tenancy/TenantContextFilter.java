@@ -14,30 +14,19 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.UUID;
 
 /**
- * Turns the authenticated identity into the tenant scope the rest of the request runs in.
+ * Sets the tenant scope for the request from the authenticated identity. An unauthenticated
+ * request gets no scope, so public paths must find their organization and enter it with
+ * {@link TenantContext#runAs}.
  *
- * <p>Runs after the three authentication filters and before anything that touches the database,
- * so a handler, a service and a repository all see the same organization without any of them
- * being handed one. This is the request half of making org ownership a
- * property of data access; {@link TenantContext#runAsSystem} is the other half.
+ * <p>The previous scope is restored rather than cleared because MockMvc runs the chain on the
+ * calling thread.
  *
- * <p>A JWT maps to the organization in the token, an API key to the one owning its project, a
- * portal session to the one owning its Consumer, and
- * a platform admin to {@link TenantContext#SYSTEM} — not being a member of any organization, and
- * meant to see across them. An unauthenticated request gets nothing: the public paths have a
- * tenant but no caller identity, so leaving the scope unset is what forces them to discover their
- * own organization and enter it with {@link TenantContext#runAs}.
- *
- * <p>The previous scope is restored in a {@code finally}, which on a real request means clearing
- * it: a leaked {@code ThreadLocal} would hand one request's tenant to the next request on that
- * pooled thread. Restoring rather than clearing matters under MockMvc, which runs the chain on
- * the calling thread.
- *
- * <p>Not a {@code @Component}: a {@code Filter} bean is also registered with the servlet container,
- * where it would run before the security chain with an empty {@code SecurityContext} and then,
- * being a {@code OncePerRequestFilter}, decline to run where the identity exists.
+ * <p>Not a {@code @Component}: a {@code Filter} bean would also be registered with the servlet
+ * container, run there before security with no identity, and then, being a
+ * {@code OncePerRequestFilter}, skip the run where the identity exists.
  */
 public class TenantContextFilter extends OncePerRequestFilter {
 
@@ -47,10 +36,9 @@ public class TenantContextFilter extends OncePerRequestFilter {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        java.util.UUID previous = TenantContext.current();
+        UUID previous = TenantContext.current();
         if (authentication instanceof PlatformAdminUserAuthenticationToken) {
-            // Before the JWT branch it extends: acting as the platform admin, the organization
-            // on the token is only where the person happens to be a member.
+            // Must precede the JWT branch, which it extends.
             TenantContext.set(TenantContext.SYSTEM);
         } else if (authentication instanceof JwtAuthenticationToken jwt) {
             TenantContext.set(jwt.getOrganizationId());

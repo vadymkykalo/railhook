@@ -4,11 +4,6 @@ import { render, screen } from '@testing-library/react';
 import { ErrorBoundary } from '../ErrorBoundary';
 import * as reporter from '../../lib/reportClientError';
 
-/**
- * The boundary caught render failures and told only the browser console, so a screen that
- * threw for every customer was indistinguishable, from the server, from a screen nobody had
- * opened. It reports now — and still has to render its own fallback whatever the reporter does.
- */
 describe('ErrorBoundary', () => {
   function Boom(): never {
     throw new Error('a component gave up');
@@ -16,7 +11,7 @@ describe('ErrorBoundary', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    // React logs the caught error itself; the test output is not where that belongs.
+    // React logs the caught error itself.
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 

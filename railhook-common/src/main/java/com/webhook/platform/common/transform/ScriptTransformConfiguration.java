@@ -7,17 +7,7 @@ import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
 
-/**
- * One engine per process, in both services.
- *
- * <p>It is a singleton because the parsed-code cache lives on it: the second run of a script
- * costs milliseconds where the first costs a second, and a per-call engine would pay the second
- * every time. It is built lazily inside itself, so a deployment that never runs a JavaScript
- * transformation never brings GraalJS up at all.
- *
- * <p>Both api and worker scan {@code com.webhook.platform.common}, which is how the preview and
- * the real delivery end up holding the same implementation with the same limits.
- */
+/** One engine per process: it holds the parsed-code cache. */
 @Configuration
 public class ScriptTransformConfiguration {
 

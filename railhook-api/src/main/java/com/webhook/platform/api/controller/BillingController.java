@@ -28,15 +28,11 @@ public class BillingController {
     private final BillingService billingService;
     private final BillingOverviewService billingOverviewService;
 
-    // ── Plan catalog (public) ─────────────────────────────────────
-
     @Operation(summary = "List available plans", description = "Returns all active plans with their limits and pricing")
     @GetMapping("/plans")
     public ResponseEntity<List<PlanResponse>> listPlans() {
         return ResponseEntity.ok(billingOverviewService.catalog());
     }
-
-    // ── Organization billing ──────────────────────────────────────
 
     @Operation(summary = "Get organization billing info", description = "Returns current plan, billing status, and usage snapshot")
     @GetMapping("/organization")
@@ -67,16 +63,12 @@ public class BillingController {
         return ResponseEntity.ok(billingOverviewService.organizationBilling());
     }
 
-    // ── Usage ──────────────────────────────────────────────────────
-
     @Operation(operationId = "getBillingUsage", summary = "Get detailed usage", description = "Returns current resource usage vs plan limits for all quota types")
     @GetMapping("/usage")
     public ResponseEntity<UsageResponse> getUsage(AuthContext auth) {
         auth.requireJwt();
         return ResponseEntity.ok(billingOverviewService.usage());
     }
-
-    // ── Invoices ───────────────────────────────────────────────────
 
     @Operation(summary = "List invoices", description = "Returns invoice history from the billing provider. " +
             "Empty when billing is disabled (self-hosted).")
@@ -85,8 +77,6 @@ public class BillingController {
         auth.requireJwt();
         return ResponseEntity.ok(billingService.listInvoices());
     }
-
-    // ── Checkout / Portal ─────────────────────────────────────────
 
     @Operation(summary = "Create checkout session", description = "Creates a billing provider checkout session for plan upgrade")
     @ApiResponse(responseCode = "200", description = "Checkout URL returned")
@@ -121,8 +111,6 @@ public class BillingController {
         billingService.cancelSubscription();
         return ResponseEntity.noContent().build();
     }
-
-    // ── Webhook (public, no auth — verified by provider signature) ─
 
     @Operation(summary = "Billing provider webhook",
             description = "Handles callbacks from billing providers. Each provider has its own endpoint. " +

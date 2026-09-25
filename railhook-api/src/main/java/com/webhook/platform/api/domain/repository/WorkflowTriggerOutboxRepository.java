@@ -37,25 +37,11 @@ public interface WorkflowTriggerOutboxRepository extends JpaRepository<WorkflowT
     List<WorkflowTriggerOutbox> claimBatch(@Param("batchSize") int batchSize, @Param("maxPerProject") int maxPerProject);
 
     /**
-     * Returns rows abandoned mid-flight to the queue.
+     * Returns rows abandoned in PROCESSING (dead pod, dropped task) to the queue; nothing else
+     * reclaims them. Attempts is not incremented, since being abandoned is not an attempt.
      *
-     * <p>{@link #claimBatch} flips a row to PROCESSING and hands it to an executor. If that
-     * hand-off never completes — the pod dies, or the task is dropped without the caller
-     * being told, which is what happened before the workflow executor learnt to throw — the
-     * row keeps that status forever: claimBatch selects PENDING only, and the cleanup delete
-     * touches processed rows only. Nothing else in the system reclaims it, so the workflow
-     * silently never runs and the table grows without bound.</p>
-     *
-     * <p>Attempts is deliberately not incremented: being abandoned is not an attempt, and
-     * charging for it would retire a row that has never actually run.</p>
-     *
-     * <p>Staleness is measured from {@code claimedAt}, not {@code createdAt}. A row is held in
-     * PENDING for as long as its project is at its concurrency ceiling — {@code deferToNextPoll}
-     * puts it back on every poll, which is what stops one project taking the whole pool — so a
-     * busy project's rows are routinely older than the threshold before they are claimed at all.
-     * Measuring from ingestion therefore returned rows to PENDING while a live executor was
-     * running them, and the workflow ran concurrently with itself. A null {@code claimedAt} is a
-     * row from before this column existed: left alone, and collected by the daily cleanup.</p>
+     * <p>Staleness is measured from {@code claimedAt}, not {@code createdAt}: a busy project's
+     * rows wait in PENDING past the threshold, and would be reclaimed while still running.
      */
     @Modifying
     @Query("""

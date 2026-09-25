@@ -1,19 +1,5 @@
 #!/usr/bin/env bash
-# Polls connection-pool, JVM memory, outbox depth, and Redis key count every
-# INTERVAL_SECONDS and appends one CSV row per sample. Meant to run for the
-# same hours-long window as `k6 run -e DURATION=4h load/soak.js` — see
-# load/README.md "Soak run".
-#
-# Everything here goes through `docker compose exec`, not a published port:
-# docker-compose.yml intentionally doesn't publish the actuator port (8082)
-# to the host (see the MANAGEMENT_PORT comment in docker-compose.yml) so
-# Prometheus-style scraping bypasses the JWT/API-key auth chain only from
-# inside the trusted webhook-network — this script stays inside that trust
-# boundary the same way.
-#
-# Usage:
-#   ./load/scripts/monitor-soak.sh soak-results.csv
-#   INTERVAL_SECONDS=30 ./load/scripts/monitor-soak.sh soak-results.csv
+# Through `docker compose exec`: the unauthenticated management port is not published.
 set -euo pipefail
 
 OUT_FILE="${1:-soak-results.csv}"

@@ -85,7 +85,7 @@ public class RetrySchedulerService {
     void scheduleRetries(long pendingCount) {
         int effectiveBatch = governor.computeEffectiveBatch(pendingCount);
         if (effectiveBatch <= 0) {
-            return; // Governor cooldown — skip this poll
+            return;
         }
 
         // Phase 1: short transaction, claim candidates.
@@ -103,11 +103,9 @@ public class RetrySchedulerService {
                 return List.<Delivery>of();
             }
 
-            // PROCESSING so a crash before Phase 3 leaves a row the stuck sweep can recover,
-            // rather than a PENDING row with no next_retry_at that nothing can see.
+            // PROCESSING, so a crash before Phase 3 leaves a row the stuck sweep can see. A fresh
+            // token per claim stops an abandoned earlier attempt writing over this one.
             for (Delivery d : locked) {
-                // Fresh token per claim, so an earlier attempt swept away as abandoned
-                // cannot come back and write over this one.
                 d.claim(UUID.randomUUID());
             }
             deliveryRepository.saveAll(locked);
@@ -121,8 +119,7 @@ public class RetrySchedulerService {
 
         log.info("Claimed {} deliveries for retry dispatch", claimed.size());
 
-        // Read before a hand-back clears it on the entity: the token is what proves a row is
-        // still this scheduler's to write.
+        // Read before a hand-back clears it: the token proves the row is still ours to write.
         Map<UUID, UUID> claimedUnder = new HashMap<>();
         for (Delivery delivery : claimed) {
             claimedUnder.put(delivery.getId(), delivery.getClaimToken());
@@ -178,8 +175,7 @@ public class RetrySchedulerService {
             log.warn("Batch send timeout or error, will check individual results: {}", e.getMessage());
         }
 
-        // Phase 3: short transaction, update results. Only rows this method still owns are
-        // written — a successful send hands the row to the consumer, so it is counted, not saved.
+        // Phase 3. A successful send hands the row to the consumer, so it is counted, not saved.
         int sentDeliveries = 0;
         List<Delivery> failedDeliveries = new ArrayList<>();
 
@@ -199,10 +195,8 @@ public class RetrySchedulerService {
                 }
                 SendResult<String, DeliveryMessage> result = future.get();
                 RecordMetadata metadata = result.getRecordMetadata();
-                // Deliberately NOT collected for saving. The consumer often picks the message
-                // up within milliseconds and has already advanced the row; re-saving the Phase 1
-                // snapshot raced it, and when the consumer lost, the retry partition stalled
-                // until a restart.
+                // Re-saving the Phase 1 snapshot raced the consumer, and when the consumer lost,
+                // the retry partition stalled until a restart.
                 sentDeliveries++;
 
                 log.info("Scheduled retry for delivery {} to topic {} partition {} offset {}",
@@ -242,12 +236,9 @@ public class RetrySchedulerService {
     }
 
     /**
-     * Writes the hand-backs, each fenced on the token Phase 1 claimed the row under.
-     *
-     * <p>A send reported as failed or timed out may still reach the consumer, which then owns the
-     * row; that row matches nothing and is left to it. The rows around it are written regardless:
-     * saving the Phase 1 snapshots together let one bumped version roll the whole batch back, and
-     * every row in it sat PROCESSING until the stuck sweep.
+     * Fenced on the Phase 1 token, row by row. A send reported as failed may still reach the
+     * consumer, which then owns the row. Saving the batch together once let one bumped version
+     * roll back the whole batch, which then sat PROCESSING until the stuck sweep.
      */
     private void handBack(List<Delivery> deliveries, Map<UUID, UUID> claimedUnder) {
         if (deliveries.isEmpty()) {
@@ -268,8 +259,6 @@ public class RetrySchedulerService {
     private void rescheduleDelivery(Delivery delivery, String reason) {
         long jitter = ThreadLocalRandom.current().nextLong(0, Math.max(1, rescheduleDelaySeconds / 2) + 1);
         Instant rescheduleTime = Instant.now().plusSeconds(rescheduleDelaySeconds + jitter);
-        // Revert the Phase 1 claim so the delivery is picked up again rather than waiting
-        // out a stuck sweep.
         delivery.handBackTo(rescheduleTime);
 
         log.warn("Rescheduling delivery {} to {} due to: {}",
@@ -281,16 +270,13 @@ public class RetrySchedulerService {
             return deliveryRepository.countPending(Instant.now().minus(30, ChronoUnit.DAYS));
         } catch (Exception e) {
             log.warn("Failed to count pending retries for governor: {}", e.getMessage());
-            return -1; // Unknown — governor skips queue depth check
+            return -1;
         }
     }
 
     private String getRetryTopic(int attemptCount) {
         return switch (attemptCount) {
-            // 0: concurrency/rate-limit backpressure reschedules the delivery before its
-            // first HTTP attempt (WebhookDeliveryService increments attempt_count only once
-            // the call is actually about to be made) -- treat it the same as attempt 1, not
-            // as an exhausted ladder.
+            // 0: backpressure rescheduled it before its first HTTP attempt.
             case 0, 1 -> KafkaTopics.DELIVERIES_RETRY_1M;
             case 2 -> KafkaTopics.DELIVERIES_RETRY_5M;
             case 3 -> KafkaTopics.DELIVERIES_RETRY_15M;

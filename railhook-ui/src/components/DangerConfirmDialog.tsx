@@ -19,21 +19,14 @@ interface DangerConfirmDialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description: string;
-  /** What the person must type back before the action unlocks. */
   confirmName: string;
-  /** What this will cost, stated before it happens. */
   impact?: string[];
   onConfirm: () => void | Promise<void>;
   loading?: boolean;
   confirmLabel?: string;
 }
 
-/**
- * The one ritual every irreversible action in the product goes through:
- * say what will be lost, make the person type the name back, and only then
- * unlock the button. Uniform on purpose — a delete that looks different from
- * the last delete is a delete somebody clicks through.
- */
+/** Uniform on purpose: a delete that looks different is one somebody clicks through. */
 export default function DangerConfirmDialog({
   open,
   onOpenChange,
@@ -67,7 +60,7 @@ export default function DangerConfirmDialog({
         </AlertDialogHeader>
 
         {impact && impact.length > 0 && (
-          <div className="rounded-lg border border-halt/30 bg-halt-soft p-3">
+          <div className="border border-halt/30 bg-halt-soft p-3">
             <p className="mono-label text-halt">{t('dangerConfirm.impact')}</p>
             <ul className="mt-1.5 space-y-1">
               {impact.map((line) => (

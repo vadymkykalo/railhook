@@ -1,10 +1,5 @@
 ---
-/**
- * Starlight's header, with two things it leaves out on a phone. Starlight moves the language
- * switch into the sidebar drawer below 50rem, where nobody looks for it, so here it stays in the
- * bar at every width. And the docs are a separate site under the product's own address, with no
- * way back to it: a "Railhook" link to the landing page sits beside the language switch.
- */
+// Starlight hides the language switch in the drawer below 50rem; this keeps it in the bar.
 import config from 'virtual:starlight/user-config';
 
 import LanguageSelect from 'virtual:starlight/components/LanguageSelect';
@@ -76,7 +71,6 @@ const siteLabel = isUk ? 'На сайт' : 'Back to site';
     gap: 0.35rem;
     min-height: 2.25rem;
     padding: 0 0.5rem;
-    border-radius: 0.45rem;
     font-size: var(--sl-text-sm);
     color: var(--sl-color-gray-2);
     text-decoration: none;
@@ -86,12 +80,11 @@ const siteLabel = isUk ? 'На сайт' : 'Back to site';
     color: var(--sl-color-white);
   }
   .site-link:focus-visible {
-    outline: 2px solid var(--sl-color-accent);
+    outline: 2px solid var(--sl-color-white);
     outline-offset: 1px;
   }
 
-  /* On a phone the bar holds the title, search, this group and the menu button: the link keeps
-     only its arrow, which the title attribute and the screen-reader text still name. */
+  /* On a phone the link is just the arrow; title and screen-reader text still name it. */
   @media (max-width: 49.99rem) {
     .right-group {
       gap: 0.25rem;
@@ -107,7 +100,7 @@ const siteLabel = isUk ? 'На сайт' : 'Back to site';
     .site-link {
       padding: 0 0.4rem;
     }
-    /* The mark alone: "Railhook Docs" does not fit beside the controls and was cut mid-word. */
+    /* "Railhook Docs" does not fit beside the controls on a phone. */
     .title-wrapper :global(.site-title span) {
       position: absolute;
       width: 1px;

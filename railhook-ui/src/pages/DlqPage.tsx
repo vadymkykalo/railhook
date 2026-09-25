@@ -23,22 +23,15 @@ import { AttemptCell, CopyId, FilterBar, FilterField, SelectBox, SelectionBar, T
 import DeliveryDetailsSheet from './DeliveryDetailsSheet';
 
 
-/** A number worth reading on its own, in the machine voice. */
 function Metric({ label, value, halt }: { label: string; value: number; halt?: boolean }) {
   return (
-    <div className="rounded-lg border border-rail bg-card px-4 py-3">
+    <div className="border border-rail bg-card px-4 py-3">
       <p className="mono-label">{label}</p>
       <p className={`mt-1 font-mono text-2xl ${halt ? 'text-halt' : 'text-foreground'}`}>{value}</p>
     </div>
   );
 }
 
-/**
- * The DLQ is not a separate product — it is the Deliveries table filtered down
- * to the obligations Railhook has stopped trying: every row's Retry Ladder is
- * exhausted, so every row is `halt`, and the only question left is whether a
- * human wants it replayed or purged.
- */
 export default function DlqPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
@@ -64,8 +57,7 @@ export default function DlqPage() {
   const totalElements = dlqData?.totalElements ?? 0;
   const totalPages = dlqData?.totalPages ?? 0;
 
-  // Only the first load swaps the page for a skeleton; a filter or page change keeps the
-  // previous rows on screen (keepPreviousData) instead of unmounting the filters mid-edit.
+  // Skeleton on first load only, so the filters are not unmounted mid-edit.
   const loading = (projectLoading && !project) || (dlqLoading && !dlqData);
   const isError = projectIsError || dlqIsError;
   const retry = () => { refetchProject(); refetchDlq(); refetchStats(); };
@@ -129,7 +121,7 @@ export default function DlqPage() {
     return (
       <PageSkeleton maxWidth="max-w-none">
         <SkeletonCards count={3} height="h-20" cols="grid-cols-3" />
-        <div className="h-[300px] animate-pulse rounded-xl bg-muted" />
+        <div className="h-[300px] animate-pulse bg-muted" />
       </PageSkeleton>
     );
   }
@@ -199,7 +191,7 @@ export default function DlqPage() {
             </SelectionBar>
           </PermissionGate>
 
-          <div className="overflow-hidden rounded-lg border border-rail bg-card">
+          <div className="overflow-hidden border border-rail bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -301,11 +293,7 @@ export default function DlqPage() {
         </div>
       )}
 
-      {/* A DLQ item is a Delivery that ran out of ladder, and the sheet that
-          shows a Delivery's whole attempt history — every request, every
-          response, replay — already exists. `dlqApi.getItem` returns the same
-          nine fields the row above already has, so calling it would cost a
-          request and tell the reader nothing new. */}
+      {/* Reuses the delivery sheet: dlqApi.getItem returns nothing the row lacks. */}
       <DeliveryDetailsSheet
         deliveryId={selectedDeliveryId}
         open={!!selectedDeliveryId}

@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+import com.webhook.platform.api.exception.ForbiddenException;
 
 @Slf4j
 @RestController
@@ -75,11 +76,6 @@ public class OrganizationController {
                     + "No decrypted secrets are included. Owner only.")
     @ApiResponse(responseCode = "200", description = "Data export as JSON")
     @ApiResponse(responseCode = "403", description = "Forbidden — requires OWNER role")
-    // A read, so no ratchet asks it to declare anything — MutatingHandlerAccessDeclarationTest
-    // covers state-changing handlers only, and most reads legitimately require nothing. This one
-    // returns every member, project, endpoint and audit row in the organization, and until this
-    // annotation its OWNER requirement lived only in the call below, while its sibling
-    // deleteOrganization declared it.
     @RequireAccess(AccessLevel.OWNER)
     @RefusedInDemo
     @GetMapping("/{orgId}/export")
@@ -88,7 +84,7 @@ public class OrganizationController {
             AuthContext auth) {
         auth.requireOwnerAccess();
         if (!orgId.equals(auth.organizationId())) {
-            throw new com.webhook.platform.api.exception.ForbiddenException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         GdprExportDto export = gdprExportService.exportOrganizationData();
         return ResponseEntity.ok()
@@ -109,7 +105,7 @@ public class OrganizationController {
             AuthContext auth) {
         auth.requireOwnerAccess();
         if (!orgId.equals(auth.organizationId())) {
-            throw new com.webhook.platform.api.exception.ForbiddenException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         organizationService.deleteOrganization();
         return ResponseEntity.noContent().build();

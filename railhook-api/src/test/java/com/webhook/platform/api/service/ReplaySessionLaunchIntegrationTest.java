@@ -39,17 +39,7 @@ import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-/**
- * A replay session is a row the HTTP request commits, and a replay that runs afterwards on the
- * replay executor, one transaction per batch. It used to run inside the request's own transaction
- * on the request thread — {@code @Async} does not apply to a call a bean makes on itself — so
- * cancel and the concurrency cap could not see the session, and one failing batch rolled back
- * everything, the session included.
- *
- * <p>Both subscriptions are ordered and on one endpoint, so every event yields two deliveries on
- * that endpoint, and the sequence numbers the (mocked) generator hands out decide whether a batch
- * can commit.
- */
+// Two ordered subscriptions on one endpoint: the mocked sequence numbers decide which batch commits.
 @TestPropertySource(properties = {"replay.batch-size=1", "replay.batch-delay-ms=0"})
 class ReplaySessionLaunchIntegrationTest extends AbstractIntegrationTest {
 

@@ -39,7 +39,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DlqService {
 
-    /** Deliberately not "all of them in one statement" — see deleteDlqBatchByProjectId. */
     private static final int PURGE_BATCH_SIZE = 500;
 
     private final DeliveryRepository deliveryRepository;
@@ -49,11 +48,7 @@ public class DlqService {
     private final ObjectMapper objectMapper;
     private final DeliveryDispatch deliveryDispatch;
 
-    /**
-     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
-     * lookup only sees projects inside the caller's organization: a foreign project id is
-     * indistinguishable from a missing one, which is intended.
-     */
+    // Project carries @TenantId, so a foreign project id is indistinguishable from a missing one.
     public void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
@@ -68,7 +63,6 @@ public class DlqService {
             deliveries = deliveryRepository.findDlqByProjectId(projectId, pageable);
         }
 
-        // Batch-load last delivery attempts in 1 query instead of N
         List<UUID> deliveryIds = deliveries.getContent().stream()
                 .map(Delivery::getId).collect(Collectors.toList());
         Map<UUID, DeliveryAttempt> lastAttempts = Map.of();
@@ -85,8 +79,7 @@ public class DlqService {
     @Transactional(readOnly = true)
     public DlqItemResponse getDlqItem(UUID projectId, UUID deliveryId) {
         validateProjectOwnership(projectId);
-        // In this project, not merely this organization: another project's delivery is as
-        // unknown here as a missing one, and is refused before its status can say otherwise.
+        // Scoped to the project, so another project's delivery is refused like a missing one.
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .filter(d -> eventRepository.findById(d.getEventId())
                         .map(event -> projectId.equals(event.getProjectId()))
@@ -123,18 +116,15 @@ public class DlqService {
         int retried = 0;
         
         for (Delivery delivery : deliveries) {
-            // Verify delivery belongs to the project
             Event event = eventRepository.findById(delivery.getEventId()).orElse(null);
             if (event == null || !event.getProjectId().equals(projectId)) {
                 continue;
             }
             
-            // What a human pressing "retry" is asking for: another go at the ladder, without
-            // pretending the attempts it already made never happened.
+            // Another go at the ladder, without forgetting the attempts already made.
             delivery.returnToLadder(Delivery.MANUAL_RETRY_ATTEMPTS);
             deliveryRepository.save(delivery);
             
-            // Create outbox message for redelivery
             deliveryDispatch.announce(delivery, projectId, DeliveryDispatch.Reason.RETRY);
             
             log.info("Retrying DLQ delivery: {}", delivery.getId());
@@ -149,10 +139,7 @@ public class DlqService {
     public int purgeAllDlq(UUID projectId) {
         validateProjectOwnership(projectId);
         
-        // Batched, because this used to be one unbounded DELETE. A project with a large DLQ
-        // meant a single long transaction holding row locks across every matching delivery —
-        // and, now that the foreign key is back (V061), cascading into delivery_attempts for
-        // each one, which is where the real volume is.
+        // Batched: one unbounded DELETE locked the whole DLQ and its cascaded attempts.
         long total = 0;
         int deleted;
         do {
@@ -166,7 +153,6 @@ public class DlqService {
     }
 
     private DlqItemResponse mapToResponse(Delivery delivery, DeliveryAttempt lastAttempt) {
-        // Use already-fetched relations from JOIN FETCH (no extra queries)
         Event event = delivery.getEvent();
         Endpoint endpoint = delivery.getEndpoint();
 

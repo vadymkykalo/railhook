@@ -80,7 +80,6 @@ public class WorkflowStepExecution {
         SUCCESS,
         FAILED,
         SKIPPED,
-        /** The node asked the execution to be suspended and resumed later — see StepResult.waiting. */
         WAITING
     }
 }

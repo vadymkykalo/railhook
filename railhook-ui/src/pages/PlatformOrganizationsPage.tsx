@@ -17,7 +17,6 @@ import {
   PlatformScope, useDebouncedValue,
 } from './platformAdminParts';
 
-/** Every organization on the deployment, searchable by name or by a member's address. */
 export default function PlatformOrganizationsPage() {
   const { t } = useTranslation();
   const [page, setPage] = useState(0);

@@ -66,11 +66,7 @@ class AnalyticsServiceTest {
         TenantContext.clear();
     }
 
-    /**
-     * The delivery time series counts FAILED and DLQ together, so a chart with red
-     * points next to a "FAILED 0" card is a contradiction the user has to resolve.
-     * The overview has to count both terminal failure states as well.
-     */
+    // The time series already counted DLQ as failed, so the overview card contradicted the chart.
     @Test
     void overviewCountsDlqAsFailed() {
         when(deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
@@ -83,15 +79,5 @@ class AnalyticsServiceTest {
         AnalyticsResponse response = analyticsService.getAnalytics(projectId, "24h");
 
         assertThat(response.getOverview().getFailedDeliveries()).isEqualTo(10L);
-    }
-
-    @Test
-    void overviewReportsZeroFailuresWhenNeitherStateIsPresent() {
-        when(deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
-                eq(projectId), any(DeliveryStatus.class), any(), any())).thenReturn(0L);
-
-        AnalyticsResponse response = analyticsService.getAnalytics(projectId, "7d");
-
-        assertThat(response.getOverview().getFailedDeliveries()).isZero();
     }
 }

@@ -6,11 +6,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Refuses to start when a Retry Ladder outlives the hard cap that escalates its obligation to DLQ,
- * which would silently drop the last tiers rather than run them.
- *
- * <p>Each direction against its own cap: the two escalation services make different promises, and
- * checking the incoming ladder against the outgoing cap passes trivially.
+ * Refuses to start when a Retry Ladder outlives its direction's hard cap, which would silently
+ * drop the last tiers. Each direction is checked against its own cap.
  */
 @Component
 public class RetryLadderCapValidator {

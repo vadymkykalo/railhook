@@ -50,7 +50,6 @@ const CHANNEL_ICON: Record<AlertChannel, React.ElementType> = {
   SLACK: MessageSquare,
 };
 
-/** True while a rule is actually armed — enabled, not muted, not snoozed. */
 function isArmed(rule: { enabled: boolean; muted: boolean; snoozedUntil: string | null }): boolean {
   if (!rule.enabled || rule.muted) return false;
   return !rule.snoozedUntil || new Date(rule.snoozedUntil) <= new Date();
@@ -246,7 +245,6 @@ export default function AlertsPage() {
           />
         </div>
 
-        {/* What fired — the surface that needs a human. */}
         <section>
           <div className="mb-3">
             <h3 className="text-sm font-medium leading-tight">{t('alerts.history.title')}</h3>
@@ -304,9 +302,9 @@ export default function AlertsPage() {
                                     <span className={STATUS_TEXT[kind]}>{event.currentValue.toFixed(1)}</span>
                                     <span className="text-muted-foreground"> / {event.thresholdValue.toFixed(1)}</span>
                                   </span>
-                                  <span className="relative mt-1 block h-1 w-full overflow-hidden rounded-full bg-muted">
+                                  <span className="relative mt-1 block h-1 w-full overflow-hidden bg-muted">
                                     <span
-                                      className={cn('absolute inset-y-0 left-0 rounded-full', STATUS_FILL[kind])}
+                                      className={cn('absolute inset-y-0 left-0', STATUS_FILL[kind])}
                                       style={{ width: `${overshoot}%` }}
                                     />
                                   </span>
@@ -394,7 +392,6 @@ export default function AlertsPage() {
           )}
         </section>
 
-        {/* What is watching. */}
         <section>
           <div className="mb-3">
             <h3 className="text-sm font-medium leading-tight">{t('alerts.rules.title')}</h3>
@@ -500,7 +497,7 @@ export default function AlertsPage() {
                               <Clock className="h-3.5 w-3.5" />
                             </Button>
                             {snoozeDropdownId === rule.id && (
-                              <div className="absolute right-0 top-full z-10 mt-1 min-w-[130px] rounded-md border border-rail bg-popover py-1 shadow-elevated">
+                              <div className="absolute right-0 top-full z-10 mt-1 min-w-[130px] border border-rail bg-popover py-1 shadow-elevated">
                                 {SNOOZE_HOURS.map((h) => (
                                   <button
                                     key={h}

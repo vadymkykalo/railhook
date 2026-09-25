@@ -1,16 +1,5 @@
 #!/usr/bin/env node
-/**
- * Every English page has a Ukrainian twin, and every Ukrainian page an English one.
- *
- * Starlight would quietly fill a missing translation with the English page and a "not
- * translated" notice, which is how a docs site ends up bilingual in its sidebar and
- * monolingual in its content. The contract here is stricter: both, or neither.
- *
- * It checks what is present, not the slug contract — a page not yet written in either
- * language is the sidebar's concern (it only lists pages that exist), not this check's.
- *
- *   node scripts/check-parity.mjs
- */
+// Starlight would silently show the English page for a missing translation.
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +7,6 @@ import { fileURLToPath } from 'node:url';
 const PAGE = /\.mdx?$/;
 const UK = 'uk';
 
-/** Every page under `dir`, as a slash-separated path relative to it, extension kept. */
 function listPages(dir, root = dir) {
   let out = [];
   for (const name of readdirSync(dir)) {
@@ -29,13 +17,8 @@ function listPages(dir, root = dir) {
   return out;
 }
 
-/** A page's slug: the path without its extension, so `a.md` and `a.mdx` are twins. */
 const slugOf = (page) => page.replace(PAGE, '');
 
-/**
- * @param {string} docsDir the `src/content/docs` directory
- * @returns {{ missingUk: string[], missingEn: string[] }} slugs lacking a twin, sorted
- */
 export function findParityGaps(docsDir) {
   const pages = listPages(docsDir);
   const en = new Set(pages.filter((p) => !p.startsWith(`${UK}/`)).map(slugOf));

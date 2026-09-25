@@ -22,30 +22,12 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "railhook.serviceAccountName" . }}
-      # Smaller than the worker's: the api drains one graceful web server, not two
-      # thread pools waiting on in-flight HTTP deliveries.
       terminationGracePeriodSeconds: {{ .Values.api.terminationGracePeriodSeconds }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       {{- /*
-        No migration initContainer. There was one, and it could never have
-        worked: it ran the whole api jar with
-        `--spring.main.web-application-type=none --railhook.run-migration-only=true`,
-        and that last flag is not read anywhere in the codebase — nothing
-        makes the context stop after Flyway. So the container had two ways to
-        fail before a migration could matter. It was handed DB_USERNAME (the
-        app reads DB_USER) and none of WEBHOOK_ENCRYPTION_KEY /
-        WEBHOOK_ENCRYPTION_SALT / JWT_SECRET, all of which are required with
-        no default, so the context failed to start; and had it started, the
-        non-daemon scheduling threads would have kept the JVM alive forever
-        with the api pod stuck in Init.
-
-        The api runs its own migrations at startup anyway — application.yml
-        sets `spring.flyway.enabled: true` — and Flyway serialises concurrent
-        starts on a PostgreSQL advisory lock, so replicas coming up together
-        migrate exactly once. That is the same mechanism docker-compose.yml
-        relies on. A separate migration step would need a jar entry point that
-        migrates and exits; there isn't one.
+        No migration initContainer: the api migrates at startup, and Flyway's advisory lock makes
+        replicas starting together migrate exactly once.
       */}}
       containers:
         - name: api
@@ -57,9 +39,6 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
-            # Actuator, on its own port so a Prometheus scrape does not have to
-            # pass SecurityConfig's authenticated chain on 8080. Same split
-            # docker-compose.yml makes; see railhook.api.managementPort.
             - name: management
               containerPort: {{ include "railhook.api.managementPort" . }}
               protocol: TCP
@@ -86,9 +65,6 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.encryptionKey.existingSecret }}
                   key: {{ .Values.secrets.encryptionKey.key }}
-            # Required, no default (application.yml: `encryption-salt:
-            # ${WEBHOOK_ENCRYPTION_SALT}`). Missing it is a startup failure,
-            # not a degraded mode.
             - name: WEBHOOK_ENCRYPTION_SALT
               valueFrom:
                 secretKeyRef:
@@ -119,14 +95,8 @@ spec:
             - name: PLATFORM_ADMIN_EMAILS
               value: {{ . | quote }}
             {{- end }}
-            # After the api.env range above, deliberately: these two are not
-            # knobs. The probes, the UI's health proxy and the ServiceMonitor
-            # all address actuator on this port and expect it bound on every
-            # interface, so a value supplied through api.env would break all
-            # three at once. 0.0.0.0 here means "reachable from other pods",
-            # and this port is not published outside the cluster; setting it to
-            # 127.0.0.1 (which reads as the safer choice) already broke metrics
-            # scraping once in Compose.
+            # After the api.env range so a value there cannot override them: probes, the UI's
+            # health proxy and the ServiceMonitor all need actuator bound here on every interface.
             - name: MANAGEMENT_PORT
               value: {{ include "railhook.api.managementPort" . | quote }}
             - name: MANAGEMENT_ADDRESS

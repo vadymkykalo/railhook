@@ -1,31 +1,13 @@
-/**
- * Settings that belong to the running container rather than to the image.
- *
- * The published image is compiled once for every deployment of it — the hosted cloud and each
- * self-hosted install alike. What has to differ between those deployments is written by the UI
- * container when it starts, into a script the page loads before the app: `window.__RAILHOOK__`.
- *
- * Read on every call rather than captured at import, so nothing freezes the value the module
- * happened to see first.
- */
+/** Read on every call, not at import, so nothing freezes the first value seen. */
 export interface RuntimeConfig {
-  /** Domain behind the sales@ / support@ addresses. Empty on a self-hosted install. */
   contactDomain?: string;
-  /** Public origin, e.g. https://railhook.io. Empty when the deployment has not declared one. */
   siteUrl?: string;
-  /** Registration challenge site key. Empty means no challenge. */
   captchaSiteKey?: string;
-  /** The challenge provider's script. Only set alongside a site key. */
   captchaScriptUrl?: string;
-  /** Cloudflare Web Analytics token. Empty means no analytics, which is the default. */
   webAnalyticsToken?: string;
-  /** The public status page the footer links to. Empty means no link, which is the default. */
   statusPageUrl?: string;
-  /** Whether the public webhook tester (/tester) is on. Off unless the deployment says so. */
   publicTester?: boolean;
-  /** Whether the live demo (/demo) is on. Off unless the deployment says so. */
   publicDemo?: boolean;
-  /** Whether the blog (/blog) is on: railhook.io's own content, off unless the deployment says so. */
   publicBlog?: boolean;
 }
 
@@ -40,47 +22,38 @@ function read(key: Exclude<keyof RuntimeConfig, 'publicTester' | 'publicDemo' | 
   return (typeof value === 'string' && value.trim()) || undefined;
 }
 
-/** The configured contact domain, trimmed; undefined when none is configured. */
 export function contactDomain(): string | undefined {
   return read('contactDomain');
 }
 
-/** The configured public origin, trimmed; undefined when none is configured. */
 export function configuredSiteUrl(): string | undefined {
   return read('siteUrl');
 }
 
-/** The registration challenge's site key; undefined when the challenge is off. */
 export function captchaSiteKey(): string | undefined {
   return read('captchaSiteKey');
 }
 
-/** The challenge script; Turnstile's when a site key is set without one. */
 export function captchaScriptUrl(): string {
   return read('captchaScriptUrl') ?? 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 }
 
-/** The Cloudflare Web Analytics token; undefined when analytics is off. */
 export function webAnalyticsToken(): string | undefined {
   return read('webAnalyticsToken');
 }
 
-/** The public status page's address; undefined when the deployment has none. */
 export function statusPageUrl(): string | undefined {
   return read('statusPageUrl');
 }
 
-/** Whether the public webhook tester is on for this deployment. */
 export function publicTesterEnabled(): boolean {
   return typeof window !== 'undefined' && window.__RAILHOOK__?.publicTester === true;
 }
 
-/** Whether the live demo is on for this deployment. */
 export function publicDemoEnabled(): boolean {
   return typeof window !== 'undefined' && window.__RAILHOOK__?.publicDemo === true;
 }
 
-/** Whether the blog is on for this deployment — railhook.io's, never a self-hosted install's by default. */
 export function publicBlogEnabled(): boolean {
   return typeof window !== 'undefined' && window.__RAILHOOK__?.publicBlog === true;
 }

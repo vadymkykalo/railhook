@@ -8,27 +8,20 @@ use Railhook\Exception\RailhookException;
 
 class Webhook
 {
-    private const DEFAULT_TOLERANCE_MS = 300000; // 5 minutes
+    private const DEFAULT_TOLERANCE_MS = 300000;
 
     /** The Standard Webhooks headers carry seconds, not milliseconds. */
     private const DEFAULT_STANDARD_TOLERANCE_SECONDS = 300;
 
     /**
-     * Verify webhook signature using HMAC-SHA256.
-     *
-     * The header is `t=<unix-ms>,v1=<hex>` and may carry more than one `v1`.
-     * After you rotate an endpoint's secret, Railhook signs each delivery with
-     * both the new secret and the retired one for the endpoint's grace window
-     * (24 hours by default), so the new secret can be deployed whenever you like
-     * rather than at the instant you press rotate. The delivery is authentic if
-     * any `v1` matches.
+     * Verify an `X-Signature` header (`t=<unix-ms>,v1=<hex>[,v1=...]`); during a secret rotation
+     * any one `v1` matching is enough.
      *
      * @param string $payload Raw request body
-     * @param string $signature X-Signature header value (format: t=timestamp,v1=signature[,v1=...])
+     * @param string $signature X-Signature header value
      * @param string $secret Endpoint webhook secret
-     * @param int $toleranceMs Maximum age of signature in milliseconds
-     * @return bool True if signature is valid
-     * @throws RailhookException If signature is invalid or expired
+     * @param int $toleranceMs Maximum age of the signature in milliseconds
+     * @throws RailhookException If the signature is invalid or expired
      */
     public static function verifySignature(
         string $payload,
@@ -41,9 +34,8 @@ class Webhook
         }
 
         $timestamp = null;
-        // Collected, not overwritten: a header sent during a secret rotation carries
-        // one v1 per valid secret, and keeping only the last would reject whichever
-        // of the pair the receiver is currently holding.
+        // Collected, not overwritten: during a rotation keeping only the last v1 would
+        // reject whichever secret the receiver currently holds.
         $signatures = [];
 
         foreach (explode(',', $signature) as $part) {
@@ -76,8 +68,7 @@ class Webhook
         $signedPayload = "{$timestamp}.{$payload}";
         $expectedSignature = hash_hmac('sha256', $signedPayload, $secret);
 
-        // Every candidate is compared, with no early exit, so the time taken does
-        // not depend on which position matched.
+        // No early exit, so timing does not reveal which candidate matched.
         $matched = false;
         foreach ($signatures as $candidate) {
             if (hash_equals($expectedSignature, $candidate)) {
@@ -93,24 +84,13 @@ class Webhook
     }
 
     /**
-     * Verify the {@link https://www.standardwebhooks.com Standard Webhooks} headers.
-     *
-     * Endpoints receive both header sets by default (`signatureScheme: BOTH`), so use
-     * whichever suits you — this one if you would rather verify the same way as the other
-     * providers you integrate with, `verifySignature` if you already verify `X-Signature`.
-     *
-     * Two things differ from Railhook's own scheme beyond the header names: the message id
-     * is part of what is signed, and the digest is base64 rather than hex. Rotation behaves
-     * the same — through the grace window the header carries a space-separated signature per
-     * valid secret, and any one matching is enough.
+     * Verify the Standard Webhooks headers; during a rotation any one matching signature is enough.
      *
      * @param string $payload Raw request body
-     * @param array $headers Request headers (case-insensitive)
-     * @param string $secret The endpoint's `standardWebhooksSecret` (`whsec_…`). A raw
-     *                       secret is accepted too and used as-is.
+     * @param array<string, string|string[]> $headers Request headers, any case
+     * @param string $secret The endpoint's `standardWebhooksSecret` (`whsec_…`); a raw secret is used as-is
      * @param int $toleranceSeconds How far the timestamp may be from now, either way
-     * @return bool True if the signature is valid
-     * @throws RailhookException If it is not
+     * @throws RailhookException If the signature is invalid or expired
      */
     public static function verifyStandardWebhook(
         string $payload,
@@ -118,8 +98,7 @@ class Webhook
         string $secret,
         int $toleranceSeconds = self::DEFAULT_STANDARD_TOLERANCE_SECONDS
     ): bool {
-        // Laravel's and Symfony's `$request->headers->all()` map each name to a list of
-        // values; constructEvent already unwrapped those, this did not.
+        // Laravel's and Symfony's `$request->headers->all()` map each name to a list of values.
         $normalized = [];
         foreach ($headers as $key => $value) {
             $normalized[strtolower((string) $key)] = is_array($value) ? ($value[0] ?? null) : $value;
@@ -150,9 +129,6 @@ class Webhook
             );
         }
 
-        // `whsec_<base64>` is the conventional form and is what the endpoint's
-        // standardWebhooksSecret gives you: the base64 body decodes to the key bytes.
-        // Anything else is taken literally, so a raw secret still works.
         $key = str_starts_with($secret, 'whsec_')
             ? base64_decode(substr($secret, strlen('whsec_')), true)
             : $secret;
@@ -164,8 +140,7 @@ class Webhook
             hash_hmac('sha256', $messageId . '.' . $timestampSeconds . '.' . $payload, $key, true)
         );
 
-        // Space-separated, one per valid secret during a rotation window. Every candidate is
-        // compared with no early exit, so the time taken does not reveal which one matched.
+        // No early exit, so timing does not reveal which candidate matched.
         $matched = false;
         foreach (preg_split('/\s+/', trim((string) $signature)) as $part) {
             $comma = strpos($part, ',');
@@ -185,25 +160,15 @@ class Webhook
     }
 
     /**
-     * Construct a webhook event from request, verifying signature.
-     *
-     * What Railhook actually POSTs on the wire is the event's **payload**, not
-     * an envelope: a `$client->events->send(type: 'order.completed', data:
-     * [...])` arrives at your endpoint as the `data` array alone, with the
-     * identifiers carried in headers (`X-Event-Id`, `X-Delivery-Id`,
-     * `X-Timestamp`, `X-Sequence-Number`). So `eventId` / `deliveryId` /
-     * `timestamp` are always populated for a real delivery and `data` is the
-     * decoded body, but `type` is only populated when the body itself carries
-     * a `type` key — which for a default subscription it does not. Route on
-     * the payload, or configure the subscription's `payloadTemplate` to wrap
-     * the event so that `type` becomes part of the body.
+     * Verify the request and decode it into an event. `type` is set only when the body carries a
+     * `type` key; ids come from the headers.
      *
      * @param string $payload Raw request body
-     * @param array $headers Request headers (case-insensitive)
+     * @param array $headers Request headers, any case
      * @param string $secret Endpoint webhook secret
-     * @param int $toleranceMs Maximum age of signature in milliseconds
-     * @return array Parsed webhook event with eventId, deliveryId, timestamp, type, data
-     * @throws RailhookException If signature is invalid or payload is malformed
+     * @param int $toleranceMs Maximum age of the signature in milliseconds
+     * @return array Keys: eventId, deliveryId, timestamp, type, data
+     * @throws RailhookException If the signature is invalid or the payload is malformed
      */
     public static function constructEvent(
         string $payload,
@@ -211,7 +176,6 @@ class Webhook
         string $secret,
         int $toleranceMs = self::DEFAULT_TOLERANCE_MS
     ): array {
-        // Normalize headers to lowercase
         $normalizedHeaders = [];
         foreach ($headers as $key => $value) {
             $normalizedHeaders[strtolower($key)] = is_array($value) ? $value[0] : $value;
@@ -242,14 +206,7 @@ class Webhook
         ];
     }
 
-    /**
-     * Generate a signature for testing purposes.
-     *
-     * @param string $payload Request body
-     * @param string $secret Webhook secret
-     * @param int|null $timestampMs Optional timestamp in milliseconds (defaults to now)
-     * @return string Signature string in format t=timestamp,v1=signature
-     */
+    /** Build an `X-Signature` value (`t=<ms>,v1=<hex>`) for tests; the timestamp defaults to now. */
     public static function generateSignature(
         string $payload,
         string $secret,

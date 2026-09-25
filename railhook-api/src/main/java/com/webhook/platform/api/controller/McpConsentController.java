@@ -26,14 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 /**
- * The consent screen's side of connecting an MCP app: the signed-in person reads what an app is
- * asking for, then approves it for one project or declines.
- *
- * <p>The decision is an authenticated API call from the dashboard, carrying the session's JWT in a
- * header — not a form post a foreign page could make a browser send. It answers with the URL to
- * send the browser to, which the dashboard follows. A person's own sign-in is the only credential
- * that can answer: an API key is refused outright, since a key must never be able to mint another
- * credential.
+ * The decision is an API call carrying the JWT in a header, not a form post a foreign page could
+ * make a browser send. API keys are refused: a key must never be able to mint another credential.
  */
 @RestController
 @RequestMapping("/api/v1/oauth/requests")
@@ -71,10 +65,9 @@ public class McpConsentController {
             @ApiResponse(responseCode = "403", description = "The caller's role may not grant READ_WRITE"),
             @ApiResponse(responseCode = "404", description = "Request expired or answered, or project not found"),
     })
-    // An API key never reaches the body (requireJwt), so this scope only ever restates that.
     @RequireScope(ApiKeyScope.READ_WRITE)
-    // Any member: a Viewer may connect an app read-only. The service refuses READ_WRITE to a
-    // role that could not create an API key, which is the rule it mirrors.
+    // A Viewer may connect an app read-only; the service refuses READ_WRITE to a role that could
+    // not create an API key.
     @RequireAccess(AccessLevel.READ)
     @PostMapping("/{requestId}/approve")
     public ResponseEntity<McpConsentDecisionResponse> approveMcpConsentRequest(@PathVariable("requestId") UUID requestId,

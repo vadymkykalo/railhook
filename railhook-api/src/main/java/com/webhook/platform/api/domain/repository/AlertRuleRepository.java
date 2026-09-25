@@ -14,12 +14,8 @@ public interface AlertRuleRepository extends JpaRepository<AlertRule, UUID> {
     List<AlertRule> findByProjectIdAndEnabledTrue(UUID projectId);
 
     /**
-     * Every enabled rule in every organization — the evaluator's entry point.
-     *
-     * <p>{@code AlertRule} carries {@code @TenantId}, so this returns rows from one
-     * organization unless the caller is system-scoped. The scheduler that uses it declares
-     * {@code @SystemTenant}; anything else calling this gets its own organization's rules,
-     * which is harmless but not what the name suggests.
+     * Crosses organizations only under {@code @SystemTenant}, as the evaluator runs it. Any other
+     * caller gets just its own organization's rules.
      */
     List<AlertRule> findByEnabledTrue();
     Optional<AlertRule> findByIdAndProjectId(UUID id, UUID projectId);

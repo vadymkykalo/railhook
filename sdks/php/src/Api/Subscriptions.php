@@ -15,9 +15,7 @@ class Subscriptions
         $this->client = $client;
     }
 
-    /**
-     * Create a new subscription.
-     */
+    /** Create a new subscription. */
     public function create(string $projectId, array $params): array
     {
         return $this->client->request(
@@ -27,9 +25,7 @@ class Subscriptions
         );
     }
 
-    /**
-     * Get subscription by ID.
-     */
+    /** Get subscription by ID. */
     public function get(string $projectId, string $subscriptionId): array
     {
         return $this->client->request(
@@ -38,9 +34,7 @@ class Subscriptions
         );
     }
 
-    /**
-     * List all subscriptions for a project.
-     */
+    /** List all subscriptions for a project. */
     public function list(string $projectId): array
     {
         return $this->client->request(
@@ -49,9 +43,7 @@ class Subscriptions
         );
     }
 
-    /**
-     * Update subscription.
-     */
+    /** Update subscription. */
     public function update(string $projectId, string $subscriptionId, array $params): array
     {
         return $this->client->request(
@@ -61,9 +53,7 @@ class Subscriptions
         );
     }
 
-    /**
-     * Delete subscription.
-     */
+    /** Delete subscription. */
     public function delete(string $projectId, string $subscriptionId): void
     {
         $this->client->request(

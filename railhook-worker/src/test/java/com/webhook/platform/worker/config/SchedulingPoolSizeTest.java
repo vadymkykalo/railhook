@@ -17,17 +17,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Regression guard: Spring Boot defaults spring.task.scheduling.pool.size to 1, which
- * means a single slow @Scheduled job (e.g. DlqMonitoringService blocking on an unbounded
- * Kafka AdminClient call) delays every other cron sharing the JVM, including
- * StuckDeliveryRecoveryService. See railhook-api's SchedulingPoolSizeTest for the API
- * side of the same guard.
- *
- * This test resolves the actual value declared in application.yml (not a hardcoded duplicate)
- * through Spring's own TaskSchedulingAutoConfiguration, so it fails if the setting is ever
- * removed, reverted to the 1-thread default, or the property key is mistyped.
- */
+// Boot defaults the scheduling pool to 1, so one slow job delayed StuckDeliveryRecoveryService.
 class SchedulingPoolSizeTest {
 
     @Test
@@ -41,8 +31,7 @@ class SchedulingPoolSizeTest {
                 .withPropertyValues("spring.task.scheduling.pool.size=" + configuredValue)
                 .run(context -> {
                     TaskScheduler scheduler = context.getBean(TaskScheduler.class);
-                    // getPoolSize() reports live threads (0 until a task actually runs);
-                    // the configured core size is what we want to guard here.
+                    // getPoolSize() reports live threads; the configured core size is what matters.
                     int poolSize = ((ThreadPoolTaskScheduler) scheduler)
                             .getScheduledThreadPoolExecutor().getCorePoolSize();
                     assertTrue(poolSize > 1,

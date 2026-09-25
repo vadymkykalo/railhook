@@ -21,14 +21,7 @@ public class Event {
     @Id
     private UUID id;
 
-    /**
-     * Tenant discriminator, mapped but not enforced here: the api filters on this column via
-     * {@code @TenantId}, the worker deliberately does not — it has no {@code AuthContext} and
-     * every consumer is a system path. It is mapped rather than ignored because the attempt
-     * stores have to carry the tenant across from the parent row, and because
-     * {@code EntityMappingParityIntegrationTest} requires both modules to map every column of a
-     * shared table.
-     */
+    /** Not tenant-filtered here: the worker has no request tenant. Mapped so attempt rows can copy it. */
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
 
@@ -47,12 +40,8 @@ public class Event {
     private String payload;
 
     /**
-     * Whether {@link #payload} holds a gzip+Base64 blob rather than the JSON itself.
-     *
-     * <p>The api compresses on ingest above {@code WEBHOOK_PAYLOAD_COMPRESSION_THRESHOLD_BYTES}
-     * (1 KB by default) and reads back through {@code getDecompressedPayload()}. This column
-     * was not mapped here, so the worker read the stored column directly and delivered — and
-     * signed — the Base64 blob as the webhook body for every event at or above the threshold.
+     * The api gzip+Base64 encodes large payloads. When this was unmapped the worker signed and
+     * delivered the Base64 blob.
      */
     @Builder.Default
     @Column(name = "payload_compressed", nullable = false)
@@ -61,11 +50,7 @@ public class Event {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    /**
-     * The payload as callers expect it: decompressed when stored compressed.
-     * Always use this rather than {@link #getPayload()} when building a request body,
-     * computing a signature, or applying a transform.
-     */
+    /** Use this, not {@link #getPayload()}, for request bodies, signatures and transforms. */
     public String getDecompressedPayload() {
         return PayloadCompressionUtil.decompress(payload, payloadCompressed);
     }

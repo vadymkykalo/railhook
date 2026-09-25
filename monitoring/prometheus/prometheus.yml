@@ -3,10 +3,9 @@ global:
   evaluation_interval: 15s
 
 rule_files:
-  # The platform's rules — kept identical to the Helm chart's (AlertRuleParityTest).
+  # Kept identical to the Helm chart's rules.
   - "alerts.yml"
-  # The host this Compose stack runs on: disk, memory, containers, uptime, backups.
-  # Kubernetes has its own answers to all of these, so the chart has no copy.
+  # Host rules: Kubernetes has its own answers to all of these, so the chart has no copy.
   - "host-alerts.yml"
 
 alerting:
@@ -51,8 +50,6 @@ scrape_configs:
         regex: ""
         action: drop
 
-  # Public URLs, probed the way a customer reaches them. Targets come from
-  # render-targets.sh (RAILHOOK_DOMAIN / MONITORING_PROBE_URLS).
   - job_name: "blackbox-public"
     metrics_path: /probe
     params:

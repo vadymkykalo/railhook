@@ -4,13 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { initCSP } from '../csp';
 
-/**
- * Cloudflare Web Analytics, off unless the container was given a token.
- *
- * `public/analytics.js` is one static file shared by the app and the docs site: it reads the
- * token from `window.__RAILHOOK__` and adds Cloudflare's beacon. Without a token it adds
- * nothing, which is every self-hosted install — they must never report to anyone.
- */
+/** Without a token nothing is added: self-hosted installs must never report to anyone. */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SCRIPT = readFileSync(join(root, 'public', 'analytics.js'), 'utf8');
 const BEACON = 'https://static.cloudflareinsights.com/beacon.min.js';

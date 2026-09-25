@@ -1,9 +1,4 @@
-/**
- * A request made with `responseType: 'blob'` gets its error body as a Blob too, so
- * `err.response.data.message` — what showApiError reads — was undefined and a failed export
- * toasted a generic fallback instead of the server's reason. This reads a JSON error body back
- * into an object on the same error; anything else is rethrown untouched.
- */
+/** A blob request's error body is a Blob too; read JSON back so showApiError sees the message. */
 export async function withJsonErrorBody<T>(request: Promise<T>): Promise<T> {
   try {
     return await request;

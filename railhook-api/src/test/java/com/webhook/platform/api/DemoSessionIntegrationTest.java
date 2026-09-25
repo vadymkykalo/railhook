@@ -48,16 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The public demo, end to end: a visitor with no account opens a session, can read everything in
- * the demo organization, and can change nothing — by any handler, not only the ones a person
- * would think to try.
- *
- * <p>The walk over every state-changing handler is the point of this class. It asks the running
- * application which handlers exist rather than listing them, so a handler added next year is
- * covered the day it lands: it either refuses a demo session, or it carries
- * {@link AllowedInDemo}, whose set {@code DemoSessionAllowListTest} freezes.
- */
+// Asks the app which handlers exist, so a new handler is covered the day it lands.
 @TestPropertySource(properties = {
         "demo.enabled=true",
         "demo.session-ttl-minutes=30"
@@ -94,8 +85,7 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String openSession() throws Exception {
-        // As the anonymous visitor it is: no tenant scope, which AbstractIntegrationTest otherwise
-        // leaves on the thread MockMvc runs the request on.
+        // Anonymous visitor: no tenant scope, which AbstractIntegrationTest otherwise leaves on the thread.
         TenantContext.clear();
         MvcResult result;
         try {
@@ -112,13 +102,10 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isString())
                 .andExpect(jsonPath("$.expiresAt").isString())
-                // Nothing that outlives the token: no refresh cookie, no refresh token.
                 .andExpect(header().doesNotExist("Set-Cookie"))
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andReturn();
     }
-
-    // ── Opening a session ──────────────────────────────────────────
 
     @Test
     void aSessionIsAViewerInTheDemoOrganizationThatSaysItIsTheDemo() throws Exception {
@@ -165,8 +152,6 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/actuator/metrics").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
     }
-
-    // ── Reading ────────────────────────────────────────────────────
 
     @Test
     void theDemoCanBeReadInFull() throws Exception {
@@ -297,8 +282,6 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
-    // ── Changing anything ──────────────────────────────────────────
-
     @Test
     void everyStateChangingHandlerRefusesADemoSession() throws Exception {
         String token = openSession();
@@ -338,8 +321,7 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
                             leaks.add(id + " is @AllowedInDemo but was refused");
                         }
                     } else if (pattern.startsWith("/api/v1/admin/") || pattern.startsWith("/api/v1/portal/")) {
-                        // Refused before the interceptor, by the filter chain: a demo session is
-                        // neither the platform admin nor a portal session.
+                        // Refused before the interceptor, by the filter chain.
                         if (status != 403) {
                             leaks.add(method + " " + pattern + " (" + id + ") answered " + status);
                         }
@@ -365,8 +347,6 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(header().doesNotExist("Set-Cookie"));
     }
 
-    // ── Side doors ─────────────────────────────────────────────────
-
     @Test
     void theDemoSourcesTakeNoWebhooks() throws Exception {
         String ingressToken = jdbc.queryForObject(
@@ -379,8 +359,7 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void nothingSeededIsWorkForTheWorker() {
-        // What the worker picks up: PENDING or PROCESSING, or anything with a retry due, or an
-        // outbox row. The demo must have none of it, or its reserved hosts would be attempted.
+        // Anything the worker would pick up: the demo's reserved hosts must never be attempted.
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM deliveries WHERE organization_id = ? "
                         + "AND (status IN ('PENDING', 'PROCESSING') OR next_retry_at IS NOT NULL)",
                 Integer.class, DemoTenant.ORGANIZATION_ID)).isZero();
@@ -389,7 +368,6 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
                 Integer.class, DemoTenant.ORGANIZATION_ID)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox_messages WHERE project_id = ?",
                 Integer.class, DemoTenant.PROJECT_ID)).isZero();
-        // What the workflow engine picks up: a run to resume, a run presumed hung, a trigger to announce.
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM workflow_executions WHERE organization_id = ? "
                         + "AND (status NOT IN ('COMPLETED', 'FAILED') OR resume_at IS NOT NULL)",
                 Integer.class, DemoTenant.ORGANIZATION_ID)).isZero();
@@ -399,8 +377,6 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
                         + "AND url NOT LIKE 'https://%.example/%'",
                 Integer.class, DemoTenant.ORGANIZATION_ID)).isZero();
     }
-
-    // ── Seeding ────────────────────────────────────────────────────
 
     @Test
     void withTheDemoOnNothingRemovesIt() {
@@ -428,7 +404,7 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
         assertThat(count("workflows")).isEqualTo(3);
         assertThat(jdbc.queryForObject("SELECT secret_encrypted FROM endpoints WHERE organization_id = ? "
                 + "ORDER BY id LIMIT 1", String.class, DemoTenant.ORGANIZATION_ID)).isEqualTo(secretBefore);
-        // Replaced, not appended: the same order of magnitude, not twice or three times as much.
+        // Replaced, not appended.
         assertThat(count("events")).isBetween((int) (eventsBefore * 0.8), (int) (eventsBefore * 1.2));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM deliveries WHERE organization_id = ? AND status = 'DLQ'",
                 Integer.class, DemoTenant.ORGANIZATION_ID)).isPositive();
@@ -473,7 +449,6 @@ class DemoSessionIntegrationTest extends AbstractIntegrationTest {
                 Integer.class, DemoTenant.ORGANIZATION_ID);
     }
 
-    /** A URL the pattern matches: the demo's own ids where the name says which, a fresh id elsewhere. */
     private static String concrete(String pattern) {
         Matcher m = PATH_VARIABLE.matcher(pattern);
         StringBuilder out = new StringBuilder();

@@ -1,16 +1,6 @@
 #!/bin/sh
-# Writes the uptime probe targets Prometheus reads through file_sd, at container start.
-#
-# Prometheus does not expand environment variables in its config, and the URLs differ per
-# installation, so they are rendered here (the image is busybox: POSIX sh only).
-#
-#   MONITORING_PROBE_URLS  comma- or space-separated URLs to probe from outside, e.g.
-#                          https://example.com/,https://example.com/docs/
-#   RAILHOOK_DOMAIN        when the list is empty, the site root, /docs/ and
-#                          /actuator/health on this domain
-#
-# Inside the network it always probes the UI, and Caddy when there is a domain (Caddy runs
-# only under the tls profile, which a domain turns on).
+# Prometheus does not expand environment variables in its config, so targets are rendered here
+# (busybox image: POSIX sh only).
 set -eu
 
 SD="${PROMETHEUS_SD_DIR:-/prometheus/sd}"
@@ -21,8 +11,7 @@ if [ -z "$(printf '%s' "$urls" | tr -d ' ')" ] && [ -n "${RAILHOOK_DOMAIN:-}" ];
   urls="https://${RAILHOOK_DOMAIN}/ https://${RAILHOOK_DOMAIN}/docs/ https://${RAILHOOK_DOMAIN}/actuator/health"
 fi
 
-# $1 file, remaining args targets. Written to a temp file and moved, so Prometheus never
-# reads half of one.
+# Written to a temp file and moved, so Prometheus never reads half of one.
 write() {
   file="$1"; shift
   {

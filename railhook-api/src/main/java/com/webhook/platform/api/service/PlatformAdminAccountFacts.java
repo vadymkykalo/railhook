@@ -19,18 +19,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * What the platform admin panel says about an account besides its own row: how it signs in, when
- * it was last active, and which organizations it belongs to.
- *
- * <p>One query per question for a whole page of accounts, never one per account — the lists these
- * feed are fifty rows long.
- */
+// One query per question for a whole page of accounts, never one per account.
 @Component
 @RequiredArgsConstructor
 public class PlatformAdminAccountFacts {
 
-    /** An account with a password hash can sign in with it; identity providers are listed by name. */
     public static final String PASSWORD = "PASSWORD";
 
     private final UserIdentityRepository userIdentityRepository;

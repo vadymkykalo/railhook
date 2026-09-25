@@ -1,23 +1,4 @@
-// Soak scenario: hours (not minutes) of moderate, steady ingestion, meant to
-// be run alongside load/scripts/monitor-soak.sh so the two together answer
-// "does anything leak or grow unbounded over hours of normal traffic" —
-// connection-pool leaks (HikariCP leak-detection-threshold is already set to
-// 60000ms in both api and worker application.yml and will log if a
-// connection is held that long), JVM heap growth, Redis key accumulation
-// (ordering cursors, idempotency keys, rate-limit buckets, etc. that should
-// expire/clean up and don't).
-//
-// This is deliberately low-RPS relative to load/ingest.js — the point isn't
-// to find the throughput ceiling, it's to run long enough for slow leaks to
-// show up in a memory/connection graph that a 2-minute burst never would.
-//
-// Usage (run in two terminals):
-//   k6 run -e DURATION=4h -e TARGET_RPS=10 load/soak.js
-//   ./load/scripts/monitor-soak.sh soak-results.csv
-//
-// See load/README.md "Soak run" for how to read the CSV afterwards, and for
-// why this needs `docker compose exec`-level access rather than a published
-// actuator port.
+// Hours of steady ingestion, run beside load/scripts/monitor-soak.sh, to catch slow leaks.
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Counter } from 'k6/metrics';

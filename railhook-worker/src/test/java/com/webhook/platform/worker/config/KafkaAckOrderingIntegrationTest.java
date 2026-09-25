@@ -39,19 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 
-/**
- * Reproduces the out-of-order-ack defect against a real broker: records 5..9 are handed to the
- * listener, complete (and ack) before records 0..4 do, mirroring how BoundedAsyncExecutor
- * acks from whichever pool thread finishes first. Without {@code asyncAcks}, MANUAL ack
- * mode commits straight to the highest acked offset regardless of order, so the commit
- * jumps to 10 while 0..4 are still in flight — a kill at that point loses them. With
- * {@code asyncAcks}, the commit is deferred until every lower offset in the batch has
- * also been acked.
- *
- * <p>Builds the container from the real {@link KafkaConsumerConfig} bean method (not a
- * hand-rolled copy) so this test regresses if the {@code setAsyncAcks(true)} fix in that
- * class is ever reverted.</p>
- */
+// Without asyncAcks, MANUAL mode commits to the highest acked offset and a kill loses the lower ones.
 @Testcontainers
 class KafkaAckOrderingIntegrationTest {
 
@@ -84,8 +72,7 @@ class KafkaAckOrderingIntegrationTest {
 
     @Test
     void committedOffset_neverRunsAheadOfIncompleteWork_whenAckedOutOfOrder() throws Exception {
-        // KafkaConsumerConfig is instantiated directly (not via Spring context) so this
-        // test exercises the exact container factory the worker registers in production.
+        // The real container factory, so reverting setAsyncAcks(true) fails this.
         KafkaConsumerConfig config = new KafkaConsumerConfig(mock(KafkaOperations.class), new SimpleMeterRegistry());
         ReflectionTestUtils.setField(config, "bootstrapServers", KAFKA.getBootstrapServers());
         ReflectionTestUtils.setField(config, "groupId", GROUP);
@@ -98,14 +85,10 @@ class KafkaAckOrderingIntegrationTest {
 
         var factory = config.kafkaListenerContainerFactory();
         container = factory.createContainer(TOPIC);
-        // Default poll timeout is 5s: acks queued from a non-consumer thread are only
-        // drained/committed at the top of the next poll loop iteration (doProcessCommits,
-        // before doPoll). Shorten it so the test doesn't have to wait a full 5s per check.
+        // Acks from other threads commit only at the next poll; shorten the default 5s.
         container.getContainerProperties().setPollTimeout(200L);
 
-        // Gate per record offset: the test controls exactly when each record's async
-        // "work" finishes and calls acknowledge(), just like BoundedAsyncExecutor does
-        // from a pool thread once the HTTP delivery attempt completes.
+        // Each record acks when its gate completes, as BoundedAsyncExecutor does.
         Map<Long, CompletableFuture<Void>> gates = new java.util.concurrent.ConcurrentHashMap<>();
         for (long i = 0; i < RECORD_COUNT; i++) {
             gates.put(i, new CompletableFuture<>());
@@ -131,21 +114,17 @@ class KafkaAckOrderingIntegrationTest {
         container.start();
         assertTrue(received.await(30, TimeUnit.SECONDS), "all records should reach the listener");
 
-        // Records 5..9 finish (and ack) first; 0..4 are still "in flight".
         for (long offset = 5; offset < RECORD_COUNT; offset++) {
             gates.get(offset).complete(null);
         }
 
-        // Give the out-of-order acks time to reach the container and (if it were going
-        // to) commit — several poll cycles at the shortened 200ms timeout. This is the
-        // moment a SIGKILL would previously have lost 0..4.
+        // Several poll cycles: long enough for an out-of-order commit, had it been going to happen.
         Thread.sleep(1500);
 
         Long committedBeforeCompletion = fetchCommittedOffset();
         assertTrue(committedBeforeCompletion == null || committedBeforeCompletion <= 0,
                 "committed offset must not run ahead of incomplete record 0, but was: " + committedBeforeCompletion);
 
-        // Now let 0..4 finish in order, unblocking the deferred commit.
         for (long offset = 0; offset < 5; offset++) {
             gates.get(offset).complete(null);
         }

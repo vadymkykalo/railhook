@@ -12,15 +12,7 @@ import PortalEndpoints from './portal/PortalEndpoints';
 import PortalDeliveries from './portal/PortalDeliveries';
 import { WRAP, panel } from './landing/primitives';
 
-/**
- * The customer portal: what a Railhook customer embeds in their own product so that their user —
- * a Consumer — can register Endpoints, choose what they receive, and see why a Delivery failed.
- *
- * It stands outside the dashboard entirely. There is no Railhook user here and no dashboard
- * session: the one credential is the portal session token the customer's backend put in the
- * URL's fragment. It is taken out of the address bar on the first render, so it does not linger
- * in history, a bookmark or a screenshot, and held in memory only.
- */
+/** The token is taken out of the URL fragment on first render so it stays out of history and screenshots. */
 
 type Tab = 'endpoints' | 'deliveries';
 
@@ -58,9 +50,7 @@ function useBranding(params: PortalParams) {
   }, [params.theme]);
   useEffect(() => {
     if (!params.lang || i18n.language === params.lang) return;
-    // i18next caches whatever it switches to as this origin's language, which is the dashboard's
-    // preference too: a customer's `lang` must not change the language a Railhook user signs
-    // in to next. The previous choice is put back once the switch has been cached.
+    // A customer's lang must not change the language a Railhook user signs in to next.
     let previous: string | null = null;
     try {
       previous = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -76,8 +66,7 @@ function useBranding(params: PortalParams) {
       }
     });
   }, [params.lang, i18n]);
-  // On the document rather than the page's wrapper: dialogs and sheets render in a portal at the
-  // end of <body>, outside anything the wrapper's variables would reach.
+  // On the document: dialogs render in a portal outside the wrapper's variables.
   useEffect(() => {
     if (!params.primary) return undefined;
     const root = document.documentElement;
@@ -92,7 +81,7 @@ function Notice({ icon: Icon, title, description }: { icon: React.ElementType; t
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className={cn(panel(), 'w-full max-w-md p-7 text-center')} role="alert">
         <Icon className="mx-auto mb-3 h-6 w-6 text-muted-foreground" aria-hidden />
-        <h1 className="font-display text-lg font-bold tracking-[-0.02em]">{title}</h1>
+        <h1 className="text-lg font-medium tracking-[-0.02em]">{title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{description}</p>
       </div>
     </div>
@@ -106,8 +95,7 @@ export default function PortalPage() {
   const [expired, setExpired] = useState(false);
   const [tab, setTab] = useState<Tab>('endpoints');
 
-  // The shell's static title is the landing page's; inside someone else's product that reads as
-  // an advert in the browser's tab strip.
+  // The shell's static title is the landing page's, which reads as an advert inside another product.
   useEffect(() => {
     document.title = t('portal.title');
   }, [t]);
@@ -169,12 +157,12 @@ export default function PortalPage() {
           {params.logo ? (
             <img src={params.logo} alt="" className="h-8 max-w-[160px] object-contain" referrerPolicy="no-referrer" />
           ) : (
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-rail bg-card">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center border border-rail bg-card">
               <Webhook className="h-4 w-4 text-primary" aria-hidden />
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="truncate font-display text-[1.45rem] font-bold leading-tight tracking-[-0.025em]">
+            <h1 className="truncate text-[1.45rem] font-medium leading-tight tracking-[-0.025em]">
               {t('portal.title')}
             </h1>
             <p className="truncate text-sm text-muted-foreground">

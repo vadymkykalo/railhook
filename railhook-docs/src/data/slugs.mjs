@@ -1,13 +1,3 @@
-/**
- * The docs slug contract: every page the site is meant to have, in sidebar order.
- *
- * The sidebar in `astro.config.mjs` is built from this list. A page is added by adding its
- * slug here and writing `src/content/docs/<slug>.mdx` plus `src/content/docs/uk/<slug>.mdx`.
- *
- * `index` and `api-reference` are not in a group: `index` is the docs home, reached from
- * the site title, and `api-reference` is a custom Astro page (Scalar), not a content entry.
- */
-
 /** @typedef {{ label: string, uk: string, slugs: string[] }} SidebarGroup */
 
 /** @type {SidebarGroup[]} */
@@ -115,8 +105,6 @@ export const SIDEBAR_GROUPS = [
   },
 ];
 
-/** The API reference: a custom page, so it is addressed by path rather than by content slug. */
 export const API_REFERENCE = { slug: 'api-reference', label: 'API reference', uk: 'Довідник API' };
 
-/** Every slug in the contract, the docs home and the API reference included. */
 export const CONTRACT_SLUGS = ['index', ...SIDEBAR_GROUPS.flatMap((g) => g.slugs), API_REFERENCE.slug];

@@ -17,14 +17,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-/**
- * The outbox depth gauge as Prometheus reads it: on the management port's request thread, which
- * no TenantContextFilter has touched.
- *
- * <p>Every scrape in production logged "Failed to apply the value function for the gauge
- * 'outbox_queue_depth'" and exported NaN, because the count ran with no tenant scope and the
- * resolver refused it. The OutboxSendingStuck alert reads this gauge, so it could never fire.
- */
 public class OutboxQueueDepthGaugeIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired

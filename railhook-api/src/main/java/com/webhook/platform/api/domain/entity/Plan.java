@@ -70,7 +70,6 @@ public class Plan {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    /** Returns true if the given limit value means "unlimited" (-1). */
     public boolean isUnlimited(long value) {
         return value == -1;
     }

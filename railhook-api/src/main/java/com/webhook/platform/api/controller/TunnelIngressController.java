@@ -27,10 +27,6 @@ import java.util.UUID;
 
 import static com.webhook.platform.api.filter.IngressRawBodyFilter.rawBody;
 
-/**
- * Public endpoint for requests destined for a CLI tunnel. The request goes out over the WebSocket
- * the CLI holds open, and the CLI's answer comes back as this response.
- */
 @RestController
 @RequestMapping("/tunnel")
 @Tag(name = "Tunnel Ingress", description = "Public tunnel ingress endpoints")
@@ -43,7 +39,6 @@ public class TunnelIngressController {
     @RequestMapping(value = {"/{slug}", "/{slug}/**"}, method = {RequestMethod.GET, RequestMethod.POST,
             RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE, RequestMethod.HEAD, RequestMethod.OPTIONS})
     @Operation(summary = "Tunnel ingress", description = "Forward request through CLI tunnel to local application")
-    // Documented as the String it used to be bound as: the wire format is unchanged.
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             content = @Content(mediaType = "application/json", schema = @Schema(type = "string")))
     @ApiResponse(responseCode = "200", description = "OK",
@@ -51,10 +46,7 @@ public class TunnelIngressController {
     public ResponseEntity<byte[]> handleTunnelRequest(
             @PathVariable("slug") String slug,
             HttpServletRequest request) throws IOException {
-        // Bytes, not @RequestBody String: for a form POST Spring rebuilds that String from parsed
-        // parameters, and any String is a decoding — either way the developer's app, checking a
-        // provider's signature, was handed bytes the provider never sent. IngressRawBodyFilter
-        // kept the original.
+        // Raw bytes, not a String: the local app verifies the provider's signature over them.
         byte[] body = rawBody(request);
 
         TunnelIngressService.Outcome outcome =
@@ -80,8 +72,7 @@ public class TunnelIngressController {
         return switch (refused.error()) {
             case "rate_limit_exceeded" -> HttpStatus.TOO_MANY_REQUESTS;
             case "payload_too_large" -> HttpStatus.PAYLOAD_TOO_LARGE;
-            // Temporarily unavailable, not a broken upstream: a 502 is replaced by a CDN's own
-            // error page, and providers retry a 503.
+            // A CDN replaces a 502 with its own page, and providers retry a 503.
             case "tunnel_offline" -> HttpStatus.SERVICE_UNAVAILABLE;
             case "tunnel_suspended" -> HttpStatus.FORBIDDEN;
             default -> HttpStatus.BAD_GATEWAY;
@@ -102,17 +93,7 @@ public class TunnelIngressController {
                 .build();
     }
 
-    /**
-     * The part of the request URI that belongs to the developer's own service, with this
-     * tunnel's prefix removed.
-     *
-     * <p>Plain string work, not {@code replaceFirst}. That method takes a <em>regex</em>, and
-     * the slug arrives in the path of an endpoint anyone on the internet can call: a slug
-     * carrying regex metacharacters either strips the wrong span (a {@code .} matches any
-     * character), throws {@link java.util.regex.PatternSyntaxException} out of a request
-     * handler, or hands a stranger the ability to choose a pattern that backtracks. None of
-     * that is what the line was for - it only ever wanted "drop this prefix".
-     */
+    // Not replaceFirst: the slug is caller-controlled and would be read as a regex.
     private static String pathAfterSlug(String uri, String slug) {
         String prefix = "/tunnel/" + slug;
         return uri.startsWith(prefix) ? uri.substring(prefix.length()) : uri;
@@ -139,8 +120,6 @@ public class TunnelIngressController {
                 }
             });
         }
-        // The local app's bytes, not a string re-encoded here: a gzip, an image, or text in a
-        // charset other than the one this side would have picked reaches the caller unchanged.
         return ResponseEntity.status(response.getStatusCode()).headers(headers).body(response.bodyBytes());
     }
 

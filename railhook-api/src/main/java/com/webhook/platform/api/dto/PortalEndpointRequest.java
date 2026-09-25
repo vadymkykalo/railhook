@@ -13,11 +13,8 @@ import org.hibernate.validator.constraints.URL;
 import java.util.List;
 
 /**
- * An Endpoint as a Consumer describes it from the portal: where to send, and what.
- *
- * <p>Deliberately narrower than {@link EndpointRequest}. The rate limit, the source-address
- * allow-list, mTLS and the signing scheme are the customer's operational decisions, not their
- * user's. Absent fields leave the Endpoint alone on update, as {@link EndpointRequest} does.
+ * Narrower than {@link EndpointRequest} on purpose: rate limit, allow-list, mTLS and signing are
+ * the customer's decisions, not their user's.
  */
 @Data
 @NoArgsConstructor

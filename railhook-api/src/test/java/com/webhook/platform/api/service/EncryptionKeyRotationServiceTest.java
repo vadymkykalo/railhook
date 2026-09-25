@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -60,14 +61,12 @@ class EncryptionKeyRotationServiceTest {
         registry = buildRegistry("", "1:" + KEY_V1 + ",2:" + KEY_V2, 2, SALT);
         meterRegistry = new SimpleMeterRegistry();
 
-        // TransactionTemplate that just executes the callback directly
         TransactionTemplate txTemplate = mock(TransactionTemplate.class);
         lenient().doAnswer(inv -> {
-            inv.<java.util.function.Consumer<TransactionStatus>>getArgument(0).accept(null);
+            inv.<Consumer<TransactionStatus>>getArgument(0).accept(null);
             return null;
         }).when(txTemplate).executeWithoutResult(any());
 
-        // LockProvider that always grants the lock
         SimpleLock simpleLock = mock(SimpleLock.class);
         LockProvider lockProvider = mock(LockProvider.class);
         lenient().when(lockProvider.lock(any(LockConfiguration.class))).thenReturn(Optional.of(simpleLock));
@@ -153,7 +152,6 @@ class EncryptionKeyRotationServiceTest {
             assertThat(saved.getEncryptionKeyVersion()).isEqualTo(2);
             assertThat(saved.getSecretEncrypted()).isNotEqualTo(secret.getCiphertext());
 
-            // Verify the re-encrypted data actually decrypts to original value
             String decrypted = CryptoUtils.decryptSecret(
                     saved.getSecretEncrypted(), saved.getSecretIv(), KEY_V2, SALT);
             assertThat(decrypted).isEqualTo("my-secret");
@@ -324,7 +322,6 @@ class EncryptionKeyRotationServiceTest {
 
         @Test
         void countsErrorsAndContinues() {
-            // Endpoint with garbage encrypted data — will fail to decrypt
             Endpoint badEndpoint = Endpoint.builder()
                     .id(UUID.randomUUID())
                     .projectId(UUID.randomUUID())
@@ -391,7 +388,6 @@ class EncryptionKeyRotationServiceTest {
 
         @Test
         void throwsWhenLockNotAcquired() throws Exception {
-            // LockProvider that never grants the lock
             LockProvider noLockProvider = mock(LockProvider.class);
             when(noLockProvider.lock(any(LockConfiguration.class))).thenReturn(Optional.empty());
             LockingTaskExecutor noopLockExecutor = new DefaultLockingTaskExecutor(noLockProvider);

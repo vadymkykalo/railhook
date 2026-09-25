@@ -9,12 +9,6 @@ import { membersApi } from '../../api/members.api';
 import { queryKeys } from '../../api/queries';
 import { createTestQueryClient } from '../../test/renderPage';
 
-/**
- * Accepting an invite is what puts someone inside another organization, so the case that
- * matters most is the one where it must *not* happen: no token, no organization, or nobody
- * signed in to accept as. A screen that called the endpoint anyway would be asking the backend
- * to decide something the URL had already got wrong.
- */
 describe('AcceptInvitePage', () => {
   let queryClient = createTestQueryClient();
 
@@ -88,7 +82,6 @@ describe('AcceptInvitePage', () => {
     renderAt('?token=the-token&orgId=org-1', false);
 
     await waitFor(() => expect(accept).not.toHaveBeenCalled());
-    // And is given the way to do it, with this page as the destination.
     expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
   });
 

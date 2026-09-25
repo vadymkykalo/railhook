@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.List;
 
-/** What the portal needs to know about the session it is running in. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

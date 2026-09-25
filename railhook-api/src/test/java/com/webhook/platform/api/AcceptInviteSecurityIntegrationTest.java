@@ -23,14 +23,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/**
- * Regression tests for P0 security fix: accept-invite must validate
- * both orgId (from path) and authenticated userId against the invite token.
- *
- * Strategy: register real users (each gets their own org + userId via JWT),
- * then create INVITED memberships directly via repository to control the
- * exact invite token, orgId, and userId.
- */
 @AutoConfigureMockMvc
 public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest {
 
@@ -72,10 +64,6 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
         return new UserContext(auth, me);
     }
 
-    /**
-     * Create an INVITED membership directly in DB with a known invite token hash.
-     * Returns the plaintext token (what the user receives via email).
-     */
     private String createInvitedMembership(UUID userId, UUID orgId) {
         String inviteToken = "test-invite-" + UUID.randomUUID();
         String tokenHash = CryptoUtils.hashApiKey(inviteToken);
@@ -93,18 +81,14 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
 
     @Test
     public void testAcceptInvite_wrongUser_returns403() throws Exception {
-        // Owner registers → creates OrgA
         UserContext owner = registerUser("sec-owner1@test.com", "SecOrg1");
         UUID orgId = owner.currentUser().getOrganization().getId();
 
-        // Invitee registers → gets a userId
         UserContext invitee = registerUser("sec-invitee1@test.com", "InviteeOrg1");
         UUID inviteeUserId = invitee.currentUser().getUser().getId();
 
-        // Create invite membership: invitee is invited to OrgA
         String inviteToken = createInvitedMembership(inviteeUserId, orgId);
 
-        // Attacker: different user tries to accept
         UserContext attacker = registerUser("sec-attacker1@test.com", "AttackerOrg1");
 
         mockMvc.perform(post("/api/v1/orgs/" + orgId + "/members/accept-invite")
@@ -112,7 +96,6 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
                         .header("Authorization", "Bearer " + attacker.auth().getAccessToken()))
                 .andExpect(status().isForbidden());
 
-        // Verify not compromised
         String tokenHash = CryptoUtils.hashApiKey(inviteToken);
         Membership m = membershipRepository.findByInviteTokenHash(tokenHash).orElseThrow();
         assertEquals(MembershipStatus.INVITED, m.getStatus());
@@ -120,25 +103,20 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
 
     @Test
     public void testAcceptInvite_wrongOrgId_returns403() throws Exception {
-        // Owner registers → creates OrgA
         UserContext owner = registerUser("sec-owner2@test.com", "SecOrg2");
         UUID orgId = owner.currentUser().getOrganization().getId();
 
-        // Invitee registers → gets own OrgB
         UserContext invitee = registerUser("sec-invitee2@test.com", "InviteeOrg2");
         UUID inviteeUserId = invitee.currentUser().getUser().getId();
         UUID wrongOrgId = invitee.currentUser().getOrganization().getId();
 
-        // Create invite: invitee invited to OrgA
         String inviteToken = createInvitedMembership(inviteeUserId, orgId);
 
-        // Try to accept with wrong orgId (invitee's own org)
         mockMvc.perform(post("/api/v1/orgs/" + wrongOrgId + "/members/accept-invite")
                         .param("token", inviteToken)
                         .header("Authorization", "Bearer " + invitee.auth().getAccessToken()))
                 .andExpect(status().isForbidden());
 
-        // Verify not compromised
         String tokenHash = CryptoUtils.hashApiKey(inviteToken);
         Membership m = membershipRepository.findByInviteTokenHash(tokenHash).orElseThrow();
         assertEquals(MembershipStatus.INVITED, m.getStatus());
@@ -154,7 +132,6 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
 
         String inviteToken = createInvitedMembership(inviteeUserId, orgId);
 
-        // Completely fabricated orgId
         mockMvc.perform(post("/api/v1/orgs/" + UUID.randomUUID() + "/members/accept-invite")
                         .param("token", inviteToken)
                         .header("Authorization", "Bearer " + invitee.auth().getAccessToken()))
@@ -171,7 +148,6 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
 
         String inviteToken = createInvitedMembership(inviteeUserId, orgId);
 
-        // Correct user + correct org → should succeed
         mockMvc.perform(post("/api/v1/orgs/" + orgId + "/members/accept-invite")
                         .param("token", inviteToken)
                         .header("Authorization", "Bearer " + invitee.auth().getAccessToken()))
@@ -179,17 +155,12 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.role").value("DEVELOPER"));
 
-        // Token hash should be cleared after acceptance
         String tokenHash = CryptoUtils.hashApiKey(inviteToken);
         assertFalse(membershipRepository.findByInviteTokenHash(tokenHash).isPresent(),
                 "Invite token hash should be cleared after acceptance");
     }
 
-    /**
-     * With {@code app.email.enabled=false} — the shipped default, and what these tests
-     * run under — nothing is mailed, so the link returned to the inviting owner is the
-     * only copy of the invite that exists. It has to be the real token.
-     */
+    // Email is off here, so the returned link is the only copy of the invite.
     @Test
     public void testInviteResponseCarriesAWorkingLinkAndTheListingDoesNot() throws Exception {
         UserContext owner = registerUser("link-owner@test.com", "LinkOrg");
@@ -206,8 +177,7 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
                 .orElseThrow(() -> new AssertionError("the returned link does not carry the stored token"));
         assertEquals(invited.getUserId(), membership.getUserId());
 
-        // The listing is readable by every member of the organization, so it carries the
-        // expiry and never the link. This is the leak the token was moved out of.
+        // Every member can read the listing, so it carries the expiry and never the link.
         mockMvc.perform(get("/api/v1/orgs/" + orgId + "/members")
                         .header("Authorization", "Bearer " + owner.auth().getAccessToken()))
                 .andExpect(status().isOk())
@@ -243,7 +213,6 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
                 "re-issuing restarts the expiry");
     }
 
-    /** Invites {@code email} into {@code orgId} as a DEVELOPER, as the owner would. */
     private MemberResponse addMember(UserContext owner, UUID orgId, String email) throws Exception {
         AddMemberRequest request = AddMemberRequest.builder()
                 .email(email)
@@ -260,7 +229,6 @@ public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest
         return objectMapper.readValue(result.getResponse().getContentAsString(), MemberResponse.class);
     }
 
-    /** The token out of an accept-invite URL, as the invitee's browser would send it. */
     private String tokenOf(String inviteUrl) {
         return UriComponentsBuilder.fromUriString(inviteUrl).build()
                 .getQueryParams().getFirst("token");

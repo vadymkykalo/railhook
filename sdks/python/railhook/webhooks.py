@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 from .types import WebhookEvent
 from .errors import RailhookError
 
-DEFAULT_TOLERANCE_MS = 300000  # 5 minutes
+DEFAULT_TOLERANCE_MS = 300000
 
 # The Standard Webhooks headers carry seconds, not milliseconds.
 DEFAULT_STANDARD_TOLERANCE_SECONDS = 300
@@ -22,37 +22,26 @@ def verify_signature(
     tolerance_ms: int = DEFAULT_TOLERANCE_MS,
 ) -> bool:
     """
-    Verify webhook signature using HMAC-SHA256.
-
-    The header is ``t=<unix-ms>,v1=<hex>`` and may carry more than one ``v1``.
-    After you rotate an endpoint's secret, Railhook signs each delivery with both
-    the new secret and the retired one for the endpoint's grace window (24 hours
-    by default), so the new secret can be deployed whenever you like rather than
-    at the instant you press rotate. The delivery is authentic if *any* ``v1``
-    matches.
+    Verify an ``X-Signature`` header (``t=<unix-ms>,v1=<hex>[,v1=...]``); during a secret
+    rotation any one ``v1`` matching is enough.
 
     Args:
-        payload: Raw request body as string
-        signature: X-Signature header value (format: t=timestamp,v1=signature[,v1=...])
+        payload: Raw request body
+        signature: X-Signature header value
         secret: Endpoint webhook secret
-        tolerance_ms: Maximum age of signature in milliseconds
-
-    Returns:
-        True if signature is valid
+        tolerance_ms: Maximum age of the signature in milliseconds
 
     Raises:
-        RailhookError: If signature is invalid or expired
+        RailhookError: If the signature is invalid or expired
     """
     if not signature:
         raise RailhookError(
             "Missing signature header", 400, "invalid_signature"
         )
 
-    # Parse signature
     timestamp: Optional[str] = None
-    # Collected, not overwritten: a header sent during a secret rotation carries one
-    # v1 per valid secret, and keeping only the last would reject whichever of the
-    # pair the receiver is currently holding.
+    # Collected, not overwritten: during a rotation keeping only the last v1 would reject
+    # whichever secret the receiver currently holds.
     signatures: list[str] = []
 
     for part in signature.split(","):
@@ -89,7 +78,6 @@ def verify_signature(
             "timestamp_expired",
         )
 
-    # Verify signature
     signed_payload = f"{timestamp}.{payload}"
     expected_signature = hmac.new(
         secret.encode("utf-8"),
@@ -97,9 +85,8 @@ def verify_signature(
         hashlib.sha256,
     ).hexdigest()
 
-    # Every candidate is compared, with no early exit, so the time taken does not
-    # depend on which position matched. As bytes: compare_digest raises TypeError on a
-    # non-ASCII str, and the header is whatever the sender chose to put in it.
+    # No early exit, so timing does not reveal which candidate matched. As bytes, because
+    # compare_digest raises TypeError on a non-ASCII str and the header is sender-controlled.
     matched = False
     expected_bytes = expected_signature.encode("utf-8")
     for candidate in signatures:
@@ -118,30 +105,18 @@ def verify_standard_webhook(
     secret: str,
     tolerance_seconds: int = DEFAULT_STANDARD_TOLERANCE_SECONDS,
 ) -> bool:
-    """Verify the `Standard Webhooks <https://www.standardwebhooks.com>`_ headers.
+    """Verify the Standard Webhooks headers (``webhook-id``, ``-timestamp``, ``-signature``).
 
-    Endpoints receive both header sets by default (``signatureScheme: "BOTH"``), so use
-    whichever suits you — this one if you would rather verify the same way as other
-    providers you integrate with, :func:`verify_signature` if you already verify
-    ``X-Signature``.
-
-    Two things differ from Railhook's own scheme beyond the header names: the message id is
-    part of what is signed, and the digest is base64 rather than hex. Rotation behaves the
-    same — through the grace window the header carries a space-separated signature per valid
-    secret, and any one matching is enough.
+    During a rotation's grace window any one matching signature is enough.
 
     Args:
         payload: the raw request body.
-        headers: the request headers, including the three ``webhook-*`` ones.
-        secret: the endpoint's ``standardWebhooksSecret`` (``whsec_…``). A raw secret is
-            accepted too and used as-is.
+        headers: the request headers.
+        secret: the endpoint's ``standardWebhooksSecret`` (``whsec_…``); a raw secret is used as-is.
         tolerance_seconds: how far the timestamp may be from now, either way.
 
-    Returns:
-        True if the signature is valid.
-
     Raises:
-        RailhookError: if it is not.
+        RailhookError: if the signature is invalid or expired.
     """
     lowered = {str(k).lower(): v for k, v in headers.items()}
     message_id = lowered.get("webhook-id")
@@ -165,9 +140,6 @@ def verify_standard_webhook(
             "Webhook timestamp is outside tolerance window", 400, "timestamp_expired"
         )
 
-    # ``whsec_<base64>`` is the conventional form, and is what the endpoint's
-    # standardWebhooksSecret gives you: the base64 body decodes to the key bytes. Anything
-    # else is taken literally, so a raw secret still works.
     if secret.startswith("whsec_"):
         key = base64.b64decode(secret[len("whsec_") :])
     else:
@@ -176,9 +148,8 @@ def verify_standard_webhook(
     signed_content = f"{message_id}.{timestamp_seconds}.{payload}".encode("utf-8")
     expected = base64.b64encode(hmac.new(key, signed_content, hashlib.sha256).digest()).decode()
 
-    # Space-separated, one per valid secret during a rotation window. Every candidate is
-    # compared with no early exit, so the time taken does not reveal which one matched.
-    # As bytes, because compare_digest raises TypeError on a non-ASCII str.
+    # No early exit, so timing does not reveal which candidate matched. As bytes, because
+    # compare_digest raises TypeError on a non-ASCII str.
     matched = False
     expected_bytes = expected.encode("utf-8")
     for part in str(signature).strip().split():
@@ -201,32 +172,18 @@ def construct_event(
     tolerance_ms: int = DEFAULT_TOLERANCE_MS,
 ) -> WebhookEvent:
     """
-    Construct a webhook event from request, verifying signature.
-
-    What Railhook actually POSTs on the wire is the event's **payload**, not an
-    envelope: a ``client.events.send(Event(type="order.completed", data={...}))``
-    arrives at your endpoint as the ``data`` object alone, with the identifiers
-    carried in headers (``X-Event-Id``, ``X-Delivery-Id``, ``X-Timestamp``,
-    ``X-Sequence-Number``). So ``event_id`` / ``delivery_id`` / ``timestamp``
-    are always populated for a real delivery and ``data`` is the parsed body,
-    but ``type`` is only populated when the body itself carries a ``type`` key
-    — which for a default subscription it does not. Route on the payload, or
-    configure the subscription's ``payload_template`` to wrap the event so that
-    ``type`` becomes part of the body.
+    Verify the request and parse it into a WebhookEvent. ``type`` is set only when the body
+    carries a ``type`` key; ids come from the headers.
 
     Args:
-        payload: Raw request body as string
-        headers: Request headers (case-insensitive dict)
+        payload: Raw request body
+        headers: Request headers, any case
         secret: Endpoint webhook secret
-        tolerance_ms: Maximum age of signature in milliseconds
-
-    Returns:
-        Parsed and verified WebhookEvent
+        tolerance_ms: Maximum age of the signature in milliseconds
 
     Raises:
-        RailhookError: If signature is invalid or payload is malformed
+        RailhookError: If the signature is invalid or the payload is malformed
     """
-    # Get headers (case-insensitive)
     headers_lower = {k.lower(): v for k, v in headers.items()}
 
     signature = headers_lower.get("x-signature", "")
@@ -241,7 +198,6 @@ def construct_event(
 
     verify_signature(payload, signature, secret, tolerance_ms)
 
-    # Parse payload
     import json
 
     try:
@@ -263,17 +219,7 @@ def generate_signature(
     secret: str,
     timestamp_ms: Optional[int] = None,
 ) -> str:
-    """
-    Generate a signature for testing purposes.
-
-    Args:
-        payload: Request body as string
-        secret: Webhook secret
-        timestamp_ms: Optional timestamp in milliseconds (defaults to now)
-
-    Returns:
-        Signature string in format t=timestamp,v1=signature
-    """
+    """Build an ``X-Signature`` value (``t=<ms>,v1=<hex>``) for tests; the timestamp defaults to now."""
     ts = timestamp_ms or int(time.time() * 1000)
     signed_payload = f"{ts}.{payload}"
     signature = hmac.new(

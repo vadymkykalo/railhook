@@ -6,11 +6,6 @@ import ProtectedRoute, { hasMinRole } from '../ProtectedRoute';
 import { AuthContext, type AuthState } from '../auth.store';
 import type { CurrentUserResponse } from '../../types/api.types';
 
-/**
- * The gate in front of every admin route, and until now the least tested code in the app.
- * What it decides is who sees what, so the cases below are the ones where being wrong is not
- * a cosmetic bug: an unauthenticated visitor reaching a page, or a Viewer reaching an Owner's.
- */
 describe('ProtectedRoute', () => {
   function authState(overrides: Partial<AuthState> & { role?: string } = {}): AuthState {
     const { role, ...rest } = overrides;
@@ -80,8 +75,7 @@ describe('ProtectedRoute', () => {
   });
 
   it('treats a user whose role is missing as the least privileged', () => {
-    // A session restored from an older shape, or a backend that stopped sending it. Defaulting
-    // upwards here would hand an Owner's screens to whoever had the gap.
+    // Defaulting upwards would hand an Owner's screens to whoever had the gap.
     const state = authState({ role: 'OWNER' });
     (state.user as unknown as { role?: string }).role = undefined;
 

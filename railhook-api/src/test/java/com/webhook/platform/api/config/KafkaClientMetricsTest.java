@@ -7,13 +7,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The outbox producer's own Kafka client metrics — record send rate, queue time, batch size,
- * connections — reach the registry Prometheus scrapes.
- *
- * <p>Spring only times the KafkaTemplate call; the client's metrics exist only when a Micrometer
- * listener is on the factory. Without one every panel of the Kafka dashboard was empty.
- */
+// Client metrics exist only with a Micrometer listener on the factory.
 class KafkaClientMetricsTest {
 
     @Test

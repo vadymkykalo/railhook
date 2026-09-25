@@ -66,13 +66,12 @@ public class IncomingDestination {
     @Builder.Default
     private String retryDelays = RetryLadderDefaults.INCOMING_DELAYS;
 
-    /** Which HTTP statuses are worth another Attempt; the default is what both directions used
-     * to hardcode. Unlike the ladder, this does not differ by direction. */
+    /** Unlike the retry ladder, this default is the same in both directions. */
     @Column(name = "retryable_statuses", nullable = false, columnDefinition = "TEXT")
     @Builder.Default
     private String retryableStatuses = RetryableStatuses.DEFAULT_SPEC;
 
-    /** @see Endpoint#getFailingSince() — the same four columns, kept by the same seam. */
+    /** Same four columns as on Endpoint, maintained by the same code. */
     @Column(name = "failing_since")
     private Instant failingSince;
 

@@ -28,12 +28,6 @@ import Callout from '../components/Callout';
 
 const QUICK_RANGES = ['1h', '6h', '24h', '7d', 'custom'] as const;
 
-/**
- * A replay session is an action taken over a selection of events, so it borrows
- * the same four status meanings everything else uses rather than inventing a
- * palette: running is an attempt still owed, completed is delivered, failed is
- * abandoned, cancelled is nothing tried.
- */
 function kindOfReplayStatus(status: string): StatusKind {
   switch (status) {
     case 'COMPLETED': return 'ok';
@@ -219,7 +213,7 @@ export default function ReplayPage() {
     return (
       <PageSkeleton maxWidth="max-w-none">
         <SkeletonCards count={3} height="h-20" cols="grid-cols-3" />
-        <div className="h-[300px] animate-pulse rounded-xl bg-muted" />
+        <div className="h-[300px] animate-pulse bg-muted" />
       </PageSkeleton>
     );
   }
@@ -234,7 +228,7 @@ export default function ReplayPage() {
       />
 
       <PermissionGate allowed={canReplayDeliveries}>
-        <section className="mb-8 rounded-lg border border-rail bg-card p-4">
+        <section className="mb-8 border border-rail bg-card p-4">
           <h3 className="mono-label mb-3">{t('replay.selection')}</h3>
 
           <div className="mb-3 flex flex-wrap gap-1.5">
@@ -290,7 +284,7 @@ export default function ReplayPage() {
                 { label: t('replay.estimate_result.estimatedDeliveries'), value: estimate.estimatedDeliveries },
                 { label: t('replay.estimate_result.activeSubscriptions'), value: estimate.activeSubscriptions },
               ].map((metric) => (
-                <div key={metric.label} className="rounded-lg border border-rail px-4 py-3">
+                <div key={metric.label} className="border border-rail px-4 py-3">
                   <dt className="mono-label">{metric.label}</dt>
                   <dd className="mt-1 font-mono text-2xl">{metric.value.toLocaleString()}</dd>
                 </div>
@@ -343,7 +337,7 @@ export default function ReplayPage() {
           docsLink="outgoing/replay"
         />
       ) : (
-        <div className="animate-fade-in overflow-hidden rounded-lg border border-rail bg-card">
+        <div className="animate-fade-in overflow-hidden border border-rail bg-card">
           <Table>
             <TableHeader>
               <TableRow>
@@ -387,9 +381,9 @@ export default function ReplayPage() {
                     </TableCell>
                     <TableCell>
                       <span className="flex flex-col gap-1">
-                        <span className="h-1.5 w-24 overflow-hidden rounded-full bg-secondary">
+                        <span className="h-1.5 w-24 overflow-hidden bg-secondary">
                           <span
-                            className={`block h-full rounded-full ${session.status === 'COMPLETED' ? 'bg-ok' : 'bg-primary'}`}
+                            className={`block h-full ${session.status === 'COMPLETED' ? 'bg-ok' : 'bg-primary'}`}
                             style={{ width: `${Math.min(session.progressPercent ?? 0, 100)}%` }}
                           />
                         </span>

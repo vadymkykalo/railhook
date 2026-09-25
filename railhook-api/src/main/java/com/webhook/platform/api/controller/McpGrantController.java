@@ -21,10 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * The MCP apps connected to a project over OAuth, listed and revoked next to its API keys — they
- * are the same kind of credential, and managed by the same people.
- */
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/mcp-grants")
 @Tag(name = "MCP apps", description = "Connecting AI apps to a project over OAuth, for the MCP server")
@@ -56,7 +52,6 @@ public class McpGrantController {
     public ResponseEntity<Void> revokeMcpGrant(@PathVariable("projectId") UUID projectId,
                                                @PathVariable("grantId") UUID grantId,
                                                AuthContext auth) {
-        // As for API keys: managing credentials takes a signed-in person.
         auth.requireJwt();
         auth.requireWriteAccess();
         oauthService.revokeGrant(projectId, grantId, auth.requireUserId());

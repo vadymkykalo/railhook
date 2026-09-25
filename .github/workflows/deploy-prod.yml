@@ -1,24 +1,5 @@
-# Puts a released version on the production host.
-#
-# Manual on purpose. The repository is public, so anything that fires on a tag or a
-# release fires on something a stranger can see coming and nobody has looked at twice.
-# Deploying is the one action here that is not reversible by reverting a commit — it
-# runs migrations, and Flyway is forward-only in this project.
-#
-# Three gates, none of which is the workflow trusting itself:
-#   - workflow_dispatch, which only someone with write access can start;
-#   - the `production` environment, which requires a named reviewer to approve the run
-#     before any secret is readable;
-#   - and the key at the far end, which is forced to /usr/local/bin/railhook-deploy and
-#     can run `deploy <vX.Y.Z>` and `status` and nothing else. It cannot read .env, it
-#     cannot open a shell, and a version that is not a plain tag is refused before the
-#     host acts on it.
-#
-# Production settings live in Settings → Environments → production, not in a shell on the
-# host: a variable (or, for anything sensitive, a secret) named DOTENV_<NAME> becomes
-# NAME=value in /opt/railhook/.env on every deploy. To change one, edit it there and run this
-# workflow again — the version already deployed is fine. The encryption key and salt, JWT and
-# database passwords stay on the host; the helper refuses them.
+# Manual on purpose: the repository is public and a deploy runs forward-only migrations.
+# DOTENV_<NAME> variables and secrets of the production environment become NAME=value in the host's .env.
 name: Deploy to production
 
 on:
@@ -30,8 +11,7 @@ on:
         type: string
 
 concurrency:
-  # Two deploys at once would race each other's migrations. Queue rather than cancel:
-  # a half-applied upgrade is worse than a slow one.
+  # Queue, never cancel: a half-applied upgrade is worse than a slow one.
   group: deploy-production
   cancel-in-progress: false
 
@@ -56,8 +36,7 @@ jobs:
             echo "::error::'$VERSION' is not a vX.Y.Z tag."
             exit 1
           fi
-          # Deploying a tag whose images were never published leaves the host pulling
-          # something that does not exist, after it has already taken its backup.
+          # A tag without images would leave the host pulling nothing after its backup.
           if ! gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::$VERSION has no GitHub release. Publish it first."
             exit 1
@@ -70,12 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="${VERSION#v}"
-          # Asked of the registry directly rather than through `docker manifest inspect`.
-          # That command answers "no such manifest" for an image that is plainly there
-          # whenever the daemon has no credentials for the host — indistinguishable, from
-          # here, from the image genuinely being missing. This step exists to tell those
-          # two apart before the host is touched, so it must not be the thing that
-          # confuses them.
+          # Not `docker manifest inspect`: without credentials it reports a present image as missing.
           for image in api worker ui; do
             repo="vadymkykalo/railhook-${image}"
             token=$(curl -fsSL "https://ghcr.io/token?scope=repository:${repo}:pull&service=ghcr.io" | jq -r .token)
@@ -98,26 +72,20 @@ jobs:
           set -euo pipefail
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
-          # Pinned rather than accept-new: this runs unattended, so there is nobody to
-          # notice a host key that changed.
+          # Pinned rather than accept-new: runs unattended.
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 600 ~/.ssh/known_hosts
 
       - name: Collect the production settings
         env:
           VARS_JSON: ${{ toJSON(vars) }}
-          # Sensitive settings, named one by one. Serialising the whole secrets context put the SSH
-          # deploy key and every other secret of the repository into this step's environment only
-          # for jq to drop them again; a step should hold the secrets it sends and nothing more. A new
-          # sensitive setting is a DOTENV_<NAME> secret in the environment plus a line here.
+          # Named one by one so the step holds only the secrets it sends; a new one needs a line here.
           DOTENV_CAPTCHA_SECRET_KEY: ${{ secrets.DOTENV_CAPTCHA_SECRET_KEY }}
           DOTENV_SMTP_PASSWORD: ${{ secrets.DOTENV_SMTP_PASSWORD }}
           DOTENV_GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.DOTENV_GOOGLE_OAUTH_CLIENT_SECRET }}
           SETTINGS_FILE: ${{ runner.temp }}/production-settings.env
         run: |
           set -euo pipefail
-          # Every DOTENV_<NAME> variable of this environment and every named DOTENV_ secret above,
-          # as NAME=value. A secret wins over a variable of the same name; an unset secret is
-          # skipped rather than sent as an empty value.
+          # A secret wins over a variable of the same name; an unset secret is skipped.
           umask 077
           SECRETS_JSON=$(jq -n 'env | with_entries(select((.key | startswith("DOTENV_")) and .value != ""))')
           export SECRETS_JSON
@@ -135,7 +103,7 @@ jobs:
             echo "::error::$(sed 's/^jq: error[^:]*: //' "$RUNNER_TEMP/settings.err")"
             exit 1
           fi
-          # Names only. Values stay out of the log, secrets and variables alike.
+          # Names only: values stay out of the log.
           if [ -s "$SETTINGS_FILE" ]; then
             echo "Settings sent with this deploy:"
             cut -d= -f1 "$SETTINGS_FILE" | sed 's/^/  /'
@@ -151,11 +119,7 @@ jobs:
         run: |
           set -euo pipefail
           trap 'rm -f "$SETTINGS_FILE"' EXIT
-          # The command is ignored by the host — it is forced — so this string is only
-          # ever read as an argument by railhook-deploy. Its stdin is not: railhook-deploy
-          # runs `./railhook upgrade`, which applies these settings to .env before anything
-          # else, and refuses the whole upgrade if one of them is not allowed. It takes a
-          # backup before it migrates, and refuses to continue if that backup fails.
+          # The host forces the command, so this string is only an argument; stdin carries the settings.
           ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes \
               "root@${HOST}" "deploy ${VERSION}" < "$SETTINGS_FILE"
 
@@ -168,9 +132,7 @@ jobs:
           echo "--- containers ---"
           ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes "root@${HOST}" status
 
-          # From the outside, over the real certificate, because that is what a customer
-          # gets. A deploy that leaves the stack healthy behind a broken proxy is not a
-          # deploy that worked.
+          # From outside, over the real certificate: a healthy stack behind a broken proxy is not deployed.
           up=""
           for attempt in $(seq 1 30); do
             code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 https://railhook.io/ || echo 000)
@@ -187,9 +149,7 @@ jobs:
             exit 1
           fi
 
-          # A 200 is not the release. 2.17.0 answered 200 while the host still served the
-          # previous UI, pinned by an override, and this step called it deployed. The UI image
-          # serves its own version; the query string keeps any cache out of the answer.
+          # A 200 is not the release: a pinned UI image once answered 200 with the old version.
           want="${VERSION#v}"
           served=""
           for attempt in $(seq 1 12); do
@@ -207,10 +167,6 @@ jobs:
       - name: Prove the site works, page by page
         run: |
           set -uo pipefail
-          # The right version answering 200 on / is still not a working site: the docs, the
-          # installer, the API behind nginx and the runtime config can each break on their own.
-          # Every address a visitor, a self-hoster or the dashboard depends on is fetched from the
-          # outside, with the status it must have and a piece of content only a working one has.
           base=https://railhook.io
           failed=0
           check() {

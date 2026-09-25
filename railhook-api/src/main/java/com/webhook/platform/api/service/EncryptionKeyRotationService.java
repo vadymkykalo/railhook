@@ -56,9 +56,7 @@ public class EncryptionKeyRotationService {
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.transactionTemplate = transactionTemplate;
         this.lockingTaskExecutor = lockingTaskExecutor;
-        // A partial rotation failure can leave some tenants' secrets encrypted under a
-        // key version other records no longer carry — that must never be silently tolerated.
-        // This counter is the alertable signal (paired with a non-200 response to the caller).
+        // Alerted on: a partial rotation leaves secrets under a key version others no longer carry.
         this.partialFailureCounter = Counter.builder("encryption_rotation_partial_failures_total")
                 .description("Count of individual secret re-encryption failures during a key rotation run")
                 .register(meterRegistry);
@@ -157,11 +155,6 @@ public class EncryptionKeyRotationService {
         endpointRepository.save(endpoint);
     }
 
-    /**
-     * Decrypts one field under the key it was written with and writes it back under the current
-     * one. A field that is not set stays that way — an endpoint without mTLS has no certificate
-     * to rotate.
-     */
     private void reEncrypt(int currentVersion, Supplier<String> ciphertext, Supplier<String> iv,
             Consumer<String> setCiphertext, Consumer<String> setIv) {
         if (ciphertext.get() == null || iv.get() == null) {

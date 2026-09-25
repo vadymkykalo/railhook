@@ -10,32 +10,8 @@ import java.util.Base64;
 import java.util.Map;
 
 /**
- * HubSpot webhook signature verifier, version 3 of HubSpot's scheme.
- *
- * <p>HubSpot sends {@code X-HubSpot-Signature-v3}: base64(HMAC-SHA256(clientSecret, data)), over
- * the request method, the full request URI, the raw body and the timestamp, concatenated in that
- * order with no separators. {@code X-HubSpot-Request-Timestamp} carries that timestamp in
- * milliseconds, and HubSpot's own instruction is to refuse anything older than five minutes —
- * which is the difference between v3 and the v1 and v2 schemes it replaced, neither of which
- * bound a request to a moment at all. Only v3 is implemented; the older two exist, and choosing
- * them would mean accepting a webhook that can be captured and replayed for as long as the
- * client secret lives.
- *
- * <p>The URI is the full URL, scheme and host included, so it has the problem
- * {@link TwilioVerifier} and {@link SquareVerifier} have: reading it off the request would mean
- * trusting {@code Host} and {@code X-Forwarded-Proto}, and behind a reverse proxy that is exactly
- * how it breaks. It is rebuilt from {@code webhook.ingress-base-url}, the setting that produces
- * the ingress URL a person pastes into HubSpot.
- *
- * <p>HubSpot decodes a fixed set of percent-escapes in the query string — and only there, never
- * in the path — before signing. A Railhook ingress URL usually has no query at all, but a source
- * behind a rewrite can, and without this the signature would never match.
- *
- * <p>No provider event id is read from a HubSpot request. The body is an array of events, each
- * with its own {@code eventId}; there is no id for the batch. Deduplicating on the first event's
- * id would silently drop the rest of a batch HubSpot had re-cut on a retry, so the handler
- * deduplicates per event instead, and the five-minute window plus
- * {@code ReplayDetectionService} is what bounds a replay here.
+ * Signature v3 only, since v1 and v2 carry no timestamp. The signed URI is rebuilt from the
+ * ingress base URL rather than trusting Host headers behind a proxy.
  */
 public class HubSpotVerifier implements WebhookVerificationStrategy {
 
@@ -43,7 +19,7 @@ public class HubSpotVerifier implements WebhookVerificationStrategy {
     private static final String TIMESTAMP_HEADER = "X-HubSpot-Request-Timestamp";
     private static final long TOLERANCE_MILLIS = 300_000L;
 
-    /** The escapes HubSpot turns back into their characters, in the query string only. */
+    // HubSpot decodes these before signing, in the query string only, never the path.
     private static final Map<String, String> QUERY_ESCAPES = Map.ofEntries(
             Map.entry("%3A", ":"), Map.entry("%2F", "/"), Map.entry("%3F", "?"),
             Map.entry("%40", "@"), Map.entry("%21", "!"), Map.entry("%24", "$"),
@@ -83,8 +59,7 @@ public class HubSpotVerifier implements WebhookVerificationStrategy {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            // method + URI, then the body's own bytes, then the timestamp: the body sits in the
-            // middle of the signed string and is fed in without being decoded and re-encoded.
+            // The raw body sits in the middle of the signed string and must not be re-encoded.
             mac.update((request.getMethod() + requestUri(request)).getBytes(StandardCharsets.UTF_8));
             mac.update(body != null ? body : new byte[0]);
             String computed = Base64.getEncoder()

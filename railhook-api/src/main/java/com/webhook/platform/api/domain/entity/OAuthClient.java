@@ -19,11 +19,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * An MCP app that registered itself through OAuth dynamic client registration (RFC 7591).
- *
- * <p>Not tenant-scoped: an app registers before any person or organization is involved, and one
- * registration serves every person who later connects it. What it may reach is decided per
- * {@link OAuthGrant}, never here.
+ * Not tenant-scoped: an app registers before any organization is involved, and one registration
+ * serves everyone who connects it. Access is decided per {@link OAuthGrant}.
  */
 @Entity
 @Table(name = "oauth_clients")

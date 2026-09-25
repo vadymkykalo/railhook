@@ -12,48 +12,8 @@ import java.time.Duration;
 import java.time.Instant;
 
 /**
- * How many wrong passwords an account tolerates before it stops answering for a while.
- *
- * <h2>What this is for</h2>
- *
- * <p>{@link AuthRateLimiterService} bounds login attempts at ten a minute per IP <em>and</em> ten
- * a minute per email address. Ten a minute is 14,400 a day against one account, which is a
- * perfectly workable rate for a dictionary attack on a human-chosen password — and when Redis is
- * unavailable that limiter degrades to a per-instance in-memory bucket, so the real ceiling is
- * multiplied by however many API replicas are running. Rate limiting answers "how fast", not
- * "how many"; this answers "how many".
- *
- * <p>The counter lives in Postgres, not in Redis, precisely because of that fallback: the
- * database is shared by every replica and has no degraded mode in which the count quietly
- * becomes per-instance.
- *
- * <h2>Lockout is itself an attack, so this one is built to be a poor weapon</h2>
- *
- * <p>Anything that locks an account on failed attempts hands an attacker who knows an email
- * address a way to keep its owner out. That is a real trade and it is decided here rather than
- * left implicit:
- *
- * <ul>
- *   <li><b>Every lockout expires on its own.</b> There is no administrator-only unlock, because
- *       an unlock that needs another human is what turns a nuisance into an outage — and in a
- *       self-hosted product that human is frequently the locked-out person.</li>
- *   <li><b>The window is short and capped</b> — a minute at the threshold, doubling per further
- *       failure, capped at fifteen. Progressive because a real user who mistypes twice more
- *       should not be treated like the thousandth guess; capped because the value of a longer
- *       window to a defender falls off quickly while its value to a griefer does not.</li>
- *   <li><b>The account holder always has a way through.</b> A password reset clears the lockout
- *       outright, so someone locked out by a stranger is one email away from their account
- *       rather than waiting on anybody.</li>
- *   <li><b>A correct password is never what trips it.</b> The count is of consecutive failures
- *       and a success zeroes it, so an account in daily use never accumulates one.</li>
- *   <li><b>Failures go stale.</b> Two typos in March and three in June are not five consecutive
- *       failures; anything older than the failure window is dropped before counting.</li>
- * </ul>
- *
- * <p>What remains is that an attacker can cost a targeted address up to fifteen minutes at a
- * time, and only for as long as they keep spending attempts through the IP rate limiter to do
- * it. That is the accepted cost. The alternative — no bound at all on attempts per account —
- * costs the account itself.
+ * Rate limiting bounds how fast; this bounds how many. Lockout always expires, caps at fifteen
+ * minutes and is cleared by a password reset, so it is a poor weapon against an owner.
  */
 @Service
 @Slf4j
@@ -91,7 +51,6 @@ public class AccountLockoutService {
         this.failureWindow = Duration.ofMinutes(failureWindowMinutes);
     }
 
-    /** How much longer this account is locked, or {@link Duration#ZERO} when it is not. */
     public Duration remainingLockout(User user) {
         if (!enabled || user.getLockoutExpiresAt() == null) {
             return Duration.ZERO;
@@ -104,14 +63,6 @@ public class AccountLockoutService {
         return !remainingLockout(user).isZero();
     }
 
-    /**
-     * Counts one failed password check, locking the account once the failures reach the
-     * threshold.
-     *
-     * <p>System-scoped because it is reached from the login path, where no organization is
-     * established yet — {@code users} carries no {@code @TenantId}, but Hibernate still needs a
-     * scope to open a session in.
-     */
     @SystemTenant("counts a failed login, which happens before any organization is known")
     @Transactional
     public void recordFailure(User user) {
@@ -120,9 +71,7 @@ public class AccountLockoutService {
         }
         Instant now = Instant.now();
 
-        // Failures have to be consecutive *and* recent to mean anything. Without this, a user
-        // who mistypes once every few months eventually locks themselves out of an account
-        // nobody is attacking.
+        // Only recent failures count, or occasional typos over months would add up to a lockout.
         int previous = user.getLastFailedLoginAt() != null
                 && user.getLastFailedLoginAt().isAfter(now.minus(failureWindow))
                 ? orZero(user.getFailedLoginAttempts())
@@ -142,11 +91,6 @@ public class AccountLockoutService {
         userRepository.save(user);
     }
 
-    /**
-     * Forgets the failures for an account whose holder has just proved they are present — a
-     * successful login, a password change, or a completed password reset. The reset case is the
-     * load-bearing one: it is the unlock path for somebody a stranger locked out.
-     */
     @SystemTenant("clears login failures on paths that run before, or without, an organization scope")
     @Transactional
     public void clearFailures(User user) {
@@ -161,11 +105,6 @@ public class AccountLockoutService {
         userRepository.save(user);
     }
 
-    /**
-     * Doubling from the threshold, capped. The first lockout past the threshold is short enough
-     * that a real user who has just remembered their password barely notices; by the time the
-     * attempts are in the dozens it is the cap.
-     */
     private Duration lockoutFor(int attempts) {
         int steps = Math.min(attempts - threshold, 20); // 2^20 minutes already dwarfs any cap
         Duration scaled = initialLockout.multipliedBy(1L << steps);

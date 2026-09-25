@@ -1,9 +1,5 @@
 ---
-/**
- * Replaces Starlight's language <select>: "EN | UK" as two links to the same page, as in the
- * dashboard header. Every English page has a Ukrainian twin at the same path under /uk/ — the
- * parity test holds that — so the other language's address is a prefix swap.
- */
+// The parity test guarantees a twin at the same path under /uk/, so switching is a prefix swap.
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const isUk = Astro.locals.starlightRoute.locale === 'uk';
 const path = Astro.url.pathname;
@@ -28,18 +24,17 @@ const options = [
 <style>
   .switch {
     display: inline-flex;
-    padding: 3px;
-    gap: 2px;
-    border: 1px solid var(--sl-color-hairline);
-    border-radius: 0.625rem;
+    height: 2.25rem;
+    border: 1px solid var(--sl-color-gray-5);
   }
   a {
     font-family: var(--sl-font-mono);
     font-size: 0.75rem;
     font-weight: 500;
     line-height: 1;
-    padding: 0.45rem 0.55rem;
-    border-radius: 0.45rem;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 0.625rem;
     color: var(--sl-color-gray-3);
     text-decoration: none;
   }
@@ -47,11 +42,11 @@ const options = [
     color: var(--sl-color-white);
   }
   a[aria-current='page'] {
-    background: var(--sl-color-gray-6);
-    color: var(--sl-color-white);
+    background: var(--sl-color-white);
+    color: var(--sl-color-black);
   }
   a:focus-visible {
-    outline: 2px solid var(--sl-color-accent);
+    outline: 2px solid var(--sl-color-white);
     outline-offset: 1px;
   }
 </style>

@@ -62,11 +62,8 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
     int deleteOldSuccessfulAttempts(@Param("cutoffTime") Instant cutoffTime, @Param("limit") int limit);
     
     /**
-     * The window runs only over deliveries already known to be over the limit. It used to number
-     * every row of delivery_attempts, sorted by delivery, for each batch of a run — a full sort of
-     * the largest table every thirty minutes, once per thousand rows deleted. The candidates are
-     * counted off the delivery_id index without sorting or reading the rows, and at most
-     * {@code limit} are taken, which fills a batch since each has at least one row to delete.
+     * The window function runs only over deliveries already known to be over the limit, found
+     * from the delivery_id index, so the largest table is never sorted in full.
      */
     @Modifying(clearAutomatically = true)
     @Query(value = """

@@ -8,10 +8,7 @@ import RegisterPage from '../RegisterPage';
 import { AuthContext, type AuthState } from '../auth.store';
 import { authApi } from '../../api/auth.api';
 
-/**
- * The account this exists for was registered as `wheelet1228@gmail.con`, and never got a single
- * one of its verification mails.
- */
+/** A real account registered as wheelet1228@gmail.con and never got a verification mail. */
 describe('RegisterPage — a mistyped address', () => {
   function renderRegister() {
     const authState: AuthState = {
@@ -31,9 +28,7 @@ describe('RegisterPage — a mistyped address', () => {
     const user = userEvent.setup();
     renderRegister();
 
-    // Pasted, not typed: typing ~75 characters one keystroke at a time re-rendered the page (and
-    // its password strength meter) on every key, which outran the test timeout under a full run.
-    // What is under test is the address the form ends up holding, not how it got there.
+    // Pasted, not typed: per-key re-renders outran the test timeout under a full run.
     const fill = async (field: HTMLElement, value: string) => {
       await user.click(field);
       await user.paste(value);

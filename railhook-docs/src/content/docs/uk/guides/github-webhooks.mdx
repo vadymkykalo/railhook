@@ -1,25 +1,25 @@
 ---
 title: Як надійно отримувати вебхуки GitHub
-description: GitHub не повторює невдалу доставку вебхука. Поставте Railhook перед застосунком — перевірка підпису вебхука GitHub (X-Hub-Signature-256), повторні спроби пересилання у ваш сервіс і відтворення після збою.
+description: GitHub не повторює невдалу доставку вебхука. Перевірка підпису X-Hub-Signature-256 у Railhook, повторні спроби пересилання у ваш сервіс і відтворення після збою.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps } from '@astrojs/starlight/components';
 
-У цьому посібнику Railhook стоїть між GitHub і вашим застосунком. GitHub надсилає вебхуки на джерело Railhook, а воно перевіряє підпис, зберігає кожну доставку такою, якою та надійшла, і пересилає її у ваш сервіс із повторними спробами. Поки сервіс лежить, вебхуки чекають у Railhook, а не губляться.
+GitHub надсилає вебхуки на джерело Railhook. Джерело перевіряє підпис, зберігає кожну доставку такою, якою вона надійшла, і пересилає її у ваш сервіс із повторними спробами. Поки сервіс лежить, вебхуки чекають у Railhook.
 
 ## Чому вебхукам GitHub потрібен буфер
 
-GitHub прямо пише, що не доставляє невдалі вебхуки повторно автоматично. Повторити доставку можна вручну або через API, але лише за останні 3 дні. ([GitHub: Handling failed webhook deliveries](https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries), [Redelivering webhooks](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/redelivering-webhooks)) Крім того, GitHub просить ваш сервер відповісти `2xx` протягом 10 секунд. ([Best practices for using webhooks](https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks))
+GitHub не доставляє невдалі вебхуки повторно автоматично. Повторити доставку можна вручну або через API, але лише за останні 3 дні. ([GitHub: Handling failed webhook deliveries](https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries), [Redelivering webhooks](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/redelivering-webhooks)) Ваш сервер має відповісти `2xx` протягом 10 секунд. ([Best practices for using webhooks](https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks))
 
-Тож один деплой, одне падіння чи один повільний обробник у невдалий момент — і подія push, pull request чи issue зникне, якщо ніхто цього не помітить. Коли попереду стоїть Railhook:
+Деплой, падіння чи повільний обробник у невдалий момент губить подію push, pull request чи issue. Коли попереду стоїть Railhook:
 
-- Railhook відповідає GitHub, щойно збереже доставку, — задовго до спливу 10 секунд.
+- Railhook відповідає GitHub, щойно збереже доставку, задовго до спливу 10 секунд.
 - Ваш сервіс отримує до 5 спроб на кожне пересилання з інтервалами від 1 хвилини до 1 години.
 - Те, що так і не вдалося доставити, потрапляє в **«Недоставлені пересилання»**, а будь-яку збережену доставку можна відтворити, доки зберігаються події.
 - Повторна доставка від GitHub має той самий ідентифікатор `X-GitHub-Delivery`. Railhook його розпізнає, відповідає `202` зі збереженою копією і вдруге її не пересилає.
 
 ## Підключення GitHub
 
-Знадобляться проєкт Railhook і API-ключ. Усе описане нижче можна зробити й у панелі керування, у розділі **«Вхідні»**.
+Знадобляться проєкт Railhook і API-ключ. Ті самі кроки є в панелі керування, у розділі **«Вхідні»**.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -48,7 +48,7 @@ export PROJECT_ID=...
 
 3. **Зареєструйте вебхук у GitHub.** У репозиторії чи організації відкрийте **Settings → Webhooks → Add webhook**. Вставте `ingressUrl` у поле **Payload URL**, у **Content type** виберіть `application/json`, у **Secret** вставте той самий секрет і позначте потрібні події.
 
-4. **Додайте призначення** — URL вашого сервісу:
+4. **Додайте призначення**, URL вашого сервісу:
 
    ```bash
    curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources/$SOURCE_ID/destinations" \
@@ -63,7 +63,7 @@ export PROJECT_ID=...
 
 ## Як перевіряється підпис
 
-Railhook читає `X-Hub-Signature-256` — це `sha256=`, а за ним HMAC-SHA256 необробленого тіла в hex, — і порівнює його з підписом, який сам обчислив із секретом джерела. На запит, що не збігається, Railhook відповідає `401` і не зберігає його. Підпис, який уже траплявся в межах вікна захисту від повторного використання (типово 5 хвилин), теж відхиляється, якщо тільки запит не є повторною доставкою того, що Railhook уже зберіг.
+Railhook читає `X-Hub-Signature-256` (`sha256=`, а за ним HMAC-SHA256 необробленого тіла в hex) і порівнює його з підписом, який сам обчислив із секретом джерела. На запит, що не збігається, Railhook відповідає `401` і не зберігає його. Підпис, який уже траплявся в межах вікна захисту від повторного використання (типово 5 хвилин), теж відхиляється, якщо тільки запит не є повторною доставкою того, що Railhook уже зберіг.
 
 ## Що отримує ваш сервіс
 
@@ -81,13 +81,13 @@ Railhook читає `X-Hub-Signature-256` — це `sha256=`, а за ним HMA
 
 2. Додайте джерелу друге призначення: публічну адресу, яку вивела команда, з вашим маршрутом у кінці, наприклад `https://<host>/tunnel/<slug>/webhooks/github`. Запит потрапить на `http://localhost:3000/webhooks/github`.
 
-3. Зробіть push або відтворіть збережений `ping` у Railhook (повторна доставка з боку GitHub має той самий `X-GitHub-Delivery`, тож Railhook відповість на неї збереженою копією і вдруге не перешле). Перевірений вебхук надійде у ваш локальний застосунок із заголовком `X-GitHub-Event`. Коли закриєте тунель, вимкніть це призначення.
+3. Зробіть push або відтворіть збережений `ping` у Railhook. Повторна доставка з боку GitHub тут не спрацює: вона має той самий `X-GitHub-Delivery`, тож Railhook відповість збереженою копією і не перешле її. Перевірений вебхук надійде у ваш локальний застосунок із заголовком `X-GitHub-Event`. Коли закриєте тунель, вимкніть це призначення.
 
 </Steps>
 
 ## Відтворення після збою
 
-Відтворіть те, що надійшло, поки ваш сервіс лежав. Кожна відтворена доставка піде на кожне призначення джерела як нове пересилання:
+Кожна відтворена доставка піде на кожне призначення джерела як нове пересилання:
 
 ```bash
 curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
@@ -96,12 +96,4 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-rep
   -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
 ```
 
-На відміну від повторної доставки в самому GitHub, тут немає обмеження в 3 дні: відтворити можна все, що ще зберігається, — 7 днів у Railhook Cloud і скільки налаштуєте на власному сервері. Зробіть обробник ідемпотентним за `X-GitHub-Delivery`, бо відтворення може надіслати доставки, які ваш сервіс уже обробив. Див. [Відтворення](/docs/uk/outgoing/replay/#відтворення-вхідних-вебхуків).
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Перевірка вхідних вебхуків" href="/docs/uk/incoming/verification/" description="Схема підпису кожного провайдера й захист від повторного використання підписів." />
-  <LinkCard title="Джерела" href="/docs/uk/incoming/sources/" description="Що відповідає ingress і як дедуплікуються повторні надсилання." />
-  <LinkCard title="Вебхуки GitLab" href="/docs/uk/guides/gitlab-webhooks/" description="Таке саме налаштування для GitLab." />
-</CardGrid>
+Тут немає обмеження в 3 дні: відтворити можна все, що ще зберігається: 7 днів у Railhook Cloud і скільки налаштуєте на власному сервері. Зробіть обробник ідемпотентним за `X-GitHub-Delivery`, бо відтворення може надіслати доставки, які ваш сервіс уже обробив. Див. [Відтворення](/docs/uk/outgoing/replay/#відтворення-вхідних-вебхуків).

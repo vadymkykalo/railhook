@@ -52,11 +52,6 @@ public class User {
     @Column(name = "password_reset_token_expires_at")
     private Instant passwordResetTokenExpiresAt;
 
-    /**
-     * Consecutive failed logins, reset by anything that proves the account holder is present.
-     * See {@code AccountLockoutService} for what the count buys and why it is held here rather
-     * than in Redis.
-     */
     @Builder.Default
     @Column(name = "failed_login_attempts", nullable = false)
     private Integer failedLoginAttempts = 0;
@@ -67,14 +62,11 @@ public class User {
     @Column(name = "lockout_expires_at")
     private Instant lockoutExpiresAt;
 
-    /**
-     * When the onboarding welcome went out — set once, when the address is proven, and only on a
-     * deployment with onboarding mail on. Also when the day-2 nudge is timed from.
-     */
+    /** The day-2 nudge is timed from this. */
     @Column(name = "onboarding_welcome_sent_at")
     private Instant onboardingWelcomeSentAt;
 
-    /** When the day-2 onboarding nudge went out. Never cleared, so it is sent at most once. */
+    /** Never cleared, so the nudge is sent at most once. */
     @Column(name = "onboarding_nudge_sent_at")
     private Instant onboardingNudgeSentAt;
 
@@ -82,10 +74,6 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    /**
-     * Whatever path writes an account, its address is stored in the one spelling lookups use, so
-     * the unique index on lower(email) and an exact match by address agree.
-     */
     @PrePersist
     @PreUpdate
     void normalizeEmail() {

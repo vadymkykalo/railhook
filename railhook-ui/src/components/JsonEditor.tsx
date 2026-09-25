@@ -9,22 +9,7 @@ import { lintGutter } from '@codemirror/lint';
 import { closeBrackets } from '@codemirror/autocomplete';
 import { editorTheme, tokenHighlight } from './editor/theme';
 
-/**
- * The JSON surface the whole workbench is written on.
- *
- * It used to load `@codemirror/theme-one-dark` and paint a fixed slate
- * rectangle whichever theme the app was in — a dark hole on a paper-white
- * page — and it only ever sampled the theme once, at mount, so toggling the
- * app theme left the editor behind until the page remounted. Both are fixed
- * here: every colour is a design token read through CSS custom properties, so
- * the editor repaints with the app for free, and `useIsDarkTheme` watches the
- * root element's class so CodeMirror's own dark-mode behaviour (selection,
- * caret, matching brackets) flips at the same moment.
- *
- * The skin itself now lives in `editor/theme.ts`, shared with the script
- * editor. Two editors in the same workbench drifting apart would be the same
- * bug this product exists to prevent, one layer up.
- */
+/** Colours are CSS tokens, so the editor repaints with the app; useIsDarkTheme flips CodeMirror's own dark mode. */
 
 interface JsonEditorProps {
   value: string;
@@ -34,7 +19,6 @@ interface JsonEditorProps {
   minHeight?: string;
   maxHeight?: string;
   className?: string;
-  /** Forces a theme; omit to follow the app. */
   darkMode?: boolean;
   'aria-label'?: string;
 }
@@ -91,7 +75,6 @@ export default function JsonEditor({
     return EditorState.create({ doc, extensions });
   }, [minHeight, maxHeight, placeholder, readOnly, isDark, ariaLabel]);
 
-  // Initialize editor
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -105,11 +88,9 @@ export default function JsonEditor({
       view.destroy();
       viewRef.current = null;
     };
-    // Only run on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
   }, []);
 
-  // Sync external value changes
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
@@ -121,7 +102,6 @@ export default function JsonEditor({
     }
   }, [value]);
 
-  // Recreate state when theme/readOnly changes
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;

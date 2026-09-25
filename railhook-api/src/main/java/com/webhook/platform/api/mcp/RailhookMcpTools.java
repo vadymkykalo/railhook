@@ -36,15 +36,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * The tools the remote MCP server offers: a thin layer over the services the REST controllers
- * call, never a second implementation of what those services decide.
- *
- * <p>Every tool runs through {@link McpCaller}, which supplies the caller, the tenant, the
- * READ_ONLY refusal and the error mapping. What a tool adds is only what its REST controller adds
- * on top of the service — the event rate limit, the endpoint quota, bean validation.
- *
- * <p>The descriptions are written for a model deciding which tool to call, in the words of
- * {@code CONTEXT.md}.
+ * A thin layer over the services the REST controllers call. A tool adds only what its controller
+ * adds on top of the service: rate limit, quota, bean validation.
  */
 @Component
 @ConditionalOnProperty(prefix = "spring.ai.mcp.server", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -52,7 +45,6 @@ public class RailhookMcpTools {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
-    /** Request and response bodies of an attempt are cut to this many characters. */
     private static final int BODY_LIMIT = 2000;
 
     private final McpCaller caller;
@@ -270,15 +262,12 @@ public class RailhookMcpTools {
         });
     }
 
-    // ── argument parsing ────────────────────────────────────────────────
-
     private static Pageable pageable(Integer page, Integer size) {
         int number = page == null ? 0 : Math.max(0, page);
         int pageSize = size == null ? DEFAULT_PAGE_SIZE : Math.min(MAX_PAGE_SIZE, Math.max(1, size));
         return PageRequest.of(number, pageSize, Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
-    /** The page without Spring's envelope: what a model needs to read it and ask for the next one. */
     private static Map<String, Object> page(Page<?> page) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("content", page.getContent());

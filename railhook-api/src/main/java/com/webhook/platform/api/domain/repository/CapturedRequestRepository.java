@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.Instant;
 
 @Repository
 public interface CapturedRequestRepository extends JpaRepository<CapturedRequest, UUID> {
@@ -26,7 +27,7 @@ public interface CapturedRequestRepository extends JpaRepository<CapturedRequest
     @Modifying
     @Query("DELETE FROM CapturedRequest c WHERE c.testEndpointId IN " +
            "(SELECT t.id FROM TestEndpoint t WHERE t.expiresAt < :now)")
-    int deleteExpiredRequests(@Param("now") java.time.Instant now);
+    int deleteExpiredRequests(@Param("now") Instant now);
 
     long countByTestEndpointId(UUID testEndpointId);
 }

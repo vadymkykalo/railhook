@@ -28,17 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-/**
- * The two statements that keep a target's run of failures, against a real Postgres.
- *
- * <p>They are native and unconditional on purpose — two workers failing against the same
- * endpoint at the same moment both have to count, and a read-modify-write through the entity
- * would have the later write overwrite the earlier one. That is exactly the kind of SQL that
- * compiles, passes every mock, and then binds an {@code Instant} wrong at runtime.
- *
- * <p>A {@code *RepositoryTest}: Testcontainers, so it belongs to the Docker job — see
- * {@code scripts/check-test-routing.sh}.
- */
+// Native and unconditional so two concurrent failures both count; exactly the SQL that binds an Instant wrong.
 @DataJpaTest
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -165,8 +155,7 @@ class TargetFailureRunRepositoryTest {
     void successOnAHealthyEndpointIsFree() {
         Endpoint endpoint = persistEndpoint();
 
-        // The delivery path's common case. It matching no rows is what keeps this feature from
-        // costing an UPDATE per delivery on a deployment where everything works.
+        // Matching no rows keeps this from costing an UPDATE per successful delivery.
         assertEquals(0, endpointRepository.recordAttemptSucceeded(endpoint.getId()));
     }
 

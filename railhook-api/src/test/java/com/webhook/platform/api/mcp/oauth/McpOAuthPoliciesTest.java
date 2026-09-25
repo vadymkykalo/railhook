@@ -11,11 +11,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The small rules the authorization server's security rests on, checked without a database:
- * which redirect URIs can be registered and matched, which resource a token may be asked for, and
- * PKCE.
- */
 class McpOAuthPoliciesTest {
 
     @ParameterizedTest

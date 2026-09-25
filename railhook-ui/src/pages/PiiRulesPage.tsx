@@ -24,15 +24,6 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 
-/**
- * PII masking rules: *when a field matches, mask it like this*.
- *
- * The same sentence Rules tells, so it is drawn with the same pieces — see
- * `src/components/RuleLayout.tsx`. This page used to be a bare table with a
- * hand-rolled toggle and hand-picked chip colours; the match/action shape and
- * the status tokens now come from one place for both pages.
- */
-
 const MASK_STYLE_VALUES: MaskStyle[] = ['PARTIAL', 'FULL', 'HASH'];
 
 export default function PiiRulesPage() {
@@ -161,7 +152,7 @@ export default function PiiRulesPage() {
       />
 
       {showAddForm && (
-        <section className="mb-4 rounded-xl border border-rail bg-card shadow-card">
+        <section className="mb-4 border border-rail bg-card shadow-card">
           <header className="border-b border-rail px-4 py-2.5">
             <div className="mono-label">{t('piiRules.newRuleEyebrow')}</div>
             <h3 className="text-[13px] font-medium">{t('piiRules.newRule')}</h3>
@@ -300,10 +291,6 @@ export default function PiiRulesPage() {
             ))}
           </ul>
 
-          {/* What the rules above actually do to a payload. This used to be a
-              hand-written example per row — including a hash nothing ever
-              produced — while the endpoint that answers it honestly went
-              uncalled. */}
           <PiiPreview projectId={projectId!} />
         </div>
       )}

@@ -16,21 +16,6 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/**
- * The two nightly jobs that delete events, run the way the scheduler runs them: outside any
- * transaction a test opened, so a rollback inside them is a rollback the test can see.
- *
- * <p>Two production failures are pinned here. A workflow trigger that had exhausted its retries
- * kept a FAILED row in {@code workflow_trigger_outbox}, whose foreign key to {@code events} had no
- * {@code ON DELETE}; the first expired event carrying one failed the delete, and because the whole
- * job was one transaction every attempt and delivery it had already removed that night came back.
- * Every night, for as long as the row existed — which was forever, since outbox cleanup only
- * collects DONE rows.
- *
- * <p>And plan retention measured only the event's age. A six-day-old event replayed on a
- * seven-day plan has a fresh PENDING delivery with a retry scheduled; the next night deleted it,
- * attempts and all, mid-ladder.
- */
 @TestPropertySource(properties = "billing.enabled=true")
 class RetentionCleanupIntegrationTest extends AbstractIntegrationTest {
 
@@ -56,14 +41,11 @@ class RetentionCleanupIntegrationTest extends AbstractIntegrationTest {
         projectId = UUID.randomUUID();
         endpointId = UUID.randomUUID();
         transactionTemplate.executeWithoutResult(tx -> {
-            // The jobs are called directly, but still through their @SchedulerLock, whose
-            // lockAtLeastFor would make every call after the first in this class a silent no-op.
-            // Expired rather than deleted: the provider remembers the row exists and only ever
-            // updates it afterwards, so a deleted row can never be acquired again.
+            // Called through @SchedulerLock, so expire the lock; a deleted row could never be acquired again.
             entityManager.createNativeQuery(
                     "UPDATE shedlock SET lock_until = TIMESTAMP '2000-01-01 00:00:00'").executeUpdate();
 
-            // The free plan keeps seven days, which is what makes an eight-day-old event expired.
+            // The free plan keeps seven days.
             entityManager.createNativeQuery("""
                     INSERT INTO organizations (id, name, plan_id)
                     VALUES (:id, 'plan-retention-test', (SELECT id FROM plans WHERE name = 'free'))
@@ -124,12 +106,11 @@ class RetentionCleanupIntegrationTest extends AbstractIntegrationTest {
         UUID settledEvent = UUID.randomUUID();
 
         transactionTemplate.executeWithoutResult(tx -> {
-            // The control: without it a run that deleted nothing at all would pass.
+            // The control: without it a run that deleted nothing would pass.
             seedEvent(settledEvent, daysAgo(8));
             seedDelivery(UUID.randomUUID(), settledEvent, "SUCCESS");
 
-            // A replay of an old event: the event is past the plan's seven days, its delivery is
-            // new and has a retry scheduled.
+            // A replay: the event is past retention, its delivery is new with a retry scheduled.
             seedEvent(pendingEvent, daysAgo(8));
             seedDelivery(pendingDelivery, pendingEvent, "PENDING");
             seedAttempt(pendingDelivery);

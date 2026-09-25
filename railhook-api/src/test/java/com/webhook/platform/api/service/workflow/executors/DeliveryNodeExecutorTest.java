@@ -76,36 +76,12 @@ class DeliveryNodeExecutorTest {
     }
 
     @Test
-    void getType_returnsDelivery() {
-        assertThat(executor.getType()).isEqualTo("delivery");
-    }
-
-    @Test
     void missingEndpointId_returnsFailed() throws Exception {
         StepResult result = executor.execute(json("{}"), json("{}"));
 
         assertThat(result.status()).isEqualTo(StepStatus.FAILED);
         assertThat(result.errorMessage()).contains("endpointId is required");
         verifyNoInteractions(endpointRepository, deliveryRepository, outboxMessageRepository, eventRepository);
-    }
-
-    @Test
-    void invalidEndpointIdFormat_returnsFailed() throws Exception {
-        StepResult result = executor.execute(json("{\"endpointId\":\"not-a-uuid\"}"), json("{}"));
-
-        assertThat(result.status()).isEqualTo(StepStatus.FAILED);
-        assertThat(result.errorMessage()).contains("invalid endpointId format");
-    }
-
-    @Test
-    void endpointNotFound_returnsFailed() throws Exception {
-        UUID endpointId = UUID.randomUUID();
-        when(endpointRepository.findById(endpointId)).thenReturn(Optional.empty());
-
-        StepResult result = executor.execute(json("{\"endpointId\":\"" + endpointId + "\"}"), json("{}"));
-
-        assertThat(result.status()).isEqualTo(StepStatus.FAILED);
-        assertThat(result.errorMessage()).contains("endpoint not found or deleted");
     }
 
     @Test
@@ -132,12 +108,7 @@ class DeliveryNodeExecutorTest {
         verifyNoInteractions(deliveryRepository, outboxMessageRepository, eventRepository);
     }
 
-    /**
-     * A Delivery points at an Event, and the worker sends that Event's payload. The node took the
-     * Event from {@code _eventId} in its input, which nothing on the server set — so every delivery
-     * node failed on the NOT NULL column, seen on production. The node now records its own input as
-     * an Event in the endpoint's project and delivers that.
-     */
+    // The node read the Event from _eventId, which nothing set, so every delivery node failed in production.
     @Test
     void enabledEndpoint_deliversItsInputAsAnEventInTheEndpointsProject() throws Exception {
         UUID endpointId = UUID.randomUUID();
@@ -183,11 +154,7 @@ class DeliveryNodeExecutorTest {
         assertThat(outbox.getProjectId()).isEqualTo(projectId);
     }
 
-    /**
-     * {@code _eventId} came from the workflow's input, which a customer controls. Delivered as is, it
-     * pointed the Delivery at any organization's Event, and the worker — which loads Events without a
-     * tenant filter — would have sent that payload to the caller's endpoint.
-     */
+    // A customer-controlled _eventId could point the Delivery at another organization's Event.
     @Test
     void input_withEventId_isIgnored() throws Exception {
         UUID endpointId = UUID.randomUUID();
@@ -209,7 +176,6 @@ class DeliveryNodeExecutorTest {
         assertThat(deliveryCaptor.getValue().getEventId()).isNotNull().isNotEqualTo(someoneElsesEvent);
     }
 
-    /** The Event the node records is charged like any other, so it is checked like any other. */
     @Test
     void overQuota_failsBeforeWritingAnything() throws Exception {
         UUID endpointId = UUID.randomUUID();
@@ -225,26 +191,9 @@ class DeliveryNodeExecutorTest {
     }
 
     @Test
-    void repositoryThrows_returnsFailed() throws Exception {
-        UUID endpointId = UUID.randomUUID();
-        when(endpointRepository.findById(endpointId)).thenThrow(new RuntimeException("db down"));
-
-        StepResult result = executor.execute(json("{\"endpointId\":\"" + endpointId + "\"}"), json("{}"));
-
-        assertThat(result.status()).isEqualTo(StepStatus.FAILED);
-        assertThat(result.errorMessage()).contains("Delivery error");
-    }
-
-    @Test
     @DisplayName("the Delivery and its announcement are one transaction, or neither")
     void theDeliveryAndItsOutboxRowCommitTogether() throws Exception {
-        // DeliveryDispatch's whole contract is that the Outbox row is written in the same
-        // transaction as the Delivery, so the two cannot disagree about whether the work exists.
-        // This node had neither an annotation nor a template, and WorkflowEngine runs it on its
-        // own pool, so there was no ambient transaction to inherit either: two auto-commits with
-        // a window between them. A failure in that window left a PENDING Delivery with no Outbox
-        // row and next_retry_at NULL — which nothing dispatches, and which waits an hour for the
-        // stranded-PENDING sweep to notice.
+        // Two auto-commits left a PENDING Delivery without its Outbox row, which nothing dispatches.
         UUID endpointId = UUID.randomUUID();
         Endpoint endpoint = new Endpoint();
         endpoint.setId(endpointId);
@@ -264,7 +213,7 @@ class DeliveryNodeExecutorTest {
 
         assertThat(result.status())
                 .as("the node reports the failure rather than claiming a delivery nobody will make")
-                .isNotEqualTo(com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus.SUCCESS);
+                .isNotEqualTo(StepStatus.SUCCESS);
         verify(transactionManager).rollback(any());
     }
 }

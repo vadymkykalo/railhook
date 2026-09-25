@@ -38,17 +38,11 @@ public class RuleService {
     private final RuleEngineService ruleEngineService;
     private final ObjectMapper objectMapper;
 
-    /**
-     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
-     * lookup only sees projects inside the caller's organization: a foreign project id is
-     * indistinguishable from a missing one, which is intended.
-     */
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
     }
 
-    /** Another project's rule is "not found", like a missing one - the URL names the project. */
     private Rule requireRule(UUID projectId, UUID id) {
         return ruleRepository.findByIdAndProjectId(id, projectId)
                 .orElseThrow(() -> new NotFoundException("Rule not found"));
@@ -114,7 +108,6 @@ public class RuleService {
                 .collect(Collectors.toList());
     }
 
-    /** How often a rule ran, and how often it matched. */
     private record ExecutionCounts(long executions, long matches) {
 
         static final ExecutionCounts NONE = new ExecutionCounts(0, 0);
@@ -192,15 +185,12 @@ public class RuleService {
         return mapToResponse(rule);
     }
 
-    // ─── Helpers ────────────────────────────────────────────────────────
-
     private void saveActions(UUID ruleId, UUID projectId, List<RuleActionRequest> actions) {
         for (int i = 0; i < actions.size(); i++) {
             RuleActionRequest actionReq = actions.get(i);
 
             ActionType actionType = actionReq.getType();
 
-            // Validate endpoint exists AND belongs to same project for ROUTE
             if (actionType == ActionType.ROUTE) {
                 if (actionReq.getEndpointId() == null) {
                     throw new IllegalArgumentException("ROUTE action requires endpointId");
@@ -212,7 +202,6 @@ public class RuleService {
                 }
             }
 
-            // Validate transformation exists AND belongs to same project for TRANSFORM
             if (actionType == ActionType.TRANSFORM) {
                 if (actionReq.getTransformationId() == null) {
                     throw new IllegalArgumentException("TRANSFORM action requires transformationId");

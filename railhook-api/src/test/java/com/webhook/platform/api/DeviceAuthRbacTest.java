@@ -39,16 +39,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The device-code flow must mint a token whose role comes from the same
- * membership row as the organization the code was approved for, must be single-use
- * under concurrency, and the poll/approve endpoints must be rate-limited.
- *
- * <p>Full stack (real Postgres via {@link AbstractIntegrationTest}) because the
- * concurrency guarantee depends on an actual DB-level compare-and-set (two real
- * transactions racing a conditional UPDATE), which a mocked repository cannot
- * exercise honestly.
- */
+// Full stack: single use depends on a real DB-level compare-and-set.
 @AutoConfigureMockMvc
 class DeviceAuthRbacTest extends AbstractIntegrationTest {
 
@@ -100,15 +91,12 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
     void mintedTokenUsesRoleFromApprovedOrgNotAnArbitraryOne() throws Exception {
         when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
 
-        // userA: OWNER of "own org" (via registration).
         AuthResponse ownerAuth = register("consultant@example.com", "Consultant Own Org");
         CurrentUserResponse me = me(ownerAuth.getAccessToken());
         UUID userId = me.getUser().getId();
         UUID ownOrgId = me.getOrganization().getId();
         assertEquals(MembershipRole.OWNER, me.getRole());
 
-        // clientOrg: a separate org (created by a different owner) where userA is
-        // granted only VIEWER — the low-privilege membership.
         AuthResponse clientOwnerAuth = register("client-owner@example.com", "Client Org");
         UUID clientOrgId = me(clientOwnerAuth.getAccessToken()).getOrganization().getId();
 
@@ -120,9 +108,6 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
                 .build();
         membershipRepository.save(viewerMembership);
 
-        // Approve the device code while acting in the client org context (a JWT scoped
-        // to clientOrgId — exactly what the dashboard would present if the user had the
-        // client org selected when they approved the CLI login).
         String clientOrgToken = jwtUtil.generateAccessToken(userId, clientOrgId, MembershipRole.VIEWER, null, true);
 
         DeviceCodeResponse deviceCode = initiate();
@@ -156,14 +141,10 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
         AuthResponse ownerAuth = register("lone-owner@example.com", "Lone Org");
         UUID userId = me(ownerAuth.getAccessToken()).getUser().getId();
 
-        // A second, unrelated org that userId has never been added to.
         AuthResponse otherOwnerAuth = register("other-owner@example.com", "Other Org");
         UUID otherOrgId = me(otherOwnerAuth.getAccessToken()).getOrganization().getId();
 
-        // Forge a token claiming membership in otherOrgId — the real-world equivalent is
-        // a membership revoked between JWT issuance and the poll. The service must not
-        // trust the org/role encoded on the JWT to imply real membership; it must fail
-        // closed.
+        // Stands in for a membership revoked between JWT issuance and the poll.
         String bogusOrgToken = jwtUtil.generateAccessToken(userId, otherOrgId, MembershipRole.OWNER, null, true);
 
         DeviceCodeResponse deviceCode = initiate();
@@ -203,7 +184,6 @@ class DeviceAuthRbacTest extends AbstractIntegrationTest {
                                 DeviceTokenRequest.builder().deviceCode(deviceCode.getDeviceCode()).build())))
                 .andExpect(status().isOk());
 
-        // Second poll of the same (now CONSUMED) device_code must not mint another pair.
         mockMvc.perform(post("/api/v1/auth/device/token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(

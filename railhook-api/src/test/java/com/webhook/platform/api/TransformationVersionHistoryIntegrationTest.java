@@ -22,16 +22,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The version number a Transformation shows is a promise that the template it used to hold can be
- * read back and put back. Before this, nothing stored a previous template: the counter went up and
- * the old text was overwritten, so "v3" in the list was a number with nothing behind it.
- *
- * <p>What is asserted here is the promise, through the HTTP surface: every published template is
- * listed with who published it and when, any one of them can be fetched or compared with another,
- * and restoring one moves the transformation forward to a new version rather than rewriting the
- * history that led to it.
- */
 @DisplayName("Transformation version history — every published template is kept, readable and restorable")
 @TestPropertySource(properties = "transformations.version-history-limit=5")
 class TransformationVersionHistoryIntegrationTest extends AbstractIntegrationTest {
@@ -116,8 +106,7 @@ class TransformationVersionHistoryIntegrationTest extends AbstractIntegrationTes
                 .andExpect(jsonPath("$[0].createdByEmail").value(email))
                 .andExpect(jsonPath("$[0].createdAt").exists())
                 .andExpect(jsonPath("$[0].restoredFromVersion").doesNotExist())
-                // The list is an index, not a payload dump: the template comes from the
-                // single-version endpoint, so a hundred 64 KB templates are not one response.
+                // The list is an index: templates come from the single-version endpoint.
                 .andExpect(jsonPath("$[0].template").doesNotExist());
     }
 
@@ -143,10 +132,7 @@ class TransformationVersionHistoryIntegrationTest extends AbstractIntegrationTes
     void renameAloneDoesNotVersion() throws Exception {
         UUID id = createTransformation(V1);
 
-        // The edit form always PUTs the whole transformation back, template included, so
-        // "renamed the transformation" and "rewrote the template" arrive as the same request.
-        // The version counter used to go up for both, which is how a history would fill with
-        // identical entries nobody made.
+        // The edit form PUTs the whole transformation, so a rename must not bump the version.
         putTemplate(id, "renamed-only", V1);
 
         mockMvc.perform(get(base() + "/" + id).header("Authorization", "Bearer " + jwt))
@@ -208,7 +194,7 @@ class TransformationVersionHistoryIntegrationTest extends AbstractIntegrationTes
                 .andExpect(jsonPath("$.length()").value(3))
                 .andExpect(jsonPath("$[0].version").value(3))
                 .andExpect(jsonPath("$[0].restoredFromVersion").value(1))
-                // v2 is still there: a restore is a step forward, not an erasure.
+                // A restore is a step forward, not an erasure.
                 .andExpect(jsonPath("$[1].version").value(2));
 
         mockMvc.perform(get(base() + "/" + id + "/versions/2").header("Authorization", "Bearer " + jwt))
@@ -252,7 +238,7 @@ class TransformationVersionHistoryIntegrationTest extends AbstractIntegrationTes
     @DisplayName("history is capped per transformation: the oldest versions fall off, the newest never do")
     void historyIsCapped() throws Exception {
         UUID id = createTransformation(V1);
-        // Capped at 5 for this class (see @TestPropertySource) so this is 8 round trips, not 51.
+        // Capped at 5 for this class (see @TestPropertySource).
         for (int i = 2; i <= 8; i++) {
             putTemplate(id, "capped", "{\"n\":" + i + "}");
         }

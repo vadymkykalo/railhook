@@ -13,14 +13,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A project, and only a live one.
- *
- * <p>Deleting a project stamps {@code deleted_at} and keeps the row. For as long as only the
- * project list read that column, a deleted project went on working everywhere else: its API keys
- * authenticated, its sources took webhooks, its endpoints could still be edited — some fifty
- * lookups by id, each one a place to forget the check. The restriction puts the check where no
- * lookup can forget it, {@code findById} and {@code existsById} included, so a deleted project
- * answers exactly as a project that never existed does.
+ * Deletion is soft. The restriction applies to every lookup, {@code findById} included, so a
+ * deleted project behaves exactly like one that never existed.
  */
 @Entity
 @Table(name = "projects")

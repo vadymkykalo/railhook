@@ -37,12 +37,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * What the embedded customer portal calls, on behalf of one Consumer.
- *
- * <p>Authenticated by a portal session and by nothing else ({@code SecurityConfig}); every
- * operation is confined to the session's Consumer by {@link PortalService}. The handlers take a
- * {@link PortalContext} instead of an {@code AuthContext}, and declare no access level or API-key
- * scope, because the caller has neither: the session is the whole of its authority.
+ * Authenticated only by a portal session, and PortalService confines every operation to the
+ * session's Consumer. No access level or API-key scope: the caller has neither.
  */
 @RestController
 @RequiredArgsConstructor

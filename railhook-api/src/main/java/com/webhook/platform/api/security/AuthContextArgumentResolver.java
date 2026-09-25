@@ -39,8 +39,7 @@ public class AuthContextArgumentResolver implements HandlerMethodArgumentResolve
 
         if (auth instanceof ApiKeyAuthenticationToken apiKey) {
             // The organization was resolved during authentication, where the tenant-less lookup
-            // belongs. A key that reaches here always has one: ApiKeyAuthenticationFilter leaves
-            // the request unauthenticated when the project is missing.
+            // belongs; a key without a project never gets this far.
             return new AuthContext(
                     null,
                     apiKey.getOrganizationId(),

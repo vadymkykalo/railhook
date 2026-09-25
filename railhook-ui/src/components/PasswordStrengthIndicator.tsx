@@ -21,29 +21,16 @@ const RULES: Rule[] = [
   { key: 'special', test: (p) => /[^A-Za-z0-9]/.test(p) },
 ];
 
-/**
- * Whether every rule the checklist draws is satisfied.
- *
- * The form has to gate on the same list the user is looking at. Before this,
- * the submit button stayed enabled while the checklist showed a red cross, so
- * the only way to learn the password was rejected was to send it and read a
- * server error — which said "Invalid request parameters" and named no field.
- */
+/** The form gates on the same rules the checklist shows. */
 export function passwordMeetsPolicy(password: string): boolean {
   return RULES.every((r) => r.test(password));
 }
 
-/** The translation keys of the rules the password does not meet yet, in checklist order. */
 export function missingPasswordRules(password: string): string[] {
   return RULES.filter((r) => !r.test(password)).map((r) => `passwordStrength.rules.${r.key}`);
 }
 
-/**
- * The meter reads in three steps, not four: rejected, not yet accepted,
- * accepted. "Fair" and "Good" are both "not yet strong", so they share a hue
- * and are told apart by the filled segment count and the label — which is what
- * a person actually reads. The bar never borrows the brand accent.
- */
+/** Three steps, not four: Fair and Good share a hue and differ by segments and label. */
 const LEVEL_STYLE = {
   weak: { bar: 'bg-halt', text: 'text-halt' },
   fair: { bar: 'bg-retry', text: 'text-retry' },
@@ -73,7 +60,7 @@ export default function PasswordStrengthIndicator({ password, className }: Passw
             <div
               key={i}
               className={cn(
-                'h-1 flex-1 rounded-full transition-colors duration-200',
+                'h-1 flex-1 transition-colors duration-200',
                 i < strength ? style.bar : 'bg-rail',
               )}
             />
@@ -87,8 +74,7 @@ export default function PasswordStrengthIndicator({ password, className }: Passw
       <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
         {results.map((r) => (
           <div key={r.key} className="flex items-center gap-1.5 text-[11px]">
-            {/* An unmet rule is what blocks the submit button, so it reads as a rejection, not as
-                a faint grey hint that is easy to take for "not applicable". */}
+            {/* An unmet rule blocks submit, so it reads as a rejection, not a grey hint. */}
             {r.passed ? (
               <Check className="h-3 w-3 flex-shrink-0 text-ok" aria-hidden />
             ) : (

@@ -36,151 +36,39 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Parity ratchet over the entity duplication the two modules keep.
- *
- * <p>{@code api} and {@code worker} each keep their own {@code @Entity} copy of
- * every shared table, deliberately. The cost is that a schema change is a
- * three-file change — migration, api entity, worker entity — and that nothing in the build
- * noticed when only two of the three happened. Hibernate's {@code ddl-auto: validate} catches a
- * mapping that names a column the schema does not have; it cannot catch a column the schema has
- * and an entity never mentions. That direction is silent by construction, and it has cost two
- * production bugs:
- *
- * <ul>
- *   <li>{@code events.payload_compressed} unmapped by the worker's {@code Event}: every Event
- *       above the 1 KB compression threshold was delivered — and HMAC-signed — as a gzip+Base64
- *       blob instead of JSON.</li>
- *   <li>{@code endpoints.deleted_at} unmapped by the worker's {@code Endpoint}: a soft-deleted
- *       Endpoint kept receiving Deliveries for the whole life of its Retry Ladder.</li>
- * </ul>
- *
- * <p>Both columns had been in the schema for releases. This test makes that shape of gap fail
- * the build instead: for every table mapped by <em>both</em> modules, each schema column must be
- * mapped by both sides, or appear in {@link #DELIBERATELY_UNMAPPED} with a stated reason.
- *
- * <h2>Where the three inputs come from</h2>
- *
- * <ol>
- *   <li><b>Schema</b> — Flyway runs the real migrations into a throwaway Postgres and the column
- *       set is read from {@code information_schema.columns}. Deriving it by reading the SQL was
- *       tried and rejected: the schema is 55 migrations deep, and V052/V053 rebuild
- *       {@code delivery_attempts} and {@code tunnel_request_log} as partitioned tables by
- *       renaming the original aside and re-creating it, partly through dynamic SQL inside
- *       {@code DO $$} blocks. A hand-written DDL interpreter would be one more thing that can be
- *       silently wrong — which is the exact failure mode this test exists to remove. This is
- *       what this test does instead: compares each shared table's
- *       {@code information_schema} columns against both {@code @Entity} mappings.</li>
- *   <li><b>Which tables are shared</b> — derived from the filesystem, by intersecting the two
- *       entity package directories. A tenth shared entity is covered the day it is added; it is
- *       never a list anyone has to remember to update.</li>
- *   <li><b>What each side maps</b> — parsed out of the entity <em>sources</em> of both modules.
- *       The two modules are siblings in the reactor and neither depends on the other, so no
- *       module's test classpath can see both sets of classes. Adding a test-scoped edge was
- *       rejected: both modules ship an {@code application.yml} and a {@code logback-spring.xml}
- *       at the classpath root, so putting one on the other's test classpath makes which config
- *       wins a matter of jar order, and would quietly change how every existing
- *       {@code @SpringBootTest} in this module boots.</li>
- * </ol>
- *
- * <h2>Why the source parser can be trusted</h2>
- *
- * <p>A parser that under-reports a mapping produces a loud false failure someone investigates. A
- * parser that over-reports one hides real drift, which is the dangerous direction, so it is
- * checked three ways:
- *
- * <ul>
- *   <li>{@link #parsedMappingsResolveToRealColumns()} — every column either parser derives must
- *       exist in the migrated schema. Both modules run {@code ddl-auto: validate}, so a mapping
- *       the schema does not have could not boot; a column name this parser invents therefore
- *       fails here.</li>
- *   <li>{@link #sourceParserAgreesWithReflection()} — for the api side, whose classes <em>are</em>
- *       on this test's classpath, the source parser's answer must equal reflection's.</li>
- *   <li>{@link EntitySource#unhandled} — the parser never guesses. Any JPA construct it was not
- *       written for ({@code @Embedded}, a {@code @ManyToOne} with no {@code @JoinColumn}, a
- *       multi-name field declaration) is reported and fails the build, so extending the entities
- *       into new territory forces extending the parser rather than silently widening a blind
- *       spot.</li>
- * </ul>
- *
- * <p>Named {@code *IntegrationTest} on purpose: it starts a container, so CI must route it to the
- * Docker job — see {@code scripts/check-test-routing.sh}.
- */
+// ddl-auto validate cannot catch a schema column an entity never maps; that gap caused two prod bugs.
+// Entities are parsed from source: neither module can see the other's classes.
 @Testcontainers
 @Tag("ratchet")
 class EntityMappingParityIntegrationTest {
 
-    /**
-     * Schema columns that are deliberately not mapped by one or both modules, and why.
-     *
-     * <p>Key is {@code table.column}; value is the reason. An entry here is a claim that the
-     * omission is intentional and safe — the same weight as an entry in
-     * {@code MutatingHandlerScopeDeclarationTest.DOCUMENTED_EXEMPTIONS}. Prefer mapping the
-     * column. If you cannot say why a column is missing, it is drift, not an exemption.
-     *
-     * <p>Every entry below is a column the <em>worker</em> does not map; the api maps all of
-     * them. Two reasons recur and are worth stating
-     * once: a column can be safely unmapped either because only the api ever writes it, or
-     * because the worker consumes its <em>outcome</em> through a different column it does map.
-     * Neither reason survives the column being read on the delivery or forward path — which is
-     * exactly what {@code payload_compressed} and {@code deleted_at} turned out to be.
-     */
+    // Key is table.column, value the reason; prefer mapping the column over adding an entry.
     private static final Map<String, String> DELIBERATELY_UNMAPPED = new TreeMap<>();
 
     static {
-        // --- Outgoing: replay bookkeeping. Written by ReplayService when the api re-queues an
-        // Event, to tie the new Delivery back to its Replay Session for the dashboard. The
-        // worker never creates a Delivery row and never reads the link.
         exempt("deliveries.replay_session_id", "api-only: set by ReplayService, read by the dashboard");
 
-        // --- Outgoing: Endpoint columns the delivery path does not consult.
         exempt("endpoints.description", "dashboard-only label; carries no delivery behaviour");
         exempt("endpoints.created_at", "informational; the worker neither reads nor writes it");
         exempt("endpoints.consumer_id", "api-only: groups Endpoints for the customer portal; carries no delivery behaviour");
 
-        // The four secret-rotation columns were exempt here with the note "IF DUAL-SIGNING
-        // DURING A GRACE PERIOD IS EVER IMPLEMENTED, the worker is where it lands, and these
-        // four entries must be deleted rather than re-justified." It was, and they are:
-        // EndpointService.rotateSecret writes the retired secret and stamps rotated_at, and
-        // OutgoingAttemptStore.secretInsideGraceWindow reads all four.
-
-        // Endpoint-verification handshake: entirely an api flow. The worker consumes only its
-        // outcome, through verification_status, which it does map — OutgoingAttemptStore
-        // defers the Delivery unless that column reads VERIFIED or SKIPPED.
         exempt("endpoints.verification_token", "api-side verification handshake; the worker gates on verification_status");
         exempt("endpoints.verification_attempted_at", "api-side verification handshake; the worker gates on verification_status");
         exempt("endpoints.verification_completed_at", "api-side verification handshake; the worker gates on verification_status");
         exempt("endpoints.verification_skip_reason", "api-side verification handshake; the worker gates on verification_status");
 
-        // --- Outgoing: ingest-time deduplication, resolved before the Event is announced.
         exempt("events.idempotency_key", "api-only: ingest dedup key, consumed before the outbox row exists");
 
-        // --- Incoming: request capture kept as it arrived, for the dashboard's request
-        // inspector. A Forward posts to destination.url verbatim (IncomingAttemptStore
-        // .buildRequest) and reproduces none of the original request line.
         exempt("incoming_events.path", "capture metadata; a Forward posts to destination.url, not to the original path");
         exempt("incoming_events.query_params", "capture metadata; a Forward posts to destination.url, not to the original path");
         exempt("incoming_events.client_ip", "capture metadata; not forwarded, and not part of any Forward decision");
         exempt("incoming_events.user_agent", "capture metadata; the Forward sends its own User-Agent");
 
-        // Ingress-side dedup and replay keys, consumed by IngressService before anything is
-        // enqueued.
         exempt("incoming_events.body_sha256", "api-only: ingress replay key, checked before the outbox row exists");
         exempt("incoming_events.provider_event_id", "api-only: ingress dedup key, checked before the outbox row exists");
 
-        // IngressService answers 401 and writes no row when a Source has a verification mode
-        // and the signature does not check out, so a Forward can only ever see a verified
-        // Incoming Event. These two exist for the dashboard's audit trail.
         exempt("incoming_events.verified", "api-only: an unverified webhook is rejected at ingress and never reaches a Forward");
         exempt("incoming_events.verification_error", "api-only: an unverified webhook is rejected at ingress and never reaches a Forward");
-
-        // incoming_sources is no longer a shared table. The worker's IncomingSource entity and
-        // its repository were dead code — nothing in the worker injected either, because the
-        // Forward path resolves a Destination directly and never loads a Source — and they were
-        // deleted rather than kept in step. That also removed a trap this list used to carry:
-        // the worker mapped the Source's encrypted HMAC secret without the key version it was
-        // encrypted under, so the first worker-side decryptWithFallback for a Source would have
-        // used the wrong one.
     }
 
     private static void exempt(String tableAndColumn, String reason) {
@@ -214,10 +102,8 @@ class EntityMappingParityIntegrationTest {
                     .withUsername("parity")
                     .withPassword("parity");
 
-    /** table name -> its columns, straight out of {@code information_schema}. */
     private static Map<String, Set<String>> schema;
 
-    /** simple class name -> the two modules' parsed mappings, for entities both modules declare. */
     private static Map<String, Map<String, EntitySource>> sharedEntities;
 
     @BeforeAll
@@ -225,8 +111,6 @@ class EntityMappingParityIntegrationTest {
         schema = migrateAndReadSchema();
         sharedEntities = loadSharedEntities();
     }
-
-    // ------------------------------------------------------------------ the ratchet
 
     @Test
     @DisplayName("every column of a shared table is mapped by both modules, or documented")
@@ -318,7 +202,7 @@ class EntityMappingParityIntegrationTest {
             if (!sharedTables.contains(table)) {
                 malformed.add("  '" + key + "' names '" + table + "', which is not a shared table");
             }
-            // A reason is the entire value of this list. "n/a", "TODO" and "" are not reasons.
+            // A reason is the entire value of this list.
             if (reason == null || reason.strip().length() < 20) {
                 malformed.add("  '" + key + "' has no usable reason: \"" + reason + "\"");
             }
@@ -329,15 +213,10 @@ class EntityMappingParityIntegrationTest {
                         + "real reason and a real table.column:\n" + String.join("\n", malformed) + "\n");
     }
 
-    // ------------------------------------------------------- guards on the inputs
-
     @Test
     @DisplayName("the shared-entity set is discovered from the filesystem and is not empty")
     void sharedEntitySetIsDiscovered() {
-        // Eight, not the nine originally recorded: the worker's IncomingSource entity
-        // and repository were dead code and were deleted, so incoming_sources stopped being a
-        // shared table. Lower this number only for a deletion you can name — the guard exists so
-        // a broken directory scan cannot quietly make the whole test vacuous.
+        // Lower only for a deletion you can name: guards a broken scan making the test vacuous.
         assertTrue(sharedEntities.size() >= 8,
                 "Only " + sharedEntities.size() + " entities were found in both modules. This test "
                         + "expects eight. Fewer means the directory scan is broken and this whole "
@@ -424,8 +303,6 @@ class EntityMappingParityIntegrationTest {
                         + String.join("\n", disagreements) + "\n");
     }
 
-    // ------------------------------------------------------------------ schema
-
     private static Map<String, Set<String>> migrateAndReadSchema() throws SQLException {
         assertTrue(Files.isDirectory(MIGRATIONS),
                 "migration directory not found: " + MIGRATIONS.toAbsolutePath());
@@ -458,8 +335,6 @@ class EntityMappingParityIntegrationTest {
         return found;
     }
 
-    // ------------------------------------------------------------------ entities
-
     private static Map<String, Map<String, EntitySource>> loadSharedEntities() {
         Set<String> apiNames = entityClassNames(API_ENTITY_DIR);
         Set<String> workerNames = entityClassNames(WORKER_ENTITY_DIR);
@@ -477,7 +352,6 @@ class EntityMappingParityIntegrationTest {
         return loaded;
     }
 
-    /** Names of the {@code @Entity} classes in a package directory. */
     private static Set<String> entityClassNames(Path dir) {
         assertTrue(Files.isDirectory(dir), "entity directory not found: " + dir.toAbsolutePath());
         try (Stream<Path> files = Files.list(dir)) {
@@ -498,7 +372,6 @@ class EntityMappingParityIntegrationTest {
         }
     }
 
-    /** The reference implementation the source parser is checked against, for api classes only. */
     private static Set<String> columnsByReflection(Class<?> entity) {
         Set<String> columns = new TreeSet<>();
         for (Field field : entity.getDeclaredFields()) {
@@ -530,13 +403,7 @@ class EntityMappingParityIntegrationTest {
         return columns;
     }
 
-    /**
-     * The column Hibernate derives for a property with no explicit name, using the real
-     * {@link CamelCaseToUnderscoresNamingStrategy} rather than a re-implementation of it. That is
-     * Spring Boot 3's default physical naming strategy and neither module's {@code application.yml}
-     * overrides it. The strategy ignores the {@code JdbcEnvironment} it is handed, so {@code null}
-     * is safe — and if a future Hibernate stops ignoring it, this throws rather than drifting.
-     */
+    // The strategy ignores the JdbcEnvironment, so null is safe.
     private static String implicitColumnName(String propertyName) {
         return NAMING.toPhysicalColumnName(Identifier.toIdentifier(propertyName), null).getText();
     }
@@ -555,16 +422,6 @@ class EntityMappingParityIntegrationTest {
                 "could not find the reactor root from " + Path.of("").toAbsolutePath());
     }
 
-    // ---------------------------------------------------------- the source parser
-
-    /**
-     * One module's {@code @Entity} class, as read off its source file.
-     *
-     * @param origin  human-readable "module's ClassName", for failure messages
-     * @param table   the physical table the entity maps
-     * @param columns every column the entity maps
-     * @param unhandled constructs the parser refused to interpret rather than guess at
-     */
     private record EntitySource(String origin, String table, Set<String> columns,
                                 List<String> unhandled) {
 
@@ -635,13 +492,11 @@ class EntityMappingParityIntegrationTest {
             columns.add(explicit != null ? explicit : implicitColumnName(member.name()));
         }
 
-        /** {@code @Table(name = "x")}, if the class declares one. */
         private static java.util.Optional<String> explicitTableName(String source) {
             String value = attribute(source, "Table", "name");
             return java.util.Optional.ofNullable(value);
         }
 
-        /** Text between the class declaration's opening brace and its matching close. */
         private static String classBody(String source, String className, String origin) {
             int declaration = source.indexOf("class " + className);
             assertTrue(declaration >= 0, "could not find 'class " + className + "' in " + origin);
@@ -652,15 +507,7 @@ class EntityMappingParityIntegrationTest {
             return source.substring(open + 1, close);
         }
 
-        /**
-         * Splits a class body into its top-level members.
-         *
-         * <p>Walks the body tracking paren and brace depth. A {@code ;} at depth zero ends a field
-         * declaration; a {@code {} at depth zero starts a method, nested type or initialiser, whose
-         * whole block is skipped. Braces and semicolons inside an annotation's argument list — the
-         * {@code indexes = &#123;@Index(...)&#125;} form — sit at paren depth &gt; 0 and are
-         * therefore not mistaken for member boundaries.
-         */
+        // Braces inside annotation arguments sit at paren depth > 0, so they are not member boundaries.
         private static List<Member> members(String body) {
             List<Member> members = new ArrayList<>();
             StringBuilder buffer = new StringBuilder();
@@ -702,10 +549,6 @@ class EntityMappingParityIntegrationTest {
             return annotationStart(annotations, simpleName) >= 0;
         }
 
-        /**
-         * The {@code String} value of one attribute of one annotation, e.g. {@code name} of
-         * {@code @Column}. Returns null when the annotation or the attribute is absent.
-         */
         private static String attribute(String text, String annotation, String attribute) {
             int start = annotationStart(text, annotation);
             if (start < 0) {
@@ -725,7 +568,6 @@ class EntityMappingParityIntegrationTest {
             return matcher.find() ? matcher.group(1) : null;
         }
 
-        /** Index of {@code @Name} in {@code text}, as a whole annotation name. */
         private static int annotationStart(String text, String simpleName) {
             int from = 0;
             while (true) {
@@ -802,12 +644,7 @@ class EntityMappingParityIntegrationTest {
             return text.length();
         }
 
-        /**
-         * Removes comments, keeping string literals intact. Essential rather than cosmetic: these
-         * entities carry Javadoc that names columns in {@code &#123;@code ...&#125;} and
-         * {@code &#123;@link ...&#125;} tags, which an annotation scan would otherwise read as
-         * annotations.
-         */
+        // Entity Javadoc names columns in {@code} tags, which an annotation scan would misread.
         static String stripComments(String source) {
             StringBuilder out = new StringBuilder(source.length());
             int i = 0;
@@ -844,15 +681,8 @@ class EntityMappingParityIntegrationTest {
         }
     }
 
-    /** One field declaration: its annotations, and the declaration itself. */
     private record Member(String annotations, String declaration, String name, boolean isStatic) {
 
-        /**
-         * Splits {@code text} — everything since the previous member boundary — into leading
-         * annotations and the declaration they sit on. Returns null when what is left is not a
-         * field (an {@code import}, a package statement, an enum constant list, a stray
-         * {@code ;}).
-         */
         static Member of(String text) {
             int i = 0;
             int annotationsEnd = 0;
@@ -884,13 +714,11 @@ class EntityMappingParityIntegrationTest {
             if (declaration.isEmpty()) {
                 return null;
             }
-            // Drop any initialiser: `= VerificationStatus.SKIPPED`, `= new HashMap<>()`.
             int assign = declaration.indexOf('=');
             String signature = (assign < 0 ? declaration : declaration.substring(0, assign)).trim();
 
             List<String> tokens = new ArrayList<>(List.of(signature.split("\\s+")));
             tokens.removeIf(String::isBlank);
-            // `Type name` is the shortest a field can be; anything shorter is not one.
             if (tokens.size() < 2) {
                 return null;
             }

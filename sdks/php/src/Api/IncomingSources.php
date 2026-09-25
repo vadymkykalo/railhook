@@ -18,7 +18,6 @@ class IncomingSources
     /**
      * Create a new incoming webhook source.
      *
-     * @param string $projectId Project UUID
      * @param array $params Source parameters: name (required), slug, providerType, verificationMode, hmacSecret, hmacHeaderName, hmacSignaturePrefix, rateLimitPerSecond
      * @return array IncomingSource response
      */
@@ -31,9 +30,7 @@ class IncomingSources
         );
     }
 
-    /**
-     * Get incoming source by ID.
-     */
+    /** Get incoming source by ID. */
     public function get(string $projectId, string $sourceId): array
     {
         return $this->client->request(
@@ -42,9 +39,7 @@ class IncomingSources
         );
     }
 
-    /**
-     * List incoming sources for a project.
-     */
+    /** List incoming sources for a project. */
     public function list(string $projectId, ?array $queryParams = null): array
     {
         return $this->client->request(
@@ -55,9 +50,7 @@ class IncomingSources
         );
     }
 
-    /**
-     * Update incoming source.
-     */
+    /** Update incoming source. */
     public function update(string $projectId, string $sourceId, array $params): array
     {
         return $this->client->request(
@@ -67,9 +60,7 @@ class IncomingSources
         );
     }
 
-    /**
-     * Delete (disable) incoming source.
-     */
+    /** Delete (disable) incoming source. */
     public function delete(string $projectId, string $sourceId): void
     {
         $this->client->request(
@@ -78,13 +69,10 @@ class IncomingSources
         );
     }
 
-    // ── Destinations ──
 
     /**
      * Create a forwarding destination for an incoming source.
      *
-     * @param string $projectId Project UUID
-     * @param string $sourceId Source UUID
      * @param array $params Destination parameters: url (required), authType, authConfig, customHeadersJson, enabled, maxAttempts, timeoutSeconds, retryDelays, payloadTransform
      * @return array IncomingDestination response
      */
@@ -97,9 +85,7 @@ class IncomingSources
         );
     }
 
-    /**
-     * Get destination by ID.
-     */
+    /** Get destination by ID. */
     public function getDestination(string $projectId, string $sourceId, string $destinationId): array
     {
         return $this->client->request(
@@ -108,9 +94,7 @@ class IncomingSources
         );
     }
 
-    /**
-     * List destinations for an incoming source.
-     */
+    /** List destinations for an incoming source. */
     public function listDestinations(string $projectId, string $sourceId, ?array $queryParams = null): array
     {
         return $this->client->request(
@@ -121,9 +105,7 @@ class IncomingSources
         );
     }
 
-    /**
-     * Update a forwarding destination.
-     */
+    /** Update a forwarding destination. */
     public function updateDestination(string $projectId, string $sourceId, string $destinationId, array $params): array
     {
         return $this->client->request(
@@ -133,9 +115,7 @@ class IncomingSources
         );
     }
 
-    /**
-     * Delete a forwarding destination.
-     */
+    /** Delete a forwarding destination. */
     public function deleteDestination(string $projectId, string $sourceId, string $destinationId): void
     {
         $this->client->request(

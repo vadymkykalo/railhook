@@ -8,10 +8,6 @@ import lombok.Getter;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * In-memory compiled representation of a Rule for fast evaluation.
- * Created once on cache load, reused for every event.
- */
 @Getter
 @Builder
 public class CompiledRule {
@@ -21,13 +17,12 @@ public class CompiledRule {
     private final String name;
     private final int priority;
 
-    /** NULL = catch-all (matches every event type) */
+    /** Null matches every event type. */
     private final String eventTypePattern;
 
-    /** Pre-parsed condition tree (avoids JSON parsing per event). NULL = match all. */
+    /** Parsed once so events do not pay for JSON parsing. Null matches all. */
     private final ConditionNode conditionTree;
 
-    /** Pre-resolved actions */
     private final List<CompiledAction> actions;
 
     @Getter

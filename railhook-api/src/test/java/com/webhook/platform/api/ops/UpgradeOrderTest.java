@@ -13,20 +13,10 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over the order in which {@code railhook upgrade} replaces the services.
- *
- * <p>Only the API runs Flyway. The worker validates the schema against its entities when it
- * starts, so a worker from the new release started before the new API has migrated fails with
- * {@code Schema validation: missing column}. The 2.20.7 production deploy did exactly that: the
- * helper's comment said the worker went last, and the loop above {@code roll_api} started it
- * first. It crashed once and came back on its restart, which is why nothing but the restart count
- * showed it.
- */
+// Only the API runs Flyway; a worker started first fails schema validation.
 @Tag("ratchet")
 class UpgradeOrderTest {
 
-    /** The helper script install.sh writes into a deployment directory. */
     private static final Path INSTALLER = Paths.get("..", "install.sh");
 
     @Test

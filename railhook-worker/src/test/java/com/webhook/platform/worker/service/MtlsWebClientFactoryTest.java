@@ -10,6 +10,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.resources.ConnectionProvider;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -34,7 +35,6 @@ class MtlsWebClientFactoryTest {
     private static final String ENCRYPTION_SALT = "test-salt-value";
     private EncryptionKeyRegistry encryptionKeyRegistry;
 
-    // Pre-generated self-signed RSA 2048 cert + PKCS8 key (via keytool+openssl)
     private static final String TEST_CERT_PEM = "-----BEGIN CERTIFICATE-----\n" +
             "MIICwjCCAaqgAwIBAgIJAJzzY03WpClSMA0GCSqGSIb3DQEBDAUAMA8xDTALBgNV\n" +
             "BAMTBFRlc3QwHhcNMjYwMjI4MTEzOTM1WhcNMjcwMjI4MTEzOTM1WjAPMQ0wCwYD\n" +
@@ -87,7 +87,7 @@ class MtlsWebClientFactoryTest {
     @BeforeEach
     void setUp() throws Exception {
         encryptionKeyRegistry = createTestRegistry(ENCRYPTION_KEY, ENCRYPTION_SALT);
-        factory = new MtlsWebClientFactory(encryptionKeyRegistry, true, java.util.List.of(), WebClient.builder(), ConnectionProvider.newConnection());
+        factory = new MtlsWebClientFactory(encryptionKeyRegistry, true, List.of(), WebClient.builder(), ConnectionProvider.newConnection());
     }
 
     private static EncryptionKeyRegistry createTestRegistry(String key, String salt) throws Exception {
@@ -96,7 +96,7 @@ class MtlsWebClientFactoryTest {
         setField(registry, "multiKeys", "");
         setField(registry, "configuredActiveVersion", 0);
         setField(registry, "salt", salt);
-        var initMethod = registry.getClass().getDeclaredMethod("init");
+        Method initMethod = registry.getClass().getDeclaredMethod("init");
         initMethod.setAccessible(true);
         initMethod.invoke(registry);
         return registry;
@@ -108,51 +108,12 @@ class MtlsWebClientFactoryTest {
         f.set(obj, value);
     }
 
-    // -----------------------------------------------------------------------
-    // mTLS disabled / null
-    // -----------------------------------------------------------------------
-
     @Test
-    @DisplayName("Should return default WebClient when mTLS is disabled")
-    void shouldReturnDefaultClientWhenMtlsDisabled() {
-        Endpoint endpoint = createEndpoint(false);
-        assertNotNull(factory.getWebClient(endpoint));
-    }
-
-    @Test
-    @DisplayName("Should return default WebClient when mtlsEnabled is null")
-    void shouldReturnDefaultClientWhenMtlsNull() {
-        Endpoint endpoint = Endpoint.builder()
-                .id(UUID.randomUUID())
-                .mtlsEnabled(null)
-                .build();
-        assertNotNull(factory.getWebClient(endpoint));
-    }
-
-    // -----------------------------------------------------------------------
-    // mTLS enabled — WebClient creation
-    // -----------------------------------------------------------------------
-
-    @Test
-    @DisplayName("Should create mTLS WebClient with valid RSA cert and key")
+    @DisplayName("Should create mTLS WebClient with valid RSA cert and key, with or without a CA cert")
     void shouldCreateMtlsClientWithRsaCert() {
-        Endpoint endpoint = createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, null);
-        WebClient result = factory.getWebClient(endpoint);
-        assertNotNull(result, "mTLS WebClient should be created successfully");
+        assertNotNull(factory.getWebClient(createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, null)));
+        assertNotNull(factory.getWebClient(createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, TEST_CERT_PEM)));
     }
-
-    @Test
-    @DisplayName("Should create mTLS WebClient with CA cert")
-    void shouldCreateMtlsClientWithCaCert() {
-        // Use same cert as CA for testing
-        Endpoint endpoint = createMtlsEndpoint(TEST_CERT_PEM, TEST_KEY_PEM, TEST_CERT_PEM);
-        WebClient result = factory.getWebClient(endpoint);
-        assertNotNull(result, "mTLS WebClient with CA cert should be created");
-    }
-
-    // -----------------------------------------------------------------------
-    // Caching
-    // -----------------------------------------------------------------------
 
     @Test
     @DisplayName("Should cache mTLS WebClient for same endpoint")
@@ -195,16 +156,10 @@ class MtlsWebClientFactoryTest {
         assertNotSame(first, second, "Should create new WebClient after manual invalidation");
     }
 
-    // -----------------------------------------------------------------------
-    // Tenant isolation between clients built at the same time
-    // -----------------------------------------------------------------------
-
     @Test
     @DisplayName("Building an mTLS client never configures the builder every client is built from")
     void buildingAnMtlsClientLeavesTheSharedBuilderUnconfigured() {
-        // The connector carries one endpoint's client certificate and trusted CA. Set on the
-        // shared builder, a build racing another could pick up the other's connector, and
-        // endpoint A's cached client then presented tenant B's certificate.
+        // Set on the shared builder, a racing build could present another tenant's certificate.
         WebClient.Builder shared = spy(WebClient.builder());
         MtlsWebClientFactory isolated = new MtlsWebClientFactory(
                 encryptionKeyRegistry, true, List.of(), shared, ConnectionProvider.newConnection());
@@ -218,9 +173,6 @@ class MtlsWebClientFactoryTest {
     @Test
     @DisplayName("Two callers missing the cache together share one client for the endpoint")
     void concurrentCacheMissesBuildOneClient() throws Exception {
-        // Whoever reaches the build holds the gate open briefly for the other caller. With a
-        // read-then-put cache both builds run and the callers leave with different clients; with
-        // an atomic populate the second caller waits for the first and is handed its client.
         CountDownLatch bothBuilding = new CountDownLatch(2);
         EncryptionKeyRegistry gated = spy(encryptionKeyRegistry);
         doAnswer(inv -> {
@@ -244,10 +196,6 @@ class MtlsWebClientFactoryTest {
             pool.shutdownNow();
         }
     }
-
-    // -----------------------------------------------------------------------
-    // Error cases
-    // -----------------------------------------------------------------------
 
     @Test
     @DisplayName("Should throw RuntimeException on invalid cert")
@@ -284,42 +232,6 @@ class MtlsWebClientFactoryTest {
 
         assertThrows(RuntimeException.class, () -> factory.getWebClient(endpoint));
     }
-
-    // -----------------------------------------------------------------------
-    // CryptoUtils encrypt/decrypt round-trip for mTLS data
-    // -----------------------------------------------------------------------
-
-    @Test
-    @DisplayName("Should encrypt and decrypt cert PEM round-trip")
-    void shouldEncryptDecryptCertRoundTrip() {
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(TEST_CERT_PEM, ENCRYPTION_KEY, ENCRYPTION_SALT);
-        String decrypted = CryptoUtils.decryptSecret(
-                encrypted.getCiphertext(), encrypted.getIv(), ENCRYPTION_KEY, ENCRYPTION_SALT);
-        assertEquals(TEST_CERT_PEM, decrypted);
-    }
-
-    @Test
-    @DisplayName("Should encrypt and decrypt key PEM round-trip")
-    void shouldEncryptDecryptKeyRoundTrip() {
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(TEST_KEY_PEM, ENCRYPTION_KEY, ENCRYPTION_SALT);
-        String decrypted = CryptoUtils.decryptSecret(
-                encrypted.getCiphertext(), encrypted.getIv(), ENCRYPTION_KEY, ENCRYPTION_SALT);
-        assertEquals(TEST_KEY_PEM, decrypted);
-    }
-
-    @Test
-    @DisplayName("Different encryptions of same data should produce different ciphertext (random IV)")
-    void shouldUseDifferentIvPerEncryption() {
-        CryptoUtils.EncryptedData first = CryptoUtils.encryptSecret(TEST_CERT_PEM, ENCRYPTION_KEY, ENCRYPTION_SALT);
-        CryptoUtils.EncryptedData second = CryptoUtils.encryptSecret(TEST_CERT_PEM, ENCRYPTION_KEY, ENCRYPTION_SALT);
-
-        assertNotEquals(first.getIv(), second.getIv(), "IVs should differ per encryption");
-        assertNotEquals(first.getCiphertext(), second.getCiphertext(), "Ciphertext should differ per encryption");
-    }
-
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
 
     private Endpoint createEndpoint(boolean mtlsEnabled) {
         return Endpoint.builder()

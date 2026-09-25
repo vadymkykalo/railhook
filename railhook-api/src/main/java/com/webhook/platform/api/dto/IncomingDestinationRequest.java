@@ -54,12 +54,7 @@ public class IncomingDestinationRequest {
     @Size(max = 4096, message = "Payload transform expression must be at most 4096 characters")
     private String payloadTransform;
 
-    /**
-     * A string rather than a {@code UUID} so that {@code ""} can mean "detach", the way a blank
-     * {@code payloadTransform} clears that field. Jackson maps both an absent property and an
-     * explicit null to the same value, so a typed UUID left no way to express the difference and
-     * a destination that acquired a transformation could never be freed of one.
-     */
+    // A String so that "" can mean detach: Jackson maps absent and null to the same value.
     @Schema(description = "ID of a reusable transformation template to apply (overrides "
             + "payloadTransform if set). Empty string detaches the destination from its template.",
             format = "uuid")

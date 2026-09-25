@@ -2,13 +2,9 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../lib/utils"
 
-/**
- * Status variants draw from the reserved status tokens and nothing else.
- * `default` is the only variant that uses the brand colour, so a badge tinted
- * like a primary button always means "brand", never "this delivery is fine".
- */
+/** Status variants use only the reserved status tokens; default and info never read as "fine". */
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+  "inline-flex items-center gap-1.5 border px-2 py-0.5 text-xs font-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
   {
     variants: {
       variant: {
@@ -21,8 +17,6 @@ const badgeVariants = cva(
         halt: "border-transparent bg-halt-soft text-halt",
         idle: "border-transparent bg-idle-soft text-idle",
 
-        // Aliases kept so existing call sites keep compiling; they resolve to
-        // the same tokens as the status variants above.
         success: "border-transparent bg-ok-soft text-ok",
         warning: "border-transparent bg-retry-soft text-retry",
         destructive: "border-transparent bg-halt-soft text-halt",

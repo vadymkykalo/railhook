@@ -13,19 +13,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Tells an organization that Railhook turned one of its targets off.
- *
- * <p>Two channels, both of which already exist: an {@code AlertEvent}, which is what the
- * dashboard's alert list reads, and — where the deployment has mail on — one message to the
- * organization's owners. Nothing new is invented, and in particular this does not go through an
- * {@code AlertRule}'s channel: a rule's channel belongs to the rule its owner wrote, and this is
- * not that.
- *
- * <p>Separate from {@link EndpointAutoDisableService} because it is the only part that needs a
- * tenant. The sweep runs across every organization; each notification has to be written inside
- * the one it belongs to, or the alert lands on nobody's dashboard.
- */
+/** Separate from the sweep, which spans organizations, because each notice is written in its own tenant. */
 @Component
 @Slf4j
 public class EndpointAutoDisableNotifier {
@@ -62,10 +50,7 @@ public class EndpointAutoDisableNotifier {
         });
     }
 
-    /**
-     * @param projectId the Destination's Project, reached through its Source — a Destination has
-     *                  no project of its own, and an alert is filed against one
-     */
+    /** projectId comes from the Destination's Source; a Destination has no project of its own. */
     public void destinationDisabled(IncomingDestination destination, UUID projectId) {
         String title = "Destination disabled after continuous failure";
         String message = destination.getUrl() + " has not accepted a forward since "
@@ -74,8 +59,7 @@ public class EndpointAutoDisableNotifier {
                 + "lets you retry it.";
 
         TenantContext.runAs(destination.getOrganizationId(), () -> {
-            // endpointId stays null: this event is about a Destination, and pointing the field at
-            // one would have the dashboard link to an endpoint that does not exist.
+            // endpointId stays null, or the dashboard would link to an endpoint that does not exist.
             alertService.raiseSystemAlert(projectId, null, AlertSeverity.CRITICAL, title, message);
             mailOwners(destination.getOrganizationId(), title, destination.getUrl(),
                     destination.getFailingSince(), destination.getConsecutiveFailures(),
@@ -83,11 +67,6 @@ public class EndpointAutoDisableNotifier {
         });
     }
 
-    /**
-     * One message per owner, or none at all when the deployment has no mail configured —
-     * {@code EmailService} logs rather than sends in that case, and a list of owners is worth
-     * not querying for.
-     */
     private void mailOwners(UUID organizationId, String subject, String url, Instant failingSince,
             Integer failures, String link) {
         if (!emailService.isEnabled()) {
@@ -112,10 +91,6 @@ public class EndpointAutoDisableNotifier {
         return baseUrl + "/projects/" + projectId + "/incoming-sources";
     }
 
-    /**
-     * Says which target, since when, and what to do — in that order, because the reader is
-     * finding out about this for the first time and the only useful next step is the link.
-     */
     private String body(String url, Instant failingSince, Integer failures, String link) {
         return """
             <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">

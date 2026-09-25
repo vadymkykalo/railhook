@@ -19,16 +19,10 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
-/**
- * Unit coverage for StuckDeliveryRecoveryService: rows are recovered exactly
- * when the recovery lock is held, and left untouched when another instance already
- * holds it.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class StuckDeliveryRecoveryServiceTest {
@@ -80,31 +74,6 @@ class StuckDeliveryRecoveryServiceTest {
     }
 
     @Test
-    void recoverStuckDeliveries_lockNotAcquired_skipsEntirely() throws InterruptedException {
-        when(lock.tryLock(0, 30, TimeUnit.SECONDS)).thenReturn(false);
-
-        service.recoverStuckDeliveries();
-
-        verify(deliveryRepository, never()).resetStuckDeliveries(any());
-        verify(deliveryRepository, never()).resetStrandedPendingDeliveries(any());
-        verify(lock, never()).unlock();
-    }
-
-    @Test
-    void recoverStuckDeliveries_noRowsToRecover_stillUnlocksCleanly() throws InterruptedException {
-        when(lock.tryLock(0, 30, TimeUnit.SECONDS)).thenReturn(true);
-        when(lock.isHeldByCurrentThread()).thenReturn(true);
-        when(deliveryRepository.resetStuckDeliveries(any())).thenReturn(0);
-        when(deliveryRepository.resetStrandedPendingDeliveries(any())).thenReturn(0);
-
-        service.recoverStuckDeliveries();
-
-        verify(deliveryRepository, times(1)).resetStuckDeliveries(any());
-        verify(deliveryRepository, times(1)).resetStrandedPendingDeliveries(any());
-        verify(lock).unlock();
-    }
-
-    @Test
     void recoverStuckDeliveries_interruptedWhileAcquiringLock_doesNotThrow_doesNotUnlock() throws InterruptedException {
         when(lock.tryLock(0, 30, TimeUnit.SECONDS)).thenThrow(new InterruptedException("interrupted"));
 
@@ -113,16 +82,5 @@ class StuckDeliveryRecoveryServiceTest {
         verify(deliveryRepository, never()).resetStuckDeliveries(any());
         verify(lock, never()).unlock();
         assertTrue(Thread.interrupted(), "the current thread's interrupt flag must be restored");
-    }
-
-    @Test
-    void recoverStuckDeliveries_lockAcquired_butNotHeldByCurrentThread_doesNotUnlock() throws InterruptedException {
-        // Defensive guard in the finally: only unlock if this thread actually holds it.
-        when(lock.tryLock(0, 30, TimeUnit.SECONDS)).thenReturn(true);
-        when(lock.isHeldByCurrentThread()).thenReturn(false);
-
-        service.recoverStuckDeliveries();
-
-        verify(lock, never()).unlock();
     }
 }

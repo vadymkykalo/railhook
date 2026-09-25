@@ -2,13 +2,13 @@
 title: Endpoints and subscriptions
 description: Register a URL that receives events, choose which event types it gets, and send the first event to it.
 ---
-import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-An **endpoint** is a URL that is willing to receive your events. A **subscription** says which event types that endpoint wants. When your system sends an event, Railhook creates one **delivery** per endpoint whose subscription matches, and works on each delivery until it succeeds or is abandoned.
+An **endpoint** is a URL that receives your events. A **subscription** says which event types it gets. For each event you send, Railhook creates one **delivery** per endpoint with a matching subscription.
 
-In the dashboard, an endpoint together with its subscriptions is shown as one **Connection**, on the Connections screen. It is a view, not a separate record: changing a connection changes the endpoint or its subscriptions.
+The dashboard's Connections screen shows an endpoint with its subscriptions as one **Connection**. It is a view, not a separate record.
 
-The examples below use `$RAILHOOK_URL` for the address of your Railhook API, `$PROJECT_ID` for your project and `$API_KEY` for a project API key.
+Examples use `$RAILHOOK_URL` (your Railhook API), `$PROJECT_ID` and `$API_KEY` (a project API key).
 
 ## Create an endpoint and subscribe it
 
@@ -55,40 +55,38 @@ The examples below use `$RAILHOOK_URL` for the address of your Railhook API, `$P
 
 ## When Railhook turns an endpoint off
 
-A receiver that has been dead for days used to keep its full retry budget: every new event started a fresh ladder, and nothing said the endpoint itself was the problem. Railhook now turns such an endpoint off and tells you.
-
-The rule is two conditions, both of which have to hold:
+An endpoint that has been failing for days is turned off, and you are told. Otherwise every new event would start a fresh retry ladder against a dead receiver. Both conditions must hold:
 
 | Condition | Default | Variable |
 |---|---|---|
 | Nothing has succeeded for this long | 72 hours | `ENDPOINT_AUTO_DISABLE_AFTER_HOURS` |
 | …and the run contains at least this many failed attempts | 10 | `ENDPOINT_AUTO_DISABLE_MIN_FAILURES` |
 
-The second exists so that an endpoint receiving one event a week is not turned off for being idle. One success at any point clears the run and the count.
+The second keeps an endpoint that gets one event a week from being turned off for being idle. One success clears the run and the count.
 
-The endpoint's list and its row in Connections both show **Auto-disabled** and say since when. The API returns `autoDisabledAt`, `autoDisabledReason` and `failingSince` on the endpoint.
+The endpoint list and Connections show **Auto-disabled** and since when. The API returns `autoDisabledAt`, `autoDisabledReason` and `failingSince` on the endpoint.
 
 ### What happens to deliveries already queued
 
-They are **not** dropped and they do not silently fail. Everything already made out to the endpoint goes to Failed Messages, with the reason recorded — so once the receiver works again you can retry all of it. See [Retries and failed messages](/docs/outgoing/retries/).
+They go to Failed Messages with the reason recorded, so you can retry them once the receiver works again. See [Retries and failed messages](/docs/outgoing/retries/).
 
-This is deliberately different from an endpoint *you* turn off, where queued deliveries end as `FAILED`. Turning an endpoint off is a statement that you no longer want it delivered to; Railhook turning it off is a statement that it could not be.
+An endpoint *you* turn off is different: its queued deliveries end as `FAILED`, because you no longer want them delivered.
 
 ### Turning it back on
 
-Re-enabling clears the auto-disable and the run of failures with it, so the sweep does not turn it straight off again. Use the power button on the endpoint, or `POST /api/v1/projects/{projectId}/endpoints/{id}/enable`. Fix the receiver first: an endpoint enabled while it is still failing simply starts a new run.
+Re-enabling clears the auto-disable and the run of failures, so the sweep does not turn it straight off again. Use the power button on the endpoint, or `POST /api/v1/projects/{projectId}/endpoints/{id}/enable`. Fix the receiver first: an endpoint that still fails starts a new run.
 
 ### Who gets told
 
-An alert appears on the project's Alerts page, and — where the deployment has mail configured (`EMAIL_ENABLED=true`) — one message goes to the organization's owners naming the endpoint, since when it has been failing, and how to turn it back on. No alert rule is needed; this is Railhook reporting its own decision.
+An alert appears on the project's Alerts page. With mail configured (`EMAIL_ENABLED=true`), the organization's owners also get one email naming the endpoint, since when it has failed, and how to turn it back on. No alert rule is needed.
 
 ### Incoming destinations
 
-A destination that has been failing as long is turned off on exactly the same terms, and its queued forwards go to Failed Forwards the same way.
+A destination is turned off on the same terms, and its queued forwards go to Failed Forwards.
 
 ### Turning the feature off
 
-`ENDPOINT_AUTO_DISABLE_ENABLED=false` in both the api and the worker. With it off nothing is counted and nothing is ever disabled automatically.
+Set `ENDPOINT_AUTO_DISABLE_ENABLED=false` in both the api and the worker.
 
 <Aside type="caution" title="New endpoints and verification">
 By default a new endpoint starts as `SKIPPED` and receives deliveries straight away. When the operator sets `WEBHOOK_ENDPOINT_VERIFICATION_REQUIRED=true`, a new endpoint starts as `PENDING` and every delivery to it fails until it passes the ownership check. See [Endpoint security](/docs/outgoing/endpoint-security/#prove-you-own-the-endpoint).
@@ -110,11 +108,11 @@ By default a new endpoint starts as `SKIPPED` and receives deliveries straight a
 | `payloadTemplate` | An inline template, used when no `transformationId` is set. |
 | `customHeaders` | Extra HTTP headers, as a JSON object in a string. |
 
-Leave `maxAttempts` and `retryDelays` out to get the default Outgoing retry ladder, see [Retries and failed messages](/docs/outgoing/retries/).
+Leave out `maxAttempts` and `retryDelays` to get the default outgoing retry ladder: see [Retries and failed messages](/docs/outgoing/retries/).
 
 ### Event type patterns
 
-An event type is lower case, starts with a letter, and uses dots between segments: `order.completed`. A subscription can point at a pattern instead of one type:
+An event type is lower case, starts with a letter, and separates segments with dots: `order.completed`. A subscription can use a pattern instead:
 
 | Pattern | Matches |
 |---|---|
@@ -126,7 +124,7 @@ An event type is lower case, starts with a letter, and uses dots between segment
 
 ## Send an event
 
-`POST /api/v1/events` with a `type` and a `data` object. It answers `201`. Send an `Idempotency-Key` header so that the receiver can recognise a repeat.
+`POST /api/v1/events` with a `type` and a `data` object. It answers `201`. Send an `Idempotency-Key` header so the receiver can recognise a repeat.
 
 <Tabs syncKey="lang">
 <TabItem label="Node.js">
@@ -199,7 +197,7 @@ curl -X POST "$RAILHOOK_URL/api/v1/events" \
 
 ### Idempotency policy
 
-A project decides what happens to an event sent without an `Idempotency-Key`, through its `idempotencyPolicy` setting:
+The project's `idempotencyPolicy` decides what happens to an event sent without an `Idempotency-Key`:
 
 | Policy | An event sent without a key |
 |---|---|
@@ -207,11 +205,11 @@ A project decides what happens to an event sent without an `Idempotency-Key`, th
 | `AUTO` | Is accepted and gets a random key. |
 | `REQUIRED` | Is rejected. |
 
-Whatever the policy, sending a key the project has already used returns the original event instead of creating a second one.
+Under any policy, a key the project has already used returns the original event instead of creating a second one.
 
 ## What arrives at the endpoint
 
-The endpoint receives the event's `data` object as the body, not an envelope. The identifiers travel in headers:
+The body is the event's `data` object, not an envelope. Identifiers travel in headers:
 
 ```http title="A delivery"
 POST /webhooks HTTP/1.1
@@ -231,16 +229,8 @@ webhook-signature: v1,<base64>
 
 The event type is not in the body. Route on the payload or on the endpoint, or give the subscription a template that puts `type` into the body.
 
-`Idempotency-Key` is the event's key followed by `-` and the endpoint id. When the event has no key, it is the event id followed by `-` and the endpoint id. It stays the same across every attempt of the delivery.
+`Idempotency-Key` is the event's key (or, without one, the event id), then `-` and the endpoint id. It is the same on every attempt of the delivery.
 
 <Aside type="tip">
-To check that an endpoint answers before real traffic reaches it, use `POST /api/v1/projects/{projectId}/endpoints/{id}/test`. It reports whether the request succeeded, the HTTP status and the latency. The full request and response shapes are in the [API reference](/docs/api-reference/).
+To check that an endpoint answers before real traffic reaches it, use `POST /api/v1/projects/{projectId}/endpoints/{id}/test`. It reports success, the HTTP status and the latency. Request and response shapes are in the [API reference](/docs/api-reference/).
 </Aside>
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Verify signatures" href="/docs/outgoing/signatures/" description="Check that a delivery really came from Railhook." />
-  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="What happens when the endpoint does not answer 2xx." />
-  <LinkCard title="Rules" href="/docs/outgoing/rules/" description="Route, reshape or drop events by their content." />
-</CardGrid>

@@ -21,18 +21,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
-/**
- * The contract and the sandbox, in one place. Everything here runs in the unit job — the engine
- * needs no Docker and no Spring.
- */
 class JavaScriptTransformEngineTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /**
-     * Short on purpose: every escape test below has to fail *fast* or the suite takes minutes.
-     * Production defaults are an order of magnitude larger and live in {@code .env.dist}.
-     */
+    // Short so every escape test fails fast; production limits are an order of magnitude larger.
     private static final ScriptLimits LIMITS = new ScriptLimits(
             Duration.ofMillis(600), 48L * 1024 * 1024, 256 * 1024, 50, 64 * 1024);
 
@@ -64,8 +57,6 @@ class JavaScriptTransformEngineTest {
     private static TransformOutcome run(String script, String payloadJson) {
         return engine.run(script, request(payloadJson));
     }
-
-    // ── The contract ────────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("the handler contract")
@@ -183,22 +174,16 @@ class JavaScriptTransformEngineTest {
         }
 
         @Test
-        void validateAcceptsACompilableScriptAndRejectsABrokenOne() {
+        void validateAcceptsACompilableScriptAndRejectsABrokenOrHandlerlessOne() {
             engine.validate("function handler(w) { return { payload: w.payload }; }");
             assertThatThrownBy(() -> engine.validate("function handler(w) { return {{; }"))
                     .isInstanceOf(ScriptTransformException.class);
-        }
-
-        @Test
-        void validateRefusesAScriptWithNoHandlerWithoutRunningIt() {
             assertThatThrownBy(() -> engine.validate("var x = 1;"))
                     .isInstanceOf(ScriptTransformException.class)
                     .extracting(e -> ((ScriptTransformException) e).reason())
                     .isEqualTo(ScriptTransformException.Reason.CONTRACT);
         }
     }
-
-    // ── console ─────────────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("console")
@@ -247,8 +232,6 @@ class JavaScriptTransformEngineTest {
         }
     }
 
-    // ── the sandbox ─────────────────────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("the sandbox refuses")
     class Sandbox {
@@ -261,10 +244,7 @@ class JavaScriptTransformEngineTest {
             assertThat(e.reason()).isEqualTo(ScriptTransformException.Reason.TIMEOUT);
         }
 
-        /**
-         * The one that decides whether the timeout is a limit or a suggestion: a guest
-         * {@code catch} must not be able to swallow the cancellation and carry on.
-         */
+        // A guest catch/finally must not be able to swallow the cancellation and carry on.
         @Test
         void anInfiniteLoopWrappedInTryCatch() {
             ScriptTransformException e = catchThrowableOfType(() -> run("""
@@ -360,8 +340,6 @@ class JavaScriptTransformEngineTest {
             assertThat(e.reason()).isEqualTo(ScriptTransformException.Reason.SOURCE_TOO_LARGE);
         }
     }
-
-    // ── the engine keeps working ────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("after a script is killed")

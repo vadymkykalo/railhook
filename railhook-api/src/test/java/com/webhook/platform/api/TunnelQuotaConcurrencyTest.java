@@ -23,14 +23,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/**
- * The active-tunnel limit under concurrent opens, against a real Postgres.
- *
- * <p>The limit was a count taken before the insert, with nothing held in between, so two CLIs
- * opening at the same moment both counted zero and both got a tunnel on a plan that allows one.
- * Each round is a fresh Free organization and several threads released together; any round
- * ending with more than one active tunnel is the race.
- */
 @TestPropertySource(properties = "billing.enabled=true")
 class TunnelQuotaConcurrencyTest extends AbstractIntegrationTest {
 

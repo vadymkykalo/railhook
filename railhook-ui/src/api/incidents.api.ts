@@ -64,13 +64,7 @@ export const incidentsApi = {
   addTimeline: (projectId: string, incidentId: string, data: TimelineEntryRequest): Promise<IncidentResponse> =>
     http.post(`/api/v1/projects/${projectId}/incidents/${incidentId}/timeline`, data),
 
-  /**
-   * The three tile numbers, each counted over the project.
-   *
-   * <p>`count` is unresolved incidents — OPEN and INVESTIGATING together. The endpoint is still
-   * called open-count and still answers that field; the other two joined it because deriving
-   * them from `list().content` counted one page of a filtered list.
-   */
+  /** count is OPEN plus INVESTIGATING; derived from list() it counted one filtered page. */
   countOpen: (projectId: string): Promise<IncidentCounts> =>
     http.get(`/api/v1/projects/${projectId}/incidents/open-count`),
 };

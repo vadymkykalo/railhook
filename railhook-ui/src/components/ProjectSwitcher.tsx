@@ -10,15 +10,8 @@ interface ProjectSwitcherProps {
   collapsed?: boolean;
 }
 
-/** Filtering only earns its keystrokes once the list stops fitting on screen. */
 const FILTER_THRESHOLD = 7;
 
-/**
- * The switcher sits under the logo and never leaves the screen, so its whole
- * job is to answer "which project am I in?" before anyone has to ask. The
- * current project gets the name slot and an accent marker; everything else about
- * the control stays quiet.
- */
 export default function ProjectSwitcher({ currentProjectId, collapsed }: ProjectSwitcherProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -64,7 +57,6 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
   const handleSwitch = (newProjectId: string) => {
     setOpen(false);
     if (newProjectId === currentProjectId) return;
-    // Land on the same facet of the new project rather than back at its root.
     const subSection = location.pathname.match(/\/admin\/projects\/[^/]+\/(.+)/)?.[1] || 'endpoints';
     navigate(`/admin/projects/${newProjectId}/${subSection}`);
   };
@@ -75,7 +67,7 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
   const menu = open && (
     <div
       className={cn(
-        'absolute z-50 mt-1 overflow-hidden rounded-lg border border-rail bg-popover shadow-elevated animate-scale-in',
+        'absolute z-50 mt-1 overflow-hidden border border-rail bg-popover shadow-elevated animate-scale-in',
         collapsed ? 'left-0 top-full w-56' : 'left-0 right-0 top-full'
       )}
     >
@@ -103,8 +95,8 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
               <button
                 onClick={() => handleSwitch(project.id)}
                 className={cn(
-                  'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  current ? 'bg-accent/60 font-medium text-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  'flex w-full items-center gap-2.5 px-2 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  current ? 'bg-accent font-medium text-accent-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 )}
               >
                 <span
@@ -127,7 +119,7 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
         <Link
           to="/admin/projects"
           onClick={() => setOpen(false)}
-          className="block rounded-md px-2 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          className="block px-2 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
         >
           {t('nav.allProjects')}
         </Link>
@@ -145,7 +137,7 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
           aria-expanded={open}
           title={label}
           aria-label={t('nav.currentProject', { name: label })}
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary font-mono text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex h-9 w-9 items-center justify-center bg-primary font-mono text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           {initial}
         </button>
@@ -163,13 +155,13 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
         aria-expanded={open}
         aria-label={t('nav.currentProject', { name: label })}
         className={cn(
-          'flex w-full items-center gap-2.5 rounded-lg border px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+          'flex w-full items-center gap-2.5 border px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
           open ? 'border-primary/50 bg-secondary/60' : 'border-rail hover:bg-secondary/60'
         )}
       >
         <span
           aria-hidden
-          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-primary font-mono text-[13px] font-medium text-primary-foreground"
+          className="flex h-7 w-7 flex-shrink-0 items-center justify-center bg-primary font-mono text-[13px] font-medium text-primary-foreground"
         >
           {initial}
         </span>

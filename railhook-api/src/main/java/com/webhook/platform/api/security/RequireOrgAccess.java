@@ -5,11 +5,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * Requires the {@code orgId} path variable to match the caller's organization claim.
- * {@link OrgAccessAspect} throws
- * {@link com.webhook.platform.api.exception.ForbiddenException} on a mismatch.
- */
+/** Requires the {@code orgId} path variable to match the caller's organization claim. */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RequireOrgAccess {

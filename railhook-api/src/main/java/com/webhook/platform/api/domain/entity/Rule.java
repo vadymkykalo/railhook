@@ -51,7 +51,7 @@ public class Rule {
     @Column(name = "event_type_pattern", length = 255)
     private String eventTypePattern;
 
-    /** Condition tree as JSONB. NULL = match all events (no conditions). */
+    // Null matches every event.
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "JSONB")
     private String conditions;

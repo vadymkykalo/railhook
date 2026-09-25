@@ -31,15 +31,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * A deleted project is gone, on every path that can reach it.
- *
- * <p>Deleting a project only stamps {@code deleted_at}, and for a long time nothing but the
- * project list read that column: the project's API keys went on authenticating, its incoming
- * sources went on receiving webhooks, and its test endpoints went on capturing — while the plan's
- * project quota, which does count only live projects, let the owner create a replacement. Each
- * test here takes one of those paths and asks for the answer a project that never existed gets.
- */
 @AutoConfigureMockMvc
 public class DeletedProjectIsolationTest extends AbstractIntegrationTest {
 

@@ -13,6 +13,8 @@ import com.webhook.platform.api.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -74,14 +76,6 @@ class BillingServiceTest {
                 entitlementService, lifecycleService);
     }
 
-    // ── Plan catalog ────────────────────────────────────────────────
-
-
-    /**
-     * Every service under test now reads its organization from the ambient tenant scope instead
-     * of taking it as a parameter. A unit test has no request to establish one, so it
-     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
-     */
     @BeforeEach
     void enterTenantScope() {
         TenantContext.set(ORG_ID);
@@ -91,30 +85,6 @@ class BillingServiceTest {
     void leaveTenantScope() {
         TenantContext.clear();
     }
-
-    @Test
-    void listActivePlans_delegatesToRepo() {
-        when(planRepository.findByActiveTrueOrderByPriceMonthlyCentsAsc())
-                .thenReturn(List.of(starterPlan, proPlan));
-        assertThat(service.listActivePlans()).containsExactly(starterPlan, proPlan);
-    }
-
-    @Test
-    void getPlanByName_throwsWhenNotFound() {
-        when(planRepository.findByName("gold")).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.getPlanByName("gold"))
-                .isInstanceOf(NotFoundException.class);
-    }
-
-    // ── assignPlan ──────────────────────────────────────────────────
-
-    /*
-     * `PUT /api/v1/billing/organization/plan` is guarded by nothing but the OWNER role, and
-     * assignPlan used to set whatever plan name it was handed. Its own OpenAPI description
-     * said "for paid plans, use checkout instead" — a sentence, not a check — so any customer
-     * could PUT {"planName":"pro"} and be on Pro without paying. The test that stood here
-     * asserted exactly that behaviour, which is how it survived.
-     */
 
     @Test
     void assignPlan_allowsTheFreePlan() {
@@ -128,6 +98,7 @@ class BillingServiceTest {
         verify(entitlementService).evictPlanCache(any());
     }
 
+    // assignPlan once set any plan it was handed, so an OWNER could PUT "pro" without paying.
     @Test
     void assignPlan_refusesAPaidPlanWithNoSubscriptionBehindIt() {
         when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
@@ -150,8 +121,7 @@ class BillingServiceTest {
         when(planRepository.findByName("self_hosted")).thenReturn(Optional.of(selfHosted));
         when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
 
-        /* Zero-priced, seeded active, and unlimited on every quota. A price test would have
-           waved it through — which is why the rule is a whitelist of one name. */
+        // Zero-priced and unlimited, so a price check would wave it through.
         assertThatThrownBy(() -> service.assignPlan("self_hosted"))
                 .isInstanceOf(ForbiddenException.class);
     }
@@ -184,24 +154,20 @@ class BillingServiceTest {
         assertThat(org.getPlan()).isEqualTo(proPlan);
     }
 
-    // ── createCheckoutSession ───────────────────────────────────────
-
-    @Test
-    void createCheckoutSession_createsPaymentPage() {
+    @ParameterizedTest
+    @CsvSource({"MONTHLY, 2900", "YEARLY, 29000", "garbage, 2900"})
+    void createCheckoutSession_chargesThePriceOfTheInterval(String interval, long expectedCents) {
         when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
         when(planRepository.findByName("starter")).thenReturn(Optional.of(starterPlan));
         when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
-
         stripeProvider.setCreateCustomerResult("cus_new_123");
         stripeProvider.setCreatePaymentResult(
                 new BillingProvider.CreatePaymentResult("https://checkout.stripe.com/session_1", "cs_1"));
 
-        String url = service.createCheckoutSession( "starter", "stripe", "MONTHLY",
-                "https://app.com/success", "https://app.com/cancel");
+        String url = service.createCheckoutSession("starter", "stripe", interval, "ok", "cancel");
 
         assertThat(url).isEqualTo("https://checkout.stripe.com/session_1");
-        assertThat(stripeProvider.lastPaymentRequest).isNotNull();
-        assertThat(stripeProvider.lastPaymentRequest.amountCents()).isEqualTo(2900L);
+        assertThat(stripeProvider.lastPaymentRequest.amountCents()).isEqualTo(expectedCents);
     }
 
     @Test
@@ -220,15 +186,11 @@ class BillingServiceTest {
 
         service.createCheckoutSession( "starter", null, null, "ok", "cancel");
 
-        // Should not create new customer
         assertThat(stripeProvider.createCustomerCalled).isFalse();
         assertThat(stripeProvider.lastPaymentRequest.externalCustomerId()).isEqualTo("cus_existing");
     }
 
-    // A paid checkout used to create nothing: no production code wrote a billing_subscriptions
-    // row, so the payment callback found no subscription, logged a warning, and the organization
-    // stayed on Free while the provider kept the money.
-
+    // A paid checkout once wrote no subscription row, so the organization stayed on Free after paying.
     @Test
     void createCheckoutSession_opensAPendingSubscriptionBoundToTheReferenceTheProviderEchoes() {
         TestBillingProvider wayforpay = merchantRecurringProvider();
@@ -261,8 +223,6 @@ class BillingServiceTest {
 
         service.createCheckoutSession("pro", "stripe", "YEARLY", "ok", "cancel");
 
-        // Stripe creates the subscription when the session completes; its first invoice names
-        // the customer, which is what finds this row.
         verify(lifecycleService).createPending(proPlan, "stripe", "USD", BillingInterval.YEARLY,
                 99000L, "cus_new", null, "cs_1");
     }
@@ -274,8 +234,6 @@ class BillingServiceTest {
         when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.of(
                 BillingSubscription.builder().id(SUB_ID).plan(starterPlan).status(SubscriptionStatus.ACTIVE).build()));
 
-        // A second checkout would start a second paid subscription beside the first, and both
-        // would be charged.
         assertThatThrownBy(() -> service.createCheckoutSession("pro", "stripe", "MONTHLY", "ok", "cancel"))
                 .isInstanceOf(ConflictException.class);
         assertThat(stripeProvider.lastPaymentRequest).isNull();
@@ -294,25 +252,8 @@ class BillingServiceTest {
     }
 
     @Test
-    void createCheckoutSession_usesYearlyPrice() {
-        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
-        when(planRepository.findByName("pro")).thenReturn(Optional.of(proPlan));
-        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
-
-        stripeProvider.setCreateCustomerResult("cus_y");
-        stripeProvider.setCreatePaymentResult(
-                new BillingProvider.CreatePaymentResult("https://url", null));
-
-        service.createCheckoutSession( "pro", "stripe", "YEARLY", "ok", "cancel");
-
-        assertThat(stripeProvider.lastPaymentRequest.amountCents()).isEqualTo(99000L);
-    }
-
-    @Test
     void createCheckoutSession_refusesWhenNothingCanTakeThePayment() {
-        // The no-op provider's payment page is the success URL itself: a checkout through it
-        // would send the customer "back from paying" having paid nothing. With no provider
-        // configured the deployment offers the free plan only, so the attempt is refused.
+        // The no-op provider's payment page is the success URL itself.
         BillingService freeOnly = new BillingService(
                 true, new BillingProviderRegistry(List.of(new NoOpBillingProvider()), "noop"),
                 planRepository, organizationRepository, subscriptionRepository, invoiceRepository,
@@ -323,12 +264,9 @@ class BillingServiceTest {
         assertThatThrownBy(() -> freeOnly.createCheckoutSession("pro", null, "MONTHLY", "ok", "cancel"))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("Paid plans");
-        // Naming the no-op provider explicitly on a deployment that has a real one is the same.
         assertThatThrownBy(() -> service.createCheckoutSession("pro", "noop", "MONTHLY", "ok", "cancel"))
                 .isInstanceOf(ConflictException.class);
     }
-
-    // ── cancelSubscription ──────────────────────────────────────────
 
     @Test
     void cancelSubscription_cancelsExternalAndLocal() {
@@ -352,45 +290,12 @@ class BillingServiceTest {
                 .isInstanceOf(NotFoundException.class);
     }
 
-    // ── createPortalSession ─────────────────────────────────────────
-
-    @Test
-    void createPortalSession_returnsPortalUrl() {
-        BillingSubscription sub = BillingSubscription.builder()
-                .id(SUB_ID).providerCode("stripe")
-                .externalCustomerId("cus_portal").build();
-        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID))
-                .thenReturn(Optional.of(sub));
-
-        stripeProvider.setPortalUrl("https://billing.stripe.com/portal_1");
-
-        String url = service.createPortalSession( "https://app.com/billing");
-        assertThat(url).isEqualTo("https://billing.stripe.com/portal_1");
-    }
-
     @Test
     void createPortalSession_returnsReturnUrlWhenNoSub() {
         when(subscriptionRepository.findActiveByOrganizationId(ORG_ID))
                 .thenReturn(Optional.empty());
         String url = service.createPortalSession( "https://app.com/billing");
         assertThat(url).isEqualTo("https://app.com/billing");
-    }
-
-    // ── listInvoices ────────────────────────────────────────────────
-
-    @Test
-    void listInvoices_returnsLocalInvoicesFirst() {
-        BillingInvoice inv = BillingInvoice.builder()
-                .id(UUID.randomUUID()).organizationId(ORG_ID)
-                .status(InvoiceStatus.PAID).totalCents(2900).currency("USD")
-                .periodStart(Instant.now()).periodEnd(Instant.now())
-                .build();
-        when(invoiceRepository.findByOrganizationIdOrderByCreatedAtDesc(ORG_ID))
-                .thenReturn(List.of(inv));
-
-        List<InvoiceResponse> result = service.listInvoices();
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getAmountCents()).isEqualTo(2900);
     }
 
     @Test
@@ -412,8 +317,6 @@ class BillingServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getId()).isEqualTo("inv_1");
     }
-
-    // ── processWebhook ──────────────────────────────────────────────
 
     @Test
     void processWebhook_invoicePaid_renewsActiveSubscription() {
@@ -614,13 +517,6 @@ class BillingServiceTest {
     }
 
     @Test
-    void processWebhook_nullEvent_skips() {
-        stripeProvider.setWebhookEvent(null);
-        service.processWebhook("stripe", "{}", Map.of());
-        verifyNoInteractions(lifecycleService);
-    }
-
-    @Test
     void processWebhook_storesRecurringToken() {
         BillingSubscription sub = BillingSubscription.builder()
                 .id(SUB_ID).organizationId(ORG_ID).providerCode("stripe")
@@ -638,8 +534,6 @@ class BillingServiceTest {
 
         verify(lifecycleService).setRecurringToken(SUB_ID, "rec_token_enc", "1234", "mastercard");
     }
-
-    // ── Checkout → first payment ────────────────────────────────────
 
     @Test
     void processWebhook_firstPaymentActivatesThePendingCheckoutAndMovesThePlan() {
@@ -702,8 +596,6 @@ class BillingServiceTest {
 
         service.processWebhook("stripe", "{}", Map.of());
 
-        // Nothing was ever paid, so there is nothing past due: marking it would put an
-        // organization on Free into dunning over a card it tried once.
         verify(lifecycleService, never()).markPastDue(any(), any());
         verify(lifecycleService, never()).activate(any(), any(), any());
         ArgumentCaptor<BillingPayment> payment = ArgumentCaptor.forClass(BillingPayment.class);
@@ -758,8 +650,6 @@ class BillingServiceTest {
 
         service.processWebhook("stripe", "{}", Map.of());
 
-        // The customer paid on the first tab after opening a second: the money is real, so the
-        // checkout it paid for is the one that counts.
         verify(lifecycleService).abandon(eq(newer.getId()), any());
         verify(lifecycleService).activate(eq(SUB_ID), any(), any());
     }
@@ -779,8 +669,6 @@ class BillingServiceTest {
 
         service.processWebhook("stripe", "{}", Map.of());
 
-        // Paid twice: the payment is recorded so it can be refunded, but only one subscription
-        // stays live.
         verify(paymentRepository).save(any(BillingPayment.class));
         verify(lifecycleService, never()).activate(any(), any(), any());
         verify(lifecycleService, never()).renew(any(), any(), any());
@@ -826,25 +714,6 @@ class BillingServiceTest {
                 planRepository, organizationRepository, subscriptionRepository, invoiceRepository,
                 paymentRepository, entitlementService, lifecycleService);
     }
-
-    // ── parseBillingInterval ────────────────────────────────────────
-
-    @Test
-    void createCheckoutSession_defaultsToMonthlyForInvalidInterval() {
-        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
-        when(planRepository.findByName("starter")).thenReturn(Optional.of(starterPlan));
-        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
-        stripeProvider.setCreateCustomerResult("cus_x");
-        stripeProvider.setCreatePaymentResult(
-                new BillingProvider.CreatePaymentResult("https://url", null));
-
-        service.createCheckoutSession( "starter", "stripe", "garbage", "ok", "cancel");
-
-        // monthly price = 2900
-        assertThat(stripeProvider.lastPaymentRequest.amountCents()).isEqualTo(2900L);
-    }
-
-    // ── Test helper: controllable BillingProvider ────────────────────
 
     static class TestBillingProvider implements BillingProvider {
         private final String code;

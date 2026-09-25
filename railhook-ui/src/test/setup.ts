@@ -7,18 +7,11 @@ import uk from '../i18n/locales/uk.json';
 
 expect.extend(toHaveNoViolations);
 
-// Production loads each locale via a dynamic import() the first time it's
-// needed (see src/i18n) so useTranslation() can suspend on first render or on
-// a language switch. renderPage() wraps in a <Suspense> boundary for that
-// case, but preloading both bundles synchronously here keeps ordinary page
-// tests from paying an extra async tick (and a Suspense fallback flash) on
-// every render() call.
+// Preloaded so page tests skip the lazy locale import and its Suspense tick.
 i18n.addResourceBundle('en', 'translation', en, true, true);
 i18n.addResourceBundle('uk', 'translation', uk, true, true);
 
-// jsdom implements neither, and React Flow measures its canvas with both on mount. Without
-// them the workflow builder throws during render rather than rendering an empty canvas, so a
-// test of that page would only ever be testing the absence of a polyfill.
+// jsdom lacks both, and React Flow measures its canvas with them on mount.
 class NoopResizeObserver implements ResizeObserver {
   observe() {}
   unobserve() {}
@@ -30,9 +23,7 @@ globalThis.DOMMatrixReadOnly ??= class {
   constructor(_transform?: string) {}
 } as unknown as typeof DOMMatrixReadOnly;
 
-// jsdom has no matchMedia, and code that asks whether it is on a phone — the contact sheet locks
-// the page behind it there, and only there — would otherwise throw on mount instead of rendering.
-// Reports "not a phone", which is the viewport every page test assumes.
+// jsdom has no matchMedia; report "not a phone", the viewport page tests assume.
 globalThis.matchMedia ??= ((query: string) => ({
   matches: false,
   media: query,

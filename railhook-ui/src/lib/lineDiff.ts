@@ -3,9 +3,7 @@ export type DiffKind = 'same' | 'added' | 'removed';
 export interface DiffLine {
   kind: DiffKind;
   text: string;
-  /** 1-based line number on the left, or null for an added line. */
   leftNumber: number | null;
-  /** 1-based line number on the right, or null for a removed line. */
   rightNumber: number | null;
 }
 
@@ -15,21 +13,7 @@ export interface LineDiff {
   removed: number;
 }
 
-/**
- * A line diff over two documents, computed here rather than fetched or imported.
- *
- * `@codemirror/merge` would do this too, and was not worth a dependency: what a
- * transformation's Diff tab shows is two pretty-printed JSON documents that are
- * mostly the same shape, and for that a unified list of added, removed and
- * unchanged lines is both smaller and easier to read than a side-by-side with
- * its own scroll sync.
- *
- * Classic LCS, over lines. The inputs here are one webhook payload each — tens
- * to a few hundred lines — so the quadratic table is a few thousand cells, and
- * the guard below stops a pathological pair (a script that returned a megabyte)
- * from turning a tab switch into a frozen page: past the cap it degrades to
- * "everything changed", which is both true and cheap.
- */
+/** Past the cap it degrades to "everything changed", so a huge output cannot freeze the tab. */
 const MAX_LINES_FOR_LCS = 2000;
 
 export function lineDiff(before: string, after: string): LineDiff {
@@ -47,7 +31,6 @@ export function lineDiff(before: string, after: string): LineDiff {
     };
   }
 
-  // table[i][j] = length of the longest common subsequence of left[i..] and right[j..]
   const table: number[][] = Array.from({ length: left.length + 1 }, () =>
     new Array<number>(right.length + 1).fill(0));
 
@@ -94,11 +77,6 @@ export function lineDiff(before: string, after: string): LineDiff {
   return { lines, added, removed };
 }
 
-/**
- * Drops long stretches of unchanged lines, keeping `context` on either side of
- * every change. A transformation that renames one field in a 200-line payload
- * should not make you scroll for it.
- */
 export function collapseUnchanged(lines: DiffLine[], context = 3): Array<DiffLine | { kind: 'gap'; count: number }> {
   const keep = new Array<boolean>(lines.length).fill(false);
   lines.forEach((line, index) => {

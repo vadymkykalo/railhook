@@ -36,7 +36,6 @@ import { usePermissions } from '../auth/usePermissions';
 const SCOPES: ApiKeyScope[] = ['READ_WRITE', 'READ_ONLY'];
 const PAGE_SIZE = 20;
 
-/** A key is identified by its prefix and nothing else once it has been issued. */
 function KeyFingerprint({ prefix }: { prefix: string }) {
   return (
     <span className="font-mono text-[13px] text-muted-foreground">
@@ -144,9 +143,6 @@ export default function ApiKeysPage() {
       });
       setRotating(null);
       setCopied(false);
-      // Straight into the same one-and-only-sighting dialog the create flow uses: a rotation
-      // produces a real key that is shown exactly once, and inventing a second way to show it
-      // would be two places to get "you cannot see this again" wrong.
       setNewApiKey(replacement);
       loadData();
     } catch (err: any) {
@@ -209,8 +205,6 @@ export default function ApiKeysPage() {
         <div className="animate-fade-in space-y-3">
           {apiKeys.map((apiKey) => {
             const expired = !!apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date();
-            // A key with a rotated-at is not merely expiring, it is being handed over: its
-            // successor is already live and this one stops working when the window closes.
             const retiring = !!apiKey.rotatedAt && !expired;
             return (
               <Card key={apiKey.id}>
@@ -222,7 +216,7 @@ export default function ApiKeysPage() {
                         kind={expired ? 'halt' : retiring ? 'retry' : 'ok'}
                         label={t(expired ? 'apiKeys.expired' : retiring ? 'apiKeys.retiring' : 'apiKeys.activeKey')}
                       />
-                      <span className="rounded-md border border-rail px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                      <span className="border border-rail px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
                         {t(apiKey.scope === 'READ_ONLY' ? 'apiKeys.scopeReadOnly' : 'apiKeys.scopeReadWrite')}
                       </span>
                     </div>
@@ -260,7 +254,7 @@ export default function ApiKeysPage() {
                       onClick={() => { setRotateGraceHours('24'); setRotating(apiKey); }}
                       title={t('apiKeys.rotate')}
                       aria-label={t('apiKeys.rotateNamed', { name: apiKey.name })}
-                      className="flex-shrink-0 text-muted-foreground hover:text-primary"
+                      className="flex-shrink-0 text-muted-foreground hover:text-foreground"
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
                     </Button>
@@ -297,7 +291,6 @@ export default function ApiKeysPage() {
 
       {projectId && <ConnectedMcpApps projectId={projectId} />}
 
-      {/* Create */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
@@ -332,8 +325,8 @@ export default function ApiKeysPage() {
                       disabled={creating}
                       onClick={() => setScope(s)}
                       className={cn(
-                        'rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                        scope === s ? 'border-primary bg-accent/40' : 'border-rail bg-card hover:border-primary/40'
+                        'border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                        scope === s ? 'border-primary bg-secondary' : 'border-rail bg-card hover:border-primary/40'
                       )}
                     >
                       <span className="flex items-center gap-2 text-sm font-medium">
@@ -373,7 +366,6 @@ export default function ApiKeysPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Rotate: the create-then-revoke race, done by the server instead of by hand. */}
       <ConfirmDialog
         open={!!rotating}
         onOpenChange={(open) => !open && setRotating(null)}
@@ -404,7 +396,6 @@ export default function ApiKeysPage() {
         </div>
       </ConfirmDialog>
 
-      {/* Revoke */}
       <DangerConfirmDialog
         open={!!revoking}
         onOpenChange={(open) => !open && setRevoking(null)}
@@ -421,7 +412,6 @@ export default function ApiKeysPage() {
         confirmLabel={t('apiKeys.revoke')}
       />
 
-      {/* The one and only sighting of the secret. */}
       <Dialog open={!!newApiKey} onOpenChange={(open) => { if (!open) { setNewApiKey(null); setCopied(false); } }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -430,14 +420,14 @@ export default function ApiKeysPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <p className="flex items-start gap-2.5 rounded-lg border border-retry/40 bg-retry-soft p-3.5 text-sm font-medium text-retry">
+            <p className="flex items-start gap-2.5 border border-retry/40 bg-retry-soft p-3.5 text-sm font-medium text-retry">
               <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
               {t('apiKeys.keyDialog.onlyChance')}
             </p>
 
             <div className="space-y-2">
               <Label htmlFor="new-key">{t('apiKeys.keyDialog.label')}</Label>
-              <div className="rounded-lg border border-rail bg-secondary/60 p-3">
+              <div className="border border-rail bg-secondary/60 p-3">
                 <code id="new-key" className="block break-all font-mono text-[13px] leading-relaxed">
                   {newApiKey?.key}
                 </code>
@@ -455,7 +445,7 @@ export default function ApiKeysPage() {
 
             <div className="space-y-1.5">
               <p className="mono-label">{t('apiKeys.keyDialog.howToUse')}</p>
-              <pre className="overflow-x-auto rounded-lg border border-rail bg-secondary/60 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
+              <pre className="overflow-x-auto border border-rail bg-secondary/60 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
 {sendEventCurl({ payload: '{"type":"user.created","data":{"userId":"123"}}', apiKey: '$RAILHOOK_API_KEY' })}
               </pre>
             </div>

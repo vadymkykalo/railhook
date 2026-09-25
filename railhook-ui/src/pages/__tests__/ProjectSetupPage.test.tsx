@@ -34,11 +34,6 @@ function renderSetup(segment: string) {
   );
 }
 
-/**
- * The screen a rail entry opens when the organization has no project yet. It replaces a silent
- * bounce back to the projects list, so it has to say what the section is for, offer the one thing
- * that unlocks it, and then actually take the person where they were going.
- */
 describe('ProjectSetupPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();

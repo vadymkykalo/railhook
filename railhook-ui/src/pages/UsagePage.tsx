@@ -31,8 +31,7 @@ export default function UsagePage() {
     data: usage, isLoading, isError, error, isFetching, refetch,
   } = useUsageStats(projectId, days);
 
-  // The organization's plan, not the project's traffic: the same key BillingPage
-  // reads, so the two screens can never show different remaining quota.
+  // Same key BillingPage reads, so the two screens never disagree on quota.
   const { data: quota } = useQuery({
     queryKey: ['billing', 'usage'],
     queryFn: billingApi.getUsage,
@@ -107,7 +106,6 @@ export default function UsagePage() {
       </div>
 
       <div className="space-y-4">
-        {/* Quota against limit — the question this tab exists to answer. */}
         <section>
           <div className="mb-3">
             <h3 className="text-sm font-medium leading-tight">{t('usage.quota.title')}</h3>
@@ -162,7 +160,6 @@ export default function UsagePage() {
           <StatTile label={t('usage.resources.alertRules')} value={formatCompact(current?.activeAlertRules ?? 0)} hint={t('usage.tiles.alertRulesHint')} />
         </div>
 
-        {/* The chart's table twin: every plotted value readable without hovering. */}
         <Card className="overflow-hidden">
           <div className="px-5 pb-3 pt-5">
             <h3 className="text-sm font-medium leading-tight">{t('usage.history.title')}</h3>

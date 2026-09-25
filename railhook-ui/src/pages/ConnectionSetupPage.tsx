@@ -25,19 +25,7 @@ import SignatureSchemePicker, { sendsStandardHeaders } from '../components/Signa
 import SecretField from '../components/SecretField';
 import type { SignatureScheme } from '../types/api.types';
 
-/**
- * Creating a connection.
- *
- * This used to be a 693-line page you navigated to — a fourth destination for
- * the job the Connections tab already names. It is now a flow: `ConnectionsPage`
- * opens it in a dialog, and the route that still points here renders the same
- * flow full-page so an existing link keeps working.
- *
- * The step order also changed. The old wizard collected the retry ladder in
- * step 5 but had already written the subscriptions in step 4, so a ladder the
- * person chose was silently dropped. Here the subscriptions are written once,
- * at the end, with the ladder that was actually chosen.
- */
+/** Subscriptions are written once, at the end, so the chosen retry ladder is not dropped. */
 
 function generateSecret(): string {
   const array = new Uint8Array(32);
@@ -45,7 +33,6 @@ function generateSecret(): string {
   return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-/** Seconds → the shortest honest unit, for a ladder preview. */
 export function formatLadderDelay(seconds: number): string {
   if (seconds >= 86400) return `${Math.round(seconds / 86400)}d`;
   if (seconds >= 3600) return `${Math.round(seconds / 3600)}h`;
@@ -53,7 +40,6 @@ export function formatLadderDelay(seconds: number): string {
   return `${seconds}s`;
 }
 
-/** A comma-separated delay list → rail ticks, ignoring anything unparseable. */
 export function ladderTicks(retryDelays: string, maxAttempts: number): RailAttempt[] {
   const delays = retryDelays
     .split(',')
@@ -83,16 +69,10 @@ const SUGGESTED_EVENT_TYPES = [
 
 export interface ConnectionSetupFlowProps {
   projectId: string;
-  /** Called once the connection exists, so the opener can close and refresh. */
   onDone?: () => void;
-  /** Rendered as the flow's own cancel control when the opener wants one. */
   onCancel?: () => void;
 }
 
-/**
- * The five steps, laid out for whatever frame holds them: a dialog on the
- * Connections tab, or the full page below.
- */
 export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionSetupFlowProps) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -158,12 +138,7 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
     }
   };
 
-  /**
-   * The endpoint already exists by this step, so a change is a write, not a
-   * pending form value. `rateLimitPerSecond` is absent here only because the
-   * wizard has not offered it yet — the API reads that field unconditionally,
-   * so an update that omits one it *has* been given would clear it.
-   */
+  /** Omits rateLimitPerSecond only because the wizard never sets one; the API clears it when absent. */
   const handleSchemeChange = async (next: SignatureScheme) => {
     if (!endpointId) return;
     const previous = signatureScheme;
@@ -236,8 +211,6 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
 
   return (
     <div className="space-y-5">
-      {/* Where in the flow we are — ticks, not a progress bar: the steps are
-          discrete and one of them (the test) is optional. */}
       <div>
         <div className="mono-label mb-2">
           {t('connectionSetup.stepCounter', 'Step {{n}} of {{total}} · {{name}}', {
@@ -251,7 +224,7 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
             <li
               key={s}
               className={cn(
-                'h-1 flex-1 rounded-full transition-colors',
+                'h-1 flex-1 transition-colors',
                 i < stepIndex ? 'bg-primary' : i === stepIndex ? 'bg-primary/60' : 'bg-rail'
               )}
             />
@@ -296,16 +269,13 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
           {secret ? (
             <>
               <SecretField secret={secret} label={t('connectionSetup.secret.label', 'Signing secret')} />
-              {/* Derived from the same secret, but the only form a Standard
-                  Webhooks library will take — and useless to an endpoint that
-                  is sent no Standard Webhooks headers. */}
               {standardSecret && sendsStandardHeaders(signatureScheme) && (
                 <>
                   <SecretField secret={standardSecret} label={t('connectionSetup.secret.standardLabel')} />
                   <p className="text-xs text-muted-foreground">{t('connectionSetup.secret.standardHint')}</p>
                 </>
               )}
-              <div className="flex items-start gap-2.5 rounded-lg border border-retry/30 bg-retry-soft p-3">
+              <div className="flex items-start gap-2.5 border border-retry/30 bg-retry-soft p-3">
                 <KeyRound className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
                 <p className="text-xs text-retry">{t('connectionSetup.steps.secret.warning')}</p>
               </div>
@@ -329,7 +299,7 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
             {t('connectionSetup.steps.test.send')}
           </Button>
           {testResult && (
-            <div className="rounded-lg border border-rail p-3">
+            <div className="border border-rail p-3">
               <StatusBadge
                 kind={testResult.success ? 'ok' : 'halt'}
                 label={testResult.success ? t('connectionSetup.steps.test.passed') : t('connectionSetup.steps.test.failed')}
@@ -361,7 +331,7 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
                     prev.includes(type) ? prev : [...prev.filter((v) => v.trim()), type]
                   )
                 }
-                className="rounded-md border border-rail px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                className="border border-rail px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
               >
                 + {type}
               </button>
@@ -440,7 +410,7 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
             />
             <p className="text-xs text-muted-foreground">{t('connectionSetup.steps.retry.delaysHint')}</p>
           </div>
-          <div className="rounded-lg border border-rail p-4">
+          <div className="border border-rail p-4">
             <div className="mono-label mb-2">{t('connectionSetup.steps.retry.preview')}</div>
             <AttemptRail
               attempts={ticks}
@@ -502,10 +472,7 @@ export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionS
   );
 }
 
-/**
- * The route that used to be the wizard's home. Another workstream owns the
- * router, so the path stays live and renders the same flow full-page.
- */
+/** Kept so existing links to the old wizard route still work. */
 export default function ConnectionSetupPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
@@ -524,8 +491,7 @@ export default function ConnectionSetupPage() {
     );
   }
 
-  // A wizard whose fetch failed would otherwise write into a project we could
-  // not confirm exists — an empty form, then a 404 on submit.
+  // Otherwise the wizard writes into a project we could not confirm exists.
   if (isError) {
     return (
       <div className="p-4 lg:p-6">

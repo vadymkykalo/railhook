@@ -46,8 +46,7 @@ async function sendEvent() {
   fireEvent.click(screen.getByRole('button', { name: /send & inspect/i }));
 }
 
-// The console mounts CodeMirror and walks fake time through a send, a poll and a second send; the
-// default 5s budget is too tight for that on a loaded CI runner.
+// CodeMirror plus fake-time polling outruns the default 5s on a loaded CI runner.
 describe('TestConsolePage delivery polling', { timeout: 20_000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();

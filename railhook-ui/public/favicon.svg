@@ -1,7 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <!-- Flat brand cobalt, the same #1D4BFF as the primary token. No gradients. -->
-  <rect width="32" height="32" rx="7" fill="#1D4BFF"/>
-  <path d="M8 7v12c0 3.9 3.1 7 7 7s7-3.1 7-7v-6" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M19 16l3-3 3 3" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <circle cx="8" cy="7" r="2" fill="#FFFFFF"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none">
+  <style>
+    .m { stroke: #000; }
+    .o { fill: #000; }
+    @media (prefers-color-scheme: dark) {
+      .m { stroke: #fff; }
+      .o { fill: #fff; }
+    }
+  </style>
+  <g class="m" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5.25 3.5v6.75a4 4 0 0 0 8 0V8.5"/>
+    <path d="M10.25 6.25l3-2.75 3 2.75"/>
+  </g>
+  <circle class="o" cx="5.25" cy="3.5" r="1.75"/>
 </svg>

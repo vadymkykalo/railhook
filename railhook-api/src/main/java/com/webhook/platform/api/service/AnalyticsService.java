@@ -90,8 +90,7 @@ public class AnalyticsService {
         long totalDeliveries = deliveryRepository.countByProjectIdAndCreatedAtBetween(projectId, from, to);
         long successfulDeliveries = deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
                 projectId, DeliveryStatus.SUCCESS, from, to);
-        // FAILED and DLQ are both terminal failures; the time series counts them
-        // together, so the overview card has to agree or the chart contradicts it.
+        // FAILED and DLQ together, as the time series counts them, so the card agrees with the chart.
         long failedDeliveries = deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
                 projectId, DeliveryStatus.FAILED, from, to)
                 + deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(

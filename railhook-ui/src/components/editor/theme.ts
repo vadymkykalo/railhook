@@ -2,19 +2,7 @@ import { EditorView } from '@codemirror/view';
 import { HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 
-/**
- * One editor skin, shared by the JSON surface and the script surface.
- *
- * It lived inside `JsonEditor` until there was a second editor, and copying it
- * would have meant two editors drifting apart in a product whose whole point is
- * that the preview and the delivery do not. Every colour is a design token read
- * through a CSS custom property, so CodeMirror repaints with the app for free.
- *
- * The syntax palette is deliberately two-tone. The four status hues are reserved
- * for statuses, so a JSON string is not allowed to be "ok green"; keys and
- * keywords carry the brand accent, values carry ink, and the rest is separated
- * by weight and italics rather than by inventing colours.
- */
+/** Two-tone: the four status hues are reserved, so a JSON string must not be "ok green". */
 export const tokenHighlight = HighlightStyle.define([
   { tag: tags.propertyName, color: 'hsl(var(--primary))', fontWeight: '500' },
   { tag: tags.string, color: 'hsl(var(--foreground))' },
@@ -27,8 +15,6 @@ export const tokenHighlight = HighlightStyle.define([
   { tag: tags.squareBracket, color: 'hsl(var(--muted-foreground))' },
   { tag: tags.invalid, color: 'hsl(var(--halt))' },
 
-  // JavaScript only. Same two-tone rule: structure in accent, content in ink,
-  // everything else demoted rather than given a hue of its own.
   { tag: tags.keyword, color: 'hsl(var(--primary))', fontWeight: '500' },
   { tag: tags.controlKeyword, color: 'hsl(var(--primary))', fontWeight: '500' },
   { tag: tags.definitionKeyword, color: 'hsl(var(--primary))', fontWeight: '500' },
@@ -53,7 +39,6 @@ export interface EditorSkin {
   isDark: boolean;
 }
 
-/** The chrome: sizing, gutters, caret, selection, focus ring — all in tokens. */
 export function editorTheme({ minHeight, maxHeight, readOnly, isDark }: EditorSkin) {
   return EditorView.theme(
     {
@@ -113,12 +98,7 @@ export function editorTheme({ minHeight, maxHeight, readOnly, isDark }: EditorSk
         color: 'hsl(var(--muted-foreground))',
         fontStyle: 'italic',
       },
-      // The failure line. A script that throws names a line, and that line is the
-      // one thing the author needs to find — so it is marked in the document, not
-      // only described in a panel that has scrolled away.
-      // Stronger in dark: the same 18% tint that reads clearly on paper disappears
-      // against a dark editor, and the failing line is the one thing on this screen
-      // that must not be easy to miss.
+      // Stronger in dark: the 18% tint that reads on paper vanishes on a dark editor.
       '.cm-lintRange-error': {
         backgroundImage: 'none',
         backgroundColor: isDark ? 'hsl(var(--halt) / 0.32)' : 'hsl(var(--halt) / 0.18)',

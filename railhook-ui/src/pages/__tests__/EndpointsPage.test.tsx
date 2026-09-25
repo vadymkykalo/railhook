@@ -148,10 +148,6 @@ describe('EndpointsPage', () => {
   });
 
   it('lets the creator choose a signature scheme, and sends the one they chose', async () => {
-    /* The picker was wired into the two Connection surfaces and not into this one, which is
-       the flat sibling list — so an endpoint created here silently took the BOTH default and
-       nobody was shown that there was a decision. The scheme decides which headers a
-       receiver has to verify, which is the first thing their developer needs to know. */
     vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
     vi.mocked(endpointsApi.listPaged).mockResolvedValue(emptyPage());
     vi.mocked(endpointsApi.create).mockResolvedValue({ ...ENDPOINT, secret: 'whsec_x' } as any);

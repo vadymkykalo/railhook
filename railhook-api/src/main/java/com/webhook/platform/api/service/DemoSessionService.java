@@ -13,16 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Duration;
 import java.time.Instant;
 
-/**
- * Opens read-only sessions in the public demo for visitors with no account.
- *
- * <p>What a session is, and is not, is the whole of the safety argument, so it is stated here:
- * an access token for {@link DemoTenant#USER_ID} in {@link DemoTenant#ORGANIZATION_ID} as a
- * Viewer, carrying the demo claim, for {@code demo.session-ttl-minutes}. No refresh token, no
- * session row, no cookie: it cannot be renewed or listed, and when it expires the demo is over.
- * Everything it may do is decided elsewhere — {@code ScopeEnforcementInterceptor} refuses every
- * change it attempts.
- */
+/** A Viewer access token with the demo claim and no refresh token, session row or cookie. */
 @Service
 public class DemoSessionService {
 
@@ -45,7 +36,7 @@ public class DemoSessionService {
         return enabled;
     }
 
-    /** Refuses with a 404 where the demo is off, so an installation that never enabled it has no such thing. */
+    // A 404 where the demo is off, so an installation that never enabled it has no such thing.
     public void requireEnabled() {
         if (!enabled) {
             throw new NotFoundException("The demo is not enabled on this server");
@@ -54,9 +45,7 @@ public class DemoSessionService {
 
     public DemoSessionResponse open() {
         requireEnabled();
-        // The token names a person and an organization, and every guard downstream trusts that the
-        // person is a Viewer there. Check it rather than assume the seeder ran: on a first start
-        // the seeding may still be under way, and a token for a missing member is a broken demo.
+        // Downstream guards trust the Viewer membership, and the seeder may still be running.
         Integer members = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM memberships WHERE user_id = ? AND organization_id = ? "
                         + "AND role = 'VIEWER' AND status = 'ACTIVE'",

@@ -43,10 +43,6 @@ function renderSource(overrides: Partial<IncomingSourceResponse>) {
   });
 }
 
-/**
- * A Stripe source showed "X-Signature" and a cURL with no signature at all, so the one example the
- * page gave could only ever be answered with 401.
- */
 describe('IncomingSourceDetailPage — how a request is signed', () => {
   beforeEach(() => {
     vi.clearAllMocks();

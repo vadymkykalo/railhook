@@ -8,6 +8,9 @@ import com.webhook.platform.common.enums.VerificationMode;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -16,6 +19,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.spec.ECGenParameterSpec;
@@ -23,6 +27,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -37,9 +42,7 @@ class WebhookVerifierTest {
     private static final String SECRET = "whsec_test_secret_key";
     private static final String BODY = "{\"event\":\"push\",\"ref\":\"refs/heads/main\"}";
     /** The same body as bytes: verifiers sign what arrived, not a re-encoding of it. */
-    private static final byte[] BODY_BYTES = BODY.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-
-    // ======================== GenericHmacVerifier ========================
+    private static final byte[] BODY_BYTES = BODY.getBytes(StandardCharsets.UTF_8);
 
     @Test
     void genericHmac_success() {
@@ -87,8 +90,6 @@ class WebhookVerifierTest {
         assertThat(result.error()).contains("Signature mismatch");
     }
 
-    // ======================== GitHubVerifier ========================
-
     @Test
     void github_success() {
         GitHubVerifier verifier = new GitHubVerifier();
@@ -133,8 +134,6 @@ class WebhookVerifierTest {
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("mismatch");
     }
-
-    // ======================== StripeVerifier ========================
 
     @Test
     void stripe_success() {
@@ -187,11 +186,7 @@ class WebhookVerifierTest {
         assertThat(result.error()).contains("missing t or v1");
     }
 
-    /**
-     * While a secret is being rolled Stripe signs with every live secret and sends one v1 per
-     * secret. Only the last v1 was kept, so whenever the one this Source's secret produced was not
-     * last, a genuine event was refused.
-     */
+    // During a secret roll Stripe sends one v1 per secret; only the last was once kept.
     @Test
     void stripe_severalSignatures_theValidOneFirst_verifies() {
         StripeVerifier verifier = new StripeVerifier();
@@ -242,8 +237,6 @@ class WebhookVerifierTest {
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("mismatch");
     }
-
-    // ======================== SlackVerifier ========================
 
     @Test
     void slack_success() {
@@ -301,8 +294,6 @@ class WebhookVerifierTest {
         assertThat(result.error()).contains("Missing header: X-Slack-Request-Timestamp");
     }
 
-    // ======================== ShopifyVerifier ========================
-
     @Test
     void shopify_success() {
         ShopifyVerifier verifier = new ShopifyVerifier();
@@ -337,8 +328,6 @@ class WebhookVerifierTest {
         assertThat(result.error()).contains("mismatch");
     }
 
-    // ======================== WebhookVerifierFactory ========================
-
     @Test
     void factory_returnsNullForNone() {
         var factory = new WebhookVerifierFactory(TWILIO_URL);
@@ -347,44 +336,27 @@ class WebhookVerifierTest {
         assertThat(factory.getVerifier(source)).isNull();
     }
 
-    @Test
-    void factory_returnsGenericHmac() {
-        var factory = new WebhookVerifierFactory(TWILIO_URL);
-        var source = buildSource(VerificationMode.HMAC_GENERIC, null);
-
-        assertThat(factory.getVerifier(source)).isInstanceOf(GenericHmacVerifier.class);
+    static Stream<Arguments> verifierPerSource() {
+        return Stream.of(
+                Arguments.of(VerificationMode.HMAC_GENERIC, null, GenericHmacVerifier.class),
+                Arguments.of(VerificationMode.PROVIDER, ProviderType.GITHUB, GitHubVerifier.class),
+                Arguments.of(VerificationMode.PROVIDER, ProviderType.STRIPE, StripeVerifier.class),
+                Arguments.of(VerificationMode.PROVIDER, ProviderType.SLACK, SlackVerifier.class),
+                Arguments.of(VerificationMode.PROVIDER, ProviderType.SHOPIFY, ShopifyVerifier.class),
+                Arguments.of(VerificationMode.PROVIDER, ProviderType.TWILIO, TwilioVerifier.class),
+                Arguments.of(VerificationMode.PROVIDER, ProviderType.SQUARE, SquareVerifier.class),
+                Arguments.of(VerificationMode.PROVIDER, ProviderType.ADYEN, AdyenVerifier.class),
+                Arguments.of(VerificationMode.PROVIDER, ProviderType.SENDGRID, SendGridVerifier.class),
+                Arguments.of(VerificationMode.PROVIDER, ProviderType.HUBSPOT, HubSpotVerifier.class),
+                // GITLAB was once routed to GitHubVerifier and failed every delivery.
+                Arguments.of(VerificationMode.PROVIDER, ProviderType.GITLAB, GitLabVerifier.class));
     }
 
-    @Test
-    void factory_returnsGitHubForProvider() {
-        var factory = new WebhookVerifierFactory(TWILIO_URL);
-        var source = buildSource(VerificationMode.PROVIDER, ProviderType.GITHUB);
-
-        assertThat(factory.getVerifier(source)).isInstanceOf(GitHubVerifier.class);
-    }
-
-    @Test
-    void factory_returnsStripeForProvider() {
-        var factory = new WebhookVerifierFactory(TWILIO_URL);
-        var source = buildSource(VerificationMode.PROVIDER, ProviderType.STRIPE);
-
-        assertThat(factory.getVerifier(source)).isInstanceOf(StripeVerifier.class);
-    }
-
-    @Test
-    void factory_returnsSlackForProvider() {
-        var factory = new WebhookVerifierFactory(TWILIO_URL);
-        var source = buildSource(VerificationMode.PROVIDER, ProviderType.SLACK);
-
-        assertThat(factory.getVerifier(source)).isInstanceOf(SlackVerifier.class);
-    }
-
-    @Test
-    void factory_returnsShopifyForProvider() {
-        var factory = new WebhookVerifierFactory(TWILIO_URL);
-        var source = buildSource(VerificationMode.PROVIDER, ProviderType.SHOPIFY);
-
-        assertThat(factory.getVerifier(source)).isInstanceOf(ShopifyVerifier.class);
+    @ParameterizedTest
+    @MethodSource("verifierPerSource")
+    void factory_picksTheVerifierForTheSource(VerificationMode mode, ProviderType provider, Class<?> expected) {
+        assertThat(new WebhookVerifierFactory(TWILIO_URL).getVerifier(buildSource(mode, provider)))
+                .isInstanceOf(expected);
     }
 
     @Test
@@ -397,16 +369,13 @@ class WebhookVerifierTest {
                 .hasMessageContaining("No verifier available for provider type");
     }
 
-    // ======================== TwilioVerifier ========================
-
     private static final String TWILIO_URL = "https://hooks.example.com";
     private static final String TWILIO_PATH = "/ingress/tok_abc";
 
     @Test
     void twilio_formEncoded_success() {
         String body = "To=%2B15551234567&From=%2B15559876543&Body=hi+there";
-        // Twilio signs the URL, then every parameter sorted by name, each as the name
-        // immediately followed by its decoded value: Body, From, To.
+        // Twilio signs the URL followed by each parameter, sorted, as name then decoded value.
         String signed = TWILIO_URL + TWILIO_PATH
                 + "Bodyhi there" + "From+15559876543" + "To+15551234567";
         String signature = hmacSha1Base64(SECRET, signed);
@@ -416,7 +385,7 @@ class WebhookVerifierTest {
         when(request.getQueryString()).thenReturn(null);
         when(request.getContentType()).thenReturn("application/x-www-form-urlencoded");
 
-        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, body.getBytes(java.nio.charset.StandardCharsets.UTF_8), request);
+        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, body.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.error()).isNull();
         assertThat(result.verified()).isTrue();
@@ -434,7 +403,7 @@ class WebhookVerifierTest {
         when(request.getContentType()).thenReturn("application/x-www-form-urlencoded");
 
         var result = new TwilioVerifier(TWILIO_URL)
-                .verify(SECRET, "To=%2B15550000000&Body=hi+there".getBytes(java.nio.charset.StandardCharsets.UTF_8), request);
+                .verify(SECRET, "To=%2B15550000000&Body=hi+there".getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
     }
@@ -443,7 +412,7 @@ class WebhookVerifierTest {
     void twilio_missingHeader() {
         when(request.getHeader("X-Twilio-Signature")).thenReturn(null);
 
-        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, "To=x".getBytes(java.nio.charset.StandardCharsets.UTF_8), request);
+        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, "To=x".getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("X-Twilio-Signature");
@@ -460,7 +429,7 @@ class WebhookVerifierTest {
         when(request.getQueryString()).thenReturn(query);
         when(request.getContentType()).thenReturn("application/json");
 
-        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, body.getBytes(java.nio.charset.StandardCharsets.UTF_8), request);
+        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, body.getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.error()).isNull();
         assertThat(result.verified()).isTrue();
@@ -476,21 +445,11 @@ class WebhookVerifierTest {
         when(request.getQueryString()).thenReturn(query);
         when(request.getContentType()).thenReturn("application/json");
 
-        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, "{\"kind\":\"other\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8), request);
+        var result = new TwilioVerifier(TWILIO_URL).verify(SECRET, "{\"kind\":\"other\"}".getBytes(StandardCharsets.UTF_8), request);
 
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("bodySHA256");
     }
-
-    @Test
-    void factory_returnsTwilioForProvider() {
-        var factory = new WebhookVerifierFactory(TWILIO_URL);
-        var source = buildSource(VerificationMode.PROVIDER, ProviderType.TWILIO);
-
-        assertThat(factory.getVerifier(source)).isInstanceOf(TwilioVerifier.class);
-    }
-
-    // ======================== SquareVerifier ========================
 
     private static final String SQUARE_URL = "https://hooks.example.com";
     private static final String SQUARE_PATH = "/ingress/tok_square";
@@ -517,12 +476,7 @@ class WebhookVerifierTest {
         assertThat(result.replayKey()).isEqualTo(signature);
     }
 
-    /**
-     * The notification URL is signed, so http for https, a trailing slash or another host all
-     * change the digest. Square documents that as the first thing to check when a genuine
-     * notification will not verify, and it is why the URL is rebuilt from the configured ingress
-     * base rather than from what the request claims its Host is.
-     */
+    // The URL is signed, so it is rebuilt from the configured ingress base, not the Host header.
     @Test
     void square_signedForADifferentNotificationUrlFails() {
         String signature = hmacSha256Base64(SECRET, "http://hooks.example.com" + SQUARE_PATH + SQUARE_BODY);
@@ -561,16 +515,6 @@ class WebhookVerifierTest {
         assertThat(result.error()).contains("x-square-hmacsha256-signature");
     }
 
-    @Test
-    void factory_returnsSquareForProvider() {
-        var factory = new WebhookVerifierFactory(TWILIO_URL);
-        var source = buildSource(VerificationMode.PROVIDER, ProviderType.SQUARE);
-
-        assertThat(factory.getVerifier(source)).isInstanceOf(SquareVerifier.class);
-    }
-
-    // ======================== AdyenVerifier ========================
-
     /** Hex, because Adyen's key is generated as hex and hex-decoded before it is used. */
     private static final String ADYEN_KEY = "44782DEF547AAA06C910C43932B1EB0C71FC68D9D0C057550C48EC2ACF6BA0B3";
 
@@ -587,11 +531,7 @@ class WebhookVerifierTest {
                 + "}}]}";
     }
 
-    /**
-     * The concatenation is the whole of Adyen's scheme, so it is pinned against the literal
-     * string Adyen's documentation prints for this notification rather than against a value this
-     * test computed the same way the code does.
-     */
+    // Pinned against the literal string Adyen's documentation prints.
     @Test
     void adyen_buildsTheDataToSignAdyenDocuments() {
         assertThat(AdyenVerifier.dataToSign(adyenItem(adyenStandardBody("sig"))))
@@ -635,10 +575,7 @@ class WebhookVerifierTest {
         assertThat(result.error()).contains("hmacSignature");
     }
 
-    /**
-     * Adyen's Management, Banking and Platforms webhooks sign the whole body and put the
-     * signature in a header instead. Same key, same base64 HMAC-SHA256, different input.
-     */
+    // Adyen's platform webhooks sign the whole body and send the signature in a header.
     @Test
     void adyen_headerScheme_signsTheWholeBody() {
         String body = "{\"type\":\"balancePlatform.accountHolder.updated\",\"data\":{\"id\":\"AH00000000000000000000001\"}}";
@@ -672,16 +609,6 @@ class WebhookVerifierTest {
         assertThat(result.verified()).isFalse();
         assertThat(result.error()).contains("hexadecimal");
     }
-
-    @Test
-    void factory_returnsAdyenForProvider() {
-        var factory = new WebhookVerifierFactory(TWILIO_URL);
-        var source = buildSource(VerificationMode.PROVIDER, ProviderType.ADYEN);
-
-        assertThat(factory.getVerifier(source)).isInstanceOf(AdyenVerifier.class);
-    }
-
-    // ======================== SendGridVerifier ========================
 
     /** One delivered event, in the shape the Event Webhook posts them: a JSON array. */
     private static final String SENDGRID_BODY = "[{\"email\":\"jane@example.com\",\"timestamp\":1771075200,"
@@ -781,16 +708,6 @@ class WebhookVerifierTest {
         assertThat(result.error()).contains("verification key");
     }
 
-    @Test
-    void factory_returnsSendGridForProvider() {
-        var factory = new WebhookVerifierFactory(TWILIO_URL);
-        var source = buildSource(VerificationMode.PROVIDER, ProviderType.SENDGRID);
-
-        assertThat(factory.getVerifier(source)).isInstanceOf(SendGridVerifier.class);
-    }
-
-    // ======================== HubSpotVerifier ========================
-
     private static final String HUBSPOT_PATH = "/ingress/tok_hubspot";
     /** HubSpot batches its CRM events into an array. */
     private static final String HUBSPOT_BODY = "[{\"eventId\":531833541,\"subscriptionId\":3923621,"
@@ -856,10 +773,7 @@ class WebhookVerifierTest {
         assertThat(result.error()).contains("mismatch");
     }
 
-    /**
-     * HubSpot decodes a fixed dozen escapes in the query string before signing, and leaves the
-     * path alone. A source whose ingress URL carries a query would otherwise never verify.
-     */
+    // HubSpot decodes a fixed set of escapes in the query string before signing.
     @Test
     void hubSpot_decodesTheEscapesHubSpotDecodesInTheQueryString() {
         String timestamp = String.valueOf(Instant.now().toEpochMilli());
@@ -899,16 +813,6 @@ class WebhookVerifierTest {
         assertThat(result.error()).contains("X-HubSpot-Request-Timestamp");
     }
 
-    @Test
-    void factory_returnsHubSpotForProvider() {
-        var factory = new WebhookVerifierFactory(TWILIO_URL);
-        var source = buildSource(VerificationMode.PROVIDER, ProviderType.HUBSPOT);
-
-        assertThat(factory.getVerifier(source)).isInstanceOf(HubSpotVerifier.class);
-    }
-
-    // ======================== helpers ========================
-
     private IncomingSource buildSource(VerificationMode mode, ProviderType providerType) {
         return IncomingSource.builder()
                 .id(UUID.randomUUID())
@@ -931,7 +835,7 @@ class WebhookVerifierTest {
 
     private static String sha256Hex(String data) {
         try {
-            return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(data.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -997,12 +901,6 @@ class WebhookVerifierTest {
         }
     }
 
-    // ======================== GitLabVerifier ========================
-    //
-    // GITLAB used to be routed to GitHubVerifier, which looks for X-Hub-Signature-256.
-    // GitLab never sends that header, so a source configured for GitLab in PROVIDER mode
-    // failed every single delivery while the provider was listed as supported.
-
     @Test
     void gitlab_success() {
         GitLabVerifier verifier = new GitLabVerifier();
@@ -1023,9 +921,7 @@ class WebhookVerifierTest {
 
         var result = verifier.verify(SECRET, BODY_BYTES, request);
 
-        /* The token is identical on every GitLab request by design. Returning it as the
-           replay key would make the second webhook GitLab ever sent look like a replay of
-           the first, and replay detection rejects those outright. */
+        // The token is identical on every GitLab request, so it cannot be the replay key.
         assertThat(result.replayKey()).isEqualTo("event-uuid-1");
         assertThat(result.replayKey()).isNotEqualTo(SECRET);
     }
@@ -1038,8 +934,6 @@ class WebhookVerifierTest {
 
         var result = verifier.verify(SECRET, BODY_BYTES, request);
 
-        // Nothing on the request distinguishes two identical deliveries, so a null key —
-        // which IngressService reads as "do not run replay detection" — is the honest answer.
         assertThat(result.verified()).isTrue();
         assertThat(result.replayKey()).isNull();
     }
@@ -1075,17 +969,5 @@ class WebhookVerifierTest {
 
         // Must not pass by comparing an empty secret to an empty token.
         assertThat(result.verified()).isFalse();
-    }
-
-    @Test
-    void factoryRoutesGitlabToItsOwnVerifier() {
-        IncomingSource source = IncomingSource.builder()
-                .id(UUID.randomUUID())
-                .verificationMode(VerificationMode.PROVIDER)
-                .providerType(ProviderType.GITLAB)
-                .build();
-
-        assertThat(new WebhookVerifierFactory(TWILIO_URL).getVerifier(source))
-                .isInstanceOf(GitLabVerifier.class);
     }
 }

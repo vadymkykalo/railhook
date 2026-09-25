@@ -18,10 +18,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A short-lived bearer credential for one Consumer, opened by the customer's backend.
- *
- * <p>Only the SHA-256 of the token is kept, as with an API key: the plaintext exists in the
- * response that created it and in the browser it was handed to.
+ * A short-lived bearer credential for one Consumer. Only the token's SHA-256 is stored.
  */
 @Entity
 @Table(name = "portal_sessions")
@@ -49,7 +46,7 @@ public class PortalSession {
     @Column(name = "token_hash", nullable = false, length = 64)
     private String tokenHash;
 
-    /** The one https origin the portal may be embedded in, or null for any. */
+    // Null allows embedding anywhere.
     @Column(name = "allowed_origin")
     private String allowedOrigin;
 

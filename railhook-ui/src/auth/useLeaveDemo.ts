@@ -1,10 +1,7 @@
 import { useContext, useEffect } from 'react';
 import { AuthContext } from './auth.store';
 
-/**
- * Ends a live-demo session on arrival. For the sign-in and sign-up pages: whoever opens them from
- * the demo is about to become someone, and the demo's token must not ride along into it.
- */
+/** Whoever signs in or up from the demo must not carry its token along. */
 export function useLeaveDemo(): void {
   const context = useContext(AuthContext);
   const inDemo = context?.user?.demo === true;

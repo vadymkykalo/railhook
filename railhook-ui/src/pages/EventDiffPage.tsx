@@ -18,8 +18,6 @@ import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
 import { formatDateTime, formatRelativeTime } from '../lib/date';
 
-// ── Searchable event picker ─────────────────────────────────────────
-
 interface EventPickerProps {
   label: string;
   events: EventResponse[];
@@ -31,7 +29,6 @@ interface EventPickerProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   loading: boolean;
-  /** The caught error from the last event fetch, if it failed. */
   error?: unknown;
   onRetry: () => void;
   totalElements: number;
@@ -58,13 +55,12 @@ function EventPicker({
     <div className="space-y-1.5" ref={wrapperRef}>
       <span className="mono-label">{label}</span>
       <div className="relative">
-        {/* A div, not a <button>: it hosts a real nested clear-button, and HTML
-            forbids interactive content inside <button>. */}
+        {/* A div, not a <button>: HTML forbids the nested clear-button inside one. */}
         <div
           role="button"
           tabIndex={0}
           aria-expanded={open}
-          className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-rail bg-card px-3 py-2 text-left text-sm transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedId ? '' : 'text-muted-foreground'}`}
+          className={`flex w-full cursor-pointer items-center justify-between gap-2 border border-rail bg-card px-3 py-2 text-left text-sm transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedId ? '' : 'text-muted-foreground'}`}
           onClick={() => setOpen(!open)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -86,7 +82,7 @@ function EventPicker({
           {selectedId && (
             <button
               type="button"
-              className="flex-shrink-0 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex-shrink-0 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={(e) => { e.stopPropagation(); onSelect(''); }}
               aria-label={t('eventDiff.clearSelection')}
             >
@@ -96,7 +92,7 @@ function EventPicker({
         </div>
 
         {open && (
-          <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-rail bg-popover shadow-elevated">
+          <div className="absolute z-50 mt-1 w-full overflow-hidden border border-rail bg-popover shadow-elevated">
             <div className="border-b border-rail p-2">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
@@ -130,7 +126,7 @@ function EventPicker({
                   <button
                     key={ev.id}
                     type="button"
-                    className={`w-full border-b border-rail px-3 py-2 text-left text-xs transition-colors last:border-b-0 hover:bg-secondary ${ev.id === selectedId ? 'bg-accent' : ''}`}
+                    className={`w-full border-b border-rail px-3 py-2 text-left text-xs transition-colors last:border-b-0 hover:bg-secondary ${ev.id === selectedId ? 'bg-accent text-accent-foreground' : ''}`}
                     onClick={() => { onSelect(ev.id); setOpen(false); }}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -169,8 +165,6 @@ function EventPicker({
     </div>
   );
 }
-
-// ── Page ────────────────────────────────────────────────────────────
 
 export default function EventDiffPage() {
   const { t } = useTranslation();
@@ -254,7 +248,7 @@ export default function EventDiffPage() {
   }, [diffResult]);
 
   if (loadingEvents && allEvents.length === 0) {
-    return <PageSkeleton><div className="h-64 animate-pulse rounded-xl bg-muted" /></PageSkeleton>;
+    return <PageSkeleton><div className="h-64 animate-pulse bg-muted" /></PageSkeleton>;
   }
 
   const sameEvent = !!leftId && leftId === rightId;
@@ -298,7 +292,7 @@ export default function EventDiffPage() {
           totalElements={totalElements}
         />
 
-        <div className="flex items-center gap-3 rounded-lg border border-rail p-3">
+        <div className="flex items-center gap-3 border border-rail p-3">
           <Switch id="ed-sanitize" checked={sanitize} onCheckedChange={setSanitize} />
           <div>
             <Label htmlFor="ed-sanitize" className="cursor-pointer text-[13px]">{t('eventDiff.sanitizePii')}</Label>
@@ -334,8 +328,6 @@ export default function EventDiffPage() {
     />
   ) : (
     <ResultFrame
-      // Two events that differ are not "broken", but a drift between them is
-      // the thing a reader came to notice, so it reads as attention-needed.
       kind={summary.total === 0 ? 'ok' : 'retry'}
       statusLabel={summary.total === 0
         ? t('eventDiff.noDiffsTitle')

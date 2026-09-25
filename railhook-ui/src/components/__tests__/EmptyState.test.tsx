@@ -4,7 +4,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { Webhook } from 'lucide-react';
 import EmptyState, { ErrorState } from '../EmptyState';
 
-// Real i18n instance (initialized via side-effect import chain through '../../lib/toast' -> '../../i18n').
 import '../../i18n';
 
 function withRouter(ui: React.ReactElement) {
@@ -19,8 +18,7 @@ describe('EmptyState', () => {
   });
 
   it('keeps its centred layout when a caller only changes the spacing', () => {
-    // Inside a card, "py-10" used to replace the whole layout: the icon and title fell against
-    // the card's left edge.
+    // "py-10" used to replace the whole layout inside a card.
     withRouter(<EmptyState icon={Webhook} title="No projects." className="py-10" />);
     const container = screen.getByText('No projects.').parentElement!;
     expect(container).toHaveClass('flex', 'flex-col', 'items-center', 'justify-center', 'py-10');
@@ -63,8 +61,7 @@ describe('ErrorState', () => {
   it('surfaces a distinct "backend unreachable" message for a network error, not a generic fallback', () => {
     const networkErr = { request: {}, message: 'Network Error' };
     withRouter(<ErrorState error={networkErr} fallbackKey="endpoints.toast.loadFailed" />);
-    // Must not silently fall back to the generic "Failed to load data" copy —
-    // a down backend needs to look different from a normal load failure.
+    // A down backend must look different from a normal load failure.
     expect(screen.queryByText('Failed to load data')).not.toBeInTheDocument();
     expect(screen.getByText(/network error/i)).toBeInTheDocument();
   });

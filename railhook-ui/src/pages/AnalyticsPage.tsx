@@ -47,9 +47,7 @@ export default function AnalyticsPage() {
     if (projectId) qc.invalidateQueries({ queryKey: queryKeys.dashboard.analytics(projectId, period) });
   };
 
-  // Every field is read through a default: an analytics window with no traffic
-  // in it comes back sparse, and a chart page must render the absence rather
-  // than fall over on it.
+  // Defaults everywhere: a window with no traffic comes back sparse.
   const overview = analytics?.overview ?? EMPTY_OVERVIEW;
   const percentiles = analytics?.latencyPercentiles ?? EMPTY_PERCENTILES;
   const endpointPerformance = analytics?.endpointPerformance ?? [];
@@ -68,7 +66,6 @@ export default function AnalyticsPage() {
     [analytics]
   );
 
-  // Nominal categories, ordered by magnitude for reading — not coloured by it.
   const eventTypeRows: RankDatum[] = useMemo(
     () => (analytics?.eventTypeBreakdown ?? [])
       .slice()
@@ -78,7 +75,6 @@ export default function AnalyticsPage() {
     [analytics]
   );
 
-  // Ordered categories: p50 → p99 is a scale, so the colour carries the order.
   const percentileRows: RankDatum[] = useMemo(
     () => ([
       ['p50', percentiles.p50], ['p75', percentiles.p75], ['p90', percentiles.p90],
@@ -125,13 +121,11 @@ export default function AnalyticsPage() {
         }
       />
 
-      {/* One filter row, above everything it scopes. Every chart below reads the
-          same slice, so no two numbers on this page can disagree. */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div
           role="group"
           aria-label={t('analytics.periodLabel')}
-          className="inline-flex rounded-lg border border-rail bg-card p-0.5"
+          className="inline-flex border border-rail bg-card p-0.5"
         >
           {PERIODS.map((p) => (
             <button
@@ -140,7 +134,7 @@ export default function AnalyticsPage() {
               onClick={() => setPeriod(p)}
               aria-pressed={period === p}
               className={cn(
-                'rounded-md px-3 py-1.5 font-mono text-xs transition-colors',
+                'px-3 py-1.5 font-mono text-xs transition-colors',
                 period === p
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'
@@ -245,7 +239,6 @@ export default function AnalyticsPage() {
             title={t('analytics.latencyPercentiles')}
             description={t('analytics.latencyPercentilesDesc')}
             eyebrow={period}
-            /* Five fixed rungs — sized to the rows so the card never scrolls. */
             bodyClass="h-[166px]"
             isRefetching={isFetching}
             isEmpty={!hasDeliveries}

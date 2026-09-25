@@ -9,9 +9,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * What the dashboard sends when a render fails. Every field is attacker-controlled in the sense
- * that matters here — a browser chose it — so the sizes below are the outer bound and
- * {@code ClientErrorReportService} trims further before anything reaches a log line.
+ * Every field is browser-controlled, so these sizes are only the outer bound; the service trims
+ * further before anything is logged.
  */
 @Data
 @Builder

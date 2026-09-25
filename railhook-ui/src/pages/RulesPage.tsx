@@ -38,16 +38,6 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import ConditionTreeEditor, { mkGroup, mkPredicate, countPredicates, NO_VALUE_OPS } from '../components/ConditionTreeEditor';
 
-/**
- * Rules: *when this matches, do that*. The PII rules page says the same
- * sentence about a different subject, so both are drawn with the pieces in
- * `RuleLayout` — see the note there.
- *
- * An action type used to carry its own colour (blue route, purple transform,
- * red drop). Those are not statuses, and the palette reserves colour for
- * statuses, so an action is now told apart by its icon and its name.
- */
-
 const ACTION_ICON: Record<ActionType, LucideIcon> = {
   ROUTE: Route,
   TRANSFORM: Wand2,
@@ -260,7 +250,7 @@ export default function RulesPage() {
           </div>
 
           {filteredRules.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-rail px-6 py-12 text-center text-sm text-muted-foreground">
+            <p className="border border-dashed border-rail px-6 py-12 text-center text-sm text-muted-foreground">
               {t('rules.noResults')}
             </p>
           ) : (
@@ -366,7 +356,6 @@ export default function RulesPage() {
         </div>
       )}
 
-      {/* Create / edit */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -415,12 +404,11 @@ export default function RulesPage() {
               </Label>
             </div>
 
-            {/* Conditions */}
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-muted-foreground" aria-hidden />
-                  <Label className="text-sm font-semibold">{t('rules.form.conditions')}</Label>
+                  <Label className="text-sm font-medium">{t('rules.form.conditions')}</Label>
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Button variant="outline" size="sm" onClick={addGroupToRoot}>
@@ -436,7 +424,7 @@ export default function RulesPage() {
                 <EmptyState
                   icon={Filter}
                   title={t('rules.form.noConditions')}
-                  className="flex flex-col items-center justify-center rounded-lg border border-dashed border-rail py-6"
+                  className="flex flex-col items-center justify-center border border-dashed border-rail py-6"
                 />
               ) : (
                 <ConditionTreeEditor
@@ -449,11 +437,10 @@ export default function RulesPage() {
               )}
             </div>
 
-            {/* Actions */}
             <div className="space-y-3">
               <span className="flex items-center gap-2">
                 <Zap className="h-4 w-4 text-muted-foreground" aria-hidden />
-                <Label className="text-sm font-semibold">{t('rules.form.actions')}</Label>
+                <Label className="text-sm font-medium">{t('rules.form.actions')}</Label>
               </span>
 
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -464,7 +451,7 @@ export default function RulesPage() {
                       key={type}
                       type="button"
                       onClick={() => addAction(type)}
-                      className="flex items-center gap-2 rounded-lg border border-dashed border-rail p-3 text-sm transition-colors hover:border-solid hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex items-center gap-2 border border-dashed border-rail p-3 text-sm transition-colors hover:border-solid hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
                       {t(`rules.actionTypes.${type}`)}
@@ -478,10 +465,10 @@ export default function RulesPage() {
                   {formActions.map((action, idx) => {
                     const Icon = ACTION_ICON[action.type];
                     return (
-                      <li key={idx} className="flex items-center gap-3 rounded-lg border border-rail bg-muted/40 p-3">
+                      <li key={idx} className="flex items-center gap-3 border border-rail bg-muted/40 p-3">
                         <Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden />
                         <div className="min-w-0 flex-1 space-y-1.5">
-                          <p className="text-xs font-semibold">{t(`rules.actionTypes.${action.type}`)}</p>
+                          <p className="text-xs font-medium">{t(`rules.actionTypes.${action.type}`)}</p>
                           {action.type === 'ROUTE' && (
                             <Select value={action.endpointId || ''} onChange={(e) => updateAction(idx, { endpointId: e.target.value || undefined })}>
                               <option value="">{t('rules.form.selectEndpoint')}</option>
@@ -527,7 +514,6 @@ export default function RulesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -547,12 +533,10 @@ export default function RulesPage() {
   );
 }
 
-// ── Read-only condition tree ───────────────────────────────────────
-
 function ConditionTreeDisplay({ node }: { node: ConditionNode }) {
   if (node.type === 'predicate') {
     return (
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rail bg-card px-3 py-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 border border-rail bg-card px-3 py-2 text-sm">
         <code className="font-mono text-xs text-primary">{node.field}</code>
         <Badge variant="outline" className="font-mono text-[10px]">{node.operator}</Badge>
         {!NO_VALUE_OPS.includes(node.operator) && (
@@ -563,7 +547,7 @@ function ConditionTreeDisplay({ node }: { node: ConditionNode }) {
   }
 
   return (
-    <div className="space-y-1.5 rounded-lg border-l-2 border-rail py-1.5 pl-3">
+    <div className="space-y-1.5 border-l-2 border-rail py-1.5 pl-3">
       <Badge variant="outline" className="font-mono text-[10px]">{node.op}</Badge>
       {node.children.map((child, i) => (
         <ConditionTreeDisplay key={i} node={child} />

@@ -17,10 +17,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * {@link MigratedSchemaGate} against PostgreSQL: the query it runs, and that Hibernate's
- * validation really is held behind it in a Spring context.
- */
 @Testcontainers
 class MigratedSchemaGateIntegrationTest {
 

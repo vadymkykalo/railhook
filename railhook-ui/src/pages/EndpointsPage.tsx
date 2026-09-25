@@ -43,13 +43,6 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-/**
- * The flat list of Endpoints — one half of a connection, for the times you
- * want to work on endpoints as endpoints: add one without subscribing it to
- * anything yet, retire one, or find the one whose verification never landed.
- * The Connections tab is where the two halves are seen together.
- */
-
 function generateSecret(): string {
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);
@@ -178,8 +171,7 @@ export default function EndpointsPage() {
           },
         });
       } else {
-        // Turning it back on says only that, and clears an auto-disable with it. Going through
-        // the update would resend an endpoint rebuilt from the four fields this page renders.
+        // Enable clears an auto-disable; an update would resend an endpoint rebuilt from this page's four fields.
         await enableEndpoint.mutateAsync(endpoint.id);
       }
       showSuccess(endpoint.enabled ? t('endpoints.toast.disabled') : t('endpoints.toast.enabled'));
@@ -503,10 +495,6 @@ export default function EndpointsPage() {
                 />
                 <p className="text-xs text-muted-foreground">{t('endpoints.createDialog.allowedIpsHint')}</p>
               </div>
-              {/* The same choice the Connection surfaces offer. Without it an endpoint created
-                  here took the BOTH default silently, and the person creating it was never
-                  shown that the scheme — which decides what their receiver has to verify — was
-                  a decision at all. */}
               <SignatureSchemePicker
                 value={signatureScheme}
                 onChange={setSignatureScheme}
@@ -571,7 +559,6 @@ export default function EndpointsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* The secret is shown once, masked until asked for. */}
       <Dialog open={!!newSecret} onOpenChange={closeSecretDialog}>
         <DialogContent>
           <DialogHeader>
@@ -593,7 +580,7 @@ export default function EndpointsPage() {
             <DialogDescription>{t('endpoints.testDialog.description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="flex items-center gap-3 rounded-lg border border-rail p-4">
+            <div className="flex items-center gap-3 border border-rail p-4">
               <StatusBadge
                 kind={testResult?.success ? 'ok' : 'halt'}
                 label={testResult?.success ? t('endpoints.testDialog.success') : t('endpoints.testDialog.failed')}
@@ -607,7 +594,7 @@ export default function EndpointsPage() {
             {testResult?.responseBody && (
               <div className="space-y-1.5">
                 <div className="mono-label">{t('endpoints.testDialog.responseBody')}</div>
-                <pre className="max-h-48 overflow-auto rounded-md border border-rail bg-secondary/40 p-3 font-mono text-xs">
+                <pre className="max-h-48 overflow-auto border border-rail bg-secondary/40 p-3 font-mono text-xs">
                   {testResult.responseBody}
                 </pre>
               </div>
@@ -616,7 +603,7 @@ export default function EndpointsPage() {
             {testResult?.errorMessage && (
               <div className="space-y-1.5">
                 <div className="mono-label">{t('endpoints.testDialog.errorMessage')}</div>
-                <p className="rounded-md border border-halt/30 bg-halt-soft p-3 text-sm text-halt">
+                <p className="border border-halt/30 bg-halt-soft p-3 text-sm text-halt">
                   {testResult.errorMessage}
                 </p>
               </div>

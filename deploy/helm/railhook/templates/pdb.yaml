@@ -1,17 +1,6 @@
 {{- /*
-  PodDisruptionBudgets for api, worker and ui.
-
-  values.yaml has exposed api.pdb / worker.pdb / ui.pdb since the chart was
-  written, values-production.yaml turns all three on, and the README lists
-  "PodDisruptionBudgets for HA" among what production mode gives you — but no
-  template read any of it, so a node drain could take every replica of a
-  service at once and nothing said otherwise. This is that template; the value
-  keys are the ones that were already documented, not new ones.
-
-  minAvailable and maxUnavailable are mutually exclusive in the API, so
-  maxUnavailable wins when a caller sets it and minAvailable is the default
-  otherwise. A PDB with minAvailable >= replicas blocks drains outright, which
-  is why production pairs minAvailable: 2 with replicaCount: 3.
+  minAvailable and maxUnavailable are mutually exclusive, so maxUnavailable wins when set.
+  minAvailable >= replicas blocks node drains outright.
 */}}
 {{- range $component, $cfg := dict "api" .Values.api "worker" .Values.worker "ui" .Values.ui }}
 {{- if and $cfg.pdb $cfg.pdb.enabled }}

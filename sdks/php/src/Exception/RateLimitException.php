@@ -19,13 +19,7 @@ class RateLimitException extends RailhookException
         return $this->rateLimitInfo;
     }
 
-    /**
-     * Milliseconds to wait before retrying.
-     *
-     * `reset` is the raw X-RateLimit-Reset header, which the API sends as a
-     * Unix timestamp in **seconds**; subtracting a millisecond clock from it
-     * directly always yields 0.
-     */
+    /** Milliseconds to wait before retrying. `reset` is in seconds, hence the `* 1000`. */
     public function getRetryAfterMs(): int
     {
         $now = (int) (microtime(true) * 1000);

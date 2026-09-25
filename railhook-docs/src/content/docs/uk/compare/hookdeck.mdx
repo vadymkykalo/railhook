@@ -2,9 +2,9 @@
 title: Railhook чи Hookdeck — open-source альтернатива Hookdeck
 description: Шукаєте альтернативу Hookdeck, яку можна розгорнути на власному сервері? Railhook приймає й надсилає вебхуки під ліцензією MIT, а шлюз приймання Hookdeck доступний лише як SaaS.
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-Ця сторінка допоможе вибрати між Hookdeck і Railhook. Hookdeck — це два продукти: Event Gateway, щоб приймати вебхуки, і Outpost, щоб їх надсилати. Railhook робить і те, і те в одному продукті, тож тут його порівнюють з кожною з двох половин.
+Hookdeck складається з двох продуктів: Event Gateway, щоб приймати вебхуки, і Outpost, щоб їх надсилати. Railhook робить і те, і те в одному продукті, тож його порівнюють з кожною з двох половин.
 
 <Aside title="Перевірено 18.09.2026">
 Відомості про Hookdeck узято з [hookdeck.com/pricing](https://hookdeck.com/pricing) і [github.com/hookdeck/outpost](https://github.com/hookdeck/outpost) станом на 18 вересня 2026 р. Продукти змінюються: перевірте все самі, перш ніж ухвалювати рішення, а якщо щось тут застаріло, надішліть виправлення через pull request.
@@ -41,11 +41,3 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 ## Перехід з Hookdeck
 
 Джерело Event Gateway стає джерелом Railhook, а його призначення — призначеннями цього джерела. Призначення Outpost стає ендпоінтом Railhook. Спершу створіть у Railhook джерело та його призначення, надішліть тестовий вебхук на адресу приймання, а потім змініть на неї адресу вебхука в налаштуваннях провайдера. Повна відповідність понять — у розділі [Перехід на Railhook](/docs/uk/resources/migrating/).
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Перехід на Railhook" href="/docs/uk/resources/migrating/" description="Відповідність понять і перехід, поки працюють обидві платформи." />
-  <LinkCard title="Прийміть перший вебхук" href="/docs/uk/start/receive-first-webhook/" description="Створіть джерело й налаштуйте пересилання на призначення." />
-  <LinkCard title="Порівняння Railhook з альтернативами" href="/docs/uk/resources/comparison/" description="Railhook поруч з усіма альтернативами — разом із прогалинами." />
-</CardGrid>

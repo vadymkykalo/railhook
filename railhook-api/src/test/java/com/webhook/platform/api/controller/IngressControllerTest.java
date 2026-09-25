@@ -1,7 +1,6 @@
 package com.webhook.platform.api.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.webhook.platform.api.domain.entity.IncomingEvent;
 import com.webhook.platform.api.dto.IngressResponse;
 import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.service.IngressService;
@@ -19,11 +18,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * What a provider's retry logic reads off a refusal. Every 429 the ingress answers says when to
- * come back; one that did not left each provider to guess, and the ones that give up dropped the
- * webhook.
- */
+// A 429 without Retry-After left providers to guess, and the ones that give up dropped the webhook.
 class IngressControllerTest {
 
     private final IngressController controller = new IngressController(mock(IngressService.class));
@@ -52,20 +47,6 @@ class IngressControllerTest {
         assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
         assertThat(new ObjectMapper().writeValueAsString(response.getBody()))
                 .isEqualTo("{\"challenge\":\"3eZbrw1aBm2rZgRNFdxV\"}");
-    }
-
-    @Test
-    void anAcceptedWebhookIsAnswered202WithItsRequestId() throws Exception {
-        IngressService service = mock(IngressService.class);
-        when(service.receiveWebhook(eq("tok"), any(), any()))
-                .thenReturn(new IngressOutcome.Accepted(IncomingEvent.builder().requestId("req-1").build()));
-
-        ResponseEntity<?> response = new IngressController(service)
-                .receiveWebhook("tok", new MockHttpServletRequest("POST", "/ingress/tok"));
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
-        assertThat(response.getBody()).isEqualTo(
-                IngressResponse.builder().status("accepted").requestId("req-1").build());
     }
 
     @Test

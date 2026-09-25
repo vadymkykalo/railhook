@@ -10,17 +10,10 @@ import org.redisson.api.RedissonClient;
 import java.time.Duration;
 
 /**
- * Per-second Redisson rate limiters whose rate follows the caller's.
- *
- * <p>{@code trySetRate} writes only when the key is absent, so a rate changed while traffic kept
- * the key alive never reached Redis. The rate stored in Redis is compared with the wanted one and
- * rewritten when they differ; what was last applied is remembered locally, so a steady rate costs
- * one round trip per acquire.
- *
- * <p>The keep-alive is refreshed by Redisson on every acquire, so a limiter in use never expires.
- * One that is gone anyway (evicted under {@code allkeys-lru}, Redis restarted) makes Redisson throw
- * "RateLimiter is not initialized"; that is re-created and retried once, not reported as Redis
- * being down.
+ * {@code trySetRate} writes only an absent key, so a changed rate never reached a limiter traffic
+ * kept alive. The stored rate is compared and rewritten when it differs; the last applied rate is
+ * remembered locally, so a steady rate costs one round trip. A limiter evicted under allkeys-lru
+ * makes Redisson throw "RateLimiter is not initialized", which is re-created and retried once.
  */
 final class ConvergingRateLimiter {
 

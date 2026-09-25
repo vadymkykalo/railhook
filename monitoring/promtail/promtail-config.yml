@@ -1,23 +1,5 @@
-# Railhook Promtail config.
-#
-# Discovers containers via the Docker daemon (docker_sd_configs) rather than assuming
-# fixed container names — the main docker-compose.yml doesn't set container_name for
-# api/worker, and this repo is routinely checked out into differently-named
-# directories (parallel-agent worktrees, forks, ...), which changes Compose's default
-# project name and therefore the generated container names. `com.docker.compose.service`
-# is a label Docker Compose sets on every container regardless of project name, so
-# filtering on that is robust across all of those.
-#
-# One job per service, each filtered by the Docker API itself. A single job with a `keep`
-# relabel rule looked equivalent and was not: Promtail 3.0 went on tailing the containers
-# that rule dropped and pushed their lines with no labels at all, which Loki refused
-# ("at least one label pair is required per stream") about once a second — while reading
-# every log on the host, Kafka's included.
-#
-# Which services: api and worker for correlation-ID tracing; ui (nginx) and caddy because
-# a 502 is answered there, not in the API; postgres for the errors the API only reports as a
-# failed transaction; db-backup because a failed dump says why only in its log. Kafka and
-# Redis stay out: noisy, and rarely the question.
+# One job per service, filtered by the Docker API: with a `keep` relabel instead, Promtail 3.0 kept
+# pushing the dropped containers' lines unlabelled. Found by service label: names change per checkout.
 
 server:
   http_listen_port: 9080
@@ -45,30 +27,19 @@ scrape_configs:
         regex: "/(.*)"
         target_label: container
     pipeline_stages: &pipeline
-      # Unwraps the Docker JSON log-driver envelope ({"log":"...","stream":"stdout",
-      # "time":"..."}) to get at the actual line the service wrote.
       - docker: {}
-      # Spring Boot's start-up banner is ASCII art printed before logging starts, as bare lines
-      # with no level. The services no longer print it; this keeps an older image from filling
-      # the Logs panel with it after every restart. A line with no letter or digit has nothing
-      # to read in it.
+      # Keeps an older image's Spring Boot banner (bare lines, no level) out of the Logs panel.
       - match:
           selector: '{service=~"api|worker"}'
           stages:
             - drop:
                 expression: '^[^A-Za-z0-9]*$|^\s*:: Spring Boot ::'
-      # Production logs are single-line JSON (LogstashEncoder — see logback-spring.xml
-      # in both modules; Caddy logs JSON too). Extract only `level` as a Loki *label*
-      # (low cardinality, useful for filtering/alerting on log volume by severity);
-      # correlationId/organizationId/userId/projectId/deliveryId/etc. deliberately stay
-      # unindexed in the line body — promoting per-request/per-tenant IDs to labels would
-      # blow up Loki's index cardinality. Query them with `| json` at query time instead.
+      # Only `level` becomes a label: per-request and per-tenant IDs as labels would blow up
+      # Loki's index cardinality. Query them with `| json` instead.
       - json:
           expressions:
             level: level
-      # The two plain-text services get a level too, so one filter covers every service.
-      # Postgres: "... [123] ERROR:  message". nginx's error log: "... [error] 12#12: ...";
-      # its access log has no level, and a request it served is info.
+      # nginx's access log has no level; a request it served is info.
       - match:
           selector: '{service="postgres"}'
           stages:
@@ -82,19 +53,14 @@ scrape_configs:
             - template:
                 source: level
                 template: '{{ if .Value }}{{ .Value }}{{ else }}info{{ end }}'
-      # One vocabulary for every service — error, warn, info, debug — so a dashboard legend never
-      # shows `api INFO` beside `api info`, and one filter value means the same thing everywhere.
+      # One vocabulary for every service, so a legend never shows `api INFO` beside `api info`.
       - template:
           source: level
           template: '{{ with .Value }}{{ $l := ToLower . }}{{ if eq $l "warning" }}warn{{ else if or (eq $l "fatal") (eq $l "panic") (eq $l "crit") (eq $l "alert") (eq $l "emerg") }}error{{ else if or (eq $l "log") (eq $l "notice") }}info{{ else if eq (TrimRight $l "0123456789") "debug" }}debug{{ else }}{{ $l }}{{ end }}{{ end }}'
       - labels:
           level:
-      # Dev-mode (non-production profile) logs are plain text, not JSON — the `json`
-      # stage above silently no-ops on a line that isn't valid JSON, setting the
-      # __error__ label instead of failing the pipeline, so this config works
-      # unchanged against `make up` (dev profile) too, just without the `level` label
-      # dev-mode lines don't have. Drop that error label unconditionally (a no-op
-      # when it was never set) so it never gets indexed.
+      # The json stage sets __error__ on a plain-text (dev profile) line instead of failing;
+      # drop it so it never gets indexed.
       - labeldrop:
           - __error__
 

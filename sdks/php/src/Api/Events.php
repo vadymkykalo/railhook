@@ -21,8 +21,7 @@ class Events
      * @param string $type Event type (e.g., "order.completed")
      * @param array $data Event payload data
      * @param string|null $idempotencyKey Unique key to prevent duplicates
-     * @return array Event response with eventId, type, createdAt, deliveriesCreated, and
-     *               schemaWarnings when the project validates schemas with the WARN policy
+     * @return array eventId, type, createdAt, deliveriesCreated, schemaWarnings (WARN schema policy)
      */
     public function send(string $type, array $data, ?string $idempotencyKey = null): array
     {

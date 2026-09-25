@@ -28,10 +28,6 @@ const UNVERIFIED = {
   hasPassword: true,
 } as unknown as CurrentUserResponse;
 
-/**
- * The person this exists for registered as `wheelet1228@gmail.con` and could do nothing about it:
- * the banner told them to verify an address no mail would ever reach.
- */
 describe('the verification banner', () => {
   beforeEach(() => vi.clearAllMocks());
 

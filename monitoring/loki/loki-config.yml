@@ -1,14 +1,4 @@
-# Railhook Loki config.
-#
-# Single-node, filesystem-backed — matches this repo's "one docker compose stack per
-# self-hoster" deployment model (same spirit as the embedded Postgres/Redis/Kafka in
-# the main docker-compose.yml). Retention and rotation are handled by the compactor
-# below so a self-hoster's disk doesn't fill silently.
-#
-# ${VAR:-default} below is expanded by Loki itself (run with -config.expand-env=true,
-# set on the loki container's command in monitoring/docker-compose.yml) rather than a
-# render-config.sh preprocessing step like alertmanager uses — Loki supports this
-# natively, alertmanager's busybox image doesn't.
+# ${VAR:-default} is expanded by Loki itself (-config.expand-env=true on the container).
 
 auth_enabled: false
 
@@ -39,25 +29,19 @@ schema_config:
         period: 24h
 
 limits_config:
-  # Retention window — independent of the Postgres DATA_RETENTION_* days;
-  # logs and delivery data are different retention conversations. Default 7d.
+  # Independent of the Postgres DATA_RETENTION_* days.
   retention_period: ${LOKI_RETENTION_PERIOD:-168h}
   reject_old_samples: true
   reject_old_samples_max_age: 168h
   max_query_series: 5000
-  # Self-hosters run this on modest hardware; cap ingestion so a runaway DEBUG-level
-  # logger can't OOM the Loki container instead of just filling disk.
+  # So a runaway DEBUG logger can't OOM Loki on a small host.
   ingestion_rate_mb: 8
   ingestion_burst_size_mb: 16
-  # Belt-and-braces per-stream cardinality guard: MDC fields like correlationId /
-  # deliveryId must never become Loki *labels* (see promtail-config.yml — they stay
-  # in the JSON log line, queried with `| json`, not indexed as labels). This limit
-  # is the safety net if a future change accidentally does label one of them.
+  # Safety net if a change ever makes a per-request ID (correlationId, deliveryId) a label.
   max_streams_per_user: 10000
 
-# Recording rules over the logs (rules/railhook.yml), remote-written into Prometheus. The
-# alerts on them — ErrorLogSpike, EdgeServerErrorSpike — are Prometheus rules, so every alert
-# reaches Alertmanager by one path and shows in one list.
+# Only recording rules here, remote-written into Prometheus: the alerts on them are Prometheus
+# rules, so every alert reaches Alertmanager by one path and shows in one list.
 ruler:
   storage:
     type: local

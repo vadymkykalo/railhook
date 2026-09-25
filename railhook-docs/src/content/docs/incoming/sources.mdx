@@ -2,7 +2,7 @@
 title: Sources
 description: Give a third-party provider one URL to send its webhooks to, and learn what that URL answers.
 ---
-import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 A **source** is one third-party provider you connect, such as Stripe or GitHub, together with what Railhook needs to prove a webhook really came from it. Creating a source gives you an ingress URL to paste into the provider.
 
@@ -118,7 +118,7 @@ Set `WEBHOOK_INGRESS_BASE_URL` to the public address providers reach. It builds 
 
 ## What the ingress answers
 
-The ingress answers a provider, not a person. Each code is what the provider's own retry logic sees.
+Each code is what the provider's retry logic sees.
 
 | Status | Meaning |
 |---|---|
@@ -151,11 +151,3 @@ Providers send the same webhook again. When a request carries an id Railhook rec
 | Slack | `event_id` in the JSON body |
 
 A provider that sends none of these is not deduplicated.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Where received webhooks are forwarded, and how." />
-  <LinkCard title="Verification" href="/docs/incoming/verification/" description="How each provider's signature is checked." />
-  <LinkCard title="Replay and Time Machine" href="/docs/outgoing/replay/#replay-incoming-webhooks" description="Forward stored incoming events again." />
-</CardGrid>

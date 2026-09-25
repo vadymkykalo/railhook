@@ -1,22 +1,4 @@
-# ============================================================================
-# Build from source — an overlay, not a second copy of the stack.
-# ============================================================================
-# docker-compose.yml resolves every service to a published image. Layer this on
-# top and the three services Railhook actually owns are built from the working
-# tree instead:
-#
-#   docker compose -f docker-compose.yml -f docker-compose.build.yml \
-#     --profile embedded-db up -d --build
-#
-# which is what `make up` runs. Postgres, Kafka and Redis are not ours to build
-# and stay as published images either way.
-#
-# This file exists because the alternative — a second complete Compose file with
-# `build:` instead of `image:` — is what the repository had, and 80% of its
-# ~550 lines were a hand-maintained duplicate of this one's. They drifted, and
-# the drift was a live bug: the worker's actuator bind address differed between
-# the two, so metrics scraping worked in one deployment path and silently did
-# not in the other. Twenty-five lines cannot drift from anything.
+# Build settings only: a second full copy of the stack once drifted and broke metrics scraping.
 
 services:
   api:
@@ -35,8 +17,7 @@ services:
     build:
       context: .
       dockerfile: ./railhook-ui/Dockerfile
-      # Vite inlines import.meta.env.VITE_* at build time, so these have to be
-      # build args; as runtime env on the nginx stage they were dead config.
+      # Vite inlines VITE_* at build time, so they must be build args, not runtime env.
       args:
         VITE_API_URL: ${VITE_API_URL:-}
         VITE_CSP_EXTRA_CONNECT: ${VITE_CSP_EXTRA_CONNECT:-}

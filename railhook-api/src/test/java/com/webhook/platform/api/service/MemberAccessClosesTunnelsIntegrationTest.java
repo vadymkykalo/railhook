@@ -21,14 +21,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * A member who loses access to an organization loses the tunnels they opened in it.
- *
- * <p>Removing or suspending a member revoked their sessions and nothing else. A tunnel is not a
- * session — the CLI authenticated once with the tunnel token and never presents an access token
- * again — so the tunnel stayed ACTIVE and the organization's public slug went on forwarding
- * traffic to the machine of somebody who was no longer allowed anywhere near it.
- */
+// A tunnel is not a session, so revoking sessions left it forwarding to a former member.
 class MemberAccessClosesTunnelsIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private MembershipService membershipService;

@@ -10,12 +10,6 @@ import { Button, buttonVariants } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { useAuth } from './auth.store';
 
-/**
- * An outcome screen: the invite token in the URL has already decided what
- * happens. Each state names the outcome and offers exactly one way on — the
- * "create an account instead" path is a cross-link, not a second button
- * competing with it.
- */
 export default function AcceptInvitePage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -42,8 +36,7 @@ export default function AcceptInvitePage() {
 
     membersApi.acceptInvite(orgId, token)
       .then(() => {
-        // The organization switcher only appears with a second organization to switch to, and its
-        // cached list does not know about the one just joined.
+        // The switcher's cached list doesn't know the organization just joined.
         queryClient.invalidateQueries({ queryKey: queryKeys.organizations.mine });
         setStatus('success');
       })
@@ -58,7 +51,7 @@ export default function AcceptInvitePage() {
   if (status === 'loading') {
     return (
       <AuthLayout title={t('invite.accepting')} subtitle={t('invite.pleaseWait')}>
-        <div className="flex items-center gap-3 rounded-md border border-rail bg-card p-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3 border border-rail bg-card p-4 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
           {t('invite.accepting')}
         </div>
@@ -74,7 +67,7 @@ export default function AcceptInvitePage() {
         footer={
           <>
             {t('invite.newUserHint')}{' '}
-            <Link to={`/register?redirect=${returnTo}`} className="font-medium text-primary hover:underline">
+            <Link to={`/register?redirect=${returnTo}`} className="font-medium link-ink">
               {t('invite.goToRegister')}
             </Link>
           </>
@@ -91,7 +84,7 @@ export default function AcceptInvitePage() {
     return (
       <AuthLayout title={t('invite.errorTitle')} subtitle={t('invite.failed')}>
         <div className="space-y-5">
-          <div role="alert" className="rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+          <div role="alert" className="border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
             {errorMessage}
           </div>
           <Button className="h-10 w-full" onClick={() => navigate('/login')}>

@@ -32,97 +32,29 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Runs a Transformation written in JavaScript, in a sandbox, identically wherever it is called
- * from.
+ * Runs a JavaScript Transformation in a sandbox. It lives in common so the preview and the real
+ * Delivery run the same code.
  *
- * <p>It lives in {@code railhook-common} rather than in either service because the preview a
- * person reads before saving and the transform that runs on a real Delivery have to be the same
- * code. The template language already learned that lesson the expensive way: it has two copies
- * that disagree about whether a bad JSONPath is an error.
+ * <p>A script defines {@code function handler(webhook)} and returns {@code {payload, headers}} or
+ * {@code {cancel: true}}. It cannot change the URL or method, because the SSRF check has already
+ * run. It gets no secrets: credentials are applied after the script runs.
  *
- * <h2>The contract</h2>
- *
- * <p>A script declares one entry point and nothing else is called:
- *
- * <pre>{@code
- * function handler(webhook) {
- *   return { payload: { id: webhook.eventId }, headers: { 'X-Kind': 'demo' } };
- * }
- * }</pre>
- *
- * <p>The argument carries the Event — {@code payload}, {@code eventType}, {@code eventId},
- * {@code timestamp} — and the delivery context — {@code direction}, {@code url},
- * {@code headers}, {@code attemptNumber}. The return is an envelope: {@code payload} is the body
- * to send, {@code headers} is merged over the computed ones, and {@code cancel: true} drops the
- * delivery instead. {@code payload} is required unless {@code cancel} is.
- *
- * <p>Two things a script deliberately cannot do. It cannot change the <b>URL</b> or the
- * <b>method</b>: the Runner validates the address against the SSRF rules before it ever gets
- * here, and a script that could rewrite it afterwards would be standing on the other side of
- * that check. And it has no <b>secrets</b> of its own — a script that needs to authenticate to
- * a receiver uses the Endpoint's or the Destination's own configured credentials, which are
- * encrypted at rest and applied after the script runs, so it cannot read or overwrite them. A
- * per-project secret store for scripts would be a new thing to encrypt, rotate and audit; the
- * seam for it is one field on {@link TransformRequest} and one line in {@code inputJson}, and it
- * is left unbuilt rather than half-built.
- *
- * <p>The script runs in strict mode. There are no modules, no {@code require}, no
- * {@code module.exports} and no top-level {@code await}: one file, one function, synchronous.
- *
- * <h2>The sandbox</h2>
- *
- * <p>Five things are refused, and each of them is a test in
- * {@code JavaScriptTransformEngineTest}:
- *
- * <ul>
- *   <li><b>The host.</b> {@link HostAccess#NONE}, no class lookup, no
- *       {@code java}/{@code Packages} globals, {@link PolyglotAccess#NONE}. A script cannot
- *       name a Java class, so it cannot reach a repository, a connection pool or another
- *       tenant's row.</li>
- *   <li><b>The world.</b> No IO, no native access, no environment, no {@code load}. There is no
- *       filesystem and no socket to open — not a blocked one, an absent one.</li>
- *   <li><b>Threads.</b> {@code allowCreateThread(false)}, so a script runs on exactly the
- *       thread that called it and cannot outlive the call.</li>
- *   <li><b>Time.</b> A wall clock, enforced from outside by cancelling the Context. Guest code
- *       cannot catch a cancellation — a {@code while(true)} inside a {@code try} dies the same
- *       as one outside it.</li>
- *   <li><b>Memory.</b> An allocation ceiling for the run, sampled from the running thread's
- *       allocation counter and enforced the same way. Community GraalJS has no heap quota of
- *       its own, so this is the enforcement rather than a second line behind one.</li>
- * </ul>
- *
- * <p>Every failure is a {@link ScriptTransformException}, and every one of them is treated the
- * way a failed template is treated today: the attempt fails, it is retried, and the raw payload
- * is never sent instead.
- *
- * <h2>Why GraalJS</h2>
- *
- * <p>The alternative was an embedded QuickJS binding, which starts faster and is a fraction of
- * the size. It was rejected on the sandbox, not on the language: a JNI engine's runaway script
- * is a native frame on a worker thread, and stopping it means stopping the thread. GraalJS can
- * be cancelled from outside, from another thread, deterministically, which is the one property
- * this feature cannot do without. The cost is about 60 MB of jars in each image and roughly a
- * second of first-run warm-up per process; see the branch report for the measurements.
+ * <p>No host access, IO, environment or threads. Time and allocation limits are enforced by
+ * closing the Context from another thread, which guest code cannot catch. That is why this is
+ * GraalJS and not a JNI engine such as QuickJS. Community GraalJS has no heap quota, so the
+ * per-thread allocation counter is the only memory limit.
  */
 @Slf4j
 public class JavaScriptTransformEngine implements AutoCloseable {
 
-    /** The one name a script has to define. */
     public static final String ENTRY_POINT = "handler";
 
     private static final String SOURCE_NAME = "transformation.js";
 
     /**
-     * Deliberately one physical line. The author's line numbers are this wrapper's minus
-     * {@link #LINE_OFFSET}, and that arithmetic is only true while the prelude stays on one line.
-     *
-     * <p>It opens by deleting the names GraalJS binds into a fresh realm — {@code java},
-     * {@code Packages}, {@code Java}, {@code Polyglot}, {@code load} and their neighbours.
-     * Every one of them is already useless behind {@link HostAccess#NONE} and a denied
-     * filesystem, so this is not the barrier; it is what turns "that object refuses everything"
-     * into "there is no such name", which is the answer a script author can act on. GraalJS has
-     * options for the same effect, but they are marked experimental, and an experimental option
-     * is a thing that can silently stop being honoured on an upgrade. A deleted global cannot.
+     * Must stay one physical line: error line numbers are shifted by {@link #LINE_OFFSET}.
+     * Deleting the globals is not the security barrier (HostAccess.NONE is); it turns a
+     * refusing object into a missing name. GraalJS options for this are experimental.
      */
     private static final String PRELUDE_FORMAT =
             "['Packages','java','javax','javafx','org','com','edu','Java','Graal','Polyglot',"
@@ -145,7 +77,6 @@ public class JavaScriptTransformEngine implements AutoCloseable {
             + "return JSON.stringify({result:(__rhR===undefined?null:__rhR),"
             + "console:globalThis.__rhC,truncated:globalThis.__rhT});}};})()";
 
-    /** One line of prelude sits above the author's first line. */
     private static final int LINE_OFFSET = 1;
 
     private final ObjectMapper objectMapper;
@@ -169,26 +100,11 @@ public class JavaScriptTransformEngine implements AutoCloseable {
         return limits;
     }
 
-    // ── public surface ──────────────────────────────────────────────────────────────────
-
-    /**
-     * Compiles a script and checks it declares a {@code handler}, without ever calling it.
-     *
-     * <p>The top level still runs — a {@code const handler = ...} does not exist until it does —
-     * so this is as sandboxed as a real run, and as limited.
-     *
-     * @throws ScriptTransformException when it will not compile or declares no handler
-     */
+    /** Runs the top level (a {@code const handler} needs it) but never calls the handler. */
     public void validate(String script) {
         execute(script, null);
     }
 
-    /**
-     * Runs a script against one Event and one delivery context.
-     *
-     * @throws ScriptTransformException for every outcome that is not a payload, including a
-     *         cancellation the script did not ask for
-     */
     public TransformOutcome run(String script, TransformRequest request) {
         TransformOutcome outcome = execute(script, request);
         if (outcome == null) {
@@ -214,9 +130,6 @@ public class JavaScriptTransformEngine implements AutoCloseable {
         }
     }
 
-    // ── the run itself ──────────────────────────────────────────────────────────────────
-
-    /** {@code request == null} means "compile and check the contract, then stop". */
     private TransformOutcome execute(String script, TransformRequest request) {
         if (script == null || script.isBlank()) {
             throw new ScriptTransformException(ScriptTransformException.Reason.CONTRACT,
@@ -260,7 +173,7 @@ public class JavaScriptTransformEngine implements AutoCloseable {
         return PRELUDE_FORMAT.formatted(limits.maxConsoleLines()) + script + EPILOGUE;
     }
 
-    /** The guest's whole world, as JSON. It parses this itself; nothing crosses as a host object. */
+    /** Passed as JSON so no host object crosses into the guest. */
     private String inputJson(TransformRequest request) {
         try {
             Map<String, Object> input = new LinkedHashMap<>();
@@ -362,14 +275,7 @@ public class JavaScriptTransformEngine implements AutoCloseable {
         return lines;
     }
 
-    /**
-     * Reads back whatever the script logged before it died.
-     *
-     * <p>Best effort by construction: a cancelled Context cannot be evaluated again, so a script
-     * killed on time or memory comes back with nothing. For everything else — a throw, a
-     * reference to something the sandbox does not have — these lines are usually the only clue
-     * the author gets.
-     */
+    /** Best effort: a Context cancelled on time or memory cannot be evaluated again. */
     private List<ScriptConsoleLine> readConsoleQuietly(Context context) {
         try {
             return readConsole(objectMapper.readTree(
@@ -378,8 +284,6 @@ public class JavaScriptTransformEngine implements AutoCloseable {
             return List.of();
         }
     }
-
-    // ── failure translation ─────────────────────────────────────────────────────────────
 
     private ScriptTransformException translate(PolyglotException e, Guard guard, Context context) {
         ScriptTransformException.Reason tripped = guard.tripped();
@@ -412,7 +316,6 @@ public class JavaScriptTransformEngine implements AutoCloseable {
         return raw == null || raw.isBlank() ? e.getClass().getSimpleName() : raw;
     }
 
-    /** {@code {line, column}} in the author's own script, or {@code {-1, -1}}. */
     private int[] locate(PolyglotException e) {
         SourceSection section = e.getSourceLocation();
         if (section == null) {
@@ -430,8 +333,6 @@ public class JavaScriptTransformEngine implements AutoCloseable {
         return line >= 1 ? new int[] {line, section.getStartColumn()} : new int[] {-1, -1};
     }
 
-    // ── the sandbox ─────────────────────────────────────────────────────────────────────
-
     private Context newContext() {
         return newContext(sharedEngine());
     }
@@ -448,17 +349,12 @@ public class JavaScriptTransformEngine implements AutoCloseable {
                 .allowValueSharing(false)
                 .allowEnvironmentAccess(EnvironmentAccess.NONE)
                 .allowPolyglotAccess(PolyglotAccess.NONE)
-                // No `allowIO`: the default is a filesystem that denies everything, which is
-                // what we want. Naming it would only invite someone to pass something else.
+                // No allowIO: the default filesystem denies everything.
                 .option("js.ecmascript-version", "2023")
                 .build();
     }
 
-    /**
-     * Built once, lazily. It carries the parsed-code cache, so the second run of a script costs
-     * milliseconds where the first costs about a second — and a deployment that never runs a
-     * JavaScript transformation never pays for it at all.
-     */
+    /** Lazy, so a deployment that never runs JavaScript never pays for it. */
     private Engine sharedEngine() {
         Engine current = engine;
         if (current != null) {
@@ -472,9 +368,7 @@ public class JavaScriptTransformEngine implements AutoCloseable {
                 }
                 try {
                     engine = Engine.newBuilder("js")
-                            // Stock JDKs have no Graal compiler, so Truffle runs interpreted.
-                            // That is a performance note, not a correctness one, and it is not
-                            // worth a WARN on every boot.
+                            // Stock JDKs have no Graal compiler; interpreted mode is expected.
                             .option("engine.WarnInterpreterOnly", "false")
                             .build();
                 } catch (LinkageError err) {
@@ -489,13 +383,8 @@ public class JavaScriptTransformEngine implements AutoCloseable {
     }
 
     /**
-     * Runs one trivial script so the first real one does not pay for the language.
-     *
-     * <p>Not an optimisation. Bringing GraalJS up costs about a second of wall clock and tens of
-     * megabytes of allocation, and both of those are charged to whichever run happens to be
-     * first — which, under a two-second timeout and a memory ceiling, means the first
-     * transformation after every deploy fails on limits it never came close to. Paid here
-     * instead, once, outside any watchdog, on whoever asked first.
+     * Pays GraalJS's startup cost (about a second and tens of MB) outside any watchdog. Otherwise
+     * the first transformation after a deploy fails on limits it never came close to.
      */
     private void warmUp(Engine warm) {
         long startedAt = System.nanoTime();
@@ -509,8 +398,6 @@ public class JavaScriptTransformEngine implements AutoCloseable {
             log.warn("JavaScript transformation engine warm-up failed: {}", e.getMessage());
         }
     }
-
-    // ── the watchdog ────────────────────────────────────────────────────────────────────
 
     private Guard arm(Context context) {
         Guard guard = new Guard(context, Thread.currentThread().getId(),
@@ -533,15 +420,6 @@ public class JavaScriptTransformEngine implements AutoCloseable {
         }
     }
 
-    /**
-     * Watches one run, from outside it.
-     *
-     * <p>Both ceilings are enforced the same way — {@code Context.close(true)}, called from
-     * another thread, which unwinds the guest wherever it is. That is the whole reason this
-     * engine is GraalJS: a cancellation cannot be caught, delayed or retried by guest code, so
-     * a {@code while (true)} inside a {@code try/catch/finally} ends exactly as fast as one
-     * standing on its own.
-     */
     private final class Guard {
 
         private final Context context;
@@ -572,8 +450,8 @@ public class JavaScriptTransformEngine implements AutoCloseable {
         private void trip(ScriptTransformException.Reason reason) {
             tripped = reason;
             cancel();
-            // close(true) blocks until the guest has unwound, so it must not run on the
-            // watchdog thread: one stuck script would stop every other script being watched.
+            // close(true) blocks until the guest unwinds; off the watchdog thread so one stuck
+            // script cannot stop the others being watched.
             try {
                 cancellers.execute(() -> closeQuietly(context));
             } catch (RejectedExecutionException e) {
@@ -610,8 +488,7 @@ public class JavaScriptTransformEngine implements AutoCloseable {
     }
 
     private static ThreadMXBean resolveAllocationCounter() {
-        // The JDK's own ThreadMXBean shares this simple name, so one of the two has to be
-        // written out; it is the one used once, here.
+        // The JDK's ThreadMXBean shares the simple name with the imported one.
         java.lang.management.ThreadMXBean bean = ManagementFactory.getThreadMXBean();
         if (bean instanceof ThreadMXBean sun && sun.isThreadAllocatedMemorySupported()) {
             sun.setThreadAllocatedMemoryEnabled(true);

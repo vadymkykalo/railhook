@@ -17,10 +17,6 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Manages subscription state transitions and logs every change as an event.
- * Single source of truth for subscription lifecycle.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -34,23 +30,8 @@ public class SubscriptionLifecycleService {
     private final PlanRepository planRepository;
     private final EntitlementService entitlementService;
 
-    // ── Create ──────────────────────────────────────────────────────
-
-    /**
-     * Opens a checkout: a {@code PENDING} subscription for the caller's organization, bound to the
-     * reference the provider will echo back in its payment callback. The organization's plan is
-     * left alone — nothing has been paid — and {@link #activate} moves it on the first payment.
-     *
-     * <p>A checkout the customer walked away from is still {@code PENDING}; starting another one
-     * expires it, so an organization never holds two open checkouts. The expiry is flushed before
-     * the insert because Hibernate orders inserts ahead of updates, and the database allows one
-     * open subscription per organization.
-     *
-     * @param externalSubscriptionId the reference callbacks carry, when the provider's checkout
-     *                               has one (WayForPay's orderReference); null when the provider
-     *                               creates the subscription later (Stripe)
-     * @param checkoutSessionId      the provider's checkout session, kept for support lookups
-     */
+    // The plan changes only on the first payment. Earlier unpaid checkouts are expired and flushed
+    // first: Hibernate orders inserts before updates, and only one open subscription is allowed.
     @Transactional
     public BillingSubscription createPending(Plan plan, String providerCode, String currency,
                                              BillingInterval interval, long priceCents,
@@ -74,8 +55,7 @@ public class SubscriptionLifecycleService {
                 .externalSubscriptionId(externalSubscriptionId)
                 .metadata(checkoutSessionId != null ? checkoutMetadata(checkoutSessionId) : "{}")
                 .build();
-        // Flushed too: the event row below references it by a plain id column, which Hibernate's
-        // insert ordering does not see, and batched with the expiry event above it went first.
+        // Flushed: the event row references it by a plain id column Hibernate's ordering cannot see.
         sub = subscriptionRepository.saveAndFlush(sub);
 
         logEvent(sub, SubscriptionEventType.CREATED, null, SubscriptionStatus.PENDING,
@@ -85,12 +65,7 @@ public class SubscriptionLifecycleService {
         return sub;
     }
 
-    // ── Abandon (a checkout that will not be paid) ──────────────────
-
-    /**
-     * Expires a checkout that was never paid. Unlike {@link #cancel} the organization's plan is not
-     * touched: it never moved. A subscription that has been paid for is left alone.
-     */
+    /** Unlike {@link #cancel}, the plan is not touched: it never moved. */
     @Transactional
     public void abandon(UUID subscriptionId, String reason) {
         BillingSubscription sub = findOrThrow(subscriptionId);
@@ -117,8 +92,6 @@ public class SubscriptionLifecycleService {
         }
     }
 
-    // ── Activate (from trial or past_due) ───────────────────────────
-
     @Transactional
     public void activate(UUID subscriptionId, Instant periodStart, Instant periodEnd) {
         BillingSubscription sub = findOrThrow(subscriptionId);
@@ -132,8 +105,6 @@ public class SubscriptionLifecycleService {
                 null, null, "Subscription activated");
         syncOrgPlan(sub.getOrganizationId(), sub.getPlan(), BillingStatus.ACTIVE);
     }
-
-    // ── Renew ───────────────────────────────────────────────────────
 
     @Transactional
     public void renew(UUID subscriptionId, Instant newPeriodStart, Instant newPeriodEnd) {
@@ -150,8 +121,6 @@ public class SubscriptionLifecycleService {
         log.info("Subscription renewed: sub={} until {}", subscriptionId, newPeriodEnd);
     }
 
-    // ── Plan change ─────────────────────────────────────────────────
-
     @Transactional
     public void changePlan(UUID subscriptionId, Plan newPlan) {
         BillingSubscription sub = findOrThrow(subscriptionId);
@@ -164,8 +133,6 @@ public class SubscriptionLifecycleService {
         syncOrgPlan(sub.getOrganizationId(), newPlan, BillingStatus.ACTIVE);
         log.info("Plan changed: sub={} → {}", subscriptionId, newPlan.getName());
     }
-
-    // ── Payment failed → PAST_DUE ──────────────────────────────────
 
     @Transactional
     public void markPastDue(UUID subscriptionId, String reason) {
@@ -180,8 +147,6 @@ public class SubscriptionLifecycleService {
         log.warn("Subscription past due: sub={} reason={}", subscriptionId, reason);
     }
 
-    // ── Grace period ────────────────────────────────────────────────
-
     @Transactional
     public void startGracePeriod(UUID subscriptionId) {
         BillingSubscription sub = findOrThrow(subscriptionId);
@@ -191,15 +156,10 @@ public class SubscriptionLifecycleService {
 
         logEvent(sub, SubscriptionEventType.GRACE_PERIOD_STARTED, prev, SubscriptionStatus.GRACE_PERIOD,
                 null, null, "Grace period started");
-        // Every other transition here syncs the organization; this one did not, so an org whose
-        // subscription entered its grace period kept reading PAST_DUE — the two rows disagreed
-        // about the same fact for the whole seven days, and BillingStatus.GRACE_PERIOD, which the
-        // dashboard and the GDPR export both already render, was never written by anything.
+        // Without this the organization kept reading PAST_DUE through the whole grace period.
         syncOrgBillingStatus(sub.getOrganizationId(), BillingStatus.GRACE_PERIOD);
         log.warn("Grace period started: sub={}", subscriptionId);
     }
-
-    // ── Suspend (grace expired) ─────────────────────────────────────
 
     @Transactional
     public void suspend(UUID subscriptionId) {
@@ -211,14 +171,11 @@ public class SubscriptionLifecycleService {
         logEvent(sub, SubscriptionEventType.SUSPENDED, prev, SubscriptionStatus.SUSPENDED,
                 null, null, "Subscription suspended — payment overdue");
 
-        // Downgrade org to free plan
         planRepository.findByName("free").ifPresent(freePlan -> {
             syncOrgPlan(sub.getOrganizationId(), freePlan, BillingStatus.SUSPENDED);
         });
         log.warn("Subscription suspended: sub={}", subscriptionId);
     }
-
-    // ── Cancel ──────────────────────────────────────────────────────
 
     @Transactional
     public void cancel(UUID subscriptionId, String reason) {
@@ -236,8 +193,6 @@ public class SubscriptionLifecycleService {
         });
         log.info("Subscription cancelled: sub={} reason={}", subscriptionId, reason);
     }
-
-    // ── Update external IDs (after provider creates customer/subscription) ──
 
     @Transactional
     public void setExternalIds(UUID subscriptionId, String externalCustomerId, String externalSubscriptionId) {
@@ -257,8 +212,6 @@ public class SubscriptionLifecycleService {
         subscriptionRepository.save(sub);
     }
 
-    // ── Internal ────────────────────────────────────────────────────
-
     private BillingSubscription findOrThrow(UUID subscriptionId) {
         return subscriptionRepository.findById(subscriptionId)
                 .orElseThrow(() -> new NotFoundException("Subscription not found: " + subscriptionId));
@@ -267,11 +220,7 @@ public class SubscriptionLifecycleService {
     private void logEvent(BillingSubscription sub, SubscriptionEventType type,
                           SubscriptionStatus fromStatus, SubscriptionStatus toStatus,
                           UUID fromPlanId, UUID toPlanId, String reason) {
-        // Most callers are the billing schedulers and the provider webhook, all system-scoped:
-        // Hibernate leaves the entity's own organization_id alone under the root tenant, and the
-        // column is NOT NULL since V056 — so the value comes off the subscription being changed,
-        // the same way syncOrgPlan below takes it. Without it the whole webhook transaction rolls
-        // back and the status change is lost.
+        // Set explicitly: Hibernate leaves it null under the root tenant and the insert would fail.
         eventRepository.save(BillingSubscriptionEvent.builder()
                 .organizationId(sub.getOrganizationId())
                 .subscriptionId(sub.getId())
@@ -284,14 +233,7 @@ public class SubscriptionLifecycleService {
                 .build());
     }
 
-    /**
-     * Takes the organization explicitly, unlike the request-facing methods above.
-     *
-     * <p>Most callers here are the billing schedulers, which run under the system tenant and walk
-     * subscriptions belonging to many organizations: the organization comes off the row being
-     * processed, not off an ambient scope. Reading it from {@code TenantContext} would have
-     * resolved to the system sentinel and written the plan onto nothing.
-     */
+    // Explicit organization: schedulers run under the system tenant.
     private void syncOrgPlan(UUID organizationId, Plan plan, BillingStatus billingStatus) {
         organizationRepository.findById(organizationId).ifPresent(org -> {
             org.setPlan(plan);
@@ -301,7 +243,6 @@ public class SubscriptionLifecycleService {
         entitlementService.evictPlanCache(organizationId);
     }
 
-    /** Explicitly scoped for the same reason as {@link #syncOrgPlan}. */
     private void syncOrgBillingStatus(UUID organizationId, BillingStatus billingStatus) {
         organizationRepository.findById(organizationId).ifPresent(org -> {
             org.setBillingStatus(billingStatus);

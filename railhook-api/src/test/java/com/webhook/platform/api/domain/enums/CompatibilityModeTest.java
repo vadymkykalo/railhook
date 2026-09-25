@@ -5,13 +5,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The rule BACKWARD, FORWARD and FULL were only ever names for.
- *
- * <p>One base schema and one changed schema per scenario, so what each mode lets through and what
- * it refuses is readable side by side — the two directions deliberately disagree, and a test that
- * asserted only "breaking" would hide that.
- */
 class CompatibilityModeTest {
 
     private static final String BASE = """
@@ -80,8 +73,7 @@ class CompatibilityModeTest {
                 {"type":"object","properties":{"note":{"type":"string"}}}
                 """;
 
-        // A consumer written against the new schema no longer asks for `id`, so old events
-        // still read. FORWARD is the mode that refuses this, and does below.
+        // FORWARD is the mode that refuses this, below.
         assertThat(CompatibilityMode.BACKWARD.violations(against(dropped))).isEmpty();
     }
 

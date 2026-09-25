@@ -8,13 +8,8 @@ import java.time.Duration;
 import java.util.Locale;
 
 /**
- * Every cookie the sign-in endpoints set, and the attributes they share.
- *
- * <p>Secure whenever the deployment is production or its public address is https. Not always: a
- * browser drops a Secure cookie set over plain http from anywhere but localhost, and an install on
- * {@code http://<address>} is a supported way to run Railhook, which would then never stay signed
- * in. Production alone was not enough either — an operator who put TLS in front without setting
- * {@code APP_ENV=production} got a refresh token that would also travel over http.
+ * Secure in production or when the public address is https. Not unconditionally: browsers drop
+ * Secure cookies over plain http except on localhost, and a plain-http install is supported.
  */
 @Component
 public class AuthCookies {

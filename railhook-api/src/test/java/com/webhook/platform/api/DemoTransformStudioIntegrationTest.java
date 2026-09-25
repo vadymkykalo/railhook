@@ -30,27 +30,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The Transform Studio inside the public demo: a visitor with no account runs JavaScript on our
- * servers, sees what it produced, and gets nothing else.
- *
- * <p>Three things have to hold at once, and they pull against each other, which is why they are
- * in one class. The two handlers that execute a script answer a demo session — otherwise the
- * Studio is a screenshot. The dry-run's signature is not in the answer — otherwise a token
- * anybody can mint is a signing oracle. And everything around them still refuses: saving a
- * script, creating, editing or deleting a Transformation, and the rest of the API.
- *
- * <p>{@code DemoSessionIntegrationTest} walks every state-changing handler and
- * {@code DemoSessionAllowListTest} freezes the set that may be excepted; this one is about what
- * those two exceptions actually hand over.
- */
 @TestPropertySource(properties = {
         "demo.enabled=true",
         "demo.session-ttl-minutes=30"
 })
 class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
 
-    /** Written against the demo's own {@code order.created} shape, as the seeded one is. */
     private static final String SCRIPT = """
             function handler(webhook) {
               var lines = webhook.payload.data.items.map(function (item) {
@@ -89,7 +74,7 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String openSession() throws Exception {
-        // As the anonymous visitor it is: no tenant scope on the thread MockMvc runs the request on.
+        // Anonymous visitor: no tenant scope.
         TenantContext.clear();
         MvcResult result;
         try {
@@ -111,8 +96,6 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
         return jdbc.queryForObject("SELECT id FROM endpoints WHERE organization_id = ? ORDER BY id LIMIT 1",
                 UUID.class, DemoTenant.ORGANIZATION_ID);
     }
-
-    // ── Running a script ───────────────────────────────────────────
 
     @Test
     void aVisitorCanRunAScriptAndSeeWhatItProduced() throws Exception {
@@ -136,8 +119,7 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void aScriptThatFailsIsReportedRatherThanRefused() throws Exception {
-        // The sandbox is the demo's protection, not the 403: a broken script has to come back as
-        // a readable error, because reading the error is what the Studio is for.
+        // A broken script must come back as a readable error: reading it is what the Studio is for.
         String token = openSession();
 
         mockMvc.perform(post(studio()).header("Authorization", "Bearer " + token)
@@ -149,8 +131,6 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.errors").isNotEmpty());
     }
-
-    // ── The dry-run, and its signature ─────────────────────────────
 
     @Test
     void theDryRunAnswersTheDemoWithoutAUsableSignature() throws Exception {
@@ -165,17 +145,13 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
                                 "endpointId", endpoint.toString(), "eventType", "order.created"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                // Everything the Studio shows is there: the body, the URL, the headers.
                 .andExpect(jsonPath("$.endpointUrl").isString())
                 .andExpect(jsonPath("$.transformedPayload").isString())
                 .andExpect(jsonPath("$.requestHeaders['X-Timestamp']").isString())
-                // The one thing that is a capability is not.
                 .andExpect(jsonPath("$.signature").value(DemoDryRunMask.MASKED))
                 .andExpect(jsonPath("$.requestHeaders['X-Signature']").value(DemoDryRunMask.MASKED))
                 .andReturn();
 
-        // Nothing anywhere in the answer that a receiver would verify: not the signature, and not
-        // the secret it would have been computed from.
         String body = result.getResponse().getContentAsString();
         String secret = jdbc.queryForObject("SELECT secret_encrypted FROM endpoints WHERE id = ?",
                 String.class, endpoint);
@@ -184,8 +160,7 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void aRealCallerStillGetsARealSignature() throws Exception {
-        // The mask is the demo's, not the endpoint's: masking for everybody would quietly break
-        // the one thing a dry-run is for.
+        // Masking for everybody would break what a dry-run is for.
         String owner = registerSomeoneWithAProject();
         UUID project = UUID.fromString(objectMapper.readTree(mockMvc.perform(
                         post("/api/v1/projects").header("Authorization", "Bearer " + owner)
@@ -196,8 +171,7 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
                         post("/api/v1/projects/" + project + "/endpoints")
                                 .header("Authorization", "Bearer " + owner)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(// A host that resolves: endpoint creation validates the address, and a reserved
-                                // .example TLD makes this case fail for a reason that has nothing to do with it.
+                                .content(// A resolving host: endpoint creation validates the address.
                                 "{\"url\":\"https://example.com/hook\",\"description\":\"Mine\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString())
                 .get("id").asText();
@@ -211,8 +185,6 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.signature").isString())
                 .andExpect(jsonPath("$.signature").value(not(DemoDryRunMask.MASKED)));
     }
-
-    // ── What is still refused ──────────────────────────────────────
 
     @Test
     void runningAScriptIsNotSavingOne() throws Exception {
@@ -251,7 +223,6 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
     void theStudioIsNotAWayIntoTheRestOfTheApi() throws Exception {
         String token = openSession();
 
-        // The neighbours of the two allowed handlers, all of which run a script's worth of nothing.
         mockMvc.perform(post("/api/v1/projects/" + DemoTenant.PROJECT_ID + "/endpoints")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -264,8 +235,6 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("demo_read_only"));
     }
-
-    // ── The budget ─────────────────────────────────────────────────
 
     @Test
     void aDemoSessionOutOfScriptRunsIsRefused() throws Exception {
@@ -304,14 +273,10 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
                                 "inputPayload", ORDER, "template", SCRIPT, "kind", "JAVASCRIPT"))))
                 .andExpect(status().isOk());
 
-        // And the demo can still look at everything while it is out of runs: the budget is on
-        // starting a script, not on the demo.
         mockMvc.perform(get("/api/v1/projects/" + DemoTenant.PROJECT_ID + "/transformations")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
     }
-
-    // ── What the visitor opens on ──────────────────────────────────
 
     @Test
     void theDemoShipsAJavaScriptTransformationWiredToASubscription() throws Exception {
@@ -329,7 +294,6 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
             }
         }
         assertThat(script).as("the demo has a JavaScript transformation to open the Studio on").isNotNull();
-        // The three things the template language cannot do, which is why the example exists.
         assertThat(script.get("template").asText())
                 .contains(".map(")
                 .contains("if (")
@@ -341,7 +305,6 @@ class DemoTransformStudioIntegrationTest extends AbstractIntegrationTest {
                 .as("wired to a Subscription, so the Studio opens on real code against real events")
                 .isPositive();
 
-        // And it runs, here, against the demo's own most recent event of that type.
         String recent = jdbc.queryForObject("SELECT payload::text FROM events WHERE organization_id = ? "
                         + "AND event_type = 'order.created' ORDER BY created_at DESC LIMIT 1",
                 String.class, DemoTenant.ORGANIZATION_ID);

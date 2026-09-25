@@ -19,12 +19,6 @@ import { usePermissions } from '../auth/usePermissions';
 import { cn } from '../lib/utils';
 import { formatJson } from '../lib/json';
 
-/**
- * A throwaway URL that keeps whatever is posted to it.
- *
- * Same workbench shape as the rest of Develop: what you are driving on the
- * left (which endpoint), what came back on the right (what it captured).
- */
 export default function TestEndpointsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
@@ -56,8 +50,7 @@ export default function TestEndpointsPage() {
     }
   }, [projectId]);
 
-  // Only the latest load may write: switching endpoints while one is still loading used to let
-  // the earlier, slower answer land on top of the endpoint now selected.
+  // Only the latest load may write, or a slower earlier answer lands on the newly selected endpoint.
   const latestRequestsLoad = useRef(0);
   const loadRequests = useCallback(async (endpointId: string) => {
     if (!projectId) return;
@@ -154,7 +147,7 @@ export default function TestEndpointsPage() {
       <PageSkeleton>
         <div className="grid gap-6 lg:grid-cols-2">
           <SkeletonRows count={2} height="h-28" />
-          <div className="h-64 animate-pulse rounded-xl bg-muted" />
+          <div className="h-64 animate-pulse bg-muted" />
         </div>
       </PageSkeleton>
     );
@@ -217,8 +210,8 @@ export default function TestEndpointsPage() {
               <div
                 key={endpoint.id}
                 className={cn(
-                  'rounded-lg border p-3 transition-colors',
-                  selectedEndpoint === endpoint.id ? 'border-primary/40 bg-accent' : 'border-rail hover:bg-secondary/60',
+                  'border p-3 transition-colors',
+                  selectedEndpoint === endpoint.id ? 'border-primary bg-secondary' : 'border-rail hover:bg-secondary/60',
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -291,7 +284,7 @@ export default function TestEndpointsPage() {
                 requests.map((req) => {
                   const expanded = expandedRequest === req.id;
                   return (
-                    <div key={req.id} className="overflow-hidden rounded-lg border border-rail">
+                    <div key={req.id} className="overflow-hidden border border-rail">
                       <button
                         type="button"
                         aria-expanded={expanded}

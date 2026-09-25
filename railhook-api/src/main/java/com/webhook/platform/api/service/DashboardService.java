@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
 
 @Slf4j
 @Service
@@ -71,24 +72,20 @@ public class DashboardService {
         UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        
-        
+
         Instant since = Instant.now().minus(30, ChronoUnit.DAYS);
         
-        // Calculate delivery stats using DB-level counts (last 30 days)
         DashboardStatsResponse.DeliveryStats deliveryStats = calculateDeliveryStats(projectId, since);
         
-        // Get recent events (last 10) with delivery counts
         List<DashboardStatsResponse.RecentEventSummary> recentEvents = getRecentEvents(projectId);
         
-        // Get endpoint health (last 30 days)
         List<DashboardStatsResponse.EndpointHealthSummary> endpointHealth = getEndpointHealth(projectId, since);
         
         return new DashboardStatsResponse(deliveryStats, recentEvents, endpointHealth);
     }
     
     private DashboardStatsResponse.DeliveryStats calculateDeliveryStats(UUID projectId, Instant since) {
-        // Use materialized view instead of runtime GROUP BY (refreshed every 5 min)
+        // Materialized view, refreshed every 5 minutes, instead of a runtime GROUP BY.
         Map<String, Long> statusCounts = materializedViewRepository.getDeliveryStatsByProject(projectId);
         
         long successful = statusCounts.getOrDefault(DeliveryStatus.SUCCESS.name(), 0L);
@@ -124,7 +121,7 @@ public class DashboardService {
     
     private List<DashboardStatsResponse.EndpointHealthSummary> getEndpointHealth(UUID projectId, Instant since) {
         List<Endpoint> endpoints = endpointRepository.findByProjectIdAndDeletedAtIsNull(projectId,
-                org.springframework.data.domain.PageRequest.of(0, 100)).getContent();
+                PageRequest.of(0, 100)).getContent();
         
         if (endpoints.isEmpty()) {
             return new ArrayList<>();
@@ -133,7 +130,6 @@ public class DashboardService {
         List<UUID> endpointIds = endpoints.stream().map(Endpoint::getId).collect(Collectors.toList());
         List<Object[]> stats = deliveryRepository.countByEndpointIdsGroupByEndpointAndStatus(TenantContext.require(), endpointIds, since);
         
-        // Build lookup: endpointId -> {status -> count}
         Map<UUID, Map<String, Long>> statsMap = new HashMap<>();
         for (Object[] row : stats) {
             UUID eid = (UUID) row[0];

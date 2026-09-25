@@ -32,25 +32,22 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.http.MediaType;
 
 /**
- * How the Outgoing direction records its Attempts: one {@code deliveries} row mutated in
- * place, with a separate {@code delivery_attempts} row appended per Attempt as a log.
- *
- * <p>The fence and the FIFO ordering gate live here and never reach {@link AttemptRunner};
- * the gate appears at the seam as {@link ClaimResult.Deferred}, because parking a Delivery
- * already means the Claim was released and nothing was sent.
+ * Outgoing mutates one {@code deliveries} row in place and appends a {@code delivery_attempts}
+ * row per Attempt as a log. The FIFO ordering gate shows up at the seam only as
+ * {@link ClaimResult.Deferred}.
  *
  * <p>One instance per Attempt; thread-confined.
  */
 @Slf4j
 public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.Claim> {
 
-    /** Ownership of one delivery row; {@code fence} is the token stamped when it was taken. */
     public record Claim(UUID deliveryId, UUID fence, Delivery delivery) {
     }
 
-    /** Set as a default on the shared WebClient (WebClientConfig); recorded here, since it is sent. */
+    /** The shared WebClient's default; repeated here only so the attempt record shows it. */
     private static final String USER_AGENT = "WebhookPlatform/1.0";
 
     private final DeliveryRepository deliveryRepository;
@@ -73,7 +70,6 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     private final DeliveryMessage message;
     private final boolean isRetry;
 
-    // Resolved inside claim(), after the ordering gate — see the note there.
     private Endpoint endpoint;
     private Event event;
 
@@ -119,13 +115,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         this.isRetry = isRetry;
     }
 
-    /**
-     * Claim, then apply the ordering gate.
-     *
-     * <p>The retry path does not re-claim: RetrySchedulerService already moved the row to
-     * PROCESSING before publishing, so an {@code UPDATE … WHERE status = 'PENDING'} would
-     * never match and every retry would be silently skipped.
-     */
+    /** A retry CASes on the published token: the scheduler already moved the row to PROCESSING. */
     @Override
     public ClaimResult<Claim> claim() {
         Delivery delivery;
@@ -134,8 +124,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         if (isRetry) {
             UUID expected = message.getClaimToken();
             if (expected == null) {
-                // Published before the token travelled with the message. Trust the status
-                // rather than strand every retry already in flight.
+                // Message from an older producer. Trust the status rather than strand the retry.
                 delivery = deliveryRepository.findById(message.getDeliveryId()).orElse(null);
                 if (delivery == null || delivery.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
                     return new ClaimResult.NotClaimed<>("retry delivery not found or not PROCESSING");
@@ -144,9 +133,8 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                         + "proceeding without CAS", message.getDeliveryId());
                 fence = delivery.getClaimToken();
             } else {
-                // CAS on the token the scheduler published with, not on the status: reading
-                // the fence out of the row let every copy of a redelivered message match, and
-                // the second webhook went out with nothing recording it.
+                // Reading the fence out of the row let every copy of a redelivered message
+                // match, and the duplicate webhook went out unrecorded.
                 UUID token = UUID.randomUUID();
                 delivery = transactionTemplate.execute(tx ->
                         deliveryRepository.claimRetryForProcessing(message.getDeliveryId(), expected, token));
@@ -168,8 +156,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
 
         Claim claim = new Claim(delivery.getId(), fence, delivery);
 
-        // Before the Endpoint and Event are read: a parked Delivery is re-polled every few
-        // seconds, and loading both rows each time put two reads per poll on the hot path.
+        // Before loading the Endpoint and Event: a parked Delivery is re-polled every few seconds.
         if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
             Instant until = orderingGate.holdUntil(delivery);
             if (until != null) {
@@ -177,20 +164,16 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             }
         }
 
-        // Resolved after the claim rather than before it, so these terminal failures are
-        // written under the fencing token like every other finalisation.
+        // Checked after the claim so terminal failures are written under the fencing token.
         endpoint = endpointRepository.findById(delivery.getEndpointId()).orElse(null);
         if (endpoint == null) {
             return terminal(claim, "Endpoint not found");
         }
-        // A soft delete is a deletion as far as the owner is concerned: stop delivering,
-        // including for events already queued or partway through the retry ladder.
         if (endpoint.getDeletedAt() != null) {
             return terminal(claim, "Endpoint has been deleted");
         }
-        // Deleting a Project or suspending an Organization stamps that row and nothing under it,
-        // so the Endpoint reads as live here. A deleted Project ends as a deleted Endpoint does;
-        // a suspension is handed back, because an operator can lift it.
+        // Project deletion and Organization suspension leave the Endpoint looking live. A
+        // suspension is deferred because an operator can lift it.
         ProjectStatusLookup.ProjectStatus projectStatus = projectStatusLookup.forProject(endpoint.getProjectId());
         if (projectStatus == ProjectStatusLookup.ProjectStatus.DELETED) {
             return terminal(claim, "Project has been deleted");
@@ -199,12 +182,8 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             return deferred(claim, "Organization is suspended");
         }
         if (!endpoint.getEnabled()) {
-            // Who turned it off decides what happens to Deliveries already queued. Its owner
-            // turning it off means "stop sending to this", and that is FAILED, as it always
-            // was. Railhook turning it off for continuous failure means "we gave up on this
-            // receiver" — an obligation a person can still make succeed, by fixing the
-            // receiver and retrying it. That is the DLQ, which is where Railhook keeps what it
-            // abandoned for a human to decide about.
+            // Disabled by the owner: FAILED. Auto-disabled by us for continuous failure: DLQ, so a
+            // person can fix the receiver and retry.
             if (endpoint.getAutoDisabledAt() != null) {
                 return abandoned(claim, "Endpoint auto-disabled: "
                         + reasonOrDefault(endpoint.getAutoDisabledReason()));
@@ -226,7 +205,6 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         try {
             ladder = RetryLadder.parse(delivery.getRetryDelays(), delivery.getMaxAttempts());
         } catch (IllegalArgumentException e) {
-            // No number of retries fixes a ladder that does not parse.
             String reason = "INVALID_RETRY_LADDER: " + e.getMessage();
             log.error("Delivery {} carries an unusable retry ladder: {}", delivery.getId(), e.getMessage());
             return terminal(claim, reason);
@@ -236,8 +214,6 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         try {
             retryableStatuses = RetryableStatuses.parse(delivery.getRetryableStatuses());
         } catch (IllegalArgumentException e) {
-            // As with the ladder: the api rejects a malformed spec on write, so reaching this
-            // means the column was written outside the api, and retrying cannot fix it.
             String reason = "INVALID_RETRYABLE_STATUSES: " + e.getMessage();
             log.error("Delivery {} carries an unusable retryable-status spec: {}",
                     delivery.getId(), e.getMessage());
@@ -258,10 +234,6 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         return new ClaimResult.Claimed<>(claim, context);
     }
 
-    /**
-     * Hands the Delivery back under its fencing token, unattempted, until {@link
-     * ProjectStatusLookup#SUSPENSION_RECHECK} from now.
-     */
     private ClaimResult<Claim> deferred(Claim claim, String reason) {
         Instant until = Instant.now().plus(ProjectStatusLookup.SUSPENSION_RECHECK);
         log.info("Delivery {} will not be attempted before {}: {}", claim.deliveryId(), until, reason);
@@ -269,11 +241,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         return new ClaimResult.Deferred<>(until, reason);
     }
 
-    /**
-     * Hands the Delivery to the DLQ under its fencing token and reports that there is nothing
-     * to attempt. Like {@link #terminal}, it never reaches {@link AttemptRunner}, so it owes
-     * the side effect itself — and only if its own finalisation applied.
-     */
+    /** Never reaches {@link AttemptRunner}, so it runs the side effect itself if finalise applied. */
     private ClaimResult<Claim> abandoned(Claim claim, String reason) {
         log.warn("Delivery {} will not be attempted and goes to Failed Messages: {}",
                 claim.deliveryId(), reason);
@@ -287,11 +255,9 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         return reason != null && !reason.isBlank() ? reason : "continuous failure";
     }
 
-    /** Fails the Delivery under its fencing token and reports that there is nothing to attempt. */
+    /** Never reaches {@link AttemptRunner}, so it runs the release itself if finalise applied. */
     private ClaimResult<Claim> terminal(Claim claim, String reason) {
         log.warn("Delivery {} will not be attempted: {}", claim.deliveryId(), reason);
-        // Never reaches AttemptRunner, so it owes the release itself — and only if its own
-        // finalisation applied.
         if (finalise(claim, new Finalization.TerminallyFailed(reason))) {
             onTerminallyFailed(claim);
         }
@@ -315,9 +281,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                 ? mtlsWebClientFactory.getWebClient(endpoint)
                 : defaultWebClient;
 
-        // One set of headers feeds both the request and the Attempt's record. They used to be
-        // written out twice, and the record lost X-Sequence-Number and Idempotency-Key while the
-        // request kept them.
+        // One set of headers feeds both the request and the record, which used to drift apart.
         Map<String, String> sent = new LinkedHashMap<>();
         Map<String, String> recorded = new LinkedHashMap<>();
         recorded.put("Content-Type", "application/json");
@@ -333,7 +297,6 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             recorded.put("X-Timestamp", String.valueOf(signatures.timestampMillis()));
         }
         if (signatures.standard() != null) {
-            // Lower-case as the convention spells them; cosmetic on the wire.
             sent.put("webhook-id", delivery.getId().toString());
             recorded.put("webhook-id", delivery.getId().toString());
             sent.put("webhook-timestamp", String.valueOf(signatures.timestampSeconds()));
@@ -341,14 +304,11 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             sent.put("webhook-signature", signatures.standard());
             recorded.put("webhook-signature", signatures.maskedStandard());
         }
-        // The WebClient's default, which a custom header of the same name replaces.
         recorded.put("User-Agent", USER_AGENT);
 
         Map<String, String> custom = new LinkedHashMap<>();
-        // Whatever the transformation set comes first, so the Endpoint's own custom headers
-        // still win: a script belongs to whoever wrote the transformation, and the endpoint
-        // configuration belongs to whoever owns the endpoint. Signatures are computed above and
-        // are not in this map, so a script cannot overwrite one.
+        // Script headers first so the Endpoint's custom headers win. Signatures are not in this
+        // map, so a script cannot overwrite one.
         custom.putAll(transformed.headers());
         AttemptSupport.collectCustomHeaders(custom, delivery.getCustomHeaders(), objectMapper);
         recorded.putAll(HeaderSanitizer.sanitize(custom));
@@ -356,17 +316,14 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         return new RequestSpec(
                 client,
                 request -> {
-                    request.contentType(org.springframework.http.MediaType.APPLICATION_JSON);
+                    request.contentType(MediaType.APPLICATION_JSON);
                     sent.forEach(request::header);
                     custom.forEach(request::header);
                 },
                 recordedHeaders(recorded));
     }
 
-    /**
-     * A missing or disabled {@code transformationId} is a configuration failure, not "no
-     * transform": falling back would ship the data the transform exists to strip.
-     */
+    /** A missing transformation fails the Attempt: falling back would ship what it strips. */
     @Override
     public TransformedBody buildBody(Claim claim) {
         Delivery delivery = claim.delivery();
@@ -379,8 +336,6 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                                 + " not found or disabled for delivery " + delivery.getId());
             }
         } else {
-            // An inline template on the Delivery predates saved transformations and is always
-            // the template language: there is nowhere on a Delivery to say otherwise.
             resolved = TransformationCacheService.Resolved.template(delivery.getPayloadTemplate());
         }
 
@@ -392,13 +347,10 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                         .timestamp(event.getCreatedAt())
                         .direction("OUTGOING")
                         .url(endpoint.getUrl())
-                        // The Endpoint's own configured headers. Railhook's — the signature, the
-                        // ids, the sequence number — are computed in buildRequest, after this,
-                        // and are deliberately not shown: a script that could read a signature is
-                        // a script that could leak one.
+                        // Signatures are added later and never shown: a script that can read a
+                        // signature can leak one.
                         .headers(configuredHeaders(delivery.getCustomHeaders()))
-                        // attemptStarting has already spent the rung, so this is the number of
-                        // the attempt the script is being run for, not the last one.
+                        // Already incremented by attemptStarting, so this is the current attempt.
                         .attemptNumber(delivery.getAttemptCount())
                         .build());
     }
@@ -414,22 +366,19 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         Integer spent = transactionTemplate.execute(tx ->
                 deliveryRepository.incrementAttemptCount(claim.deliveryId(), claim.fence()));
         if (spent == null || spent == 0) {
-            // Its finalisation will not apply either, so it queues nothing.
             log.warn("Delivery {} was reclaimed before its attempt started; the rung stays with the "
                     + "attempt that holds it now", claim.deliveryId());
         }
         claim.delivery().setAttemptCount(claim.delivery().getAttemptCount() + 1);
     }
 
-    /** Outgoing keeps a separate row per Attempt, with more of the body kept for failures. */
     @Override
     public void recordAttempt(Claim claim, AttemptRecord record) {
         boolean success = record.statusCode() != null
                 && record.statusCode() >= 200 && record.statusCode() < 300;
         deliveryAttemptRepository.save(DeliveryAttempt.builder()
                 .deliveryId(claim.deliveryId())
-                // Carried across from the Delivery: the api filters delivery_attempts on it and
-                // the worker has no tenant of its own to derive it from.
+                // The worker has no tenant scope to derive this from; the api filters on it.
                 .organizationId(claim.delivery().getOrganizationId())
                 .attemptNumber(claim.delivery().getAttemptCount())
                 .requestHeaders(record.requestHeaders())
@@ -442,13 +391,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                 .build());
     }
 
-    /**
-     * Re-reads the row and writes only while this Attempt still holds the Claim.
-     *
-     * <p>The status alone is not enough: a swept row reclaimed by another Attempt is PROCESSING
-     * again, for somebody else. Both tokens null is a match, so a row claimed before the token
-     * existed is not stranded; a mismatch is not.
-     */
+    /** Checks the fence too: a swept and reclaimed row is PROCESSING again, for someone else. */
     @Override
     public boolean finalise(Claim claim, Finalization outcome) {
         Boolean applied = transactionTemplate.execute(tx -> {
@@ -488,7 +431,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         return Boolean.TRUE.equals(applied);
     }
 
-    /** Outside the finalising transaction: the DLQ write is committed, this is a notification. */
+    /** Only a notification; the DLQ state is already committed. */
     @Override
     public void onAbandoned(Claim claim) {
         Delivery delivery = claim.delivery();
@@ -516,17 +459,12 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         orderingGate.release(claim.delivery(), false);
     }
 
-    /** Outgoing's target is the Endpoint the Delivery was made out to. */
     @Override
     public void recordTargetOutcome(Claim claim, boolean succeeded) {
         targetFailureRecorder.endpointAttempt(claim.delivery().getEndpointId(), succeeded);
     }
 
-    /**
-     * The cursor has to move past a terminally failed Delivery too, or a single non-retryable
-     * 4xx parks an ordering-enabled endpoint at that sequence forever. Removed from the buffer
-     * as well: nothing is coming along behind it to clean up.
-     */
+    /** The cursor must move past a failed Delivery too, or the ordered endpoint stalls forever. */
     @Override
     public void onTerminallyFailed(Claim claim) {
         orderingGate.release(claim.delivery(), true);
@@ -536,7 +474,6 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         return AttemptSupport.fenceMatches(fresh.getClaimToken(), claim.fence());
     }
 
-    /** What the dashboard shows for this request; signatures and custom secrets already masked. */
     private String recordedHeaders(Map<String, String> recorded) {
         try {
             return objectMapper.writeValueAsString(recorded);

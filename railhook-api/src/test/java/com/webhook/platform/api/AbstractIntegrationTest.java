@@ -64,18 +64,7 @@ public abstract class AbstractIntegrationTest {
     @MockitoBean
     protected RedisTunnelCoordinator redisTunnelCoordinator;
 
-    /**
-     * Integration tests reach for repositories directly — seeding fixtures, asserting on rows,
-     * often for several organizations in one test. That is system work, and system
-     * work say so: without a scope the first repository call fails with
-     * TenantNotResolvedException.
-     *
-     * <p>Entered here rather than in each test so the default matches what these tests are: an
-     * out-of-band view of the database. A test that wants to prove confinement enters a real
-     * tenant itself with {@code TenantContext.runAs(...)} — see {@code CrossTenantIsolationTest}.
-     * Requests made through MockMvc are unaffected: they go through TenantContextFilter and get
-     * the caller's own scope.
-     */
+    // System scope by default: without one the first repository call throws TenantNotResolvedException.
     @BeforeEach
     void enterSystemTenantScope() {
         TenantContext.set(TenantContext.SYSTEM);
@@ -90,24 +79,13 @@ public abstract class AbstractIntegrationTest {
     void setupMocks() {
         when(authRateLimiterService.allowLogin(anyString(), any())).thenReturn(true);
         when(authRateLimiterService.allowRegister(anyString())).thenReturn(true);
-        // allowTokenAction backs /auth/forgot-password's IP+email check and
-        // /auth/reset-password's IP+token check — without stubbing it, an unstubbed
-        // Mockito boolean mock defaults to false and every reset-password call gets a
-        // spurious 429 (pre-existing gap here since allowTokenAction was added; not
-        // related to password-reset hashing, just needed so PasswordResetIntegrationTest can run at all).
+        // Unstubbed Mockito booleans are false, so each limiter below would answer 429.
         when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
         when(authRateLimiterService.allowPlatformAdmin(anyString())).thenReturn(true);
-        // Session refresh has its own budget (allowRefresh); unstubbed it is false and every
-        // refresh in an integration test answers 429.
         when(authRateLimiterService.allowRefresh(anyString(), any())).thenReturn(true);
-        // Device-code polling too (allowDevicePoll): unstubbed, every CLI poll answers 429.
         when(authRateLimiterService.allowDevicePoll(anyString(), any())).thenReturn(true);
-        // Creating a public tester URL without an account (allowPublicBin).
         when(authRateLimiterService.allowPublicBin(anyString())).thenReturn(true);
-        // Running a transformation from a demo session (allowDemoScriptRun): unstubbed it is
-        // false, and the Transform Studio's two handlers answer 429 for every demo caller.
         when(authRateLimiterService.allowDemoScriptRun(anyString(), any())).thenReturn(true);
-        // The MCP server's OAuth registration and token endpoints.
         when(authRateLimiterService.allowOAuthRegister(anyString())).thenReturn(true);
         when(authRateLimiterService.allowOAuthToken(anyString(), any())).thenReturn(true);
         when(tokenBlacklistService.isBlacklisted(any())).thenReturn(false);
@@ -134,10 +112,5 @@ public abstract class AbstractIntegrationTest {
         registry.add("platform.admin.token", () -> PLATFORM_ADMIN_TEST_TOKEN);
     }
 
-    /**
-     * Shared platform-admin operator credential for integration tests.
-     * Any test wanting to authenticate as the platform admin sends this value in the
-     * {@code X-Platform-Admin-Token} header.
-     */
     protected static final String PLATFORM_ADMIN_TEST_TOKEN = "test_platform_admin_operator_token";
 }

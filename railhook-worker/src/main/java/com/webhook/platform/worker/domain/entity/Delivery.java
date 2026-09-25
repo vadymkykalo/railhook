@@ -20,14 +20,7 @@ public class Delivery {
     @Id
     private UUID id;
 
-    /**
-     * Tenant discriminator, mapped but not enforced here: the api filters on this column via
-     * {@code @TenantId}, the worker deliberately does not — it has no {@code AuthContext} and
-     * every consumer is a system path. It is mapped rather than ignored because the attempt
-     * stores have to carry the tenant across from the parent row, and because
-     * {@code EntityMappingParityIntegrationTest} requires both modules to map every column of a
-     * shared table.
-     */
+    /** Not tenant-filtered here: the worker has no request tenant. Mapped so attempt rows can copy it. */
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
 
@@ -63,24 +56,13 @@ public class Delivery {
     @Column(name = "ordering_enabled", nullable = false)
     private Boolean orderingEnabled = false;
 
-    /**
-     * When this delivery was first buffered waiting on a missing predecessor sequence.
-     * Null if it has never been buffered. Drives the gap timeout in
-     * {@code OrderingBufferService#isGapTimedOut} — measured from here, not from
-     * {@link #createdAt}.
-     */
+    /** The ordering gap timeout is measured from here, not from {@link #createdAt}. */
     @Column(name = "ordering_first_buffered_at")
     private Instant orderingFirstBufferedAt;
 
     /**
-     * Fencing token stamped by whichever claim moved this delivery to PROCESSING.
-     *
-     * <p>Guarding a finalizer on {@code status == PROCESSING} alone cannot tell the claim
-     * it is finishing apart from a newer claim on the same row: an attempt whose worker
-     * looked dead can be swept back to PENDING, reclaimed by a different attempt, and then
-     * have its own late response arrive and finalize a row it no longer owns. Comparing
-     * this token against the one the attempt started under closes that window. Null while
-     * the delivery is unclaimed.
+     * Fencing token. Status alone cannot tell an attempt's claim from a newer one after a sweep,
+     * so a late response could finalise a row it no longer owns. Null while unclaimed.
      */
     @Column(name = "claim_token")
     private UUID claimToken;
@@ -94,10 +76,8 @@ public class Delivery {
     private String retryDelays = RetryLadderDefaults.OUTGOING_DELAYS;
 
     /**
-     * Which HTTP statuses are worth another Attempt, copied from the Subscription when this
-     * Delivery was created. On the row rather than read through the Subscription for the same
-     * reason the ladder is: the store never loads the Subscription, and an edit mid-ladder must
-     * not change the rules an obligation already in flight is judged by.
+     * Copied from the Subscription at creation, like the ladder, so an edit does not change the
+     * rules for a Delivery already in flight.
      */
     @Builder.Default
     @Column(name = "retryable_statuses", nullable = false, columnDefinition = "TEXT")
@@ -121,10 +101,7 @@ public class Delivery {
     @Column(name = "last_attempt_at")
     private Instant lastAttemptAt;
 
-    /**
-     * When a person last put this Delivery back on its Retry Ladder; null if never. Written by
-     * the api. The hard-cap escalation measures a Delivery's age from here when it is set.
-     */
+    /** Set by the api when a person retries the Delivery; the hard-cap escalation measures from it. */
     @Column(name = "ladder_resumed_at")
     private Instant ladderResumedAt;
 
@@ -144,10 +121,7 @@ public class Delivery {
     @Column(name = "version", nullable = false)
     private Long version;
 
-    /**
-     * Takes the row for one Attempt. The token is what a later writer must still match to
-     * finalise: "token set" means "currently claimed", which is why handing the row back clears it.
-     */
+    /** A set token means "currently claimed", which is why handing the row back clears it. */
     public void claim(UUID token) {
         Instant now = Instant.now();
         this.status = DeliveryStatus.PROCESSING;
@@ -157,7 +131,6 @@ public class Delivery {
         this.updatedAt = now;
     }
 
-    /** Ends the Claim and returns the obligation to the retry ladder, to be picked up at {@code retryAt}. */
     public void handBackTo(Instant retryAt) {
         this.status = DeliveryStatus.PENDING;
         this.claimToken = null;
@@ -172,7 +145,6 @@ public class Delivery {
         this.updatedAt = now;
     }
 
-    /** The Retry Ladder is exhausted: kept for a human to decide about. */
     public void abandon() {
         Instant now = Instant.now();
         this.status = DeliveryStatus.DLQ;
@@ -180,13 +152,7 @@ public class Delivery {
         this.updatedAt = now;
     }
 
-    /** No number of retries would help — a refused URL, a deleted endpoint, an unusable ladder. */
-    /**
-     * Ends the obligation because a Transformation said not to send it.
-     *
-     * <p>{@code failedAt} is set, like every other terminal end, so the row carries when it
-     * stopped being in flight — the status is what says it was not a failure.
-     */
+    /** Sets {@code failedAt} like every terminal end; the status says it was not a failure. */
     public void cancel() {
         Instant now = Instant.now();
         this.status = DeliveryStatus.CANCELLED;
@@ -203,7 +169,6 @@ public class Delivery {
 
     public enum DeliveryStatus {
         PENDING, PROCESSING, SUCCESS, FAILED, DLQ,
-        /** A Transformation said not to send this one. Terminal, deliberate, not a failure. */
         CANCELLED
     }
 

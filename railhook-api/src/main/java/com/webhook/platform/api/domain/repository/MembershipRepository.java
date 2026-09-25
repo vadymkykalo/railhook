@@ -34,11 +34,7 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     long countByOrganizationId(UUID organizationId);
 
-    /**
-     * Which of these addresses belong to an active member of the organization in scope who has
-     * verified the address — the only people an alert rule may email. Addresses are compared as
-     * stored, which is lower case.
-     */
+    /** Alert rules may only email verified, active members. Addresses are stored lower case. */
     @Query("SELECT u.email FROM Membership m JOIN User u ON m.userId = u.id "
             + "WHERE m.status = com.webhook.platform.api.domain.enums.MembershipStatus.ACTIVE "
             + "AND u.emailVerified = true AND u.email IN :emails")
@@ -47,33 +43,22 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     @Query("SELECT m, u FROM Membership m JOIN User u ON m.userId = u.id WHERE m.organizationId = :orgId")
     List<Object[]> findMembersWithUsers(@Param("orgId") UUID organizationId);
 
-    /**
-     * {@code [organizationId, email]} of the members holding {@code role} in each organization,
-     * oldest membership first — for the platform admin's list, which names each organization's
-     * owner. Only meaningful in the system scope, where it can see more than one organization.
-     */
+    /** Only meaningful in the system scope, where it can see more than one organization. */
     @Query("SELECT m.organizationId, u.email FROM Membership m JOIN User u ON m.userId = u.id "
             + "WHERE m.organizationId IN :organizationIds AND m.role = :role AND m.status = :status "
             + "ORDER BY m.createdAt ASC")
     List<Object[]> findEmailsByRole(@Param("organizationIds") Collection<UUID> organizationIds,
             @Param("role") MembershipRole role, @Param("status") MembershipStatus status);
 
-    /** {@code [userId, organizationId, organizationName, role]} for each of the given accounts. */
     @Query("SELECT m.userId, o.id, o.name, m.role FROM Membership m JOIN m.organization o "
             + "WHERE m.userId IN :userIds ORDER BY m.createdAt ASC")
     List<Object[]> findOrganizationsOfUsers(@Param("userIds") Collection<UUID> userIds);
 
-    /** The scope's members with their accounts, for a page that shows both. */
     @Query(value = "SELECT m FROM Membership m JOIN FETCH m.user",
             countQuery = "SELECT COUNT(m) FROM Membership m")
     Page<Membership> findAllWithUser(Pageable pageable);
 
-    /**
-     * The verified addresses of the organization's active owners, oldest membership first —
-     * who to tell when Railhook makes a decision about their installation rather than reporting
-     * a rule they wrote. Verified only, for the reason alert recipients are: an unverified
-     * address is somebody's typo until proven otherwise.
-     */
+    /** Verified addresses only: an unverified one may be somebody's typo. */
     @Query("SELECT u.email FROM Membership m JOIN User u ON m.userId = u.id "
             + "WHERE m.organizationId = :organizationId "
             + "AND m.role = com.webhook.platform.api.domain.enums.MembershipRole.OWNER "

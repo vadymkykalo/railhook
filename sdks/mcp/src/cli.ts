@@ -3,10 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createBridge } from './bridge';
 import { ConfigError, loadConfig } from './config';
 
-/**
- * Starts the stdio bridge. Returns the exit code for a failure it can explain, and nothing while
- * the server runs — stdout belongs to the MCP protocol, so every diagnostic goes to stderr.
- */
+/** stdout belongs to the MCP protocol, so every diagnostic goes to stderr. */
 export async function main(
   env: NodeJS.ProcessEnv = process.env,
   stderr: Pick<NodeJS.WriteStream, 'write'> = process.stderr

@@ -67,7 +67,6 @@ public class LoginCommand implements Callable<Integer> {
             config.setRefreshToken(response.get("refreshToken").asText());
         }
 
-        // Fetch current user info
         fetchAndStoreUserInfo(client, configService, config);
 
         out.println("✓ Logged in successfully");
@@ -80,7 +79,6 @@ public class LoginCommand implements Callable<Integer> {
         out.println("Initiating device authorization...");
         out.println();
 
-        // Step 1: Get device code
         JsonNode deviceResponse = client.postForJson("/api/v1/auth/device/code", null);
         String deviceCode = deviceResponse.get("deviceCode").asText();
         String userCode = deviceResponse.get("userCode").asText();
@@ -98,7 +96,6 @@ public class LoginCommand implements Callable<Integer> {
         out.println();
         out.println("  Waiting for authorization (expires in " + (expiresIn / 60) + " minutes)...");
 
-        // Step 2: Poll for token
         long deadline = System.currentTimeMillis() + (expiresIn * 1000L);
         while (System.currentTimeMillis() < deadline) {
             Thread.sleep(pollInterval * 1000L);
@@ -120,7 +117,6 @@ public class LoginCommand implements Callable<Integer> {
                 out.println("  Config saved to: " + configService.getConfigPath());
                 return 0;
             } else if (pollResponse.statusCode() == 202) {
-                // Still pending — continue polling
                 out.print(".");
                 out.flush();
             } else if (pollResponse.statusCode() == 403) {
@@ -130,13 +126,11 @@ public class LoginCommand implements Callable<Integer> {
                 err.println("\n✗ Device code expired");
                 return 1;
             } else if (pollResponse.statusCode() == 429) {
-                // RFC 8628 slow_down: back off by five seconds rather than keep spending the
-                // server's budget at the same pace.
+                // RFC 8628 slow_down: add five seconds to the interval.
                 pollInterval += 5;
                 out.print(".");
                 out.flush();
             } else {
-                // Unexpected — continue polling
                 out.print("?");
                 out.flush();
             }
@@ -158,7 +152,7 @@ public class LoginCommand implements Callable<Integer> {
                 config.setOrganizationId(me.get("organization").get("id").asText());
             }
         } catch (Exception e) {
-            // Non-critical — we still have the token
+            // Not fatal: the token is already stored.
         }
         configService.save(config);
     }

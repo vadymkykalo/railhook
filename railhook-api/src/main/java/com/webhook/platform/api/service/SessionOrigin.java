@@ -2,16 +2,9 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.enums.SessionClient;
 
-/**
- * Where a sign-in came from, as far as the request can tell.
- *
- * <p>Both fields are decoration for a human reading their own session list, never an
- * authorization input: a User-Agent is whatever the client typed, and an IP is whatever
- * {@code TrustedProxyResolver} could establish. Nothing may be gated on either.
- */
+/** Display only, never an authorization input: both fields are whatever the client claims. */
 public record SessionOrigin(SessionClient client, String userAgent, String ipAddress) {
 
-    /** User-Agent strings are unbounded; the column is not. */
     private static final int MAX_USER_AGENT = 512;
 
     public static SessionOrigin of(SessionClient client, String userAgent, String ipAddress) {

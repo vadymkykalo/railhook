@@ -84,8 +84,6 @@ describe('GettingStarted', () => {
   });
 
   it('honours the answer it is given', async () => {
-    // The bug this component replaces: the picker wrote the answer and the app
-    // never read it.
     render();
     const user = userEvent.setup();
 
@@ -111,8 +109,6 @@ describe('GettingStarted', () => {
   });
 
   it('opens the connection wizard in place instead of navigating away', async () => {
-    // "Go there" used to close the tour and drop you on a page with nothing
-    // carried over. A step that builds something has to build it here.
     localStorage.setItem(INTENT_KEY, 'send');
     render();
     const user = userEvent.setup();
@@ -160,7 +156,6 @@ describe('GettingStarted', () => {
     await user.click(await screen.findByRole('button', { name: 'Dismiss' }));
     await waitFor(() => expect(screen.queryByText('Create a connection')).not.toBeInTheDocument());
 
-    // Only this project is hidden — the flag is a list, not a boolean.
     expect(JSON.parse(localStorage.getItem(DISMISS_KEY)!)).toEqual([TEST_PROJECT_ID]);
 
     await user.click(screen.getByRole('button', { name: /Getting started/ }));

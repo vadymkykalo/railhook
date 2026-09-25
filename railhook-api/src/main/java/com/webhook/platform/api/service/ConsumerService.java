@@ -27,13 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * The customer's side of Consumers: who they are, and which Endpoints are theirs.
- *
- * <p>Every lookup is by id <em>and</em> project, so a Consumer of another project of the same
- * organization is "not found" exactly like a missing one — the URL names the project, and an API
- * key is confined to the project in the URL.
- */
+/** Every lookup is by id and project, since an API key is confined to the project in the URL. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -76,7 +70,6 @@ public class ConsumerService {
         return toResponse(consumer, liveEndpointCounts(List.of(consumer)).getOrDefault(consumer.getId(), 0L));
     }
 
-    /** All the project's Consumers, or the one whose externalId is given. */
     public Page<ConsumerResponse> listConsumers(UUID projectId, String externalId, Pageable pageable) {
         requireProject(projectId);
         Page<Consumer> page = externalId == null || externalId.isBlank()
@@ -103,14 +96,7 @@ public class ConsumerService {
         return toResponse(consumer, liveEndpointCounts(List.of(consumer)).getOrDefault(consumer.getId(), 0L));
     }
 
-    /**
-     * Removes a Consumer: its sessions end and its Endpoints stop receiving.
-     *
-     * <p>The Endpoints are soft-deleted rather than handed back to the customer unassigned. A
-     * Consumer is deleted because that user is gone; an Endpoint that went on receiving their
-     * events with nobody left who could see it would be exactly the silent delivery the portal
-     * exists to end. Their Deliveries stay, as a deleted Endpoint's always do.
-     */
+    // The Endpoints are soft-deleted, not unassigned: nobody would be left to see what they receive.
     @Auditable(action = AuditAction.DELETE, resourceType = "Consumer")
     @Transactional
     public void deleteConsumer(UUID projectId, UUID consumerId) {

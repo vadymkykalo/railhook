@@ -10,11 +10,6 @@ import uk from '../../i18n/locales/uk.json';
 import { renderPage } from '../../test/renderPage';
 import SignatureVerifierPage from '../SignatureVerifierPage';
 
-/**
- * The free signature verifier: paste a body, a secret and the signature header, and see whether
- * they match. It is a page people search for, and the promise that makes it usable with a real
- * secret is that nothing pasted into it leaves the browser.
- */
 function renderVerifier() {
   return renderPage(<SignatureVerifierPage />, {
     path: '/tools/webhook-signature',
@@ -27,7 +22,6 @@ const SECRET = "It's a Secret to Everybody";
 const BODY = 'Hello, World!';
 const GITHUB_SIGNATURE = `sha256=${createHmac('sha256', SECRET).update(BODY).digest('hex')}`;
 
-/** Sets a field in one step, as a paste does. */
 function paste(label: string | RegExp, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 }

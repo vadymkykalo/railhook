@@ -17,11 +17,7 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
- * Evaluates a {@link ConditionNode} tree against a parsed JSON event payload.
- * <p>
- * Supports nested AND/OR/NOT groups with recursive evaluation.
- * Field values are resolved once and cached per event (memoization).
- * No reflection, no script engines — pure switch-dispatch for maximum throughput.
+ * Field values are resolved once per event and cached across all rules evaluated for it.
  */
 @Slf4j
 public class ConditionTreeEvaluator {
@@ -41,14 +37,6 @@ public class ConditionTreeEvaluator {
     private ConditionTreeEvaluator() {
     }
 
-    /**
-     * Evaluate a condition tree against event JSON.
-     *
-     * @param root       condition tree root (may be null = match all)
-     * @param eventJson  parsed event JSON
-     * @param fieldCache mutable cache for resolved field values (shared per event)
-     * @return true if conditions match (or no conditions present)
-     */
     public static boolean evaluate(ConditionNode root, JsonNode eventJson, Map<String, JsonNode> fieldCache) {
         if (root == null) {
             return true; // no conditions = always match
@@ -64,8 +52,6 @@ public class ConditionTreeEvaluator {
         }
         return false;
     }
-
-    // ─── Group evaluation ───────────────────────────────────────────────
 
     private static boolean evaluateGroup(Group group, JsonNode eventJson, Map<String, JsonNode> fieldCache) {
         if (group.getOp() == null || group.getChildren() == null || group.getChildren().isEmpty()) {
@@ -90,14 +76,11 @@ public class ConditionTreeEvaluator {
                 yield false;
             }
             case NOT -> {
-                // NOT applies to first child only
                 ConditionNode child = group.getChildren().get(0);
                 yield !evaluateNode(child, eventJson, fieldCache);
             }
         };
     }
-
-    // ─── Predicate evaluation ───────────────────────────────────────────
 
     private static boolean evaluatePredicate(Predicate pred, JsonNode eventJson, Map<String, JsonNode> fieldCache) {
         if (pred.getField() == null || pred.getOperator() == null) {
@@ -109,7 +92,6 @@ public class ConditionTreeEvaluator {
         Object value = pred.getValue();
         boolean ci = Boolean.TRUE.equals(pred.getCaseInsensitive());
 
-        // Presence operators — don't need resolved value
         if (op == PredicateOperator.EXISTS) {
             JsonNode node = resolveField(field, eventJson, fieldCache);
             return node != null && !node.isMissingNode();
@@ -127,7 +109,6 @@ public class ConditionTreeEvaluator {
             return node != null && !node.isMissingNode() && !node.isNull();
         }
 
-        // Resolve field value
         JsonNode fieldNode = resolveField(field, eventJson, fieldCache);
         if (fieldNode == null || fieldNode.isMissingNode() || fieldNode.isNull()) {
             return false; // missing field → comparison fails
@@ -152,12 +133,9 @@ public class ConditionTreeEvaluator {
         };
     }
 
-    // ─── Field resolution with memoization ──────────────────────────────
-
     static JsonNode resolveField(String path, JsonNode root, Map<String, JsonNode> cache) {
         if (path == null || root == null) return null;
 
-        // Strip leading "$." or "payload." prefix
         String cleanPath = path;
         if (cleanPath.startsWith("$.")) cleanPath = cleanPath.substring(2);
 
@@ -170,7 +148,6 @@ public class ConditionTreeEvaluator {
         for (String segment : segments) {
             if (current == null || current.isMissingNode() || current.isNull()) return null;
 
-            // Handle array index: items[0]
             int bracketIdx = segment.indexOf('[');
             if (bracketIdx >= 0 && segment.endsWith("]")) {
                 String fieldName = segment.substring(0, bracketIdx);
@@ -192,18 +169,14 @@ public class ConditionTreeEvaluator {
         return current;
     }
 
-    // ─── Comparison helpers ─────────────────────────────────────────────
-
     private static boolean compareEquals(JsonNode fieldNode, Object value, boolean ci) {
         if (value == null) return fieldNode.isNull();
         String fieldText = asText(fieldNode);
         String valueText = String.valueOf(value);
 
-        // Numeric comparison
         if (fieldNode.isNumber() && isNumeric(valueText)) {
             return new BigDecimal(fieldText).compareTo(new BigDecimal(valueText)) == 0;
         }
-        // Boolean comparison
         if (fieldNode.isBoolean()) {
             return fieldText.equals(valueText);
         }
@@ -292,9 +265,7 @@ public class ConditionTreeEvaluator {
     }
 
     /**
-     * CharSequence wrapper that aborts regex matching after a deadline.
-     * Each charAt() call checks elapsed time — if exceeded, throws to break
-     * catastrophic backtracking (ReDoS protection).
+     * Checks a deadline on every charAt() so catastrophic backtracking (ReDoS) is cut off.
      */
     private static final class InterruptibleCharSequence implements CharSequence {
         private final CharSequence inner;
@@ -343,10 +314,6 @@ public class ConditionTreeEvaluator {
         }
     }
 
-    /**
-     * Create a fresh field cache for a single event evaluation.
-     * Share this across all rules evaluated for the same event.
-     */
     public static Map<String, JsonNode> newFieldCache() {
         return new HashMap<>(16);
     }

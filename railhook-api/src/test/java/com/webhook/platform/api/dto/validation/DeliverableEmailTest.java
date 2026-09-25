@@ -21,16 +21,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The server half of the typo check the dashboard makes as someone types.
- *
- * <p>A real account was registered as {@code wheelet1228@gmail.con}. Every verification mail
- * bounced, and the account could never be verified. The form is the friendly place to catch it;
- * this is the place a client that skipped the form cannot get around. It refuses only what can
- * never receive mail — an ending no registry has delegated — and names the address that was
- * probably meant. A typo of a popular domain ({@code gmial.com}) is a registrable name, so that
- * stays a suggestion in the dashboard and is not refused here.
- */
+// Refuses only endings no registry delegates; a popular-domain typo stays a dashboard suggestion.
 class DeliverableEmailTest {
 
     private static ValidatorFactory factory;
@@ -83,10 +74,7 @@ class DeliverableEmailTest {
         assertThat(validator.validate(ChangeEmailRequest.builder().newEmail("me@gmail.con").build())).hasSize(1);
     }
 
-    /**
-     * Sign-in must never refuse an address that is already an account: the person who registered
-     * with the typo has to be able to reach the dashboard to correct it.
-     */
+    // Whoever registered with the typo must be able to sign in to correct it.
     @Test
     void signInDoesNotCheckIt() {
         assertThat(validator.validate(LoginRequest.builder()

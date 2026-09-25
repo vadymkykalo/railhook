@@ -4,18 +4,11 @@ import { Tooltip } from './ui/tooltip';
 import { usePermissions } from '../auth/usePermissions';
 
 interface VerificationGateProps {
-  /** Fallback: 'disable' shows disabled + tooltip, 'hide' hides entirely */
   fallback?: 'disable' | 'hide';
-  /** Override tooltip text */
   tooltip?: string;
   children: ReactElement;
 }
 
-/**
- * Gates critical write actions behind email verification.
- * When the user's email is not verified, the child element is disabled with a tooltip,
- * or hidden entirely depending on the fallback prop.
- */
 export default function VerificationGate({
   fallback = 'disable',
   tooltip,

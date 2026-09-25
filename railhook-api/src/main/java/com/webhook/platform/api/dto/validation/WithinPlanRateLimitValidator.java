@@ -4,10 +4,7 @@ import com.webhook.platform.api.service.billing.EntitlementService;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
-/**
- * Reads the caller's plan, so it runs where a request has already been scoped to an
- * organization — the controller's {@code @Valid}.
- */
+/** Reads the caller's plan, so it only works once the request is scoped to an organization. */
 public class WithinPlanRateLimitValidator implements ConstraintValidator<WithinPlanRateLimit, Integer> {
 
     private final EntitlementService entitlementService;

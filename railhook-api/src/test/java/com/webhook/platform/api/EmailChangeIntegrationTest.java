@@ -44,17 +44,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Changing the address an account signs in with, end to end.
- *
- * <p>It started with one person registered as {@code wheelet1228@gmail.con}, stuck: the product had
- * no way to change an address at all. The owner's worry is the other direction — that a way to
- * change it becomes a way around the checks the address stands for. So most of what is asserted
- * here is what does <em>not</em> happen: an unverified account stays unverified, a verified one
- * keeps its address until the new one is proved, nothing reveals who else has an account, the mail
- * it can cause is capped, the organization and its quota are untouched, and every step is in the
- * audit log its owner reads.
- */
 class EmailChangeIntegrationTest extends AbstractIntegrationTest {
 
     private static final String PASSWORD = "Test1234!";
@@ -152,8 +141,8 @@ class EmailChangeIntegrationTest extends AbstractIntegrationTest {
 
         @Test
         void asksAnAddressToProveItselfAtMostFiveTimesADayAcrossResendAndChange() throws Exception {
-            Account account = register("sends@example.com"); // 1
-            for (int i = 0; i < 4; i++) {                     // 2..5
+            Account account = register("sends@example.com");
+            for (int i = 0; i < 4; i++) {
                 mockMvc.perform(post("/api/v1/auth/resend-verification").param("email", "sends@example.com"))
                         .andExpect(status().isOk());
             }
@@ -226,7 +215,6 @@ class EmailChangeIntegrationTest extends AbstractIntegrationTest {
                     "select count(*) from user_sessions where user_id = ? and revoked_at is null",
                     Long.class, account.userId())).isZero();
 
-            // Single use.
             mockMvc.perform(post("/api/v1/auth/email-change/confirm").param("token", confirm))
                     .andExpect(status().isBadRequest());
 
@@ -345,10 +333,10 @@ class EmailChangeIntegrationTest extends AbstractIntegrationTest {
 
         @Test
         void resendGoesToThePendingAddressAndCountsTowardsTheCap() throws Exception {
-            Account account = verified("resend@example.com"); // register: 1 send
+            Account account = verified("resend@example.com");
             change(account, ChangeEmailRequest.builder().newEmail("resend-new@example.com").currentPassword(PASSWORD).build())
-                    .andExpect(status().isOk());                  // 2
-            for (int i = 0; i < 3; i++) {                         // 3..5
+                    .andExpect(status().isOk());
+            for (int i = 0; i < 3; i++) {
                 mockMvc.perform(post("/api/v1/auth/email-change/resend").header("Authorization", bearer(account)))
                         .andExpect(status().isOk());
             }
@@ -392,7 +380,6 @@ class EmailChangeIntegrationTest extends AbstractIntegrationTest {
         return account(email, result);
     }
 
-    /** Registered, verified, and signed in again so the session's token says so. */
     private Account verified(String email) throws Exception {
         register(email);
         mockMvc.perform(post("/api/v1/auth/verify-email").param("token", lastVerificationToken(email)))
@@ -443,7 +430,7 @@ class EmailChangeIntegrationTest extends AbstractIntegrationTest {
         return jdbc.queryForObject("select plan_id from organizations where id = ?", UUID.class, organizationId);
     }
 
-    /** Audit rows are written off the request thread, so give the writer a moment. */
+    // Audit rows are written off the request thread.
     private List<AuditLog> auditRows(UUID userId, AuditAction action) throws InterruptedException {
         long deadline = System.currentTimeMillis() + 5_000;
         List<AuditLog> rows;

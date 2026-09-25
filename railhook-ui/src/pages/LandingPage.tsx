@@ -1,34 +1,23 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import HeroSection from './landing/HeroSection';
-import DirectionsSection from './landing/DirectionsSection';
-import ReliabilitySection from './landing/ReliabilitySection';
-import ArchitectureSection from './landing/ArchitectureSection';
 import ProductSection from './landing/ProductSection';
-import RunSection from './landing/RunSection';
-import DeveloperSection from './landing/DeveloperSection';
+import ReliabilitySection from './landing/ReliabilitySection';
+import SelfHostSection from './landing/SelfHostSection';
+import FinalSection from './landing/FinalSection';
+import { IN, LabelBand, Rule } from './landing/parts';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
-/**
- * Seven sections, read by people who decide on outcomes as much as by the engineers who install:
- * the promise and both ways in (hero), the real product in screenshots straight after it
- * (product), what it does in either direction (directions), what happens when the other side is
- * down (reliability), what it is built on and why that keeps events safe (architecture), how
- * to run it — free in the cloud or on your own servers (run), and where an engineer starts, with
- * the ask again (developer).
- *
- * The page it replaced had twelve sections, a pricing grid for plans that did not exist yet and
- * a mechanism on every screen. How retries, signatures and ordering work is in the docs; the
- * page stays under 600 words, and a test holds it there.
- */
+const PROVIDERS = ['Stripe', 'GitHub', 'Shopify', 'Slack', 'Twilio', 'SendGrid'];
+
 export default function LandingPage() {
+  const { t } = useTranslation();
   const { hash } = useLocation();
 
   useDocumentMeta({ titleKey: 'meta.landing.title', descriptionKey: 'meta.landing.description', path: '/' });
 
-  /* The nav's section links are client-side navigations to "/#id", so nothing
-     scrolls on its own — including the case where the reader was already on
-     this page and only the hash changed. */
+  // A router navigation to "/#id" does not scroll on its own.
   useEffect(() => {
     if (!hash) {
       window.scrollTo({ top: 0, behavior: 'auto' });
@@ -41,12 +30,24 @@ export default function LandingPage() {
   return (
     <>
       <HeroSection />
+
+      <Rule className="mt-20" />
+      <LabelBand>{t('landing.providers.label')}</LabelBand>
+      <Rule />
+      <ul className={`${IN} grid grid-cols-4 items-center gap-y-[22px] py-[22px] min-[901px]:h-[92px] min-[901px]:grid-cols-7 min-[901px]:py-0`}>
+        {PROVIDERS.map((name) => (
+          <li key={name} className="text-center text-[17px] font-medium leading-none tracking-[-0.01em] text-[#4A4A4A] dark:text-muted-foreground">
+            {name}
+          </li>
+        ))}
+        <li className="text-center font-mono text-xs uppercase leading-none text-[#777] dark:text-muted-foreground">{t('landing.providers.any')}</li>
+      </ul>
+      <Rule />
+
       <ProductSection />
-      <DirectionsSection />
       <ReliabilitySection />
-      <ArchitectureSection />
-      <RunSection />
-      <DeveloperSection />
+      <SelfHostSection />
+      <FinalSection />
     </>
   );
 }

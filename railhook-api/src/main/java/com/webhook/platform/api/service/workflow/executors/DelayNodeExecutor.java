@@ -8,23 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
-/**
- * Delay node — asks the engine to continue this execution later.
- *
- * <p>Config: {@code delaySeconds} (int, default 5, max 300). Passes input through unchanged.
- *
- * <p>This used to be a {@code Thread.sleep}. The workflow pool is core-size 4 / max-size 8 for
- * the whole deployment, and a delay may be configured up to 300 seconds, so eight delay nodes —
- * one badly-configured workflow, or eight ordinary ones that happened to overlap — occupied
- * every thread for five minutes and no workflow belonging to any organization ran at all. The
- * threads were not doing work; they were watching a clock, which a database column does for
- * free.
- *
- * <p>So the node computes when it is due and returns; the engine records the execution's
- * position and releases the thread, and {@code WorkflowResumeJob} continues it. The upper bound
- * survives only as a guard against a typo — nothing about a suspended execution costs more when
- * it is longer, so the cap is now the one thing here that could safely be raised.
- */
+/** Returns a due time instead of sleeping, which let eight delay nodes hold the shared pool. */
 @Component
 @Slf4j
 public class DelayNodeExecutor implements NodeExecutor {

@@ -14,33 +14,17 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over the pg_dump flags, which are written down twice and must not diverge.
- *
- * <p>A packaged Helm chart only ships files under its own directory, so the CronJob cannot
- * source {@code deploy/scripts/db-backup.sh} — the script the Makefile and Compose paths use.
- * Both files say, in a comment, to keep the flags identical, and the script's comment promised
- * that {@code make verify-backup-parity} checked it. No such target existed, in the Makefile or
- * in CI. This is that check.
- *
- * <p>Why it matters more than it looks: {@code -Fc} is what makes the dump restorable with
- * {@code pg_restore} at all, and {@code --no-owner --no-privileges} are what let it restore into
- * a database whose roles differ from the source — which is every disaster-recovery restore there
- * is. A dump taken without them looks fine until the day it is needed.
- */
+// The Helm CronJob cannot source db-backup.sh, so the flags are written twice.
 @Tag("ratchet")
 class BackupFlagParityTest {
 
     private static final Path SCRIPT = Paths.get("..", "deploy", "scripts", "db-backup.sh");
     private static final Path CRONJOB =
             Paths.get("..", "deploy", "helm", "railhook", "templates", "db-backup-cronjob.yaml");
-    /** The `railhook backup` helper install.sh writes into a deployment directory. */
     private static final Path INSTALLER = Paths.get("..", "install.sh");
 
-    /** The flags that decide whether a dump can be restored, and where. */
     private static final Set<String> REQUIRED_FLAGS = Set.of("-Fc", "--no-owner", "--no-privileges");
 
-    /** How many modes db-backup.sh offers: embedded, external, direct. */
     private static final int SCRIPT_MODES = 3;
 
     @Test
@@ -48,16 +32,14 @@ class BackupFlagParityTest {
     void scriptInvocationsCarryTheFlags() throws IOException {
         String script = read(SCRIPT);
 
-        // `pg_dump -h "` and `pg_dump -U "` are the real invocations; the quote is what keeps this
-        // from counting the mode's own progress `echo`, which also says "pg_dump ->".
+        // The quote keeps this from counting the mode's own progress echo.
         int commands = countOccurrences(script, "pg_dump -h \"") + countOccurrences(script, "pg_dump -U \"");
         assertEquals(SCRIPT_MODES, commands,
                 "expected the embedded, external and direct modes to each run pg_dump; found " + commands
                         + ". If a mode was added or removed, update SCRIPT_MODES with it — and check the "
                         + "new one carries the same flags.");
 
-        // Trailing `-f` so the file's own comment, which quotes the same flags to explain the
-        // pairing, is not counted as a fourth invocation.
+        // Trailing -f so the file's own comment quoting the flags is not counted.
         int flagged = countOccurrences(script, "-Fc --no-owner --no-privileges -f");
         assertEquals(SCRIPT_MODES, flagged,
                 "one of db-backup.sh's pg_dump invocations does not carry `-Fc --no-owner --no-privileges`. "

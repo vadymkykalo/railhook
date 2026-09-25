@@ -1,25 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Bumps every version source in this repo in one step: the reactor poms, the
-# Helm chart, the UI package.json (+ lockfile), the three SDK manifests and the
-# MCP bridge's package.json (+ lockfile).
-#
-# This replaces the old release process step ("2. Update version numbers",
-# CONTRIBUTING.md), which meant hand-editing six files and was the direct
-# cause of the drift that followed: root pom.xml stuck at 1.0.0-SNAPSHOT while
-# eight releases were tagged and Chart.yaml/ui/package.json never moved.
-#
-# Usage:
-#   scripts/set-version.sh <new-version>            e.g. scripts/set-version.sh 2.3.0
-#   scripts/set-version.sh <new-version>-SNAPSHOT    for develop's next-cycle bump
-#
-# A trailing -SNAPSHOT is applied to the reactor poms only (Maven convention);
-# every other file gets the version with -SNAPSHOT stripped, since Helm/npm/
-# PyPI/Packagist have no equivalent concept and always describe the last
-# real release.
-#
-# After running this, `scripts/check-version-drift.sh` should pass.
+# Usage: scripts/set-version.sh <version>[-SNAPSHOT]. -SNAPSHOT goes to the reactor poms only:
+# Helm, npm, PyPI and Packagist have no such concept.
 
 if [ $# -ne 1 ] || [ -z "$1" ]; then
   echo "Usage: $0 <new-version>" >&2
@@ -93,10 +76,7 @@ fs.writeFileSync(f, JSON.stringify(data, null, 2) + '\n');
 "
 
 echo ""
-# The SDKs also carry the version in code, not just in the manifest: each client
-# builds its User-Agent from it, and Python exposes it as __version__. Those four
-# constants were unmanaged and drifted two minor versions behind the manifests,
-# so every SDK reported a wrong User-Agent and railhook.__version__ lied.
+# The SDKs carry the version in code too: the User-Agent, and Python's __version__.
 echo "Setting SDK in-code version constants to $RELEASE_VERSION"
 sed -i.bak -E "s/^const SDK_VERSION = '.*';/const SDK_VERSION = '$RELEASE_VERSION';/" sdks/node/src/client.ts
 sed -i.bak -E "s/^SDK_VERSION = \".*\"/SDK_VERSION = \"$RELEASE_VERSION\"/" sdks/python/railhook/client.py

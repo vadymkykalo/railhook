@@ -15,9 +15,7 @@ class Deliveries
         $this->client = $client;
     }
 
-    /**
-     * Get delivery by ID.
-     */
+    /** Get delivery by ID. */
     public function get(string $deliveryId): array
     {
         return $this->client->request(
@@ -29,7 +27,6 @@ class Deliveries
     /**
      * List deliveries for a project with optional filters.
      *
-     * @param string $projectId Project ID
      * @param array $params Optional filters: status, endpointId, fromDate, toDate, page, size
      */
     public function list(string $projectId, array $params = []): array
@@ -42,9 +39,7 @@ class Deliveries
         );
     }
 
-    /**
-     * Get all delivery attempts.
-     */
+    /** Get all delivery attempts. */
     public function getAttempts(string $deliveryId): array
     {
         return $this->client->request(
@@ -53,9 +48,7 @@ class Deliveries
         );
     }
 
-    /**
-     * Replay a failed delivery.
-     */
+    /** Replay a failed delivery. */
     public function replay(string $deliveryId): void
     {
         $this->client->request(

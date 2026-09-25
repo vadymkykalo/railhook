@@ -33,18 +33,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * A copy of a message that finds the executor full may hand back only the Claim that copy would
- * have taken, never one another copy already holds.
- *
- * <p>The duplicate is ordinary: a rebalance before the commit, or a scheduler send it gave up
- * waiting on that landed anyway. When one copy has claimed the row and its POST is on the wire, a
- * second copy that is refused by backpressure used to see the row PENDING or PROCESSING and hand
- * it back to the ladder. The first copy's 2xx then failed to finalise, and the ladder sent the
- * webhook again seconds later.
- *
- * <p>Real Postgres, real transactions: the fence is a predicate on the row as committed.
- */
+// A backpressured duplicate once handed back a live Claim, and the ladder re-sent the webhook.
 @DataJpaTest
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -96,8 +85,6 @@ class BackpressureHandBackConcurrencyTest {
                 null, null, null);
     }
 
-    // ── Outgoing ──────────────────────────────────────────────────────────────────
-
     @Test
     void aRetryCopyRefusedByBackpressureLeavesTheClaimAnotherCopyTook() {
         UUID scheduledUnder = UUID.randomUUID();
@@ -128,8 +115,7 @@ class BackpressureHandBackConcurrencyTest {
 
     @Test
     void aRetryMessageWithoutATokenCannotProveItsClaimAndHandsNothingBack() {
-        // It could be any copy. Leaving the row PROCESSING costs a stuck-sweep interval; handing
-        // back a live Claim costs a duplicate webhook.
+        // Leaving the row PROCESSING costs a sweep interval; handing back a live Claim costs a duplicate.
         Delivery delivery = persistDelivery(Delivery.DeliveryStatus.PROCESSING, UUID.randomUUID());
 
         deliveries.rescheduleForBackpressure(retryMessage(delivery.getId(), null), true);
@@ -162,8 +148,6 @@ class BackpressureHandBackConcurrencyTest {
         assertThat(row.getStatus()).isEqualTo(Delivery.DeliveryStatus.PENDING);
         assertThat(row.getNextRetryAt()).isAfter(Instant.now());
     }
-
-    // ── Incoming ──────────────────────────────────────────────────────────────────
 
     @Test
     void aForwardRetryCopyRefusedByBackpressureLeavesTheClaimAnotherCopyTook() {
@@ -229,8 +213,6 @@ class BackpressureHandBackConcurrencyTest {
         assertThat(row.getStatus()).isEqualTo(ForwardAttemptStatus.PENDING);
         assertThat(row.getNextRetryAt()).isAfter(Instant.now());
     }
-
-    // ── fixtures ──────────────────────────────────────────────────────────────────
 
     private static DeliveryMessage retryMessage(UUID deliveryId, UUID claimToken) {
         return DeliveryMessage.builder().deliveryId(deliveryId).attemptCount(1).claimToken(claimToken).build();

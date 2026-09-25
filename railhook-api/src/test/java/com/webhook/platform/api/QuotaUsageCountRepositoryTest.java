@@ -13,15 +13,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The database count behind the quota: the number the Redis counter is re-seeded from, the one a
- * quota check falls back to when Redis is down, and the one the usage page shows.
- *
- * <p>Both directions charge the quota, but this count used to read only {@code events}, so every
- * re-seed forgave an organization the incoming webhooks it had received that month and the usage
- * page disagreed with the check that was refusing its requests. Asserted on real PostgreSQL
- * because the thing that can be wrong is the SQL.
- */
 class QuotaUsageCountRepositoryTest extends AbstractIntegrationTest {
 
     private static final Instant FROM = Instant.parse("2026-03-01T00:00:00Z");

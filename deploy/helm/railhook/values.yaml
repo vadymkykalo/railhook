@@ -1,50 +1,26 @@
-# Default values for Railhook self-hosted deployment
-# This is a YAML-formatted file.
-
 global:
   imageRegistry: ""
   imagePullSecrets: []
 
-# How the platform is addressed from a browser.
 app:
-  # The URL people type. Verification, password-reset and invite links are
-  # built from it, and CORS is allowed for it. Leave empty and the chart
-  # derives it from ui.ingress (https://<first host> when TLS is configured) -
-  # see railhook.appBaseUrl in templates/_helpers.tpl. Set it when browsers
-  # reach Railhook by some other name than the ingress host.
-  #
-  # It is not optional in the way an empty default suggests: the application's
-  # own fallback is http://localhost:5173, so a deployment that supplies
-  # neither this nor an ingress host mails out links to the operator's laptop.
+  # The URL people type; verification, reset and invite links are built from it. Empty derives
+  # it from ui.ingress — with neither set, links point at the app's fallback http://localhost:5173.
   baseUrl: ""
 
-  # Browser origins allowed to call the API. Defaults to app.baseUrl above.
-  # With APP_ENV=production (the default for both services), leaving the
-  # application's own default in place is fatal, not cosmetic:
-  # ProductionSafetyValidator refuses to start when CORS_ALLOWED_ORIGINS still
-  # names localhost. Comma-separated for more than one origin.
+  # Browser origins allowed to call the API, comma-separated. Defaults to app.baseUrl; production
+  # refuses to start while it still names localhost.
   corsAllowedOrigins: ""
 
-  # Public base of incoming-source and tunnel URLs (…/ingress/<token>, …/tunnel/<slug>),
-  # which are handed to providers and the CLI. Defaults to app.baseUrl above; set it
-  # only when webhooks reach Railhook on a different host than the dashboard.
+  # Public base of incoming-source and tunnel URLs. Defaults to app.baseUrl; set it only when
+  # webhooks reach Railhook on a different host than the dashboard.
   ingressBaseUrl: ""
 
-# API service configuration
 api:
-  # 30s for spring.lifecycle.timeout-per-shutdown-phase to drain the web server,
-  # plus margin. Mirrors docker-compose.yml's stop_grace_period for the api.
+  # The 30s shutdown phase that drains the web server, plus margin.
   terminationGracePeriodSeconds: 65
   replicaCount: 2
   image:
-    # Published by .github/workflows/docker-publish.yml on every version tag
-    # (multi-arch: linux/amd64, linux/arm64).
-    #
-    # Empty means "the chart's appVersion", so `helm install` of chart 2.6.1
-    # runs the 2.6.1 images and `helm rollback` rolls the image back with it.
-    # A literal `latest` decoupled the two: the chart claimed a version and
-    # installed whatever GHCR last tagged, and IfNotPresent then kept serving a
-    # stale image on nodes that already had one.
+    # Empty tag means the chart's appVersion, so `helm rollback` rolls the image back with it.
     repository: ghcr.io/vadymkykalo/railhook-api
     tag: ""
     pullPolicy: IfNotPresent
@@ -63,8 +39,7 @@ api:
   
   env:
     APP_ENV: production
-    # Dashboard failures come back here and go into this pod's logs. Nothing leaves the
-    # cluster; there is no third party involved.
+    # Dashboard errors are logged by this pod; nothing leaves the cluster.
     CLIENT_ERROR_REPORTING_ENABLED: "true"
     LOG_LEVEL: INFO
     WEBHOOK_ALLOW_PRIVATE_IPS: "false"
@@ -72,10 +47,7 @@ api:
     DB_POOL_MAX_SIZE: "20"
     DB_POOL_MIN_IDLE: "15"
   
-  # 8082, not 8080: actuator is served on MANAGEMENT_PORT (see
-  # railhook.api.managementPort in templates/_helpers.tpl), and once it moves
-  # there it is not on 8080 at all - probing 8080 would 404 forever. Same port
-  # docker-compose.yml's api healthcheck uses.
+  # Actuator lives only on the management port (8082); probing 8080 would 404 forever.
   livenessProbe:
     httpGet:
       path: /actuator/health/liveness
@@ -104,24 +76,13 @@ api:
     enabled: false
     minAvailable: 1
 
-# Worker service configuration
 worker:
-  # 30s (lifecycle, drains the Kafka containers) + 2 x
-  # WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS (the outgoing and incoming
-  # BoundedAsyncExecutors, which shut down in @PreDestroy after the lifecycle
-  # phase and one after the other) + margin. The Kubernetes default of 30s
-  # SIGKILLed the worker mid-delivery on every rollout and HPA scale-down.
+  # 30s lifecycle phase + 2 x WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS (the two delivery executors
+  # drain one after the other) + margin. The default 30s killed deliveries mid-flight on rollout.
   terminationGracePeriodSeconds: 155
   replicaCount: 2
   image:
-    # Published by .github/workflows/docker-publish.yml on every version tag
-    # (multi-arch: linux/amd64, linux/arm64).
-    #
-    # Empty means "the chart's appVersion", so `helm install` of chart 2.6.1
-    # runs the 2.6.1 images and `helm rollback` rolls the image back with it.
-    # A literal `latest` decoupled the two: the chart claimed a version and
-    # installed whatever GHCR last tagged, and IfNotPresent then kept serving a
-    # stale image on nodes that already had one.
+    # Empty tag means the chart's appVersion.
     repository: ghcr.io/vadymkykalo/railhook-worker
     tag: ""
     pullPolicy: IfNotPresent
@@ -159,10 +120,8 @@ worker:
     timeoutSeconds: 3
     failureThreshold: 3
 
-  # A worker from a new release waits for the api to finish migrating before it validates the
-  # schema — up to 15 minutes (MigratedSchemaGate) — and a Helm upgrade rolls both Deployments at
-  # once. The liveness probe does not start until this one passes, so a worker that is waiting is
-  # not killed as hung. 96 x 10s outlasts the wait; MigratedSchemaGateTest fails if it stops.
+  # A new worker waits up to 15 minutes for the api to finish migrating; 96 x 10s outlasts that,
+  # so liveness does not kill it as hung meanwhile.
   startupProbe:
     httpGet:
       path: /actuator/health/liveness
@@ -181,45 +140,28 @@ worker:
     enabled: false
     minAvailable: 1
 
-# UI service configuration
 ui:
-  # nginx serves static files; there is nothing in flight worth waiting for.
   terminationGracePeriodSeconds: 30
   replicaCount: 2
-  # Domain behind the sales@ / support@ addresses on /contact and in the footer,
-  # e.g. example.com. Read by the container at startup, so it works on the
-  # published image. Empty — the default, and right for a self-hosted install —
-  # offers no mail addresses at all.
+  # Domain for the sales@ / support@ addresses on /contact, e.g. example.com. Empty shows none.
   contactDomain: ""
-  # The registration challenge's public half, read by the container at startup.
-  # Set siteKey together with the API's CAPTCHA_SECRET_KEY, never alone. Empty
-  # scriptUrl means Cloudflare Turnstile.
+  # Registration CAPTCHA public key; set together with the API's CAPTCHA_SECRET_KEY.
+  # Empty scriptUrl means Cloudflare Turnstile.
   captcha:
     siteKey: ""
     scriptUrl: ""
-  # Cloudflare Web Analytics token, read by the container at startup. Empty — the
-  # default — loads no analytics script at all.
+  # Cloudflare Web Analytics token. Empty loads no analytics script.
   webAnalyticsToken: ""
-  # A public status page (https://…) the footer links to. Empty — the default — shows no link.
+  # Public status page (https://…) linked from the footer. Empty shows no link.
   statusPageUrl: ""
-  # The public webhook tester page (/tester). Turn it on together with
-  # api.env.PUBLIC_TESTER_ENABLED: "true"; off, the page says so.
+  # The public webhook tester (/tester); enable together with api.env.PUBLIC_TESTER_ENABLED.
   publicTester: false
-  # The live demo's entry points (/demo). Turn it on together with
-  # api.env.DEMO_ENABLED: "true"; off, the page says the demo is not enabled here.
+  # The live demo (/demo); enable together with api.env.DEMO_ENABLED.
   publicDemo: false
-  # The blog (/blog, its posts and its feed): railhook.io's own articles. Off — the
-  # default, and right for a self-hosted install — /blog answers 404 and the sitemap lists no posts.
+  # railhook.io's own blog (/blog). Off answers 404.
   publicBlog: false
   image:
-    # Published by .github/workflows/docker-publish.yml on every version tag
-    # (multi-arch: linux/amd64, linux/arm64).
-    #
-    # Empty means "the chart's appVersion", so `helm install` of chart 2.6.1
-    # runs the 2.6.1 images and `helm rollback` rolls the image back with it.
-    # A literal `latest` decoupled the two: the chart claimed a version and
-    # installed whatever GHCR last tagged, and IfNotPresent then kept serving a
-    # stale image on nodes that already had one.
+    # Empty tag means the chart's appVersion.
     repository: ghcr.io/vadymkykalo/railhook-ui
     tag: ""
     pullPolicy: IfNotPresent
@@ -228,11 +170,8 @@ ui:
     type: ClusterIP
     port: 80
 
-  # The UI image's nginx.conf proxies to the literal hostname `api`, and nginx
-  # refuses to start when a literal upstream does not resolve. This creates a
-  # Service by that name alongside the release-prefixed one, so the image works
-  # unchanged under both Compose and Helm. See the template for the full
-  # reasoning and for why the name is namespace-scoped.
+  # The UI image's nginx proxies to the literal host `api` and will not start if it does not
+  # resolve, so the chart adds a Service by that name.
   apiUpstreamAlias:
     enabled: true
     name: api
@@ -245,8 +184,7 @@ ui:
       cpu: 200m
       memory: 128Mi
   
-  # The image is nginx with `listen 5173` (railhook-ui/nginx.conf), not
-  # 80. Probing 80 meant readiness could never pass.
+  # The UI's nginx listens on 5173, not 80.
   livenessProbe:
     httpGet:
       path: /
@@ -261,13 +199,8 @@ ui:
     initialDelaySeconds: 5
     periodSeconds: 5
 
-  # The chart-wide podSecurityContext / securityContext below are written for
-  # the Spring Boot images, whose Dockerfiles declare `USER appuser`. The UI is
-  # stock nginx, which starts its master as root and drops privileges itself.
-  # Handed runAsUser: 1001 and cap_drop ALL it cannot write /var/cache/nginx or
-  # /var/run/nginx.pid and CrashLoops, so it gets its own pair — still
-  # unprivileged, with the writable paths supplied as emptyDir in the
-  # Deployment. Set either to null to fall back to the chart-wide values.
+  # nginx needs its own user and writable paths (emptyDirs in the Deployment); under the
+  # chart-wide 1001 context it CrashLoops. Set either to null to use the chart-wide values.
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 101      # the `nginx` user in nginx:alpine
@@ -296,26 +229,17 @@ ui:
         hosts:
           - app.example.com
 
-# PostgreSQL configuration
-# This chart no longer ships a PostgreSQL subchart (was Bitnami,
-# removed - see Chart.yaml). `enabled` now only selects which host/port
-# templates.tpl reads (see railhook.postgresql.* in templates/_helpers.tpl);
-# it does not deploy a database. Point `external` at your own instance -
-# managed (RDS/Cloud SQL/etc.) for production, or your own StatefulSet/
-# Docker container (postgres:16-alpine is what docker-compose.yml and CI
-# test against) for a self-managed cluster.
+# The chart deploys no database: point `external` at your own PostgreSQL 16.
+# `enabled` only selects which host/port the templates read.
 postgresql:
   enabled: false
-  # auth.* is read by templates/db-backup-cronjob.yaml as the primary
-  # source for the backup job's DB name/user/secret (falling back to
-  # external.* below) - kept even with the subchart gone.
+  # Read first by the backup CronJob for its database, user and secret; falls back to external.*.
   auth:
     username: webhook_user
     password: ""  # Use existingSecret instead
     database: railhook
     existingSecret: railhook-postgresql-secret
 
-  # Bring-your-own PostgreSQL configuration (required - see the note above).
   external:
     host: ""  # e.g., postgres.example.com
     port: 5432
@@ -324,54 +248,33 @@ postgresql:
     existingSecret: railhook-postgresql-secret
     existingSecretPasswordKey: password
 
-# Kafka configuration
-# This chart no longer ships a Kafka subchart (was Bitnami, removed -
-# see Chart.yaml; Bitnami had already dropped Kafka from its free catalog
-# entirely). Point `external` at your own cluster - managed (MSK/Confluent
-# Cloud/etc.) for production, or your own StatefulSet/Docker container
-# (apache/kafka:3.7.0 is what docker-compose.yml and CI test against, and is
-# also the image templates/kafka-topics-job.yaml itself uses to create
-# topics) for a self-managed cluster.
+# The chart deploys no Kafka: point `external` at your own cluster.
 kafka:
   enabled: false
-  # Run the post-install hook that creates every topic the platform consumes,
-  # at the partition count below. Turn it off for a managed cluster that
-  # provisions topics out of band, or one whose ACLs don't let a client create
-  # them. It is not gated on `enabled` above: with no subchart to enable, that
-  # gate meant the job never ran at all.
+  # A post-install hook creates every topic. Turn it off when topics are provisioned out of
+  # band or ACLs forbid clients creating them.
   createTopics: true
-  # Topic configuration - read by templates/kafka-topics-job.yaml.
-  topicPartitions: 12  # Number of partitions for delivery topics
+  topicPartitions: 12
   topicReplicationFactor: 1  # Set to 3 for production multi-broker clusters
 
-  # Bring-your-own Kafka configuration (required - see the note above).
   external:
     bootstrapServers: ""  # e.g., kafka-1:9092,kafka-2:9092,kafka-3:9092
 
-# Redis configuration
-# This chart no longer ships a Redis subchart (was Bitnami, removed -
-# see Chart.yaml) - `enabled` therefore now defaults to false (it defaulted
-# to true when a subchart still backed it). Point `external` at your own
-# instance - managed (ElastiCache/Memorystore/etc.) for production, or your
-# own StatefulSet/Docker container (redis:7-alpine is what
-# docker-compose.yml and CI test against) for a self-managed cluster.
+# The chart deploys no Redis: point `external` at your own instance.
 redis:
   enabled: false
-  # auth.existingSecret* is read wherever Redis credentials are needed
-  # regardless of `enabled` - kept even with the subchart gone.
+  # Read wherever Redis credentials are needed, regardless of `enabled`.
   auth:
     enabled: true
     existingSecret: railhook-redis-secret
     existingSecretPasswordKey: password
 
-  # Bring-your-own Redis configuration (required - see the note above).
   external:
     host: ""  # e.g., redis.example.com
     port: 6379
     existingSecret: railhook-redis-secret
     existingSecretPasswordKey: password
 
-# Database backup configuration
 backup:
   enabled: false  # Enable to create a CronJob for PostgreSQL backups
   schedule: "0 2 * * *"  # Daily at 2 AM UTC
@@ -380,22 +283,16 @@ backup:
   storageSize: 10Gi
   storageClass: ""  # Use default StorageClass if empty
   existingClaim: ""  # Use existing PVC instead of creating one
-  activeDeadlineSeconds: 3600  # Max 1 hour for backup job
+  activeDeadlineSeconds: 3600
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
 
-# Transactional email — verification, password-reset and invite mail.
-#
-# With email off, accounts are created already verified (there would be no way
-# to deliver a verification link) and nobody can be invited to an organization.
-# Turning it on without an SMTP relay is worse than leaving it off: signup
-# accepts the account and then cannot mail the link, so supply smtp.host
-# whenever enabled is true. Variable names match .env.dist / docker-compose.yml.
+# Verification, password-reset and invite mail. Off: accounts start verified and invites are
+# unavailable. On without smtp.host, signup cannot deliver its verification link.
 email:
   enabled: false
   from: noreply@example.com
-  # ONBOARDING_EMAILS_ENABLED: a welcome and one day-2 nudge to new accounts, written as
-  # Railhook's author. Meant for Railhook Cloud; leave off on your own install.
+  # Welcome and day-2 mails to new accounts; meant for Railhook Cloud.
   onboarding: false
   smtp:
     host: ""
@@ -403,76 +300,60 @@ email:
     username: ""
     auth: true
     starttls: true
-    # Secret holding the SMTP password under `existingSecretPasswordKey`.
-    # Leave empty for a relay that takes no password (set auth: false too).
+    # Secret holding the SMTP password; empty for a relay without one (set auth: false too).
     existingSecret: ""
     existingSecretPasswordKey: smtp-password
 
-# "Continue with Google" on the sign-in and registration pages. Off unless clientId is set and
-# existingSecret holds the client secret. In Google Cloud Console the OAuth client ("Web
-# application") must allow the redirect URI <app.baseUrl>/api/v1/auth/oauth/google/callback.
+# "Continue with Google". Off unless clientId is set and existingSecret holds the client secret;
+# the OAuth client must allow <app.baseUrl>/api/v1/auth/oauth/google/callback.
 googleSignIn:
   clientId: ""
   existingSecret: ""
   existingSecretKey: client-secret
 
-# Secrets configuration
 secrets:
   # Encryption key for webhook secrets (32 characters)
   encryptionKey:
     existingSecret: railhook-secrets
     key: encryption-key
 
-  # Salt the encryption key is derived with. Required, with no default in
-  # either application.yml — the api and worker fail to start without it, which
-  # is how `helm install` used to produce two CrashLooping Deployments. Must be
-  # the same value for both services and must never change after the first
-  # write, or every endpoint secret already in the database decrypts to garbage.
+  # Required, same for api and worker, and never changed after the first write — otherwise
+  # every stored endpoint secret decrypts to garbage.
   encryptionSalt:
     existingSecret: railhook-secrets
     key: encryption-salt
 
-  # JWT secret for authentication
   jwtSecret:
     existingSecret: railhook-secrets
     key: jwt-secret
 
-# Platform admin panel: verified addresses (comma-separated) of the people who run this
-# deployment and may open /admin/platform with an ordinary sign-in. Each must also be an
-# active account with a sign-in under 12 hours old. Empty means nobody.
+# Comma-separated verified emails allowed into /admin/platform (with a sign-in under 12 hours
+# old). Empty means nobody.
 platformAdmin:
   emails: ""
 
-# Service Account
 serviceAccount:
   create: true
   annotations: {}
   name: ""
 
-# Network Policy
 networkPolicy:
   enabled: false
   policyTypes:
     - Ingress
     - Egress
-  # Where PostgreSQL, Kafka and Redis are, when they are not in this namespace — which is
-  # the arrangement this chart expects, since it ships none of the three and
-  # values-production.yaml points all three at managed services. Those live in the
-  # cluster's VPC, so the default is the private ranges; narrow it to your database's own
-  # address if you would rather be precise. Set it to [] only if all three really do run
-  # as pods beside the application, or the policy will deny the connections.
+  # Where PostgreSQL, Kafka and Redis live outside this namespace. Set [] only if all three run
+  # as pods beside the application, or the policy denies the connections.
   dependencyEgressCidrs:
     - 10.0.0.0/8
     - 172.16.0.0/12
     - 192.168.0.0/16
 
-# Pod Security Context
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1001
   fsGroup: 1001
 
-# Security Context
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
@@ -480,7 +361,6 @@ securityContext:
       - ALL
   readOnlyRootFilesystem: false
 
-# Monitoring (Prometheus Operator + Grafana)
 monitoring:
   serviceMonitor:
     enabled: false  # Enable if using kube-prometheus-stack
@@ -494,11 +374,8 @@ monitoring:
     enabled: false  # Enable to create ConfigMap with Grafana dashboards
     labels: {}  # e.g., grafana_dashboard: "1"
 
-# Node selector
 nodeSelector: {}
 
-# Tolerations
 tolerations: []
 
-# Affinity
 affinity: {}

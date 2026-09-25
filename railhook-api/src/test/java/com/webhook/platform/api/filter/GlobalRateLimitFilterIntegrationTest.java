@@ -18,12 +18,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * The platform-wide limit is one Redis key shared by every API replica. It used to be given a 24h
- * TTL once, at startup: a day later the key was gone, every request logged a warning, and each
- * replica enforced its own local bucket, so the platform limit became the limit times the replica
- * count for as long as the process lived.
- */
+// A startup-only 24h TTL once lapsed and each replica enforced its own bucket.
 @Testcontainers
 class GlobalRateLimitFilterIntegrationTest {
 

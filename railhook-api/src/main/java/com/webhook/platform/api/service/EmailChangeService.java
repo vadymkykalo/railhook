@@ -33,25 +33,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Changing the address an account signs in with, without making it a way around what the address
- * stands for.
- *
- * <p>Two shapes, decided by whether the account has proved its current address:
- * <ul>
- *   <li><b>Unverified.</b> The change applies at once and a fresh verification goes to the new
- *       address; the old token stops working. Nothing is granted — the account stays unverified,
- *       and so stays behind the write gate, until the new address is proved. It answers the same
- *       CAPTCHA registration does, because re-typing an address is registering it.</li>
- *   <li><b>Verified.</b> Nothing changes until the new address is proved. The requester re-enters
- *       the password, or — with none, because they sign in with Google — has signed in within the
- *       last {@link #RECENT_SIGN_IN} minutes. A confirmation link goes to the new address and a
- *       notice with a "this wasn't me" link to the old one. Confirming, or cancelling from that
- *       notice, signs every session out, as a password change does.</li>
- * </ul>
- *
- * <p>A taken address is refused with the same answer registration gives, which reveals nothing
- * registration does not. The organization, its plan and its usage belong to the organization
- * and are not touched; a Google link is keyed on Google's subject and survives the change.
+ * A verified account changes nothing until the new address confirms; an unverified one applies at
+ * once behind the CAPTCHA, since re-typing an address is registering it.
  */
 @Service
 @Slf4j
@@ -175,7 +158,6 @@ public class EmailChangeService {
         log.info("Email of user {} changed after confirmation; all sessions revoked", user.getId());
     }
 
-    /** "This wasn't me", from the notice sent to the old address. No session needed or trusted. */
     @SystemTenant("acts on a User by emailed token, with no authenticated caller")
     @Transactional
     public void cancelByToken(String cancelToken) {
@@ -184,7 +166,7 @@ public class EmailChangeService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "This link is invalid or the change was already settled."));
         settle(pending, EmailChangeStatus.CANCELLED);
-        // Whoever asked held a session. The owner saying it was not them is the reason to end it.
+        // Whoever asked held a session; the owner disowning it is the reason to end it.
         userSessionService.revokeAllSessions(pending.getUserId());
         budget.audit(pending.getUserId(), AuditAction.EMAIL_CHANGE_CANCELLED, details(pending, "old address"));
         log.warn("Email change for user {} cancelled from the old address; all sessions revoked", pending.getUserId());
@@ -194,7 +176,6 @@ public class EmailChangeService {
         String previous = user.getEmail();
         String token = newToken();
         user.setEmail(newEmail);
-        // Replacing the hash is what invalidates the link already sent to the old address.
         user.setVerificationToken(CryptoUtils.hashApiKey(token));
         user.setVerificationTokenExpiresAt(Instant.now().plus(CONFIRMATION_LIFETIME));
         saveAddress(user);
@@ -217,8 +198,7 @@ public class EmailChangeService {
         changeRepository.findByUserIdAndStatus(user.getId(), EmailChangeStatus.PENDING)
                 .ifPresent(previous -> {
                     settle(previous, EmailChangeStatus.CANCELLED);
-                    // One pending change per account is a unique index; the replacement below
-                    // must not meet the row it replaces.
+                    // One pending change per account is a unique index, so the old row goes first.
                     changeRepository.flush();
                 });
 
@@ -252,7 +232,7 @@ public class EmailChangeService {
         }
     }
 
-    /** The same refusal, word for word, that registration gives for an address in use. */
+    // Word for word what registration says for an address in use.
     private void requireAvailable(String email, UUID userId) {
         userRepository.findByEmail(EmailAddresses.normalize(email))
                 .filter(other -> !other.getId().equals(userId))
@@ -261,7 +241,6 @@ public class EmailChangeService {
                 });
     }
 
-    /** Two changes racing to the same address meet the unique constraint; the loser gets the same answer. */
     private void saveAddress(User user) {
         try {
             userRepository.saveAndFlush(user);

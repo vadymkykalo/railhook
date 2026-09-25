@@ -56,27 +56,17 @@ public class WorkflowExecution {
     @Column(name = "duration_ms")
     private Integer durationMs;
 
-    /** When a suspended execution becomes due. Null unless {@code status == WAITING}. */
+    // Null unless WAITING.
     @Column(name = "resume_at")
     private Instant resumeAt;
 
-    /**
-     * Engine-private snapshot taken at a suspension: the outputs produced so far, the nodes
-     * already skipped, and which node to continue from. Opaque to SQL — written and read only
-     * by {@code WorkflowEngine}.
-     */
+    // Opaque to SQL: only WorkflowEngine reads and writes it.
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "resume_state", columnDefinition = "jsonb")
     private String resumeState;
 
-    /**
-     * Milliseconds spent actually executing nodes, accumulated across suspensions.
-     *
-     * <p>The global execution timeout is a budget for work. Measuring it as wall-clock from
-     * {@code startedAt} would make a workflow containing a delay longer than the budget
-     * impossible to finish: it would time out on the resume every time, having done almost
-     * nothing.
-     */
+    // The timeout budgets node execution time, not wall-clock, or a long delay node could
+    // never finish.
     @Column(name = "working_ms")
     private Long workingMs;
 
@@ -90,7 +80,6 @@ public class WorkflowExecution {
 
     public enum ExecutionStatus {
         RUNNING,
-        /** Suspended at a delay node, due at {@code resumeAt}. Not running, not finished. */
         WAITING,
         COMPLETED,
         FAILED,

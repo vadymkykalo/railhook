@@ -7,10 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
-/**
- * A read-only session in the public demo: an access token and when it stops working. There is no
- * refresh token — when it expires, the demo is over and a new one can be opened.
- */
+/** No refresh token: when the access token expires, the demo session is over. */
 @Data
 @Builder
 @NoArgsConstructor

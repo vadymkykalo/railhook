@@ -14,18 +14,6 @@ import { cn } from '../lib/utils';
 import { blogDate, ReadingTime, useBlogDateFormat } from './BlogPage';
 import { PageIntro, panel, WRAP } from './landing/primitives';
 
-/**
- * One article.
- *
- * The body is Markdown from `src/content/blog/<slug>/<locale>.md`, parsed into data and rendered
- * by `Prose`. Everything around it — the byline, the contents, the two ways on and the call to
- * action — is the site's own furniture, so a post is prose and nothing else.
- *
- * The table of contents is a wide-screen affordance: below `xl` the column would push the
- * measure down to something unreadable, so the article takes the full column instead and the
- * headings do the navigating.
- */
-
 function NotFound() {
   const { t } = useTranslation();
   return (
@@ -37,7 +25,6 @@ function NotFound() {
   );
 }
 
-/** The article's own headings, as a rail down the side. */
 function Contents({ post }: { post: BlogPost }) {
   const { t } = useTranslation();
   if (post.document.headings.length < 2) return null;
@@ -51,7 +38,7 @@ function Contents({ post }: { post: BlogPost }) {
           <li key={heading.id} className={heading.level === 3 ? 'pl-7' : 'pl-4'}>
             <a
               href={`#${heading.id}`}
-              className="block text-[13px] leading-snug text-muted-foreground transition-colors hover:text-primary"
+              className="block text-[13px] leading-snug text-muted-foreground transition-colors hover:text-foreground"
             >
               {heading.text}
             </a>
@@ -62,13 +49,12 @@ function Contents({ post }: { post: BlogPost }) {
   );
 }
 
-/** Where a reader goes after the last paragraph. The tester only where the deployment has one. */
 function CallToAction() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   return (
     <aside className={cn('mt-14 max-w-[68ch] p-6 sm:p-7', panel())}>
-      <h2 className="font-display text-[1.3rem] font-bold tracking-[-0.02em] text-foreground">{t('blog.cta.title')}</h2>
+      <h2 className="text-[1.5rem] font-normal tracking-[-0.02em] text-foreground">{t('blog.cta.title')}</h2>
       <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{t('blog.cta.body')}</p>
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <Button asChild className="max-sm:w-full">
@@ -110,7 +96,7 @@ function Neighbours({ slug, language }: { slug: string; language: string }) {
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             {t('blog.previous')}
           </span>
-          <span className="font-semibold text-foreground">{previous.title}</span>
+          <span className="font-medium text-foreground">{previous.title}</span>
         </Link>
       ) : (
         <span aria-hidden="true" />
@@ -121,7 +107,7 @@ function Neighbours({ slug, language }: { slug: string; language: string }) {
             {t('blog.next')}
             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
           </span>
-          <span className="font-semibold text-foreground">{next.title}</span>
+          <span className="font-medium text-foreground">{next.title}</span>
         </Link>
       )}
     </nav>
@@ -135,8 +121,7 @@ export default function BlogPostPage() {
   const dates = useBlogDateFormat();
   const site = siteUrl();
 
-  // Hooks cannot be skipped, so the unknown-slug case still describes itself — as the blog
-  // index, which is where the page sends the reader.
+  // Hooks cannot be skipped, so an unknown slug describes itself as the blog index.
   useDocumentMeta(
     post
       ? { title: post.title, description: post.description, path: `/blog/${post.slug}`, image: post.image }
@@ -179,19 +164,16 @@ export default function BlogPostPage() {
 
   return (
     <div className={`${WRAP} pb-20 pt-10 sm:pt-14`}>
-      <Link to="/blog" className="mono-label inline-flex min-h-10 items-center gap-1.5 hover:text-primary">
+      <Link to="/blog" className="mono-label inline-flex min-h-10 items-center gap-1.5 hover:text-foreground">
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
         {t('blog.allPosts')}
       </Link>
 
       <div className="mt-2 grid gap-12 xl:grid-cols-[minmax(0,1fr)_15rem]">
-        {/* `min-w-0`: a grid item's automatic minimum is its content's min-content, and the
-            comparison table sets one. Without this the column grows to the table's width and the
-            whole article scrolls sideways on a phone, rather than the table scrolling inside its
-            own box. */}
+        {/* min-w-0: otherwise the table widens the grid column and the page scrolls sideways on a phone. */}
         <article className="min-w-0">
           <header className="max-w-[68ch]">
-            <h1 className="font-display text-[2rem] font-bold leading-[1.08] tracking-[-0.035em] text-foreground [text-wrap:balance] sm:text-[2.7rem]">
+            <h1 className="text-[2rem] font-normal leading-[1.16] tracking-[-0.03em] text-foreground [text-wrap:balance] sm:text-[2.7rem]">
               {post.title}
             </h1>
             <p className="mt-4 text-[1.15rem] leading-relaxed text-muted-foreground">{post.lead}</p>

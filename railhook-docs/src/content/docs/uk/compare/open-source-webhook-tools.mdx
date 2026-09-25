@@ -1,10 +1,10 @@
 ---
 title: Open-source інструменти для вебхуків — порівняння (2026)
-description: Railhook, Svix, Hookdeck Outpost, Convoy і Hook0 поруч — ліцензія, напрямок, що входить у версію для власного сервера і як працює кожен.
+description: "Railhook, Svix, Hookdeck Outpost, Convoy і Hook0 поруч: ліцензія, напрямок, що входить у версію для власного сервера і як працює кожен."
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-Ця сторінка допоможе відібрати сервер вебхуків, який можна запустити самостійно. Тут розглянуто п'ять проєктів, чий код можна завантажити й розгорнути на власному сервері, причому відкриті окремо від source-available: саме ліцензія визначає, що з ними можна робити.
+П'ять серверів вебхуків, чий код можна завантажити й розгорнути на власному сервері. Відкриті ліцензії розглянуто окремо від source-available, бо саме ліцензія визначає, що з ними можна робити.
 
 <Aside title="Перевірено 18.09.2026">
 Відомості взято з власного сайту й репозиторію кожного проєкту (посилання нижче) станом на 18 вересня 2026 р. Railhook — наш продукт; його прогалини перелічено так само прямо, як і чужі. Якщо щось тут застаріло, надішліть виправлення через pull request.
@@ -37,23 +37,15 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## Кожен одним рядком
 
-- **Railhook** — обидва напрямки в одному продукті під MIT, усі функції на власному сервері без ліцензійного ключа, тунель до localhost у CLI, вбудовуваний портал для клієнтів. Доставка лише через HTTP, OpenTelemetry немає. [Порівняння Railhook з альтернативами](/docs/uk/resources/comparison/).
-- **Svix** — зріла платформа для надсилання вебхуків із SDK для 9 мов, Terraform-провайдером і сертифікаціями SOC 2 та HIPAA для хмарного сервісу; у відкритому сервері немає App Portal і трансформацій. [Railhook чи Svix](/docs/uk/compare/svix/).
-- **Hookdeck Outpost** — лише надсилання; саме його варто обрати, коли приймачі ваших клієнтів — SQS, Kafka, EventBridge, Pub/Sub чи RabbitMQ. Шлюз Hookdeck для приймання вебхуків — окремий SaaS із закритим кодом. [Railhook чи Hookdeck](/docs/uk/compare/hookdeck/).
-- **Convoy** — обидва напрямки під source-available ліцензією; portal links, трансформації на JavaScript, OpenTelemetry і RBAC — у платних версіях. [Railhook чи Convoy](/docs/uk/compare/convoy/).
-- **Hook0** — надсилання вебхуків, хмара в ЄС, ліцензія SSPL. [Railhook чи Hook0](/docs/uk/compare/hook0/).
+- **Railhook**: обидва напрямки в одному продукті під MIT, усі функції на власному сервері без ліцензійного ключа, тунель до localhost у CLI, вбудовуваний портал для клієнтів. Доставка лише через HTTP, OpenTelemetry немає. [Порівняння Railhook з альтернативами](/docs/uk/resources/comparison/).
+- **Svix**: зріла платформа для надсилання вебхуків із SDK для 9 мов, Terraform-провайдером і сертифікаціями SOC 2 та HIPAA для хмарного сервісу; у відкритому сервері немає App Portal і трансформацій. [Railhook чи Svix](/docs/uk/compare/svix/).
+- **Hookdeck Outpost**: лише надсилання; його варто обрати, коли приймачами ваших клієнтів є SQS, Kafka, EventBridge, Pub/Sub чи RabbitMQ. Шлюз Hookdeck для приймання вебхуків є окремим SaaS із закритим кодом. [Railhook чи Hookdeck](/docs/uk/compare/hookdeck/).
+- **Convoy**: обидва напрямки під source-available ліцензією; portal links, трансформації на JavaScript, OpenTelemetry і RBAC у платних версіях. [Railhook чи Convoy](/docs/uk/compare/convoy/).
+- **Hook0**: надсилання вебхуків, хмара в ЄС, ліцензія SSPL. [Railhook чи Hook0](/docs/uk/compare/hook0/).
 
 ## Як вибрати
 
 - **Вам потрібні обидва напрямки під відкритою ліцензією:** Railhook. Svix пропонує приймання окремим продуктом (Ingest), а Convoy охоплює обидва напрямки, але під source-available ліцензією.
 - **Приймачі ваших клієнтів — черги:** Outpost.
 - **Ваші клієнти мають самі керувати своїми ендпоінтами, і хмара постачальника вас влаштовує:** Svix.
-- **Дані в хмарі мають лишатися в ЄС, і потрібен саме хмарний сервіс:** Hook0 — або розгорніть будь-який з інших проєктів на власному сервері у своєму регіоні.
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Порівняння Railhook з альтернативами" href="/docs/uk/resources/comparison/" description="Сильні сторони Railhook і всі його прогалини — докладно." />
-  <LinkCard title="Встановлення з Docker" href="/docs/uk/self-hosting/install-docker/" description="Запустіть Railhook на власному сервері." />
-  <LinkCard title="Перехід на Railhook" href="/docs/uk/resources/migrating/" description="Перейдіть з іншої платформи, поки працюють обидві." />
-</CardGrid>
+- **Дані в хмарі мають лишатися в ЄС, і потрібен саме хмарний сервіс:** Hook0 або розгорніть будь-який з інших проєктів на власному сервері у своєму регіоні.

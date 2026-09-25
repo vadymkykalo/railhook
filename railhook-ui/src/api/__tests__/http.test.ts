@@ -3,11 +3,7 @@ import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'ax
 
 import { DEFAULT_TIMEOUT_MS, EXPORT_TIMEOUT_MS, http } from '../http';
 
-/**
- * A signed-in person is logged out only when their session is actually gone. QA saw a single
- * 429 (rate limit) and a single 502 (an API restart) on the refresh call each throw the user to
- * the sign-in screen.
- */
+/** A single 429 or 502 on refresh used to sign the user out. */
 describe('http client session refresh', () => {
   type Reply = { status: number; data?: unknown };
   let refreshReplies: Reply[];
@@ -69,9 +65,7 @@ describe('http client session refresh', () => {
   it.each([500, 504])(
     'does not replay a refresh that may have rotated the cookie before failing (%i)',
     async (status) => {
-      // The API may have rotated the refresh token and then failed to answer. The browser never
-      // saw the new cookie, so a retry would present the rotated-away one: reuse detection then
-      // revokes every session the person has.
+      // The API may have rotated the token; retrying the old cookie revokes every session.
       refreshReplies = [{ status }, { status: 200, data: { accessToken: 'fresh' } }];
       const result = http.get('/api/v1/projects');
       const settled = expect(result).rejects.toBeTruthy();
@@ -118,8 +112,7 @@ describe('http client session refresh', () => {
   });
 
   it('never refreshes a live-demo session: an expired demo simply ends', async () => {
-    // A demo token has no refresh token behind it. Refreshing would present this browser's own
-    // cookie and could put a demo tab into whoever's real account that cookie belongs to.
+    // A demo token has no refresh token; refreshing would use this browser's real cookie.
     http.setDemo(true);
     refreshReplies = [{ status: 200, data: { accessToken: 'fresh' } }];
     const result = http.get('/api/v1/projects');
@@ -134,12 +127,7 @@ describe('http client session refresh', () => {
   });
 });
 
-/**
- * Tabs share one refresh cookie, and the API revokes every session when a rotated-away cookie is
- * presented again. Two tabs refreshing at once (a browser restoring its tabs, a laptop waking up)
- * sent the same cookie twice and signed the person out everywhere. A refresh now waits for any
- * other tab's to finish, so it goes out with the cookie that one left in the jar.
- */
+/** Two tabs refreshing at once presented one cookie twice and signed out everywhere. */
 describe('http client refresh across tabs', () => {
   const client = (http as unknown as { client: { defaults: { adapter: unknown } } }).client;
   let originalAdapter: unknown;
@@ -147,7 +135,6 @@ describe('http client refresh across tabs', () => {
   let releaseOtherTab: () => void;
   const lockNames: string[] = [];
 
-  /** Web Locks as a browser grants them: one holder per name, the rest queued in order. */
   function installLocks() {
     let tail: Promise<unknown> = new Promise<void>((resolve) => { releaseOtherTab = resolve; });
     const locks = {
@@ -222,11 +209,6 @@ describe('http client refresh across tabs', () => {
   });
 });
 
-/**
- * A request with no timeout never settles when the backend stops answering, so the page it
- * belongs to spins forever: no error state, nothing for react-query to catch, no way out but
- * a reload. The client shipped without one.
- */
 describe('http client timeouts', () => {
   it('has a finite default', () => {
     expect(DEFAULT_TIMEOUT_MS).toBeGreaterThan(0);

@@ -4,10 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Signing up with Google asks for nothing, so the organization needs a name nobody typed. A
- * Workspace account says which company it belongs to; a personal one does not.
- */
+// A Workspace account names its company; a personal one does not.
 class NewAccountOrganizationNameTest {
 
     private static VerifiedIdentity identity(String email, String givenName, String hostedDomain) {

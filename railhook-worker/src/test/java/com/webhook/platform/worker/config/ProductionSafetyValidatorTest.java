@@ -11,11 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * The worker's half of the production gate. The api's equivalent has had tests since it was
- * written; this one had none, which is how it kept an {@code ApplicationReadyEvent} trigger
- * long after the api had moved off it.
- */
 class ProductionSafetyValidatorTest {
 
     private static final String STRONG_KEY = "kQ2v9ZpL7xR4mN8sT1wY6bC3dF0gH5jK9nM2pQ7rS4t";

@@ -11,12 +11,8 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 /**
- * A new address for the signed-in account.
- *
- * <p>Which of the other two fields matters depends on the account. An unverified account proves
- * nothing by knowing its password — whoever registered it chose that — so it answers the same
- * CAPTCHA registration asks for. A verified account re-enters its password, or, when it has none
- * because it signs in with Google, has signed in within the last few minutes.
+ * An unverified account answers a CAPTCHA, since knowing its password proves nothing. A verified
+ * account re-enters its password, or, with no password, must have signed in recently.
  */
 @Data
 @Builder

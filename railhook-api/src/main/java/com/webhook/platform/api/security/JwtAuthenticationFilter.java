@@ -48,10 +48,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String jti = claims.getId();
                 String tokenType = claims.get("typ", String.class);
                 if (!JwtUtil.TOKEN_TYPE_ACCESS.equals(tokenType)) {
-                    // Deliberate rejection of anything that isn't an access token -- a refresh
-                    // token (or a legacy token with no "typ" claim) must not authenticate
-                    // API requests. Previously this only failed by accident (NPE below on the
-                    // missing "organizationId" claim, swallowed by the catch block).
+                    // A refresh token, or one with no "typ" claim, must not authenticate requests.
                     log.debug("Token jti={} has type={}, expected access, rejecting", jti, tokenType);
                 } else if (tokenBlacklistService.isBlacklisted(jti)) {
                     log.debug("Token jti={} is blacklisted, rejecting", jti);
@@ -63,22 +60,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     if (tokenBlacklistService.isTokenRevokedByEpoch(userId, claims.getIssuedAt())) {
                         log.debug("Token for user {} was issued before revocation epoch, rejecting", userId);
                     } else if (sessionId != null && tokenBlacklistService.isSessionRevoked(sessionId)) {
-                        // Without this, "sign this device out" would only take effect once the
-                        // access token already in that device's hands expired on its own -- a
-                        // promise kept a quarter of an hour late, on the one screen where a user
-                        // is acting because they believe a device is compromised.
+                        // Otherwise signing a device out would wait for its access token to expire.
                         log.debug("Token belongs to revoked session {}, rejecting", sessionId);
                     } else if (isDemo(claims) && !request.getRequestURI().startsWith("/api/")) {
-                        // A demo token is handed to anyone who asks for one. It speaks for the
-                        // read-only demo on the API and nowhere else: not the actuator, not any
-                        // path a future filter chain might open to "any authenticated caller".
+                        // Anyone can get a demo token, so it is valid on the API and nowhere else.
                         log.debug("Demo token presented outside /api ({}), rejecting", request.getRequestURI());
                     } else {
                         UUID organizationId = UUID.fromString(claims.get("organizationId", String.class));
                         MembershipRole role = MembershipRole.valueOf(claims.get("role", String.class));
 
-                        // Absent on tokens minted before the claim existed; those read as
-                        // verified rather than signing every live session out on upgrade.
+                        // Absent on older tokens, which read as verified.
                         Boolean verifiedClaim = claims.get(JwtUtil.CLAIM_EMAIL_VERIFIED, Boolean.class);
 
                         JwtAuthenticationToken authentication = new JwtAuthenticationToken(
@@ -113,11 +104,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return Boolean.TRUE.equals(claims.get(JwtUtil.CLAIM_DEMO, Boolean.class));
     }
 
-    /**
-     * The session a token names, or {@code null} when it names none — which is the case for
-     * every token minted before sessions existed. A malformed value is also {@code null}: it
-     * cannot match a real session, and treating it as one would reject a token on a typo.
-     */
+    /** A malformed value is treated as no session, since it cannot match a real one. */
     private static UUID sessionIdOf(Claims claims) {
         String raw = claims.get(JwtUtil.CLAIM_SESSION_ID, String.class);
         if (raw == null) {

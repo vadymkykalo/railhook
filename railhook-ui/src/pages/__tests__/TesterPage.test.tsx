@@ -14,11 +14,6 @@ vi.mock('../../api/publicBin.api', async (importOriginal) => ({
 import TesterPage, { STORAGE_KEY } from '../TesterPage';
 import { publicBinApi } from '../../api/publicBin.api';
 
-/**
- * The webhook tester on the public site. A developer makes a URL, points a provider at it and
- * sees exactly what arrived — with the way to keep, retry and forward those requests one sign-up
- * away. A crawler, and the prerender, must never make a URL just by loading the page.
- */
 const SLUG = 'abcdefghijklmnopqrstuvwx';
 const URL = `https://railhook.io/hook/p/${SLUG}`;
 

@@ -84,7 +84,7 @@ public class BillingSubscription {
     @Builder.Default
     private String currency = "USD";
 
-    /** What the checkout charged, in minor units of {@link #currency}; renewals charge it again. */
+    /** Minor units of {@link #currency}; renewals charge the same amount. */
     @Column(name = "price_cents")
     private Long priceCents;
 

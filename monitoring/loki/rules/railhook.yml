@@ -1,13 +1,8 @@
-# Loki recording rules, remote-written to Prometheus (see ruler: in loki-config.yml).
-#
-# Mounted as the rules of Loki's single tenant ("fake", with auth_enabled: false). The alerts
-# on these series live in prometheus/host-alerts.yml, group railhook.logs.
 groups:
   - name: railhook.logs
     interval: 1m
     rules:
-      # Lines per second by service and level. Promtail already files every service under
-      # error, warn, info or debug; lower-casing here still covers lines it stored before that.
+      # Promtail already lower-cases the level; this still covers lines it stored before that.
       - record: railhook:log_lines:rate5m
         expr: |
           sum by (service, level) (

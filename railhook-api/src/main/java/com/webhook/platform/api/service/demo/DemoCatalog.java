@@ -3,22 +3,12 @@ package com.webhook.platform.api.service.demo;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * What the public demo is set up with: the Endpoints and Subscriptions of project "Acme Shop",
- * its two Sources and their Destinations, and three Workflows. Fixed ids, so seeding it twice
- * finds it already there.
- *
- * <p>Every URL is on a {@code .example} host (RFC 2606): reserved for documentation, never
- * delegated, so nothing here names a machine anybody runs. Nothing is ever sent to them either —
- * see {@link DemoHistory} for why no demo row can reach the worker — but a name that cannot exist
- * is the right thing to show in a product anyone can open.
- */
+/** Fixed ids so seeding is idempotent; every URL is on a reserved .example host. */
 final class DemoCatalog {
 
     private DemoCatalog() {
     }
 
-    /** How an Endpoint behaves in the generated history. */
     enum Profile { RELIABLE, MOSTLY_RELIABLE, FLAKY }
 
     record DemoEndpoint(UUID id, String url, String description, Profile profile, int latencyMs, int jitterMs) {
@@ -35,7 +25,7 @@ final class DemoCatalog {
     }
 
     static final String OUTGOING_DELAYS = "60,300,900,3600,21600,86400";
-    /** Short enough that an abandoned Delivery gets there within the history window. */
+    // Short enough that an abandoned Delivery gets there within the history window.
     static final String PARTNER_DELAYS = "60,300,900";
     static final String INCOMING_DELAYS = "60,300,900,3600,21600";
 
@@ -63,21 +53,10 @@ final class DemoCatalog {
             new DemoSubscription(id(0x29), ALERTS, "payment.failed", 7, OUTGOING_DELAYS),
             new DemoSubscription(id(0x2a), ALERTS, "order.cancelled", 7, OUTGOING_DELAYS));
 
-    /**
-     * A Transformation written in JavaScript, and the Subscription it is wired to. The demo has
-     * exactly one, and it exists to answer the question the Transform Studio raises the moment a
-     * visitor opens it: what is this for, when a template already exists? So the script does the
-     * three things a template cannot — loop over an array, branch, and compute — against the very
-     * events the demo's Deliveries were built from.
-     */
     record DemoTransformation(UUID id, UUID subscriptionId, String name, String description, String script) {
     }
 
-    /**
-     * Wired to {@code order.created} on the order service, which is the busiest event in the
-     * demo's history, so the Studio opens on a script and a recent real Event to run it against
-     * rather than an empty editor.
-     */
+    // Shows what a template cannot do: loop, branch, compute.
     static final DemoTransformation ORDER_LINES = new DemoTransformation(id(0x50), id(0x20),
             "Order lines (JavaScript)",
             "Turns an order into the line summary the order service wants: one row per item with its "
@@ -140,12 +119,7 @@ final class DemoCatalog {
 
     static final List<DemoDestination> DESTINATIONS = List.of(STRIPE_TO_BILLING, GITHUB_TO_CI, GITHUB_TO_CHAT);
 
-    /**
-     * A workflow as the builder saves it: {@code definition} is the canvas's own JSON — nodes with
-     * a type, a position and their data, edges between them — which the engine runs as it is.
-     * The nodes are listed in an order the edges allow, which is the order {@link DemoHistory}
-     * walks them in.
-     */
+    // Nodes are listed in an order the edges allow; DemoHistory walks them in that order.
     record DemoWorkflow(UUID id, String name, String description, String eventTypePattern, String definition) {
 
         String triggerConfig() {
@@ -153,7 +127,6 @@ final class DemoCatalog {
         }
     }
 
-    /** A branch: large orders alert the sales channel, the rest earn loyalty points. */
     static final DemoWorkflow HIGH_VALUE_ORDERS = new DemoWorkflow(id(0x60), "Route high-value orders",
             "Orders of $100 or more alert the sales channel; every other order earns loyalty points.",
             "order.created", """
@@ -183,7 +156,6 @@ final class DemoCatalog {
             ]}
             """.formatted(ALERTS.id(), ORDERS.id()));
 
-    /** A filter and a delay: a declined card gets five minutes to be retried before billing chases it. */
     static final DemoWorkflow CARD_DECLINES = new DemoWorkflow(id(0x61), "Chase declined cards",
             "Waits five minutes after a declined card payment over $50, then asks billing to send the customer a retry link.",
             "payment.failed", """
@@ -210,7 +182,6 @@ final class DemoCatalog {
             ]}
             """.formatted(BILLING.id()));
 
-    /** A wildcard trigger and a filter of two conditions: delivered parcels turn into review requests. */
     static final DemoWorkflow SHIPMENT_REVIEWS = new DemoWorkflow(id(0x62), "Ask for a review on delivery",
             "Every shipment event is checked; a parcel UPS or DHL has delivered becomes a review request.",
             "shipment.*", """
@@ -244,7 +215,7 @@ final class DemoCatalog {
         return DESTINATIONS.stream().filter(d -> d.source().equals(source)).toList();
     }
 
-    /** The demo's fixed ids share one prefix, so a stray demo row is recognisable at a glance. */
+    // One shared prefix, so a stray demo row is recognisable at a glance.
     static UUID id(int n) {
         return new UUID(0x0000000000004000L, 0x800000000000de00L + n);
     }

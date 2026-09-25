@@ -28,10 +28,10 @@ public class IncomingDestinationResponse {
     private String payloadTransform;
     private UUID transformationId;
     private String transformationName;
-    /** Start of the current unbroken run of failed forwards; null when the last one succeeded. */
+    /** Null when the last forward succeeded. */
     private Instant failingSince;
 
-    /** When Railhook turned this destination off for continuous failure; null when its owner did. */
+    /** Null when the owner disabled it rather than Railhook. */
     private Instant autoDisabledAt;
 
     private String autoDisabledReason;

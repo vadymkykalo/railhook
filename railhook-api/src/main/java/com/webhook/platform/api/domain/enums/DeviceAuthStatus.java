@@ -6,10 +6,8 @@ public enum DeviceAuthStatus {
     DENIED,
     EXPIRED,
     /**
-     * Terminal state set the moment an APPROVED code is successfully exchanged for a
-     * token pair. Makes the code single-use: {@code pollDeviceToken} moves
-     * APPROVED -> CONSUMED with a conditional UPDATE (compare-and-set on the old
-     * status), so a second concurrent poll of the same code cannot also win.
+     * Makes the code single-use: APPROVED moves to CONSUMED with a compare-and-set UPDATE, so a
+     * second concurrent poll cannot also win.
      */
     CONSUMED
 }

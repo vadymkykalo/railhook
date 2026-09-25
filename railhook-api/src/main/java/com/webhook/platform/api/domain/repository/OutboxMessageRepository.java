@@ -14,11 +14,8 @@ import java.util.UUID;
 
 @Repository
 public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UUID> {
-    // The outer SELECT..IN(...) FOR UPDATE has its own ORDER BY created_at — without it,
-    // Postgres is free to return the id-filtered rows in arbitrary (plan) order even though the
-    // inner subquery computed the correct rn_proj/rn_key ranking, so the List<OutboxMessage>
-    // handed to OutboxPublisherService#publishBatchAsync could interleave up to maxPerKey
-    // messages for the same endpoint out of order.
+    // The outer ORDER BY created_at is needed: without it Postgres may return the rows in plan
+    // order and publish messages for the same key out of order.
     @Query(value = """
             SELECT * FROM outbox_messages WHERE id IN (
                 SELECT id FROM (
@@ -32,7 +29,6 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
             """, nativeQuery = true)
     List<OutboxMessage> findPendingBatchForUpdate(@Param("status") String status, @Param("limit") int limit, @Param("maxPerKey") int maxPerKey, @Param("maxPerProject") int maxPerProject);
 
-    // Same fix as findPendingBatchForUpdate above — this feeds the same publishBatchAsync path.
     @Query(value = """
             SELECT * FROM outbox_messages WHERE id IN (
                 SELECT id FROM (
@@ -56,43 +52,30 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
     Instant findOldestPendingCreatedAt();
 
     /**
-     * Hands a row nobody ever answered for back to the queue, and counts it.
-     *
-     * <p>The count is the part that was missing. Recovery is the only way out of SENDING,
-     * {@code promoteExhaustedToDead} only ever looks at FAILED, and nothing else touches
-     * retry_count — so without the increment a message that never gets a callback inside
-     * {@code batchSendTimeoutSeconds} cycles PENDING -> SENDING -> PENDING for ever, never
-     * reaches DEAD, and shows up nowhere except a queue-depth gauge. The window is not narrow:
-     * that timeout defaults to 30s and Kafka's own delivery.timeout.ms to 120s.
+     * The retry_count increment matters: nothing else counts a row that never got a Kafka
+     * callback, so without it the row would cycle PENDING and SENDING for ever.
      */
     @Modifying
     @Query(value = "UPDATE outbox_messages SET status = 'PENDING', retry_count = retry_count + 1, updated_at = NOW() WHERE status = 'SENDING' AND updated_at < :cutoff", nativeQuery = true)
     int recoverStuckSendingMessages(@Param("cutoff") Instant cutoff);
 
     /**
-     * The other half of recovery: a stuck row whose recovery would reach {@code maxRetries}
-     * goes to DEAD instead. The count alone did not stop anything — the PENDING claim does not
-     * read retry_count and {@code promoteExhaustedToDead} only reads FAILED — so without this a row
-     * that never gets an outcome went round for ever. Run before {@link #recoverStuckSendingMessages}
-     * in the same transaction, which then no longer sees these rows.
+     * Must run before {@link #recoverStuckSendingMessages} in the same transaction; the PENDING
+     * claim ignores retry_count, so this is the only thing that stops a stuck row.
      */
     @Modifying
     @Query(value = "UPDATE outbox_messages SET status = 'DEAD', retry_count = retry_count + 1, error_message = 'No Kafka send outcome before recovery, retries exhausted', updated_at = NOW() WHERE status = 'SENDING' AND updated_at < :cutoff AND retry_count + 1 >= :maxRetries", nativeQuery = true)
     int deadLetterStuckSendingMessages(@Param("cutoff") Instant cutoff, @Param("maxRetries") int maxRetries);
 
     /**
-     * Settles the rows this batch is still holding.
-     *
-     * <p>{@code AND status = 'SENDING'} is load-bearing. A Kafka callback that arrives after the
-     * batch wait is settled on its own by {@code OutboxPublisherService.settleLateOutcomes}, and
-     * by then its row may have been recovered to PENDING. Without the guard the straggler stamps
-     * its stale outcome over a row that is queued again.
+     * {@code AND status = 'SENDING'} stops a late Kafka callback from overwriting a row that
+     * recovery already put back to PENDING.
      */
     @Modifying
     @Query(value = "UPDATE outbox_messages SET status = 'PUBLISHED', published_at = :now, updated_at = :now WHERE id IN :ids AND status = 'SENDING'", nativeQuery = true)
     int batchMarkPublished(@Param("ids") List<UUID> ids, @Param("now") Instant now);
 
-    /** Same guard, same reason — see {@link #batchMarkPublished}. */
+    /** Same SENDING guard as {@link #batchMarkPublished}. */
     @Modifying
     @Query(value = "UPDATE outbox_messages SET status = 'FAILED', retry_count = retry_count + 1, error_message = :error, last_attempt_at = :now, updated_at = :now WHERE id IN :ids AND status = 'SENDING'", nativeQuery = true)
     int batchMarkFailed(@Param("ids") List<UUID> ids, @Param("error") String error, @Param("now") Instant now);

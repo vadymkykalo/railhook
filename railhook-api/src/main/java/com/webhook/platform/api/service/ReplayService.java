@@ -94,8 +94,7 @@ public class ReplayService {
         this.sequenceGeneratorService = sequenceGeneratorService;
         this.events = events;
         this.txTemplate = new TransactionTemplate(transactionManager);
-        // Each batch commits on its own whatever the caller holds: joined to an outer transaction,
-        // one failing batch marked all of it rollback-only.
+        // Joined to an outer transaction, one failing batch marked all of it rollback-only.
         this.txTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
         this.replayEventsProcessedCounter = Counter.builder("replay.events.processed")
@@ -107,8 +106,6 @@ public class ReplayService {
         this.replayBatchTimer = Timer.builder("replay.batch.duration")
                 .description("Replay batch processing time").register(meterRegistry);
     }
-
-    // ========== Public API ==========
 
     public ReplayEstimateResponse estimate(UUID projectId, ReplayRequest request) {
         validateProjectOwnership(projectId);
@@ -214,12 +211,7 @@ public class ReplayService {
         return get(projectId, sessionId);
     }
 
-    // ========== Execution ==========
-
-    /**
-     * Runs a committed session to the end, batch by batch. Called by {@link ReplaySessionLauncher}
-     * on the replay executor; never throws, a failure is written to the session instead.
-     */
+    // Never throws: a failure is written to the session instead.
     public void run(UUID sessionId) {
         try {
             executeReplay(sessionId);
@@ -229,11 +221,7 @@ public class ReplayService {
         }
     }
 
-    /**
-     * For a session whose replay could not be handed to the executor. Called after the creating
-     * transaction has committed, so in a transaction of its own: joined to that one, the write
-     * would never be committed.
-     */
+    // Runs after the creating transaction committed, so it needs a transaction of its own.
     public void failToStart(UUID sessionId, String reason) {
         txTemplate.executeWithoutResult(status -> markFailed(sessionId, reason));
     }
@@ -253,17 +241,13 @@ public class ReplayService {
         }
 
         UUID projectId = session.getProjectId();
-        // Where each Event goes is decided per Event, by the same code a fresh ingest runs: a
-        // rule can route an Event to an endpoint no Subscription covers, so an empty Subscription
-        // list is no reason to stop.
+        // A rule can route to an endpoint no Subscription covers, so no Subscriptions is no reason to stop.
         final UUID endpointFilter = session.getEndpointId();
         final UUID sid = sessionId;
 
-        // Cursor-based batch processing
         Instant cursorCreatedAt = session.getFromDate().minusNanos(1);
         UUID cursorId = session.getLastProcessedEventId() != null ? session.getLastProcessedEventId() : ZERO_UUID;
 
-        // If resuming, use the last processed event's timestamp
         if (session.getLastProcessedEventId() != null) {
             Event lastEvent = eventRepository.findById(session.getLastProcessedEventId()).orElse(null);
             if (lastEvent != null) {
@@ -276,7 +260,6 @@ public class ReplayService {
         int totalErrors = session.getErrors();
 
         while (true) {
-            // Check cancellation
             ReplaySession freshSession = replaySessionRepository.findById(sessionId).orElse(null);
             if (freshSession == null ||
                 freshSession.getStatus() == ReplaySessionStatus.CANCELLING ||
@@ -286,13 +269,11 @@ public class ReplayService {
                 return;
             }
 
-            // Fetch next batch
             List<Event> batch = fetchBatch(projectId, session, cursorCreatedAt, cursorId);
             if (batch.isEmpty()) {
                 break;
             }
 
-            // Process batch in a new transaction
             Timer.Sample sample = Timer.start();
             final List<Event> currentBatch = batch;
             try {
@@ -315,21 +296,17 @@ public class ReplayService {
             }
             sample.stop(replayBatchTimer);
 
-            // Advance cursor
             Event lastEvent = batch.get(batch.size() - 1);
             cursorCreatedAt = lastEvent.getCreatedAt();
             cursorId = lastEvent.getId();
 
-            // Checkpoint progress (every batch)
             updateProgress(sessionId, totalProcessed, totalDeliveries, totalErrors, lastEvent.getId());
 
-            // Backpressure: pause between batches to avoid overwhelming Kafka/DB
             if (batchDelayMs > 0) {
                 sleep(batchDelayMs);
             }
         }
 
-        // Mark completed
         markCompleted(sessionId, totalProcessed, totalDeliveries, totalErrors);
         log.info("Replay session {} completed: {} events → {} deliveries ({} errors)",
                 sessionId, totalProcessed, totalDeliveries, totalErrors);
@@ -344,8 +321,7 @@ public class ReplayService {
             try {
                 decision = eventIntake.decide(event);
             } catch (IllegalArgumentException e) {
-                // A fresh ingest refuses an Event over the fan-out limit outright, so none of
-                // its endpoints get the replay either.
+                // Over the fan-out limit: a fresh ingest would refuse it outright too.
                 errors++;
                 log.warn("Event {} not replayed: {}", event.getId(), e.getMessage());
                 continue;
@@ -362,8 +338,7 @@ public class ReplayService {
                     if (Boolean.TRUE.equals(delivery.getOrderingEnabled())) {
                         delivery.setSequenceNumber(sequenceGeneratorService.nextSequence(delivery.getEndpointId()));
                     }
-                    // A new Delivery, not the original sent again: carrying the Event's key would
-                    // hand the receiver the key it already processed, and it would drop the replay.
+                    // The receiver already processed the original key and would drop the replay.
                     delivery.setIdempotencyKey(null);
                     delivery.setReplaySessionId(sessionId);
                     deliveriesToSave.add(delivery);
@@ -375,11 +350,9 @@ public class ReplayService {
             }
         }
 
-        // Batch save all deliveries
         List<Delivery> savedDeliveries = deliveryRepository.saveAll(deliveriesToSave);
         deliveryRepository.flush();
 
-        // Batch create and save all outbox messages
         List<OutboxMessage> outboxMessages = new ArrayList<>();
         for (Delivery delivery : savedDeliveries) {
             try {
@@ -395,8 +368,6 @@ public class ReplayService {
 
         return new BatchResult(outboxMessages.size(), errors);
     }
-
-    // ========== Helpers ==========
 
     private List<Event> fetchBatch(UUID projectId, ReplaySession session, Instant cursorCreatedAt, UUID cursorId) {
         if (session.getEventType() != null && !session.getEventType().isBlank()) {
@@ -417,10 +388,7 @@ public class ReplayService {
         return eventRepository.countForReplay(TenantContext.require(), projectId, request.getFromDate(), request.getToDate());
     }
 
-    /**
-     * For the estimate only. Matched the way intake matches, patterns included; rules are not
-     * applied here, so the estimate does not know what a DROP or ROUTE will change.
-     */
+    // Estimate only: rules are not applied, so DROP and ROUTE are not reflected.
     private List<Subscription> findActiveSubscriptions(UUID projectId, ReplayRequest request) {
         List<Subscription> subscriptions = request.getEventType() != null && !request.getEventType().isBlank()
                 ? subscriptionMatchingCache.findMatching(projectId, request.getEventType())
@@ -471,11 +439,6 @@ public class ReplayService {
         });
     }
 
-    /**
-     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
-     * lookup only sees projects inside the caller's organization: a foreign project id is
-     * indistinguishable from a missing one, which is intended.
-     */
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));

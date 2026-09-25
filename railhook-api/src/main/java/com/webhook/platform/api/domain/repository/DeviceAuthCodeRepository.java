@@ -26,13 +26,8 @@ public interface DeviceAuthCodeRepository extends JpaRepository<DeviceAuthCode, 
     int expireOldCodes(@Param("now") Instant now);
 
     /**
-     * Compare-and-set: flips an APPROVED code to CONSUMED and reports how many rows
-     * moved. The WHERE clause is the CAS guard — under Postgres READ COMMITTED, two
-     * concurrent callers serialize on the row; the first to commit wins (returns 1),
-     * and the second re-evaluates the WHERE against the now-committed row and finds
-     * it no longer APPROVED (returns 0). Callers MUST check the return value rather
-     * than assuming success — this is what makes {@code pollDeviceToken} single-use
-     * under concurrent polls.
+     * Compare-and-set: of two concurrent polls, only the first to commit gets 1, because the
+     * second re-evaluates the WHERE under READ COMMITTED. Callers must check the result.
      */
     @Modifying
     @Query("UPDATE DeviceAuthCode d SET d.status = 'CONSUMED' WHERE d.id = :id AND d.status = 'APPROVED'")

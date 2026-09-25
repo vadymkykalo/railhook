@@ -24,13 +24,8 @@ import java.util.UUID;
 public class Delivery {
 
     /**
-     * How many more Attempts a person gets by sending a Delivery again by hand, from Failed
-     * Messages or from the Delivery itself.
-     *
-     * <p>The ladder is not restarted (see {@link #returnToLadder}), so these Attempts wait at the
-     * tier the Delivery already reached — for an abandoned one, the last. Three of them still fit
-     * inside the worker's 96-hour hard cap at the top of the jitter; a whole ladder's worth would
-     * be escalated before its last Attempts could run.
+     * A manual retry does not restart the ladder, so these Attempts wait at the tier already
+     * reached. Three still fit inside the worker's 96-hour hard cap at the top of the jitter.
      */
     public static final int MANUAL_RETRY_ATTEMPTS = 3;
 
@@ -77,23 +72,13 @@ public class Delivery {
     @Builder.Default
     private Boolean orderingEnabled = false;
 
-    /**
-     * When this delivery was first buffered by the worker waiting on a missing predecessor
-     * sequence. Null if it has never been buffered. Written only by the worker; kept here
-     * purely so Hibernate schema validation (ddl-auto=validate) passes on this side too.
-     */
+    /** Written only by the worker; mapped here so schema validation passes. */
     @Column(name = "ordering_first_buffered_at")
     private Instant orderingFirstBufferedAt;
 
     /**
-     * Fencing token stamped by whichever claim moved this delivery to PROCESSING.
-     *
-     * <p>Guarding a finalizer on {@code status == PROCESSING} alone cannot tell the claim
-     * it is finishing apart from a newer claim on the same row: an attempt whose worker
-     * looked dead can be swept back to PENDING, reclaimed by a different attempt, and then
-     * have its own late response arrive and finalize a row it no longer owns. Comparing
-     * this token against the one the attempt started under closes that window. Null while
-     * the delivery is unclaimed.
+     * Fencing token. A status check alone cannot tell a late response from a swept-and-reclaimed
+     * attempt apart from the current claim, so finalizers compare this token.
      */
     @Column(name = "claim_token")
     private UUID claimToken;
@@ -106,11 +91,7 @@ public class Delivery {
     @Builder.Default
     private String retryDelays = RetryLadderDefaults.OUTGOING_DELAYS;
 
-    /**
-     * Which HTTP statuses are worth another Attempt, copied from the Subscription when this
-     * Delivery was created — as the ladder is, and for the same reason: an edit mid-ladder must
-     * not change the rules an obligation already in flight is judged by.
-     */
+    /** Copied from the Subscription at creation, like the ladder, so an edit cannot change a Delivery in flight. */
     @Column(name = "retryable_statuses", nullable = false, columnDefinition = "TEXT")
     @Builder.Default
     private String retryableStatuses = RetryableStatuses.DEFAULT_SPEC;
@@ -136,10 +117,7 @@ public class Delivery {
     @Column(name = "last_attempt_at")
     private Instant lastAttemptAt;
 
-    /**
-     * When a person last put this Delivery back on its Retry Ladder; null if never. The worker's
-     * hard-cap escalation measures age from here when it is set, and from createdAt otherwise.
-     */
+    /** The worker's hard-cap escalation measures age from here when set, else from createdAt. */
     @Column(name = "ladder_resumed_at")
     private Instant ladderResumedAt;
 
@@ -162,17 +140,8 @@ public class Delivery {
     private Long version;
 
     /**
-     * Puts this Delivery back on its Retry Ladder for {@code additionalAttempts} more Attempts,
-     * the first of which is sent as soon as it is announced.
-     *
-     * <p>attemptCount is carried forward, never reset. The ladder reads it to pick the next wait,
-     * and every recorded Attempt is numbered by it: restarting the count gives the history two
-     * attempt 1s, and "the latest attempt" stops being well defined. The headroom comes from
-     * maxAttempts instead, capped where a ladder stops being parseable — past that the worker
-     * would fail the Delivery for carrying an invalid ladder rather than attempt it.
-     *
-     * <p>Stamps ladderResumedAt, so the hard-cap escalation measures age from now rather than
-     * from createdAt.
+     * attemptCount is never reset: the ladder reads it and every recorded Attempt is numbered by
+     * it. The headroom comes from maxAttempts, capped at the largest ladder the worker accepts.
      */
     public void returnToLadder(int additionalAttempts) {
         this.status = DeliveryStatus.PENDING;
@@ -180,9 +149,8 @@ public class Delivery {
         this.nextRetryAt = null;
         this.failedAt = null;
         this.ladderResumedAt = Instant.now();
-        // The worker leaves its token on a Delivery it finished with. Kept, it made the retry
-        // look claimed, and a dispatch rescheduled for backpressure (claim_token IS NULL) matched
-        // nothing — the Delivery sat until the stranded sweep, an hour later.
+        // The worker leaves its token behind; kept, the retry looks claimed and a backpressure
+        // reschedule (claim_token IS NULL) never matches it.
         this.claimToken = null;
     }
 

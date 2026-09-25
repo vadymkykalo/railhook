@@ -18,8 +18,7 @@ vi.mock('../../api/endpoints.api', () => ({
   endpointsApi: { list: vi.fn().mockResolvedValue([]) },
 }));
 
-// The page loads the project alongside the sessions; without this the whole load rejects and
-// the list never renders, which would make every assertion below pass for the wrong reason.
+// Without this mock the load rejects and every assertion passes for the wrong reason.
 vi.mock('../../api/projects.api', () => ({
   projectsApi: {
     get: vi.fn().mockResolvedValue({ id: 'project-1', name: 'Test Project' }),
@@ -28,14 +27,6 @@ vi.mock('../../api/projects.api', () => ({
 
 import ReplayPage from '../ReplayPage';
 import { replayApi } from '../../api/replay.api';
-
-/**
- * Replay re-sends real events to real endpoints, which is why it has an estimate step at all —
- * and why the page shipping with no test is worse than most. The thing to hold down is that
- * opening it does not start one: a page that estimates on mount is a page that could as easily
- * create on mount, and the difference is somebody's customers receiving a few thousand webhooks
- * a second time.
- */
 
 const page = (content: ReplaySessionResponse[]) => ({
   content,
@@ -96,7 +87,6 @@ describe('ReplayPage', () => {
     renderReplay();
 
     await waitFor(() => expect(replayApi.list).toHaveBeenCalled());
-    // The count is what tells an operator whether to let it finish or cancel it.
     await waitFor(() => expect(document.body.textContent).toMatch(/300|1[,.\s]?200|25/));
   });
 

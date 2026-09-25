@@ -33,30 +33,12 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-/**
- * Incoming sources — the same shape as Connections, one direction over.
- *
- * A source is a third-party provider a customer has connected, together with
- * what Railhook needs to prove a webhook genuinely came from it. Its
- * destinations live on its own page, the way subscriptions live on a
- * connection: open a source to see where its incoming events are forwarded.
- */
-
 const PROVIDER_TYPES: ProviderType[] = [
   'GENERIC', 'GITHUB', 'GITLAB', 'STRIPE', 'SHOPIFY', 'SLACK', 'TWILIO', 'SQUARE', 'ADYEN', 'SENDGRID', 'HUBSPOT',
 ];
 const VERIFICATION_MODES: VerificationMode[] = ['NONE', 'HMAC_GENERIC', 'PROVIDER'];
 
-/**
- * The providers WebhookVerifierFactory actually ships a verifier for — which is now every
- * provider type except GENERIC.
- *
- * GENERIC is the label for a provider Railhook has no preset for, so PROVIDER mode with it is
- * refused by the API: HMAC_GENERIC, with that provider's own header and prefix, is what verifies
- * those. It used to be worse than a refusal — the source saved, and then threw at ingress once
- * the provider was already sending. Narrowing the list here means the choice that fails cannot
- * be made; the server check stays the authority.
- */
+/** Every provider but GENERIC: the API refuses PROVIDER mode with GENERIC. */
 const VERIFIABLE_PROVIDERS: ProviderType[] = [
   'STRIPE', 'GITHUB', 'GITLAB', 'SLACK', 'SHOPIFY', 'TWILIO', 'SQUARE', 'ADYEN', 'SENDGRID', 'HUBSPOT',
 ];
@@ -127,10 +109,7 @@ export default function IncomingSourcesPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    // The update API skips a field sent as null, so "clear" needs a value it will store. A prefix
-    // clears with "" and a rate limit with 0 (no limit of its own: the default applies). A
-    // header has no such value — "" would make every signature check look for a header named
-    // nothing — so clearing one is refused here instead of reported as saved.
+    // The update API skips nulls, so clearing needs a stored value; a header has none, so clearing it is refused.
     if (editSource?.hmacHeaderName && formVerification === 'HMAC_GENERIC' && !formHmacHeader.trim()) {
       setHeaderCannotBeCleared(true);
       return;
@@ -240,7 +219,7 @@ export default function IncomingSourcesPage() {
                       <button
                         type="button"
                         onClick={() => openSource(source)}
-                        className="text-left text-[13px] font-medium hover:text-primary hover:underline"
+                        className="text-left text-[13px] font-medium hover:link-ink"
                       >
                         {source.name}
                       </button>
@@ -389,7 +368,7 @@ export default function IncomingSourcesPage() {
               </div>
 
               {formVerification === 'NONE' && (
-                <div className="flex items-start gap-2.5 rounded-lg border border-retry/30 bg-retry-soft p-3">
+                <div className="flex items-start gap-2.5 border border-retry/30 bg-retry-soft p-3">
                   <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
                   <div>
                     <p className="text-sm font-medium text-retry">{t('incomingSources.security.noVerificationTitle')}</p>

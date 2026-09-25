@@ -12,15 +12,6 @@ const slugs = readdirSync(CONTENT, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name);
 
-/**
- * The authoring contract, held by a test rather than by review.
- *
- * Three posts from now nobody will remember that a missing `uk.md` silently serves English, or
- * that `:::figure` naming a drawing that was never written renders nothing at all. Both are
- * invisible in a browser and obvious here.
- *
- * `src/content/blog/README.md` is the same contract in prose.
- */
 describe('every blog post', () => {
   it('finds the posts it is meant to be checking', () => {
     expect(slugs.length).toBeGreaterThan(0);
@@ -58,9 +49,7 @@ describe('every blog post', () => {
   );
 
   it.each(slugs)('%s has the social card its og:image points at', (slug) => {
-    // Committed rather than generated at build: `npm run blog:og`. An og:image that only exists
-    // after a prerender is one that is missing from every local build, which is when somebody
-    // is pasting the link into Slack to see what it looks like.
+    // Committed, not built: an og:image made only at prerender is missing from local builds.
     const card = resolve(CONTENT, '..', '..', '..', 'public', 'blog', `${slug}.png`);
     expect(existsSync(card), `${slug}.png is missing. Run: npm run blog:og`).toBe(true);
   });

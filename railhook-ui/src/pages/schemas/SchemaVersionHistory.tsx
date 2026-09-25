@@ -31,13 +31,6 @@ import {
 import { cn } from '../../lib/utils';
 import { formatJson } from '../../lib/json';
 
-/**
- * One event type's history: every version it has had, and every diff between
- * them. A schema version is a contract, so its state is a domain status —
- * active is `ok`, a draft nobody has activated is `idle`, and a deprecated
- * version is `halt`.
- */
-
 function kindOfVersionStatus(status: string): StatusKind {
   switch (status) {
     case 'ACTIVE': return 'ok';
@@ -82,7 +75,6 @@ function parseChangeSummary(summary: string): ChangeSummary {
   }
 }
 
-/** A single +/−/~ tally, in the machine voice. */
 function ChangeTally({ summary }: { summary: ChangeSummary }) {
   const { t } = useTranslation();
   return (
@@ -164,7 +156,7 @@ export default function SchemaVersionHistory({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-xl border border-rail bg-card shadow-card">
+      <section className="border border-rail bg-card shadow-card">
         <header className="flex flex-wrap items-start justify-between gap-3 p-4">
           <div className="min-w-0">
             <div className="mono-label">{t('schemas.eventTypeEyebrow')}</div>
@@ -292,8 +284,6 @@ function HistoryTab({ active, onClick, label }: { active: boolean; onClick: () =
   );
 }
 
-// ── Versions ───────────────────────────────────────────────────────
-
 function VersionList({ projectId, eventType }: { projectId: string; eventType: EventTypeCatalogResponse }) {
   const { t } = useTranslation();
   const {
@@ -318,8 +308,7 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
       return;
     }
     try {
-      // Left blank the field is omitted, and the server inherits the previous version's mode.
-      // Sending NONE explicitly is a different thing: it drops the promise the type was under.
+      // Blank is omitted so the server inherits the previous mode; sending NONE would drop it.
       await createMutation.mutateAsync({
         schemaJson: schemaInput,
         description: versionDesc.trim() || undefined,
@@ -359,7 +348,7 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
       </div>
 
       {showUpload && (
-        <div className="space-y-3 rounded-xl border border-rail bg-card p-4 shadow-card">
+        <div className="space-y-3 border border-rail bg-card p-4 shadow-card">
           <div className="space-y-1.5">
             <Label className="text-xs">{t('schemas.jsonSchema')}</Label>
             <JsonEditor
@@ -431,7 +420,7 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
           {versions.map((v: EventSchemaVersionResponse) => {
             const isExpanded = expanded === v.id;
             return (
-              <li key={v.id} className="overflow-hidden rounded-xl border border-rail bg-card shadow-card">
+              <li key={v.id} className="overflow-hidden border border-rail bg-card shadow-card">
                 <div className="flex flex-wrap items-center gap-2 p-3.5">
                   <button
                     type="button"
@@ -506,8 +495,6 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
   );
 }
 
-// ── Changes for one event type ─────────────────────────────────────
-
 function ChangeList({ projectId, eventType }: { projectId: string; eventType: EventTypeCatalogResponse }) {
   const { t } = useTranslation();
   const {
@@ -535,7 +522,7 @@ function ChangeList({ projectId, eventType }: { projectId: string; eventType: Ev
       {changes.map((c: SchemaChangeResponse) => {
         const summary = parseChangeSummary(c.changeSummary);
         return (
-          <li key={c.id} className="rounded-xl border border-rail bg-card p-3.5 shadow-card">
+          <li key={c.id} className="border border-rail bg-card p-3.5 shadow-card">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-sm font-medium">
                 {c.fromVersion != null ? `v${c.fromVersion} → v${c.toVersion}` : `v${c.toVersion}`}
@@ -554,8 +541,6 @@ function ChangeList({ projectId, eventType }: { projectId: string; eventType: Ev
   );
 }
 
-// ── Project-wide timeline, shown when no event type is selected ────
-
 export function RecentSchemaChanges({ projectId }: { projectId: string }) {
   const { t } = useTranslation();
   const { data: changes, isLoading } = useProjectSchemaChanges(projectId);
@@ -567,7 +552,7 @@ export function RecentSchemaChanges({ projectId }: { projectId: string }) {
   const shown = expanded ? changes : changes.slice(0, 6);
 
   return (
-    <section className="rounded-xl border border-rail bg-card shadow-card">
+    <section className="border border-rail bg-card shadow-card">
       <header className="flex flex-wrap items-center gap-2 border-b border-rail px-4 py-2.5">
         <History className="h-4 w-4 text-muted-foreground" aria-hidden />
         <h3 className="text-[13px] font-medium">{t('schemas.board.title')}</h3>

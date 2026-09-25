@@ -16,7 +16,6 @@ public class AlertEventResponse {
     /** The rule that fired, or null for an event Railhook raised on its own. */
     private UUID alertRuleId;
     private UUID projectId;
-    /** The endpoint the event is about, when it is about one. */
     private UUID endpointId;
     private AlertSeverity severity;
     private String title;

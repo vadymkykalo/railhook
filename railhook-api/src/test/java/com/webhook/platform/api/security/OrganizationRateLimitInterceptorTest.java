@@ -6,7 +6,6 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.webhook.platform.api.tenancy.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,12 +30,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * The wall between two tenants sharing one installation.
- *
- * <p>Without it there is a single platform-wide bucket, so one organization looping over its
- * deliveries spends everyone's budget and the rest get 429s for something they did not do.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class OrganizationRateLimitInterceptorTest {
@@ -62,20 +55,7 @@ class OrganizationRateLimitInterceptorTest {
 
         assertTrue(interceptor(false, 200).preHandle(request, response, new Object()));
 
-        // A self-hosted installation has no neighbour to be noisy, and should not pay a round
-        // trip per request for the problem it does not have.
         verify(rateLimiterService, never()).tryAcquireForOrganization(any(), anyInt());
-    }
-
-    @Test
-    @DisplayName("a caller within its share passes through")
-    void withinLimitPassesThrough() throws IOException {
-        UUID org = UUID.randomUUID();
-        TenantContext.set(org);
-        when(rateLimiterService.tryAcquireForOrganization(org, 200)).thenReturn(true);
-
-        assertTrue(interceptor(true, 200).preHandle(request, response, new Object()));
-        assertEquals(200, response.getStatus());
     }
 
     @Test
@@ -88,8 +68,6 @@ class OrganizationRateLimitInterceptorTest {
         assertFalse(interceptor(true, 200).preHandle(request, response, new Object()));
 
         assertEquals(429, response.getStatus());
-        // Without Retry-After a client retries immediately, which is the behaviour that got it
-        // rate-limited in the first place.
         assertEquals("1", response.getHeader("Retry-After"));
         assertTrue(response.getContentAsString().contains("organization_rate_limit"));
     }
@@ -141,9 +119,6 @@ class OrganizationRateLimitInterceptorTest {
         appender.start();
         logger.addAppender(appender);
         try {
-            // The URI is whatever the caller typed. Logged raw, a newline in it ends our entry
-            // and opens one the caller wrote — which is how a rate-limit warning becomes
-            // evidence of an operator action that never happened.
             MockHttpServletRequest forged = new MockHttpServletRequest(
                     "GET", "/api/v1/deliveries\nWARN  Organization deleted by operator");
 

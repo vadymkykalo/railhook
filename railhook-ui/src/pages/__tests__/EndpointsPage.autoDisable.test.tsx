@@ -40,7 +40,6 @@ const PROJECT: ProjectResponse = {
   updatedAt: NOW,
 };
 
-/** Turned off by its owner: a configuration state, and nothing to explain. */
 const MANUALLY_OFF: EndpointResponse = {
   id: 'endpoint-off',
   projectId: TEST_PROJECT_ID,
@@ -50,7 +49,6 @@ const MANUALLY_OFF: EndpointResponse = {
   updatedAt: NOW,
 };
 
-/** Turned off by Railhook, which the owner did not ask for and has to be told about. */
 const AUTO_DISABLED: EndpointResponse = {
   ...MANUALLY_OFF,
   id: 'endpoint-dead',
@@ -75,11 +73,6 @@ function render() {
   });
 }
 
-/**
- * An auto-disable is the one thing on this page the owner did not do themselves, so the two
- * states it could be confused with — on, and switched off on purpose — are what these assert
- * against.
- */
 describe('EndpointsPage — an endpoint Railhook turned off', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -106,9 +99,7 @@ describe('EndpointsPage — an endpoint Railhook turned off', () => {
   });
 
   it('re-enabling goes through the enable call, not a rebuilt update', async () => {
-    // The update request requires a URL, so toggling through it means resending the endpoint
-    // from whatever fields this page happens to render — which is how allowedSourceIps and
-    // signatureScheme used to be silently dropped by a click on the power button.
+    // Toggling through update used to drop allowedSourceIps and signatureScheme.
     vi.mocked(endpointsApi.listPaged).mockResolvedValue(page([AUTO_DISABLED]));
     vi.mocked(endpointsApi.enable).mockResolvedValue({ ...AUTO_DISABLED, enabled: true });
 

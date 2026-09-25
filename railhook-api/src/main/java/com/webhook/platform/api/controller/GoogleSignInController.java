@@ -24,11 +24,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * The browser-facing half of "Continue with Google". The dashboard's half — trading the one-time
- * code for a session — is {@code POST /api/v1/auth/oauth/exchange} on {@link AuthController},
- * beside the other endpoints that set the refresh cookie.
- */
 @RestController
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Authentication", description = "User registration and login")

@@ -15,7 +15,7 @@ use Railhook\Api\PortalSessions;
 
 class Railhook
 {
-    private const SDK_VERSION = '2.30.2';
+    private const SDK_VERSION = '2.31.0';
 
     private string $apiKey;
     private string $baseUrl;
@@ -53,41 +53,31 @@ class Railhook
         $this->portalSessions = new PortalSessions($this);
     }
 
-    /**
-     * Generic GET request. Use for endpoints not yet covered by the SDK.
-     */
+    /** Generic GET request. Use for endpoints not yet covered by the SDK. */
     public function get(string $path, ?array $queryParams = null): mixed
     {
         return $this->request('GET', $path, queryParams: $queryParams);
     }
 
-    /**
-     * Generic POST request. Use for endpoints not yet covered by the SDK.
-     */
+    /** Generic POST request. Use for endpoints not yet covered by the SDK. */
     public function post(string $path, ?array $body = null, ?string $idempotencyKey = null): mixed
     {
         return $this->request('POST', $path, body: $body, idempotencyKey: $idempotencyKey);
     }
 
-    /**
-     * Generic PUT request. Use for endpoints not yet covered by the SDK.
-     */
+    /** Generic PUT request. Use for endpoints not yet covered by the SDK. */
     public function put(string $path, ?array $body = null): mixed
     {
         return $this->request('PUT', $path, body: $body);
     }
 
-    /**
-     * Generic PATCH request. Use for endpoints not yet covered by the SDK.
-     */
+    /** Generic PATCH request. Use for endpoints not yet covered by the SDK. */
     public function patch(string $path, ?array $body = null): mixed
     {
         return $this->request('PATCH', $path, body: $body);
     }
 
-    /**
-     * Generic DELETE request. Use for endpoints not yet covered by the SDK.
-     */
+    /** Generic DELETE request. Use for endpoints not yet covered by the SDK. */
     public function delete(string $path): mixed
     {
         return $this->request('DELETE', $path);
@@ -187,10 +177,7 @@ class Railhook
         return $data;
     }
 
-    /**
-     * @return array{limit:int,remaining:int,reset:int}|null `reset` is a Unix
-     *         timestamp in **seconds** — the raw X-RateLimit-Reset value.
-     */
+    /** @return array{limit:int,remaining:int,reset:int}|null `reset` is Unix time in seconds */
     private function extractRateLimitInfo(string $headers): ?array
     {
         $limit = null;
@@ -222,16 +209,13 @@ class Railhook
             401 => new Exception\AuthenticationException($message),
             404 => new Exception\NotFoundException($message),
             429 => new Exception\RateLimitException($message, $rateLimitInfo ?? [
-                // `reset` is a Unix timestamp in seconds, matching the raw
-                // X-RateLimit-Reset header — not milliseconds.
+                // `reset` is in seconds, so the fallback is too.
                 'limit' => 0,
                 'remaining' => 0,
                 'reset' => time() + 60,
             ]),
             400 => new Exception\ValidationException($message, $body['fieldErrors'] ?? []),
-            // Everything the match does not name (403, 413, 422, 5xx) keeps the
-            // envelope's own `error` code, so getErrorCode() is not null for
-            // exactly the statuses the README's error table documents.
+            // Keeps the envelope's own `error` code, so getErrorCode() is set for 403, 413, 422 and 5xx.
             default => new Exception\RailhookException($message, $status, $body['error'] ?? null),
         };
     }

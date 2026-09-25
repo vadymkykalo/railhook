@@ -13,7 +13,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ExchangeSignInCodeRequest {
 
-    /** The one-time code the Google sign-in callback put in the dashboard's URL. */
     @NotBlank
     @Size(max = 128)
     private String code;

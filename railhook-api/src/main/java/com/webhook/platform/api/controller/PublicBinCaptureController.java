@@ -23,11 +23,7 @@ import java.util.Map;
 
 import static com.webhook.platform.api.filter.IngressRawBodyFilter.rawBody;
 
-/**
- * A public tester URL receiving a request. Under /hook/, so nginx already proxies it, the raw body
- * is kept as it arrived, and it is public; {@code /hook/{slug}} is a project's test endpoint, this
- * is {@code /hook/p/{slug}}.
- */
+/** Under /hook/ so nginx already proxies it and the raw body is kept as it arrived. */
 @RestController
 @RequestMapping("/hook/p")
 @Tag(name = "Webhook Tester", description = "Public webhook tester URLs that need no account")
@@ -35,7 +31,6 @@ import static com.webhook.platform.api.filter.IngressRawBodyFilter.rawBody;
 @RequiredArgsConstructor
 public class PublicBinCaptureController {
 
-    /** The same ceiling as a project's test endpoint. */
     private static final int RATE_LIMIT_PER_SECOND = 10;
     private static final String RATE_KEY_PREFIX = "public:";
 

@@ -31,8 +31,7 @@ class DeliveryConsumerTest {
     @BeforeEach
     void setUp() {
         webhookDeliveryService = mock(WebhookDeliveryService.class);
-        // Real executor, not mocked: the bug is about which thread the shutdown
-        // rejection is visible on, so a mock would hide it.
+        // Real executor: the shutdown bug is about which thread sees the rejection.
         asyncExecutor = new BoundedAsyncExecutor("test-delivery", 4, 5, new SimpleMeterRegistry());
         consumer = new DeliveryConsumer(webhookDeliveryService, asyncExecutor, mock(KafkaListenerEndpointRegistry.class));
     }
@@ -49,17 +48,11 @@ class DeliveryConsumerTest {
 
         assertDoesNotThrow(() -> consumer.consumeDispatch(message, "key", "deliveries.dispatch", null, ack));
 
-        Thread.sleep(200);
-        verify(webhookDeliveryService).processDelivery(message, false);
-        verify(ack).acknowledge();
+        verify(webhookDeliveryService, timeout(5000)).processDelivery(message, false);
+        verify(ack, timeout(5000)).acknowledge();
     }
 
-    /**
-     * A record the listener still receives while the worker stops is an ordinary record. The
-     * shutdown flag used to turn it into a not-retryable exception, which the error handler sends
-     * straight to the dead-letter topic — a topic nothing consumes — while the Delivery waited an
-     * hour for the stranded-PENDING sweep.
-     */
+    /** The shutdown flag used to send in-flight records to the unconsumed dead-letter topic. */
     @Test
     void aRecordArrivingWhileTheWorkerStops_isDelivered_notSentToTheDeadLetterTopic() {
         AttemptRunner runner = mock(AttemptRunner.class);
@@ -87,8 +80,6 @@ class DeliveryConsumerTest {
 
     @Test
     void consumeDispatch_shouldRescheduleAndAck_whenExecutorFull() throws Exception {
-        // Fill the pool (size 4) so the next submission is rejected — a
-        // rejected record must be explicitly rescheduled and acked, not left unacked.
         fillExecutorPool();
 
         DeliveryMessage message = dispatchMessage();

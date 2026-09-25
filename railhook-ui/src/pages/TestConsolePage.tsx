@@ -35,11 +35,7 @@ import { formatJson } from '../lib/json';
 
 type ConsoleMode = 'event' | 'ping' | 'verify';
 
-/**
- * Recomputes the signature Railhook would have sent and compares it to the one
- * that arrived. Entirely local — the secret never leaves the browser, which is
- * why this is arithmetic here rather than a call to the API.
- */
+/** Local on purpose: the secret never leaves the browser. */
 async function verifySignature(secret: string, signatureHeader: string, body: string): Promise<boolean> {
   const parts = signatureHeader.split(',');
   const v1Part = parts.find((p) => p.startsWith('v1,') || p.startsWith('v1=')) || parts[0];
@@ -60,7 +56,6 @@ interface DeliveryWithAttempts extends DeliveryResponse {
   endpointUrl?: string;
 }
 
-/** A delivery's status is a domain status; the console never invents one. */
 function labelKeyOfStatus(status: string): string {
   switch (status) {
     case 'SUCCESS': return 'testConsole.statusSuccess';
@@ -71,7 +66,6 @@ function labelKeyOfStatus(status: string): string {
   }
 }
 
-/** Worst-case across every delivery the event created — that is the verdict. */
 function rollUp(deliveries: DeliveryWithAttempts[]): StatusKind {
   if (deliveries.length === 0) return 'idle';
   const kinds = deliveries.map((d) => kindOfDeliveryStatus(d.status));
@@ -114,25 +108,21 @@ export default function TestConsolePage() {
 
   const [mode, setMode] = useState<ConsoleMode>('event');
 
-  // Send-event input
   const [eventType, setEventType] = useState('');
   const [payload, setPayload] = useState('{\n  "user_id": "123",\n  "action": "created"\n}');
   const [jsonError, setJsonError] = useState('');
   const [sending, setSending] = useState(false);
 
-  // Ping input
   const [selectedEndpointId, setSelectedEndpointId] = useState('');
   const [pinging, setPinging] = useState(false);
   const [pingResult, setPingResult] = useState<EndpointTestResponse | null>(null);
 
-  // Verify-signature input (all local; the secret never leaves the browser)
   const [secret, setSecret] = useState('');
   const [signatureHeader, setSignatureHeader] = useState('');
   const [signedBody, setSignedBody] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<boolean | null>(null);
 
-  // Result
   const [lastEvent, setLastEvent] = useState<EventResponse | null>(null);
   const [deliveries, setDeliveries] = useState<DeliveryWithAttempts[]>([]);
   const [loadingResults, setLoadingResults] = useState(false);
@@ -140,9 +130,7 @@ export default function TestConsolePage() {
   const [polling, setPolling] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // One polling run at a time. Each send starts a new run and bumps the counter; a timer or an
-  // in-flight response from an older run sees a stale number and stops, so an earlier event's
-  // deliveries can never overwrite a later one's, and nothing polls after the page is gone.
+  // Run counter: a timer or response from an older run sees a stale number and stops.
   const pollRun = useRef(0);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelPolling = useCallback(() => {
@@ -306,8 +294,7 @@ export default function TestConsolePage() {
 
   if (loading) return <PageSkeleton />;
 
-  // Every mode below sends to an endpoint out of these two fetches. Returning
-  // null on a failed one left the console blank with no way back.
+  // Returning null on a failed fetch left the console blank with no way back.
   if (projectFailed || endpointsFailed || !project) {
     return (
       <div className="p-4 lg:p-6">
@@ -386,7 +373,7 @@ export default function TestConsolePage() {
         </div>
 
         {eventType.trim() && (
-          <div className="rounded-lg border border-rail p-3">
+          <div className="border border-rail p-3">
             <p className="mono-label mb-2">{t('testConsole.expectedDeliveries')}</p>
             {matchingSubscriptions.length === 0 ? (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -566,8 +553,6 @@ export default function TestConsolePage() {
   );
 }
 
-// ── Signature verdict ──────────────────────────────────────────────
-
 function VerifyResult({ result, running }: { result: boolean | null; running: boolean }) {
   const { t } = useTranslation();
 
@@ -593,8 +578,6 @@ function VerifyResult({ result, running }: { result: boolean | null; running: bo
     </ResultFrame>
   );
 }
-
-// ── Result ─────────────────────────────────────────────────────────
 
 function ResultsPanel({
   mode, lastEvent, deliveries, pingResult, busy, polling,
@@ -626,7 +609,7 @@ function ResultsPanel({
 
   if (busy && !lastEvent && !pingResult) {
     return (
-      <div className="min-h-[320px] space-y-3 rounded-xl border border-dashed border-rail p-4" aria-busy="true">
+      <div className="min-h-[320px] space-y-3 border border-dashed border-rail p-4" aria-busy="true">
         <p className="text-sm text-muted-foreground">{t('testConsole.processing')}</p>
         <SkeletonRows count={3} height="h-20" />
       </div>
@@ -651,7 +634,7 @@ function ResultsPanel({
         }
       >
         {pingResult.message && (
-          <div className="rounded-lg border border-rail bg-muted/40 p-3">
+          <div className="border border-rail bg-muted/40 p-3">
             <p className="mono-label mb-1">{t('testConsole.message')}</p>
             <p className="text-sm">{pingResult.message}</p>
           </div>
@@ -675,7 +658,7 @@ function ResultsPanel({
           </OutputBlock>
         )}
         {pingResult.errorMessage && (
-          <div className="rounded-lg border border-halt/30 bg-halt-soft p-3">
+          <div className="border border-halt/30 bg-halt-soft p-3">
             <p className="mono-label mb-1">{t('testConsole.error')}</p>
             <p className="text-sm text-halt">{pingResult.errorMessage}</p>
           </div>
@@ -741,7 +724,7 @@ function ResultsPanel({
           ))}
         </div>
       ) : !polling && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-rail bg-muted/40 p-3">
+        <div className="flex items-start gap-2.5 border border-rail bg-muted/40 p-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
           <div>
             <p className="text-sm font-medium">{t('testConsole.noDeliveries')}</p>
@@ -752,8 +735,6 @@ function ResultsPanel({
     </ResultFrame>
   );
 }
-
-// ── One delivery ───────────────────────────────────────────────────
 
 function DeliveryCard({
   delivery, expanded, onToggle, getEndpointUrl, copiedId, copyText,
@@ -772,7 +753,7 @@ function DeliveryCard({
   const ticks = railTicks(delivery);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-rail">
+    <div className="overflow-hidden border border-rail">
       <button
         type="button"
         onClick={onToggle}
@@ -839,7 +820,7 @@ function AttemptDetail({
   const isSuccess = attempt.httpStatusCode != null && attempt.httpStatusCode >= 200 && attempt.httpStatusCode < 300;
 
   return (
-    <div className="space-y-2 rounded-lg border border-rail bg-card p-3">
+    <div className="space-y-2 border border-rail bg-card p-3">
       <div className="flex items-center gap-2 text-xs">
         <StatusBadge
           kind={isSuccess ? 'ok' : attempt.httpStatusCode != null || attempt.errorMessage ? 'halt' : 'idle'}

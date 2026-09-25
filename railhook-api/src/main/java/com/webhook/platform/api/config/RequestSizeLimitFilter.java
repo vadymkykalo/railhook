@@ -38,7 +38,6 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
         long effectiveLimit = resolveLimit(request);
-        // Fast path: reject if Content-Length header is present and exceeds the limit
         long contentLength = request.getContentLengthLong();
         if (contentLength > effectiveLimit) {
             log.warn("Request rejected: Content-Length {} exceeds max payload size {} bytes (URI: {})",
@@ -47,7 +46,7 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Wrap request to enforce size limit at stream level (handles chunked transfer)
+        // Chunked bodies carry no Content-Length, so the stream is counted too.
         HttpServletRequest wrappedRequest = new ContentLimitedRequestWrapper(request, effectiveLimit);
 
         try {
@@ -59,7 +58,6 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
                 rejectRequest(response, effectiveLimit);
             }
         } catch (ServletException e) {
-            // Unwrap nested PayloadTooLargeException from framework wrapping
             if (hasPayloadTooLargeCause(e)) {
                 log.warn("Request rejected mid-stream: body exceeds max payload size {} bytes (URI: {})",
                         effectiveLimit, request.getRequestURI());
@@ -99,18 +97,12 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
         return false;
     }
 
-    /**
-     * IOException subclass thrown when the request body exceeds the size limit.
-     */
     public static class PayloadTooLargeException extends IOException {
         public PayloadTooLargeException(long limit) {
             super("Request body exceeds maximum allowed size of " + limit + " bytes");
         }
     }
 
-    /**
-     * Request wrapper that returns a size-limited input stream.
-     */
     private static class ContentLimitedRequestWrapper extends HttpServletRequestWrapper {
 
         private final long maxBytes;
@@ -132,11 +124,6 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    /**
-     * ServletInputStream wrapper that counts bytes and throws
-     * PayloadTooLargeException
-     * when the limit is exceeded.
-     */
     private static class LimitedServletInputStream extends ServletInputStream {
 
         private final ServletInputStream delegate;

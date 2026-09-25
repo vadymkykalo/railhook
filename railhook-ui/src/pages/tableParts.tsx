@@ -10,21 +10,6 @@ import { formatRelativeTime, formatDateTime, formatRelativeFuture } from '../lib
 import { showSuccess } from '../lib/toast';
 import { cn } from '../lib/utils';
 
-/**
- * The pieces every record list on this section shares.
- *
- * Events, Deliveries, the DLQ and Incoming events are four views of two
- * obligations, so they are one table shape rather than four: the same id cell
- * you can actually copy, the same filter row above the table, the same
- * selection column and count. Outgoing and incoming differ in what they carry,
- * never in how a person reads them.
- */
-
-/**
- * An id a person can use: a short mono prefix, a copy control, and — when the
- * record has a detail view — a link to it. Truncation without a copy control is
- * what made the old "ev0…" column useless.
- */
 export function CopyId({
   value,
   to,
@@ -74,12 +59,7 @@ export function CopyId({
   );
 }
 
-/**
- * The filter row. Above the table, on the page ground — never inside a card.
- *
- * On a phone four full-width fields pushed the first record below the fold, so there the row
- * folds behind a Filters button; from `sm` it is the same row it always was.
- */
+/** On a phone the row folds behind a Filters button, or the first record falls below the fold. */
 export function FilterBar({ children, className }: { children: ReactNode; className?: string }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -157,7 +137,6 @@ export function SearchField({
   );
 }
 
-/** Selection column control. Native checkbox, so it is keyboard- and SR-native. */
 export function SelectBox({
   checked, indeterminate = false, onChange, label,
 }: {
@@ -179,7 +158,6 @@ export function SelectBox({
   );
 }
 
-/** What a selection can be done to, and to how many. */
 export function SelectionBar({
   count, onClear, children,
 }: {
@@ -190,7 +168,7 @@ export function SelectionBar({
   const { t } = useTranslation();
   if (count === 0) return null;
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+    <div className="mb-3 flex flex-wrap items-center gap-3 border border-primary/30 bg-primary/5 px-3 py-2">
       <span className="font-mono text-[13px] text-foreground">
         {t('common.selectedCount', { count })}
       </span>
@@ -200,7 +178,6 @@ export function SelectionBar({
   );
 }
 
-/** Relative time over the exact stamp — both, because operators need both. */
 export function TimeCell({ value }: { value: string }) {
   return (
     <span className="flex flex-col">
@@ -210,10 +187,6 @@ export function TimeCell({ value }: { value: string }) {
   );
 }
 
-/**
- * The attempt rail as a table cell: how far along the ladder this obligation
- * is, and when the next rung falls due.
- */
 export function AttemptCell({
   rail, maxAttempts, attemptCount, ladderLength, nextRetryAt,
 }: {
@@ -240,9 +213,5 @@ export function AttemptCell({
   );
 }
 
-/**
- * SortableTableHead renders a bare `<th>` rather than `TableHead`, so it does
- * not inherit the mono column-head style. Every sortable column in these
- * tables sits next to plain `TableHead` cells and has to match them.
- */
+/** SortableTableHead renders a bare <th>, so it needs TableHead's style by hand. */
 export const SORTABLE_HEAD_CLASS = 'h-9 font-mono text-[11px] uppercase tracking-[0.08em]';

@@ -63,13 +63,6 @@ function renderApiKeys() {
   });
 }
 
-/**
- * Rolling a key over used to be a create-then-revoke race the user ran by hand, because the API
- * offered nothing else. These cover the two halves the UI is responsible for: offering the
- * rotation at all, and then being honest about the key it just retired — a key inside its grace
- * window is still working, and showing it as merely "expiring" would tell somebody they are safe
- * to ignore a credential that is very much live.
- */
 describe('ApiKeysPage — rotation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -92,7 +85,6 @@ describe('ApiKeysPage — rotation', () => {
     await waitFor(() =>
       expect(apiKeysApi.rotate).toHaveBeenCalledWith(TEST_PROJECT_ID, 'key-1', { gracePeriodHours: 24 })
     );
-    // Straight into the same one-and-only-sighting dialog the create flow uses.
     expect(await screen.findByText('hf_new_thereal_plaintext')).toBeInTheDocument();
   });
 
@@ -104,11 +96,7 @@ describe('ApiKeysPage — rotation', () => {
     await screen.findByText('production ingest');
     await user.click(screen.getByRole('button', { name: /Rotate production ingest/i }));
 
-    /* Defaulting to zero would make the safe-looking action -- click rotate, accept the
-       default -- the one that breaks every caller still holding the old key. The Radix select
-       stays closed in jsdom (see DeliveriesPage.i18n.test.tsx), so this reads the trigger's
-       label rather than opening the list; what each window value does to the retiring key is
-       ApiKeyRotationTest's job. */
+    /* The Radix select stays closed in jsdom, so this reads the trigger's label. */
     expect(screen.getByRole('combobox', { name: /Keep the old key working for/i }))
       .toHaveTextContent('24 hours');
   });
@@ -121,8 +109,6 @@ describe('ApiKeysPage — rotation', () => {
 
     renderApiKeys();
 
-    /* It is still a working credential until the window closes, and it is working alongside its
-       replacement. "Expires tomorrow" would read as "nothing to do here". */
     expect(await screen.findByText('Retiring')).toBeInTheDocument();
     expect(screen.getByText(/Replaced by a newer key/i)).toBeInTheDocument();
   });
@@ -135,8 +121,6 @@ describe('ApiKeysPage — rotation', () => {
     renderApiKeys();
     await screen.findByText('production ingest');
 
-    /* A second rotation would leave the first replacement live, unnamed by any successor chain
-       and about to be forgotten -- the server refuses it, and the UI does not dangle it. */
     expect(screen.queryByRole('button', { name: /Rotate production ingest/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Revoke production ingest/i })).toBeInTheDocument();
   });

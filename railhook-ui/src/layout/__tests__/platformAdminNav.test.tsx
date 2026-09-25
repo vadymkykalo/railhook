@@ -35,7 +35,6 @@ describe('the platform admin entry', () => {
   });
 
   it('is not offered to an organization owner who is not one', () => {
-    // OWNER is the most privileged tenant role, and still not the deployment's operator.
     renderSidebar(false);
     expect(screen.queryByRole('link', { name: 'Platform admin' })).not.toBeInTheDocument();
   });

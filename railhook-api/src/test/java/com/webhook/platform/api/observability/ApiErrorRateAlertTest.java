@@ -13,16 +13,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * ApiErrorRateHigh is the critical page for the API, and it paged on 2026-09-18 for three requests.
- *
- * <p>A tunnel relays the answer of a server on the customer's own machine, and answers 503 while
- * no client is connected — a customer's dev server returning 500, or their laptop being shut,
- * counted as Railhook failing. On a quiet deployment three such requests were 2% of traffic.
- *
- * <p>The page then said "0.02% of requests returning 5xx" under a 0.5% threshold: the expression
- * is a ratio and the template printed it with a percent sign.
- */
+// Tunnel 5xx relay the customer's own server, and the ratio used to print as a percent.
 class ApiErrorRateAlertTest {
 
     private static final List<Path> RULE_FILES = List.of(
@@ -41,11 +32,7 @@ class ApiErrorRateAlertTest {
         }
     }
 
-    /**
-     * It paged again on 2026-09-21 and 2026-09-22 for two or three requests: an MCP client's
-     * probe answered 500, at about 220 requests in fifteen minutes. A ratio alone cannot tell a
-     * quiet deployment's two failures from an outage, so the rule also wants a floor of errors.
-     */
+    // A ratio alone cannot tell a quiet deployment's two failures from an outage.
     @Test
     @DisplayName("two or three errors on a quiet deployment do not page")
     void aFewErrorsDoNotPage() throws IOException {

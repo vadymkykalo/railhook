@@ -43,7 +43,6 @@ const TIMELINE_ICON: Record<IncidentTimelineType, React.ElementType> = {
   STATUS_CHANGE: ArrowRight,
 };
 
-/** A timeline entry's type is a lifecycle state, so it maps onto the same four. */
 const TIMELINE_KIND = {
   FAILURE: 'halt',
   RETRY: 'retry',
@@ -79,10 +78,7 @@ export default function IncidentsPage() {
   const { data: expandedIncident } = useIncident(projectId, expandedId ?? undefined);
 
   const incidents = incidentsData?.content ?? [];
-  // All three come from the server, all three span the project. They used to be one real
-  // count beside two derived from `incidents` — which is one page of a filtered list, so a
-  // project with more open incidents than fit on a page read "Critical: 0" with a critical
-  // incident open on page two.
+  // Server counts span the project: counting one filtered page undercounted critical incidents.
   const openIncidents = openCount?.count ?? 0;
   const investigating = openCount?.investigating ?? 0;
   const critical = openCount?.critical ?? 0;
@@ -181,12 +177,11 @@ export default function IncidentsPage() {
           />
         </div>
 
-        {/* One filter row, above what it scopes. */}
         <div className="flex flex-wrap items-center gap-2">
           <div
             role="group"
             aria-label={t('incidents.filterLabel')}
-            className="inline-flex rounded-lg border border-rail bg-card p-0.5"
+            className="inline-flex border border-rail bg-card p-0.5"
           >
             {([true, false] as const).map((only) => (
               <button
@@ -195,7 +190,7 @@ export default function IncidentsPage() {
                 onClick={() => { setOpenOnly(only); setPage(0); }}
                 aria-pressed={openOnly === only}
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-xs transition-colors',
+                  'px-3 py-1.5 text-xs transition-colors',
                   openOnly === only
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground'
@@ -238,10 +233,9 @@ export default function IncidentsPage() {
                     onClick={() => setExpandedId(isExpanded ? null : incident.id)}
                     aria-expanded={isExpanded}
                   >
-                    {/* The severity rule: colour and position, before any words. */}
                     <span
                       aria-hidden
-                      className={cn('mt-0.5 h-9 w-1 flex-shrink-0 rounded-full', STATUS_FILL[severityKind])}
+                      className={cn('mt-0.5 h-9 w-1 flex-shrink-0', STATUS_FILL[severityKind])}
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{incident.title}</span>
@@ -320,7 +314,7 @@ export default function IncidentsPage() {
                               const kind = TIMELINE_KIND[entry.entryType] ?? 'idle';
                               return (
                                 <li key={entry.id} className="relative">
-                                  <span className="absolute -left-[31px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-rail bg-card">
+                                  <span className="absolute -left-[31px] top-0.5 flex h-4 w-4 items-center justify-center border border-rail bg-card">
                                     <EntryIcon className={cn('h-2.5 w-2.5', STATUS_TEXT[kind])} aria-hidden />
                                   </span>
                                   <span className="flex flex-wrap items-baseline gap-2">

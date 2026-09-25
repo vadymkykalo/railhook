@@ -11,10 +11,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
-/**
- * Utility for JSON Schema operations: inference from payloads, fingerprinting,
- * diff computation, breaking change detection, and payload validation.
- */
 public final class JsonSchemaUtils {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -22,12 +18,6 @@ public final class JsonSchemaUtils {
     private JsonSchemaUtils() {
     }
 
-    // ── Schema Inference ──
-
-    /**
-     * Infers a JSON Schema (draft-07 style) from a sample payload.
-     * Returns a schema object with type, properties, required fields.
-     */
     public static ObjectNode inferSchema(String payloadJson) throws JsonProcessingException {
         JsonNode payload = MAPPER.readTree(payloadJson);
         return inferNodeSchema(payload);
@@ -73,12 +63,7 @@ public final class JsonSchemaUtils {
         return schema;
     }
 
-    // ── Fingerprinting ──
-
-    /**
-     * Computes a SHA-256 fingerprint of a normalized JSON Schema.
-     * Normalization: remove description/title fields, sort keys deterministically.
-     */
+    /** SHA-256 of the schema with cosmetic fields removed and keys sorted. */
     public static String fingerprint(String schemaJson) throws JsonProcessingException {
         JsonNode schema = MAPPER.readTree(schemaJson);
         JsonNode normalized = normalizeForFingerprint(schema);
@@ -104,7 +89,6 @@ public final class JsonSchemaUtils {
             while (fields.hasNext()) {
                 Map.Entry<String, JsonNode> field = fields.next();
                 String key = field.getKey();
-                // strip cosmetic fields
                 if ("description".equals(key) || "title".equals(key) || "$comment".equals(key)) {
                     continue;
                 }
@@ -123,23 +107,13 @@ public final class JsonSchemaUtils {
         return node;
     }
 
-    // ── Schema Diff ──
-
     /**
-     * Computes the diff between two JSON Schemas.
+     * {@code required} is read from the owning object's own array, not the root's: reading the
+     * root's once marked every nested field optional.
      *
-     * <p>Five buckets, because a compatibility rule has to tell them apart: properties the new
-     * schema added, properties it dropped, properties whose type it changed, properties it made
-     * required that were optional before ({@code tightened}), and properties it made optional
-     * that were required before ({@code relaxed}). Whether a property is required is read from
-     * the {@code required} array of the object that owns it, not the root's — a nested object
-     * has its own, and reading the root's marked every nested field optional.
-     *
-     * <p>{@code breaking} is the union of the four that cost somebody something: it answers
-     * "would any consumer of either schema notice?", which is what the schema-changes board
-     * shows. The narrower question — "is this allowed under the compatibility mode this version
-     * declares?" — is answered by {@code CompatibilityMode}, which reads the buckets separately,
-     * because the two directions disagree about which of them matter.
+     * <p>{@code breaking} answers "would any consumer notice?". Whether a change is allowed under a
+     * version's compatibility mode is {@code CompatibilityMode}'s question, and it reads the buckets
+     * separately because the two directions disagree about which matter.
      */
     public static SchemaDiff diff(String oldSchemaJson, String newSchemaJson) throws JsonProcessingException {
         JsonNode oldSchema = MAPPER.readTree(oldSchemaJson);
@@ -187,9 +161,6 @@ public final class JsonSchemaUtils {
         return new SchemaDiff(added, removed, changed, tightened, relaxed, breaking);
     }
 
-    /**
-     * Serializes a SchemaDiff to JSON string for storage.
-     */
     public static String diffToJson(SchemaDiff diff) {
         try {
             ObjectNode json = MAPPER.createObjectNode();
@@ -205,17 +176,7 @@ public final class JsonSchemaUtils {
         }
     }
 
-    // ── Payload Validation ──
-
-    /**
-     * Validates a payload against a JSON Schema.
-     * Returns a list of validation errors. Empty list = valid.
-     * <p>
-     * This is a lightweight validator that checks:
-     * - required fields present
-     * - type matches (string, number, integer, boolean, array, object, null)
-     * - nested object validation
-     */
+    /** A lightweight check: required fields, types and nesting. Empty means valid. */
     public static List<String> validate(String payloadJson, String schemaJson) {
         try {
             JsonNode payload = MAPPER.readTree(payloadJson);
@@ -237,7 +198,6 @@ public final class JsonSchemaUtils {
         }
 
         if ("object".equals(expectedType) && payload.isObject()) {
-            // Check required fields
             if (schema.has("required") && schema.get("required").isArray()) {
                 for (JsonNode req : schema.get("required")) {
                     String fieldName = req.asText();
@@ -247,7 +207,6 @@ public final class JsonSchemaUtils {
                 }
             }
 
-            // Validate each property
             if (schema.has("properties") && schema.get("properties").isObject()) {
                 Iterator<Map.Entry<String, JsonNode>> props = schema.get("properties").fields();
                 while (props.hasNext()) {
@@ -292,12 +251,6 @@ public final class JsonSchemaUtils {
         return "unknown";
     }
 
-    // ── Helpers ──
-
-    /**
-     * Every property in the schema, keyed by JSONPath, each carrying its declared type and
-     * whether the object that owns it lists it as required.
-     */
     private static Map<String, Property> flattenProperties(JsonNode schema, String prefix) {
         Map<String, Property> result = new LinkedHashMap<>();
         if (schema.has("properties") && schema.get("properties").isObject()) {
@@ -307,7 +260,6 @@ public final class JsonSchemaUtils {
                 Map.Entry<String, JsonNode> field = fields.next();
                 String path = prefix + "." + field.getKey();
                 result.put(path, new Property(getType(field.getValue()), required.contains(field.getKey())));
-                // Recurse into nested objects
                 if (field.getValue().has("type") && "object".equals(field.getValue().get("type").asText())) {
                     result.putAll(flattenProperties(field.getValue(), path));
                 }
@@ -335,18 +287,9 @@ public final class JsonSchemaUtils {
 
     private record Property(String type, boolean required) {}
 
-    // ── Data classes ──
-
     public record FieldChange(String path, String type, String oldType, boolean required) {}
 
-    /**
-     * @param added     properties the new schema has and the old one did not
-     * @param removed   properties the old schema had and the new one does not
-     * @param changed   properties whose declared type differs between the two
-     * @param tightened properties the new schema requires that the old one left optional
-     * @param relaxed   properties the new schema leaves optional that the old one required
-     * @param breaking  true when a consumer of either schema could notice the difference
-     */
+    /** {@code tightened}: newly required. {@code relaxed}: newly optional. */
     public record SchemaDiff(
             List<FieldChange> added,
             List<FieldChange> removed,

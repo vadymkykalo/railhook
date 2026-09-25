@@ -1,15 +1,4 @@
 ---
-/**
- * Every environment variable in `.env.dist`, searchable, grouped by its section there.
- *
- * Rendered from `src/data/env-reference.json`, which `scripts/env-reference.mjs` derives from
- * `.env.dist` — so a variable is documented by writing its comment in `.env.dist`, never here.
- * The descriptions are the file's own comments and stay in English on the Ukrainian page;
- * the table chrome is translated.
- *
- *   import EnvReference from '../../../components/EnvReference.astro';     (EN page)
- *   import EnvReference from '../../../../components/EnvReference.astro';  (uk/ page)
- */
 import data from '../data/env-reference.json';
 import { envParagraphs as paragraphs, envSectionId as slug } from './env-paragraphs.mjs';
 
@@ -41,33 +30,6 @@ const t = uk
     };
 
 const total = data.sections.reduce((n, s) => n + s.variables.length, 0);
-
-/**
- * Hard-wrapped comment lines back into paragraphs. An indented line is an example
- * (`  WEBHOOK_TRUSTED_PROXIES=10.0.0.5,…`), so a run of them is kept verbatim as code while
- * the prose around it is rejoined.
- */
-function paragraphs(/** @type {string} */ text) {
-  /** @type {Array<{ code: boolean, text: string }>} */
-  const blocks = [];
-  for (const para of text.split('\n\n').filter(Boolean)) {
-    for (const line of para.split('\n')) {
-      const code = /^\s{2,}/.test(line);
-      const last = blocks.at(-1);
-      if (last && last.code === code && !last.text.endsWith('\n\n')) {
-        last.text += code ? `\n${line}` : ` ${line.trim()}`;
-      } else {
-        blocks.push({ code, text: code ? line : line.trim() });
-      }
-    }
-    const last = blocks.at(-1);
-    if (last) last.text += '\n\n';
-  }
-  return blocks.map((b) => ({ code: b.code, text: b.code ? b.text.replace(/\n+$/, '') : b.text.trim() }));
-}
-
-const slug = (/** @type {string} */ title) =>
-  `env-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 ---
 
 <div
@@ -198,7 +160,7 @@ const slug = (/** @type {string} */ title) =>
     gap: 0.75rem;
     padding: 0.5rem;
     border: 1px solid var(--sl-color-hairline);
-    border-radius: var(--rh-radius-card, 16px);
+    border-radius: 0;
     background: var(--sl-color-bg);
   }
   .env-ref__search {
@@ -209,13 +171,13 @@ const slug = (/** @type {string} */ title) =>
     font: inherit;
     font-size: var(--sl-text-sm);
     color: var(--sl-color-white);
-    background: var(--rh-mist, var(--sl-color-bg-sidebar));
-    border: 1px solid var(--rh-rail-strong, var(--sl-color-gray-5));
-    border-radius: var(--rh-radius-control, 10px);
+    background: var(--rh-soft, var(--sl-color-gray-7));
+    border: 1px solid var(--rh-line-strong, var(--sl-color-gray-5));
+    border-radius: 0;
     padding: 0.5rem 0.75rem;
   }
   .env-ref__search input:focus-visible {
-    outline: 2px solid var(--sl-color-accent);
+    outline: 2px solid var(--sl-color-white);
     outline-offset: 1px;
   }
   .env-ref__count {
@@ -226,14 +188,14 @@ const slug = (/** @type {string} */ title) =>
   }
   .env-ref__section h3 {
     font-size: var(--sl-text-lg);
-    font-weight: 600;
+    font-weight: 500;
     color: var(--sl-color-white);
     margin: 0 0 0.625rem;
   }
   .env-ref__scroll {
     overflow-x: auto;
     border: 1px solid var(--sl-color-hairline);
-    border-radius: var(--rh-radius-card, 16px);
+    border-radius: 0;
   }
   table {
     width: 100%;
@@ -243,10 +205,13 @@ const slug = (/** @type {string} */ title) =>
   }
   th {
     text-align: start;
-    font-weight: 500;
-    font-size: var(--sl-text-xs);
+    font-family: var(--__sl-font-mono);
+    font-weight: 400;
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     color: var(--sl-color-gray-3);
-    background: var(--rh-mist, var(--sl-color-bg-sidebar));
+    background: var(--rh-soft, var(--sl-color-gray-7));
     padding: 0.625rem 1rem;
     border-bottom: 1px solid var(--sl-color-hairline);
   }
@@ -259,7 +224,8 @@ const slug = (/** @type {string} */ title) =>
     border-bottom: 0;
   }
   tr:target td {
-    background: var(--sl-color-accent-low);
+    background: var(--rh-hl, var(--sl-color-accent-low));
+    color: #000;
   }
   code {
     font-family: var(--__sl-font-mono);

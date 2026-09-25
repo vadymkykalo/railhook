@@ -26,11 +26,8 @@ public class AuditLogRetentionJob {
         this.retentionDays = retentionDays;
     }
 
-    // This is a cron (not fixedDelay), so with a multi-thread scheduler pool and
-    // multiple API replicas it can genuinely fire concurrently. deleteByCreatedAtBefore is
-    // idempotent either way, but the lock avoids redundant duplicate DELETE work across
-    // replicas - same reasoning as every other retention job in DataRetentionService /
-    // RetentionCleanupScheduler, which are all already locked.
+    // A cron fires on every replica at once. The delete is idempotent; the lock only saves
+    // duplicate work.
     @SystemTenant
     @Scheduled(cron = "${audit.retention-cron:0 0 3 * * *}")
     @SchedulerLock(name = "audit-log-retention", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")

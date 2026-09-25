@@ -46,12 +46,9 @@ public class IncomingForwardAttempt {
     private Instant startedAt;
 
     /**
-     * Fencing token for whichever claim moved this row to PROCESSING (V060).
-     *
-     * <p>{@code finalise} writes only while this still matches the token its own attempt was
-     * claimed under, so an attempt a stuck sweep has already taken away cannot finalize a row
-     * that has since been reclaimed. Null when unclaimed. The outgoing counterpart is
-     * {@code deliveries.claim_token} (V055).</p>
+     * Fencing token of the claim that moved this row to PROCESSING. Finalising writes only while
+     * it still matches, so an attempt taken away by the stuck sweep cannot finalise a reclaimed
+     * row. Null when unclaimed.
      */
     @Column(name = "claim_token")
     private UUID claimToken;
@@ -59,14 +56,10 @@ public class IncomingForwardAttempt {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
-    /**
-     * Headers as they went to the Destination, already sanitised: this is shown in the
-     * dashboard, so the Destination's own credentials must be masked before they land here.
-     */
+    /** Shown in the dashboard, so the Destination's credentials are masked before they land here. */
     @Column(name = "request_headers_json", columnDefinition = "TEXT")
     private String requestHeadersJson;
 
-    /** The transformed body actually sent, capped the way {@code delivery_attempts} caps its own. */
     @Column(name = "request_body_snippet", columnDefinition = "TEXT")
     private String requestBodySnippet;
 
@@ -86,12 +79,8 @@ public class IncomingForwardAttempt {
     private Instant nextRetryAt;
 
     /**
-     * The Replay this Forward belongs to, null for one created by ingress (V064).
-     *
-     * <p>A Replay builds a fresh Forward with its own ladder starting at attempt 1, so its rows
-     * would otherwise collide by attempt number with the live ladder's. Every claim is scoped to
-     * this value, which is what stops two Replays of the same Incoming Event to the same
-     * Destination claiming each other's rows.</p>
+     * Null for a Forward created by ingress. A Replay's ladder restarts at attempt 1, so every
+     * claim is scoped to this value to keep Replays from claiming each other's rows.
      */
     @Column(name = "replay_session_id")
     private UUID replaySessionId;

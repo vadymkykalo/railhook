@@ -53,6 +53,9 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 
 @Service
 @Slf4j
@@ -109,8 +112,7 @@ public class IngressService {
         this.objectMapper = objectMapper;
         this.forwardDispatch = forwardDispatch;
         this.meterRegistry = meterRegistry;
-        // The same counter the /events path increments, so one series answers "how many events did
-        // we take in". Registered now, so a deployment that has not received a webhook exports 0.
+        // Shared with the /events path. Registered eagerly so an idle deployment exports 0.
         this.incomingEventsIngestedCounter = Counter.builder("events_ingested_total").tag("direction", "incoming")
                 .description("Events accepted, by the direction they travel").register(meterRegistry);
         this.verifierFactory = verifierFactory;
@@ -128,20 +130,9 @@ public class IngressService {
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
-    /**
-     * Only the writes (IncomingEvent + forward attempts + outbox) run inside a
-     * transaction. Token lookup, rate limiting, payload-size check, signature verification and
-     * replay-marking all happen first, on plain (non-transactional) reads and Redis round
-     * trips -- previously the whole method ran inside one transaction, so every invalid-token
-     * or rate-limited request held a Hikari connection for the duration of two Redis calls that
-     * never wrote anything (a cheap DoS on the connection pool).
-     */
+    // No transaction across the Redis checks, or rejected requests each pin a pool connection.
     public IngressOutcome receiveWebhook(String token, byte[] body, HttpServletRequest request) {
-        // Ingress has a tenant but no caller. Nothing has authenticated, so TenantContextFilter
-        // left the scope unset and the path token in the URL is the only thing that names an
-        // organization -- which means the lookup that finds it has to run without one. Everything
-        // after it is confined to the Source's organization, so the writes below (IncomingEvent,
-        // forward attempts, outbox) get the right tenant stamped on them by Hibernate.
+        // The path token is the only thing naming an organization, so this lookup runs as system.
         IncomingSource source = TenantContext.callAsSystem(() -> resolveActiveSource(token));
         return TenantContext.callAs(source.getOrganizationId(), () -> receiveVerifiedWebhook(source, body, request));
     }
@@ -153,7 +144,6 @@ public class IngressService {
         RequestMetadata meta = extractMetadata(body, request);
         VerificationOutcome verification = verify(source, body, request);
 
-        // Block immediately when signature verification is configured and not verified
         if (source.getVerificationMode() != VerificationMode.NONE && !Boolean.TRUE.equals(verification.verified())) {
             meterRegistry.counter("incoming_events_rejected_total",
                     "reason", "signature_verification_failed").increment();
@@ -164,14 +154,7 @@ public class IngressService {
             throw new SignatureVerificationFailedException("Signature verification failed: " + reason);
         }
 
-        // Slack's url_verification is answered here and goes no further. It is a handshake, not
-        // an event: storing it would forward a message no Destination can do anything with, and
-        // charge the Organization for it. So it runs ahead of dedup (it carries no event_id), the
-        // quota (a customer over quota can still connect their Slack app, since nothing is
-        // stored) and the replay check (that one marks a signature for a write that will not
-        // happen). Behind verification, and only when verification actually passed: an unverified
-        // request — including one to a Source with verification off — is never echoed back, so
-        // nobody can register someone else's ingress URL in their own Slack app.
+        // A handshake, never stored. Echoed only when verified, so nobody can claim another's URL.
         if (source.getProviderType() == ProviderType.SLACK && Boolean.TRUE.equals(verification.verified())) {
             String challenge = slackUrlVerificationChallenge(meta.body());
             if (challenge != null) {
@@ -180,22 +163,10 @@ public class IngressService {
             }
         }
 
-        // Extract provider event ID for dedup (well-known headers only, no body hash fallback).
-        // The decoded copy from extractMetadata, so the body is turned into a String exactly
-        // once: this reads JSON out of it, which needs characters, and nothing here has to
-        // agree with the sender byte for byte the way the signature does.
         String providerEventId = ProviderEventIdExtractor.extract(request, meta.body());
 
-        // Dedup: if same source + same provider event ID already exists, return existing
-        // (idempotent). Plain read, no explicit transaction needed.
-        //
-        // Ahead of the quota and the replay check, and behind verification. A provider resending
-        // an event it already delivered — GitHub, Shopify, Twilio and a raw-hex HMAC all sign the
-        // body alone, so the resend carries the very signature already marked as seen — was
-        // answered 401 "replay attack", or 429 once the organization was over quota, for a webhook
-        // Railhook already had. Neither check has anything to protect here: nothing is stored or
-        // charged. Verification still comes first, or a forged request could learn which provider
-        // ids exist.
+        // Before quota and replay checks, so a same-signature resend is not refused; after
+        // verification, so a forged request cannot probe which ids exist.
         if (providerEventId != null) {
             var existing = eventRepository.findByIncomingSourceIdAndProviderEventId(source.getId(), providerEventId);
             if (existing.isPresent()) {
@@ -206,12 +177,7 @@ public class IngressService {
             }
         }
 
-        // An Incoming Event is an Event the Organization is charged for, same as one it posts to
-        // /events itself. This runs inside the Source's tenant scope, which is the only thing on
-        // this path that names an organization: ingress is unauthenticated, so the AuthContext
-        // @RequireQuota resolves against does not exist here and the annotation would no-op.
-        // Before the replay check, because that one marks the signature as seen: refused here, the
-        // provider's retry once there is room again must not be taken for a replay.
+        // By hand, since ingress has no AuthContext; before the replay check so a retry is not a replay.
         entitlementService.checkEventQuota();
         rejectReplay(source, verification, providerEventId);
 
@@ -226,10 +192,7 @@ public class IngressService {
             if (recovered != null) {
                 return new IngressOutcome.Accepted(recovered);
             }
-            // Genuinely lost -- nothing was persisted and there's no existing row to fall back
-            // to. The replay marker (if any) must not stay burned for a webhook that never made
-            // it to disk, or the provider's legitimate resend gets rejected as a replay for the
-            // rest of the TTL window instead of just being retried.
+            // Nothing was stored, so the replay marker must not block the provider's resend.
             releaseReplayMarkerAfterFailedPersist(source, verification, providerEventId);
             throw e;
         } catch (RuntimeException e) {
@@ -238,7 +201,6 @@ public class IngressService {
         }
     }
 
-    /** The challenge of a {@code {"type":"url_verification","challenge":...}} body, or null for anything else. */
     private String slackUrlVerificationChallenge(String body) {
         if (body == null || body.isBlank()) {
             return null;
@@ -260,38 +222,27 @@ public class IngressService {
     private IncomingSource resolveActiveSource(String token) {
         IncomingSource source = sourceRepository.findByIngressPathToken(token)
                 .orElseThrow(() -> new SourceNotFoundException("Invalid ingress token"));
-        // A Source outlives its project's deletion as a row, not as an address: a deleted project
-        // is not found, so neither is anything that sends to it.
+        // The Source row outlives a deleted project; its address must not.
         if (!projectRepository.existsById(source.getProjectId())) {
             throw new SourceNotFoundException("Invalid ingress token");
         }
         if (source.getStatus() != IncomingSourceStatus.ACTIVE) {
             throw new SourceDisabledException("Source is disabled");
         }
-        // Ingest is what a suspension most needs to stop, and this path authenticates nobody, so
-        // the interceptor that refuses a suspended organization's writes never sees it.
+        // The suspension interceptor never sees this unauthenticated path.
         if (suspensionCheck.suspensionReason(source.getOrganizationId()).isPresent()) {
             log.warn("Rejecting incoming webhook: organization {} is suspended (sourceId={})",
                     source.getOrganizationId(), source.getId());
             throw new OrganizationSuspendedException("Organization is suspended");
         }
-        // The demo's Sources are on show with their ingress URLs, to everyone. Taking webhooks on
-        // them would let any visitor write into the read-only demo, and have the worker forward
-        // what they sent. Refused the way a suspension is: nothing here is accepting webhooks.
+        // Demo ingress URLs are public; accepting on them would let anyone write into the demo.
         if (DemoTenant.isDemoOrganization(source.getOrganizationId())) {
             throw new OrganizationSuspendedException("The demo organization does not take webhooks");
         }
         return source;
     }
 
-    /**
-     * Charges the Organization for the Incoming Event that just committed.
-     *
-     * <p>Deliberately fire-and-forget and deliberately after the commit, for the reason
-     * EventIngestService gives: the counter is an approximate Redis value that no rollback
-     * undoes, so charging inside the transaction billed for ingests that never happened. A
-     * webhook resolved by dedup never reaches here, because nothing new was stored.
-     */
+    // After commit: the Redis counter is not rolled back with the transaction.
     private void chargeQuotaPostCommit() {
         try {
             quotaCounterService.increment();
@@ -300,13 +251,7 @@ public class IngressService {
         }
     }
 
-    /**
-     * Per-source rate limiting, fail-closed: reject if Redis is down.
-     *
-     * <p>A Source that names no limit of its own gets the configured default rather than none.
-     * Until it did, the only thing standing between an unauthenticated {@code /ingress/{token}}
-     * and the database was one platform-wide bucket shared by every tenant.
-     */
+    /** Fail-closed. A Source without its own limit gets the default, never none. */
     private void enforceRateLimit(IncomingSource source) {
         int limit = source.getRateLimitPerSecond() != null && source.getRateLimitPerSecond() > 0
                 ? source.getRateLimitPerSecond()
@@ -320,7 +265,6 @@ public class IngressService {
     }
 
     private void enforcePayloadSize(byte[] body) {
-        // Bytes were always the right unit here; now they are also what we are holding.
         if (body != null && body.length > maxPayloadSizeBytes) {
             throw new PayloadTooLargeException("Payload exceeds maximum allowed size of " + maxPayloadSizeBytes + " bytes");
         }
@@ -331,17 +275,7 @@ public class IngressService {
                                     String headersJson, String bodySha256, String body, byte[] bodyBytes) {
     }
 
-    /**
-     * Decodes the body once, here, for the copy that is stored and shown to an operator, and keeps
-     * the bytes themselves whenever that copy cannot reproduce them.
-     *
-     * <p>Everything that has to agree with the sender byte for byte — the signature and the
-     * digest — is computed from {@code body} itself and never from this String. So is a Forward:
-     * for a body that is valid UTF-8 the text encodes back to exactly what arrived, and for any
-     * other body — another charset, binary, gzip — the bytes are stored beside it, because the
-     * text holds replacement characters. A NUL byte is valid UTF-8 but not something PostgreSQL
-     * text can hold, so such a body keeps its bytes too and its text shows the NUL replaced.
-     */
+    // Raw bytes are also kept when text cannot hold them: invalid UTF-8, or a NUL.
     private RequestMetadata extractMetadata(byte[] body, HttpServletRequest request) {
         String requestId = UUID.randomUUID().toString();
         String method = request.getMethod();
@@ -368,15 +302,15 @@ public class IngressService {
                 headersJson, bodySha256, storedBody, bodyBytes);
     }
 
-    /** The body as UTF-8 text, or null when it is not valid UTF-8 and decoding would lose bytes. */
+    /** Null when the body is not valid UTF-8. */
     private static String decodeUtf8Exactly(byte[] body) {
         try {
             return StandardCharsets.UTF_8.newDecoder()
-                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
-                    .decode(java.nio.ByteBuffer.wrap(body))
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(body))
                     .toString();
-        } catch (java.nio.charset.CharacterCodingException e) {
+        } catch (CharacterCodingException e) {
             return null;
         }
     }
@@ -384,15 +318,7 @@ public class IngressService {
     private record VerificationOutcome(Boolean verified, String verificationError, String replayKey) {
     }
 
-    /**
-     * Verifies the signature BEFORE dedup to prevent dedup poisoning (P0 security fix). An
-     * attacker could send a webhook with a known providerEventId but invalid signature; if we
-     * dedup/persist first, the poisoned record blocks the real webhook.
-     *
-     * <p>Marks nothing. Replay detection is {@link #rejectReplay}, run separately and only for a
-     * webhook that dedup did not resolve, because marking is a side effect a resend must not
-     * trip over.
-     */
+    // Before dedup, or a forged request with a known event id could poison it. Marks nothing.
     private VerificationOutcome verify(IncomingSource source, byte[] body, HttpServletRequest request) {
         Boolean verified = null;
         String verificationError = null;
@@ -417,28 +343,12 @@ public class IngressService {
         return new VerificationOutcome(verified, verificationError, replayKey);
     }
 
-    /**
-     * Unified replay detection for ALL verifiers (Generic, Stripe, GitHub, Slack, Shopify): a
-     * verified signature already seen is refused. Key = sourceId + SHA256(replayKey). TTL = 5 min
-     * (matches provider timestamp tolerance).
-     *
-     * <p>Only reached by a webhook that is about to be stored — dedup has already answered a
-     * resend that carries a provider event id — so what it still refuses is a captured request
-     * sent again as though it were new. The check marks the signature as seen as a side effect;
-     * if the write that's supposed to follow never commits, the caller must release this mark via
-     * {@link #releaseReplayMarkerAfterFailedPersist}.
-     */
-    /**
-     * The signature, and the provider's delivery id when it sent one. A signature over the body
-     * alone is the same for two genuine deliveries with byte-identical bodies — Shopify firing an
-     * order under two topics in one second, a sender posting a static payload — and keyed on the
-     * signature alone the second was refused as a replay. A replay repeats the id too, and dedup
-     * answers it before this check; the window this key guards is only five minutes either way.
-     */
+    // Includes the delivery id: two genuine identical bodies share a signature.
     private static String replayKey(VerificationOutcome verification, String providerEventId) {
         return providerEventId == null ? verification.replayKey() : verification.replayKey() + ":" + providerEventId;
     }
 
+    // Marks the signature as seen. If the write never commits, the caller must release the mark.
     private void rejectReplay(IncomingSource source, VerificationOutcome verification, String providerEventId) {
         if (Boolean.TRUE.equals(verification.verified()) && verification.replayKey() != null
                 && replayDetectionService.isReplay(source.getId().toString(), replayKey(verification, providerEventId))) {
@@ -472,12 +382,6 @@ public class IngressService {
         return null;
     }
 
-    /**
-     * Everything that must be transactional: persisting the IncomingEvent row and, if there are
-     * enabled destinations, the forward-attempt + outbox rows in the same transaction as the
-     * outbox pattern requires. Runs inside {@code transactionTemplate.execute} only -- no
-     * Redis/verification work happens in here.
-     */
     private IncomingEvent persistEventAndForwardAttempts(IncomingSource source, RequestMetadata meta,
                                                            String providerEventId, VerificationOutcome verification) {
         IncomingEvent event = IncomingEvent.builder()
@@ -507,7 +411,6 @@ public class IngressService {
         log.info("Received incoming webhook: eventId={}, sourceId={}, requestId={}, verified={}",
                 event.getId(), source.getId(), meta.requestId(), verification.verified());
 
-        // Create forward attempts + outbox messages in batch
         List<IncomingDestination> destinations = destinationRepository
                 .findByIncomingSourceIdAndEnabledTrue(source.getId());
 
@@ -546,7 +449,6 @@ public class IngressService {
         );
     }
 
-    /** Over the bytes that arrived, so the stored digest is of the request and not of our copy. */
     private String computeSha256(byte[] body) {
         if (body == null || body.length == 0) {
             return null;

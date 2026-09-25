@@ -7,7 +7,6 @@ import java.time.Instant;
 
 /**
  * @param resumeAt set only by {@link StepStatus#WAITING}: when the execution becomes due again.
- *                 Null for every other status.
  */
 public record StepResult(StepStatus status, JsonNode output, String errorMessage, Instant resumeAt) {
 
@@ -19,13 +18,7 @@ public record StepResult(StepStatus status, JsonNode output, String errorMessage
         return new StepResult(StepStatus.SUCCESS, output, null);
     }
 
-    /**
-     * The node has nothing left to do but wait, and will not hold a thread doing it.
-     *
-     * <p>The engine writes down where it got to and returns; {@code WorkflowResumeJob} continues
-     * the execution once {@code resumeAt} has passed. The node's input becomes its output, so a
-     * suspension is transparent to whatever comes next.
-     */
+    /** Input becomes output, so the suspension is transparent to the next node. */
     public static StepResult waiting(Instant resumeAt, JsonNode passThrough) {
         return new StepResult(StepStatus.WAITING, passThrough, null, resumeAt);
     }

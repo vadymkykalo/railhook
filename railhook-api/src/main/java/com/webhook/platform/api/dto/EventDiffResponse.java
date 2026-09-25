@@ -21,6 +21,5 @@ public class EventDiffResponse {
     private Instant rightCreatedAt;
     private String leftPayload;
     private String rightPayload;
-    /** Was a nested {@code DiffEntry}; the wire shape is unchanged. */
     private List<JsonDiffEntry> diffs;
 }

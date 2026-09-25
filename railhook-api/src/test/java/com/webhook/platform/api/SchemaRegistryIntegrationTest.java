@@ -82,8 +82,6 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
         return "/api/v1/projects/" + projectId + "/schemas";
     }
 
-    // ── Event Type CRUD ──
-
     @Test
     public void createEventType_returnsCreated() throws Exception {
         mockMvc.perform(post(schemasUrl())
@@ -191,8 +189,6 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
-    // ── Schema Versions ──
-
     @Test
     public void createSchemaVersion_returnsCreatedAsDraft() throws Exception {
         String eventTypeId = createEventType("version.test");
@@ -236,8 +232,6 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
         assert id1.equals(id2) : "Duplicate schema should return same version";
     }
 
-    // ── Compatibility mode ──
-
     private static final String COMPAT_V1 =
             "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
                     + "\"note\":{\"type\":\"string\"}},\"required\":[\"id\"]}";
@@ -270,7 +264,6 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
                         .content(postVersion(eventTypeId, withNewRequired, null)))
                 .andExpect(status().isBadRequest());
 
-        // And it is refused rather than stored: still one version.
         mockMvc.perform(get(schemasUrl() + "/" + eventTypeId + "/versions")
                         .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isOk())
@@ -286,8 +279,7 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
                         .content(postVersion(eventTypeId, COMPAT_V1, "FORWARD")))
                 .andExpect(status().isCreated());
 
-        // FORWARD refuses dropping a property the previous version required. The request below
-        // names no mode at all, so the only thing that can refuse it is the inherited one.
+        // The request names no mode, so only the inherited FORWARD can refuse it.
         String dropsRequired = "{\"type\":\"object\",\"properties\":{\"note\":{\"type\":\"string\"}}}";
 
         mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
@@ -376,8 +368,6 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(2));
     }
 
-    // ── Promote / Deprecate ──
-
     @Test
     public void promoteVersion_setsActive() throws Exception {
         String eventTypeId = createEventType("promote.test");
@@ -432,8 +422,6 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.status").value("DEPRECATED"));
     }
 
-    // ── Schema Changes / Diff ──
-
     @Test
     public void schemaChanges_computedOnNewVersion() throws Exception {
         String eventTypeId = createEventType("diff.test");
@@ -480,8 +468,6 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[0].eventTypeName").exists());
     }
 
-    // ── Event type catalog reflects versions ──
-
     @Test
     public void eventTypeCatalog_showsLatestVersion() throws Exception {
         String eventTypeId = createEventType("catalog.ver");
@@ -508,8 +494,6 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.hasBreakingChanges").value(true));
     }
 
-    // ── API Key auth works for schemas ──
-
     @Test
     public void apiKey_listEventTypes() throws Exception {
         mockMvc.perform(get(schemasUrl())
@@ -527,8 +511,6 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated());
     }
 
-    // ── Auth: no token → 401 ──
-
     @Test
     public void noAuth_listSchemas_unauthorized() throws Exception {
         mockMvc.perform(get(schemasUrl()))
@@ -542,8 +524,6 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
                         .content("{\"name\": \"no.auth\"}"))
                 .andExpect(status().isUnauthorized());
     }
-
-    // ── Org isolation: other org cannot access ──
 
     @Test
     public void crossOrg_forbidden() throws Exception {
@@ -565,13 +545,9 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get(schemasUrl())
                         .header("Authorization", "Bearer " + otherToken))
-                // A resource in another organization is not found rather than forbidden: the tenant
-        // filter means this caller's queries never see it, and answering 403 would
-        // confirm the id exists.
+                // Not found rather than forbidden: 403 would confirm the id exists.
                 .andExpect(status().isNotFound());
     }
-
-    // ── Project schema validation settings ──
 
     @Test
     public void projectSchemaValidation_defaultsOff() throws Exception {
@@ -598,8 +574,6 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.schemaValidationEnabled").value(true))
                 .andExpect(jsonPath("$.schemaValidationPolicy").value("BLOCK"));
     }
-
-    // ── Helpers ──
 
     private String createEventType(String name) throws Exception {
         MvcResult result = mockMvc.perform(post(schemasUrl())

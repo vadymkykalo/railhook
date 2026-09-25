@@ -1,7 +1,5 @@
 #!/bin/sh
-# Every five minutes, the newest scheduled backup's age and size as node-exporter textfile
-# metrics. Reads the dumps the db-backup sidecar writes (webhook_platform_*.dump), so it
-# measures what a restore would need — a file — rather than whether a script ran.
+# Measures the newest dump file — what a restore needs — rather than whether a script ran.
 set -eu
 
 DIR=/backups

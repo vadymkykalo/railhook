@@ -46,11 +46,7 @@ public class DeliveryService {
 
     private static final int BULK_REPLAY_MAX_LIMIT = 5000;
 
-    /**
-     * What a bulk replay with no status filter selects. It used to mean "everything that has not
-     * succeeded", which took in PROCESSING rows with a request on the wire and PENDING rows
-     * waiting their turn on the ladder, and sent both again.
-     */
+    /** Never PROCESSING (still on the wire) or PENDING (waiting on the ladder). */
     private static final List<DeliveryStatus> REPLAYED_WITHOUT_A_FILTER =
             List.of(DeliveryStatus.FAILED, DeliveryStatus.DLQ);
 
@@ -82,14 +78,7 @@ public class DeliveryService {
         this.piiMaskingService = piiMaskingService;
     }
 
-    /**
-     * Applies the project's masking rules, tolerating a null body.
-     *
-     * <p>The rules used to reach the project events list, the event diff and a shared debug
-     * link, and stopped there — so the screens an operator opens *because* a delivery failed
-     * showed the payload the other screens had redacted. A masking feature that holds in some
-     * places is worse than none, because it is trusted.
-     */
+    // Same masking as every other screen: partial masking is trusted, so worse than none.
     private String mask(UUID projectId, String body) {
         if (body == null || projectId == null) {
             return body;
@@ -146,8 +135,7 @@ public class DeliveryService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        // The project applies with or without an event filter: an event id alone named another
-        // project's event just as readily, and listed its deliveries under this project's URL.
+        // Scoped to the project even with an event filter, or an event id could list another project's deliveries.
         Specification<Delivery> spec = Specification.where(DeliverySpecification.hasProjectId(projectId));
         if (eventId != null) {
             spec = spec.and(DeliverySpecification.hasEventIds(List.of(eventId)));
@@ -165,7 +153,6 @@ public class DeliveryService {
         return deliveries.map(delivery -> DeliveryResponse.of(delivery, typesByEventId.get(delivery.getEventId())));
     }
 
-    /** One query for the page, rather than one per row. */
     private Map<UUID, String> eventTypesOf(List<Delivery> deliveries) {
         Set<UUID> eventIds = deliveries.stream()
                 .map(Delivery::getEventId)
@@ -189,17 +176,11 @@ public class DeliveryService {
         returnToLadder(delivery);
     }
 
-    /**
-     * The customer portal's retry: the same return to the ladder, for a Delivery to one of the
-     * given Endpoints. A Delivery to any other Endpoint is "not found", exactly like a missing one
-     * — the portal has no project-level access to fall back on, only its Consumer's Endpoints.
-     */
     @Transactional
     public void retryDeliveryToEndpoints(UUID deliveryId, Collection<UUID> endpointIds) {
         returnToLadder(requireDeliveryToEndpoints(deliveryId, endpointIds));
     }
 
-    /** The attempts of a Delivery to one of the given Endpoints; see {@link #retryDeliveryToEndpoints}. */
     public List<DeliveryAttemptResponse> getDeliveryAttemptsToEndpoints(UUID deliveryId, Collection<UUID> endpointIds) {
         return attemptsOf(requireDeliveryToEndpoints(deliveryId, endpointIds));
     }
@@ -220,11 +201,7 @@ public class DeliveryService {
         log.info("Replayed delivery: {}", delivery.getId());
     }
 
-    /**
-     * A succeeded Delivery would reach its endpoint twice. A PROCESSING one has an Attempt under
-     * way: putting it back to PENDING and announcing it sent a second request while the first
-     * was still on the wire. An Attempt that really was lost is the stuck sweep's to recover.
-     */
+    // A PROCESSING delivery sent back to PENDING went out twice; the stuck sweep recovers lost ones.
     private void requireReturnable(Delivery delivery) {
         if (delivery.getStatus() == DeliveryStatus.SUCCESS) {
             throw new IllegalArgumentException("Cannot replay successful delivery");
@@ -382,12 +359,11 @@ public class DeliveryService {
                 .deliveryId(attempt.getDeliveryId())
                 .attemptNumber(attempt.getAttemptNumber())
                 .requestHeaders(attempt.getRequestHeaders())
-                // Masked before truncation: truncating first would let the tail of a 100 KB
-                // body escape the rules simply by being past the cut.
-                .requestBody(truncate(mask(projectId, attempt.getRequestBody()), 100000)) // 100KB limit
+                // Mask before truncating, or the tail past the 100 KB cut would escape the rules.
+                .requestBody(truncate(mask(projectId, attempt.getRequestBody()), 100000))
                 .httpStatusCode(attempt.getHttpStatusCode())
                 .responseHeaders(attempt.getResponseHeaders())
-                .responseBody(truncate(mask(projectId, attempt.getResponseBody()), 100000)) // 100KB limit
+                .responseBody(truncate(mask(projectId, attempt.getResponseBody()), 100000))
                 .errorMessage(attempt.getErrorMessage())
                 .durationMs(attempt.getDurationMs())
                 .createdAt(attempt.getCreatedAt())
@@ -463,9 +439,7 @@ public class DeliveryService {
             throw new IllegalArgumentException("fromAttempt must be between 1 and " + delivery.getAttemptCount());
         }
 
-        // Grants what was left of the ladder from that attempt on. It used to wind the count back
-        // to fromAttempt - 1 instead, which recorded the attempts after it a second time under
-        // numbers already on the record.
+        // Raises the cap rather than winding the count back, which reused attempt numbers.
         delivery.returnToLadder(Math.max(1, delivery.getMaxAttempts() - (fromAttempt - 1)));
         deliveryRepository.save(delivery);
 

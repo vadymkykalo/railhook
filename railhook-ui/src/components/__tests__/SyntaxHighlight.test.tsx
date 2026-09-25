@@ -2,17 +2,6 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import SyntaxHighlight, { highlight, normalizeLanguage } from '../SyntaxHighlight';
 
-/**
- * The two things that can silently break here are a token that swallows the rest
- * of the file (an unterminated string alternative) and a scanner that stops
- * emitting text. Both show up as "the code no longer reads as the code", which is
- * why every assertion below is ultimately about lossless round-tripping.
- *
- * The samples are inline on purpose. They used to be imported from the in-app docs, which
- * now live in a site of their own; what matters here is their shape — a JSON body inside
- * shell quotes, a template literal, a PHP heredoc-free script — not where they are shown.
- */
-
 const jsonInShell = `curl -X POST https://your-api.com/api/v1/projects/$PROJECT_ID/rules \\
   -H "X-API-Key: $API_KEY" \\
   -H "Content-Type: application/json" \\
@@ -124,7 +113,6 @@ describe('highlight', () => {
   });
 });
 
-/** The text of every token the scanner coloured as `kind`, in document order. */
 function tokens(code: string, language: Parameters<typeof highlight>[1], kind: string): string[] {
   const { container, unmount } = render(
     <pre>

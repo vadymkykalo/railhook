@@ -41,18 +41,7 @@ export default function AppLayout() {
 
   const routeProjectId = params.projectId || location.pathname.match(/\/admin\/projects\/([^/]+)/)?.[1];
 
-  /**
-   * The rail is project-scoped, and `/admin/projects`, `/admin/dashboard` and
-   * the org-level pages carry no project in the URL. `nav.config` used to
-   * resolve that to `/admin/projects` — the page you are usually already on —
-   * so on the projects list every rail entry was a link that changed nothing.
-   * It reads as six broken buttons, and the switcher above them compounded it
-   * by saying "Select project" while exactly one existed.
-   *
-   * So the layout picks one up: the URL's, else the one you were last in, else the
-   * first the account has. With no projects at all each entry leads to its own
-   * setup screen (`/admin/start/<section>`), which creates the project and carries on there.
-   */
+  /** The rail is project-scoped, so pick one: URL, last used, else first; with none, per-section setup screens. */
   const { data: projects = [] } = useProjects();
   const projectId = routeProjectId ?? projectToOpen(projects);
 
@@ -65,10 +54,7 @@ export default function AppLayout() {
   useEffect(() => {
     authApi.getCurrentUser().then((freshUser) => {
       if (!freshUser) return;
-      // platformAdmin too: an address added to PLATFORM_ADMIN_EMAILS should bring the panel's
-      // entry up on the next navigation, not only after signing out and in again. The role and
-      // the organization as well: a demotion, or a session now in another organization, left
-      // every role check reading a stored copy the server no longer agreed with.
+      // Refresh platformAdmin, role and organization too, or role checks read a stale stored copy.
       const organizationChanged = freshUser.organization?.id !== user?.organization?.id;
       if (
         freshUser.user?.status !== user?.user?.status
@@ -79,7 +65,7 @@ export default function AppLayout() {
         updateUser(freshUser);
       }
       if (organizationChanged) {
-        // Everything cached belongs to the organization we were in; see OrganizationSwitcher.
+        // Everything cached belongs to the organization we were in.
         queryClient.clear();
       }
     }).catch(() => { });
@@ -115,7 +101,6 @@ export default function AppLayout() {
   const handleLogout = () => {
     logout();
     if (isDemo) {
-      // A demo visitor has no account to sign back in to: back to the page they came from.
       showSuccess(t('demo.exited'));
       navigate('/');
       return;
@@ -138,7 +123,7 @@ export default function AppLayout() {
     <div className="min-h-screen bg-background">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[100] focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
       >
         {t('nav.skipToContent')}
       </a>
@@ -230,8 +215,7 @@ export default function AppLayout() {
                   </span>
                 </div>
                 <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
-                  {/* A typo in the address is the likeliest reason no link ever arrived, and
-                      resending to it again cannot fix that. */}
+                  {/* A typo in the address is the likeliest reason no link arrived; resending cannot fix that. */}
                   {!changingEmail && (
                     <Button variant="link" size="sm" onClick={() => setChangingEmail(true)} className="text-retry">
                       {t('auth.verification.changeAddress')}
@@ -245,7 +229,7 @@ export default function AppLayout() {
                 </div>
               </div>
               {changingEmail && (
-                <div className="mt-3 rounded-md border border-rail bg-card p-3">
+                <div className="mt-3 border border-rail bg-card p-3">
                   <ChangeEmailForm
                     unverified
                     hasPassword={user.hasPassword !== false}
@@ -264,18 +248,11 @@ export default function AppLayout() {
             </div>
           )}
 
-          {/* The role gate for every /admin page, applied here rather than route
-              by route so it reads from the same nav.config table the sidebar and
-              the tab strip filter from. Inside <main> on purpose: a refusal is a
-              page, and the person keeps their navigation to go somewhere else. */}
+          {/* Role gate inside <main>: a refusal is a page, and navigation stays. */}
           <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto">
             <div className="animate-fade-in">
               <ProtectedRoute requiredRole={requiredRoleFor(location.pathname)}>
-                {/*
-                  Keyed by path so the boundary resets on navigation: a class component holds
-                  its error state forever otherwise, and the user who clicks another nav item
-                  would keep seeing the page that broke.
-                */}
+                {/* Keyed by path so the boundary resets on navigation. */}
                 <ErrorBoundary variant="page" key={location.pathname}>
                   <Outlet />
                 </ErrorBoundary>

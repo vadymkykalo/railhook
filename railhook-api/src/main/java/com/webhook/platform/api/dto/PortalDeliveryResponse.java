@@ -10,7 +10,6 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.UUID;
 
-/** A Delivery as its Consumer sees it: with the event type, which is what they recognise it by. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

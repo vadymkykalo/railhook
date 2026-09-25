@@ -23,7 +23,7 @@ public class WorkflowRequest {
 
     private Boolean enabled;
 
-    /** Full React Flow definition: {nodes: [...], edges: [...]} */
+    /** React Flow definition: {nodes: [...], edges: [...]} */
     private Object definition;
 
     private Workflow.TriggerType triggerType;

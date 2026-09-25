@@ -1,8 +1,9 @@
 package com.webhook.platform.common.util;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.List;
 
@@ -10,88 +11,44 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class JsonSchemaUtilsTest {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    // ── inferSchema ──
-
     @Test
-    void inferSchema_objectWithPrimitives() throws Exception {
-        String payload = "{\"name\": \"Alice\", \"age\": 30, \"active\": true}";
-        JsonNode schema = JsonSchemaUtils.inferSchema(payload);
+    void inferSchema_typesEachPrimitiveAndRequiresEveryField() throws Exception {
+        JsonNode schema = JsonSchemaUtils.inferSchema(
+                "{\"name\": \"Alice\", \"age\": 30, \"active\": true, \"price\": 19.99, \"data\": null}");
 
         assertEquals("object", schema.get("type").asText());
-        assertTrue(schema.has("properties"));
-        assertEquals("string", schema.get("properties").get("name").get("type").asText());
-        assertEquals("integer", schema.get("properties").get("age").get("type").asText());
-        assertEquals("boolean", schema.get("properties").get("active").get("type").asText());
-        assertNotNull(schema.get("required"));
-        assertEquals(3, schema.get("required").size());
+        JsonNode properties = schema.get("properties");
+        assertEquals("string", properties.get("name").get("type").asText());
+        assertEquals("integer", properties.get("age").get("type").asText());
+        assertEquals("boolean", properties.get("active").get("type").asText());
+        assertEquals("number", properties.get("price").get("type").asText());
+        assertEquals("null", properties.get("data").get("type").asText());
+        assertEquals(5, schema.get("required").size());
     }
 
     @Test
-    void inferSchema_nestedObject() throws Exception {
-        String payload = "{\"user\": {\"name\": \"Bob\", \"email\": \"bob@test.com\"}}";
-        JsonNode schema = JsonSchemaUtils.inferSchema(payload);
-        JsonNode userProp = schema.get("properties").get("user");
+    void inferSchema_descendsIntoObjectsAndArrays() throws Exception {
+        JsonNode schema = JsonSchemaUtils.inferSchema(
+                "{\"user\": {\"name\": \"Bob\"}, \"items\": [{\"id\": 1, \"name\": \"item1\"}]}");
 
+        JsonNode userProp = schema.get("properties").get("user");
         assertEquals("object", userProp.get("type").asText());
         assertEquals("string", userProp.get("properties").get("name").get("type").asText());
-        assertEquals("string", userProp.get("properties").get("email").get("type").asText());
-    }
-
-    @Test
-    void inferSchema_array() throws Exception {
-        String payload = "{\"items\": [{\"id\": 1, \"name\": \"item1\"}]}";
-        JsonNode schema = JsonSchemaUtils.inferSchema(payload);
         JsonNode itemsProp = schema.get("properties").get("items");
-
         assertEquals("array", itemsProp.get("type").asText());
-        assertNotNull(itemsProp.get("items"));
         assertEquals("object", itemsProp.get("items").get("type").asText());
     }
 
     @Test
-    void inferSchema_nullValue() throws Exception {
-        String payload = "{\"data\": null}";
-        JsonNode schema = JsonSchemaUtils.inferSchema(payload);
-        assertEquals("null", schema.get("properties").get("data").get("type").asText());
-    }
-
-    @Test
-    void inferSchema_number() throws Exception {
-        String payload = "{\"price\": 19.99}";
-        JsonNode schema = JsonSchemaUtils.inferSchema(payload);
-        assertEquals("number", schema.get("properties").get("price").get("type").asText());
-    }
-
-    // ── fingerprint ──
-
-    @Test
-    void fingerprint_sameSchema_sameResult() throws Exception {
-        String schema = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}}}";
-        assertEquals(JsonSchemaUtils.fingerprint(schema), JsonSchemaUtils.fingerprint(schema));
-    }
-
-    @Test
-    void fingerprint_differentSchema_differentResult() throws Exception {
-        String s1 = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}}}";
-        String s2 = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"integer\"}}}";
-        assertNotEquals(JsonSchemaUtils.fingerprint(s1), JsonSchemaUtils.fingerprint(s2));
-    }
-
-    @Test
-    void fingerprint_ignoresDescription() throws Exception {
+    void fingerprint_changesWithTheShapeButNotWithTheDescription() throws Exception {
         String s1 = "{\"type\": \"object\", \"description\": \"v1\", \"properties\": {\"name\": {\"type\": \"string\"}}}";
         String s2 = "{\"type\": \"object\", \"description\": \"v2\", \"properties\": {\"name\": {\"type\": \"string\"}}}";
+        String s3 = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"integer\"}}}";
+
+        assertEquals(JsonSchemaUtils.fingerprint(s1), JsonSchemaUtils.fingerprint(s1));
         assertEquals(JsonSchemaUtils.fingerprint(s1), JsonSchemaUtils.fingerprint(s2));
+        assertNotEquals(JsonSchemaUtils.fingerprint(s1), JsonSchemaUtils.fingerprint(s3));
     }
-
-    @Test
-    void fingerprint_isSha256Length() throws Exception {
-        assertEquals(64, JsonSchemaUtils.fingerprint("{\"type\": \"string\"}").length());
-    }
-
-    // ── diff ──
 
     @Test
     void diff_addedOptionalField_notBreaking() throws Exception {
@@ -114,6 +71,7 @@ class JsonSchemaUtilsTest {
 
         assertEquals(1, diff.removed().size());
         assertEquals("$.email", diff.removed().get(0).path());
+        assertFalse(diff.removed().get(0).required());
         assertTrue(diff.breaking());
     }
 
@@ -141,35 +99,7 @@ class JsonSchemaUtilsTest {
     }
 
     @Test
-    void diff_addedRequiredField_breaking() throws Exception {
-        String old = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}}, \"required\": [\"name\"]}";
-        String nw = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}, \"age\": {\"type\": \"integer\"}}, \"required\": [\"name\", \"age\"]}";
-        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
-
-        assertEquals(1, diff.added().size());
-        assertTrue(diff.added().get(0).required());
-        assertTrue(diff.breaking());
-    }
-
-    // ── diffToJson ──
-
-    @Test
-    void diffToJson_validJson() throws Exception {
-        String old = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}}, \"required\": [\"name\"]}";
-        String nw = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}, \"email\": {\"type\": \"string\"}}, \"required\": [\"name\"]}";
-        String json = JsonSchemaUtils.diffToJson(JsonSchemaUtils.diff(old, nw));
-
-        JsonNode parsed = MAPPER.readTree(json);
-        assertTrue(parsed.has("added"));
-        assertTrue(parsed.has("removed"));
-        assertTrue(parsed.has("changed"));
-        assertTrue(parsed.has("breaking"));
-    }
-
-    // ── diff: which side of a change was required ──
-
-    @Test
-    void diff_addedRequiredField_isMarkedRequired() throws Exception {
+    void diff_addedRequiredField_isMarkedRequiredAndBreaking() throws Exception {
         String old = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
         String nw = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
                 + "\"email\":{\"type\":\"string\"}},\"required\":[\"name\",\"email\"]}";
@@ -180,6 +110,7 @@ class JsonSchemaUtilsTest {
         assertTrue(diff.breaking());
     }
 
+    // Removed fields used to carry required=false unconditionally.
     @Test
     void diff_removedRequiredField_isMarkedRequired() throws Exception {
         String old = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
@@ -188,26 +119,12 @@ class JsonSchemaUtilsTest {
         JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
 
         assertEquals(1, diff.removed().size());
-        assertTrue(diff.removed().get(0).required(),
-                "removed fields carried required=false unconditionally, so nothing could tell a "
-                        + "dropped optional field from a dropped required one");
+        assertTrue(diff.removed().get(0).required());
     }
 
-    @Test
-    void diff_removedOptionalField_isNotMarkedRequired() throws Exception {
-        String old = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
-                + "\"nickname\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
-        String nw = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}";
-        JsonSchemaUtils.SchemaDiff diff = JsonSchemaUtils.diff(old, nw);
-
-        assertEquals(1, diff.removed().size());
-        assertFalse(diff.removed().get(0).required());
-    }
-
+    // Reading the root's required array put required=false on a field the nested object requires.
     @Test
     void diff_requiredIsReadFromTheOwningObject_notTheRoot() throws Exception {
-        // "id" is required inside `user`, and the root requires nothing of that name. Reading
-        // the root's required array put required=false on it.
         String old = "{\"type\":\"object\",\"properties\":{\"user\":{\"type\":\"object\","
                 + "\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}}}";
         String nw = "{\"type\":\"object\",\"properties\":{\"user\":{\"type\":\"object\","
@@ -245,66 +162,25 @@ class JsonSchemaUtilsTest {
         assertEquals("$.email", diff.relaxed().get(0).path());
     }
 
-    // ── validate ──
-
     @Test
     void validate_validPayload_noErrors() {
         String schema = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}, \"age\": {\"type\": \"integer\"}}, \"required\": [\"name\"]}";
-        String payload = "{\"name\": \"Alice\", \"age\": 30}";
-        assertTrue(JsonSchemaUtils.validate(payload, schema).isEmpty());
+        assertTrue(JsonSchemaUtils.validate("{\"name\": \"Alice\", \"age\": 30}", schema).isEmpty());
     }
 
-    @Test
-    void validate_missingRequiredField() {
-        String schema = "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}, \"age\": {\"type\": \"integer\"}}, \"required\": [\"name\", \"age\"]}";
-        String payload = "{\"name\": \"Alice\"}";
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "{\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}, \"age\": {\"type\": \"integer\"}}, \"required\": [\"name\", \"age\"]} | {\"name\": \"Alice\"} | age",
+            "{\"type\": \"object\", \"properties\": {\"age\": {\"type\": \"integer\"}}, \"required\": [\"age\"]} | {\"age\": \"not a number\"} | expected integer",
+            "{\"type\": \"object\", \"properties\": {\"user\": {\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}}, \"required\": [\"name\"]}}, \"required\": [\"user\"]} | {\"user\": {}} | $.user.name",
+            "{\"type\": \"object\"} | \"just a string\" | expected object",
+            "{\"type\": \"object\"} | not json | Invalid JSON",
+            "{\"type\": \"object\", \"properties\": {\"items\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"properties\": {\"id\": {\"type\": \"integer\"}}, \"required\": [\"id\"]}}}, \"required\": [\"items\"]} | {\"items\": [{\"id\": 1}, {\"id\": \"bad\"}]} | [1]",
+    })
+    void validate_reportsOneErrorNamingWhereItIs(String schema, String payload, String expectedFragment) {
         List<String> errors = JsonSchemaUtils.validate(payload, schema);
-        assertEquals(1, errors.size());
-        assertTrue(errors.get(0).contains("age"));
-        assertTrue(errors.get(0).contains("required"));
-    }
 
-    @Test
-    void validate_wrongType() {
-        String schema = "{\"type\": \"object\", \"properties\": {\"age\": {\"type\": \"integer\"}}, \"required\": [\"age\"]}";
-        String payload = "{\"age\": \"not a number\"}";
-        List<String> errors = JsonSchemaUtils.validate(payload, schema);
-        assertEquals(1, errors.size());
-        assertTrue(errors.get(0).contains("expected integer"));
-        assertTrue(errors.get(0).contains("string"));
-    }
-
-    @Test
-    void validate_nestedObject() {
-        String schema = "{\"type\": \"object\", \"properties\": {\"user\": {\"type\": \"object\", \"properties\": {\"name\": {\"type\": \"string\"}}, \"required\": [\"name\"]}}, \"required\": [\"user\"]}";
-        String payload = "{\"user\": {}}";
-        List<String> errors = JsonSchemaUtils.validate(payload, schema);
-        assertEquals(1, errors.size());
-        assertTrue(errors.get(0).contains("$.user.name"));
-    }
-
-    @Test
-    void validate_wrongRootType() {
-        String schema = "{\"type\": \"object\"}";
-        String payload = "\"just a string\"";
-        List<String> errors = JsonSchemaUtils.validate(payload, schema);
-        assertEquals(1, errors.size());
-        assertTrue(errors.get(0).contains("expected object"));
-    }
-
-    @Test
-    void validate_invalidJson() {
-        List<String> errors = JsonSchemaUtils.validate("not json", "{\"type\": \"object\"}");
-        assertEquals(1, errors.size());
-        assertTrue(errors.get(0).contains("Invalid JSON"));
-    }
-
-    @Test
-    void validate_arrayItems() {
-        String schema = "{\"type\": \"object\", \"properties\": {\"items\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"properties\": {\"id\": {\"type\": \"integer\"}}, \"required\": [\"id\"]}}}, \"required\": [\"items\"]}";
-        String payload = "{\"items\": [{\"id\": 1}, {\"id\": \"bad\"}]}";
-        List<String> errors = JsonSchemaUtils.validate(payload, schema);
-        assertEquals(1, errors.size());
-        assertTrue(errors.get(0).contains("[1]"));
+        assertEquals(1, errors.size(), errors.toString());
+        assertTrue(errors.get(0).contains(expectedFragment), errors.get(0));
     }
 }

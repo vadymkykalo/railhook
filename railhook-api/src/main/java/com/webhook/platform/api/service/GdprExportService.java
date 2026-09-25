@@ -61,13 +61,7 @@ public class GdprExportService {
         this.userRepository = userRepository;
     }
 
-    /**
-     * GDPR Article 20 — everything the organization holds, in one downloadable file.
-     *
-     * <p>Audited despite reading nothing it does not own: the file leaves the platform and is
-     * then wherever whoever asked for it put it, so "who took a copy of all of this, and when"
-     * is a question that gets asked after the fact and has to have an answer.
-     */
+    /** GDPR Article 20. Audited because the file leaves the platform, and who took a copy must be answerable later. */
     @Auditable(action = AuditAction.DATA_EXPORTED, resourceType = "Organization")
     @Transactional(readOnly = true)
     public GdprExportDto exportOrganizationData() {
@@ -222,13 +216,7 @@ public class GdprExportService {
                 .toList();
     }
 
-    /**
-     * The most recent {@value #AUDIT_LOG_LIMIT} audit entries, and how many there were in all.
-     *
-     * <p>The cap exists because an organization's audit history has no upper bound and this
-     * response is assembled in memory. What it must not do is pass for the whole thing: the
-     * page's total goes into the export so the file says what it is.
-     */
+    // Capped, since the export is built in memory; the total is included so it is not mistaken for all.
     private Page<AuditLog> auditLogPage() {
         UUID organizationId = TenantContext.require();
         Pageable limit = PageRequest.of(0, AUDIT_LOG_LIMIT);

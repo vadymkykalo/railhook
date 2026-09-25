@@ -28,20 +28,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Finding the ordered Deliveries that committed and never got a Sequence Number.
- *
- * <p>The number is assigned after the ingest transaction commits, which is the right call — it
- * comes from Redis, and a Delivery the customer has been told was accepted must not be undone
- * because a counter was unreachable. {@code EventIngestService} catches that and degrades
- * gracefully, and says so in a metric.
- *
- * <p>What no catch block covers is the process ending. A pod that dies in the window between the
- * commit and the backfill leaves the row with a null sequence for ever, and the worker's gate
- * reads {@code orderingEnabled && sequenceNumber != null} — so the Delivery goes out unordered,
- * to a customer who asked for ordering and is never told they did not get it. Nothing looked for
- * those rows, which is what made it permanent rather than transient.
- */
 class StrandedSequenceRepositoryTest extends AbstractIntegrationTest {
 
     @Autowired private DeliveryRepository deliveryRepository;
@@ -73,9 +59,7 @@ class StrandedSequenceRepositoryTest extends AbstractIntegrationTest {
     }
 
     private Delivery delivery(boolean ordered, Long sequence, DeliveryStatus status, Instant createdAt) {
-        // A fresh Event per Delivery: idx_deliveries_unique_rule makes (event, endpoint) unique
-        // for a subscription-less Delivery, which is what stops one event being delivered twice
-        // down the same route.
+        // A fresh Event per Delivery: idx_deliveries_unique_rule makes (event, endpoint) unique.
         UUID ownEventId = eventRepository.save(Event.builder()
                 .organizationId(orgId).projectId(projectId)
                 .eventType("payment.succeeded").payload("{}").build()).getId();
@@ -107,8 +91,7 @@ class StrandedSequenceRepositoryTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("one whose backfill may still be in flight is left alone")
     void leavesTheInFlightWindowAlone() {
-        // Without the age bound this sweep would race the ingest it exists to repair after, and
-        // hand out a second number for a row that was about to get its first.
+        // Without the age bound the sweep would race the ingest it repairs.
         Delivery justCommitted = delivery(true, null, DeliveryStatus.PENDING, Instant.now());
 
         assertThat(stranded()).doesNotContain(justCommitted.getId());
@@ -139,13 +122,7 @@ class StrandedSequenceRepositoryTest extends AbstractIntegrationTest {
         assertThat(stranded()).doesNotContain(done.getId(), abandoned.getId());
     }
 
-    /**
-     * Both callers of the backfill — the ingest after its commit and the stranded sweep — run it
-     * with no transaction open, and a JPQL update refuses to run without one. Every ordered
-     * Delivery ingested through the API therefore went out unordered: on railhook.io the log said
-     * "No active transaction for update or delete query" for each, and the sweep meant to repair
-     * them failed the same way.
-     */
+    // Both callers run the backfill with no transaction open.
     @Test
     @DisplayName("the backfill writes the number when called with no transaction open, as both callers do")
     void backfillRunsWithoutACallerTransaction() {

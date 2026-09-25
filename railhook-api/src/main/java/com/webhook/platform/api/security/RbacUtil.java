@@ -11,12 +11,9 @@ public class RbacUtil {
             throw new ForbiddenException("Viewers have read-only access");
         }
         
-        // API Key scope enforcement
         if (role == MembershipRole.API_KEY && apiKeyScope == ApiKeyScope.READ_ONLY) {
             throw new ForbiddenException("API key has read-only access. Write operations are not permitted.");
         }
-        
-        // DEVELOPER, OWNER, and READ_WRITE API keys have write access
     }
 
     public static void requireOwnerAccess(MembershipRole role) {

@@ -4,17 +4,7 @@ import SyntaxHighlight, { normalizeLanguage } from '../SyntaxHighlight';
 import type { Block, Inline } from '../../lib/markdown';
 import { FIGURES } from './figures';
 
-/**
- * A post's parsed Markdown, rendered as elements.
- *
- * The typography is the site's, set here rather than through a prose plugin: the pages already
- * own a display face, a rail colour and a code surface, and a second typographic system would
- * drift from them. Measure is capped at ~68 characters, which is what the rest of the public
- * pages read at.
- *
- * Nothing from a file is ever handed to `dangerouslySetInnerHTML` — `src/lib/markdown.ts`
- * produces data, and this walks it.
- */
+/** Nothing from a file reaches dangerouslySetInnerHTML; markdown.ts produces data. */
 
 function Nodes({ nodes }: { nodes: Inline[] }): ReactNode {
   return (
@@ -34,7 +24,7 @@ function Nodes({ nodes }: { nodes: Inline[] }): ReactNode {
             );
           case 'strong':
             return (
-              <strong key={index} className="font-semibold text-foreground">
+              <strong key={index} className="font-medium text-foreground">
                 <Nodes nodes={node.children} />
               </strong>
             );
@@ -62,7 +52,7 @@ function Nodes({ nodes }: { nodes: Inline[] }): ReactNode {
                   href={node.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-medium text-primary underline-offset-2 hover:underline"
+                  className="font-medium link-ink"
                 >
                   <Nodes nodes={node.children} />
                 </a>
@@ -70,13 +60,13 @@ function Nodes({ nodes }: { nodes: Inline[] }): ReactNode {
             }
             if (node.href.startsWith('#') || node.href.startsWith('/docs/')) {
               return (
-                <a key={index} href={node.href} className="font-medium text-primary underline-offset-2 hover:underline">
+                <a key={index} href={node.href} className="font-medium link-ink">
                   <Nodes nodes={node.children} />
                 </a>
               );
             }
             return (
-              <Link key={index} to={node.href} className="font-medium text-primary underline-offset-2 hover:underline">
+              <Link key={index} to={node.href} className="font-medium link-ink">
                 <Nodes nodes={node.children} />
               </Link>
             );
@@ -89,7 +79,7 @@ function Nodes({ nodes }: { nodes: Inline[] }): ReactNode {
 
 function CodeBlock({ language, code }: { language: string; code: string }) {
   return (
-    <div className="surface-ink my-7 overflow-x-auto rounded-xl border border-rail p-4 sm:p-5">
+    <div className="surface-ink my-7 overflow-x-auto border border-rail p-4 sm:p-5">
       <pre className="font-mono text-[12.5px] leading-[1.7] [font-variant-ligatures:none] sm:text-[13px]">
         <code className="block w-max min-w-full text-foreground">
           <SyntaxHighlight code={code} language={normalizeLanguage(language)} />
@@ -101,7 +91,7 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
 
 function Table({ head, rows }: { head: Inline[][]; rows: Inline[][][] }) {
   return (
-    <div className="my-8 overflow-x-auto rounded-xl border border-rail">
+    <div className="my-8 overflow-x-auto border border-rail">
       <table className="w-full min-w-[34rem] border-collapse text-[14px]">
         <thead>
           <tr className="border-b border-rail bg-muted/60">
@@ -135,11 +125,7 @@ function Table({ head, rows }: { head: Inline[][]; rows: Inline[][][] }) {
   );
 }
 
-/**
- * The measure prose is read at. Figures, tables and code blocks are deliberately not held to
- * it — a comparison table at 68 characters wraps every cell — so it sits on the text blocks
- * rather than on the container.
- */
+/** Figures and tables are not held to the measure, so it sits on text blocks only. */
 const MEASURE = 'max-w-[68ch]';
 
 function One({ block }: { block: Block }): ReactNode {
@@ -148,12 +134,12 @@ function One({ block }: { block: Block }): ReactNode {
       return block.level === 2 ? (
         <h2
           id={block.id}
-          className={`${MEASURE} mt-12 scroll-mt-24 font-display text-[1.6rem] font-bold leading-[1.15] tracking-[-0.025em] text-foreground first:mt-0`}
+          className={`${MEASURE} mt-12 scroll-mt-24 text-[1.6rem] font-medium leading-[1.15] tracking-[-0.025em] text-foreground first:mt-0`}
         >
           {block.text}
         </h2>
       ) : (
-        <h3 id={block.id} className={`${MEASURE} mt-8 scroll-mt-24 text-[1.15rem] font-semibold text-foreground`}>
+        <h3 id={block.id} className={`${MEASURE} mt-8 scroll-mt-24 text-[1.15rem] font-medium text-foreground`}>
           {block.text}
         </h3>
       );
@@ -165,7 +151,7 @@ function One({ block }: { block: Block }): ReactNode {
       );
     case 'list':
       return block.ordered ? (
-        <ol className={`${MEASURE} mt-5 list-decimal space-y-2 pl-6 text-[1.0625rem] leading-[1.75] text-muted-foreground marker:font-mono marker:text-primary`}>
+        <ol className={`${MEASURE} mt-5 list-decimal space-y-2 pl-6 text-[1.0625rem] leading-[1.75] text-muted-foreground marker:font-mono marker:text-foreground`}>
           {block.items.map((item, index) => (
             <li key={index} className="pl-1">
               <Nodes nodes={item} />
@@ -173,7 +159,7 @@ function One({ block }: { block: Block }): ReactNode {
           ))}
         </ol>
       ) : (
-        <ul className={`${MEASURE} mt-5 list-disc space-y-2 pl-6 text-[1.0625rem] leading-[1.75] text-muted-foreground marker:text-primary`}>
+        <ul className={`${MEASURE} mt-5 list-disc space-y-2 pl-6 text-[1.0625rem] leading-[1.75] text-muted-foreground marker:text-foreground`}>
           {block.items.map((item, index) => (
             <li key={index} className="pl-1">
               <Nodes nodes={item} />
@@ -193,8 +179,6 @@ function One({ block }: { block: Block }): ReactNode {
       return <Table head={block.head} rows={block.rows} />;
     case 'figure': {
       const Drawing = FIGURES[block.key];
-      // A post naming a figure nobody drew renders nothing rather than a broken box; the
-      // `every figure a post names exists` test is what stops that reaching a reader.
       return Drawing ? <Drawing /> : null;
     }
   }

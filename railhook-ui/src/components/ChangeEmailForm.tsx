@@ -11,11 +11,6 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 
-/**
- * A new address for the signed-in account, asking for exactly what the API will: the CAPTCHA for
- * an unverified account, the password for a verified one, and a fresh Google sign-in for a verified
- * account that has no password.
- */
 export default function ChangeEmailForm({
   unverified, hasPassword, currentEmail, initialValue = '', submitLabel, onDone, onCancel,
 }: {
@@ -109,7 +104,7 @@ export default function ChangeEmailForm({
       </p>
 
       {error && (
-        <p role="alert" className="rounded-md border border-halt/25 bg-halt-soft p-2.5 text-sm text-halt">{error}</p>
+        <p role="alert" className="border border-halt/25 bg-halt-soft p-2.5 text-sm text-halt">{error}</p>
       )}
 
       <div className="flex flex-wrap gap-2">

@@ -20,50 +20,21 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over the one thing an upgrade can do to a busy installation: take a lock and hold it.
- *
- * <p>{@code CREATE INDEX} takes a {@code SHARE} lock on its table, which blocks every write to
- * it until the index is built. On a table with a few hundred rows that is imperceptible; on the
- * tables below, which is where every event and every delivery this platform has ever handled
- * lives, it is an outage that lasts as long as the build. The operator experiences it as
- * "the upgrade hung" and Railhook as "we stopped accepting webhooks".
- *
- * <p>{@code CONCURRENTLY} avoids it, at the cost of two table scans and of not being allowed to
- * run inside a transaction — which is why the {@code -- flyway:executeInTransaction=false}
- * header has to be there too. Without it Flyway wraps the migration and PostgreSQL refuses the
- * statement outright, so the two belong together or neither works.
- *
- * <p>The list below is frozen, not aspirational. Every entry is a migration that has already
- * shipped and therefore cannot be edited — {@code MigrationChecksumTest} enforces that, and it
- * is right to: Flyway validates the checksum of what it applied. What this test protects is the
- * next one. The set must not grow.
- */
+// CREATE INDEX without CONCURRENTLY blocks writes to its table for the whole build.
 @Tag("ratchet")
 class MigrationIndexLockingTest {
 
     private static final Path MIGRATIONS = Paths.get("src/main/resources/db/migration");
 
-    /**
-     * Tables that grow without bound, so an index build on one is measured in minutes rather
-     * than milliseconds. Configuration tables are absent on purpose: an endpoint table has as
-     * many rows as the customer has endpoints, and locking it briefly costs nobody anything.
-     */
+    // Tables that grow without bound; configuration tables are absent on purpose.
     private static final Set<String> UNBOUNDED_TABLES = Set.of(
             "events", "deliveries", "delivery_attempts",
             "incoming_events", "incoming_forward_attempts",
             "outbox_messages", "tunnel_request_log", "audit_log", "usage_daily");
 
-    /**
-     * Migrations that build an index on one of those tables without {@code CONCURRENTLY}, and
-     * have already shipped. Frozen: a released migration cannot be edited, so these are a debt
-     * that gets paid by not adding to it.
-     *
-     * <p>Upgrading an installation with a large history across any of these takes a maintenance
-     * window. {@code docs/OPERATIONS.md} says so.
-     */
+    // Frozen: shipped migrations cannot be edited, so this set must not grow.
     private static final Set<String> SHIPPED_WITH_BLOCKING_INDEXES = new TreeSet<>(Set.of(
-            // V001 and V002 build the schema itself, against an empty database by definition.
+            // V001 and V002 run against an empty database by definition.
             "V001__initial_schema.sql",
             "V002__audit_log.sql",
             "V005__incoming_webhooks.sql",
@@ -174,7 +145,6 @@ class MigrationIndexLockingTest {
         }
     }
 
-    /** Comments explain what a migration would do; they are not what it does. */
     private static String stripComments(String sql) {
         return sql.replaceAll("(?m)--.*$", "").replaceAll("(?s)/\\*.*?\\*/", "");
     }

@@ -4,17 +4,7 @@ import { Link } from 'react-router-dom';
 import { Reveal, Section } from './landing/primitives';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
-/**
- * The privacy policy and the terms of service for Railhook Cloud.
- *
- * Both are prose the owner reviews as a whole, so the text lives in the locale files section by
- * section and this component only sets it. A body is plain paragraphs separated by a blank line;
- * a paragraph whose lines start with "- " is a list. No markup in the translations, so a
- * translator cannot break the page.
- *
- * Google publishes the "Continue with Google" consent screen only with a privacy policy and terms
- * link on it, and the registration form already asks people to agree to both.
- */
+/** No markup in the translations, so a translator cannot break the page. */
 
 type Doc = 'privacy' | 'terms';
 
@@ -24,7 +14,6 @@ const SECTIONS: Record<Doc, string[]> = {
   terms: ['service', 'free', 'use', 'suspension', 'warranty', 'liability', 'selfHosted', 'law', 'changes', 'contact'],
 };
 
-/** The date both documents were last changed. */
 export const LEGAL_UPDATED = '2026-09-13';
 
 function Body({ text }: { text: string }) {
@@ -57,7 +46,7 @@ function LegalDocument({ doc }: { doc: Doc }) {
     <Section ruled={false}>
       <Reveal>
         <article className="max-w-2xl">
-          <h1 className="font-display text-3xl leading-[1.1] tracking-tight text-foreground sm:text-headline">
+          <h1 className="text-[2.375rem] font-normal leading-[1.16] tracking-[-0.03em] text-foreground sm:text-[3.5rem]">
             {t(`legal.${doc}.title`)}
           </h1>
           <p className="mt-3 font-mono text-xs text-muted-foreground">{t('legal.updated', { date: updated })}</p>
@@ -67,7 +56,7 @@ function LegalDocument({ doc }: { doc: Doc }) {
 
           {SECTIONS[doc].map((id) => (
             <Fragment key={id}>
-              <h2 className="mt-10 text-lg font-semibold tracking-tight text-foreground">
+              <h2 className="mt-10 text-lg font-medium tracking-tight text-foreground">
                 {t(`legal.${doc}.sections.${id}.title`)}
               </h2>
               <div className="text-[15px] leading-relaxed text-muted-foreground">
@@ -77,7 +66,7 @@ function LegalDocument({ doc }: { doc: Doc }) {
           ))}
 
           <p className="mt-12 border-t border-rail pt-6 text-sm text-muted-foreground">
-            <Link to={`/${other}`} className="font-medium text-primary hover:underline">
+            <Link to={`/${other}`} className="font-medium link-ink">
               {t(`legal.${other}.title`)}
             </Link>
           </p>

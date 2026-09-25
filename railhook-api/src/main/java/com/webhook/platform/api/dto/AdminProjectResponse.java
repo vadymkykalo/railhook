@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.UUID;
 
-/** A live project of one organization — its name and age, nothing it contains. */
 @Data
 @Builder
 @NoArgsConstructor

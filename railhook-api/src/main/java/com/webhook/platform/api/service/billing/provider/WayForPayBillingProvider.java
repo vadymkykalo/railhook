@@ -26,26 +26,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.io.IOException;
 
-/**
- * WayForPay billing provider.
- * Merchant-initiated recurring via recToken + HMAC_MD5 signature.
- *
- * <p>Key differences from Stripe:</p>
- * <ul>
- *   <li>No "customer" concept — uses merchantAccount (our account)</li>
- *   <li>Recurring charges are merchant-initiated with recToken (card token)</li>
- *   <li>Our scheduler must handle billing cycles (Stripe does it automatically)</li>
- *   <li>Signature: HMAC_MD5 (Stripe uses HMAC_SHA256)</li>
- *   <li>Primary currency: UAH</li>
- * </ul>
- *
- * <p>Configuration:</p>
- * <ul>
- *   <li>{@code WAYFORPAY_MERCHANT_ACCOUNT} — merchant identifier</li>
- *   <li>{@code WAYFORPAY_MERCHANT_SECRET} — secret key for HMAC_MD5</li>
- *   <li>{@code WAYFORPAY_MERCHANT_DOMAIN} — domain name</li>
- * </ul>
- */
+/** WayForPay has no subscription object, so our scheduler charges the card's recToken each cycle. */
 @Slf4j
 public class WayForPayBillingProvider implements BillingProvider {
 
@@ -92,13 +73,7 @@ public class WayForPayBillingProvider implements BillingProvider {
     @Override
     public String getDefaultCurrency() { return "UAH"; }
 
-    // ── Pricing ─────────────────────────────────────────────────────
-
-    /**
-     * WayForPay charges in UAH from its own price table ({@code WAYFORPAY_PLAN_PRICES}), which
-     * holds one monthly price per plan. There is no yearly price to charge, and charging the
-     * monthly one for a year would undercharge twelvefold, so a yearly checkout is refused.
-     */
+    // One monthly price per plan; charging it for a year would undercharge twelvefold.
     @Override
     public long checkoutPriceCents(String planName, BillingInterval interval, long catalogPriceCents) {
         if (interval != BillingInterval.MONTHLY) {
@@ -111,21 +86,7 @@ public class WayForPayBillingProvider implements BillingProvider {
         return priceCents;
     }
 
-    // ── Payment page (Purchase, offline behaviour) ──────────────────
-
-    /**
-     * Asks WayForPay for a payment link and returns it, with the order reference the callbacks
-     * will carry.
-     *
-     * <p>A Purchase is a form the browser POSTs to WayForPay; {@code behavior=offline} makes the
-     * same request answer {@code {"url": ...}} instead, which is what lets a JSON API hand the
-     * browser a redirect. This used to build the whole form and then return the bare endpoint,
-     * so the customer arrived at WayForPay with no order.
-     *
-     * <p>No {@code regularMode}: that asks WayForPay to run its own monthly schedule on top of the
-     * renewals {@code BillingSchedulerService} already charges against the card token — a second
-     * charge every month that no cancellation in Railhook reaches.
-     */
+    // No regularMode: WayForPay would charge monthly on top of our own renewals.
     @Override
     public CreatePaymentResult createPaymentPage(CreatePaymentRequest request) {
         String orderRef = "railhook_" + request.organizationId() + "_" + System.currentTimeMillis();
@@ -185,8 +146,6 @@ public class WayForPayBillingProvider implements BillingProvider {
                 request.planName(), request.organizationId(), orderRef);
         return new CreatePaymentResult(url, orderRef);
     }
-
-    // ── Merchant-initiated recurring charge ──────────────────────────
 
     @Override
     public ChargeResult chargeRecurring(RecurringChargeRequest request) {
@@ -249,8 +208,6 @@ public class WayForPayBillingProvider implements BillingProvider {
         }
     }
 
-    // ── Webhooks (serviceUrl callback) ──────────────────────────────
-
     @Override
     public BillingWebhookEvent parseWebhook(String rawPayload, Map<String, String> headers) {
         try {
@@ -268,10 +225,7 @@ public class WayForPayBillingProvider implements BillingProvider {
             String currency = body.path("currency").asText("UAH");
             String authCode = body.path("authCode").asText("");
 
-            // The signature covers the amount as WayForPay wrote it. It used to be read with
-            // asLong, which signed "299" for a callback saying 299.5 — every price with kopecks
-            // failed verification and was dropped. The literal is taken off the wire, and its
-            // trailing-zero-free form is accepted too, since "299.00" and "299" are one amount.
+            // Signed over the amount as written: asLong broke every price with kopecks.
             boolean signed = false;
             for (String amount : amountForms(amountAsSent)) {
                 String expectedSig = hmacMd5(String.join(";",
@@ -284,9 +238,7 @@ public class WayForPayBillingProvider implements BillingProvider {
                 return null;
             }
 
-            // clientAccountId is not covered by the signature, so it cannot be what decides whose
-            // subscription a payment lands on. The organization comes from the signed reference,
-            // and a clientAccountId naming any other organization is a forged callback.
+            // clientAccountId is unsigned, so the organization comes from the signed reference.
             String organizationId = organizationFromOrderReference(orderRef);
             String clientAccountId = body.path("clientAccountId").asText(null);
             if (clientAccountId != null && !clientAccountId.equals(organizationId)) {
@@ -300,9 +252,6 @@ public class WayForPayBillingProvider implements BillingProvider {
 
             log.info("WayForPay: webhook orderRef={} status={} eventType={}", orderRef, status, eventType);
 
-            // A checkout's orderReference is the reference its pending subscription was stored
-            // under — WayForPay has no subscription object, and the first order anchors the series.
-            // Renewal references are not: the scheduler settles those synchronously.
             return new BillingWebhookEvent(
                     eventType,
                     organizationId,
@@ -325,14 +274,11 @@ public class WayForPayBillingProvider implements BillingProvider {
         }
     }
 
-    // ── Internal helpers ────────────────────────────────────────────
-
     /** Minor units as WayForPay writes an amount: {@code 29900 → "299"}, {@code 29950 → "299.5"}. */
     static String formatAmount(long cents) {
         return BigDecimal.valueOf(cents, 2).stripTrailingZeros().toPlainString();
     }
 
-    /** The top-level {@code amount} exactly as it appears in the payload, or "" when absent. */
     private String topLevelAmountText(String rawPayload) throws IOException {
         try (JsonParser parser = objectMapper.getFactory().createParser(rawPayload)) {
             if (parser.nextToken() != JsonToken.START_OBJECT) {
@@ -361,11 +307,7 @@ public class WayForPayBillingProvider implements BillingProvider {
         return forms;
     }
 
-    /**
-     * The organization a checkout or fallback recurring reference was issued for, or null when the
-     * reference names none (a scheduler renewal names its subscription, which the scheduler has
-     * already settled synchronously).
-     */
+    // Null for a scheduler renewal reference, which the scheduler has already settled.
     private static String organizationFromOrderReference(String orderRef) {
         Matcher m = ORGANIZATION_ORDER_REFERENCE.matcher(orderRef);
         return m.matches() ? m.group(1) : null;

@@ -36,18 +36,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * One row the retry scheduler no longer owns must not strand the rows it still does.
- *
- * <p>A send whose confirmation outlives the scheduler's wait is handed back as if it had failed,
- * but the message may still land: the consumer then CASes the row onto its own token, which
- * bumps the version under the scheduler's Phase 1 snapshot. Phase 3 used to write every handed
- * back row with one {@code saveAll} in one transaction, so that single stale version threw,
- * rolled back the whole batch, and left every other rescheduled row PROCESSING until the stuck
- * sweep — up to five minutes — noticed.
- *
- * <p>Real Postgres, real transactions: the conflict only exists across commits.
- */
+// One stale version in a batched saveAll once rolled back every handed-back row in the batch.
 @DataJpaTest
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -90,8 +79,7 @@ class RetrySchedulerHandBackConcurrencyTest {
         UUID consumerToken = UUID.randomUUID();
 
         KafkaTemplate<String, DeliveryMessage> kafka = mock(KafkaTemplate.class);
-        // The late send: never confirmed inside the scheduler's wait, but it did reach the
-        // consumer, whose CAS has already moved the row onto a token of its own.
+        // Never confirmed in time, but it reached the consumer, whose CAS already moved the row.
         when(kafka.send(anyString(), eq(lateSend.getEndpointId().toString()), any(DeliveryMessage.class)))
                 .thenAnswer(invocation -> {
                     DeliveryMessage message = invocation.getArgument(2);

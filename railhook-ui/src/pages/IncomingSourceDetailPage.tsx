@@ -42,22 +42,9 @@ import VerificationGate from '../components/VerificationGate';
 import { formatJson, isValidJson } from '../lib/json';
 import ConfirmDialog from '../components/ConfirmDialog';
 
-/**
- * One incoming source and the destinations its events are forwarded to.
- *
- * The incoming direction has the same shape as the outgoing one — a thing that
- * receives, and standing statements about where what it receives goes — but
- * never borrows its words: these are Destinations receiving Forwards, not
- * subscriptions receiving deliveries.
- */
-
 const AUTH_TYPES: IncomingAuthType[] = ['NONE', 'BEARER', 'BASIC', 'CUSTOM_HEADER'];
 
-/**
- * The header a request to this source has to be signed in. A provider-verified source is checked
- * against that provider's own header — Stripe-Signature, not the generic X-Signature the source row
- * also carries, which is what this card used to show for a Stripe source.
- */
+/** Provider-verified sources are checked against the provider's own header, not X-Signature. */
 function signatureHeaderOf(source: IncomingSourceResponse): string | undefined {
   if (source.verificationMode === 'NONE') return undefined;
   if (source.verificationMode === 'PROVIDER') {
@@ -237,8 +224,7 @@ export default function IncomingSourceDetailPage() {
       timeoutSeconds: parseInt(destTimeout) || 30,
       retryDelays: destRetryDelays || undefined,
       payloadTransform: destPayloadTransform || undefined,
-      // '' rather than null: an omitted transformationId leaves the current one in place, and
-      // clearing the field on this form is a request to detach.
+      // '' rather than null: an omitted transformationId keeps the current one.
       transformationId: destTransformationId,
     };
 
@@ -309,13 +295,13 @@ export default function IncomingSourceDetailPage() {
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
               <ArrowDownToLine className="h-4 w-4" aria-hidden /> {t('incomingSources.ingressUrl')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded-md border border-rail bg-secondary/50 px-3 py-2 font-mono text-xs">
+              <code className="min-w-0 flex-1 truncate border border-rail bg-secondary/50 px-3 py-2 font-mono text-xs">
                 {source.ingressUrl}
               </code>
               <Button
@@ -328,7 +314,7 @@ export default function IncomingSourceDetailPage() {
             <div>
               {source.verificationMode === 'PROVIDER' && PROVIDER_SIGNATURE_HEADERS[source.providerType] ? (
                 // An unsigned cURL to a provider-verified source only ever produces a 401.
-                <p className="rounded-md border border-rail bg-secondary/40 p-3 text-xs text-muted-foreground">
+                <p className="border border-rail bg-secondary/40 p-3 text-xs text-muted-foreground">
                   {t('incomingSources.howToSend.signedByProvider', {
                     provider: t(`incomingSources.providerNames.${source.providerType}`),
                     header: signatureHeaderOf(source),
@@ -337,7 +323,7 @@ export default function IncomingSourceDetailPage() {
               ) : (
                 <>
                   <div className="mono-label mb-1.5">{t('incomingSources.howToSend.curlExample')}</div>
-                  <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-rail bg-secondary/40 p-3 font-mono text-[11px] text-muted-foreground">
+                  <pre className="overflow-x-auto whitespace-pre-wrap break-all border border-rail bg-secondary/40 p-3 font-mono text-[11px] text-muted-foreground">
                     {ingressCurl(source, signatureHeaderOf(source))}
                   </pre>
                   {signatureHeaderOf(source) && (
@@ -353,7 +339,7 @@ export default function IncomingSourceDetailPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
               {t('incomingSources.verification')}
             </CardTitle>
           </CardHeader>
@@ -589,7 +575,7 @@ export default function IncomingSourceDetailPage() {
                         key={preset.key}
                         type="button"
                         aria-pressed={active}
-                        className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                        className={`border px-3 py-2 text-left transition-colors ${
                           active ? 'border-primary bg-primary/5' : 'border-rail hover:border-primary/50'
                         }`}
                         onClick={() => {
@@ -635,7 +621,7 @@ export default function IncomingSourceDetailPage() {
                     />
                   </div>
                 </div>
-                <div className="rounded-lg border border-rail p-3">
+                <div className="border border-rail p-3">
                   <AttemptRail
                     attempts={ladderTicks(destRetryDelays, parseInt(destMaxAttempts) || 1)}
                     size="full"
@@ -703,7 +689,7 @@ export default function IncomingSourceDetailPage() {
                 <p className="text-xs text-muted-foreground">{t('incomingDestinations.createDialog.payloadTransformHint')}</p>
 
                 {(transformPreview || transformPreviewErrors.length > 0) && (
-                  <div className="overflow-hidden rounded-lg border border-rail">
+                  <div className="overflow-hidden border border-rail">
                     {transformPreview && (
                       <div className="bg-secondary/40 p-3">
                         <div className="mono-label mb-1.5">{t('incomingDestinations.validation.previewOutput')}</div>
@@ -731,7 +717,7 @@ export default function IncomingSourceDetailPage() {
               </div>
 
               {validationErrors.length > 0 && (
-                <div className="space-y-1 rounded-lg border border-halt/30 bg-halt-soft p-3">
+                <div className="space-y-1 border border-halt/30 bg-halt-soft p-3">
                   {validationErrors.map((err, i) => (
                     <p key={i} className="flex items-center gap-1.5 text-xs text-halt">
                       <XCircle className="h-3 w-3 flex-shrink-0" aria-hidden /> {err}
@@ -740,7 +726,7 @@ export default function IncomingSourceDetailPage() {
                 </div>
               )}
               {validationOk && (
-                <div className="rounded-lg border border-ok/30 bg-ok-soft p-3">
+                <div className="border border-ok/30 bg-ok-soft p-3">
                   <p className="flex items-center gap-1.5 text-xs text-ok">
                     <CheckCircle2 className="h-3 w-3" aria-hidden /> {t('incomingDestinations.validation.allValid')}
                   </p>

@@ -9,18 +9,12 @@ import picocli.CommandLine.Parameters;
 
 import java.io.PrintStream;
 import java.util.concurrent.Callable;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 /**
- * The operator back-office, from a terminal.
- *
- * <p>Everything here needs the deployment's platform-admin token, which is the same secret for
- * every tenant on the instance. It is read from {@code RAILHOOK_ADMIN_TOKEN} or {@code --token}
- * and never saved: a credential that outlives the command that used it is one more place it can
- * leak from, and this one is not a login.
- *
- * <p>Answering "who is on this instance", "are they near their limit" and "make this one stop"
- * used to mean a psql session against a customer's tables — a bad place to answer a support
- * question and a worse place to act on an abuse report.
+ * The platform-admin token is the same secret for every tenant on the instance. It is read from
+ * {@code RAILHOOK_ADMIN_TOKEN} or {@code --token} each time and never saved.
  */
 @Command(
         name = "admin",
@@ -40,7 +34,6 @@ public class AdminCommand implements Runnable {
         System.out.println("Run 'railhook admin --help' to see the operator commands.");
     }
 
-    /** Shared by every subcommand: where the token comes from, and how failures are reported. */
     abstract static class AdminSubcommand implements Callable<Integer> {
 
         @Option(names = {"-t", "--token"},
@@ -88,7 +81,7 @@ public class AdminCommand implements Runnable {
         Integer run(AdminApiClient client) throws Exception {
             StringBuilder path = new StringBuilder("/api/v1/admin/organizations?size=" + size);
             if (search != null && !search.isBlank()) {
-                path.append("&search=").append(java.net.URLEncoder.encode(search, java.nio.charset.StandardCharsets.UTF_8));
+                path.append("&search=").append(URLEncoder.encode(search, StandardCharsets.UTF_8));
             }
             if (suspendedOnly) {
                 path.append("&suspendedOnly=true");
@@ -152,7 +145,6 @@ public class AdminCommand implements Runnable {
                 out.println("    By:      " + text(org, "suspendedBy"));
             }
 
-            // Best-effort: an organization is still worth showing when its usage cannot be read.
             try {
                 JsonNode usage = client.get("/api/v1/admin/organizations/" + organizationId + "/usage");
                 out.println();
@@ -171,8 +163,7 @@ public class AdminCommand implements Runnable {
         private void printResource(String label, JsonNode resource) {
             if (resource.isMissingNode() || resource.isNull()) return;
             long limit = resource.path("limit").asLong();
-            // -1 is how the plan catalog spells "unlimited"; printed as a number it reads as a
-            // limit of minus one, which is what the dashboard had to be taught not to do.
+            // -1 means unlimited in the plan catalog.
             String against = limit < 0 ? "unlimited" : String.valueOf(limit);
             out.printf("    %-10s %d / %s%s%n", label + ":",
                     resource.path("current").asLong(), against,
@@ -201,7 +192,6 @@ public class AdminCommand implements Runnable {
 
             out.println("✓ " + text(org, "name") + " is suspended.");
             out.println("  Reason shown to them: " + text(org, "suspensionReason"));
-            // Worth saying, because it is the surprising half and the reason support can help.
             out.println("  They can still sign in and read. Writes and ingest are refused.");
             return 0;
         }

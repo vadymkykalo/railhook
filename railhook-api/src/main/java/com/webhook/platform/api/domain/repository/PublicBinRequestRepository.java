@@ -16,10 +16,7 @@ public interface PublicBinRequestRepository extends JpaRepository<PublicBinReque
 
     List<PublicBinRequest> findByBinIdOrderByIdDesc(UUID binId, Pageable pageable);
 
-    /**
-     * Keeps the bin's newest requests: at most {@code keep} of them, and only as many as fit in
-     * {@code budgetBytes} of bodies counted newest first. The newest one always stays.
-     */
+    // Keeps at most `keep` newest requests whose bodies fit in budgetBytes; the newest always stays.
     @Modifying
     @Query(value = "DELETE FROM public_bin_requests WHERE id IN ("
             + "SELECT id FROM (SELECT id, "

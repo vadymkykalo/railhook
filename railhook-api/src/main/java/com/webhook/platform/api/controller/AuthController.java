@@ -99,10 +99,7 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "Too many registration attempts. Try again later.");
         }
-        // After the rate limit, before anything is written: the rate limit is per address and a
-        // determined signup farm distributes across many, which is the gap a challenge closes.
-        // Unconfigured deployments get a verifier that accepts everything, so this is a no-op
-        // for self-hosting rather than a requirement it has to opt out of.
+        // Unconfigured, the verifier accepts everything, so self-hosting is unaffected.
         if (!captchaVerifier.verify(request.getCaptchaToken(), clientIp)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "CAPTCHA verification failed. Please try again.");
@@ -160,7 +157,7 @@ public class AuthController {
         if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getCode())) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
-        // Good for one attempt, whatever its outcome, like the code it vouches for.
+        // Good for one attempt, whatever its outcome.
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, authCookies.clearedSignInHandoff().toString());
         AuthResponse response = externalSignInService.exchangeSignInHandoff(
                 request.getCode(), browserBinding, originOf(httpRequest));
@@ -181,8 +178,7 @@ public class AuthController {
             HttpServletResponse httpResponse) {
         String refreshToken = cookieRefreshToken != null ? cookieRefreshToken :
                 (request != null ? request.getRefreshToken() : null);
-        // Its own budget, per token with a high per-IP ceiling: refresh runs on page loads, and
-        // sharing the sign-in bucket logged people out after ten of them in a minute.
+        // Its own bucket: refresh runs on every page load.
         if (!authRateLimiterService.allowRefresh(getClientIp(httpRequest), refreshToken)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
@@ -192,9 +188,8 @@ public class AuthController {
             }
             AuthResponse response = authService.refreshToken(refreshToken, originOf(httpRequest));
             setRefreshTokenCookie(httpResponse, response.getRefreshToken());
-            // A browser holds the token in its cookie, so it stays out of the body. A client that
-            // sent it in the body (the CLI) has no cookie jar: without it here it keeps the token
-            // this call just rotated away, replays it, and reuse detection revokes every session.
+            // The CLI has no cookie jar; without the rotated token in the body it would replay the
+            // old one and trip reuse detection.
             if (cookieRefreshToken != null) {
                 response.setRefreshToken(null);
             }
@@ -222,8 +217,7 @@ public class AuthController {
                 ? authHeader.substring(7)
                 : null;
         if (DemoSessions.isCurrent()) {
-            // The demo token only. A refresh cookie in this browser belongs to whoever uses it
-            // for their real account, and leaving the demo must not sign them out of that.
+            // Leave the refresh cookie alone: it belongs to the browser's real account.
             authService.logout(accessToken, null);
             return ResponseEntity.noContent().build();
         }
@@ -333,8 +327,7 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "Not authenticated"),
             @ApiResponse(responseCode = "404", description = "No such session for this user")
     })
-    // READ rather than WRITE: this acts on the caller's own sign-ins, not on organization data,
-    // so a Viewer must be able to sign their own laptop out. Same reasoning as change-password.
+    // READ: a Viewer must be able to sign out their own devices.
     @RequireAccess(AccessLevel.READ)
     @DeleteMapping("/sessions/{sessionId}")
     public ResponseEntity<Void> revokeSession(@PathVariable("sessionId") UUID sessionId, AuthContext auth) {
@@ -379,8 +372,7 @@ public class AuthController {
     @RequireAccess(AccessLevel.READ)
     @DeleteMapping("/me")
     public ResponseEntity<Void> eraseOwnAccount(AuthContext auth, HttpServletResponse httpResponse) {
-        // A JWT only: an API key belongs to a project, has no person behind it, and must not be
-        // able to erase the human who created it.
+        // An API key must not be able to erase the person who created it.
         auth.requireJwt();
         accountErasureService.eraseAccount(auth.requireUserId());
         clearRefreshTokenCookie(httpResponse);
@@ -406,9 +398,8 @@ public class AuthController {
         auth.requireJwt();
         AuthResponse response = authService.switchOrganization(
                 auth.requireUserId(), request, cookieRefreshToken);
-        // Deliberately not re-issuing the refresh cookie: the organization now lives on the
-        // session row, so the refresh token needs no change, and rotating it would make a
-        // double-clicked switcher look like a replayed token to the reuse detection.
+        // No new refresh cookie: the organization lives on the session row, and rotating here
+        // would make a double click look like token reuse.
         return ResponseEntity.ok(response);
     }
 
@@ -436,8 +427,6 @@ public class AuthController {
     @PostMapping("/reset-password")
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request,
             HttpServletRequest httpRequest) {
-        // No email bucket applies here (unlike login) — bucket by the presented reset
-        // token too, so guessing/retrying is bounded per-token as well as per-IP.
         if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getToken())) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "Too many requests. Try again later.");
@@ -450,11 +439,7 @@ public class AuthController {
         return trustedProxyResolver.resolve(request);
     }
 
-    /**
-     * What a browser sign-in gets recorded as. Both fields are for a human reading their own
-     * session list -- a User-Agent is whatever the client claimed and the IP is whatever
-     * {@link TrustedProxyResolver} could establish -- so neither is ever an authorization input.
-     */
+    /** Display only: neither the User-Agent nor the IP is ever an authorization input. */
     private SessionOrigin originOf(HttpServletRequest request) {
         return SessionOrigin.of(SessionClient.WEB, request.getHeader("User-Agent"), getClientIp(request));
     }

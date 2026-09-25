@@ -9,10 +9,6 @@ import { renderPage } from '../../test/renderPage';
 import AboutPage from '../AboutPage';
 import { REPO_URL } from '../landing/plans';
 
-/**
- * Who builds Railhook and why, in facts only: the maintainer, the licence, the stack and where
- * the work happens. No invented team, customers, location or funding.
- */
 function renderAbout() {
   return renderPage(<AboutPage />, {
     path: '/about',
@@ -50,10 +46,10 @@ describe('AboutPage', () => {
     for (const part of ['Java', 'Spring Boot', 'PostgreSQL', 'Kafka', 'Redis']) expect(text).toContain(part);
   });
 
-  it('links to the docs, the changelog and the contact page', () => {
+  it('links to the docs, the changelog on GitHub and the contact page', () => {
     renderAbout();
     const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(expect.arrayContaining(['/docs/', '/changelog', '/contact']));
+    expect(hrefs).toEqual(expect.arrayContaining(['/docs/', `${REPO_URL}/blob/main/CHANGELOG.md`, '/contact']));
   });
 
   it('switches language', async () => {

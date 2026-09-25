@@ -9,34 +9,14 @@ import { STATUS_KIND } from '../../pages/EventsPage';
 import { STATUS_TEXT } from '../../components/charts/statusScale';
 import { nodeTemplates } from '../../components/workflow/nodes/nodeTypes';
 
-/**
- * Locale parity (en vs uk) cannot catch a key missing from *both* files, and
- * TypeScript cannot check a template-literal `t()` key against JSON. Between
- * them sits a whole class of bug that reaches production looking like
- * `events.deliveryStatus.unknown` printed where a label should be.
- *
- * Everything below renders a backend enum value through an interpolated key.
- * The enums come from the committed openapi.yaml, which CI already proves has
- * not drifted from what the API serves — so this list stays true on its own
- * rather than being a copy somebody has to remember to update.
- */
+/** Parity cannot catch a key missing from both locales, and TS cannot check template-literal keys. */
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const spec = yaml.load(readFileSync(resolve(root, '../openapi.yaml'), 'utf8')) as {
   components: { schemas: Record<string, { properties?: Record<string, { enum?: string[] }> }> };
 };
 
-/**
- * Locale namespace → the schema property whose enum it has to cover, and the values of that
- * enum the UI never renders.
- *
- * <p>The fourth element exists for one real case rather than as a general escape hatch:
- * MembershipRole carries API_KEY, which is what an API-key caller authenticates as and never
- * something a membership row is. A label for it would be a dead entry of exactly the kind the
- * "no label for a value the API cannot return" assertion is here to prevent, so the value is
- * named as unrendered and then required to be absent — which keeps both directions honest
- * instead of quietly widening one of them.
- */
+/** `unrendered` exists for MembershipRole.API_KEY, which no membership row ever is. */
 const ENUM_BACKED: Array<[namespace: string, schema: string, property: string, unrendered?: string[]]> = [
   ['billing.statuses', 'OrganizationBillingResponse', 'billingStatus'],
   ['replay.status', 'ReplaySessionResponse', 'status'],
@@ -46,24 +26,14 @@ const ENUM_BACKED: Array<[namespace: string, schema: string, property: string, u
   ['alerts.severities', 'AlertRuleResponse', 'severity'],
   ['alerts.channels', 'AlertRuleResponse', 'channel'],
   ['piiRules.maskStyles', 'PiiMaskingRuleResponse', 'maskStyle'],
-  // Added after 2.10.0 shipped four sets of raw keys to a customer's screen. Each of these is
-  // a t(`namespace.${value}`) call with the same drift risk as the four that broke; the first
-  // is the most-rendered status label in the product, and until DeliveryResponse.status was
-  // typed as its enum rather than a String, the spec did not say enough for this test to
-  // check it at all.
   ['deliveries.status', 'DeliveryResponse', 'status'],
   ['members.statuses', 'MemberResponse', 'status'],
   ['roles', 'MemberResponse', 'role', ['API_KEY']],
   ['rules.actionTypes', 'RuleActionResponse', 'type'],
   ['workflows.triggerTypes', 'WorkflowResponse', 'triggerType'],
-  // The dashboard says the same five statuses in its own words -- "Abandoned" where the
-  // deliveries table says "DLQ" -- so it is a second set of labels over one enum, and it
-  // drifts separately.
+  // A second set of labels over the same enum, so it drifts separately.
   ['dashboard.inFlight.status', 'DeliveryResponse', 'status'],
   ['analytics.endpointStatus', 'EndpointPerformance', 'status'],
-  // The provider picker and the source header both render this. A provider added to the backend
-  // enum without a label here used to reach the screen as the raw SCREAMING_CASE value, which is
-  // what the picker showed for every provider before the labels existed.
   ['incomingSources.providerNames', 'IncomingSourceResponse', 'providerType'],
 ];
 
@@ -101,10 +71,7 @@ describe('interpolated translation keys resolve', () => {
     });
   });
 
-  /* Not a backend enum: derived in the page from a rollup the API does not
-     serve. STATUS_KIND is a Record over the union, so TypeScript guarantees
-     its keys are the complete set — which is why the test reads it rather
-     than restating the values. */
+  /* STATUS_KIND is a Record over the union, so its keys are the complete set. */
   it.each([['en', en], ['uk', uk]] as const)(
     'events.deliveryStatus has a label for every derived status (%s)',
     (_name, locale) => {
@@ -113,14 +80,7 @@ describe('interpolated translation keys resolve', () => {
     },
   );
 
-  /* The dashboard's one-word answer to "is this project healthy". Derived by
-     verdictOfDeliveryStats from the delivery rollup, so it is a StatusKind and
-     nothing the API names. STATUS_TEXT is a Record over that union, which makes
-     its keys the complete set for the same reason STATUS_KIND is.
-
-     Only the forward direction is checked: the namespace also carries `label`,
-     `detail` and `idleDetail`, which are prose around the verdict rather than
-     values of it. */
+  /* Forward direction only: the namespace also carries prose keys around the verdict. */
   it.each([['en', en], ['uk', uk]] as const)(
     'dashboard.verdict has a label for every status kind (%s)',
     (_name, locale) => {
@@ -129,15 +89,6 @@ describe('interpolated translation keys resolve', () => {
     },
   );
 
-  /* Workflow node types. Not an enum at either end: the nine types are a
-     frontend catalogue, and the canvas renders each one's name and its one-line
-     description from the locale whenever the node carries no label of its own —
-     which is every node the moment it is dropped. A missing entry here is a
-     palette item reading `workflows.nodeTypes.slack.label`.
-
-     `nodeTemplates` is typed against the map React Flow is handed, so a
-     template for a type with no component does not compile and this list cannot
-     fall behind the canvas. */
   describe('workflows.nodeTypes', () => {
     it.each([['en', en], ['uk', uk]] as const)('%s names and describes every node type', (_name, locale) => {
       const labels = labelsUnder(locale, 'workflows.nodeTypes');

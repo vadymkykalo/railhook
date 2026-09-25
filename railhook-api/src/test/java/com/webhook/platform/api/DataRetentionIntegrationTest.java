@@ -47,14 +47,7 @@ import org.springframework.test.annotation.DirtiesContext;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class DataRetentionIntegrationTest {
 
-    /**
-     * Fixture tenant for rows inserted straight through JDBC.
-     *
-     * <p>These fixtures bypass the entity mapping (and the FK checks, via
-     * {@code session_replication_role = replica}) that would normally stamp
-     * {@code organization_id}, so they name one themselves. The value only has to be non-null and
-     * consistent — nothing here asserts on tenant confinement.
-     */
+    // JDBC fixtures bypass the entity mapping, so they stamp organization_id themselves.
     private static final UUID FIXTURE_ORG = UUID.randomUUID();
 
     @MockitoBean
@@ -119,11 +112,7 @@ public class DataRetentionIntegrationTest {
     private TransactionTemplate transactionTemplate;
 
 
-    /**
-     * These two build their own {@code @SpringBootTest} rather than extending
-     * {@code AbstractIntegrationTest}, so they enter the system tenant scope themselves. They read
-     * and delete rows across organizations directly, which is exactly what that scope means.
-     */
+    // Own @SpringBootTest rather than AbstractIntegrationTest, so it enters the system scope itself.
     @BeforeEach
     void enterSystemTenantScope() {
         TenantContext.set(TenantContext.SYSTEM);
@@ -174,15 +163,6 @@ public class DataRetentionIntegrationTest {
         assertEquals(6, delivery1Attempts.get(0).getAttemptNumber());
         assertEquals(15, delivery1Attempts.get(9).getAttemptNumber());
     }
-
-    // testAgeBasedCleanup (dataRetentionService.cleanupOldDeliveryAttempts()) was removed:
-    // delivery_attempts is now partitioned monthly (V052) and the global
-    // age-based cutoff this test exercised is now enforced by
-    // PartitionMaintenanceService.dropExpiredPartitions() (O(1) DROP TABLE on whole
-    // expired partitions) instead of a row-level DELETE. See
-    // PartitionMaintenanceServiceIntegrationTest for coverage of that behavior.
-    // deliveryAttemptRepository.deleteOldAttempts() itself is untouched and still
-    // covered by testBatchSizeRespected() below.
 
     @Test
     void testBatchSizeRespected() {

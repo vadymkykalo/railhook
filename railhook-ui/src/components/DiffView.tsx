@@ -10,15 +10,7 @@ interface DiffViewProps {
   maxHeight?: string;
 }
 
-/**
- * What the transformation actually changed, line by line.
- *
- * The question a Diff tab answers is not "are these different" — the Output tab
- * already shows that — but "did it change only what I meant it to". So unchanged
- * stretches collapse, and the summary at the top is a count of lines rather than
- * a verdict: "nothing changed" is a perfectly good outcome for a script that
- * only sets a header.
- */
+/** Unchanged stretches collapse; "nothing changed" is a valid outcome, not a failure. */
 export default function DiffView({
   before, after, beforeLabel, afterLabel, maxHeight = '420px',
 }: DiffViewProps) {
@@ -28,7 +20,7 @@ export default function DiffView({
 
   if (diff.added === 0 && diff.removed === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-rail p-6 text-center">
+      <div className="border border-dashed border-rail p-6 text-center">
         <p className="text-sm font-medium text-foreground">{t('transform.diff.identicalTitle')}</p>
         <p className="mt-1 text-xs text-muted-foreground">{t('transform.diff.identicalHint')}</p>
       </div>
@@ -36,7 +28,7 @@ export default function DiffView({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-rail">
+    <div className="overflow-hidden border border-rail">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-rail bg-muted/40 px-3 py-2 text-[11px]">
         <span className="font-medium text-muted-foreground">
           <span className="text-halt">−</span> {beforeLabel}

@@ -1,12 +1,1 @@
-# CODEOWNERS
-#
-# Every push/PR is currently authored or reviewed by a single maintainer, so
-# this file has one line today. It exists so GitHub can enforce "at least one
-# approval" (see CONTRIBUTING.md / the branch protection rule on `develop` and
-# `main`) and so review requests are auto-assigned instead of falling through
-# the cracks as the contributor list grows.
-#
-# Last match wins - keep more specific paths below the blanket rule if you add
-# per-directory owners later.
-
 *   @vadymkykalo

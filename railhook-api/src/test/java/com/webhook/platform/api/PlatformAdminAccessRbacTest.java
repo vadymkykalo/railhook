@@ -33,17 +33,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Who reaches the platform-admin panel with an ordinary sign-in.
- *
- * <p>The panel is for the people running this deployment, named by address in
- * {@code PLATFORM_ADMIN_EMAILS}. Being listed is not enough on its own: the address has to be
- * verified — otherwise anyone could register the operator's address on a deployment that does
- * not send mail and walk in — the account has to be active, and the sign-in behind the token has
- * to be recent, so a laptop left signed in for a week is not a standing key to every tenant.
- *
- * <p>And an organization OWNER, however privileged inside their own tenant, gets nothing.
- */
 @TestPropertySource(properties = {
         "platform.admin.emails= Operator-One@example.com , ,operator-two@example.com"
 })
@@ -72,12 +61,7 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
     private record Account(String token, UUID userId, UUID organizationId) {
     }
 
-    /**
-     * A fresh sign-in for {@code email}: registered the first time, signed in again after that.
-     * The listed addresses are fixed by the class's properties while the context — and so the
-     * database — is shared by every test, so each test after the first finds the account there,
-     * possibly left disabled or unverified by another; it is put back to active and verified first.
-     */
+    // The database is shared, so a later test finds the account and puts it back to active and verified.
     private Account register(String email) throws Exception {
         MvcResult result;
         User existing = userRepository.findByEmail(email.toLowerCase(java.util.Locale.ROOT)).orElse(null);
@@ -140,8 +124,6 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
                 post("/api/v1/admin/encryption/rotate").header("Authorization", auth));
     }
 
-    // ── Refused ────────────────────────────────────────────────────
-
     @Test
     public void anOwnerWhoIsNotListedIsRefusedEverywhere() throws Exception {
         Account owner = registerVerified("plain-owner@example.com");
@@ -203,16 +185,13 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
 
     @Test
     public void aListedAdminCannotRotateEncryptionKeysWithASignIn() throws Exception {
-        // Re-encrypting every tenant's secrets stays on the operator token: it is an infrastructure
-        // act run from the deployment, not something a browser session should be one click from.
+        // Re-encrypting every tenant's secrets stays on the operator token.
         Account admin = registerVerified(ADMIN_EMAIL);
 
         mockMvc.perform(post("/api/v1/admin/encryption/rotate")
                         .header("Authorization", "Bearer " + admin.token()))
                 .andExpect(status().isForbidden());
     }
-
-    // ── Admitted ───────────────────────────────────────────────────
 
     @Test
     public void aVerifiedActiveListedAdminSeesThePanel() throws Exception {
@@ -269,22 +248,13 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
         assertNoSecrets(users.getResponse().getContentAsString());
     }
 
-    /**
-     * The operator's own account used to read as one more OWNER in the lists. The mark comes from
-     * the same rule the admin API applies — listed, verified and active — so a listed address
-     * nobody has proved is not called an admin.
-     */
-    /**
-     * How far the last month's sign-ups got: verified the address, created a project, sent an event.
-     * The database is shared by every test in the class, so the counts are read before and after.
-     */
+    // The database is shared by every test in the class, so counts are read before and after.
     @Test
     public void theOverviewShowsHowFarRecentSignupsGot() throws Exception {
         String auth = "Bearer " + registerVerified(ADMIN_EMAIL).token();
         JsonNode before = activation(auth);
 
-        // Whether a new account starts verified depends on the deployment's mail settings, so the
-        // one that stopped at sign-up is put there explicitly.
+        // Whether a new account starts verified depends on mail settings, so set it explicitly.
         User stopped = userRepository.findById(register("funnel-stopped-at-signup@example.com").userId()).orElseThrow();
         stopped.setEmailVerified(false);
         userRepository.save(stopped);
@@ -376,12 +346,7 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
         assertThat(organizationRepository.findById(tenant.organizationId()).orElseThrow().getSuspendedBy())
                 .isEqualTo(ADMIN_EMAIL);
 
-        // The write is recorded against the organization acted on — where its owners will look —
-        // and not against the admin's own organization, which had nothing to do with it. Only the
-        // suspension's own rows: registering gave the admin a first project, audited in their
-        // organization as it should be. The admin's account is shared with the other tests in this
-        // class, whose own PLATFORM_ADMIN_ACCESS rows would otherwise meet the count before this
-        // suspension's rows land: only rows about the suspended organization are counted.
+        // Only rows about the suspended organization: the admin account is shared with other tests.
         java.util.Set<String> suspensionActions = java.util.Set.of("ORGANIZATION_SUSPENDED", "PLATFORM_ADMIN_ACCESS");
         List<AuditLog> written = awaitAudit(() -> TenantContext.callAsSystem(() -> auditLogRepository.findAll()
                 .stream()
@@ -417,7 +382,7 @@ public class PlatformAdminAccessRbacTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/admin/users").header("Authorization", "Bearer " + admin.token()))
                 .andExpect(status().isOk());
 
-        // The account is shared with the other tests in this class, so it has other rows too.
+        // The account is shared with the other tests in this class.
         List<AuditLog> reads = awaitAudit(() -> TenantContext.callAsSystem(() -> auditLogRepository.findAll()
                 .stream()
                 .filter(a -> "PLATFORM_ADMIN_ACCESS".equals(a.getAction()))

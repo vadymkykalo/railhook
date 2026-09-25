@@ -34,14 +34,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The remote MCP server at {@code /mcp}, driven the way an MCP client drives it: JSON-RPC over a
- * POST, authenticated with a project API key.
- *
- * <p>What is asserted here is what the REST interceptor would otherwise have guaranteed and no
- * longer can, because a tool call is not a handler method: the key's project is the only one a
- * tool sees, a READ_ONLY key cannot write, and a request without a key never reaches a tool.
- */
 @AutoConfigureMockMvc
 class McpServerIntegrationTest extends AbstractIntegrationTest {
 
@@ -78,7 +70,6 @@ class McpServerIntegrationTest extends AbstractIntegrationTest {
         readWriteKeyB = createKey(jwt, projectB, ApiKeyScope.READ_WRITE);
     }
 
-    /** The handshake the official TypeScript client, and so the @railhook/mcp bridge, performs. */
     @Test
     void completesTheStreamableHttpHandshake() throws Exception {
         JsonNode initialized = rpc(withBearer(readOnlyKeyA), "initialize", Map.of(
@@ -93,18 +84,14 @@ class McpServerIntegrationTest extends AbstractIntegrationTest {
                         Map.of("jsonrpc", "2.0", "method", "notifications/initialized")))))
                 .andExpect(status().isAccepted());
 
-        // Stateless: no server-initiated stream to open, which the client is built to accept.
+        // Stateless: no server-initiated stream, which the client accepts.
         mockMvc.perform(get("/mcp")
                         .header("Authorization", "Bearer " + readOnlyKeyA)
                         .accept(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(status().isMethodNotAllowed());
     }
 
-    /**
-     * A method this server does not implement is the client's question, not the server's failure:
-     * a JSON-RPC error on a 200, never an HTTP 500. Clients probe methods newer than the SDK
-     * (claude.ai sends {@code server/discover}), and each 500 counted towards the API's 5xx alert.
-     */
+    // Clients probe newer methods; each 500 counted towards the API's 5xx alert.
     @Test
     void answersAnUnknownMethodWithAJsonRpcErrorNotA500() throws Exception {
         JsonNode response = rpc(withBearer(readOnlyKeyA), "server/discover", Map.of());
@@ -240,8 +227,6 @@ class McpServerIntegrationTest extends AbstractIntegrationTest {
         assertThat(badStatus.path("isError").asBoolean(false)).isTrue();
         assertThat(text(badStatus)).contains("DLQ");
     }
-
-    // ── helpers ──────────────────────────────────────────────────────────
 
     private interface Auth {
         MockHttpServletRequestBuilder apply(MockHttpServletRequestBuilder request);

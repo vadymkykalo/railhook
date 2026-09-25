@@ -1,14 +1,6 @@
-/**
- * Pretty-prints a JSON string, returning it unchanged when it is not JSON.
- *
- * <p>A webhook body is whatever the sender put in it: showing the raw text is the honest answer
- * for a payload that never parsed.
- */
 export function formatJson(value: unknown): string {
   if (typeof value !== 'string') {
-    // Callers hand this whatever an API gave them, and axios parses a JSON
-    // body into an object whatever the content type claimed. Returning the
-    // object unchanged made React try to render it.
+    // axios parses JSON bodies into objects whatever the content type claimed.
     return value == null ? '' : JSON.stringify(value, null, 2);
   }
   try {
@@ -21,12 +13,7 @@ export function formatJson(value: unknown): string {
 
 const INDENT = '  ';
 
-/**
- * Re-indents JSON text that is already known to be valid, copying every string and number token
- * verbatim. `JSON.stringify(JSON.parse(x))` goes through a double, so an id like
- * 1234567890123456789 came back as 1234567890123456800 — on screen, and in the Transform
- * Studio's "Format", in the payload that is then sent.
- */
+/** Copies number tokens verbatim: JSON.parse turns 1234567890123456789 into ...800. */
 function reindent(text: string): string {
   let out = '';
   let depth = 0;
@@ -78,7 +65,6 @@ function reindent(text: string): string {
   return out;
 }
 
-/** Whether a string parses as JSON at all — for a form that only accepts one. */
 export function isValidJson(value: string): boolean {
   try {
     JSON.parse(value);

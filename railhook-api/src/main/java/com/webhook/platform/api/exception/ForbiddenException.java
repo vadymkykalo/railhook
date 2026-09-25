@@ -10,7 +10,6 @@ public class ForbiddenException extends RuntimeException {
         super(message, cause);
     }
 
-    /** The {@code error} field of the response body. */
     public String getCode() {
         return "forbidden";
     }

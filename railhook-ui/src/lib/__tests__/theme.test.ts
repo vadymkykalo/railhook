@@ -2,12 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTheme, isDarkApplied, setTheme, toggleTheme } from '../theme';
 
-/**
- * The toggle used to invert the *stored* theme. With nothing stored getTheme() answers
- * 'system'; 'system' is not 'dark', so it chose 'dark' — which, on a machine set to dark, is
- * the theme already on screen. The first click did nothing, for every user who had never
- * picked a theme, which is all of them until they pick one.
- */
+/** With nothing stored, 'system' on a dark machine made the first toggle choose dark again. */
 describe('toggleTheme', () => {
   function systemPrefersDark(dark: boolean) {
     vi.stubGlobal('matchMedia', (query: string) => ({

@@ -10,13 +10,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-/**
- * The worker's Kafka clients — both consumer groups and every producer — publish their own
- * metrics: consumer lag, records and bytes consumed, fetch latency, connections, send rate.
- *
- * <p>Spring only times listener and template calls; the client's metrics exist only when a
- * Micrometer listener is on the factory. Without one the Kafka dashboard had nothing to show.
- */
+// Client metrics exist only with a Micrometer listener on the factory.
 class KafkaClientMetricsTest {
 
     @Test

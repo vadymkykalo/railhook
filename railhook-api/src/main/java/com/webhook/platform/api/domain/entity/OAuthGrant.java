@@ -21,16 +21,11 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * An MCP app a person connected to one project: the OAuth counterpart of an {@link ApiKey}.
+ * The OAuth counterpart of an ApiKey for an MCP app. Unlike a key it has a person behind it, and
+ * it works only while {@link #userId} could still approve it today.
  *
- * <p>It carries exactly what a key carries — organization, project, {@link ApiKeyScope} — so on
- * {@code /mcp} the two are the same kind of caller. What a key does not have is a person behind
- * it: {@link #userId} approved the grant, and it keeps working only while they could still approve
- * it today.
- *
- * <p>Holds the one live access token and the one live refresh token, as hashes. Refreshing
- * replaces both; {@link #previousRefreshTokenHash} is kept so that a replayed refresh token is
- * recognised as one.
+ * <p>Refreshing replaces both tokens; {@link #previousRefreshTokenHash} is kept so a replayed
+ * refresh token is recognised.
  */
 @Entity
 @Table(name = "oauth_grants")
@@ -52,7 +47,7 @@ public class OAuthGrant {
     @Column(name = "project_id", nullable = false)
     private UUID projectId;
 
-    /** {@link OAuthClient#getId()}, not the public client_id string. */
+    /** OAuthClient's id, not the public client_id string. */
     @Column(name = "client_id", nullable = false)
     private UUID clientId;
 

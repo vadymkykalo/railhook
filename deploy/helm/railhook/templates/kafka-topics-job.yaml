@@ -1,13 +1,5 @@
 {{- /*
-  Guarded on createTopics and a known broker, not on kafka.enabled.
-
-  It used to be `if .Values.kafka.enabled`, which never rendered anywhere it
-  could work: enabled=false (the only supported setting since the subchart was
-  dropped) skipped the job entirely, and enabled=true pointed
-  railhook.kafka.bootstrapServers at an in-chart broker this chart no longer
-  deploys. So the README's "topics are created automatically" was true of no
-  configuration, and the apps were left relying on broker auto-create — which
-  silently applies the broker's default partition count instead of
+  Not gated on kafka.enabled: the chart ships no broker, and broker auto-create would ignore
   kafka.topicPartitions.
 */}}
 {{- if and .Values.kafka.createTopics (include "railhook.kafka.bootstrapServers" .) }}

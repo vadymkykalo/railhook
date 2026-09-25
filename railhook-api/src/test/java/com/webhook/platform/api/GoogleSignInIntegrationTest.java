@@ -47,10 +47,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * "Continue with Google" end to end, against a stand-in for Google's token endpoint and key set:
- * start, callback, the one-time code the dashboard exchanges, and the session that comes out.
- */
 class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
 
     private static final String CLIENT_ID = "test-client.apps.googleusercontent.com";
@@ -79,7 +75,6 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
-    /** What the browser that went through the last {@link #callback} holds. */
     private Cookie handoffCookie;
 
     @Autowired
@@ -144,8 +139,6 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(userIdentityRepository.findByProviderAndSubject("google", "g-grace")).isPresent();
 
-        // The same start a password registration gets: one project, so the dashboard has
-        // something to open.
         mockMvc.perform(get("/api/v1/projects").header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
@@ -166,7 +159,6 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.organization.name").value("Kernel"))
                 .andExpect(jsonPath("$.hasPassword").value(true));
 
-        // The password still works: linking adds a way in, it does not take one away.
         mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new LoginRequest("linus@kernel.dev", "Password1234!"))))
                 .andExpect(status().isOk());
@@ -176,8 +168,7 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
     void aCaseVariantOfTheAddressCannotBreakTheOwnersGoogleSignIn() throws Exception {
         registerWithPassword("grace@navy.dev", "Navy");
 
-        // Someone tries to register the owner's address in other letters. It used to succeed, and
-        // the owner's Google sign-in then found two accounts and failed on every attempt.
+        // This used to succeed, and Google sign-in then found two accounts.
         RegisterRequest variant = RegisterRequest.builder()
                 .email("Grace@Navy.dev").password("Password1234!").organizationName("Squatter").build();
         mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
@@ -196,9 +187,7 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void anUnverifiedAccountLosesAPasswordNobodyProvedWasTheirs() throws Exception {
-        // Someone registers the victim's address with a password of their own and never verifies
-        // it. When the real owner arrives through Google, the account must not keep a password the
-        // squatter knows.
+        // A squatter's unverified password must not survive the real owner's Google sign-in.
         when(emailService.isEnabled()).thenReturn(true);
         registerWithPassword("target@victim.dev", "Squatted");
         when(emailService.isEnabled()).thenReturn(false);
@@ -260,9 +249,7 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void aSignInCodeOnlyWorksInTheBrowserGoogleSentBack() throws Exception {
-        // Login CSRF: someone finishes a Google sign-in of their own, stops before the dashboard
-        // spends the code, and sends the link to someone else. Opened there, it must not sign that
-        // person into the sender's account.
+        // Login CSRF: a forwarded sign-in link must not sign someone else in.
         SignInStart attacker = start("/admin/projects");
         nextIdToken = idToken(attacker.nonce(), Map.of("sub", "g-mallory", "email", "mallory@example.dev"));
         String code = query(callback(attacker)).get("code");
@@ -273,7 +260,6 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.accessToken").doesNotExist());
 
-        // A victim who went through a sign-in of their own holds a handoff cookie too, for their code.
         SignInStart victim = start("/admin/projects");
         nextIdToken = idToken(victim.nonce(), Map.of("sub", "g-victim", "email", "victim@example.dev"));
         callback(victim);
@@ -282,7 +268,6 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
                         .content("{\"code\":\"" + code + "\"}"))
                 .andExpect(status().isUnauthorized());
 
-        // The refusals did not spend the code: the browser it was issued to still signs in.
         handoffCookie = attackersBrowser;
         exchange(code);
     }
@@ -343,8 +328,6 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
         assertThat(query(callback(start))).containsEntry("returnTo", "/admin/dashboard");
     }
 
-    // ── helpers ────────────────────────────────────────────────────────
-
     private record SignInStart(String googleUrl, String state, String nonce, Cookie cookie) {}
 
     private SignInStart start(String returnTo) throws Exception {
@@ -359,10 +342,6 @@ class GoogleSignInIntegrationTest extends AbstractIntegrationTest {
         return new SignInStart(location, query.get("state"), query.get("nonce"), cookie);
     }
 
-    /**
-     * Google's redirect back, carrying the state it was given. Returns where the API sends the
-     * browser, and keeps the handoff cookie that browser now holds for {@link #exchange}.
-     */
     private String callback(SignInStart start) throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/auth/oauth/google/callback")
                         .param("code", "google-code-" + start.state()).param("state", start.state())

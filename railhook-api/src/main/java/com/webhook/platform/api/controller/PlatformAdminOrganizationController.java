@@ -36,22 +36,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 /**
- * The operator's view of the tenants on this deployment.
- *
- * <p>Until this existed, {@code /api/v1/admin/**} was a single endpoint that rotates encryption
- * keys, and everything else an operator might need — who is on this instance, why did this
- * customer's deliveries stop, make this one stop — was psql. That is a bad place to answer a
- * support question and a worse place to act on an abuse report.
- *
- * <p>Gated like its neighbours: {@code SecurityConfig} requires the {@code PLATFORM_ADMIN}
- * authority across {@code /api/v1/admin/**}, which the operator token carries and a sign-in
- * carries only when {@code PlatformAdminAccessFilter} has checked it against
- * {@code PLATFORM_ADMIN_EMAILS}. No tenant role, however privileged, carries it.
- *
- * <p>Declares no {@link com.webhook.platform.api.security.RequireAccess}, deliberately. That
- * annotation resolves a membership role, and the operator has none — a platform-admin request
- * to a handler declaring an access level is refused by design, because such a handler is a
- * tenant endpoint. Authorization here is the credential itself.
+ * Authorization is the PLATFORM_ADMIN authority required on {@code /api/v1/admin/**}, which no
+ * tenant role carries. No RequireAccess here on purpose: it resolves a membership role, and the
+ * operator has none.
  */
 @Slf4j
 @RestController
@@ -166,9 +153,8 @@ public class PlatformAdminOrganizationController {
     public ResponseEntity<AdminOrganizationResponse> suspend(
             @PathVariable("organizationId") UUID organizationId,
             @Valid @RequestBody SuspendOrganizationRequest request) {
-        // A person is signed with the address they were admitted by, not a name they typed: the
-        // record has to say who actually did it. The operator token has no person behind it, so
-        // there the caller still names themselves.
+        // A signed-in admin is recorded by their address, not a name they typed. The operator
+        // token has no person behind it, so that caller names themselves.
         String suspendedBy = SecurityContextHolder.getContext().getAuthentication()
                 instanceof PlatformAdminUserAuthenticationToken admin
                 ? admin.getEmail()

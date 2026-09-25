@@ -23,13 +23,8 @@ public interface IncomingEventRepository extends JpaRepository<IncomingEvent, UU
     Optional<IncomingEvent> findByIncomingSourceIdAndProviderEventId(UUID incomingSourceId, String providerEventId);
 
     /**
-     * Removes up to {@code limit} Incoming Events received before the cutoff, and through the
-     * cascade their Forwards' attempt rows.
-     *
-     * <p>An Incoming Event with a Forward attempt still PENDING or PROCESSING is left alone however
-     * old it is, as events retention leaves an in-flight Delivery. A Replay or a Failed Messages
-     * retry starts a fresh Forward for a webhook that may have arrived just inside the window, and
-     * the cascade wiped it mid-ladder, with a claim possibly live on it.
+     * Skips events with a Forward still PENDING or PROCESSING, however old: a replay can start a
+     * fresh Forward on an old event, and the cascade would delete it mid-retry.
      */
     @Modifying
     @Query(value = """

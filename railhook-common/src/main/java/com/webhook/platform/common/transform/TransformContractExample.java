@@ -9,17 +9,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * The one worked example of the JavaScript contract, loaded from
- * {@code transform/contract-example.json}.
- *
- * <p>It exists so that the two places a transformation can run — the api's preview and the
- * worker's delivery — can be checked against the same script, the same input and the same
- * expected bytes, without either module depending on the other. {@code TransformParityTest} on
- * each side loads this and asserts the same result; a call site that starts doing its own thing
- * turns one of them red.
- *
- * <p>The same script is the worked example on the transformations documentation page. Changing
- * it is changing what is published.
+ * One script, input and expected output that {@code TransformParityTest} in both api and worker
+ * run, so preview and delivery cannot drift. The same script is published in the docs.
  */
 public final class TransformContractExample {
 
@@ -51,7 +42,7 @@ public final class TransformContractExample {
         return root.get("input").toString();
     }
 
-    /** The expected body, compact and key-ordered exactly as the engine returns it. */
+    /** Compact and key-ordered exactly as the engine returns it. */
     public String expectedPayloadJson() {
         return root.get("expectedPayload").toString();
     }
@@ -63,7 +54,6 @@ public final class TransformContractExample {
         return headers;
     }
 
-    /** The delivery context both call sites must hand the engine for the result to match. */
     public TransformRequest request() {
         return TransformRequest.builder()
                 .payload(inputJson())

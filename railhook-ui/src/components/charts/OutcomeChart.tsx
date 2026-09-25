@@ -14,19 +14,10 @@ export interface OutcomePoint {
 interface OutcomeChartProps {
   data: OutcomePoint[];
   labels: { success: string; failed: string };
-  /** Axis ticks: short. Tooltip heading: full. */
   formatTick: (timestamp: string) => string;
   formatStamp: (timestamp: string) => string;
 }
 
-/**
- * Delivery outcome over time — the one chart that answers "is my traffic
- * healthy right now", and the only chart in the product whose series are
- * allowed to wear status hues, because the series *are* the statuses: the
- * lower band is what was delivered, the upper band is what failed. Total
- * height stays readable as volume, so a drop in traffic and a rise in
- * failures never look alike.
- */
 export default function OutcomeChart({ data, labels, formatTick, formatStamp }: OutcomeChartProps) {
   return (
     <ResponsiveContainer width="100%" height="100%">

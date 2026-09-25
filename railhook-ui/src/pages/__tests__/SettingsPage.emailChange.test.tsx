@@ -40,10 +40,6 @@ const PENDING = {
   applied: false,
 };
 
-/**
- * A verified account's address changes only when the new one is proved, so Settings has to show
- * the in-between: which address is waiting, and the two things a person can do about it.
- */
 describe('SettingsPage — changing the email address', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -62,8 +58,7 @@ describe('SettingsPage — changing the email address', () => {
     renderSettings();
 
     await user.click(await screen.findByRole('button', { name: /^change email$/i }));
-    // Pasted, not typed: one keystroke at a time re-renders the whole Settings page per key and
-    // outran the test timeout under a full run. What matters is what the form sends.
+    // Pasted, not typed: per-key re-renders outran the timeout under a full run.
     await user.click(screen.getByLabelText(/new email address/i));
     await user.paste('owner-new@example.com');
     await user.click(screen.getByLabelText(/current password/i, { selector: '#email-change-password' }));

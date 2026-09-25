@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Every account on this deployment, searchable, for the platform admin. */
 @Service
 @RequiredArgsConstructor
 public class PlatformAdminUserService {

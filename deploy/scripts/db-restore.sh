@@ -1,20 +1,6 @@
 #!/usr/bin/env bash
-# Shared Postgres restore logic for Railhook. Counterpart to db-backup.sh
-# — see that file's header for the sharing rationale (Helm CronJob duplicates the
-# pg_dump/pg_restore flags rather than sourcing this, because Helm charts can't
-# reach outside their own chart directory).
-#
-# Restores a backup produced by db-backup.sh (custom-format `.dump`, restored
-# with pg_restore --clean --if-exists) or a legacy `.sql.gz` plain-SQL dump
-# (restored with gunzip | psql) produced by the previous plain-SQL `make backup-db`.
-#
-# Modes (set DB_MODE):
-#   embedded  - restores via `docker exec` into a local Postgres container
-#   external  - restores via a throwaway postgres:16-alpine container against
-#               DB_HOST:DB_PORT
-#
-# Env vars: same as db-backup.sh, plus:
-#   FILE   required: path to the backup file to restore
+# Restores a db-backup.sh dump (pg_restore --clean --if-exists) or a legacy .sql.gz (psql).
+# FILE is the backup; DB_MODE and the other variables are as for db-backup.sh.
 set -euo pipefail
 
 DB_MODE="${DB_MODE:-}"

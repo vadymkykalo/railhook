@@ -51,9 +51,7 @@ public class EventController {
             description = "Sends an event to all subscribed webhook endpoints. Requires API Key authentication."
     )
     @SecurityRequirement(name = "apiKey")
-    // The handler returns ResponseEntity<?> because a 429 carries an ErrorResponse instead, so
-    // springdoc has no return type to read and published the success body as a bare object --
-    // schemaWarnings and deliveriesCreated alike were invisible to anyone coding against the spec.
+    // The handler returns ResponseEntity<?>, so springdoc needs the 201 schema spelled out here.
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Event accepted for delivery",
                     content = @Content(schema = @Schema(implementation = EventIngestResponse.class))),

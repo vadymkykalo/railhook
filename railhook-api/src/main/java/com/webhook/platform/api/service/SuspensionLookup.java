@@ -13,25 +13,12 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Whether an organization is suspended, and where that answer is cached.
- *
- * <p>Modelled on {@code PlanLookup} for the same reason it exists: this is asked on the write
- * path of every request, ingest included, and a row read per event is not something to put
- * there. The cache is small, short-lived, and evicted explicitly when an operator changes the
- * state — so a suspension takes effect immediately on the node that applied it, and within the
- * TTL everywhere else. That window is acceptable for an abuse control and would not be for an
- * authorization one; suspension is the former.
- *
- * <p>Reads unscoped, because the question is asked about an organization by whoever is holding
- * its id, and because the operator asking it has no tenant of their own.
- */
+/** Cached: asked on every write. Other nodes see a change only after the TTL, fine for an abuse control. */
 @Component
 public class SuspensionLookup implements SuspensionCheck {
 
     private static final long MAX_CACHED_ORGANIZATIONS = 5_000;
 
-    /** What is cached: the reason if suspended, absent if not. */
     public record Suspension(String reason) {
     }
 
@@ -58,9 +45,7 @@ public class SuspensionLookup implements SuspensionCheck {
 
     @Override
     public Optional<String> suspensionReason(UUID organizationId) {
-        // Never maps to empty for a suspended organization: the API requires a reason, but a row
-        // edited by hand may carry none, and Optional.map on a null reason would answer "not
-        // suspended" - a suspension that silently stops suspending.
+        // A hand-edited row may have no reason; Optional.map on null would say "not suspended".
         return forOrganization(organizationId)
                 .map(suspension -> suspension.reason() == null ? "" : suspension.reason());
     }
@@ -70,9 +55,7 @@ public class SuspensionLookup implements SuspensionCheck {
     }
 
     private Optional<Suspension> load(UUID organizationId) {
-        // Absent rather than suspended when the organization is gone: a missing row is somebody
-        // else's error to report, and refusing every write with "suspended" would describe it
-        // wrongly.
+        // A missing organization is somebody else's error to report, not a suspension.
         return organizationRepository.findById(organizationId)
                 .filter(Organization::isSuspended)
                 .map(org -> new Suspension(org.getSuspensionReason()));

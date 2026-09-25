@@ -9,22 +9,15 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
+import java.util.List;
 
 @Configuration
 public class WebClientConfig {
 
     /**
-     * How much of a response body to buffer before giving up on reading it.
-     *
-     * <p>Declared rather than inherited. Spring's default is 256 KiB, and a receiver that
-     * answers 2xx with more than that used to turn a delivered webhook into a failed one —
-     * {@code AttemptRunner} no longer lets a read decide an Attempt, but the limit still
-     * belongs somewhere a person can see it. There is no reason to buffer much: both stores
-     * truncate the body to 10 KiB before it reaches the database.
-     *
-     * <p>Applied as a {@link WebClientCustomizer} so it reaches every injected
-     * {@code WebClient.Builder} — the two clients below and {@code MtlsWebClientFactory}'s,
-     * which builds its own and would otherwise keep the default.
+     * Spring's 256 KiB default once turned a large 2xx answer into a failed delivery. Both stores
+     * truncate the body to 10 KiB anyway. A customizer, so it also reaches the builder
+     * {@code MtlsWebClientFactory} uses.
      */
     @Bean
     public WebClientCustomizer responseBodyBufferLimit(
@@ -41,31 +34,27 @@ public class WebClientConfig {
                 maxConnections, pendingAcquireTimeoutSeconds, maxIdleTimeSeconds);
     }
 
-    /**
-     * The client an Outgoing Delivery goes out on. SSRF validation happens after the TCP connect,
-     * against the address actually resolved, so a DNS answer that changes between validation and
-     * request cannot get through.
-     */
+    // SSRF validation runs after connect, against the resolved address, so a DNS answer that
+    // changes between validation and request cannot get through.
     @Bean
     public WebClient outgoingWebClient(WebClient.Builder builder, ConnectionProvider webhookConnectionProvider,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts) {
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         return ssrfSafe(builder, webhookConnectionProvider, allowPrivateIps, allowedHosts)
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0")
                 .build();
     }
 
-    /** The same client for the Incoming direction, which sends no User-Agent of its own. */
     @Bean
     public WebClient incomingForwardWebClient(WebClient.Builder builder,
             ConnectionProvider webhookConnectionProvider,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") java.util.List<String> allowedHosts) {
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         return ssrfSafe(builder, webhookConnectionProvider, allowPrivateIps, allowedHosts).build();
     }
 
     private WebClient.Builder ssrfSafe(WebClient.Builder builder, ConnectionProvider connectionProvider,
-            boolean allowPrivateIps, java.util.List<String> allowedHosts) {
+            boolean allowPrivateIps, List<String> allowedHosts) {
         HttpClient httpClient = SsrfProtectionCustomizer.createHttpClient(
                 connectionProvider, allowPrivateIps, allowedHosts);
         return builder.clientConnector(new ReactorClientHttpConnector(httpClient));

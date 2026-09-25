@@ -15,27 +15,19 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collection;
+import java.util.List;
 
 @Repository
 public interface OrganizationRepository extends JpaRepository<Organization, UUID> {
 
-    /**
-     * Loads an Organization with its Plan already fetched.
-     *
-     * <p>{@code Organization.plan} is LAZY, and with Open Session In View off, a proxy
-     * returned to a caller outside the transaction cannot be initialised. EntitlementService caches
-     * the Plan and hands it to request handlers, so it has to be a real object by the time the
-     * transaction ends, not a proxy that fails on first use.
-     */
+    /** The Plan is cached and used outside the transaction, so it must not be a lazy proxy. */
     @Query("SELECT o FROM Organization o JOIN FETCH o.plan WHERE o.id = :id")
     Optional<Organization> findByIdWithPlan(@Param("id") UUID id);
 
     /**
-     * Takes the Organization's row lock until the transaction ends.
-     *
-     * <p>For a limit enforced as count-then-insert: two requests that each count before either
-     * inserts both see room, so whoever checks the limit holds this first and the second waits
-     * for the first to commit — and then counts it.
+     * Serializes count-then-insert limit checks: without the lock, two requests could both count
+     * before either inserts and both see room.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT o FROM Organization o WHERE o.id = :id")
@@ -47,34 +39,25 @@ public interface OrganizationRepository extends JpaRepository<Organization, UUID
 
     long countByCreatedAtGreaterThanEqual(Instant since);
 
-    /** Organizations created since then that have created at least one project, deleted or not. */
+    /** Counts deleted projects too. */
     @Query("SELECT COUNT(o) FROM Organization o WHERE o.createdAt >= :since "
             + "AND EXISTS (SELECT 1 FROM Project p WHERE p.organizationId = o.id)")
     long countCreatedSinceWithProject(@Param("since") Instant since);
 
-    /** Organizations created since then that have sent at least one event. */
     @Query("SELECT COUNT(o) FROM Organization o WHERE o.createdAt >= :since "
             + "AND EXISTS (SELECT 1 FROM Event e WHERE e.organizationId = o.id)")
     long countCreatedSinceWithEvent(@Param("since") Instant since);
 
-    /** {@code [organizationId, maxEventsPerMonth]} of each given organization's plan. */
+    /** Rows of {@code [organizationId, maxEventsPerMonth]}. */
     @Query("SELECT o.id, p.maxEventsPerMonth FROM Organization o JOIN o.plan p WHERE o.id IN :organizationIds")
-    java.util.List<Object[]> findEventLimits(@Param("organizationIds") java.util.Collection<UUID> organizationIds);
+    List<Object[]> findEventLimits(@Param("organizationIds") Collection<UUID> organizationIds);
 
     /**
-     * The operator's listing: every organization, newest first, optionally narrowed by name.
-     *
-     * <p>Joins the plan because the listing shows it and the association is LAZY — a page of
-     * proxies resolved outside the transaction is the N+1 this avoids twice over.
-     *
-     * <p>Unscoped by design. Nothing about this query belongs to one tenant, which is the whole
-     * point of a back-office; the caller is the platform-admin credential, which has no
-     * organization of its own.
+     * Unscoped by design: the platform-admin caller has no organization of its own. Search also
+     * matches a member's email, since support tickets name a person.
      */
     @Query("SELECT o FROM Organization o JOIN FETCH o.plan "
             + "WHERE (:search IS NULL OR LOWER(o.name) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) "
-            // Or by a member's address: "which organization is ops@customer.com in" is the
-            // question a support ticket arrives with, and it names a person, not an organization.
             + "OR EXISTS (SELECT 1 FROM Membership m JOIN User u ON m.userId = u.id "
             + "WHERE m.organizationId = o.id "
             + "AND LOWER(u.email) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))) "

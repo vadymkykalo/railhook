@@ -9,15 +9,9 @@ const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 const SNIPPET = '/etc/nginx/snippets/security-headers.conf';
 const COMMON = '/etc/nginx/snippets/security-headers-common.conf';
 
-/** The one page another site may frame; nginxRoutes.test.ts holds its headers to that. */
 const FRAMEABLE = '= /portal';
 
-/**
- * nginx inherits `add_header` from the server block only into a location that sets none of its
- * own. Every location that adds a Cache-Control header therefore dropped X-Frame-Options and the
- * rest — `location /` among them, so the dashboard's own HTML went out frameable. The headers live
- * in one snippet, included at server level and again wherever a location adds a header.
- */
+/** nginx inherits add_header only into a location that sets none of its own. */
 function locationBlocks(conf: string) {
   const blocks: { head: string; body: string }[] = [];
   const re = /^\s*location\s+([^{]+)\{/gm;
@@ -39,8 +33,6 @@ describe('nginx security headers', () => {
   const conf = read('railhook-ui/nginx.conf');
 
   it('keeps the headers in snippets the image ships', () => {
-    // X-Frame-Options in the snippet every page includes; the rest in one it shares with the
-    // portal, the single page that is framed on purpose.
     const snippet = read('railhook-ui/nginx-security-headers.conf');
     const common = read('railhook-ui/nginx-security-headers-common.conf');
     expect(snippet).toMatch(/^\s*add_header X-Frame-Options "SAMEORIGIN" always;/m);

@@ -1,13 +1,4 @@
 ---
-/**
- * The API reference: Scalar over the repository's committed `openapi.yaml`.
- *
- * Nothing here is written by hand — the spec is copied into `public/` at build
- * (scripts/copy-openapi.mjs), and `OpenApiDriftIntegrationTest` holds that spec to what the
- * API actually serves. Scalar is bundled, not loaded from a CDN, and makes no requests of its
- * own: no proxy, no telemetry, no hosted fonts. "Try it" sends straight to the origin the page
- * is served from — the reader's own instance, or railhook.io on the cloud.
- */
 const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
 ---
 
@@ -47,7 +38,6 @@ const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
     agent: { disabled: true },
     persistAuth: false,
     defaultHttpClient: { targetKey: 'shell', clientKey: 'curl' },
-    // Four ways to send a request: shell/curl, node/fetch, python/requests, php/guzzle.
     hiddenClients: {
       c: true,
       clojure: true,
@@ -88,15 +78,12 @@ const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
 </script>
 
 <style is:global>
-  /* The reference needs the width; the page has no table of contents of its own. */
+  /* The page has no table of contents, so the reference takes the full width. */
   .main-pane:has(.railhook-api-reference) .sl-container {
     max-width: none;
   }
 
-  /* The "Test Request" client is a full-viewport fixed layer, but Starlight isolates .main-pane,
-     so no z-index inside it can rise above the fixed header (10) and sidebar (5) — they painted
-     over its top and left edges. While the client is open, the pane itself is lifted above them;
-     only then, so scrolled content never slides over the header. */
+  /* Starlight isolates .main-pane, so the open Scalar client needs the pane lifted over the header. */
   .main-pane:has(.scalar-client--open) {
     position: relative;
     z-index: 20;
@@ -105,7 +92,6 @@ const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
   .railhook-api-reference {
     margin-top: 1.5rem;
     border: 1px solid var(--sl-color-hairline);
-    border-radius: var(--rh-radius-card, 16px);
     overflow: clip;
   }
 
@@ -113,45 +99,49 @@ const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
   .railhook-api-reference .scalar-app {
     --scalar-font: var(--__sl-font);
     --scalar-font-code: var(--__sl-font-mono);
-    --scalar-radius: var(--rh-radius-control, 10px);
-    --scalar-radius-lg: var(--rh-radius-card, 16px);
-    --scalar-radius-xl: var(--rh-radius-card, 16px);
+    --scalar-radius: 0;
+    --scalar-radius-lg: 0;
+    --scalar-radius-xl: 0;
+    --scalar-shadow-1: none;
+    --scalar-shadow-2: none;
+    --scalar-semibold: 500;
+    --scalar-bold: 500;
     --scalar-custom-header-height: var(--sl-nav-height);
 
     --scalar-background-1: var(--sl-color-bg);
-    --scalar-background-2: var(--rh-mist);
+    --scalar-background-2: var(--rh-soft);
     --scalar-background-3: var(--sl-color-hairline);
-    --scalar-background-accent: var(--sl-color-accent-low);
+    --scalar-background-accent: var(--rh-soft);
     --scalar-color-1: var(--sl-color-white);
-    --scalar-color-2: var(--sl-color-gray-3);
-    --scalar-color-3: var(--sl-color-gray-4);
-    --scalar-color-accent: var(--sl-color-text-accent);
+    --scalar-color-2: var(--sl-color-gray-2);
+    --scalar-color-3: var(--sl-color-gray-3);
+    --scalar-color-accent: var(--sl-color-white);
     --scalar-color-disabled: var(--sl-color-gray-4);
     --scalar-color-ghost: var(--sl-color-gray-4);
     --scalar-border-color: var(--sl-color-hairline);
 
-    --scalar-button-1: var(--rh-accent);
-    --scalar-button-1-color: var(--rh-on-accent);
-    --scalar-button-1-hover: var(--rh-accent-hover);
+    --scalar-button-1: var(--rh-ink);
+    --scalar-button-1-color: var(--rh-bg);
+    --scalar-button-1-hover: var(--rh-text);
 
-    --scalar-sidebar-background-1: var(--rh-mist);
+    --scalar-sidebar-background-1: var(--sl-color-bg);
     --scalar-sidebar-color-1: var(--sl-color-white);
-    --scalar-sidebar-color-2: var(--sl-color-gray-3);
+    --scalar-sidebar-color-2: var(--sl-color-gray-2);
     --scalar-sidebar-border-color: var(--sl-color-hairline);
-    --scalar-sidebar-item-hover-background: var(--sl-color-hairline);
+    --scalar-sidebar-item-hover-background: var(--rh-soft);
     --scalar-sidebar-item-hover-color: var(--sl-color-white);
-    --scalar-sidebar-item-active-background: var(--rh-accent-tint);
-    --scalar-sidebar-color-active: var(--rh-accent);
+    --scalar-sidebar-item-active-background: var(--rh-hl);
+    --scalar-sidebar-color-active: var(--rh-on-hl);
     --scalar-sidebar-search-background: var(--sl-color-bg);
-    --scalar-sidebar-search-border-color: var(--rh-rail-strong);
+    --scalar-sidebar-search-border-color: var(--rh-line-strong);
     --scalar-sidebar-search-color: var(--sl-color-gray-3);
 
-    /* Status hues stay status hues: response codes read ok / retry / halt. */
-    --scalar-color-green: var(--rh-ok);
-    --scalar-color-red: var(--rh-halt);
-    --scalar-color-yellow: var(--rh-retry);
-    --scalar-color-orange: var(--rh-retry);
-    --scalar-color-blue: var(--rh-accent);
-    --scalar-color-purple: var(--rh-accent);
+    /* Only status hues keep colour; HTTP method colours fall back to ink. */
+    --scalar-color-green: #16a34a;
+    --scalar-color-red: var(--rh-danger);
+    --scalar-color-yellow: var(--rh-caution);
+    --scalar-color-orange: var(--rh-caution);
+    --scalar-color-blue: var(--sl-color-white);
+    --scalar-color-purple: var(--sl-color-white);
   }
 </style>

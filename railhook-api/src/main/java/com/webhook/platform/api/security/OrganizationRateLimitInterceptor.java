@@ -15,26 +15,12 @@ import java.io.IOException;
 import java.util.UUID;
 
 /**
- * Bounds what one organization can ask of the control-plane API.
+ * Keeps one tenant from spending the platform-wide bucket in GlobalRateLimitFilter. Off by
+ * default: on a self-hosted install every tenant is the operator's own, and the check costs a
+ * Redis round trip per request.
  *
- * <p>{@code GlobalRateLimitFilter} holds a single bucket for the entire platform. One tenant
- * looping over their deliveries can spend it, and every other tenant then gets 429s for
- * something they did not do — a noisy neighbour with no wall between the flats. Event ingestion
- * was never exposed to this ({@code RedisRateLimiterService} bounds it per project); the
- * dashboard's own calls were.
- *
- * <p><b>Off by default, on purpose.</b> On a self-hosted installation every tenant is the
- * operator's own, so there is no neighbour to be noisy — and the check costs a Redis round trip
- * on every request, which is a real price to pay for a problem you do not have. A shared
- * installation is where it earns that, so it is one setting away rather than absent.
- *
- * <p>An interceptor rather than a filter because this needs to know who is asking, and the
- * filters run at {@code @Order(1)} and {@code (2)} — before authentication has happened at all.
- * By the time a handler is chosen, {@code TenantContext} holds the caller's organization.
- *
- * <p>Callers with no organization pass through untouched: an unauthenticated request has not
- * reached a handler that needs one, and the platform admin runs under the system tenant, which
- * is not a tenant whose share this is.
+ * <p>An interceptor rather than a filter because the filters run before authentication, so the
+ * organization is not known yet.
  */
 @Component
 @Slf4j
@@ -72,9 +58,6 @@ public class OrganizationRateLimitInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // Method and URI are the caller's own text, and the caller is by definition one that is
-        // hammering us. Through LogSanitizer so a newline in the path cannot end this entry and
-        // open a second one that reads like ours.
         log.warn("Organization {} exceeded its API rate limit ({}/sec) on {} {}",
                 organizationId,
                 requestsPerSecond,
@@ -82,8 +65,6 @@ public class OrganizationRateLimitInterceptor implements HandlerInterceptor {
                 LogSanitizer.forLog(request.getRequestURI()));
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType("application/json");
-        // Seconds, because the limiter refills once a second — telling a client to come back
-        // later without saying when is how you get an immediate retry loop.
         response.setHeader("Retry-After", "1");
         response.getWriter().write("{\"error\":\"organization_rate_limit\","
                 + "\"message\":\"Your organization has exceeded its API rate limit. Please retry shortly.\","

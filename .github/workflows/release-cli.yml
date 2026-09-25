@@ -4,11 +4,7 @@ on:
   push:
     tags:
       - 'v*'
-  # A release that fails cannot otherwise be retried without deleting and re-pushing its
-  # tag, which is a history rewrite to work around a transient failure — an expired token,
-  # a registry outage, or the permissions mistake that made this workflow fail to start at
-  # all on v2.6.1. Every step here is idempotent: the SDK jobs skip when the registry
-  # already has the version, and the release upload replaces its assets.
+  # Retries a failed release without re-pushing its tag; every step is idempotent.
   workflow_dispatch:
     inputs:
       tag:
@@ -27,8 +23,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
-          # On a dispatch github.ref is the branch, so without this the jar would be built
-          # from whatever that branch happens to hold rather than from the tag being released.
+          # On a dispatch github.ref is the branch, not the tag being released.
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up JDK 17
@@ -48,9 +43,6 @@ jobs:
           VERSION="${TAG#v}"
           echo "TAG=$TAG" >> $GITHUB_ENV
           cp railhook-cli/target/railhook-cli-*.jar railhook-cli.jar
-          # install.sh refuses to run a JAR that doesn't match this file (see
-          # verify_checksum() in railhook-cli/install.sh) — table
-          # stakes for a curl-pipe installer.
           sha256sum railhook-cli.jar > SHA256SUMS
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
@@ -86,24 +78,7 @@ jobs:
           draft: false
           prerelease: false
 
-  # The v2.6.0 post-mortem in one job.
-  #
-  # That release published api and worker to GHCR, skipped the UI image (its
-  # build died under QEMU), left npm on 2.2.1 (an expired token), and left
-  # Packagist on 2.2.1 (a step that could not fail). The GitHub release was
-  # created and stayed up through all of it, and `install.sh` — which resolves
-  # the latest release and pins every image tag to it — was broken for every
-  # new user from that moment.
-  #
-  # `make version-check` could not have caught any of it: it compares files in
-  # the repository to each other and never asks a registry what is actually
-  # published. This does ask.
-  #
-  # It no longer `needs:` the SDK publish, because that no longer runs from here:
-  # publish-sdks.yml is triggered by the same tag, so that npm sees it as the workflow
-  # entering the run and its Trusted Publisher matches. The two workflows race, which is
-  # exactly what the retry loops below are for — this waits for the result rather than for
-  # the job that produces it.
+  # Asks the registries what is actually published; publish-sdks.yml races this on the same tag, hence the polling.
   verify-release:
     name: Verify everything published
     needs: release-cli
@@ -112,16 +87,11 @@ jobs:
       contents: read
     steps:
       - name: Resolve version
-        # On a tag push GITHUB_REF_NAME is the tag; on a manual dispatch it is the branch,
-        # so the tag has to come from the input instead.
         run: |
           TAG="${{ inputs.tag || github.ref_name }}"
           echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
 
-      # docker-publish.yml is a separate workflow on the same tag, so this one
-      # cannot `needs:` it. Poll instead — a full multi-arch build of the three
-      # images takes ~17 minutes, so a bounded wait is the honest shape here
-      # rather than an immediate check that would just race.
+      # docker-publish.yml runs on the same tag and cannot be `needs:`-ed, so poll.
       - name: Wait for the container images
         run: |
           set -uo pipefail
@@ -155,8 +125,6 @@ jobs:
           done
           echo "All three images carry the ${VERSION} tag."
 
-      # Each of the three is checked, and each reports independently, so one
-      # broken registry does not hide the state of the other two.
       - name: Verify the SDK registries
         run: |
           set -uo pipefail
@@ -171,10 +139,7 @@ jobs:
               | python3 -c 'import sys,json; print(json.load(sys.stdin)["packages"]["railhook/php"][0]["version"].lstrip("v"))' 2>/dev/null || echo ''
           }
 
-          # Packagist crawls asynchronously after update-package returns, and
-          # npm's read replicas lag its own publish by a few seconds, so a
-          # single immediate read would report a false failure. Ten minutes is
-          # well past both and still far short of a hung job.
+          # Packagist crawls asynchronously and npm's replicas lag its publish.
           DEADLINE=$(( $(date +%s) + 10 * 60 ))
           while :; do
             NPM=$(npm_version); PYPI=$(pypi_version); PACKAGIST=$(packagist_version)
@@ -184,8 +149,6 @@ jobs:
             sleep 30
           done
 
-          # Report all three even when one has already failed: a half-published
-          # release is exactly the case where you want the whole picture.
           FAILED=0
           check() {
             if [ "$2" = "$VERSION" ]; then

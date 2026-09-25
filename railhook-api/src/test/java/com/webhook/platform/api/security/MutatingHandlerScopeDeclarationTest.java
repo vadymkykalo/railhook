@@ -22,29 +22,7 @@ import java.util.TreeSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over API-key scope declarations on state-changing handlers.
- *
- * <p>Scope is enforced by {@link ScopeEnforcementInterceptor}, and its default when a handler
- * carries no {@code @RequireScope} is to <em>allow</em>. That default is why the gap this test
- * exists to close was invisible: {@code EndpointController.testEndpoint} fired a signed
- * outbound request from the platform with no scope and no role check at all, while its sibling
- * {@code rotateSecret} was guarded — nothing flagged the difference.
- *
- * <p>This test does not require every mutating handler to declare a scope. A number of them
- * legitimately cannot: authentication endpoints mint the credential rather than consume one,
- * public webhook receivers are unauthenticated by design, and org-level handlers are gated on
- * {@code requireOwnerAccess()} / {@code @RequireOrgAccess} instead. Those are frozen in
- * {@link #DOCUMENTED_EXEMPTIONS} below, each with a stated reason.
- *
- * <p>What it does guarantee is that the set cannot grow silently. A new POST/PUT/PATCH/DELETE
- * handler without {@code @RequireScope} fails the build until someone either annotates it or
- * adds it here with a justification — which is the review this codebase did not get.
- *
- * <p>Deliberately a plain {@code *Test}: it is pure reflection over the classpath, so it must
- * run in the no-Docker unit job. Do not rename it to {@code *RbacTest} — that routes it to the
- * Testcontainers job for no reason (see {@code scripts/check-test-routing.sh}).
- */
+// No @RequireScope means allow, so the exemption set must not grow silently.
 @Tag("ratchet")
 class MutatingHandlerScopeDeclarationTest {
 
@@ -53,29 +31,20 @@ class MutatingHandlerScopeDeclarationTest {
     private static final List<Class<? extends Annotation>> MUTATING_MAPPINGS =
             List.of(PostMapping.class, PutMapping.class, PatchMapping.class, DeleteMapping.class);
 
-    /**
-     * Handlers that change state but carry no {@code @RequireScope}, with the reason each is
-     * acceptable. Format is {@code SimpleClassName.methodName}.
-     *
-     * <p>Adding an entry here is a security decision — say why, and prefer annotating instead.
-     */
+    // Adding an entry is a security decision: say why, and prefer annotating.
     private static final Set<String> DOCUMENTED_EXEMPTIONS = new TreeSet<>(Set.of(
-            // The customer portal: a portal session, never an API key, is the caller —
-            // SecurityConfig refuses an API key on /api/v1/portal/** outright, so there is no
-            // scope to check. PortalService confines every row to the session's Consumer.
+            // A portal session is the caller; SecurityConfig refuses an API key on /api/v1/portal/**.
             "PortalController.portalCreateEndpoint",
             "PortalController.portalUpdateEndpoint",
             "PortalController.portalDeleteEndpoint",
             "PortalController.portalRotateEndpointSecret",
             "PortalController.portalRetryDelivery",
 
-            // Authentication: these mint or exchange the credential itself, so an API-key
-            // scope cannot apply. Public paths in SecurityConfig.
+            // Authentication mints the credential itself: public paths in SecurityConfig.
             "AuthController.register",
             "AuthController.login",
             "AuthController.refreshToken",
-            // Public, like login: permitted without credentials in SecurityConfig, so no API key
-            // reaches it with a scope to check. The one-time code is the credential.
+            // Public like login: the one-time code is the credential.
             "AuthController.exchangeSignInCode",
             "AuthController.logout",
             "AuthController.verifyEmail",
@@ -89,37 +58,25 @@ class MutatingHandlerScopeDeclarationTest {
             "DeviceAuthController.approveDeviceCode",
             "DeviceAuthController.denyDeviceCode",
 
-            // Act on the caller's own sign-ins rather than on organization data, and are gated
-            // on auth.requireJwt(), which rejects an API key outright — strictly stronger than
-            // any scope a key could hold. An API key has no session to revoke and no membership
-            // to switch between, so a scope is not the question these ask.
+            // The caller's own sign-ins, gated on requireJwt(), which rejects an API key outright.
             "AuthController.revokeSession",
             "AuthController.revokeAllSessions",
             "AuthController.switchOrganization",
 
-            // Changing the address the caller signs in with. request/resend/cancel act on the
-            // caller's own account and resolve it with auth.requireUserId(), which rejects an API
-            // key outright; confirm and cancelByToken are public paths in SecurityConfig where the
-            // mailed single-use token is the credential, so no key reaches them with a scope.
+            // The caller's own account via requireUserId(), or public with the mailed token as credential.
             "EmailChangeController.request",
             "EmailChangeController.resend",
             "EmailChangeController.cancel",
             "EmailChangeController.confirm",
             "EmailChangeController.cancelByToken",
 
-            // Erasing your own account. Gated on auth.requireJwt(): an API key belongs to a
-            // project and has no person behind it, so it must never be able to erase the human
-            // who created it. Rejecting it outright is stronger than any scope it could hold.
+            // Gated on requireJwt(): an API key must never erase the human who created it.
             "AuthController.eraseOwnAccount",
 
-            // Reports a failure in the dashboard, which is a browser with a session. Gated on
-            // auth.requireJwt(): an API key is a program and has no dashboard to break, so
-            // rejecting it outright is stronger than any scope it could hold. Changes no
-            // state — it appends to this installation's own log.
+            // Gated on requireJwt(); only appends to this installation's log.
             "ClientErrorController.report",
 
-            // Owner-level org and billing operations: gated on requireOwnerAccess(), which is
-            // strictly stronger than any API-key scope (API keys never hold OWNER).
+            // Gated on requireOwnerAccess(); API keys never hold OWNER.
             "BillingController.updateBillingInfo",
             "BillingController.changePlan",
             "BillingController.createCheckout",
@@ -132,52 +89,35 @@ class MutatingHandlerScopeDeclarationTest {
             "MemberController.removeMember",
             "MemberController.reissueInvite",
             "MemberController.acceptInvite",
-            // Same reason, and stronger than the three above: suspend and reinstate declare
-            // @RequireAccess(OWNER), which the interceptor enforces for every caller. An API key
-            // holds MembershipRole.API_KEY and so is refused whatever its scope — a scope
-            // annotation could only weaken that.
+            // @RequireAccess(OWNER) already refuses an API key whatever its scope.
             "MemberController.suspendMember",
             "MemberController.reinstateMember",
 
-            // Unauthenticated by design — whitelisted public paths in SecurityConfig.
+            // Unauthenticated by design: public paths in SecurityConfig.
             "BillingController.handleWebhook",
             "IngressController.receiveWebhook",
-            // The public site's webhook tester: anonymous by design (/api/v1/public/** in
-            // SecurityConfig), rate-limited per address, and it touches no tenant data at all.
+            // The public webhook tester: anonymous, rate-limited, no tenant data.
             "PublicBinController.create",
-            // The public site's contact form: anonymous by design, rate-limited per address and
-            // behind the challenge; it only ever mails the deployment's own support address.
+            // The public contact form: anonymous, rate-limited, mails only the support address.
             "PublicContactController.send",
-            // The public site's live demo: anonymous by design, off unless DEMO_ENABLED; it opens a
-            // read-only session for a person, and an API key has no use for one.
+            // The public demo: anonymous, off unless DEMO_ENABLED; an API key has no use for it.
             "PublicDemoController.createSession",
-            // The MCP server's OAuth endpoints, called by an app rather than a person: open
-            // registration (RFC 7591), the token endpoint and revocation. Public in
-            // McpSecurityConfig; the app's client credentials, code + PKCE verifier or refresh
-            // token are what authorize each call, and no API key is ever the caller.
+            // MCP OAuth endpoints: an app's client credentials authorise each call, never an API key.
             "McpOAuthController.registerOAuthClient",
             "McpOAuthController.issueOAuthToken",
             "McpOAuthController.revokeOAuthToken",
 
-            // Platform-admin only, gated on the PLATFORM_ADMIN authority for /api/v1/admin/**
-            // in SecurityConfig rather than on a tenant scope.
+            // Platform-admin only via SecurityConfig, not a tenant scope.
             "EncryptionAdminController.rotateEncryptionKeys",
-            // Same: an API key belongs to a project inside one organization, and suspension is
-            // an act on an organization from outside it. No scope answers that question.
+            // Suspension acts on an organization from outside it; no project scope answers that.
             "PlatformAdminOrganizationController.suspend",
             "PlatformAdminOrganizationController.reinstate",
 
-            // POST-shaped reads: these compute a response from caller-supplied input and
-            // persist nothing. They are POSTs only because the input does not fit in a query
-            // string. Contrast TransformPreviewController.deliveryDryRun, which DOES return a
-            // real HMAC signature for a stored endpoint and is therefore annotated.
+            // POST-shaped reads: they persist nothing.
             "PiiMaskingController.previewSanitization",
             "TransformPreviewController.preview",
 
-            // Guarded by hand with auth.requireWriteAccess(), which rejects both a VIEWER role
-            // and a READ_ONLY API key (RbacUtil.requireWriteAccess). Enforced, but through a
-            // different layer than every sibling controller — worth converging on the
-            // annotation, not a security gap today.
+            // Guarded by hand with requireWriteAccess(); worth converging on the annotation.
             "ProjectEventsController.sendTestEvent",
             "TunnelController.create",
             "TunnelController.close"

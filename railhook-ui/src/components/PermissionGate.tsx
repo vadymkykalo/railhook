@@ -7,13 +7,9 @@ import type { Role } from '../auth/usePermissions';
 import { useIsDemo } from '../auth/auth.store';
 
 interface PermissionGateProps {
-  /** The permission boolean from usePermissions() */
   allowed: boolean;
-  /** Minimum role required — shown in the tooltip */
   requiredRole?: Role;
-  /** Override tooltip text */
   tooltip?: string;
-  /** Fallback: 'disable' shows disabled + tooltip, 'hide' hides entirely */
   fallback?: 'disable' | 'hide';
   children: ReactElement;
 }
@@ -32,8 +28,7 @@ export default function PermissionGate({
 
   if (fallback === 'hide') return null;
 
-  // In the live demo the role is not the reason, and naming one would send a visitor looking for
-  // a teammate to ask. What stands between them and the button is an account.
+  // In the demo the role isn't the reason; an account is.
   const tooltipText = isDemo
     ? t('demo.readOnlyTooltip')
     : tooltip || t('permissions.requiredRole', { role: t(`roles.${requiredRole}.name`) });
@@ -52,19 +47,11 @@ export default function PermissionGate({
   );
 }
 
-/* ────────────────────────────────────────────────────────────────────────
-   The role vocabulary.
-
-   Three roles decide what a person can do, and the difference between them
-   has to be readable on the page that grants them — nobody should have to
-   open the docs to learn what they just handed a teammate. The capability
-   lines below are the UI's restatement of the matrix in usePermissions.ts;
-   when that matrix changes, these change with it.
-   ──────────────────────────────────────────────────────────────────────── */
+/* Restates usePermissions' matrix; change both together. */
 
 export const ROLES: Role[] = ['OWNER', 'DEVELOPER', 'VIEWER'];
 
-/** Roles that can be granted to somebody else. An owner is never handed out from a list. */
+/** An owner is never granted from a list. */
 export const GRANTABLE_ROLES: Role[] = ['DEVELOPER', 'VIEWER'];
 
 export const ROLE_ICON: Record<Role, React.ElementType> = {
@@ -73,23 +60,16 @@ export const ROLE_ICON: Record<Role, React.ElementType> = {
   VIEWER: Eye,
 };
 
-/** How many capability bullets each role carries in the locale file. */
 const ROLE_BULLETS: Record<Role, number> = { OWNER: 3, DEVELOPER: 3, VIEWER: 3 };
 
 export function roleCapabilities(role: Role): string[] {
   return Array.from({ length: ROLE_BULLETS[role] }, (_, i) => `roles.${role}.can${i + 1}`);
 }
 
-/**
- * One role, explained. Rendered as a static card in a legend, or as a radio
- * when `onSelect` is given — the same explanation either way, so choosing a
- * role and reading about one are never two different descriptions.
- */
 export function RoleCard({
   role, count, selected, onSelect, disabled,
 }: {
   role: Role;
-  /** Members currently holding this role, when the card is a legend entry. */
   count?: number;
   selected?: boolean;
   onSelect?: (role: Role) => void;
@@ -122,7 +102,7 @@ export function RoleCard({
   );
 
   if (!interactive) {
-    return <div className="rounded-lg border border-rail bg-card p-4">{body}</div>;
+    return <div className="border border-rail bg-card p-4">{body}</div>;
   }
 
   return (
@@ -133,9 +113,9 @@ export function RoleCard({
       disabled={disabled}
       onClick={() => onSelect(role)}
       className={cn(
-        'rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        'border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        selected ? 'border-primary bg-accent/40' : 'border-rail bg-card hover:border-primary/40'
+        selected ? 'border-primary bg-secondary' : 'border-rail bg-card hover:border-primary/40'
       )}
     >
       {body}

@@ -8,170 +8,116 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class RequestSizeLimitFilterTest {
 
-    private static final long MAX_SIZE = 100; // 100 bytes max for testing
-    private static final long INGRESS_MAX_SIZE = 200; // 200 bytes max for ingress
+    private static final long MAX_SIZE = 100;
+    private static final long INGRESS_MAX_SIZE = 200;
 
-    @Mock
-    private HttpServletRequest request;
-
-    @Mock
-    private HttpServletResponse response;
-
-    @Mock
-    private FilterChain filterChain;
+    @Mock private HttpServletRequest request;
+    @Mock private HttpServletResponse response;
+    @Mock private FilterChain filterChain;
 
     private RequestSizeLimitFilter filter;
+    private StringWriter body;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         filter = new RequestSizeLimitFilter(MAX_SIZE, INGRESS_MAX_SIZE);
+        body = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(body));
     }
 
-    @Test
-    void shouldRejectWhenContentLengthExceedsLimit() throws Exception {
-        // Content-Length header reports oversized body
-        when(request.getContentLengthLong()).thenReturn(MAX_SIZE + 1);
-        when(request.getRequestURI()).thenReturn("/api/events");
-        StringWriter sw = new StringWriter();
-        when(response.getWriter()).thenReturn(new PrintWriter(sw));
+    @ParameterizedTest
+    @CsvSource({
+            "/api/events,     101, true",
+            "/api/events,     5,   false",
+            "/ingress/abc123, 150, false",
+            "/ingress/abc123, 250, true",
+    })
+    void aDeclaredLengthIsCheckedAgainstThePathsLimit(String uri, long contentLength, boolean rejected) throws Exception {
+        when(request.getContentLengthLong()).thenReturn(contentLength);
+        when(request.getRequestURI()).thenReturn(uri);
 
         filter.doFilterInternal(request, response, filterChain);
 
-        verify(response).setStatus(413);
-        verify(filterChain, never()).doFilter(any(), any());
-        assertTrue(sw.toString().contains("payload_too_large"));
+        if (rejected) {
+            verify(response).setStatus(413);
+            verify(filterChain, never()).doFilter(any(), any());
+            assertTrue(body.toString().contains("payload_too_large"));
+        } else {
+            verify(filterChain).doFilter(any(), any());
+            verify(response, never()).setStatus(413);
+        }
     }
 
-    @Test
-    void shouldAllowSmallPayloadWithContentLength() throws Exception {
-        byte[] payload = "small".getBytes();
-        when(request.getContentLengthLong()).thenReturn((long) payload.length);
-        when(request.getRequestURI()).thenReturn("/api/events");
-
-        filter.doFilterInternal(request, response, filterChain);
-
-        verify(filterChain).doFilter(any(), eq(response));
-        verify(response, never()).setStatus(413);
-    }
-
-    @Test
-    void shouldRejectChunkedTransferExceedingLimit() throws Exception {
-        // Chunked transfer — Content-Length is -1
-        byte[] oversizedPayload = new byte[(int) MAX_SIZE + 50];
+    @ParameterizedTest
+    @CsvSource({"150, true", "12, false"})
+    void aChunkedBodyIsCountedAsItIsRead(int size, boolean rejected) throws Exception {
         when(request.getContentLengthLong()).thenReturn(-1L);
-        when(request.getInputStream()).thenReturn(mockServletInputStream(oversizedPayload));
         when(request.getRequestURI()).thenReturn("/api/events");
-        StringWriter sw = new StringWriter();
-        when(response.getWriter()).thenReturn(new PrintWriter(sw));
-
-        // Simulate the filter chain reading the full body
+        when(request.getInputStream()).thenReturn(inputStream(new byte[size]));
         doAnswer(invocation -> {
             HttpServletRequest req = invocation.getArgument(0);
-            byte[] buf = new byte[1024];
-            var is = req.getInputStream();
-            while (is.read(buf) != -1) {
-                // exhaust stream
-            }
+            req.getInputStream().readAllBytes();
             return null;
         }).when(filterChain).doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
 
         filter.doFilterInternal(request, response, filterChain);
 
-        verify(response).setStatus(413);
-        assertTrue(sw.toString().contains("payload_too_large"));
+        if (rejected) {
+            verify(response).setStatus(413);
+        } else {
+            verify(response, never()).setStatus(413);
+        }
     }
 
     @Test
-    void shouldAllowChunkedTransferWithinLimit() throws Exception {
-        byte[] payload = "within limit".getBytes();
-        when(request.getContentLengthLong()).thenReturn(-1L);
-        when(request.getRequestURI()).thenReturn("/api/events");
-        when(request.getInputStream()).thenReturn(mockServletInputStream(payload));
-
-        doAnswer(invocation -> {
-            HttpServletRequest req = invocation.getArgument(0);
-            byte[] buf = new byte[1024];
-            var is = req.getInputStream();
-            while (is.read(buf) != -1) {
-                // exhaust stream
-            }
-            return null;
-        }).when(filterChain).doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
-
-        filter.doFilterInternal(request, response, filterChain);
-
-        verify(response, never()).setStatus(413);
-    }
-
-    @Test
-    void shouldPassThroughRequestsWithNoBody() throws Exception {
+    void aRequestWithNoBodyPassesThrough() throws Exception {
         when(request.getContentLengthLong()).thenReturn(-1L);
         when(request.getRequestURI()).thenReturn("/api/events");
 
         filter.doFilterInternal(request, response, filterChain);
 
-        verify(filterChain).doFilter(any(), eq(response));
+        verify(filterChain).doFilter(any(), any());
         verify(response, never()).setStatus(413);
     }
 
-    @Test
-    void shouldUseIngressLimitForIngressPath() throws Exception {
-        // 150 bytes > MAX_SIZE (100) but < INGRESS_MAX_SIZE (200)
-        byte[] payload = new byte[150];
-        when(request.getContentLengthLong()).thenReturn((long) payload.length);
-        when(request.getRequestURI()).thenReturn("/ingress/abc123");
-
-        filter.doFilterInternal(request, response, filterChain);
-
-        verify(filterChain).doFilter(any(), eq(response));
-        verify(response, never()).setStatus(413);
-    }
-
-    @Test
-    void shouldRejectIngressPayloadExceedingIngressLimit() throws Exception {
-        // 250 bytes > INGRESS_MAX_SIZE (200)
-        when(request.getContentLengthLong()).thenReturn(250L);
-        when(request.getRequestURI()).thenReturn("/ingress/abc123");
-        StringWriter sw = new StringWriter();
-        when(response.getWriter()).thenReturn(new PrintWriter(sw));
-
-        filter.doFilterInternal(request, response, filterChain);
-
-        verify(response).setStatus(413);
-        verify(filterChain, never()).doFilter(any(), any());
-        assertTrue(sw.toString().contains("payload_too_large"));
-    }
-
-    private ServletInputStream mockServletInputStream(byte[] data) {
-        ByteArrayInputStream bais = new ByteArrayInputStream(data);
+    private static ServletInputStream inputStream(byte[] data) {
+        ByteArrayInputStream in = new ByteArrayInputStream(data);
         return new ServletInputStream() {
             @Override
-            public int read() throws IOException {
-                return bais.read();
+            public int read() {
+                return in.read();
             }
 
             @Override
-            public int read(byte[] b, int off, int len) throws IOException {
-                return bais.read(b, off, len);
+            public int read(byte[] b, int off, int len) {
+                return in.read(b, off, len);
             }
 
             @Override
             public boolean isFinished() {
-                return bais.available() == 0;
+                return in.available() == 0;
             }
 
             @Override
@@ -181,7 +127,6 @@ class RequestSizeLimitFilterTest {
 
             @Override
             public void setReadListener(ReadListener readListener) {
-                // no-op
             }
         };
     }

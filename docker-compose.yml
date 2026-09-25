@@ -1,47 +1,10 @@
-# ============================================================================
-# Railhook — services, and how they are wired to each other.
-# ============================================================================
-# The one Compose file. It is what install.sh downloads, what an installation
-# runs, and — with docker-compose.build.yml layered on top — what `make up`
-# builds from source. There used to be three files describing the same seven
-# services; they drifted, and the drift was a real bug (the worker's actuator
-# bind address differed between two of them, which silently broke metrics
-# scraping in exactly one deployment path).
-#
-# Every service resolves to a pre-built image, so this file plus a .env beside
-# it is a complete deployment.
-#
-# Get both, with real generated secrets rather than the public ones in
-# .env.dist, by running the installer:
-#
-#   curl -fsSL https://railhook.io/install.sh | bash
-#
-# ONE PUBLISHED PORT. The ui service's nginx is the only thing bound to the
-# host; it serves the dashboard and proxies every API path to `api`. Nothing
-# else — not the API, not the actuator, not the datastores — is reachable from
-# outside the Docker network. Set RAILHOOK_PORT to move it off 80.
-#
-#   curl -f http://localhost/actuator/health/liveness
-#   curl -f http://localhost/
-#
-# Images default to the images this project publishes to GHCR on every
-# version tag (see .github/workflows/docker-publish.yml). Override
-# DOCKER_REGISTRY / API_IMAGE_TAG / WORKER_IMAGE_TAG / UI_IMAGE_TAG (all
-# documented in .env.dist) to point at a
-# private mirror or a specific version instead of :latest.
-#
-# Kafka topic creation, which `make up` normally does as a separate Makefile
-# step after startup, runs here as the one-shot `kafka-init` service — api and
-# worker wait for it to complete successfully before starting, so there is no
-# "app started before topics existed" race.
+# Keep this the only Compose file: three copies once drifted and broke metrics scraping.
 
 services:
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     container_name: webhook-postgres
-    # Under a profile so DB_MODE=external can point the platform at a managed
-    # database without this ever starting. install.sh turns the profile on;
-    # `make up` passes --profile embedded-db.
+    # A profile, so DB_MODE=external never starts it.
     profiles: [embedded-db]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-webhook_platform}
@@ -50,10 +13,8 @@ services:
     volumes:
       - webhook_pgdata:/var/lib/postgresql/data
     healthcheck:
-      # Over TCP, not the unix socket: the image's entrypoint runs a temporary
-      # server with listen_addresses='' while it applies the initdb scripts, and
-      # a socket probe reports that one as healthy - so a dependant starts, and
-      # the temporary server is then stopped out from under it.
+      # Over TCP, not the unix socket: during initdb the entrypoint runs a temporary socket-only
+      # server, a socket probe calls it healthy, and it is then stopped under the dependant.
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-webhook_user} -d ${POSTGRES_DB:-webhook_platform}"]
       interval: 10s
       timeout: 5s
@@ -76,20 +37,13 @@ services:
   db-backup:
     image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     container_name: webhook-db-backup
-    # Its own profile, not embedded-db: it bind-mounts two scripts from
-    # deploy/scripts/, which exist in a clone but not in an install
-    # directory — where Docker would helpfully create them as empty
-    # root-owned directories and the container would then fail to run.
-    # install.sh fetches the scripts and turns this profile on;
-    # `make up` gets it from the clone. Ad-hoc backups need none of it:
-    # `./railhook backup` runs pg_dump through `compose exec`.
+    # Its own profile: it bind-mounts deploy/scripts/, which an install directory has only when
+    # install.sh fetched it — otherwise Docker creates empty root-owned directories in its place.
     profiles: [backup]
     entrypoint: ["bash"]
     command: ["/scripts/db-backup-loop.sh"]
     environment:
-      # "direct" mode: this container has its own pg_dump (same postgres:16-alpine
-      # image as the DB itself) and reaches Postgres over webhook-network, so it
-      # never needs docker exec / the docker socket to back up a sibling container.
+      # Its own pg_dump over the network, so it never needs the docker socket.
       DB_MODE: direct
       DB_HOST: postgres
       DB_PORT: 5432
@@ -134,14 +88,11 @@ services:
       KAFKA_MIN_INSYNC_REPLICAS: 1
       KAFKA_DEFAULT_REPLICATION_FACTOR: 1
       CLUSTER_ID: webhook-kafka-cluster
-      # Unset, the image's start script uses -Xmx1G -Xms1G: the whole default container limit,
-      # committed at start-up, with nothing left for metaspace, threads and network buffers. A
-      # single broker keeps its data in the page cache, not the heap. Keep this near half of
-      # KAFKA_MEMORY_LIMIT when raising either.
+      # The image default -Xmx1G is the whole container limit; the broker's data lives in the page
+      # cache, so keep the heap near half of KAFKA_MEMORY_LIMIT.
       KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xms512m -Xmx512m}
-      # The volume below is only where the log lives if the broker is told so. Unset, the image
-      # writes to /tmp/kafka-logs inside the container, and recreating it — any change to this
-      # service's environment does — throws away every topic, offset and unread message.
+      # Unset, the log goes to /tmp/kafka-logs, not the volume, and recreating the container
+      # throws away every topic, offset and unread message.
       KAFKA_LOG_DIRS: /var/lib/kafka/data
     volumes:
       - kafka_data:/var/lib/kafka/data
@@ -166,11 +117,8 @@ services:
       - webhook-network
     restart: unless-stopped
 
-  # One-shot: creates every topic in KafkaTopics.java (worker/api do NOT rely on
-  # broker auto-create, since that would silently apply the broker default
-  # partition count instead of KAFKA_NUM_PARTITIONS). api/worker block on this
-  # via `condition: service_completed_successfully` below.
-
+  # Creates every topic up front: broker auto-create would use the broker's partition count,
+  # not KAFKA_NUM_PARTITIONS.
   kafka-init:
     image: ${KAFKA_IMAGE:-apache/kafka:3.7.0}
     container_name: webhook-kafka-init
@@ -217,38 +165,8 @@ services:
 
   api:
     image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/railhook}-api:${API_IMAGE_TAG:-latest}
-    # No container_name, and no scale: 1 either. A fixed name pins the service to one
-    # container and Compose refuses to scale it at all, which is what made a deploy a
-    # twenty-second outage: the only way to replace the API was to stop the one that
-    # was serving. With the name gone it can be rolled — `railhook upgrade` brings the
-    # replacement up, waits for it, and drains the old one, so nothing is ever asked
-    # for work by nginx while it is still starting.
-    #
-    # The cost is that `docker logs webhook-api` no longer resolves. Use
-    # `docker compose logs api`, which works for one replica or several.
-    # Deliberately no host ports. Everything reaches the API through the ui
-    # service's nginx, which proxies /api/, /ws/tunnel, /tunnel/, /hook/,
-    # /ingress/ and the two safe actuator paths. One published port is one URL
-    # to give people, one certificate to obtain and one firewall rule to
-    # write — and in production that port is 443 behind a domain, not a set of
-    # numbers anyone has to remember.
-    #
-    # Nothing else publishes a host port either — not postgres, kafka or redis.
-    # `docker compose exec` reaches all of them (that is what ./railhook backup
-    # uses), and a database listening on a laptop's loopback is a real exposure
-    # the moment anything else on that machine is compromised.
-    #
-    # If you do want something reachable directly — debugging, psql, a CLI
-    # pointed straight at the API — add a docker-compose.override.yml next to
-    # this file:
-    #
-    #   services:
-    #     api:      { ports: ["127.0.0.1:8080:8080", "127.0.0.1:8082:8082"] }
-    #     postgres: { ports: ["127.0.0.1:5432:5432"] }
-    #
-    # Keep them on 127.0.0.1. 8082 is the actuator port, and it deliberately
-    # does not pass through the authenticated security chain (see
-    # MANAGEMENT_PORT below), so it must never leave the host.
+    # No container_name: `railhook upgrade` starts a replacement api before draining the old one.
+    # No host ports: the ui's nginx is the only way in, and 8082 is the unauthenticated actuator.
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
@@ -264,19 +182,10 @@ services:
       KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS: ${KAFKA_PRODUCER_DELIVERY_TIMEOUT_MS:-120000}
       KAFKA_PRODUCER_MAX_BLOCK_MS: ${KAFKA_PRODUCER_MAX_BLOCK_MS:-10000}
       SERVER_PORT: 8080
-      # Actuator (incl. /actuator/prometheus) is split onto its own port so
-      # Prometheus can scrape it without going through the JWT/API-key-authenticated
-      # SecurityConfig filter chain on 8080. Not published to the host — only
-      # reachable from other containers on webhook-network, same trust boundary
-      # as postgres/kafka/redis. (Mirrors docker-compose.yml's api service.)
+      # Its own port so Prometheus scrapes outside the authenticated chain on 8080.
       MANAGEMENT_PORT: 8082
-      # Literal, not a variable. Neither management port is published to the
-      # host, so 0.0.0.0 here means "reachable from other containers on this
-      # network" and nothing more — which is exactly what nginx's health proxy
-      # and Prometheus's scrape both need. It was a knob, and setting it to
-      # 127.0.0.1 (which reads as the safer choice) silently broke Prometheus
-      # once already; now it would break the health endpoint too, since nginx
-      # is the only way in. Removing the knob removes the failure.
+      # Literal, not a knob: the port is never published, and 127.0.0.1 (which reads safer) once
+      # broke Prometheus's scrape and would now break nginx's health proxy too.
       MANAGEMENT_ADDRESS: 0.0.0.0
       SCHEDULING_POOL_SIZE: ${SCHEDULING_POOL_SIZE:-8}
       WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY must be set}
@@ -325,9 +234,7 @@ services:
       TRANSFORM_SCRIPT_MAX_OUTPUT_BYTES: ${TRANSFORM_SCRIPT_MAX_OUTPUT_BYTES:-1048576}
       TRANSFORM_SCRIPT_MAX_CONSOLE_LINES: ${TRANSFORM_SCRIPT_MAX_CONSOLE_LINES:-100}
       TRANSFORM_SCRIPT_MAX_CHARS: ${TRANSFORM_SCRIPT_MAX_CHARS:-65536}
-      # Incoming-source and tunnel URLs are built from this and handed to providers and the CLI, so it
-      # has to be the public address. Unset, it follows APP_BASE_URL - the old localhost:8080 default
-      # named a port nothing publishes, and a --domain install showed localhost URLs.
+      # Handed to providers and the CLI, so it must be the public address.
       WEBHOOK_INGRESS_BASE_URL: ${TUNNEL_INGRESS_BASE_URL:-${APP_BASE_URL:-http://localhost}}
       TUNNEL_HEARTBEAT_TIMEOUT_SECONDS: ${TUNNEL_HEARTBEAT_TIMEOUT_SECONDS:-120}
       TUNNEL_CLEANUP_INTERVAL_MS: ${TUNNEL_CLEANUP_INTERVAL_MS:-60000}
@@ -351,15 +258,12 @@ services:
       OUTBOX_DEAD_RETENTION_DAYS: ${OUTBOX_DEAD_RETENTION_DAYS:-90}
       OUTBOX_SENDING_RECOVERY_SECONDS: ${OUTBOX_SENDING_RECOVERY_SECONDS:-300}
       OUTBOX_BATCH_SEND_TIMEOUT_SECONDS: ${OUTBOX_BATCH_SEND_TIMEOUT_SECONDS:-30}
-      # Both fairness bounds. max-per-project was documented in .env.dist and never reached the
-      # container, so setting it did nothing; max-per-key was not a setting at all.
       OUTBOX_MAX_PER_PROJECT: ${OUTBOX_MAX_PER_PROJECT:-30}
       OUTBOX_MAX_PER_KEY: ${OUTBOX_MAX_PER_KEY:-10}
       REPLAY_BATCH_SIZE: ${REPLAY_BATCH_SIZE:-200}
       REPLAY_BATCH_DELAY_MS: ${REPLAY_BATCH_DELAY_MS:-50}
       REPLAY_MAX_EVENTS_PER_SESSION: ${REPLAY_MAX_EVENTS_PER_SESSION:-500000}
-      # The capture URL a person copies and sends requests to, so it has to be the public origin —
-      # the default used to be http://api:8080, a name that exists only inside this network.
+      # A URL people copy, so the public origin — never api:8080, which exists only in this network.
       TEST_ENDPOINT_BASE_URL: ${TEST_ENDPOINT_BASE_URL:-${APP_BASE_URL:-http://localhost}}
       PUBLIC_TESTER_ENABLED: ${PUBLIC_TESTER_ENABLED:-false}
       DEMO_ENABLED: ${DEMO_ENABLED:-false}
@@ -420,8 +324,7 @@ services:
       ORGANIZATION_SUSPENSION_CACHE_TTL_SECONDS: ${ORGANIZATION_SUSPENSION_CACHE_TTL_SECONDS:-60}
       CAPTCHA_SECRET_KEY: ${CAPTCHA_SECRET_KEY:-}
       CAPTCHA_VERIFY_URL: ${CAPTCHA_VERIFY_URL:-https://challenges.cloudflare.com/turnstile/v0/siteverify}
-      # "Continue with Google". Both set turns it on; the redirect URI Google must allow is
-      # APP_BASE_URL + /api/v1/auth/oauth/google/callback.
+      # Google must allow APP_BASE_URL + /api/v1/auth/oauth/google/callback as the redirect URI.
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
       BILLING_ENABLED: ${BILLING_ENABLED:-false}
@@ -437,9 +340,8 @@ services:
       WAYFORPAY_PLAN_PRICES: ${WAYFORPAY_PLAN_PRICES:-}
       JAVA_EXTRA_OPTS: ${API_JAVA_OPTS:-}
     depends_on:
-      # required:false so an external/managed database does not drag the
-      # embedded-db profile in — but when postgres IS in play, wait for it.
-      # Without it, Flyway races a database not yet accepting connections.
+      # required:false so an external database does not pull in the embedded-db profile; when
+      # postgres is there, waiting for it keeps Flyway from racing its startup.
       postgres:
         condition: service_healthy
         required: false
@@ -450,16 +352,13 @@ services:
       kafka-init:
         condition: service_completed_successfully
     healthcheck:
-      # Actuator lives on MANAGEMENT_PORT (8082), not the main 8080 — see the
-      # comment above. Same as docker-compose.yml's api healthcheck.
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health/liveness"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-    # 30s lifecycle + margin. Smaller than the worker's on purpose: the api drains
-    # one graceful web server, not two @PreDestroy thread pools waiting on in-flight
-    # HTTP deliveries.
+    # 30s lifecycle + margin. Smaller than the worker's on purpose: the api drains one web server,
+    # not two pools waiting on in-flight deliveries.
     stop_grace_period: 65s
     logging:
       driver: json-file
@@ -467,11 +366,7 @@ services:
         max-size: "50m"
         max-file: "5"
     deploy:
-      # More than one makes `railhook upgrade` a rolling replacement rather than a
-      # restart: the new container warms up out of rotation while the old one keeps
-      # serving, so there is no gap. One is the default because the smallest supported
-      # host has room for exactly one JVM here and a second is another ~600MB — set it
-      # to 2 if you would rather not have a twenty-second outage on every upgrade.
+      # 1 fits the smallest supported host; 2 costs ~600MB and makes every upgrade gapless.
       replicas: ${API_REPLICAS:-1}
       resources:
         limits:
@@ -493,9 +388,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-webhook_pass}
       DB_SSL_MODE: ${DB_SSL_MODE:-disable}
       DB_JDBC_URL: ${DB_JDBC_URL:-}
-      # See docker-compose.yml's worker block -- WORKER_DB_POOL_MAX_SIZE/MIN_IDLE are
-      # deliberately distinct from the API's DB_POOL_MAX_SIZE/DB_POOL_MIN_IDLE (.env.dist), or
-      # a single shared .env value silently overrides both services' independently-tuned pools.
+      # WORKER_-prefixed, or one shared .env value would override both services' pools.
       DB_POOL_MAX_SIZE: ${WORKER_DB_POOL_MAX_SIZE:-40}
       DB_POOL_MIN_IDLE: ${WORKER_DB_POOL_MIN_IDLE:-20}
       DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-30000}
@@ -506,13 +399,8 @@ services:
       KAFKA_NUM_PARTITIONS: ${KAFKA_NUM_PARTITIONS:-12}
       SCHEDULING_POOL_SIZE: ${SCHEDULING_POOL_SIZE:-8}
       MANAGEMENT_PORT: 8081
-      # Literal, not a variable. Neither management port is published to the
-      # host, so 0.0.0.0 here means "reachable from other containers on this
-      # network" and nothing more — which is exactly what nginx's health proxy
-      # and Prometheus's scrape both need. It was a knob, and setting it to
-      # 127.0.0.1 (which reads as the safer choice) silently broke Prometheus
-      # once already; now it would break the health endpoint too, since nginx
-      # is the only way in. Removing the knob removes the failure.
+      # Literal, not a knob: the port is never published, and 127.0.0.1 (which reads safer) once
+      # broke Prometheus's scrape and would now break nginx's health proxy too.
       MANAGEMENT_ADDRESS: 0.0.0.0
       WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY must be set}
       WEBHOOK_ENCRYPTION_KEYS: ${WEBHOOK_ENCRYPTION_KEYS:-}
@@ -579,11 +467,9 @@ services:
       WEBHOOK_MAX_CONCURRENT_PER_TENANT: ${WEBHOOK_MAX_CONCURRENT_PER_TENANT:-20}
       DLQ_MONITORING_INTERVAL_MS: ${DLQ_MONITORING_INTERVAL_MS:-60000}
       DLQ_MONITORING_ADMIN_CLIENT_TIMEOUT_SECONDS: ${DLQ_MONITORING_ADMIN_CLIENT_TIMEOUT_SECONDS:-10}
+      # The outgoing ladder's worst case with full jitter is 83h, and RetrySchedulerService refuses
+      # to start when it does not fit inside this cap.
       DELIVERY_ESCALATION_HARD_CAP_HOURS: ${DELIVERY_ESCALATION_HARD_CAP_HOURS:-96}
-      # 96, not 48: the outgoing retry ladder's worst case with full jitter is 83h and
-      # RetrySchedulerService refuses to start when it does not fit inside the cap. The 48
-      # here predated the ladder gaining its 24h tier and would fail every boot that did
-      # not override it.
       FORWARD_ESCALATION_HARD_CAP_HOURS: ${FORWARD_ESCALATION_HARD_CAP_HOURS:-24}
       FORWARD_ESCALATION_BATCH_SIZE: ${FORWARD_ESCALATION_BATCH_SIZE:-100}
       FORWARD_ESCALATION_INTERVAL_MS: ${FORWARD_ESCALATION_INTERVAL_MS:-300000}
@@ -591,9 +477,8 @@ services:
       DELIVERY_ESCALATION_INTERVAL_MS: ${DELIVERY_ESCALATION_INTERVAL_MS:-300000}
       JAVA_EXTRA_OPTS: ${WORKER_JAVA_OPTS:-}
     depends_on:
-      # required:false so an external/managed database does not drag the
-      # embedded-db profile in — but when postgres IS in play, wait for it.
-      # Without it, Flyway races a database not yet accepting connections.
+      # required:false so an external database does not pull in the embedded-db profile; when
+      # postgres is there, waiting for it keeps Flyway from racing its startup.
       postgres:
         condition: service_healthy
         required: false
@@ -609,14 +494,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    # 30s (spring.lifecycle.timeout-per-shutdown-phase, which drains the Kafka
-    # containers) + 2 x WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS + margin. The two
-    # are the outgoing and incoming BoundedAsyncExecutors (ExecutorConfig); they
-    # shut down in @PreDestroy, which runs after the lifecycle phase and does not
-    # share its timeout, and Spring runs them one after the other. At 35s Docker
-    # sent SIGKILL while the first pool was still waiting on in-flight deliveries.
-    # Raise this whenever WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS goes up —
-    # ShutdownBudgetTest fails the build if the two disagree.
+    # 30s lifecycle + 2 x WEBHOOK_ASYNC_SHUTDOWN_TIMEOUT_SECONDS (the executors drain one after the
+    # other) + margin; at 35s Docker killed deliveries mid-flight. ShutdownBudgetTest checks it.
     stop_grace_period: 155s
     logging:
       driver: json-file
@@ -637,38 +516,20 @@ services:
     image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/railhook}-ui:${UI_IMAGE_TAG:-latest}
     container_name: webhook-ui
     ports:
-      # The one published port. 80 by default because that is what a browser
-      # assumes. With a domain, install.sh moves this to 127.0.0.1:8080 and
-      # something else takes 80/443: Caddy below under the `tls` profile, or the
-      # operator's own proxy with --behind-proxy. Nothing else changes, because
-      # either one proxies straight to this same nginx.
+      # With a domain, install.sh binds this to 127.0.0.1:8080 behind Caddy or the operator's proxy.
       - "${RAILHOOK_BIND:-0.0.0.0}:${RAILHOOK_PORT:-80}:5173"
-    # The UI is a static bundle behind nginx. nginx proxies /api/, /ws/tunnel,
-    # /hook/ and /ingress/ to the api service, so the bundle talks to its own
-    # origin and needs no API URL.
-    #
-    # What is here is read by the container when it starts, because it has to
-    # differ between deployments of one published image. Changing a value takes
-    # `docker compose up -d ui`, never a rebuild.
+    # Read when the container starts, so one published image serves every deployment: a change
+    # takes `docker compose up -d ui`, never a rebuild.
     environment:
-      # Domain behind the sales@ / support@ addresses. Empty: none are offered.
       RAILHOOK_CONTACT_DOMAIN: ${RAILHOOK_CONTACT_DOMAIN:-}
-      # The public origin the pages name about themselves: canonical, og tags,
-      # sitemap. Empty: they stay relative to whatever origin serves them.
       RAILHOOK_SITE_URL: ${APP_BASE_URL:-}
-      # The registration challenge's public half. Turn it on together with
-      # CAPTCHA_SECRET_KEY on the API, never one without the other.
+      # Turn on together with CAPTCHA_SECRET_KEY on the API, never one without the other.
       RAILHOOK_CAPTCHA_SITE_KEY: ${CAPTCHA_SITE_KEY:-}
       RAILHOOK_CAPTCHA_SCRIPT_URL: ${CAPTCHA_SCRIPT_URL:-}
-      # Cloudflare Web Analytics token. Empty: no analytics script.
       RAILHOOK_WEB_ANALYTICS_TOKEN: ${WEB_ANALYTICS_TOKEN:-}
-      # A public status page the footer links to. Empty: no link.
       RAILHOOK_STATUS_PAGE_URL: ${STATUS_PAGE_URL:-}
-      # The public webhook tester (/tester), the same switch the API reads.
       RAILHOOK_PUBLIC_TESTER: ${PUBLIC_TESTER_ENABLED:-false}
-      # The live demo's entry points, the same switch the API reads.
       RAILHOOK_PUBLIC_DEMO: ${DEMO_ENABLED:-false}
-      # The blog (/blog): railhook.io's own content, off on a self-hosted install.
       RAILHOOK_PUBLIC_BLOG: ${BLOG_ENABLED:-false}
     depends_on:
       - api
@@ -687,20 +548,8 @@ services:
       - webhook-network
     restart: unless-stopped
 
-  # ---------------------------------------------------------------------------
-  # TLS. Off unless the `tls` profile is enabled, which install.sh does when you
-  # give it --domain.
-  #
-  # Caddy rather than nginx-with-certbot because getting and renewing the
-  # certificate is the whole job here, and Caddy does it with no cron entry, no
-  # renewal hook and no first-run chicken-and-egg where nginx will not start
-  # until a certificate exists that cannot be obtained until nginx starts.
-  #
-  # It terminates TLS and proxies to the ui service's nginx, which still does
-  # all the routing. One place decides what is public; adding TLS did not move
-  # that decision.
-  # ---------------------------------------------------------------------------
-
+  # Caddy rather than nginx + certbot: it obtains and renews certificates with no cron and no
+  # first-run chicken-and-egg. It only terminates TLS; the ui's nginx still does all routing.
   caddy:
     image: ${CADDY_IMAGE:-caddy:2-alpine}
     container_name: webhook-caddy
@@ -711,17 +560,13 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      # `:-` and not `:?`: Compose interpolates the whole file regardless of
-      # which profiles are active, so a required-variable guard here would fail
-      # every install that is not using TLS. An empty value reaches the
-      # Caddyfile, where Caddy refuses to start with a clear message — and only
-      # when this profile is actually on.
+      # `:-`, not `:?`: Compose interpolates every profile, so a guard would fail installs without
+      # TLS. Caddy itself refuses an empty domain, and only when this profile is on.
       RAILHOOK_DOMAIN: ${RAILHOOK_DOMAIN:-}
       ACME_EMAIL: ${ACME_EMAIL:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # Certificates live here. Losing this volume means re-issuing on the next
-      # start, which Let's Encrypt rate-limits — back it up with your .env.
+      # Certificates: losing them means re-issuing, which Let's Encrypt rate-limits.
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
@@ -736,13 +581,8 @@ services:
 volumes:
   caddy_data:
   caddy_config:
-  # Project-scoped, like kafka_data and redis_data beside it. It used to carry
-  # `name: ${POSTGRES_VOLUME_NAME:-webhook_pgdata}`, which pins one global volume
-  # shared by every Compose project on the host: a second install silently
-  # attached to the first one's database and then failed authentication against
-  # credentials it had never been given. There is no conditional `name:` in
-  # Compose, so the knob is gone — to attach a specific existing volume (a
-  # restore, say), declare it external in a docker-compose.override.yml.
+  # No fixed `name:` — a global name let a second install attach to the first one's database.
+  # To use an existing volume, declare it external in a docker-compose.override.yml.
   webhook_pgdata:
   kafka_data:
   redis_data:

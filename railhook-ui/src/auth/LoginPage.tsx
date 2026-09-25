@@ -27,8 +27,6 @@ export default function LoginPage() {
   const { login } = useAuth();
   useLeaveDemo();
   const [searchParams] = useSearchParams();
-  // An invite or a CLI approval sends a signed-out visitor here with ?redirect=; a protected page
-  // sends the path it was on as state.from.
   const redirect = searchParams.get('redirect');
   const from = (location.state as { from?: unknown } | null)?.from;
   const returnTo = redirect ? safeDestination(redirect, DEFAULT_DESTINATION) : undefined;
@@ -46,9 +44,7 @@ export default function LoginPage() {
       showSuccess(t('auth.login.welcomeBack'));
       navigate(destinationAfterSignIn({ redirect, from, userId: user.user?.id }, DEFAULT_DESTINATION));
     } catch (err: any) {
-      // A 403 with no message of ours is Spring refusing this page's Origin (CORS_ALLOWED_ORIGINS).
-      // The generic toast for 403 says "no permission", which is wrong about a person who has not
-      // signed in yet and says nothing an operator could fix.
+      // A 403 without our message is Spring rejecting the Origin (CORS_ALLOWED_ORIGINS), not a permission issue.
       const originRejected = err.response?.status === 403 && typeof err.response?.data?.message !== 'string';
       const errorMessage = originRejected
         ? t('auth.login.originRejected')
@@ -71,7 +67,7 @@ export default function LoginPage() {
       footer={
         <>
           {t('auth.login.noAccount')}{' '}
-          <Link to={returnTo ? `/register?redirect=${encodeURIComponent(returnTo)}` : '/register'} className="font-medium text-primary hover:underline">
+          <Link to={returnTo ? `/register?redirect=${encodeURIComponent(returnTo)}` : '/register'} className="font-medium link-ink">
             {t('auth.login.createAccount')}
           </Link>
         </>
@@ -99,7 +95,7 @@ export default function LoginPage() {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">{t('auth.login.password')}</Label>
-            <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+            <Link to="/forgot-password" className="text-xs link-ink">
               {t('auth.login.forgotPassword')}
             </Link>
           </div>
@@ -116,7 +112,7 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div role="alert" className="animate-scale-in rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+          <div role="alert" className="animate-scale-in border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
             {error}
           </div>
         )}

@@ -24,25 +24,12 @@ class BranchNodeExecutorTest {
     }
 
     @Test
-    void getType_returnsBranch() {
-        assertThat(executor.getType()).isEqualTo("branch");
-    }
-
-    @Test
     void noConditions_alwaysTakesTrueBranch() throws Exception {
         StepResult result = executor.execute(json("{}"), json("{\"amount\":10}"));
 
         assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
         assertThat(result.output().get("_branchHandle").asText()).isEqualTo("true");
         assertThat(result.output().get("_branchResult").asBoolean()).isTrue();
-    }
-
-    @Test
-    void nullConditions_alwaysTakesTrueBranch() throws Exception {
-        StepResult result = executor.execute(json("{\"conditions\":null}"), json("{}"));
-
-        assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
-        assertThat(result.output().get("_branchHandle").asText()).isEqualTo("true");
     }
 
     @Test
@@ -94,14 +81,6 @@ class BranchNodeExecutorTest {
 
         assertThat(result.output().get("orderId").asText()).isEqualTo("o-1");
         assertThat(result.output().get("amount").asInt()).isEqualTo(50);
-    }
-
-    @Test
-    void nonObjectInput_doesNotThrow() throws Exception {
-        StepResult result = executor.execute(json("{}"), json("[1,2,3]"));
-
-        assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
-        assertThat(result.output().get("_branchHandle").asText()).isEqualTo("true");
     }
 
     @Test

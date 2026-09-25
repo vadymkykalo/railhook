@@ -1,18 +1,11 @@
 import { toast } from 'sonner';
 import i18n from '../i18n';
 
-// ─── Types ──────────────────────────────────────────────────────────
-
 interface ToastOptions {
-  /** Stable ID for deduplication — same ID prevents duplicate toasts */
   id?: string;
-  /** Duration in ms. Use Infinity for sticky. Default: 4000 */
   duration?: number;
-  /** Retry callback — adds a "Retry" action button to error toasts */
   retry?: () => void;
 }
-
-// ─── Helpers ────────────────────────────────────────────────────────
 
 function t(key: string, opts?: Record<string, unknown>): string {
   return i18n.t(key, opts) as string;
@@ -42,24 +35,16 @@ function extractHttpStatus(err: unknown): number | null {
   return null;
 }
 
-/**
- * True when the request never reached a server at all — connection refused,
- * DNS failure, timeout, or the backend simply isn't up. Distinct from a 4xx/5xx,
- * which means a server *did* respond. This is the "the API is down" case.
- */
 export function isNetworkError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as any;
-  if (e.response) return false; // server responded — not a network error
+  if (e.response) return false;
   return Boolean(e.request) || e.code === 'ERR_NETWORK' || e.code === 'ECONNABORTED' || e.message === 'Network Error';
 }
 
-/** Generates a stable dedup ID from the fallback key + optional error message */
 function dedupeId(fallbackKey: string, apiMsg: string | null): string {
   return apiMsg ? `${fallbackKey}::${apiMsg}` : fallbackKey;
 }
-
-// ─── Global error → user-friendly message mapping ───────────────────
 
 const STATUS_MESSAGE_KEYS: Record<number, string> = {
   401: 'toast.errors.unauthorized',
@@ -74,13 +59,6 @@ const STATUS_MESSAGE_KEYS: Record<number, string> = {
   503: 'toast.errors.server',
 };
 
-// ─── Public API ─────────────────────────────────────────────────────
-
-/**
- * Resolves a human-readable message from an API error.
- * Priority: API message → HTTP status mapping → fallback i18n key.
- * Shared by toast notifications and inline error states so the wording matches.
- */
 export function resolveErrorMessage(err: unknown, fallbackKey: string): string {
   if (isNetworkError(err)) {
     return t('toast.errors.network');
@@ -104,16 +82,10 @@ export function resolveErrorMessage(err: unknown, fallbackKey: string): string {
 
 const reportedErrors = new WeakSet<object>();
 
-/** Whether showApiError has already put this error object in front of the user. */
 export function wasErrorReported(err: unknown): boolean {
   return !!err && typeof err === 'object' && reportedErrors.has(err);
 }
 
-/**
- * Show an error toast from an API error.
- * Priority: API message → HTTP status mapping → fallback i18n key.
- * Automatically deduplicates identical errors.
- */
 export function showApiError(err: unknown, fallbackKey: string, options?: ToastOptions) {
   if (err && typeof err === 'object') reportedErrors.add(err);
   const apiMsg = extractApiMessage(err);
@@ -139,7 +111,6 @@ export function showApiError(err: unknown, fallbackKey: string, options?: ToastO
   }
 }
 
-/** Success toast with deduplication */
 export function showSuccess(messageOrKey: string, options?: ToastOptions) {
   const message = i18n.exists(messageOrKey) ? t(messageOrKey) : messageOrKey;
   toast.success(message, {
@@ -148,7 +119,6 @@ export function showSuccess(messageOrKey: string, options?: ToastOptions) {
   });
 }
 
-/** Warning toast — for non-blocking but important notices */
 export function showWarning(messageOrKey: string, options?: ToastOptions) {
   const message = i18n.exists(messageOrKey) ? t(messageOrKey) : messageOrKey;
   toast.warning(message, {
@@ -157,7 +127,6 @@ export function showWarning(messageOrKey: string, options?: ToastOptions) {
   });
 }
 
-/** Info toast */
 export function showInfo(messageOrKey: string, options?: ToastOptions) {
   const message = i18n.exists(messageOrKey) ? t(messageOrKey) : messageOrKey;
   toast.info(message, {
@@ -166,7 +135,6 @@ export function showInfo(messageOrKey: string, options?: ToastOptions) {
   });
 }
 
-/** Error toast for non-API errors (business logic failures, etc.) */
 export function showError(messageOrKey: string, options?: ToastOptions) {
   const message = i18n.exists(messageOrKey) ? t(messageOrKey) : messageOrKey;
   toast.error(message, {
@@ -175,10 +143,6 @@ export function showError(messageOrKey: string, options?: ToastOptions) {
   });
 }
 
-/**
- * Sticky success for critical completed actions (e.g. purge, delete).
- * Stays for 8s so user has time to read.
- */
 export function showCriticalSuccess(messageOrKey: string, options?: ToastOptions) {
   showSuccess(messageOrKey, {
     ...options,

@@ -7,25 +7,18 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * The schedule of how long to wait before each successive attempt, and how many attempts
- * there are before the obligation is abandoned. Applies to both directions: an outgoing
- * Delivery reads it off its own row, an incoming Forward off its Destination.
- *
- * <p>No defaults live here, on purpose. Every row carries its own ladder via a column default,
- * so there is nothing to substitute when one looks malformed — and substituting was the old
- * behaviour, which handed a customer who mistyped {@code retry_delays} a policy that was neither
- * theirs nor documented. {@link #parse} throws, and {@link #validate(String, String)} lets the API
- * reject the mistake where it is made. The per-direction defaults live in {@link RetryLadderDefaults}.
+ * Delays between attempts and how many attempts there are, for both directions. No defaults
+ * here: every row has its own ladder via a column default. Substituting a default for a
+ * malformed ladder used to hand customers an undocumented policy, so {@link #parse} throws.
+ * Per-direction defaults are in {@link RetryLadderDefaults}.
  */
 public final class RetryLadder {
 
-    /** Longer than this is likelier a typo than an intent, and keeps the arithmetic clear of overflow. */
+    /** Longer is likelier a typo, and this keeps the arithmetic clear of overflow. */
     public static final long MAX_TIER_SECONDS = 30L * 24 * 60 * 60;
 
-    /** Upper bound on tiers, so a pasted-in wall of numbers is rejected rather than stored. */
     public static final int MAX_TIERS = 32;
 
-    /** Upper bound on attempts, for the same reason. */
     public static final int MAX_ATTEMPTS_LIMIT = 100;
 
     private final List<Long> delaysSeconds;
@@ -36,22 +29,16 @@ public final class RetryLadder {
         this.maxAttempts = maxAttempts;
     }
 
-    /** @throws IllegalArgumentException with a message meant to be shown to whoever supplied the value */
     public static RetryLadder parse(String delaysCsv, int maxAttempts) {
         List<Long> delays = parseDelays(delaysCsv, "retryDelays");
         requireAttemptsInRange(maxAttempts, "maxAttempts");
         return new RetryLadder(delays, maxAttempts);
     }
 
-    /**
-     * Validates without building one, at the point a caller supplies it. {@code delaysField} is
-     * quoted in the error, so the message names whatever the caller actually sent.
-     */
     public static void validate(String delaysCsv, String delaysField) {
         parseDelays(delaysCsv, delaysField);
     }
 
-    /** @see #validate(String, String) */
     public static void validate(String delaysCsv, String delaysField,
             Integer maxAttempts, String maxAttemptsField) {
         parseDelays(delaysCsv, delaysField);
@@ -115,13 +102,7 @@ public final class RetryLadder {
         return maxAttempts;
     }
 
-    /**
-     * The tier that applies to the given 1-indexed attempt, before jitter. Attempts past the
-     * end of the ladder clamp to its last tier.
-     *
-     * <p>Separate from {@link #nextRetryAt} so the tier arithmetic can be asserted exactly,
-     * rather than through the jitter range.
-     */
+    /** Attempts past the end of the ladder clamp to its last tier. */
     public long baseDelaySeconds(int attemptNumber) {
         if (attemptNumber < 1) {
             throw new IllegalArgumentException("attemptNumber is " + attemptNumber + "; attempts are 1-indexed");
@@ -130,29 +111,20 @@ public final class RetryLadder {
         return delaysSeconds.get(index);
     }
 
-    /**
-     * When the attempt after {@code attemptNumber} becomes due: the applicable tier with
-     * full jitter (50%–150% of it) so a burst of same-tier retries does not stampede.
-     */
+    /** 50% to 150% jitter so a burst of same-tier retries does not stampede. */
     public Instant nextRetryAt(int attemptNumber) {
         long base = baseDelaySeconds(attemptNumber);
         double jitterMultiplier = 0.5 + ThreadLocalRandom.current().nextDouble(1.0);
         return Instant.now().plusSeconds((long) (base * jitterMultiplier));
     }
 
-    /** True once {@code attemptNumber} attempts have been made and no more are allowed. */
     public boolean isExhausted(int attemptNumber) {
         return attemptNumber >= maxAttempts;
     }
 
     /**
-     * Upper bound on the total time an obligation can spend retrying before the ladder is
-     * exhausted: every tier hit at the top of {@link #nextRetryAt}'s jitter range, summed
-     * across {@link #maxAttempts} attempts with the same last-tier clamp.
-     *
-     * <p>Used to check the ladder actually fits inside the age cap past which a delivery is
-     * escalated to DLQ regardless of attempt count — if it does not, the last tiers can
-     * never fire. See {@link #requireFitsWithin}.
+     * Every tier at the top of the jitter range. If this exceeds the age cap past which a delivery
+     * is escalated regardless of attempts, the last tiers can never fire.
      */
     public long worstCaseSpanSeconds() {
         long total = 0;
@@ -162,10 +134,6 @@ public final class RetryLadder {
         return total;
     }
 
-    /**
-     * Fails fast when this ladder's worst case does not fit inside a hard cap, naming both
-     * so the operator can see which of the two to move.
-     */
     public void requireFitsWithin(long hardCapSeconds, String ladderName, String capName) {
         long worstCase = worstCaseSpanSeconds();
         if (worstCase > hardCapSeconds) {

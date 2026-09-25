@@ -41,20 +41,9 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-/**
- * The Runner's interface is the test surface.
- *
- * <p>These are the invariants that were, at some point, correct on one direction and wrong on
- * the other — commit {@code 2070d30} hand-ported four of them. Now they hold for both
- * directions or for neither, and this suite is what says so. A fake {@link AttemptStore}
- * stands in for the row model, so none of it needs Postgres, Kafka or Redis.
- *
- * <p>Deliberately a plain {@code *Test}: no container is involved, so it must run in the
- * no-Docker unit job — see {@code scripts/check-test-routing.sh}.
- */
+// Each invariant here was once right in one direction and wrong in the other.
 class AttemptRunnerTest {
 
-    /** The clamp these tests build the Runner with; short enough to assert against. */
     private static final long RETRY_AFTER_MAX_SECONDS = 3600;
 
     private HttpServer server;
@@ -95,10 +84,7 @@ class AttemptRunnerTest {
         server.stop(0);
     }
 
-    /**
-     * Answers the status line immediately, then holds the body back. The status is what decides
-     * the Attempt; everything after it is a body this receiver is slow about.
-     */
+    // The status decides the Attempt; the stalled body must not.
     private void respondThenStallBody(int status, long stallMillis, String body) {
         server.createContext("/hook", exchange -> {
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
@@ -126,7 +112,6 @@ class AttemptRunnerTest {
         });
     }
 
-    /** As {@link #respond}, plus one response header — which is how a receiver says Retry-After. */
     private void respondWith(int status, String body, String headerName, String headerValue) {
         server.createContext("/hook", exchange -> {
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
@@ -137,8 +122,6 @@ class AttemptRunnerTest {
             }
         });
     }
-
-    // ── the invariant that cost a duplicated webhook ────────────────────────────────
 
     @Nested
     @DisplayName("no successor unless the finalisation applied")
@@ -197,11 +180,7 @@ class AttemptRunnerTest {
             runner.run(store, metrics);
 
             assertInstanceOf(Finalization.Abandoned.class, store.finalizations.get(0));
-            // A non-retryable 4xx is much the commonest way a Delivery stops before its ladder
-            // ends. When it ended TerminallyFailed and that released nothing, an ordering-enabled
-            // endpoint's cursor stuck at N-1 permanently: canDeliver stayed false for every later
-            // delivery and FIFO quietly degraded to no delivery at all. It now goes to the DLQ,
-            // and whichever side effect runs has to release what the Attempt was holding.
+            // A 4xx that ended TerminallyFailed released nothing, and an ordered endpoint's cursor stuck forever.
             assertEquals(1, store.abandonedCalls,
                     "nothing else ever releases the ordering cursor for this delivery");
             assertEquals(0, store.terminallyFailedCalls);
@@ -222,10 +201,7 @@ class AttemptRunnerTest {
         @Test
         @DisplayName("a host that does not resolve is retried on the ladder, not failed for good")
         void unresolvableHostIsRetried() {
-            // A resolver timeout or a DNS record mid-change used to land in the same catch as an
-            // SSRF refusal, and both are terminal — so one bad minute of DNS failed the Delivery
-            // or Forward outright, outside the DLQ, where nobody is offered a retry. Not resolving
-            // says nothing about where the name points; only a refused address is final.
+            // Not resolving says nothing about where the name points; only a refused address is final.
             FakeStore store = new FakeStore("https://no-such-host.invalid/hook");
 
             runner.run(store, metrics);
@@ -241,8 +217,7 @@ class AttemptRunnerTest {
         @Test
         @DisplayName("an unresolvable host spends a rung, so the ladder still ends in the DLQ")
         void unresolvableHostSpendsARungAndAbandonsOnTheLast() {
-            // Invariant 5's converse: the lookup was an Attempt that really failed. Without the
-            // rung, Outgoing's attempt count never moves and the ladder is never exhausted.
+            // The lookup was a real failed Attempt; without the rung the ladder never exhausts.
             FakeStore store = new FakeStore("https://no-such-host.invalid/hook");
             store.attemptNumber = 3;
             store.ladder = RetryLadder.parse("60", 3);
@@ -272,8 +247,6 @@ class AttemptRunnerTest {
         }
     }
 
-    // ── classification ─────────────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("classification")
     class Classification {
@@ -295,13 +268,8 @@ class AttemptRunnerTest {
         @Test
         @DisplayName("a 2xx whose body is larger than the codec limit is still a success")
         void oversizedSuccessBodyIsStillASuccess() {
-            // The receiver took the webhook and answered 200 — with a body larger than the
-            // WebClient codec will buffer. Reading it threw DataBufferLimitException, the
-            // throw was caught as "the request failed", and the full ladder then ran against
-            // an endpoint that already had the event. One delivery, seven arrivals.
-            //
-            // The status is read before the body is, so an outcome that big is a failure to
-            // read a response, never a failure to deliver.
+            // A 200 with a body too big to buffer once ran the whole ladder: seven arrivals.
+            // The status is read first, so a huge body is a failure to read, never to deliver.
             respond(200, "x".repeat(2 * 1024 * 1024));
             FakeStore store = new FakeStore(baseUrl);
 
@@ -315,15 +283,7 @@ class AttemptRunnerTest {
         @Test
         @DisplayName("a 2xx whose body arrives after the timeout is still a success")
         void stalledSuccessBodyIsStillASuccess() {
-            // The sibling above covers a body too big to buffer, which arrives as an onError
-            // inside the exchange and is caught there. A body that simply does not arrive in
-            // time is not: the timeout sits on the outer chain, so it cancels the inner one
-            // rather than failing it, and no onErrorResume inside ever sees it. The
-            // TimeoutException then surfaced as "the request failed" and the whole ladder ran
-            // against an endpoint that had already taken the event.
-            //
-            // Invariant 6 does not distinguish between the two. Once a status is in hand the
-            // outcome is decided, however the body ends.
+            // The outer timeout cancels the inner chain, so no onErrorResume inside sees a stalled body.
             FakeStore store = new FakeStore(baseUrl);
             store.timeoutSeconds = 1;
             respondThenStallBody(200, 3_000, "late");
@@ -338,14 +298,7 @@ class AttemptRunnerTest {
         @Test
         @DisplayName("a store that cannot persist a 2xx does not turn it into a retry")
         void unpersistableSuccessIsNotRetried() {
-            // recordAttempt and finalise are DB writes, and they sat inside the same try that
-            // catches "the request failed". A database blip while writing down a delivered
-            // webhook therefore re-sent it — invariant 1's failure mode, reached through the
-            // persistence call rather than through the reactive chain.
-            //
-            // Failing to write down a success is not failing to deliver. Recording is
-            // observability; the finalisation is the ownership transfer, and it still runs — so
-            // a lost audit row costs an audit row rather than a second webhook.
+            // A DB blip while recording a success once re-sent the webhook; finalising must still run.
             respond(200, "ok");
             FakeStore store = new FakeStore(baseUrl);
             store.recordAttemptFailure = new IllegalStateException("connection pool exhausted");
@@ -362,10 +315,7 @@ class AttemptRunnerTest {
         @Test
         @DisplayName("a failure whose finalisation throws is recorded once and left to the stuck sweep")
         void unfinalisableFailureIsRecordedOnce() {
-            // The failure path's finalisation sat inside the same try that catches "the request
-            // failed", so a database blip while writing down a 503 re-entered fail(): the Attempt
-            // was recorded twice, the breaker counted two failures, and the second finalisation
-            // threw straight out of the Runner.
+            // A DB blip while recording a 503 once re-entered fail() and recorded the Attempt twice.
             respond(503, "unavailable");
             FakeStore store = new FakeStore(baseUrl);
             store.finaliseFailure = new IllegalStateException("connection pool exhausted");
@@ -393,11 +343,7 @@ class AttemptRunnerTest {
             assertEquals(1, store.finalizations.size());
         }
 
-        // A 4xx or a 3xx is an answer another attempt will not change, so it does not burn the
-        // ladder — but a person can change it: rotate the token back, finish the deploy, fix the
-        // URL. It used to end FAILED, which Failed Messages does not list, so the only way back
-        // was a Replay nobody was told to run. The DLQ is where Railhook keeps what it gave up
-        // on for a human to decide about.
+        // A 4xx or 3xx won't change on retry but a person can fix it, so it goes to the DLQ.
         @Test
         @DisplayName("a non-retryable 4xx goes to DLQ at once instead of burning the ladder")
         void nonRetryableClientErrorAbandonsWithoutTheLadder() {
@@ -453,8 +399,6 @@ class AttemptRunnerTest {
             assertNull(store.records.get(0).statusCode());
         }
     }
-
-    // ── admission ──────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("admission")
@@ -524,10 +468,7 @@ class AttemptRunnerTest {
 
             runner.run(store, metrics);
 
-            /* The per-endpoint cap is the only one that existed, and it is the wrong shape for
-               this: it bounds one endpoint to a slice of the pool, so a tenant with enough
-               endpoints multiplies its way to all of it. Each endpoint here is well-behaved;
-               it is their sum that is not. */
+            // Each endpoint is well-behaved; their sum is not, which a per-endpoint cap cannot bound.
             assertInstanceOf(Finalization.Deferred.class, store.finalizations.get(0));
             assertEquals(0, store.attemptStartingCalls, "a deferral is not an attempt");
             assertEquals(0, store.records.size());
@@ -541,9 +482,7 @@ class AttemptRunnerTest {
 
             runner.run(store, metrics);
 
-            /* The tenant permit is taken first, so a refusal there must not reach for the
-               target's. Invariant 3 is about releasing what you took; taking what you cannot
-               use is the other half of it. */
+            // The tenant permit is taken first, so a refusal there must not take the target's.
             verify(concurrency, never()).tryAcquireForTarget(any(UUID.class));
             verify(concurrency, never()).releaseForTarget(any(UUID.class));
         }
@@ -568,10 +507,7 @@ class AttemptRunnerTest {
 
             runner.run(store, metrics);
 
-            /* Invariant 3, now with two permits: a transformation that throws before the
-               request exists must not strand either of them. A stranded tenant permit is
-               strictly worse than a stranded endpoint one — it costs the whole organization
-               rather than one receiver. */
+            // A throwing transformation must not strand either permit.
             verify(concurrency).releaseForTenant(store.tenantKey);
             verify(concurrency).releaseForTarget(store.targetKey);
         }
@@ -597,10 +533,7 @@ class AttemptRunnerTest {
 
             runner.run(store, metrics);
 
-            /* The rate limiters are checked after the permits because a token cannot be
-               un-consumed and a permit can. That ordering is only correct if the permits are
-               handed back here — otherwise a rate-limited tenant would leak a permit per
-               deferral and throttle itself into a standstill it could never leave. */
+            // Permits come before rate limits because a permit can be returned and a token cannot.
             assertInstanceOf(Finalization.Deferred.class, store.finalizations.get(0));
             verify(concurrency).releaseForTenant(store.tenantKey);
             verify(concurrency).releaseForTarget(store.targetKey);
@@ -614,16 +547,11 @@ class AttemptRunnerTest {
 
             runner.run(store, metrics);
 
-            /* Tokens used to be spent before the concurrency check, so an attempt that never
-               happened still cost the tenant its budget. Under concurrency pressure — exactly
-               when the deferrals happen — a tenant got measurably less throughput than it was
-               configured for, and nothing said why. */
+            // Tokens spent before the concurrency check cost the tenant budget for attempts never made.
             verify(tenantRateLimiter, never()).tryAcquire(any(UUID.class));
             verify(targetRateLimiter, never()).tryAcquire(any(UUID.class), anyInt());
         }
     }
-
-    // ── the transformation rule ────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("a failed transformation never lets the raw payload out")
@@ -649,16 +577,7 @@ class AttemptRunnerTest {
         @Test
         @DisplayName("a failed transformation still consumes a rung")
         void aFailedTransformationStillConsumesARung() {
-            // attemptStarting is where the outgoing store consumes a rung, and it used to run
-            // *after* buildBody. So every failure that threw before the request existed — a
-            // transformation that has been deleted or disabled, an mTLS client that will not
-            // build — left the attempt number where it was. isExhausted never became true, and
-            // the delivery retried at the same rung every 60s for the full 96h hard cap:
-            // roughly 5,700 attempt rows for one delivery that was never going to be sent.
-            //
-            // A Deferral consumes nothing (invariant 5). This is the opposite case: an Attempt
-            // that was really made and really failed, and it has to cost what one costs. The
-            // incoming direction never had the bug — its attempt number comes off the row.
+            // attemptStarting once ran after buildBody, so a pre-send failure retried the same rung for 96h.
             respond(200, "ok");
             FakeStore store = new FakeStore(baseUrl);
             store.bodyFailure = new PayloadTransformException("template gone");
@@ -669,8 +588,6 @@ class AttemptRunnerTest {
                     "a transformation that cannot run is a spent attempt, not a free one");
         }
     }
-
-    // ── cancellation ───────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("a transformation that cancels ends the obligation without sending")
@@ -712,8 +629,7 @@ class AttemptRunnerTest {
         @Test
         @DisplayName("whatever the obligation held is released")
         void whateverItHeldIsReleased() {
-            // A terminal outcome that does not release the ordering cursor stalls every later
-            // Delivery to that endpoint, silently. Same reason onTerminallyFailed exists at all.
+            // A terminal outcome that does not release the ordering cursor silently stalls the endpoint.
             respond(200, "ok");
             FakeStore store = new FakeStore(baseUrl);
             store.transformedBody = TransformedBody.cancelled(null);
@@ -737,8 +653,6 @@ class AttemptRunnerTest {
             assertEquals(1, store.attemptStartingCalls);
         }
     }
-
-    // ── claim outcomes ─────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("claim outcomes")
@@ -770,14 +684,7 @@ class AttemptRunnerTest {
         }
     }
 
-    // ── which statuses are worth another attempt ───────────────────────────────────
-
-    /**
-     * The set used to be three literals in {@code RetryPolicy.isRetryable}. It is now whatever
-     * the obligation carries, and the obligation carries it because the Subscription or the
-     * Destination said so. The Runner reads it off the context and nothing else — which is what
-     * keeps the two directions from growing separate answers.
-     */
+    // The retryable set comes off the obligation only, so the two directions cannot diverge.
     @Nested
     @DisplayName("the retryable statuses the obligation carries")
     class RetryableStatusSpec {
@@ -820,13 +727,11 @@ class AttemptRunnerTest {
         }
     }
 
-    // ── what a receiver may ask for ────────────────────────────────────────────────
-
     @Nested
     @DisplayName("Retry-After")
     class RetryAfterHeader {
 
-        /** A ladder whose first tier is a minute, so an honoured header is unmistakable. */
+        // A first tier of a minute, so an honoured header is unmistakable.
         private FakeStore storeWithMinuteLadder() {
             FakeStore store = new FakeStore(baseUrl);
             store.ladder = RetryLadder.parse("60,300", 5);
@@ -912,14 +817,7 @@ class AttemptRunnerTest {
         }
     }
 
-    // ── what the attempt says about the target itself ──────────────────────────────
-
-    /**
-     * The circuit breaker forgets within minutes, which is what it is for. Auto-disabling a
-     * target that has answered nothing but failures for days needs a memory that outlives a
-     * worker, so the Runner tells the store the outcome and the store writes it down. Both
-     * directions get it or neither does.
-     */
+    // Auto-disable needs a memory that outlives the circuit breaker, so the store writes the outcome.
     @Nested
     @DisplayName("the outcome, as it bears on the target")
     class TargetOutcome {
@@ -996,14 +894,7 @@ class AttemptRunnerTest {
         }
     }
 
-    // ── the fake ───────────────────────────────────────────────────────────────────
-
-    /**
-     * Stands in for a row model. Records what the Runner asked it to do, which is the whole
-     * point: these tests assert observable outcomes through the interface rather than reaching
-     * past it into either direction's tables.
-     */
-    // ── the wire ───────────────────────────────────────────────────────────────────
+    // Records what the Runner asked for: assert through the interface, not either direction's tables.
 
     @Nested
     @DisplayName("what goes on the wire")
@@ -1023,9 +914,7 @@ class AttemptRunnerTest {
             });
         }
 
-        // A forward relays somebody else's webhook, so the destination must get the bytes the
-        // provider sent. The body used to travel as a String and be re-encoded on the way out, so
-        // a body that was not UTF-8 — another charset, binary, gzip — arrived altered.
+        // A forward must carry the provider's exact bytes; re-encoding a String altered non-UTF-8 bodies.
         @Test
         @DisplayName("the bytes the store hands over arrive exactly, even when they are not UTF-8")
         void bytesArriveUnchanged() {

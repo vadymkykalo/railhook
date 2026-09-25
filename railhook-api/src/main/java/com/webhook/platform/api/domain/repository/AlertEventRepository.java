@@ -18,13 +18,7 @@ public interface AlertEventRepository extends JpaRepository<AlertEvent, UUID> {
 
     long countByProjectIdAndResolvedFalse(UUID projectId);
 
-    /**
-     * Whether this rule already has an alert nobody has dealt with.
-     *
-     * <p>What makes the evaluator fire on a *crossing* rather than on every tick. Without it a
-     * rule whose condition holds for an hour would write sixty identical events and send sixty
-     * notifications, which is how alerting becomes something people mute.
-     */
+    /** Makes the evaluator fire once per crossing rather than on every tick. */
     boolean existsByAlertRuleIdAndResolvedFalse(UUID alertRuleId);
 
     @Modifying
@@ -35,17 +29,13 @@ public interface AlertEventRepository extends JpaRepository<AlertEvent, UUID> {
     @Query("UPDATE AlertEvent e SET e.resolved = true, e.resolvedAt = :now WHERE e.id = :id AND e.projectId = :projectId")
     int resolveById(@Param("id") UUID id, @Param("projectId") UUID projectId, @Param("now") Instant now);
 
-    /**
-     * Resolves whatever is still open for one rule — what the evaluator does once the rule's
-     * condition has stopped holding, so the next crossing fires again.
-     */
     @Modifying
     @Query("UPDATE AlertEvent e SET e.resolved = true, e.resolvedAt = :now WHERE e.alertRuleId = :ruleId AND e.resolved = false")
     int resolveOpenByAlertRuleId(@Param("ruleId") UUID ruleId, @Param("now") Instant now);
 
     /**
-     * Retention for alert history: resolved events older than the cutoff. An open one is kept
-     * however old it is, because it is what keeps its rule from firing again.
+     * Retention across all organizations. Open events are kept however old, since they stop
+     * their rule firing again.
      */
     @Modifying
     @Query(value = "DELETE FROM alert_events WHERE resolved = true AND created_at < :cutoff", nativeQuery = true)

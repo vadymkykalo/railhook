@@ -1,11 +1,8 @@
 package com.webhook.platform.api.service.signin;
 
 /**
- * Where the dashboard goes after a sign-in that left the site and came back.
- *
- * <p>The value makes a round trip through Google, so it is whatever the link that started the
- * sign-in said. Only a path on this origin survives: {@code //host} and {@code /\host} are both
- * read by browsers as another host, and a control character is how a value becomes a header.
+ * The value round-trips through Google, so only a same-origin path survives: browsers read //host
+ * and /\host as another host, and a control character can become a header.
  */
 public final class SafeReturnPath {
 

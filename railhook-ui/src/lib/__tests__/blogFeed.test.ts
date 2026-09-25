@@ -9,7 +9,6 @@ import { parseFrontMatter } from '../frontMatter';
 const uiRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p: string) => readFileSync(join(uiRoot, p), 'utf8');
 
-/** The origin every published URL carries until nginx substitutes the container's own. */
 const SITE = 'https://site-url.railhook.invalid';
 
 const ITEMS = [
@@ -35,8 +34,7 @@ describe('the blog feed', () => {
     expect(xml.indexOf('<title>Tom &amp; Jerry')).toBeLessThan(xml.indexOf('<title>The first one'));
     expect(xml).toContain(`<guid isPermaLink="true">${SITE}/blog/newer</guid>`);
     expect(xml).toContain(`<pubDate>${rfc822('2026-09-19')}</pubDate>`);
-    // Read as UTC, not in the builder's zone: west of Greenwich a local-time parse dates every
-    // post a day early.
+    // Read as UTC: west of Greenwich a local parse dates every post a day early.
     expect(rfc822('2026-09-19')).toBe('Sat, 19 Sep 2026 00:00:00 GMT');
   });
 
@@ -49,7 +47,7 @@ describe('the blog feed', () => {
   it('names the author where there is one, under a namespace it declares', () => {
     expect(xml).toContain('xmlns:dc="http://purl.org/dc/elements/1.1/"');
     expect(xml).toContain('<dc:creator>Vadym Kykalo</dc:creator>');
-    // No email address is published, so RSS 2.0's own <author> is never written.
+    // No email address is published, so RSS <author> is never written.
     expect(xml).not.toContain('<author>');
   });
 
@@ -58,11 +56,6 @@ describe('the blog feed', () => {
   });
 });
 
-/**
- * The feed is a file, not a route the app answers: nginx's `location /` serves
- * `dist/blog/rss.xml` and rewrites the placeholder origin in it, exactly as it does for
- * sitemap.xml. What this holds is the wiring between the two.
- */
 describe('the feed is published at /blog/rss.xml', () => {
   const config = read('vite.config.ts');
 

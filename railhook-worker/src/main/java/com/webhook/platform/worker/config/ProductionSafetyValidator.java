@@ -10,16 +10,9 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Refuses to run the worker on a development configuration. In production mode
- * (APP_ENV=production), placeholder secrets and unsafe settings fail startup rather than
- * being served.
- *
- * <p>Runs from {@link PostConstruct} rather than {@code ApplicationReadyEvent}. The api made
- * the same move because the later event fires after its connector is already bound; for the
- * worker the window is worse, because what is already running by then is the Kafka listeners.
- * A worker that starts on a placeholder encryption key and an SSRF guard turned off does not
- * merely sit there being reachable — it delivers webhooks. The check has to be ahead of that,
- * not alongside it.
+ * Fails startup on placeholder secrets and unsafe settings when APP_ENV=production. Runs from
+ * {@link PostConstruct}, not {@code ApplicationReadyEvent}: by then the Kafka listeners are
+ * already delivering webhooks.
  */
 @Component
 @Slf4j

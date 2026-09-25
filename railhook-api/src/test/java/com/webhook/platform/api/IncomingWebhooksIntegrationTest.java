@@ -48,7 +48,7 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private IncomingEventRepository incomingEventRepository;
 
-    /** Redis-backed, and there is no Redis here; unstubbed it answers "not seen before". */
+    // Redis-backed and there is no Redis here; unstubbed it answers "not seen before".
     @MockitoBean
     private ReplayDetectionService replayDetectionService;
 
@@ -58,11 +58,7 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
     private static UUID destinationId;
     private static String ingressPathToken;
 
-    /**
-     * Every Source now has an ingress rate limit — its own or the configured default — and the
-     * limiter is fail-closed. {@code RedisRateLimiterService} is a mock here, so without this
-     * every webhook posted below would be rejected with 429 before it reached the service.
-     */
+    // Every Source has a fail-closed rate limit, and the limiter is a mock here.
     @BeforeEach
     void allowIngressRateLimit() {
         when(redisRateLimiterService.tryAcquireForSourceFailClosed(any(UUID.class), anyInt()))
@@ -76,7 +72,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
     @Test
     @Order(1)
     void setup_registerAndCreateProject() throws Exception {
-        // Register user
         RegisterRequest registerRequest = RegisterRequest.builder()
                 .email("incoming-test-" + UUID.randomUUID().toString().substring(0, 8) + "@example.com")
                 .password("Test1234!")
@@ -94,7 +89,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                 registerResult.getResponse().getContentAsString(), AuthResponse.class);
         accessToken = authResponse.getAccessToken();
 
-        // Get current user to find org
         MvcResult meResult = mockMvc.perform(get("/api/v1/auth/me")
                         .header("Authorization", auth()))
                 .andExpect(status().isOk())
@@ -104,7 +98,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
         UUID organizationId = UUID.fromString(
                 objectMapper.readTree(meJson).get("organization").get("id").asText());
 
-        // Create project
         ProjectRequest projectRequest = ProjectRequest.builder()
                 .name("Incoming Test Project")
                 .build();
@@ -120,8 +113,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
         projectId = UUID.fromString(
                 objectMapper.readTree(projectResult.getResponse().getContentAsString()).get("id").asText());
     }
-
-    // ==================== Incoming Source CRUD ====================
 
     @Test
     @Order(10)
@@ -247,8 +238,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ==================== Incoming Destination CRUD ====================
-
     @Test
     @Order(20)
     void createDestination_success() throws Exception {
@@ -326,13 +315,10 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.maxAttempts").value(10));
     }
 
-    // ==================== Ingress Endpoint ====================
-
     @Test
     @Order(30)
     void ingress_receiveWebhook_accepted() throws Exception {
         Assumptions.assumeTrue(ingressPathToken != null, "Source must be created first");
-        // Re-enable destination for forwarding
         IncomingDestinationRequest enableReq = IncomingDestinationRequest.builder()
                 .url("https://example.com/updated-hook")
                 .enabled(true)
@@ -344,7 +330,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(enableReq)))
                 .andExpect(status().isOk());
 
-        // Reset verification mode to NONE for basic ingress acceptance test
         IncomingSourceRequest resetVerification = IncomingSourceRequest.builder()
                 .name("GitHub Webhooks Updated")
                 .verificationMode(VerificationMode.NONE)
@@ -355,7 +340,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(resetVerification)))
                 .andExpect(status().isOk());
 
-        // Send webhook to ingress endpoint (no auth required — public endpoint)
         mockMvc.perform(post("/ingress/" + ingressPathToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"action\":\"push\",\"ref\":\"refs/heads/main\"}"))
@@ -389,7 +373,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
     void ingress_signatureVerificationFailed_returns401() throws Exception {
         Assumptions.assumeTrue(ingressPathToken != null, "Source must be created first");
 
-        // Enable HMAC verification on the source
         IncomingSourceRequest enableHmac = IncomingSourceRequest.builder()
                 .name("GitHub Webhooks Updated")
                 .verificationMode(VerificationMode.HMAC_GENERIC)
@@ -403,7 +386,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(enableHmac)))
                 .andExpect(status().isOk());
 
-        // Send webhook with wrong signature — should be rejected
         mockMvc.perform(post("/ingress/" + ingressPathToken)
                         .header("X-Signature", "invalid-signature")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -411,7 +393,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("signature_verification_failed"));
 
-        // Reset back to NONE for subsequent tests
         IncomingSourceRequest resetMode = IncomingSourceRequest.builder()
                 .name("GitHub Webhooks Updated")
                 .verificationMode(VerificationMode.NONE)
@@ -433,16 +414,7 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.status").value("accepted"));
     }
 
-    /**
-     * A form-encoded webhook — Slack slash commands and interactivity, GitHub's form content type,
-     * a generic HMAC sender posting a form — is signed over the bytes the sender wrote.
-     *
-     * <p>Spring's message conversion does not read those bytes for a form POST without a query
-     * string: it rebuilds a body from the parameters the container already parsed, re-encoded the
-     * way Java's URLEncoder encodes. {@code %20} comes back as {@code +}, lowercase hex as
-     * uppercase, so the rebuilt body hashed to something the sender never signed and every such
-     * webhook was refused with 401 — and a query string on the URL made it verify again.
-     */
+    // Spring rebuilds a form body from parsed params; the signature covers the sender's own bytes.
     @Test
     @Order(35)
     void ingress_formEncodedWebhook_isVerifiedStoredAndForwardedAsTheBytesThatWereSigned() throws Exception {
@@ -461,8 +433,7 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(enableHmac)))
                 .andExpect(status().isOk());
 
-        // Encoded the way a sender may encode it and Java's URLEncoder does not: %20 for a space,
-        // lowercase hex, an apostrophe escaped that URLEncoder would also escape but in uppercase.
+        // Encoded the way URLEncoder does not: %20 for a space, lowercase hex.
         String raw = "command=%2fdeploy&text=hello%20world&payload=%7b%22a%22%3a1%7d&user_name=o%27brien";
         byte[] rawBytes = raw.getBytes(StandardCharsets.US_ASCII);
         String signature = HexFormat.of().formatHex(hmacSha256(secret, rawBytes));
@@ -507,8 +478,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
         return mac.doFinal(data);
     }
 
-    // ==================== Incoming Events ====================
-
     @Test
     @Order(40)
     void listIncomingEvents_success() throws Exception {
@@ -536,7 +505,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
     @Order(42)
     void getIncomingEvent_success() throws Exception {
         Assumptions.assumeTrue(projectId != null, "Setup must succeed first");
-        // First get event ID from list
         MvcResult listResult = mockMvc.perform(get("/api/v1/projects/" + projectId + "/incoming-events")
                         .header("Authorization", auth()))
                 .andExpect(status().isOk())
@@ -571,8 +539,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content").isArray());
     }
 
-    // ==================== Delete / Disable ====================
-
     @Test
     @Order(50)
     void deleteDestination_success() throws Exception {
@@ -582,7 +548,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", auth()))
                 .andExpect(status().isNoContent());
 
-        // Verify it's gone
         mockMvc.perform(get("/api/v1/projects/" + projectId +
                         "/incoming-sources/" + sourceId + "/destinations/" + destinationId)
                         .header("Authorization", auth()))
@@ -597,7 +562,6 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", auth()))
                 .andExpect(status().isNoContent());
 
-        // Source still exists but is DISABLED
         mockMvc.perform(get("/api/v1/projects/" + projectId + "/incoming-sources/" + sourceId)
                         .header("Authorization", auth()))
                 .andExpect(status().isOk())

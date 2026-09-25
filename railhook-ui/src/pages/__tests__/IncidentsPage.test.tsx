@@ -18,20 +18,6 @@ vi.mock('../../api/incidents.api', () => ({
 import IncidentsPage from '../IncidentsPage';
 import { incidentsApi } from '../../api/incidents.api';
 
-/**
- * The three numbers above the incident list, and the one thing they must agree about.
- *
- * <p>They are three tiles in a row, so a reader takes them as three answers about the same
- * thing: this project. Only one of them was. "Open" came from a server count; "Investigating"
- * and "Critical" were `incidents.filter(...)` over the rows on screen — one page of a filtered,
- * paginated list. A project with more open incidents than fit on a page therefore read
- * "Critical: 0" with a critical incident open on page two, and nothing about the screen
- * suggested the number was partial.
- *
- * <p>The test that catches that is the one where the list and the counts disagree, because
- * that is the situation the old code could not represent.
- */
-
 const now = new Date('2026-08-01T00:00:00Z').toISOString();
 
 const incident = (over: Partial<IncidentResponse>): IncidentResponse => ({
@@ -65,7 +51,6 @@ function renderIncidents() {
   });
 }
 
-/** The number a tile shows, read off the tile carrying the given label. */
 function tileValue(label: RegExp): string | undefined {
   const heading = screen.getAllByText(label)[0];
   return heading?.closest('div')?.parentElement?.querySelector('p')?.textContent ?? undefined;
@@ -85,9 +70,7 @@ describe('IncidentsPage', () => {
   });
 
   it('counts incidents the list has not loaded', async () => {
-    // 24 unresolved, of which one critical and two being investigated — and the page shows
-    // the first twenty ordinary ones. Every tile here is a number the rows on screen cannot
-    // produce, which is exactly the case the old page got wrong.
+    // Every tile is a number the rows on screen cannot produce.
     vi.mocked(incidentsApi.list).mockResolvedValue(
       page(Array.from({ length: 20 }, (_, i) => incident({ id: `incident-${i}`, title: `Routine ${i}` })), 24),
     );
@@ -113,8 +96,6 @@ describe('IncidentsPage', () => {
   });
 
   it('renders the tiles at zero rather than blank while the counts are still loading', async () => {
-    // A tile with no number in it reads as a broken tile. Until the count lands, zero is the
-    // honest placeholder and the one the page already falls back to.
     vi.mocked(incidentsApi.countOpen).mockImplementation(() => new Promise(() => {}));
 
     renderIncidents();

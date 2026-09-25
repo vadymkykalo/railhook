@@ -2,14 +2,7 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../lib/utils"
 
-/* Density is a card-level decision, not a per-slot one: a card whose header is
-   p-6 and whose content is p-4 reads as a misprint. Card publishes its density
-   through context so the slots inherit it, and each slot still accepts an
-   explicit `density` for the rare hand-tuned case. `comfortable` is the
-   default and is byte-identical to the previous hardcoded p-6, so none of the
-   ~35 existing call sites move; `compact` is the density an operations tool
-   actually wants, and is what the ~166 per-page `p-4`/`p-3` overrides were
-   reaching for. */
+/* Density is per card (via context): a p-6 header over p-4 content reads as a misprint. */
 export type CardDensity = "comfortable" | "compact"
 
 const CardDensityContext = React.createContext<CardDensity>("comfortable")
@@ -27,14 +20,11 @@ const cardPadding = cva("", {
 })
 
 const cardVariants = cva(
-  "rounded-xl border bg-card text-card-foreground shadow-card transition-shadow duration-200",
+  "border bg-card text-card-foreground transition-colors duration-200",
   {
     variants: {
-      /* The lift used to be unconditional, so a static summary card rose under
-         the cursor as if it were a link. Most cards here are read-only, so the
-         affordance is opt-in and only cards that go somewhere ask for it. */
       interactive: {
-        true: "hover:shadow-card-hover",
+        true: "hover:border-foreground",
         false: "",
       },
     },
@@ -91,8 +81,6 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h3
     ref={ref}
-    /* `text-2xl` predates the type scale; `text-title` is the scale's step for
-       a panel heading and carries its own weight and tracking. */
     className={cn("text-title", className)}
     {...props}
   />

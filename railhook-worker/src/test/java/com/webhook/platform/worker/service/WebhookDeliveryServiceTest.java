@@ -60,17 +60,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
-/**
- * Covers the Outgoing {@link com.webhook.platform.worker.attempt.OutgoingAttemptStore} through
- * the service that drives it: the {@code claim_token} fence, the FIFO ordering gate, the row
- * transitions, the {@code delivery_attempts} log and the DLQ notification.
- *
- * <p>The attempt <em>policy</em> — what order things happen in, when a successor is queued,
- * what a deferral means — moved to {@link com.webhook.platform.worker.attempt.AttemptRunner}
- * and is pinned by {@code AttemptRunnerTest} against a fake store, with no infrastructure. The
- * two suites therefore overlap in what they assert and not in what they cover: delete a case
- * here and the store loses its only test.
- */
+// Adapter coverage for OutgoingAttemptStore; the attempt policy is pinned by AttemptRunnerTest.
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class WebhookDeliveryServiceTest {
@@ -141,16 +131,7 @@ class WebhookDeliveryServiceTest {
                 deliveryRepository, transactionTemplate);
     }
 
-    /**
-     * decryptSecret (bad key version / rotated-away key) used to throw outside the
-     * try/finally that releases the concurrency permit, so every failing attempt burned a
-     * permit that never came back. maxConcurrentPerEndpoint + 1 failing attempts against the
-     * REAL RedisConcurrencyControlService (a mocked RedissonClient forces its local-fallback
-     * path, so no Docker/Redis is needed) reproduces the leak on unfixed code: the semaphore
-     * exhausts and a subsequent acquire is rejected, i.e. the endpoint is permanently blocked.
-     * On fixed code every attempt releases its permit in the finally, so the endpoint never
-     * blocks and a later attempt (the "operator fixed the cert" case) can still acquire.
-     */
+    // decryptSecret once threw outside the permit's finally, so each failure leaked a permit for good.
     @Test
     void attemptDelivery_decryptSecretThrows_releasesPermitEveryTime_soEndpointNeverBlocks() throws Exception {
         int maxConcurrent = 5;
@@ -223,8 +204,6 @@ class WebhookDeliveryServiceTest {
                         "permanently throttled to zero — every failing attempt has to release its permit");
     }
 
-    // --- a successful 2xx delivery must never be re-sent as a duplicate ------------
-
     private Endpoint verifiedEndpoint(UUID endpointId, String url) {
         return Endpoint.builder()
                 .id(endpointId)
@@ -237,9 +216,6 @@ class WebhookDeliveryServiceTest {
                 .encryptionKeyVersion(1)
                 .build();
     }
-
-    // --- a configured transformation that fails to apply must never result in the ---
-    // --- raw payload being sent, and must fail the attempt as retryable / eventually DLQ.  ---
 
     private Endpoint verifiedEndpoint(UUID endpointId, UUID projectId) {
         return Endpoint.builder()
@@ -275,12 +251,7 @@ class WebhookDeliveryServiceTest {
     }
 
 
-    /**
-     * A real AttemptRunner over the same mocks the service used to hold directly. The lifecycle
-     * these tests describe now lives in the Runner, so exercising it through the service means
-     * wiring a real one rather than a mock — which is also what keeps these tests honest about
-     * the seam: they assert observable outcomes, not who called whom.
-     */
+    // The lifecycle lives in the Runner, so wire a real one and assert outcomes, not calls.
     private AttemptRunner newAttemptRunner() {
         return new AttemptRunner(
                 projectRateLimiterService, rateLimiterService, concurrencyControlService,
@@ -291,17 +262,7 @@ class WebhookDeliveryServiceTest {
         return newService(mockWebClient, meterRegistry, newAttemptRunner());
     }
 
-    /**
-     * Reproduces the defect: handleResponse (markAsSuccess et al.) used to run inside
-     * the reactive .map, i.e. inside the .timeout guarding the HTTP call itself. A 200 response
-     * followed by slow success bookkeeping tripped the timeout AFTER the row was already
-     * written SUCCESS, and the resulting TimeoutException drove scheduleRetry to blindly
-     * overwrite it back to PENDING — a duplicate send of an already-successful webhook.
-     * <p>
-     * On unfixed code this test fails: a PENDING save is observed. On fixed code, bookkeeping
-     * runs after block() returns (off the netty event-loop thread) and is no longer subject to
-     * the HTTP timeout, so the delivery only ever ends up SUCCESS.
-     */
+    // Bookkeeping once ran inside the HTTP timeout, and a late timeout rewrote SUCCESS to PENDING.
     @Test
     void attemptDelivery_200ResponseFollowedBySlowSuccessBookkeeping_neverEndsPending() throws Exception {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -348,9 +309,7 @@ class WebhookDeliveryServiceTest {
 
             service.processDelivery(message, true);
 
-            // Give a still-in-flight background thread (unfixed code: the netty event-loop
-            // thread finishing its slow save inside .map) time to land before asserting, so the
-            // test isn't racy and doesn't leak a running thread into the next test.
+            // Lets an unfixed build's background save land, so the test is not racy and leaks no thread.
             Thread.sleep(2000);
 
             assertFalse(savedStatuses.contains(Delivery.DeliveryStatus.PENDING),
@@ -368,11 +327,6 @@ class WebhookDeliveryServiceTest {
         }
     }
 
-    /**
-     * Direct coverage of scheduleRetry's own guard: if the row already reached SUCCESS via
-     * another path by the time scheduleRetry re-reads it, scheduling a retry must be a no-op
-     * rather than blindly overwriting the terminal state back to PENDING.
-     */
     @Test
     void scheduleRetry_rowAlreadySuccess_isNoOp() throws Exception {
         int closedPort;
@@ -402,9 +356,7 @@ class WebhookDeliveryServiceTest {
                 .attemptCount(1).maxAttempts(5)
                 .succeededAt(Instant.now()).updatedAt(Instant.now())
                 .build();
-        // First read is processDelivery's own claim check (PROCESSING); the second is
-        // scheduleRetry's fresh re-read, simulating that markAsSuccess won the race and
-        // already committed SUCCESS in between.
+        // The second read simulates markAsSuccess winning the race.
         when(deliveryRepository.findById(deliveryId))
                 .thenReturn(Optional.of(claimed), Optional.of(alreadySucceeded));
 
@@ -416,16 +368,7 @@ class WebhookDeliveryServiceTest {
         verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
     }
 
-    /**
-     * A released Delivery is due now, before the message that releases it is published.
-     *
-     * <p>Parking stamps a {@code next_retry_at} a few seconds out so the fallback poll picks the
-     * Delivery up if this trigger never comes. The trigger fired, the dispatch message arrived —
-     * and the claim, which matches only a row that is due, could not take it, because the park's
-     * own timestamp was still in the future. The message was dropped and the Delivery waited for
-     * the retry poll instead: an ordered endpoint drained a whole burst one delivery per poll
-     * interval, however fast its receiver answered.
-     */
+    // The park's own future next_retry_at once made the claim refuse the release message.
     @Test
     void orderingRelease_makesTheReleasedDeliveryDueBeforePublishingIt() throws Exception {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -485,11 +428,7 @@ class WebhookDeliveryServiceTest {
         }
     }
 
-    /**
-     * The converse: the row is not ours to wake — another attempt claimed it between the cursor
-     * moving and this release — so nothing is published for it. The claim would refuse the
-     * message anyway; publishing one is a duplicate nobody can act on.
-     */
+    // Another attempt claimed the row, so publishing would be a duplicate nobody can act on.
     @Test
     void orderingRelease_releasedDeliveryAlreadyClaimed_publishesNothingForIt() throws Exception {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -544,11 +483,7 @@ class WebhookDeliveryServiceTest {
         }
     }
 
-    /**
-     * A Kafka send failure while releasing the ordering buffer after a successful delivery
-     * must not roll back the SUCCESS write — the DB commit already happened in its own
-     * transaction before the Kafka call runs.
-     */
+    // The SUCCESS write committed in its own transaction before the Kafka call.
     @Test
     void markAsSuccess_kafkaSendFailureAfterCommit_doesNotRollBackToPending() throws Exception {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -604,12 +539,7 @@ class WebhookDeliveryServiceTest {
         }
     }
 
-    /**
-     * Reproduces the original bug for the "transformationId not found/disabled" site:
-     * the delivery had an explicit transformationId configured (e.g. the transformation was
-     * later disabled or deleted), and old code silently fell back to the inline
-     * payloadTemplate (often null -> the raw payload) instead of failing the attempt.
-     */
+    // Old code fell back to the inline template, often the raw payload, instead of failing.
     @Test
     void attemptDelivery_configuredTransformationMissing_noHttpCall_failsRetryable() {
         WebClient mockWebClient = mock(WebClient.class);
@@ -649,7 +579,7 @@ class WebhookDeliveryServiceTest {
                 .updatedAt(Instant.now())
                 .build();
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
-        // Simulates the transformation being disabled/deleted after being configured.
+        // Disabled or deleted after being configured.
         when(transformationCacheService.findEnabledTemplate(transformationId)).thenReturn(null);
 
         DeliveryMessage message = DeliveryMessage.builder()
@@ -657,7 +587,7 @@ class WebhookDeliveryServiceTest {
 
         localService.processDelivery(message, true);
 
-        // No HTTP call must have been attempted -- the raw payload must never leave the platform.
+        // The raw payload must never leave the platform.
         verifyNoInteractions(mockWebClient);
         verifyNoInteractions(payloadTransformService);
 
@@ -671,19 +601,13 @@ class WebhookDeliveryServiceTest {
 
         ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(deliveryCaptor.capture());
-        // Retryable: attemptCount(1) < maxAttempts(5) -- scheduled for retry, not terminal.
+        // Retryable: attempt 1 of 5.
         assertEquals(Delivery.DeliveryStatus.PENDING, deliveryCaptor.getValue().getStatus());
 
         assertEquals(1.0, meterRegistry.get("transform_failed_total").counter().count(),
                 "a configured-but-failing transform must be counted, not just warn-logged");
     }
 
-    /**
-     * Check the DLQ path: a permanently broken template must eventually terminate at DLQ
-     * rather than retrying forever, exactly like an HTTP-level failure would. This exercises
-     * the other bug site -- PayloadTransformService.transform() itself throwing for a broken
-     * inline payloadTemplate -- with the delivery already on its last attempt.
-     */
     @Test
     void attemptDelivery_brokenPayloadTemplate_atMaxAttempts_terminatesAtDlq_noHttpCall() {
         WebClient mockWebClient = mock(WebClient.class);
@@ -737,8 +661,6 @@ class WebhookDeliveryServiceTest {
         assertEquals(Delivery.DeliveryStatus.DLQ, deliveryCaptor.getValue().getStatus(),
                 "a permanently broken template must terminate at DLQ, not retry forever");
     }
-
-    // --- basic stateful-path coverage (2xx/4xx/5xx/timeout/DLQ/concurrency/SSRF) ---
 
     private Delivery baseDelivery(UUID id, UUID eventId, UUID endpointId, int attemptCount, int maxAttempts) {
         return Delivery.builder()
@@ -814,8 +736,7 @@ class WebhookDeliveryServiceTest {
 
             service.processDelivery(message, true);
 
-            // Into Failed Messages, where a person can retry it once the endpoint is fixed; never
-            // FAILED, which Failed Messages does not list, and never the rest of the ladder.
+            // Into Failed Messages, where a person can retry it; never FAILED, which that list omits.
             verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.DLQ));
             verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
             verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.FAILED));
@@ -845,8 +766,7 @@ class WebhookDeliveryServiceTest {
             when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
             stubHappyPathPrerequisites(endpoint);
 
-            // attemptCount=0 -> after the pre-HTTP increment it becomes 1, i.e. the first
-            // tier of the default retry ladder (60s, jittered 30s-90s).
+            // The pre-HTTP increment makes this attempt 1: the ladder's first tier (60s, jittered 30-90s).
             Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
             when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
 
@@ -936,8 +856,7 @@ class WebhookDeliveryServiceTest {
             when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
             stubHappyPathPrerequisites(endpoint);
 
-            // attemptCount=4, maxAttempts=5 -> after the pre-HTTP increment attemptCount
-            // becomes 5, i.e. >= maxAttempts, so this failure must terminate at DLQ.
+            // The pre-HTTP increment makes this attempt 5 of 5, so the failure terminates at DLQ.
             Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 4, 5);
             when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
 
@@ -971,8 +890,7 @@ class WebhookDeliveryServiceTest {
 
         when(projectRateLimiterService.tryAcquire(endpoint.getProjectId())).thenReturn(true);
         when(circuitBreakerService.isCallPermitted(endpointId)).thenReturn(true);
-        // No rate limit configured on this endpoint (rateLimitPerSecond is null), so the
-        // rate limiter branch is skipped entirely -- concurrency is the blocking check.
+        // No endpoint rate limit, so concurrency is the blocking check.
         when(concurrencyControlService.tryAcquireForTenant(any())).thenReturn(true);
         when(concurrencyControlService.tryAcquireForTarget(endpointId)).thenReturn(false);
 
@@ -985,8 +903,7 @@ class WebhookDeliveryServiceTest {
         localService.processDelivery(message, true);
 
         verifyNoInteractions(mockWebClient);
-        // Concurrency was never actually acquired, so there must be nothing to release --
-        // a spurious release() here would desync the permit accounting.
+        // Never acquired, so a release here would desync the permit accounting.
         verify(concurrencyControlService, never()).releaseForTarget(any());
 
         ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
@@ -1005,8 +922,7 @@ class WebhookDeliveryServiceTest {
         UUID eventId = UUID.randomUUID();
         UUID deliveryId = UUID.randomUUID();
 
-        // Cloud-metadata endpoint: unconditionally blocked by UrlValidator regardless of
-        // allowPrivateIps/allowedHosts.
+        // Cloud metadata is blocked regardless of allowPrivateIps and allowedHosts.
         Endpoint endpoint = verifiedEndpoint(endpointId, "http://169.254.169.254/latest/meta-data/");
         when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
         Event event = stubEvent(eventId, endpoint.getProjectId());
@@ -1026,12 +942,7 @@ class WebhookDeliveryServiceTest {
         localService.processDelivery(message, true);
 
         verifyNoInteractions(mockWebClient);
-        // URL validation now runs BEFORE admission, so a Delivery the platform is not allowed
-        // to send never spends a concurrency permit or a rate-limit token on being rejected.
-        // Previously the permit was taken first and released in the finally; the permit
-        // accounting for the paths that DO take one — a decryption failure on a rotated key, a
-        // bad client certificate — is covered by
-        // attemptDelivery_decryptSecretThrows_releasesPermitEveryTime_soEndpointNeverBlocks.
+        // URL validation runs before admission, so a refused Delivery spends no permit or token.
         verify(concurrencyControlService, never()).tryAcquireForTarget(endpointId);
         verify(concurrencyControlService, never()).releaseForTarget(endpointId);
 
@@ -1046,8 +957,6 @@ class WebhookDeliveryServiceTest {
                 "attempt must record the SSRF rejection, not silently drop it");
     }
 
-    // ── gap check spans the full missing range, not just seq-1 ────
-
     private Delivery orderedDelivery(UUID id, UUID eventId, UUID endpointId, long sequenceNumber,
             Instant orderingFirstBufferedAt) {
         return Delivery.builder()
@@ -1060,14 +969,7 @@ class WebhookDeliveryServiceTest {
                 .build();
     }
 
-    /**
-     * Reproduces Scenario A: cursor is at 5, sequence 6 is genuinely still
-     * outstanding (retrying), and sequence 10 arrives. The old code only checked sequence 9
-     * (already SUCCESS, so absent from PENDING/PROCESSING) via findOldestPendingCreatedAt(...,
-     * 9), got null back, and isGapTimedOut(null) used to mean "proceed" -- so 10 was delivered
-     * ahead of 6, breaking FIFO without ever waiting out the gap timeout. The fixed range query
-     * covers the whole gap [6, 9] and finds 6 still outstanding, so this must buffer instead.
-     */
+    // Only seq-1 was once checked, so 10 went out ahead of a still-retrying 6.
     @Test
     void canDeliverWithOrdering_somethingElseInGapStillPending_buffersInsteadOfSkippingAhead() {
         MeterRegistry meterRegistry = new SimpleMeterRegistry();
@@ -1102,11 +1004,7 @@ class WebhookDeliveryServiceTest {
                 "must stamp when this delivery first started waiting, for the gap timeout clock");
     }
 
-    /**
-     * Mirror of the case above but with nothing left outstanding anywhere in the gap (e.g. the
-     * missing sequence was burned by a rolled-back ingest and will never arrive) -- must
-     * proceed immediately rather than waiting out a timeout for something that isn't there.
-     */
+    // A sequence burned by a rolled-back ingest will never arrive, so proceed at once.
     @Test
     void canDeliverWithOrdering_nothingOutstandingInGap_proceedsImmediately() throws Exception {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -1147,17 +1045,7 @@ class WebhookDeliveryServiceTest {
         }
     }
 
-    /**
-     * The load harness's ordering scenario, in one test: sequence 6 has been waiting on
-     * sequence 5 for longer than the gap timeout, and 5 is a Delivery whose first Attempt
-     * failed and whose next one is a moment away.
-     *
-     * <p>The default Outgoing ladder's first rung and the default gap timeout are both a
-     * minute, so the two fall due together — and the gap timeout used to win, letting 6 out
-     * in front of the very Attempt it was waiting for. That is FIFO disengaging on the first
-     * ordinary retry, which is the common case, not the never-closing gap the timeout is for.
-     * A gap with an Attempt still coming is a gap that is about to close: 6 stays buffered.
-     */
+    // The first rung and the gap timeout are both a minute; the timeout once let 6 jump its retrying predecessor.
     @Test
     void canDeliverWithOrdering_gapStillClosing_staysBufferedRatherThanTimingOut() {
         UUID endpointId = UUID.randomUUID();
@@ -1174,8 +1062,7 @@ class WebhookDeliveryServiceTest {
                 .thenReturn(Instant.now().minusSeconds(95));
         when(orderingBufferService.isGapTimedOut(firstBufferedAt)).thenReturn(true);
         when(orderingBufferService.gapTimeout()).thenReturn(Duration.ofSeconds(60));
-        // Sequence 5 is between the rungs of its ladder, with its next Attempt due inside the
-        // window — the gap is closing, however long 6 has been waiting.
+        // 5 is between rungs with its next Attempt due inside the window: the gap is closing.
         when(deliveryRepository.countGapClosingBefore(eq(endpointId), eq(5L), eq(5L), any(), any()))
                 .thenReturn(1L);
 
@@ -1194,12 +1081,7 @@ class WebhookDeliveryServiceTest {
         assertEquals(Delivery.DeliveryStatus.PENDING, captor.getValue().getStatus());
     }
 
-    /**
-     * webhook_ordering_gap_timeout_total used to be incremented in both
-     * OrderingBufferService.isGapTimedOut and WebhookDeliveryService.canDeliverWithOrdering.
-     * With OrderingBufferService fully mocked here (its own increment can't fire), a count of
-     * exactly 1 confirms WebhookDeliveryService's own increment is the only one left.
-     */
+    // A mocked OrderingBufferService cannot increment, so exactly 1 proves no double count.
     @Test
     void canDeliverWithOrdering_gapTimedOut_countsMetricExactlyOnce() throws Exception {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -1249,13 +1131,7 @@ class WebhookDeliveryServiceTest {
         }
     }
 
-    /**
-     * The api compresses payloads above WEBHOOK_PAYLOAD_COMPRESSION_THRESHOLD_BYTES (1 KB by
-     * default) and reads them back through getDecompressedPayload(). The worker Event entity
-     * did not map payload_compressed at all, so it read the stored column directly and sent --
-     * and signed -- the gzip+Base64 blob as the webhook body for every event at or above the
-     * threshold.
-     */
+    // The worker once left payload_compressed unmapped and sent the gzip+Base64 blob as the body.
     @Test
     void processDelivery_compressedEventPayload_isDecompressedBeforeTransformAndSend() throws Exception {
         UUID deliveryId = UUID.randomUUID();
@@ -1297,12 +1173,7 @@ class WebhookDeliveryServiceTest {
                 "the transform (and therefore the body and the signature) must see real JSON");
     }
 
-    /**
-     * deleteEndpoint is a soft delete: it stamps deleted_at and leaves `enabled` alone, and
-     * every api-side query filters on deleted_at IS NULL. The worker entity did not map the
-     * column, so already-queued deliveries kept being sent to a deleted endpoint for as long
-     * as the retry ladder ran -- up to the 24h rung.
-     */
+    // The worker once left deleted_at unmapped and kept delivering to deleted endpoints.
     @Test
     void processDelivery_softDeletedEndpoint_failsWithoutSending() throws Exception {
         UUID deliveryId = UUID.randomUUID();
@@ -1336,13 +1207,9 @@ class WebhookDeliveryServiceTest {
                 "a soft-deleted endpoint must terminally fail the delivery");
     }
 
-    // --- an unusable retry ladder is a terminal configuration failure, not a retry ---
-
     @Test
     void processDelivery_malformedRetryLadder_failsTerminallyWithoutSending() {
-        // Retrying cannot fix a ladder that does not parse, and letting RetryLadder throw
-        // from inside scheduleRetry would leave the row PROCESSING for StuckDeliveryRecovery
-        // to hand back, failing the same way forever. It must terminate on the first pass.
+        // An unparseable ladder must terminate on the first pass, not cycle through the stuck sweep.
         UUID endpointId = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
         UUID deliveryId = UUID.randomUUID();
@@ -1380,10 +1247,7 @@ class WebhookDeliveryServiceTest {
         Endpoint endpoint = verifiedEndpoint(endpointId, UUID.randomUUID());
         when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(stubEvent(eventId, endpoint.getProjectId())));
-        // Admission is now ordered by what a refusal costs to undo: the breaker first (it
-        // consumes nothing), then the two concurrency permits (releasable), then the rate
-        // limiters (a token cannot be un-consumed). So this test has to get past three checks
-        // to still stop where it means to.
+        // Admission runs breaker, then permits, then rate limiters: cheapest to undo first.
         when(circuitBreakerService.isCallPermitted(any())).thenReturn(true);
         when(concurrencyControlService.tryAcquireForTenant(any())).thenReturn(true);
         when(concurrencyControlService.tryAcquireForTarget(any())).thenReturn(true);
@@ -1401,7 +1265,7 @@ class WebhookDeliveryServiceTest {
         verify(projectRateLimiterService).tryAcquire(endpoint.getProjectId());
     }
 
-    /** Every Project active: whether a Project may still be sent for is not what this test is about. */
+    // Every Project active: project status is not what this test is about.
     private static ProjectStatusLookup activeProjects() {
         return new ProjectStatusLookup(null) {
             @Override

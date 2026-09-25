@@ -14,14 +14,6 @@ import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
-/**
- * Redis-backed tunnel bandwidth metering.
- * <p>
- * Key: {@code tunnel:bw:{orgId}:{YYYY-MM}} → atomic long (bytes), TTL = end of next month.
- * <p>
- * Incremented on every tunnel request with request + response body sizes.
- * Fire-and-forget — never blocks the response path.
- */
 @Service
 @Slf4j
 public class TunnelBandwidthService {
@@ -38,10 +30,7 @@ public class TunnelBandwidthService {
                 .register(meterRegistry);
     }
 
-    /**
-     * Record bytes transferred through a tunnel for an organization.
-     * Fire-and-forget — if Redis is down, just record the Prometheus metric.
-     */
+    // Never fails the response path: with Redis down only the metric is recorded.
     public void recordBytes(long bytes) {
         UUID organizationId = TenantContext.require();
         if (bytes <= 0) return;
@@ -58,9 +47,6 @@ public class TunnelBandwidthService {
         }
     }
 
-    /**
-     * Get current month's bandwidth usage for an organization (bytes).
-     */
     public long getCurrentUsage() {
         UUID organizationId = TenantContext.require();
         try {

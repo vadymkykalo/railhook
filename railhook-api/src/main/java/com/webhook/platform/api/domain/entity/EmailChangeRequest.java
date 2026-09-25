@@ -9,10 +9,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One asked-for change of the address an account signs in with; see the V073 migration.
- *
- * <p>Not tenant-scoped: an address belongs to a person, who may be in several organizations.
- * Every read is by user id or by the hash of a token only its holder has.
+ * Not tenant-scoped: an address belongs to a person, who may be in several organizations. Every
+ * read is by user id or by the hash of a token only its holder has.
  */
 @Entity
 @Table(name = "email_change_requests")
@@ -40,11 +38,10 @@ public class EmailChangeRequest {
     @Column(nullable = false, length = 16)
     private EmailChangeStatus status;
 
-    /** SHA-256 of the token mailed to the new address. Null once applied without one. */
+    // Null once applied without one.
     @Column(name = "token_hash", length = 64)
     private String tokenHash;
 
-    /** SHA-256 of the "this wasn't me" token mailed to the old address. */
     @Column(name = "cancel_token_hash", length = 64)
     private String cancelTokenHash;
 

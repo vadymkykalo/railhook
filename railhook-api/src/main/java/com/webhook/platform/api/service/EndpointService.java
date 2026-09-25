@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.webhook.platform.api.dto.MtlsConfigRequest;
+import com.webhook.platform.api.dto.TestResult;
 
 @Slf4j
 @Service
@@ -73,32 +75,17 @@ public class EndpointService {
         this.endpointVerificationRequired = endpointVerificationRequired;
     }
 
-    /**
-     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
-     * lookup only sees projects inside the caller's organization: a foreign project id is
-     * indistinguishable from a missing one, which is intended.
-     */
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
     }
 
-    /**
-     * The endpoint {@code id} as seen from {@code projectId}. An endpoint of another project in the
-     * same organization is "not found", exactly like a missing one: the URL names the project, and
-     * an API key is confined to the project in the URL, so an organization-wide lookup here let a
-     * key for one project read, re-point and rotate the secrets of every other project's endpoints.
-     */
+    // Project-scoped: an org-wide lookup let an API key rotate other projects' secrets.
     private Endpoint requireEndpoint(UUID projectId, UUID id) {
         return endpointRepository.findByIdAndProjectId(id, projectId)
                 .orElseThrow(() -> new NotFoundException("Endpoint not found"));
     }
 
-    /**
-     * A Consumer named on an endpoint must be one of that endpoint's project: another project's
-     * is "not found" like a missing one, or an API key could file an endpoint into a portal it
-     * has no business in.
-     */
     private UUID requireConsumerOfProject(UUID projectId, UUID consumerId) {
         return consumerRepository.findByIdAndProjectId(consumerId, projectId)
                 .orElseThrow(() -> new NotFoundException("Consumer not found"))
@@ -112,8 +99,7 @@ public class EndpointService {
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
         UUID consumerId = request.getConsumerId() == null ? null
                 : requireConsumerOfProject(projectId, request.getConsumerId());
-        
-        // Auto-generate secret if not provided
+
         String secret = request.getSecret();
         if (secret == null || secret.isBlank()) {
             secret = CryptoUtils.generateSecureToken(32);
@@ -139,8 +125,7 @@ public class EndpointService {
         if (request.getEnabled() != null) {
             endpoint.setEnabled(request.getEnabled());
         }
-        
-        // Set verification status based on feature flag
+
         if (endpointVerificationRequired) {
             endpoint.setVerificationStatus(Endpoint.VerificationStatus.PENDING);
             log.debug("Endpoint verification required, setting status to PENDING for endpoint: {}", endpoint.getUrl());
@@ -163,7 +148,6 @@ public class EndpointService {
                 .collect(Collectors.toList());
     }
 
-    /** The live Endpoints registered for one of the project's Consumers, oldest first. */
     public List<EndpointResponse> listEndpointsOfConsumer(UUID projectId, UUID consumerId) {
         requireConsumerOfProject(projectId, consumerId);
         return endpointRepository.findByConsumerIdAndDeletedAtIsNullOrderByCreatedAtAsc(consumerId).stream()
@@ -188,20 +172,8 @@ public class EndpointService {
             endpoint.setConsumerId(requireConsumerOfProject(projectId, request.getConsumerId()));
         }
 
-        // Verification belongs to the URL that earned it, not to the endpoint row. The worker
-        // gate asks only whether the status is VERIFIED or SKIPPED, so leaving the status alone
-        // here let an owner verify a URL they controlled and then re-point the endpoint
-        // anywhere while it kept delivering — a one-time check with a hole the size of a PUT.
-        //
-        // A changed URL therefore re-derives the state createEndpoint would have given a brand
-        // new endpoint at that URL, rather than unconditionally forcing PENDING. That gate in
-        // the worker is *not* behind webhook.endpoint-verification-required — it always demands
-        // VERIFIED or SKIPPED — so forcing PENDING when verification is switched off would turn
-        // every URL edit into a silent, permanent outage for the default configuration.
-        //
-        // SKIPPED is re-derived alongside VERIFIED because it passes that gate identically:
-        // sparing it would leave the hole open for every endpoint created while the flag was off.
-        // An unchanged URL is left entirely alone, or editing a description would stop delivery.
+        // Verification belongs to the URL, or an owner could verify one and re-point to another.
+        // Re-derived, not forced to PENDING: the worker always demands VERIFIED or SKIPPED.
         if (!Objects.equals(endpoint.getUrl(), request.getUrl())) {
             endpoint.setVerificationStatus(endpointVerificationRequired
                     ? Endpoint.VerificationStatus.PENDING
@@ -216,10 +188,7 @@ public class EndpointService {
 
         endpoint.setUrl(request.getUrl());
 
-        // One rule, and it is on EndpointRequest: an absent field is unchanged, an explicitly
-        // empty value clears. description and rateLimitPerSecond used to be assigned straight
-        // from the request instead, three lines above the comment explaining why that is wrong,
-        // so an update that did not mention the rate limit removed the endpoint's throttle.
+        // An absent field is unchanged; an explicitly empty value clears it.
         if (request.getDescription() != null) {
             endpoint.setDescription(blankToNull(request.getDescription()));
         }
@@ -234,9 +203,6 @@ public class EndpointService {
         if (request.getEnabled() != null) {
             endpoint.setEnabled(request.getEnabled());
             if (Boolean.TRUE.equals(request.getEnabled())) {
-                // Turning an auto-disabled endpoint back on is a statement that the receiver has
-                // been fixed. Leaving the run of failures behind would have the sweep turn it
-                // straight off again on its next pass, since failing_since would still be days old.
                 clearAutoDisable(endpoint);
             }
         }
@@ -249,36 +215,25 @@ public class EndpointService {
             endpoint.setAllowedSourceIps(blankToNull(request.getAllowedSourceIps()));
         }
 
-        // Null means "not specified", not "reset to default": an update that leaves the field
-        // out must not silently switch an endpoint back to BOTH and start sending headers its
-        // receiver has never seen.
         if (request.getSignatureScheme() != null) {
             endpoint.setSignatureScheme(request.getSignatureScheme());
         }
 
         endpoint = endpointRepository.saveAndFlush(endpoint);
-        
+
         return mapToResponse(endpoint);
     }
 
-    /** The empty value for a text field: blank clears it rather than storing whitespace. */
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
     }
 
-    /** The empty value for the rate limit: 0 is "no limit", which the column stores as null. */
+    // 0 means "no limit", stored as null.
     private static Integer zeroToNull(Integer value) {
         return value == null || value == 0 ? null : value;
     }
 
-    /**
-     * Turns an endpoint back on and forgets that it was ever failing.
-     *
-     * <p>Its own operation rather than a {@code PUT} with {@code enabled: true}, because the
-     * update request requires a URL: re-enabling through it means resending the whole endpoint,
-     * and every caller that has tried has quietly dropped a field it did not know about. Here
-     * the only thing being said is "this receiver works now".
-     */
+    // Not PUT: re-enabling through PUT kept dropping fields callers did not know about.
     @Auditable(action = AuditAction.UPDATE, resourceType = "Endpoint")
     @Transactional
     public EndpointResponse enableEndpoint(UUID projectId, UUID id) {
@@ -288,12 +243,7 @@ public class EndpointService {
         return mapToResponse(endpointRepository.save(endpoint));
     }
 
-    /**
-     * Forgets the run of failures along with the auto-disable itself. The two have to go
-     * together: the sweep decides on {@code failingSince}, so an endpoint turned back on with a
-     * three-day-old run still on its row would be turned off again on the next pass, and the
-     * owner would have no way to tell that from the feature simply not working.
-     */
+    // The failure run must go too: the sweep decides on failingSince and would disable it again.
     private static void clearAutoDisable(Endpoint endpoint) {
         endpoint.setAutoDisabledAt(null);
         endpoint.setAutoDisabledReason(null);
@@ -310,21 +260,7 @@ public class EndpointService {
         endpointRepository.save(endpoint);
     }
 
-    /**
-     * Rotates the signing secret, keeping the retired one valid for the endpoint's grace
-     * period (24 hours by default).
-     *
-     * <p>Rotation used to replace the secret in place, which made it a breaking change for
-     * the receiver: every delivery from that instant was signed with a key they had not
-     * deployed yet, and each one failed their verification. The retired secret is now kept
-     * alongside, and the worker signs with both while the window is open — the header
-     * carries two {@code v1} values and either verifies.
-     *
-     * <p>The previous secret is <em>re-encrypted</em> rather than copied as ciphertext: the
-     * row carries a single {@code encryption_key_version}, so a straight copy would leave
-     * two ciphertexts described by one version and the older one undecryptable after a key
-     * rotation.
-     */
+    // The old secret is re-encrypted, not copied: the row has one key version.
     @Auditable(action = AuditAction.ROTATE_SECRET, resourceType = "Endpoint")
     @Transactional
     public EndpointResponse rotateSecret(UUID projectId, UUID id) {
@@ -341,9 +277,7 @@ public class EndpointService {
             endpoint.setSecretPreviousIv(previous.getIv());
             endpoint.setSecretRotatedAt(Instant.now());
         } else {
-            /* Nothing decryptable to keep — the receiver could not have been verifying with
-               it either, so there is no window to open. Clearing rather than leaving a stale
-               pair behind, which would otherwise be signed with under the new rotated_at. */
+            // Clear, or a stale pair would be signed with under the new rotated_at.
             endpoint.setSecretPreviousEncrypted(null);
             endpoint.setSecretPreviousIv(null);
             endpoint.setSecretRotatedAt(null);
@@ -357,12 +291,7 @@ public class EndpointService {
         return mapToResponseWithSecret(endpoint, newSecret);
     }
 
-    /**
-     * The endpoint's current secret, or {@code null} when it cannot be decrypted.
-     *
-     * <p>An undecryptable secret must not block a rotation — rotating is exactly what an
-     * operator does to recover from one.
-     */
+    // Rotating is how an operator recovers from an undecryptable secret, so it must not block.
     private String decryptSecretOrNull(Endpoint endpoint) {
         try {
             return encryptionKeyRegistry.decryptWithFallback(
@@ -420,7 +349,7 @@ public class EndpointService {
                         int status = resp.statusCode().value();
                         return resp.bodyToMono(String.class)
                                 .defaultIfEmpty("")
-                                .map(responseBody -> new com.webhook.platform.api.dto.TestResult(status, responseBody));
+                                .map(responseBody -> new TestResult(status, responseBody));
                     })
                     .timeout(Duration.ofSeconds(10))
                     .blockOptional()
@@ -462,9 +391,7 @@ public class EndpointService {
     }
 
     private EndpointResponse mapToResponseWithSecret(Endpoint endpoint, String secret) {
-        // Only alongside the plaintext secret, which is itself only returned at creation and
-        // rotation: deriving it is trivial, but emitting it on every read would put a second
-        // copy of the secret in every list response.
+        // Only with the plaintext secret, never on ordinary reads.
         String standardWebhooksSecret = secret != null
                 ? StandardWebhookSignature.asSharedSecret(secret)
                 : null;
@@ -496,7 +423,7 @@ public class EndpointService {
 
     @Transactional
     public EndpointResponse configureMtls(UUID projectId, UUID endpointId, 
-            com.webhook.platform.api.dto.MtlsConfigRequest request) {
+            MtlsConfigRequest request) {
         Endpoint endpoint = requireEndpoint(projectId, endpointId);
 
         CryptoUtils.EncryptedData encryptedCert = encryptionKeyRegistry.encrypt(request.getClientCert());

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock i18n before importing date utils
 vi.mock('../../i18n', () => ({
   default: {
     language: 'en',
@@ -24,7 +23,6 @@ describe('date utilities', () => {
       const result = formatDateTime('2025-01-15T14:30:15Z');
       expect(result).toBeTruthy();
       expect(typeof result).toBe('string');
-      // Should contain year and time parts
       expect(result).toContain('2025');
     });
   });
@@ -74,7 +72,6 @@ describe('date utilities', () => {
       vi.setSystemTime(now);
       const tenDaysAgo = new Date(now.getTime() - 10 * 86400_000).toISOString();
       const result = formatRelativeTime(tenDaysAgo);
-      // Should fall back to formatDate — contains year
       expect(result).toContain('2025');
     });
 
@@ -86,7 +83,6 @@ describe('date utilities', () => {
   describe('formatNumber', () => {
     it('formats large numbers with locale separators', () => {
       const result = formatNumber(1234567);
-      // en-US: "1,234,567"
       expect(result).toContain('234');
       expect(result).toContain('567');
     });

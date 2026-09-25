@@ -22,24 +22,10 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * The security chain for the MCP server and its authorization server — {@code /mcp},
- * {@code /oauth/*} and the {@code /.well-known} metadata — kept apart from the dashboard's.
- *
- * <p>Three things differ from the main chain, and each is why these paths have a chain of their
- * own rather than exceptions threaded through {@code SecurityConfig}:
- * <ul>
- *   <li><b>The 401.</b> An MCP client that is refused must be told where to sign in:
- *       {@code WWW-Authenticate: Bearer resource_metadata="…"} (RFC 9728 §5.1), with
- *       {@code error="invalid_token"} when it did send a token (RFC 6750 §3.1). The dashboard's
- *       JSON 401 tells it nothing.</li>
- *   <li><b>CORS.</b> Any origin, without credentials. Nothing here is authorized by an ambient
- *       credential — every request carries its token, key or client secret explicitly — so a
- *       foreign page gains nothing it could not do from a server, and browser-based MCP clients
- *       (the MCP Inspector, web agents) need the metadata, registration and token endpoints to
- *       answer them. The dashboard's allowlist would refuse them all.</li>
- *   <li><b>Who may call.</b> Only an OAuth access token or a project API key reaches {@code /mcp};
- *       the protocol endpoints are public by definition, each proving the caller its own way.</li>
- * </ul>
+ * A separate chain from the dashboard's because the 401 must carry a
+ * {@code WWW-Authenticate: Bearer resource_metadata=...} challenge (RFC 9728), and CORS is open
+ * to any origin without credentials. That is safe because nothing here is authorized by an
+ * ambient credential, and browser-based MCP clients need these endpoints to answer them.
  */
 @Configuration(proxyBeanMethods = false)
 public class McpSecurityConfig {
@@ -73,8 +59,7 @@ public class McpSecurityConfig {
                         (request, response, e) -> challenge(request, response, settings)))
                 .addFilterBefore(accessTokenFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(apiKeyAuthenticationFilter, McpAccessTokenFilter.class)
-                // Last, as in the main chain: it turns whichever identity was established into
-                // the tenant scope the request then runs in.
+                // Last: turns the established identity into the tenant scope.
                 .addFilterAfter(new TenantContextFilter(), ApiKeyAuthenticationFilter.class);
         return http.build();
     }

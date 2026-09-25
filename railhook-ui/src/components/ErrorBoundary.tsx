@@ -6,13 +6,7 @@ import { reportClientError } from '../lib/reportClientError';
 
 interface Props {
   children: ReactNode;
-  /**
-   * `page` keeps the failure inside the content area, leaving the shell — sidebar, project
-   * switcher, navigation — alive and usable. Without it the app had exactly one boundary, at
-   * the root, so a render error anywhere took the whole dashboard down and the only way out
-   * was a reload. The heaviest pages are the likeliest to throw and the least likely to be
-   * where the user wants to stay.
-   */
+  /** `page` keeps a render error inside the content area so the shell stays usable. */
   variant?: 'app' | 'page';
 }
 
@@ -32,19 +26,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // The console is for whoever has devtools open. This is for everyone else: without it a
-    // screen that throws for every customer looks, from the server, exactly like a screen
-    // nobody opened. The report goes to this installation's own logs and nowhere else, and
-    // reportClientError swallows its own failures — a broken reporter must not become a
-    // second error on top of the one already on screen.
+    // Reported to this installation's logs, or a screen that throws for everyone looks unopened.
     console.error('ErrorBoundary caught:', error, info.componentStack);
     try {
       void reportClientError(error, { componentStack: info.componentStack ?? undefined });
     } catch {
-      // reportClientError already swallows its own failures, so this catches only the
-      // impossible: a throw on the way in. It is here because this is the last boundary
-      // there is — if componentDidCatch throws, React renders nothing at all and the user
-      // gets a blank page instead of the apology this class exists to show them.
+      // If componentDidCatch throws, React renders a blank page instead of this apology.
     }
   }
 
@@ -57,11 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-/**
- * What a failure looks like, shared by the render boundary above and by the router's
- * `errorElement` — which catches what never reaches a component boundary, such as a lazy page
- * whose chunk a new deploy has removed.
- */
+/** Also the router's errorElement, for lazy chunks a new deploy removed. */
 export function ErrorFallback({ error, variant }: { error: Error | null; variant?: 'app' | 'page' }) {
   const page = variant === 'page';
   const reload = () => window.location.reload();
@@ -75,7 +58,7 @@ export function ErrorFallback({ error, variant }: { error: Error | null; variant
       }
     >
       <div role="alert" className="w-full max-w-md text-center">
-        <div className="mx-auto mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-halt/30 bg-halt-soft">
+        <div className="mx-auto mb-5 flex h-11 w-11 items-center justify-center border border-halt/30 bg-halt-soft">
           <AlertTriangle className="h-5 w-5 text-halt" aria-hidden />
         </div>
         {page ? (
@@ -87,7 +70,7 @@ export function ErrorFallback({ error, variant }: { error: Error | null; variant
           {i18n.t('errorBoundary.description')}
         </p>
         {error && (
-          <pre className="mt-5 max-h-32 overflow-auto rounded-md border border-rail bg-card p-3 text-left font-mono text-xs text-muted-foreground">
+          <pre className="mt-5 max-h-32 overflow-auto border border-rail bg-card p-3 text-left font-mono text-xs text-muted-foreground">
             {error.message}
           </pre>
         )}

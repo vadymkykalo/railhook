@@ -13,19 +13,7 @@ import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over the one thing that decides whether a production deployment logs JSON.
- *
- * <p>{@code logback-spring.xml} picks LogstashEncoder under the {@code production} Spring
- * profile. Nothing ever activated that profile: {@code APP_ENV=production} is an ordinary
- * property, and {@code SPRING_PROFILES_ACTIVE} appeared nowhere in the repository — not in
- * compose, not in the chart, not in install.sh. So the JSON appender was written, committed,
- * documented in the observability guide, and dead, and promtail's {@code json} stage parsed
- * plain text forever, which is why the {@code level} label never showed up in Loki.
- *
- * <p>Two files have to agree for it to work, and neither references the other. This checks
- * both, in both services.
- */
+// Nothing activated the production profile, so the JSON appender was dead; both files must agree.
 @Tag("ratchet")
 class LoggingProfileActivationTest {
 

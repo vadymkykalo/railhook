@@ -5,10 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Utility for masking sensitive HTTP header values before storage.
- * Works with plain Maps — no servlet dependencies.
- */
 public final class HeaderSanitizer {
 
     private static final Set<String> SENSITIVE_HEADERS_EXACT = Set.of(
@@ -23,9 +19,6 @@ public final class HeaderSanitizer {
     private HeaderSanitizer() {
     }
 
-    /**
-     * Returns true if the header name matches known sensitive patterns.
-     */
     public static boolean isSensitiveHeader(String headerName) {
         if (headerName == null) return false;
         String lower = headerName.toLowerCase();
@@ -40,9 +33,6 @@ public final class HeaderSanitizer {
         return false;
     }
 
-    /**
-     * Sanitizes a map of headers, masking values of sensitive headers.
-     */
     public static Map<String, String> sanitize(Map<String, String> headers) {
         if (headers == null || headers.isEmpty()) {
             return headers;
@@ -58,10 +48,6 @@ public final class HeaderSanitizer {
         return result;
     }
 
-    /**
-     * Masks a signature value, keeping only the last 8 characters for debugging.
-     * Example: "v1=abc123...xyz789" → "sig_...xyz789**"
-     */
     public static String maskSignature(String signature) {
         if (signature == null || signature.length() <= 8) {
             return MASKED_VALUE;

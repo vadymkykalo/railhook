@@ -42,11 +42,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * A test event is sent to see what a real one would do, so it has to reach the same Deliveries a
- * real one does. It used to look Subscriptions up by exact type: an {@code order.*} Subscription
- * got nothing from a test {@code order.completed}, and rules were never consulted.
- */
+// Test events once matched Subscriptions by exact type and skipped rules, unlike real ones.
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class EventServiceTest {

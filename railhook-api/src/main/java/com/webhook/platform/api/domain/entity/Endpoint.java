@@ -31,10 +31,7 @@ public class Endpoint {
     @Column(name = "project_id", nullable = false)
     private UUID projectId;
 
-    /**
-     * The Consumer this Endpoint was registered for, or null when it is the customer's own. What
-     * a portal session is confined to; the worker never reads it.
-     */
+    /** Null when the customer registered it; a portal session is confined to its own Consumer. */
     @Column(name = "consumer_id")
     private UUID consumerId;
 
@@ -70,23 +67,17 @@ public class Endpoint {
     @Column(name = "rate_limit_per_second")
     private Integer rateLimitPerSecond;
 
-    /**
-     * Start of the current unbroken run of failed Attempts; null once one succeeds. The worker
-     * maintains it at the shared attempt seam, and {@code EndpointAutoDisableService} is what
-     * reads it.
-     */
+    /** Start of the current run of failed Attempts; null once one succeeds. */
     @Column(name = "failing_since")
     private Instant failingSince;
 
-    /** Attempts in that run. A long run on a near-idle endpoint is not enough on its own. */
     @Column(name = "consecutive_failures", nullable = false)
     @Builder.Default
     private Integer consecutiveFailures = 0;
 
     /**
-     * When Railhook turned this endpoint off for continuous failure. Null when it is on, and
-     * null when its <em>owner</em> turned it off — the two are deliberately told apart, because
-     * they mean different things for Deliveries already queued.
+     * Null when the owner disabled the endpoint: the two cases mean different things for
+     * Deliveries already queued.
      */
     @Column(name = "auto_disabled_at")
     private Instant autoDisabledAt;
@@ -94,13 +85,6 @@ public class Endpoint {
     @Column(name = "auto_disabled_reason", columnDefinition = "TEXT")
     private String autoDisabledReason;
 
-    /**
-     * Which signature headers this endpoint receives (V062).
-     *
-     * <p>{@code BOTH} by default: an existing receiver goes on verifying {@code X-Signature}
-     * while a new one can verify with an off-the-shelf Standard Webhooks library, and neither
-     * has to know the other exists.</p>
-     */
     @Enumerated(EnumType.STRING)
     @Column(name = "signature_scheme", nullable = false, length = 20)
     @Builder.Default

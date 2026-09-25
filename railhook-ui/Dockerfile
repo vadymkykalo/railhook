@@ -1,66 +1,28 @@
-# Build stage
-# Node:18-alpine went EOL April 2025. 22-alpine is the current
-# Maintenance LTS line (actively rebuilt/patched as of 2026-08).
-#
-# --platform=$BUILDPLATFORM pins this stage to the builder's own architecture.
-# What it produces — `dist` — is static HTML, CSS and JS, identical whatever CPU
-# built it, and it is copied into the per-arch runtime stage below, so the image
-# stays multi-arch. Without the pin, `docker buildx --platform linux/arm64` runs
-# this stage under QEMU emulation, and the prerender step launches Chromium
-# there: on the v2.6.0 tag that timed out after 16 minutes
-# ("Timed out after waiting 30000ms") and the UI image for that release was
-# never published, which broke `install.sh` for every new user.
+# Builder's arch: dist is static, and Chromium under QEMU timed out the arm64 build.
 FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 
 WORKDIR /app
 
-# Copy package files (build context is project root)
 COPY railhook-ui/package*.json ./
 
-# Install dependencies
 RUN npm ci
 
-# Chromium for the prerender step. Alpine's package rather than a Puppeteer download:
-# puppeteer-core ships no browser, and the musl builds Puppeteer fetches do not run here.
-# It lives in the build stage only — the runtime image below is nginx and carries none of it.
-# Installed before the sources are copied, so a code change does not reinstall a browser.
+# Alpine's Chromium for the prerender: the builds Puppeteer downloads don't run on musl.
 RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Copy UI source files
 COPY railhook-ui/ .
 
-# The /changelog page is built from the repository's CHANGELOG.md, which vite.config.ts reads
-# from one level above the app — /CHANGELOG.md here, the repository root in a checkout.
-COPY CHANGELOG.md /CHANGELOG.md
-
-# Vite inlines import.meta.env.VITE_* at build time, so these have to arrive
-# here as build args — passing them as runtime env to the nginx stage does
-# nothing. Empty is the normal case: nginx.conf proxies /api/, /ws/tunnel,
-# /hook/ and /ingress/ to the api service, so the bundle talks to its own
-# origin and needs no absolute API URL.
-#
-# Nothing that differs between deployments belongs here. The public origin and the
-# registration challenge are read by the container when it starts
-# (docker-entrypoint.d/20-runtime-config.sh), so every deployment runs this same image.
+# Vite inlines VITE_* at build time; per-deployment settings are runtime (20-runtime-config.sh).
 ARG VITE_API_URL=""
 ARG VITE_CSP_EXTRA_CONNECT=""
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_CSP_EXTRA_CONNECT=$VITE_CSP_EXTRA_CONNECT
 
-# Build, then render the public pages to static HTML. Without the second step nginx serves
-# `<div id="root"></div>` for every URL, and the titles, canonicals and sitemap all point at
-# pages whose body is empty until React mounts.
-#
-# version.txt names the release this image serves, so a deploy can check the new one is live.
 RUN npm run build && npm run prerender \
     && node -p "require('./package.json').version" > dist/version.txt
 
-# Docs stage: the Starlight site in railhook-docs/, served at /docs/ by the same nginx.
-# Pinned to $BUILDPLATFORM for the same reason as the build stage — its output is static
-# HTML, identical on every architecture. It reads two files from the repository root:
-# openapi.yaml (the API reference) and .env.dist (the configuration reference), which is
-# why the build context is the root.
+# Reads openapi.yaml and .env.dist from the repo root, hence the root build context.
 FROM --platform=$BUILDPLATFORM node:22-alpine AS docs
 
 WORKDIR /app
@@ -70,34 +32,20 @@ RUN cd railhook-docs && npm ci
 COPY railhook-docs/ railhook-docs/
 RUN cd railhook-docs && npm run build
 
-# Runtime stage
-# Bumped from the 1.25 stable branch (past EOL) to the current 1.30
-# stable branch.
 FROM nginx:1.30-alpine
 
-# Copy built assets from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# The docs site, served by nginx.conf's /docs/ location.
 COPY --from=docs /app/railhook-docs/dist /usr/share/nginx/html/docs
 
-# `curl -fsSL https://<host>/install.sh | bash` — the installer, served by the site it installs.
 COPY install.sh /usr/share/nginx/html/install.sh
 COPY railhook-cli/install.sh /usr/share/nginx/html/install-cli.sh
 
-# Copy nginx config
 COPY railhook-ui/nginx.conf /etc/nginx/conf.d/default.conf
 COPY railhook-ui/nginx-security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY railhook-ui/nginx-security-headers-common.conf /etc/nginx/snippets/security-headers-common.conf
 
-# Runs before nginx starts — the base image's entrypoint executes
-# /docker-entrypoint.d/*.sh in order. Fills in the resolver address from
-# /etc/resolv.conf, which is the only thing that is right under both Compose and
-# Kubernetes.
 COPY railhook-ui/docker-entrypoint.d/15-resolver.sh /docker-entrypoint.d/15-resolver.sh
-# Writes /tmp/railhook-config.js (served as /config.js) and /tmp/railhook-site.conf (the
-# origin nginx substitutes for the placeholder) from the container's own environment: the
-# settings that must differ between deployments of one image.
 COPY railhook-ui/docker-entrypoint.d/20-runtime-config.sh /docker-entrypoint.d/20-runtime-config.sh
 RUN chmod +x /docker-entrypoint.d/15-resolver.sh /docker-entrypoint.d/20-runtime-config.sh
 

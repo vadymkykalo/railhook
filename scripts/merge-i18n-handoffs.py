@@ -1,15 +1,6 @@
 #!/usr/bin/env python3
-"""Merge the parallel workstreams' i18n hand-off files into the locale bundles.
-
-Several workstreams add translation keys at once. They cannot each edit
-en.json/uk.json — concurrent read-modify-write would silently drop whichever
-write landed first — so each writes .claude/tasks/i18n-<name>.json in the shape
-
-    {"en": {"ns": {"key": "..."}}, "uk": {"ns": {"key": "..."}}}
-
-and this merges them. It refuses on a key that two workstreams define
-differently, and on a key present in one locale and not the other, because
-src/i18n/__tests__/locales.test.ts fails CI on exactly that asymmetry.
+"""Merges .claude/tasks/i18n-<name>.json hand-offs into en.json/uk.json, which concurrent edits would
+clobber. Refuses conflicting keys and keys missing from one locale.
 """
 import json
 import sys

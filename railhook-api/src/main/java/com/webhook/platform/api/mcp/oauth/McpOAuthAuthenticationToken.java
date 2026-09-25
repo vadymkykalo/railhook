@@ -7,15 +7,9 @@ import java.util.Collections;
 import java.util.UUID;
 
 /**
- * A caller on {@code /mcp} holding an OAuth access token.
- *
- * <p>An {@link ApiKeyAuthenticationToken} on purpose. A grant is the same (organization, project,
- * scope) triple a key is, so everything downstream — the tenant filter, the audit aspect,
- * {@code McpCaller}'s READ_ONLY and suspension checks — already knows what to do with it, and
- * none of them grew a second branch that could drift from the first.
- *
- * <p>The credential it carries is the grant's id, never the token: the token is a bearer secret
- * and has no business sitting in a security context.
+ * Extends ApiKeyAuthenticationToken because a grant is the same (organization, project, scope)
+ * triple as a key, so tenancy, audit and scope checks need no second branch. The credential is
+ * the grant id, never the bearer token.
  */
 public class McpOAuthAuthenticationToken extends ApiKeyAuthenticationToken {
 

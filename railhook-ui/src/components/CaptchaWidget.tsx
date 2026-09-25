@@ -2,18 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { captchaScriptUrl, captchaSiteKey } from '../lib/runtimeConfig';
 
-/**
- * The CAPTCHA challenge, when the deployment has one.
- *
- * <p>Renders nothing at all unless the container sets RAILHOOK_CAPTCHA_SITE_KEY, which is the
- * shipped default: a self-hosted registration page has nobody to challenge, and loading a
- * third-party script on every visit to prove otherwise would be a worse default than not. The
- * server side mirrors this exactly — an unconfigured deployment accepts a registration with no
- * token.
- *
- * <p>Turnstile and hCaptcha expose the same `render(container, {sitekey, callback})` shape, so
- * RAILHOOK_CAPTCHA_SCRIPT_URL is what picks between them rather than a second component.
- */
+/** Renders nothing unless RAILHOOK_CAPTCHA_SITE_KEY is set; the script URL picks Turnstile or hCaptcha. */
 interface Props {
   onToken: (token: string) => void;
 }
@@ -58,8 +47,7 @@ export default function CaptchaWidget({ onToken }: Props) {
     script.async = true;
     script.defer = true;
     script.onload = render;
-    // A challenge that cannot load is worth saying out loud: the server refuses a registration
-    // with no token, so silently rendering nothing would look like a broken submit button.
+    // The server refuses a tokenless registration, so a silent failure would look like a broken submit.
     script.onerror = () => setFailed(true);
     document.head.appendChild(script);
   }, [onToken, siteKey, scriptUrl]);

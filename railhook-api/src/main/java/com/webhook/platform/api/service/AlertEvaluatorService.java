@@ -22,27 +22,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The half of alerting that was missing: the thing that actually looks.
- *
- * <p>{@code AlertService} could always store a rule and fire an event, and
- * {@code AlertNotificationService} could always deliver one. Nothing ever decided that a rule's
- * condition had come true, so every rule a user created was inert — the UI accepted it, listed
- * it, and it never fired. All four {@link com.webhook.platform.api.domain.enums.AlertType}
- * values were unreferenced outside their enum.
- *
- * <p>Two properties this has to hold, both learned from how alerting fails elsewhere:
- *
- * <ul>
- *   <li><b>Fire on the crossing, not on the condition.</b> A rule whose condition holds for an
- *       hour must produce one alert, not sixty. That is what the unresolved-event check does:
- *       while an alert for the rule is open, the rule stays quiet. The evaluator resolves that alert
- *       itself once the condition stops holding, which re-arms the rule for the next crossing.
- *   <li><b>Every query runs as the rule's organization.</b> The scheduler is
- *       {@code @SystemTenant}, which switches Hibernate's tenant filter <i>off</i> — so counting
- *       deliveries here without re-entering the tenant would count every organization's
- *       deliveries against one customer's threshold, and the {@code AlertEvent} written at the
- *       end would belong to nobody. {@code runAs} per rule is what makes both correct.
- * </ul>
+ * Fires on the crossing, not the condition: an open alert keeps its rule quiet until it clears.
+ * Each rule runs in its own organization, or counts would include everyone's deliveries.
  */
 @Slf4j
 @Service
@@ -55,10 +36,8 @@ public class AlertEvaluatorService {
     private final DeliveryAttemptRepository attemptRepository;
     private final AlertService alertService;
 
-    /** How long resolved alert history is kept. */
     private static final Duration RESOLVED_ALERT_RETENTION = Duration.ofDays(90);
 
-    /** What the evaluator concluded about one rule: the measurement, and how to say it. */
     private record Breach(double currentValue, String message) {}
 
     @SystemTenant("alert rules belong to every organization; each is evaluated inside its own")
@@ -77,10 +56,7 @@ public class AlertEvaluatorService {
                     fired++;
                 }
             } catch (Exception e) {
-                // One malformed rule must not stop the other organizations' rules being
-                // evaluated. Logged at WARN rather than swallowed: a rule that never evaluates
-                // is indistinguishable from a rule that never fires, which is the bug this
-                // whole class exists to fix.
+                // WARN, not swallowed: a rule that never evaluates looks exactly like one that never fires.
                 log.warn("Alert rule {} ('{}') could not be evaluated: {}",
                         rule.getId(), rule.getName(), e.toString());
             }
@@ -91,11 +67,7 @@ public class AlertEvaluatorService {
         }
     }
 
-    /**
-     * Alert history is kept for a while and then dropped. Only resolved events: an open one is
-     * what keeps its rule quiet, and deleting it would make the rule fire again for an outage
-     * it has already reported.
-     */
+    // Only resolved events: an open one keeps its rule quiet, and deleting it would re-fire the rule.
     @SystemTenant("alert history of every organization past its retention window")
     @Scheduled(cron = "0 30 3 * * *")
     @SchedulerLock(name = "alert_event_purge", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
@@ -117,8 +89,7 @@ public class AlertEvaluatorService {
             boolean open = eventRepository.existsByAlertRuleIdAndResolvedFalse(rule.getId());
             Optional<Breach> breach = assess(rule);
             if (open) {
-                // Nothing else resolves an alert but a person, so without this the first alert a
-                // rule raised kept it silent through every later outage.
+                // Otherwise only a person resolves it, and the rule stays silent through later outages.
                 if (breach.isEmpty()) {
                     alertService.resolveRecovered(rule);
                 }
@@ -129,11 +100,6 @@ public class AlertEvaluatorService {
         }));
     }
 
-    /**
-     * Muting and snoozing are the user saying "I know" — distinct from disabling, which is the
-     * user saying "stop measuring". A muted rule is still evaluated by nobody here on purpose:
-     * skipping it costs no queries.
-     */
     private boolean isSilenced(AlertRule rule) {
         if (Boolean.TRUE.equals(rule.getMuted())) {
             return true;
@@ -160,8 +126,7 @@ public class AlertEvaluatorService {
 
     private Optional<Breach> assessFailureRate(AlertRule rule, double threshold, Instant from, Instant to) {
         long total = deliveryRepository.countByProjectIdAndCreatedAtBetween(rule.getProjectId(), from, to);
-        // No traffic is not a 100% failure rate. Without this an idle project pages someone
-        // every night, and the alert people learn to ignore is worse than no alert.
+        // No traffic is not a 100% failure rate.
         if (total == 0) {
             return Optional.empty();
         }
@@ -187,8 +152,6 @@ public class AlertEvaluatorService {
     }
 
     private Optional<Breach> assessConsecutiveFailures(AlertRule rule, double threshold) {
-        // Endpoint-shaped by nature: "the last N in a row failed" is a statement about one
-        // receiver, so a rule without an endpoint has nothing to measure.
         if (rule.getEndpointId() == null) {
             return Optional.empty();
         }
@@ -198,8 +161,7 @@ public class AlertEvaluatorService {
         }
         List<DeliveryStatus> recent = deliveryRepository.findRecentOutcomesByEndpointId(
                 rule.getEndpointId(), PageRequest.of(0, needed));
-        // Fewer outcomes than the threshold cannot be a streak of that length — a new endpoint
-        // whose first delivery failed is not "3 consecutive failures".
+        // A new endpoint whose first delivery failed is not "3 consecutive failures".
         if (recent.size() < needed || recent.stream().anyMatch(s -> s == DeliveryStatus.SUCCESS)) {
             return Optional.empty();
         }
@@ -209,8 +171,7 @@ public class AlertEvaluatorService {
     }
 
     private Optional<Breach> assessLatency(AlertRule rule, double threshold, Instant from, Instant to) {
-        // p95 rather than the mean: a mean is dragged under the threshold by the fast majority
-        // exactly when a tail of slow receivers is the thing worth waking up for.
+        // p95, not the mean: the fast majority hides a slow tail in a mean.
         Long p95 = attemptRepository.findLatencyPercentileByProjectId(
                 rule.getOrganizationId(), rule.getProjectId(), from, to, 0.95);
         if (p95 == null || p95 < threshold) {

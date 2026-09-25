@@ -16,7 +16,6 @@ public interface IncomingDestinationRepository extends JpaRepository<IncomingDes
 
     List<IncomingDestination> findByIncomingSourceIdAndEnabledTrue(UUID incomingSourceId);
 
-    /** @see EndpointRepository#recordAttemptFailed — the same statement on the other target. */
     @Modifying
     @Query(value = """
             UPDATE incoming_destinations
@@ -26,7 +25,6 @@ public interface IncomingDestinationRepository extends JpaRepository<IncomingDes
             """, nativeQuery = true)
     int recordAttemptFailed(@Param("destinationId") UUID destinationId, @Param("at") Instant at);
 
-    /** @see EndpointRepository#recordAttemptSucceeded */
     @Modifying
     @Query(value = """
             UPDATE incoming_destinations

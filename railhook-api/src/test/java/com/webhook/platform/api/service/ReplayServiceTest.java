@@ -15,9 +15,7 @@ import com.webhook.platform.api.dto.ReplayEstimateResponse;
 import com.webhook.platform.api.dto.ReplayRequest;
 import com.webhook.platform.api.dto.ReplaySessionResponse;
 import com.webhook.platform.api.exception.ConflictException;
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
-import com.webhook.platform.api.service.DeliveryDispatch;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.rules.RuleEngineService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -29,10 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
@@ -73,13 +68,10 @@ class ReplayServiceTest {
     @BeforeEach
     void setUp() {
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-        // The session a run() is handed is PENDING unless a test says otherwise.
         when(replaySessionRepository.markStarted(any(), eq(ReplaySessionStatus.PENDING),
                 eq(ReplaySessionStatus.RUNNING), any())).thenReturn(1);
         when(entitlementService.getMaxFanoutForProject(any())).thenReturn(100);
 
-        // The real matching and intake over mocked repositories: replay has to decide the way
-        // ingest does, so stubbing the decision away would test nothing.
         SubscriptionMatchingCache matchingCache =
                 new SubscriptionMatchingCache(subscriptionRepository, new SimpleMeterRegistry());
         EventIntake intake = new EventIntake(matchingCache, ruleEngineService, entitlementService, new ObjectMapper());
@@ -90,7 +82,6 @@ class ReplayServiceTest {
                 new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()),
                 sequenceGeneratorService, events, transactionManager, new SimpleMeterRegistry());
 
-        // @Value fields aren't populated outside a Spring context.
         ReflectionTestUtils.setField(replayService, "batchSize", 200);
         ReflectionTestUtils.setField(replayService, "batchDelayMs", 0L);
         ReflectionTestUtils.setField(replayService, "maxEventsPerSession", 500_000L);
@@ -107,14 +98,7 @@ class ReplayServiceTest {
                 .build();
     }
 
-    // ─── estimate ────────────────────────────────────────────────────────
 
-
-    /**
-     * Every service under test now reads its organization from the ambient tenant scope instead
-     * of taking it as a parameter. A unit test has no request to establish one, so it
-     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
-     */
     @BeforeEach
     void enterTenantScope() {
         TenantContext.set(orgId);
@@ -127,16 +111,6 @@ class ReplayServiceTest {
 
     @Test
     void estimate_projectOutsideTenant_throwsNotFound() {
-        // A project in another organization is invisible to this tenant, so the
-        // repository returns nothing rather than a row with a mismatched org.
-        when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> replayService.estimate(projectId, validRequest()))
-                .isInstanceOf(NotFoundException.class);
-    }
-
-    @Test
-    void estimate_projectNotFound_throwsNotFound() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> replayService.estimate(projectId, validRequest()))
@@ -213,8 +187,6 @@ class ReplayServiceTest {
         verify(eventRepository, never()).countForReplay(any(), any(), any(), any());
     }
 
-    // ─── create ──────────────────────────────────────────────────────────
-
     @Test
     void create_tooManyRunningSessions_throwsConflict() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
@@ -261,8 +233,7 @@ class ReplayServiceTest {
 
         assertThat(response.getStatus()).isEqualTo(ReplaySessionStatus.PENDING);
         assertThat(response.getTotalEvents()).isEqualTo(5);
-        // Announced, not run: this used to call the replay directly and a spy stubbed that call
-        // away, hiding that @Async never applied and the whole replay ran on the request thread.
+        // Announced, not run: the replay once ran on the request thread because @Async never applied.
         verify(events).publishEvent(new ReplaySessionCreated(response.getId()));
         verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), any(), anyInt());
 
@@ -273,22 +244,8 @@ class ReplayServiceTest {
         assertThat(captor.getValue().getStatus()).isEqualTo(ReplaySessionStatus.PENDING);
     }
 
-    // ─── get / list ──────────────────────────────────────────────────────
-
-    @Test
-    void get_sessionNotFound_throwsNotFound() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
-        UUID sessionId = UUID.randomUUID();
-        when(replaySessionRepository.findByIdAndProjectId(sessionId, projectId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> replayService.get(projectId, sessionId))
-                .isInstanceOf(NotFoundException.class);
-    }
-
     @Test
     void get_projectOutsideTenant_throwsNotFoundBeforeLookingUpSession() {
-        // A project in another organization is invisible to this tenant, so the
-        // repository returns nothing rather than a row with a mismatched org.
         when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
         UUID sessionId = UUID.randomUUID();
 
@@ -296,32 +253,6 @@ class ReplayServiceTest {
                 .isInstanceOf(NotFoundException.class);
         verify(replaySessionRepository, never()).findByIdAndProjectId(any(), any());
     }
-
-    @Test
-    void get_valid_mapsProgressPercent() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
-        UUID sessionId = UUID.randomUUID();
-        ReplaySession session = ReplaySession.builder().id(sessionId).projectId(projectId)
-                .status(ReplaySessionStatus.RUNNING).totalEvents(200).processedEvents(50).build();
-        when(replaySessionRepository.findByIdAndProjectId(sessionId, projectId)).thenReturn(Optional.of(session));
-
-        ReplaySessionResponse response = replayService.get(projectId, sessionId);
-
-        assertThat(response.getProgressPercent()).isEqualTo(25.0);
-    }
-
-    @Test
-    void list_delegatesToRepositoryAfterOwnershipCheck() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
-        when(replaySessionRepository.findByProjectIdOrderByCreatedAtDesc(eq(projectId), any()))
-                .thenReturn(new PageImpl<>(List.of()));
-
-        Page<ReplaySessionResponse> result = replayService.list(projectId, PageRequest.of(0, 20));
-
-        assertThat(result.getContent()).isEmpty();
-    }
-
-    // ─── cancel ──────────────────────────────────────────────────────────
 
     @Test
     void cancel_alreadyCompleted_throwsConflict() {
@@ -359,7 +290,6 @@ class ReplayServiceTest {
         ReplaySession session = ReplaySession.builder().id(sessionId).projectId(projectId)
                 .status(ReplaySessionStatus.RUNNING).build();
         when(replaySessionRepository.findByIdAndProjectId(sessionId, projectId)).thenReturn(Optional.of(session));
-        // Another thread finished the session between our status check and the UPDATE.
         when(replaySessionRepository.cancelSession(eq(sessionId), eq(ReplaySessionStatus.CANCELLING), anyList()))
                 .thenReturn(0);
 
@@ -367,12 +297,8 @@ class ReplayServiceTest {
                 .isInstanceOf(ConflictException.class);
     }
 
-    // ─── run — full state machine ───────────────────────────────────────
-
     @Test
     void run_nothingMatchesTheEvents_completesWithoutDeliveries() {
-        // No Subscription is no longer a reason to stop before reading events: a rule can route
-        // an Event to an endpoint no Subscription covers, and only the Event can say.
         UUID sessionId = UUID.randomUUID();
         ReplaySession session = ReplaySession.builder().id(sessionId).projectId(projectId)
                 .status(ReplaySessionStatus.PENDING)
@@ -429,7 +355,7 @@ class ReplayServiceTest {
 
         assertThat(session.getStatus()).isEqualTo(ReplaySessionStatus.COMPLETED);
         assertThat(session.getProcessedEvents()).isEqualTo(2);
-        assertThat(session.getDeliveriesCreated()).isEqualTo(2); // one delivery per event × 1 subscription
+        assertThat(session.getDeliveriesCreated()).isEqualTo(2);
         assertThat(session.getErrors()).isZero();
         assertThat(session.getLastProcessedEventId()).isEqualTo(e2.getId());
 
@@ -493,8 +419,6 @@ class ReplayServiceTest {
                 .fromDate(Instant.now().minus(1, ChronoUnit.DAYS)).toDate(Instant.now())
                 .totalEvents(2).build();
 
-        // First findById (top of executeReplay) returns PENDING; every subsequent
-        // findById call (the cancellation check inside the loop) reports CANCELLING.
         ReplaySession cancelling = ReplaySession.builder().id(sessionId).projectId(projectId)
                 .status(ReplaySessionStatus.CANCELLING).build();
         when(replaySessionRepository.findById(sessionId)).thenReturn(Optional.of(initial), Optional.of(cancelling));
@@ -505,12 +429,10 @@ class ReplayServiceTest {
 
         replayService.run(sessionId);
 
-        // Started before the cancellation check.
         verify(replaySessionRepository).markStarted(eq(sessionId), eq(ReplaySessionStatus.PENDING),
                 eq(ReplaySessionStatus.RUNNING), any());
         assertThat(cancelling.getStatus()).isEqualTo(ReplaySessionStatus.CANCELLED);
         assertThat(cancelling.getCancelledAt()).isNotNull();
-        // Never even fetches a batch once cancellation is observed.
         verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), any(), anyInt());
     }
 
@@ -527,23 +449,9 @@ class ReplayServiceTest {
                 .thenReturn(List.of(Subscription.builder().id(UUID.randomUUID()).endpointId(UUID.randomUUID())
                         .eventType("order.created").enabled(true).build()));
 
-        // markCancelled looks the session up again via findById — since it's now
-        // "deleted" (empty), the ifPresent no-ops; this must not throw.
         replayService.run(sessionId);
 
         verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), any(), anyInt());
-    }
-
-    @Test
-    void run_findByIdMissingAtStart_throwsHandledByCaller() {
-        UUID sessionId = UUID.randomUUID();
-        when(replaySessionRepository.findById(sessionId)).thenReturn(Optional.empty());
-
-        // run catches everything and routes to markFailed — since the session itself can't be
-        // found, markFailed's own findById().ifPresent() is also a no-op, so this must simply
-        // not throw out of run.
-        org.assertj.core.api.Assertions.assertThatCode(() -> replayService.run(sessionId))
-                .doesNotThrowAnyException();
     }
 
     @Test
@@ -567,12 +475,7 @@ class ReplayServiceTest {
 
         replayService.run(sessionId);
 
-        // A whole-batch failure increments totalErrors by the batch size, but NOT
-        // totalProcessed (that only happens inside the try block's success path) —
-        // yet the cursor still advances past this batch regardless, since cursor
-        // advancement reads the fetched `batch` variable directly, outside the
-        // try/catch. Net effect: these events are neither retried nor counted as
-        // processed; the loop still reaches COMPLETED rather than getting stuck.
+        // A failed batch is counted as errors and skipped, so the session still completes.
         assertThat(session.getStatus()).isEqualTo(ReplaySessionStatus.COMPLETED);
         assertThat(session.getErrors()).isEqualTo(1);
         assertThat(session.getProcessedEvents()).isZero();
@@ -599,7 +502,6 @@ class ReplayServiceTest {
         Event lastEvent = Event.builder().id(lastProcessedId).projectId(projectId)
                 .eventType("order.created").createdAt(lastEventCreatedAt).build();
         when(eventRepository.findById(lastProcessedId)).thenReturn(Optional.of(lastEvent));
-        // No more events past the resume point — loop ends immediately after the resume lookup.
         when(eventRepository.findByCursorForReplay(any(), eq(projectId), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
 

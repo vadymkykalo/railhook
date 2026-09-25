@@ -10,17 +10,7 @@ import { http } from '../api/http';
 import { showApiError } from '../lib/toast';
 import { cn } from '../lib/utils';
 
-/**
- * Which organization you are looking at, for the people who are in more than one.
- *
- * <p>Accepting a second invite used to be silent: the backend listed both organizations and
- * login always minted a token for the oldest membership, so the second one was unreachable
- * from the dashboard however many times you accepted.
- *
- * Rendered only when there is a choice to make. A switcher over a list of one is a control
- * that answers a question nobody asked, so with a single organization the sidebar keeps the
- * plain name it always had.
- */
+/** Rendered only with more than one organization. */
 export default function OrganizationSwitcher({ collapsed }: { collapsed?: boolean }) {
   const { t } = useTranslation();
   const { user, login } = useAuth();
@@ -65,15 +55,11 @@ export default function OrganizationSwitcher({ collapsed }: { collapsed?: boolea
     setSwitchingTo(organizationId);
     try {
       const { accessToken } = await authApi.switchOrganization(organizationId);
-      // The token has to be in place before /auth/me is asked anything, or the answer comes
-      // back describing the organization we are trying to leave.
+      // The token must be set before /auth/me, or it answers for the organization being left.
       http.setToken(accessToken);
       const me = await authApi.getCurrentUser();
       login(accessToken, me);
-      // Everything cached is scoped to the organization we just left — projects, endpoints,
-      // deliveries, every count on the dashboard. Dropping the lot is the only honest option;
-      // invalidating selectively would leave whichever list nobody thought of showing the old
-      // organization's rows under the new organization's name.
+      // Every cached query is org-scoped; selective invalidation would leak the old org's rows.
       queryClient.clear();
       setOpen(false);
       navigate('/admin/dashboard');
@@ -87,7 +73,7 @@ export default function OrganizationSwitcher({ collapsed }: { collapsed?: boolea
   const menu = open && (
     <div
       className={cn(
-        'absolute bottom-full z-50 mb-1 overflow-hidden rounded-lg border border-rail bg-popover shadow-elevated animate-scale-in',
+        'absolute bottom-full z-50 mb-1 overflow-hidden border border-rail bg-popover shadow-elevated animate-scale-in',
         collapsed ? 'left-0 w-56' : 'left-0 right-0'
       )}
     >
@@ -103,9 +89,9 @@ export default function OrganizationSwitcher({ collapsed }: { collapsed?: boolea
                 onClick={() => handleSwitch(organization.id)}
                 disabled={!!switchingTo}
                 className={cn(
-                  'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60',
+                  'flex w-full items-center gap-2.5 px-2 py-1.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60',
                   current
-                    ? 'bg-accent/60 font-medium text-foreground'
+                    ? 'bg-accent font-medium text-accent-foreground'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 )}
               >

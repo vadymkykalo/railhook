@@ -9,10 +9,6 @@ import { createTestQueryClient } from '../../../test/renderPage';
 import { NOTICE_KEY } from '../../../lib/consent';
 import SiteOverlays from '../SiteOverlays';
 
-/**
- * The cookie notice and the message widget over the public pages. Each appears only where it
- * means something: the notice where analytics runs, the widget where support has an address.
- */
 function renderAt(path = '/') {
   return render(
     <QueryClientProvider client={createTestQueryClient()}>
@@ -100,8 +96,7 @@ describe('the closed widget', () => {
     renderAt();
     const panel = document.querySelector('[role="dialog"]') as HTMLElement;
     expect(panel).toHaveAttribute('hidden');
-    // The attribute alone lost to a responsive display class, and the phone-sized sheet then
-    // swallowed every tap on the page behind it.
+    // The attribute alone lost to a responsive display class and the sheet swallowed every tap.
     expect(panel.className).toContain('hidden');
     expect(panel.className).not.toContain('max-sm:fixed');
 

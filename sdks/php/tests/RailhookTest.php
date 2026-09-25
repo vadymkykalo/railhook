@@ -32,8 +32,7 @@ class RailhookTest extends TestCase
     public function testUsesDefaultBaseUrl(): void
     {
         $client = new Railhook('test_api_key');
-        
-        // We can't directly test private property, but we can verify client creates successfully
+
         $this->assertInstanceOf(Railhook::class, $client);
     }
 

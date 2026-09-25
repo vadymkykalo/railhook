@@ -15,11 +15,7 @@ public enum AuditAction {
     PASSWORD_RESET,
     PASSWORD_CHANGED,
 
-    /*
-     * The address an account signs in with. Recorded against every organization the person
-     * belongs to, so an owner sees a member's address change — pending, done or called off —
-     * and sees an account hammering the caps, which is what an abuse of the feature looks like.
-     */
+    // Recorded against every organization the person belongs to.
     EMAIL_CHANGE_REQUESTED,
     EMAIL_CHANGED,
     EMAIL_CHANGE_CANCELLED,
@@ -33,46 +29,21 @@ public enum AuditAction {
     INVITE_ACCEPTED,
     RESOLVE_INCIDENT,
 
-    /*
-     * Bulk operations over stored deliveries. They were unaudited, which mattered most for
-     * the destructive one: DLQ_PURGE deletes every abandoned delivery in a project and left
-     * no record of who asked. REPLAY is the other side of the same coin — it manufactures new
-     * deliveries in bulk, so "why did our customer suddenly receive four thousand webhooks"
-     * had no answer either.
-     */
     REPLAY,
     DLQ_RETRY,
     DLQ_PURGE,
 
-    /*
-     * Putting a stored earlier version of something back in place — today, a Transformation's
-     * template. Distinct from UPDATE although its effect is one: a restore is the change nobody
-     * typed, so "the mapping went back to what it was in March and none of us edited it" needs an
-     * entry that says so rather than an edit that looks like every other edit.
-     */
+    // Distinct from UPDATE so a restore nobody typed is visible as such.
     RESTORE,
 
-    // Operator actions. Not a tenant's own doing, which is exactly why they are worth a row:
-    // the audit log is where a customer's "why did this stop working" gets answered.
     ORGANIZATION_SUSPENDED,
     ORGANIZATION_REINSTATED,
-    // Any request to the platform admin API — reads included, because reading another
-    // organization's members is the sensitive act there. Recorded under the system tenant.
+    // Reads included. Recorded under the system tenant.
     PLATFORM_ADMIN_ACCESS,
 
-    /*
-     * The data-protection rights, which have to be answerable to someone who was not there:
-     * who asked, when, and did it work. ORGANIZATION_DELETED is Article 17 and destroys every
-     * row a customer has; DATA_EXPORTED is Article 20 and puts them all into one file that
-     * somebody then carries around. Both were invisible — the erasure left only a log line,
-     * and a log line is on a retention clock of its own.
-     */
     ORGANIZATION_DELETED,
     DATA_EXPORTED,
 
-    /**
-     * Article 17 again, for one person rather than a whole customer. The row survives with no
-     * person attached to it, so this entry is the only thing that says the erasure happened.
-     */
+    // The erased user row survives with no person attached, so this entry is the only record.
     USER_ERASED
 }

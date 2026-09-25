@@ -16,33 +16,17 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * The two mails a new account gets on a deployment that turned them on: a welcome when its
- * address is proven, and one nudge two days later if its organization has still sent and received
- * nothing.
- *
- * <p>Off by default ({@code ONBOARDING_EMAILS_ENABLED}). They are written in the first person by
- * Railhook's author, which is right for Railhook Cloud and wrong for a self-hosted install mailing
- * its own users.
- *
- * <p>Each is sent at most once, and the timestamp on the user is what says so. It is written
- * before the mail goes, so a crash between the two loses a mail rather than sending it twice —
- * the right way round for mail nobody asked for.
+ * Off by default: the mails speak as Railhook's author, which suits Cloud, not self-hosting.
+ * The sent timestamp is written first, so a crash loses a mail rather than sending it twice.
  */
 @Service
 @Slf4j
 public class OnboardingMailService {
 
-    /** How long after the welcome an account that has done nothing is asked whether it is stuck. */
     static final Duration NUDGE_AFTER = Duration.ofHours(48);
 
-    /**
-     * Accounts taken per query, so one run never holds an unbounded list. Small on purpose: the
-     * nudges share the mail provider's daily quota with verification and password-reset mails, and
-     * a nudge that waits an hour loses nothing.
-     */
+    // Nudges share the daily mail quota with verification and reset mails: at most ten an hour.
     static final int BATCH_SIZE = 10;
-
-    /** Batches per run; whatever is left waits for the next run. At most ten nudges an hour. */
     static final int MAX_BATCHES = 1;
 
     private final UserRepository userRepository;
@@ -60,14 +44,7 @@ public class OnboardingMailService {
         this.enabled = enabled;
     }
 
-    /**
-     * Welcomes an account whose address has just been proven, unless it was welcomed already or
-     * this deployment does not send onboarding mail.
-     *
-     * <p>Called inside the transaction that verifies the address: the timestamp is written with
-     * it, and the mail goes only once that transaction commits, so a verification that rolls back
-     * sends nothing.
-     */
+    // The mail goes only after the verifying transaction commits, so a rollback sends nothing.
     public void welcome(User user) {
         if (!enabled
                 || user.getOnboardingWelcomeSentAt() != null
@@ -80,11 +57,6 @@ public class OnboardingMailService {
         afterCommit(() -> emailService.sendWelcomeEmail(to));
     }
 
-    /**
-     * Nudges every account that is due: verified, welcomed at least two days ago, not nudged yet,
-     * owning an organization that is not suspended, and a member of none that has sent or received
-     * an event. Returns how many were nudged.
-     */
     @SystemTenant("new accounts across every organization, found by what their organizations have not done yet")
     public int sendDueNudges() {
         if (!enabled) {
@@ -95,7 +67,7 @@ public class OnboardingMailService {
             Instant now = Instant.now(clock);
             List<UUID> due = userRepository.findDueOnboardingNudges(now.minus(NUDGE_AFTER), BATCH_SIZE);
             for (UUID userId : due) {
-                // Claimed one at a time: a row another replica already claimed updates nothing.
+                // A row another replica already claimed updates nothing.
                 if (userRepository.markOnboardingNudgeSent(userId, now) == 1) {
                     userRepository.findById(userId)
                             .ifPresent(user -> emailService.sendOnboardingNudgeEmail(user.getEmail()));

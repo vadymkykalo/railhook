@@ -10,8 +10,8 @@ from any provider, with every delivery on record.**
 
 [![Latest release](https://img.shields.io/github/v/release/vadymkykalo/railhook?label=release)](https://github.com/vadymkykalo/railhook/releases/latest)
 [![CI](https://github.com/vadymkykalo/railhook/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/railhook/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-1D4BFF.svg)](./LICENSE)
-[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Frailhook-1D4BFF?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=railhook)
+[![License: MIT](https://img.shields.io/badge/license-MIT-000000.svg)](./LICENSE)
+[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Frailhook-000000?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=railhook)
 
 <a href="https://www.saashub.com/railhook?utm_source=badge&utm_campaign=badge&utm_content=railhook&badge_variant=color&badge_kind=approved"><img src="https://cdn-b.saashub.com/img/badges/approved-color.png?v=1" alt="Railhook on SaaSHub" height="40"></a>
 
@@ -27,124 +27,75 @@ from any provider, with every delivery on record.**
 
 ## Install
 
+With Docker and Compose v2 (about 4 GiB of RAM):
+
 ```bash
-curl -fsSL https://railhook.io/install.sh | bash
+mkdir railhook && cd railhook
+curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/railhook/main/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/.env.dist -o .env
+# Replace the example secrets with your own, and turn on the bundled Postgres.
+for v in WEBHOOK_ENCRYPTION_KEY WEBHOOK_ENCRYPTION_SALT JWT_SECRET REDIS_PASSWORD; do
+  sed -i "s|^$v=.*|$v=$(openssl rand -hex 32)|" .env
+done
+db=$(openssl rand -hex 24)
+sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$db|; s|^DB_PASSWORD=.*|DB_PASSWORD=$db|" .env
+echo "COMPOSE_PROFILES=embedded-db" >> .env
+docker compose up -d
 ```
 
-On a server with a domain pointed at it, get HTTPS in the same step:
+Open http://localhost:8080 and register. The first account is active immediately.
+
+Or run the installer. It does the same, pins the latest release and adds a `./railhook` helper
+(`status`, `logs`, `upgrade`, `backup`, `doctor`):
 
 ```bash
+curl -fsSL https://railhook.io/install.sh | bash
+# on a server with a domain, with HTTPS:
 curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --email ops@example.com
 ```
 
-Already running a reverse proxy? Add `--behind-proxy` instead of `--email`. Then point the proxy at `127.0.0.1:8080`.
+## Send an event
 
-Open **http://localhost** and register — the first account is active immediately.
+Create a project, an endpoint and an API key in the UI, then:
 
-- Checks the machine first: Docker with Compose v2, about 4 GiB of RAM, 5 GiB of disk, a free port.
-- Writes a Compose file pinned to the latest release and a `.env` with freshly generated secrets.
-- Starts everything behind one port. Day two is `./railhook status | logs | upgrade | backup | doctor`.
-
-Rather not run it yourself? Railhook Cloud at https://railhook.io is free right now (10,000 events
-a month, 3 projects, 7 days of history). Paid plans with support and higher limits will come later.
+```bash
+curl -X POST http://localhost:8080/api/v1/events \
+  -H "X-API-Key: $RAILHOOK_API_KEY" \
+  -H "Idempotency-Key: order-12345-completed" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"order.completed","data":{"orderId":"ord_12345"}}'
+```
 
 ## What it does
 
-**Outgoing** — your app announces an event; Railhook gets it to every endpoint that subscribed.
+- Sends each event to every endpoint subscribed to its type. The event is stored in the same
+  transaction as the API call, then delivered through Kafka.
+- Retries a failed delivery after 1m, 5m, 15m, 1h, 6h and 24h (7 attempts). What still fails
+  goes to Failed Messages for bulk retry.
+- Signs every request with HMAC-SHA256 in [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks)
+  headers. A rotated secret keeps signing alongside the new one for 24 hours.
+- Deduplicates on `Idempotency-Key`: a repeated key returns the first event instead of a new one.
+- Optional per-endpoint ordering, rate limits and a circuit breaker.
+- Customer portal: embed a page where your customers add endpoints, pick event types, and see and
+  retry their deliveries.
+- Replay: resend one delivery, or replay a time range of events as new deliveries.
+- Incoming webhooks: one URL per source, signature verified (Stripe, GitHub, GitLab, Shopify,
+  Slack, Twilio, Square, Adyen, SendGrid, HubSpot, or generic HMAC), raw request stored, then
+  forwarded to your destinations with retries after 1m, 5m, 15m, 1h and 6h.
+- Every attempt is recorded with its request, response and timing.
+- SDKs for [Node](sdks/node), [Python](sdks/python) and [PHP](sdks/php), a [CLI](railhook-cli)
+  that tunnels webhooks to `localhost`, and an MCP server at `/mcp`.
+- Prometheus metrics, Grafana dashboards and alert rules in [`monitoring/`](monitoring), and a
+  [Helm chart](deploy/helm/railhook).
 
-- An accepted event is never lost: it is recorded in the same transaction as your write.
-- Customers verify every request — Standard Webhooks headers, with secret rotation.
-- Failures retry on a schedule that runs for more than a day, then land in Failed Messages for bulk retry.
-- Deliveries to one endpoint can arrive in the order the events happened.
-- Time Machine replays a past range as fresh deliveries.
-- Every attempt is on record with the response it got.
+## Docs
 
-**Incoming** — a provider posts to a URL you own; Railhook checks it and forwards it on.
-
-- Stripe, GitHub, GitLab, Shopify, Slack, Twilio, Square, Adyen, SendGrid and HubSpot are verified out of the box; generic HMAC covers the rest.
-- Each incoming event is kept as it arrived; a provider's repeat of the same event is not forwarded twice.
-- Forwards reach your destinations with their own retries and Failed Messages.
-
-## Everything in the box
-
-| | |
-|---|---|
-| **Delivery** | Retry ladder · per-endpoint ordering · rate limits · shared circuit breaker |
-| **Customer portal** | Embed a portal where your own customers register endpoints, pick event types, and see and retry their deliveries — in your brand colours |
-| **Recovery** | Failed Messages with bulk retry · Time Machine replay |
-| **Signing** | HMAC-SHA256 in [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks) and legacy headers · secret rotation |
-| **Shaping** | Rules · JSONPath transformations · schema registry · workflows · wildcard subscriptions |
-| **Developing** | CLI tunnel to `localhost` · test endpoints · transformation preview · delivery dry-run · [free webhook tester](https://railhook.io/tester) |
-| **AI agents** | MCP server at `/mcp` — Claude, Cursor or any MCP client can send events, manage endpoints and replay deliveries |
-| **Security** | Tenant isolation · AES-256-GCM secrets at rest · SSRF protection · mTLS · PII masking · audit log |
-| **Access** | Organizations and projects · Owner / Developer / Viewer roles · API keys |
-| **Operating** | Prometheus metrics · Grafana dashboards · 22 alert rules · data retention · GDPR export · Helm chart |
-
-## Architecture
-
-```
-Outgoing   your app ──▶ api ──▶ outbox (same txn) ──▶ Kafka ──▶ worker ──▶ endpoint
-                                                        ▲                     │
-                                                        └─── retry ladder ◀───┘
-                                                        1m 5m 15m 1h 6h 24h → DLQ
-
-Incoming   provider ──▶ /ingress/{token} ──▶ verify signature ──▶ Kafka ──▶ worker ──▶ destination
-```
-
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) covers the attempt lifecycle, Claims, ordering,
-tenancy and the failure modes; [`CONTEXT.md`](CONTEXT.md) is the vocabulary it uses.
-
-## SDKs
-
-| Language | Install | Source |
-|---|---|---|
-| Node.js | `npm i @railhook/node` | [`sdks/node`](sdks/node) |
-| Python | `pip install railhook` | [`sdks/python`](sdks/python) |
-| PHP | `composer require railhook/php` | [`sdks/php`](sdks/php) |
-
-Each sends events, manages endpoints and verifies signatures, authenticating with `X-API-Key`.
-See [SDKs](https://railhook.io/docs/tools/sdks/).
-
-## CLI
-
-```bash
-curl -fsSL https://railhook.io/install-cli.sh | bash
-```
-
-Receive webhooks on `localhost` while you develop — `railhook login`, then `railhook listen 3000`.
-`railhook events <projectId> --follow` tails events; `railhook replay <projectId> --dry-run` previews a replay.
-Install and usage: [CLI docs](https://railhook.io/docs/tools/cli/).
-
-## AI agents (MCP)
-
-Railhook serves the Model Context Protocol at `/mcp`, authenticated with a project API key:
-
-```bash
-claude mcp add --transport http railhook https://railhook.io/mcp \
-  --header "Authorization: Bearer $RAILHOOK_API_KEY"
-```
-
-Clients that only speak stdio run `npx -y @railhook/mcp`. Setup for Cursor and Claude Desktop:
-[MCP docs](https://railhook.io/docs/tools/mcp/).
-
-## Documentation
-
-- [Quickstart](https://railhook.io/docs/start/quickstart/)
-- [Self-hosting overview](https://railhook.io/docs/self-hosting/overview/)
-- [Configuration](https://railhook.io/docs/self-hosting/configuration/)
-- [API reference](https://railhook.io/docs/api-reference/)
-
-For contributors and operators: [Architecture](docs/ARCHITECTURE.md) ·
-[Operations](docs/OPERATIONS.md) · [Upgrading](UPGRADING.md) · [Roadmap](ROADMAP.md) ·
-[all repository docs](docs/README.md).
-
-## Contributing
-
-Bug reports, docs fixes and features are welcome. [`CONTRIBUTING.md`](CONTRIBUTING.md) covers setup,
-the branch to target (`develop`) and the checks CI runs. Report vulnerabilities privately per
-[`SECURITY.md`](SECURITY.md).
+- [Documentation](https://railhook.io/docs/) and [API reference](https://railhook.io/docs/api-reference/)
+- [Changelog](CHANGELOG.md), [Upgrading](UPGRADING.md)
+- [Architecture](docs/ARCHITECTURE.md), [Operations](docs/OPERATIONS.md),
+  [Contributing](CONTRIBUTING.md), [Security](SECURITY.md)
 
 ## License
 
-[MIT](./LICENSE) © Vadym Kykalo. Self-hosted gets every feature — no licence key, no paid tier.
-Third-party attributions: [`NOTICE`](./NOTICE), [`docs/licenses/`](docs/licenses/).
+[MIT](LICENSE). Self-hosted has every feature, with no licence key. Third-party notices:
+[`NOTICE`](NOTICE), [`docs/licenses/`](docs/licenses/).

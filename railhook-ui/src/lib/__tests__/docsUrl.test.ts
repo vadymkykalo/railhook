@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { docsUrl } from '../docsUrl';
 
-/**
- * The docs are a separate site at /docs/ with an English root and a /docs/uk/ copy. A link
- * from the dashboard has to be a real page load (the SPA has no /docs route any more) and
- * should land in the reader's language rather than always in English.
- */
 describe('docsUrl', () => {
   it('addresses the docs home with a trailing slash', () => {
     expect(docsUrl('en')).toBe('/docs/');

@@ -23,14 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
-/**
- * Both native queries below partition on {@code COALESCE(project_id::text, kafka_key)}.
- * Hibernate's native-query parameter parser treats {@code :text} as a named
- * parameter placeholder — it doesn't understand Postgres's {@code ::} cast —
- * so this must run against a real Postgres via Hibernate, not be asserted as
- * a string. A mocked repository (as in OutboxPublisherServiceTest) can't
- * catch this class of bug.
- */
+// Hibernate parses ::text as a named parameter, so this must run against real Postgres.
 public class OutboxMessageRepositoryTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -42,12 +35,6 @@ public class OutboxMessageRepositoryTest extends AbstractIntegrationTest {
     @Autowired
     private EntityManager entityManager;
 
-    /**
-     * The bulk updates below are {@code @Modifying} and need a transaction, exactly as they get
-     * one in {@code OutboxPublisherService} — which uses a TransactionTemplate rather than
-     * {@code @Transactional} so that self-invocation cannot bypass the proxy. Same here, and for
-     * the same reason it has to be a real one: these assertions are about what Postgres did.
-     */
     private int inTransaction(java.util.function.IntSupplier update) {
         int rows = new TransactionTemplate(transactionManager).execute(tx -> update.getAsInt());
         entityManager.clear();
@@ -66,8 +53,7 @@ public class OutboxMessageRepositoryTest extends AbstractIntegrationTest {
 
     @Test
     void findPendingBatchForUpdate_shouldReturnRowWithNullProjectId() {
-        // COALESCE's fallback arm (kafka_key) — the ingress/incoming path can
-        // write outbox rows with no project_id.
+        // No project_id: the ingress path writes outbox rows keyed only by kafka_key.
         OutboxMessage message = outboxMessageRepository.save(pendingMessage(null));
 
         List<OutboxMessage> batch = outboxMessageRepository.findPendingBatchForUpdate(
@@ -91,11 +77,7 @@ public class OutboxMessageRepositoryTest extends AbstractIntegrationTest {
 
     @Test
     void recoverStuckSendingMessages_countsTheAttemptItIsUndoing() {
-        // Without this the row cycles PENDING -> SENDING -> PENDING for ever. Recovery is the
-        // only path out of SENDING, promoteExhaustedToDead only looks at FAILED, and nothing
-        // else touches retry_count — so a message that never gets a callback inside
-        // batchSendTimeoutSeconds is immortal, and nothing says so beyond a queue-depth gauge.
-        // Not an exotic case: that timeout is 30s and Kafka's own delivery.timeout.ms is 120s.
+        // Otherwise the row cycles PENDING -> SENDING -> PENDING forever.
         OutboxMessage stuck = pendingMessage(UUID.randomUUID());
         stuck.setStatus(OutboxStatus.SENDING);
         OutboxMessage saved = outboxMessageRepository.saveAndFlush(stuck);
@@ -111,10 +93,6 @@ public class OutboxMessageRepositoryTest extends AbstractIntegrationTest {
 
     @Test
     void aRowThatNeverGetsASendOutcomeStopsCyclingOnceItsRetriesAreSpent() {
-        // Counting the recovery was half the fix: the PENDING claim ignores retry_count and
-        // promoteExhaustedToDead only looks at FAILED, so the count grew and the row still cycled
-        // PENDING -> SENDING -> PENDING for ever. Driven through the publisher's own retry cycle,
-        // with a real database, because the claim, the recovery and the promotion have to agree.
         int maxRetries = 5;
         OutboxPublisherService publisher = new OutboxPublisherService(
                 outboxMessageRepository, mock(KafkaTemplate.class),
@@ -141,10 +119,7 @@ public class OutboxMessageRepositoryTest extends AbstractIntegrationTest {
 
     @Test
     void batchMarkPublished_leavesARowSomebodyElseHasReclaimed() {
-        // A Kafka callback that arrives after the batch wait is not discarded — it lands in the
-        // next cycle's update. By then the row it names may have been recovered to PENDING and
-        // re-claimed as SENDING by a later cycle, and stamping the old outcome onto it loses
-        // whatever that cycle was doing. Only a row this batch still holds may be settled.
+        // A late Kafka callback must not settle a row a later cycle has re-claimed.
         OutboxMessage reclaimed = pendingMessage(UUID.randomUUID());
         reclaimed.setStatus(OutboxStatus.PENDING);
         OutboxMessage saved = outboxMessageRepository.saveAndFlush(reclaimed);

@@ -7,7 +7,6 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 
-/** The `kafka:` service block of docker-compose.yml, up to the next top-level service. */
 function kafkaService(): string {
   const compose = read('docker-compose.yml');
   const start = compose.indexOf('\n  kafka:\n');
@@ -29,15 +28,7 @@ function toMiB(size: string): number {
   }
 }
 
-/**
- * The broker's heap is sized for the container it runs in.
- *
- * Left unset, the apache/kafka start script sets `-Xmx1G -Xms1G`: the whole default 1G container
- * limit, committed at start-up, with nothing left for metaspace, 100 threads and network buffers.
- * Production sat at 91% of the limit on a near-idle broker and alerted — one allocation spike from
- * an OOM kill, which takes every delivery down while Kafka restarts. A single broker serving
- * webhook traffic keeps its data in the page cache, not the heap, so half the limit is plenty.
- */
+/** The image's default -Xmx1G is the whole container limit; the broker lives on the page cache. */
 describe('Kafka heap', () => {
   it('is set explicitly, with a default well inside the default container limit', () => {
     const service = kafkaService();

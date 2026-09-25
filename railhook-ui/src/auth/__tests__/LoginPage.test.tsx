@@ -16,11 +16,6 @@ const USER = {
   role: 'OWNER',
 } as unknown as CurrentUserResponse;
 
-/**
- * The one screen every user meets, and the one that had no test at all. What matters here is
- * the order: the token has to reach the http client before getCurrentUser is called, or that
- * call goes out unauthenticated and a correct password looks like a failed sign-in.
- */
 describe('LoginPage', () => {
   let login: Mock<AuthState['login']>;
 
@@ -94,13 +89,9 @@ describe('LoginPage', () => {
   });
 
   it('has the token in place before it asks who the user is', async () => {
-    // getCurrentUser goes out on the shared http client. If the token is set after this call
-    // rather than before it, the request is anonymous, the 401 path runs, and a correct
-    // password presents as a failed sign-in.
+    // The token must be set before getCurrentUser, or a correct password looks like a failed sign-in.
     vi.spyOn(authApi, 'login').mockResolvedValue({ accessToken: 'the-token' } as never);
-    // Captured at call time and asserted afterwards. An expect() inside the mock would reject
-    // the promise instead of failing the test, and LoginPage would swallow it as a sign-in
-    // error — the assertion would never be seen.
+    // An expect() inside the mock would be swallowed by LoginPage as a sign-in error.
     let tokenWhenAsked: string | null | undefined;
     const whoAmI = vi.spyOn(authApi, 'getCurrentUser').mockImplementation(async () => {
       tokenWhenAsked = http.getToken();
@@ -128,9 +119,7 @@ describe('LoginPage', () => {
   });
 
   it('says the page\'s address was refused, not that the person lacks permission, on a 403', async () => {
-    // Spring answers a sign-in from an origin missing from CORS_ALLOWED_ORIGINS with a bare
-    // 403 "Invalid CORS request". It read as "You don't have permission" — to someone who has
-    // not signed in yet, about an account that is fine.
+    // Spring's bare 403 for an unlisted origin read as "no permission".
     vi.spyOn(authApi, 'login').mockRejectedValue({
       response: { status: 403, data: 'Invalid CORS request' },
     });
@@ -149,7 +138,6 @@ describe('LoginPage', () => {
     renderLogin();
     await signIn();
 
-    // A failure with no response body must not render an empty alert.
     const alert = await screen.findByRole('alert');
     expect(alert.textContent?.trim()).not.toBe('');
   });

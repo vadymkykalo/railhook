@@ -29,10 +29,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Sending a delivery again by hand must never overlap an Attempt already under way. Needs a real
- * database because the bulk path selects its rows through a Specification.
- */
+// Needs a real database: the bulk path selects its rows through a Specification.
 class DeliveryReplayIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private DeliveryService deliveryService;

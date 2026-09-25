@@ -20,14 +20,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 public class AsyncConfig {
 
     /**
-     * Async work inherits the tenant scope of whoever submitted it — see
-     * {@link TenantPropagatingTaskDecorator}. Every executor here gets it: a pool whose tasks
-     * started with no scope would fail on its first query.
-     *
-     * <p>{@code TaskDecorator} is a Spring hook, so it reaches these beans and nothing else. A
-     * pool built with {@code Executors.new*} elsewhere needs
-     * {@link TenantPropagatingTaskDecorator#wrap} instead, which
-     * {@code HandBuiltExecutorTenantPropagationTest} enforces.
+     * Every executor here needs it: a task that starts with no tenant scope fails on its first
+     * query. A pool built with {@code Executors.new*} needs {@link TenantPropagatingTaskDecorator#wrap}
+     * instead.
      */
     private static final TenantPropagatingTaskDecorator TENANT_DECORATOR = new TenantPropagatingTaskDecorator();
 
@@ -47,14 +42,8 @@ public class AsyncConfig {
     }
 
     /**
-     * Bounded thread pool for workflow execution.
-     * - Core/Max threads limit concurrent workflow executions
-     * - Queue buffers bursts
-     * - When full: DISCARD + log warning (never block the caller thread!)
-     *   CallerRunsPolicy is catastrophic here because the caller thread often holds
-     *   a DB transaction — blocking it for minutes would exhaust the DB connection pool
-     * - Prevents OOM from unbounded thread creation
-     * - Graceful shutdown: waits for in-flight workflows before stopping
+     * Never CallerRunsPolicy: the caller often holds a DB transaction, and blocking it for
+     * minutes would exhaust the connection pool.
      */
     @Bean(name = "workflowTaskExecutor")
     public Executor workflowTaskExecutor(
@@ -73,18 +62,9 @@ public class AsyncConfig {
             log.warn("Workflow task rejected (pool overloaded): active={}, queue={}/{}. " +
                             "Deferring the outbox row — increase pool size or reduce load.",
                     pool.getActiveCount(), pool.getQueue().size(), queueCapacity);
-            // Throw, don't just log. A handler that returns normally is what
-            // ThreadPoolExecutor treats as "handled", so execute() returned normally and the
-            // caller could not tell the task had been dropped: WorkflowTriggerOutboxService's
-            // `catch (TaskRejectedException)` was unreachable, its outbox row stayed
-            // PROCESSING forever (claimBatch only selects PENDING), and the per-project
-            // in-flight counter — decremented in the discarded task's finally — leaked one
-            // per rejection until that project was throttled for good.
-            //
-            // Spring wraps this in TaskRejectedException, which the caller returns to PENDING
-            // for the next poll. Discarding is still the policy; the caller now gets to act
-            // on it. Blocking the caller (CallerRunsPolicy) stays off the table for the
-            // reason above: it often holds a DB transaction.
+            // Must throw: if the handler returns normally, execute() does too and the caller
+            // cannot tell the task was dropped. Spring wraps this in TaskRejectedException, and
+            // the outbox caller puts its row back to PENDING.
             throw new RejectedExecutionException(
                     "workflowTaskExecutor is saturated: active=" + pool.getActiveCount()
                             + ", queue=" + pool.getQueue().size() + "/" + queueCapacity);
@@ -96,10 +76,7 @@ public class AsyncConfig {
         return executor;
     }
 
-    /**
-     * Bounded executor for tunnel ingress metering + request logging.
-     * Best-effort: if queue is full, silently discard (metering is non-critical).
-     */
+    /** Best-effort: when the queue is full the task is dropped. */
     @Bean(name = "tunnelMeteringExecutor")
     public Executor tunnelMeteringExecutor(MeterRegistry meterRegistry) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();

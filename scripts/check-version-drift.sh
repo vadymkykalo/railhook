@@ -1,30 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Fails when the version recorded in the reactor poms disagrees with the
-# Helm chart, the UI package.json, any of the three SDK manifests, the MCP
-# bridge's package.json, or (when
-# HEAD sits exactly on a release tag) the tag itself.
-#
-# This exists because five sources of truth silently drifted apart for
-# months: root pom.xml frozen at 1.0.0-SNAPSHOT while eight tags were cut,
-# Chart.yaml and ui/package.json never touched at all.
-#
-# Usage:
-#   scripts/check-version-drift.sh
-#
-# Run locally with `make version-check`; CI runs it on every push/PR via the
-# `version-check` job in .github/workflows/ci.yml.
+# Fails when the reactor poms, the Helm chart, the UI package.json, the SDK manifests, the MCP
+# bridge's package.json or (when HEAD sits on a release tag) the tag disagree on the version.
 
 cd "$(git rev-parse --show-toplevel)"
 
-# The root pom has no <parent>, so its own <version> is reliably the first
-# <version> tag in the file (every subsequent one belongs to a dependency or
-# plugin).
+# The root pom has no <parent>, so its own <version> is the first <version> in the file.
 pom_version=$(grep -m1 '<version>' pom.xml | sed -E 's/.*<version>([^<]+)<\/version>.*/\1/')
-# develop legitimately runs a version ahead of the last release between
-# release branches (see CONTRIBUTING.md's Release Process) — strip any
-# -SNAPSHOT suffix before comparing so that's not reported as drift.
+# develop legitimately runs a -SNAPSHOT ahead of the last release.
 pom_compare="${pom_version%-SNAPSHOT}"
 
 chart_version=$(grep -E '^version:' deploy/helm/railhook/Chart.yaml | awk '{print $2}')
@@ -57,10 +41,7 @@ check() {
   fi
 }
 
-# The SDKs carry the version in code too — each client builds its User-Agent
-# from it, and Python exposes it as __version__. These were unmanaged until
-# they had drifted two minor versions behind the manifests, which is exactly
-# the class of drift this script exists to catch.
+# The SDKs carry the version in code too: the User-Agent, and Python's __version__.
 node_sdk_const=$(sed -nE "s/^const SDK_VERSION = '(.*)';/\1/p" sdks/node/src/client.ts)
 python_sdk_const=$(sed -nE 's/^SDK_VERSION = "(.*)"/\1/p' sdks/python/railhook/client.py)
 python_dunder=$(sed -nE 's/^__version__ = "(.*)"/\1/p' sdks/python/railhook/__init__.py)
@@ -80,9 +61,6 @@ check "sdks/python/railhook/client.py SDK_VERSION" "$python_sdk_const"
 check "sdks/python/railhook/__init__.py __version__" "$python_dunder"
 check "sdks/php/src/Railhook.php SDK_VERSION" "$php_sdk_const"
 
-# If HEAD is exactly on a release tag (vX.Y.Z), that tag must match too —
-# this is what would have caught v2.2.0/v2.2.1 being tagged while every pom
-# still said 1.0.0-SNAPSHOT.
 if tag=$(git describe --tags --exact-match 2>/dev/null); then
   tag_version="${tag#v}"
   echo "git tag (exact match on HEAD): $tag -> $tag_version"

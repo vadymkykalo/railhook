@@ -17,11 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.concurrent.Executor;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 
-/**
- * Carries one public request through a developer's tunnel to their machine, and records what it
- * cost. Admission — is the tunnel up, is the caller within its rate limit, is the body small
- * enough — is decided here, so a refusal never reaches the CLI.
- */
+/** Admission (tunnel up, rate limit, body size) is decided here, so a refusal never reaches the CLI. */
 @Service
 @Slf4j
 public class TunnelIngressService {
@@ -29,7 +25,6 @@ public class TunnelIngressService {
     private static final int MAX_BODY_SIZE = 512 * 1024;
     private static final int RATE_LIMIT_PER_SECOND = 10;
 
-    /** Either the CLI answered, or it never got the request and this says why. */
     public sealed interface Outcome {
 
         record Answered(TunnelResponseMessage response) implements Outcome {
@@ -84,11 +79,8 @@ public class TunnelIngressService {
             return refuse("payload_too_large", "payload_too_large", "Request body exceeds maximum size");
         }
 
-        // A tunnel request authenticates nothing — the slug in the URL is the only thing naming an
-        // organization — so the session lookup runs unscoped. It used to happen only afterwards,
-        // for metering; it now happens first, because a suspended organization's tunnel is
-        // refused here, where the interceptor that refuses its writes never runs. It is also what
-        // refuses a closed tunnel whose socket has not gone yet: only an ACTIVE session is returned.
+        // Unscoped: the slug is the only thing naming an organization. Suspension is refused here
+        // because the write interceptor never runs on this path.
         TunnelSession session;
         try {
             session = TenantContext.callAsSystem(() -> tunnelService.getActiveBySlug(slug));
@@ -105,7 +97,7 @@ public class TunnelIngressService {
         TunnelResponseMessage response = redisTunnelCoordinator.forwardRequest(slug, request);
         int durationMs = (int) (System.currentTimeMillis() - startMs);
 
-        // Bytes, which is what bandwidth is billed in; a String's length counts characters.
+        // Bandwidth is billed in bytes, not characters.
         int requestSize = body != null ? body.length : 0;
         byte[] responseBody = response != null ? response.bodyBytes() : null;
         int responseSize = responseBody != null ? responseBody.length : 0;
@@ -128,12 +120,7 @@ public class TunnelIngressService {
         return new Outcome.Refused(error, message);
     }
 
-    /**
-     * Best-effort, off the response path.
-     *
-     * <p>Runs inside the organization that owns the tunnel. Without that, the save fails on an
-     * unresolved tenant and metering quietly stops.
-     */
+    /** Runs inside the tunnel owner's organization, or the save fails on an unresolved tenant. */
     private void recordAsync(TunnelSession session, String slug, TunnelRequestMessage request, int requestSize,
             int responseSize, TunnelResponseMessage response, int durationMs) {
         tunnelMeteringExecutor.execute(() -> {
@@ -148,8 +135,7 @@ public class TunnelIngressService {
                             .method(request.getMethod())
                             .path(request.getPath())
                             .queryString(request.getQueryString())
-                            // Relayed verbatim — the developer's local service needs the real
-                            // Authorization — but not written down that way.
+                            // Relayed verbatim, since the local service needs the real Authorization, but stored sanitized.
                             .requestHeaders(HeaderSanitizer.sanitize(request.getHeaders()))
                             .requestBodySize(requestSize)
                             .responseStatus(response != null ? response.getStatusCode() : null)

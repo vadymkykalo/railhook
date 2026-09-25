@@ -28,13 +28,7 @@ export class RateLimitError extends RailhookError {
     this.rateLimitInfo = rateLimitInfo;
   }
 
-  /**
-   * Milliseconds to wait before retrying.
-   *
-   * `rateLimitInfo.reset` is the raw `X-RateLimit-Reset` header, which the API
-   * sends as a Unix timestamp in **seconds**; comparing it to `Date.now()`
-   * (milliseconds) directly always yields a large negative number, i.e. 0.
-   */
+  /** Milliseconds to wait before retrying. `reset` is in seconds, hence the `* 1000`. */
   get retryAfter(): number {
     return Math.max(0, this.rateLimitInfo.reset * 1000 - Date.now());
   }

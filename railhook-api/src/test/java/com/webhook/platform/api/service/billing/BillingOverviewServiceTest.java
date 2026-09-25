@@ -89,10 +89,7 @@ class BillingOverviewServiceTest {
         assertThat(usage.getEvents().getPercentUsed()).isEqualTo(40.0);
     }
 
-    /**
-     * A hosted deployment with no payment provider runs the free plan and nothing else. Listing
-     * Starter at $29 there would be a price nobody can pay and a button that cannot work.
-     */
+    // Listing a paid plan with no payment provider would be a price nobody can pay.
     @Test
     void withoutAPaymentProviderTheCatalogOffersOnlyWhatCostsNothing() {
         when(billingService.getDefaultProviderCode()).thenReturn("noop");

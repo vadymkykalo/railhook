@@ -51,8 +51,6 @@ const inputs = (
 
 describe('trackFor', () => {
   it('honours the stored intent while the account is still empty', () => {
-    // The whole reason this module exists: the answer used to be written and
-    // never read.
     expect(trackFor(NOTHING, 'receive')).toBe('receive');
     expect(trackFor(NOTHING, 'send')).toBe('send');
     expect(trackFor(NOTHING, 'both')).toBe('both');
@@ -63,8 +61,7 @@ describe('trackFor', () => {
   });
 
   it('lets the data outrank the stated intent', () => {
-    // People say "both" and build one. What the organization actually has is
-    // the stronger answer, and it survives a new browser.
+    // What the organization has beats what people say, and it survives a new browser.
     expect(trackFor({ ...NOTHING, hasIncomingSources: true }, 'send')).toBe('receive');
     expect(trackFor({ ...NOTHING, hasEndpoints: true }, 'receive')).toBe('send');
   });
@@ -102,8 +99,7 @@ describe('stepsFor', () => {
   });
 
   it('leaves the connection open until something is subscribed to the endpoint', () => {
-    // The flow writes the endpoint at step 1, so abandoning at step 2 leaves
-    // exactly this. Ticking on hasEndpoints alone would call it done.
+    // The flow writes the endpoint at step 1, so abandoning at step 2 leaves exactly this.
     const done = (status: Partial<OnboardingStatus>) =>
       stepsFor('send', inputs(status)).find((s) => s.key === 'createConnection')!.done;
 
@@ -113,8 +109,6 @@ describe('stepsFor', () => {
   });
 
   it('ticks verifySource only when a source actually verifies', () => {
-    // The bug this replaces: enableHmac read hasIncomingSources, the same flag
-    // as the step before it, so creating a source ticked both.
     const done = (sources: IncomingSourceResponse[]) =>
       stepsFor('receive', inputs({ hasIncomingSources: true }, sources))
         .find((s) => s.key === 'verifySource')!.done;
@@ -133,16 +127,12 @@ describe('stepsFor', () => {
   });
 
   it('claims no step the backend cannot report', () => {
-    // testIncomingCurl and verifyForwarding were literal `done: false`, which
-    // is what made the incoming track impossible to finish.
     const keys = stepsFor('both', inputs()).map((s) => s.key);
     expect(keys).not.toContain('testIncomingCurl');
     expect(keys).not.toContain('verifyForwarding');
   });
 
   it('flips every step when, and only when, its own input flips', () => {
-    // The rule, not the patch: a step wired to a constant or to a neighbour's
-    // flag fails here rather than shipping.
     const cases: { key: string; on: OnboardingInputs }[] = [
       { key: 'createConnection', on: inputs({ hasEndpoints: true, hasSubscriptions: true }) },
       { key: 'createApiKey', on: inputs({ hasApiKeys: true }) },
@@ -174,7 +164,6 @@ describe('progressOf', () => {
   });
 
   it('reaches the end on every track', () => {
-    // Unreachable before this change for anyone with an incoming source.
     const everything = inputs(
       {
         hasEndpoints: true, hasSubscriptions: true, hasApiKeys: true, hasEvents: true,
@@ -222,11 +211,7 @@ describe('storage', () => {
   });
 
   it('clears the blanket legacy flag when asked to show the card again', () => {
-    // The old flag was one boolean for the whole account, so it cannot say
-    // which projects the person meant. Asking for the card back clears it
-    // outright rather than inventing a per-project exception encoding: the
-    // visible card is the default state anyway, and any project can be
-    // dismissed again on its own terms.
+    // The old flag was account-wide, so asking for the card back clears it outright.
     localStorage.setItem(DISMISS_KEY, 'true');
     setDismissed('p1', false);
     expect(isDismissed('p1')).toBe(false);
@@ -234,8 +219,6 @@ describe('storage', () => {
   });
 
   it('forgets the direction so the card asks again', () => {
-    // The picker's own subtitle promises "you can always change later"; until
-    // there was a way to clear this, that was not true.
     writeIntent('both');
     forgetIntent();
     expect(readIntent()).toBeNull();

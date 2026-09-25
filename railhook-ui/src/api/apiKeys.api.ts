@@ -10,10 +10,7 @@ export interface ApiKeyRequest {
 }
 
 export interface ApiKeyRotateRequest {
-  /**
-   * Hours the outgoing key keeps working. Omitted means the server's default of 24; 0 cuts it
-   * off immediately, which is the rotation you do after a suspected leak.
-   */
+  /** Omitted means the server's 24; 0 cuts the old key off at once. */
   gracePeriodHours?: number;
   expiresAt?: string;
 }
@@ -29,7 +26,6 @@ export interface ApiKeyResponse {
   expiresAt: string | null;
   scope: string;
   key?: string;
-  /** Set on a key that has been rotated away; with expiresAt it is the grace window. */
   rotatedAt: string | null;
   replacedById: string | null;
 }
@@ -48,11 +44,6 @@ export const apiKeysApi = {
     return http.post<ApiKeyResponse>(`/api/v1/projects/${projectId}/api-keys`, data);
   },
 
-  /**
-   * Issues a replacement and puts this key into a grace window during which both work, so a
-   * rollover is not a create-then-revoke race the user has to time by hand. The plaintext of
-   * the new key comes back exactly once, in this response.
-   */
   rotate: (projectId: string, apiKeyId: string, data: ApiKeyRotateRequest = {}): Promise<ApiKeyResponse> => {
     return http.post<ApiKeyResponse>(`/api/v1/projects/${projectId}/api-keys/${apiKeyId}/rotate`, data);
   },
