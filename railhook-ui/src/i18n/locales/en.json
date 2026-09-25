@@ -2172,100 +2172,80 @@
   },
   "legal": {
     "privacy": {
-      "intro": "This policy explains what data Railhook Cloud, the hosted service at railhook.io, processes and why. It does not cover copies of Railhook you run on your own servers: there, you are the operator and your data never reaches us.",
+      "intro": "Covers Railhook Cloud, the hosted service at railhook.io. Railhook you run on your own servers sends us nothing.",
+      "title": "Privacy Policy",
       "sections": {
-        "changes": {
-          "body": "When this policy changes, we update this page and the date at the top.",
-          "title": "Changes"
-        },
-        "contact": {
-          "body": "Questions about this policy: support@railhook.io.",
-          "title": "Contact"
+        "who": {
+          "title": "Who we are",
+          "body": "Railhook Cloud at railhook.io is run by the maintainer of Railhook, an open-source webhook gateway under the MIT license. Contact: support@railhook.io."
         },
         "data": {
-          "body": "- Account data: your name, email address, organization name and a hash of your password — or, if you sign in with Google, your Google account identifier instead of a password.\n- Webhook data: the payloads, headers and delivery attempts you send through the service.\n- Technical logs: IP address, user agent and request metadata.\n\nWe do not process payment data. There are no paid plans yet.",
-          "title": "What we process"
-        },
-        "google": {
-          "body": "If you choose to sign in with Google, we request only the openid, email and profile scopes. We use the name, email address and account identifier Google returns only to create your account or sign you in. We do not use Google user data for advertising, do not sell or transfer it, and do not use it for any other purpose.\n\nRailhook's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements.",
-          "title": "Sign in with Google"
-        },
-        "processors": {
-          "body": "- Hetzner — hosting, in the EU (Helsinki).\n- Cloudflare — CDN, DNS and the Turnstile check.\n- Resend — transactional email.\n- Google — only if you choose to sign in with Google.",
-          "title": "Who processes it for us"
+          "title": "What we process",
+          "body": "- Account: your name, email address, organization name, and a hash of your password, or your Google account ID if you sign in with Google.\n- Webhooks: the payloads, headers and delivery attempts you send through the service.\n- Logs: IP address, user agent and request metadata.\n\nWe process no payment data. There are no paid plans."
         },
         "purpose": {
-          "body": "- To provide the service: receive, store and deliver your webhooks and show you their history.\n- To keep it secure and prevent abuse, including a Cloudflare Turnstile check when you register.\n- To send transactional email: address verification and password reset.",
-          "title": "Why we process it"
+          "title": "Why",
+          "body": "- To run the service: receive, store and deliver your webhooks, and show their history.\n- To prevent abuse, including a Cloudflare Turnstile check at sign-up.\n- To send account email: address verification and password reset.\n\nWe do not sell your data and use no advertising trackers."
         },
-        "retention": {
-          "body": "- Webhook events on the Free plan are kept for 7 days.\n- Account data is kept until you delete your account. You can delete it in the product.\n- Backups roll over, so deleted data leaves them over time.",
-          "title": "How long we keep it"
+        "google": {
+          "title": "Sign in with Google",
+          "body": "We request only the openid, email and profile scopes. The name, email address and account ID Google returns are used only to create your account or sign you in. We do not use Google user data for advertising, and do not sell or transfer it.\n\nRailhook's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements."
         },
-        "rights": {
-          "body": "You can ask for a copy of your data, have it corrected, or have it deleted by writing to support@railhook.io. You can also delete your account yourself in the product.",
-          "title": "Your rights"
-        },
-        "sharing": {
-          "body": "We do not sell your data, and we do not use advertising trackers.",
-          "title": "What we do not do"
-        },
-        "who": {
-          "body": "Railhook is an open-source webhook gateway released under the MIT license. Railhook Cloud at railhook.io is operated by the project maintainer. You can reach us at support@railhook.io.",
-          "title": "Who we are"
+        "processors": {
+          "title": "Processors",
+          "body": "- Hetzner: hosting in the EU (Helsinki, Finland).\n- Cloudflare: CDN, DNS, Turnstile and web analytics.\n- Resend: account email.\n- Google: sign-in, only if you choose it."
         },
         "cookies": {
           "title": "Cookies, analytics and messages",
-          "body": "- One cookie keeps you signed in. It is needed for the service to work and is not used for anything else.\n- Visits to the site are counted with Cloudflare Web Analytics. It sets no cookies and does not follow you across sites.\n- A message you send through the site's form is emailed to our support inbox with your address, so we can reply. It is kept only as long as that conversation needs."
+          "body": "- One cookie keeps you signed in. It is used for nothing else.\n- Cloudflare Web Analytics counts visits. It sets no cookies and does not track you across sites.\n- A message sent through the site's form reaches our support inbox with your email address, and is kept only as long as the conversation needs."
+        },
+        "retention": {
+          "title": "Retention",
+          "body": "- Webhook events: 7 days on the Free plan.\n- Account data: until you delete your account, which you can do in the product.\n- Backups roll over, so deleted data leaves them over time."
+        },
+        "rights": {
+          "title": "Your rights",
+          "body": "Write to support@railhook.io to get a copy of your data, correct it or delete it. You can also delete your account yourself in the product."
+        },
+        "changes": {
+          "title": "Changes",
+          "body": "When this policy changes, we update this page and the date above."
         }
-      },
-      "title": "Privacy Policy"
+      }
     },
     "terms": {
-      "intro": "These terms apply to Railhook Cloud, the hosted service at railhook.io. By creating an account you agree to them.",
+      "intro": "These terms cover Railhook Cloud, the hosted service at railhook.io. Creating an account means you accept them.",
+      "title": "Terms of Service",
       "sections": {
-        "changes": {
-          "body": "When these terms change, we update this page and the date at the top.",
-          "title": "Changes"
-        },
-        "contact": {
-          "body": "Questions about these terms: support@railhook.io.",
-          "title": "Contact"
+        "service": {
+          "title": "The service",
+          "body": "Railhook Cloud sends and receives webhooks on your behalf. It is provided \"as is\" and \"as available\", without warranties of any kind. We work to keep it available, but do not guarantee it will be uninterrupted or error-free."
         },
         "free": {
-          "body": "Railhook Cloud is currently free, within these limits:\n\n- 10,000 events per month\n- 3 projects\n- 7-day retention of webhook events\n\nPaid plans may be offered later. We will not move you to one without your consent.",
-          "title": "The Free plan"
-        },
-        "law": {
-          "body": "These terms are governed by the laws of Ukraine.",
-          "title": "Governing law"
-        },
-        "liability": {
-          "body": "To the extent the law allows, we are not liable for indirect or consequential damages, or for lost data, revenue or profits, arising from your use of the service.",
-          "title": "Limitation of liability"
-        },
-        "selfHosted": {
-          "body": "Railhook you run on your own servers is governed by the MIT license, not by these terms.",
-          "title": "Self-hosted Railhook"
-        },
-        "service": {
-          "body": "Railhook Cloud sends and receives webhooks on your behalf. It is provided \"as is\" and \"as available\", without warranties of any kind.",
-          "title": "The service"
-        },
-        "suspension": {
-          "body": "We may suspend or close accounts that abuse the service or break these terms.",
-          "title": "Suspension"
+          "title": "The Free plan",
+          "body": "Railhook Cloud is free within these limits:\n\n- 10,000 events per month\n- 3 projects, 5 endpoints each\n- 7 days of event history\n\nIf paid plans are added, we will not move you to one without your consent."
         },
         "use": {
-          "body": "You agree not to use the service to:\n\n- send or store illegal content;\n- send spam or otherwise abuse the service;\n- attack, probe or overload third parties through webhooks.",
-          "title": "Acceptable use"
+          "title": "Acceptable use",
+          "body": "Do not use the service to:\n\n- send or store illegal content;\n- send spam or otherwise abuse the service;\n- attack, probe or overload third parties through webhooks.\n\nWe may suspend or close accounts that do, or that break these terms."
         },
-        "warranty": {
-          "body": "We work to keep the service available and your webhooks delivered, but we do not guarantee that it will be uninterrupted or error-free.",
-          "title": "No warranty"
+        "liability": {
+          "title": "Limitation of liability",
+          "body": "To the extent the law allows, we are not liable for indirect or consequential damages, or for lost data, revenue or profits, arising from your use of the service."
+        },
+        "selfHosted": {
+          "title": "Self-hosted Railhook",
+          "body": "Railhook you run on your own servers is governed by the MIT license, not by these terms."
+        },
+        "law": {
+          "title": "Governing law",
+          "body": "These terms are governed by the laws of Ukraine."
+        },
+        "changes": {
+          "title": "Changes and contact",
+          "body": "When these terms change, we update this page and the date above. Questions: support@railhook.io."
         }
-      },
-      "title": "Terms of Service"
+      }
     },
     "updated": "Last updated: {{date}}"
   },
@@ -2424,12 +2404,12 @@
   },
   "meta": {
     "docs": {
-      "description": "How to send events, receive webhooks, verify signatures, and read what happened — guides and the full API reference.",
+      "description": "How to send events, receive webhooks, verify signatures and trace a delivery: guides and the full API reference.",
       "title": "Documentation — Railhook",
       "titleSection": "{{section}} — Railhook docs"
     },
     "landing": {
-      "description": "Open-source webhook gateway. Send webhooks to your customers and receive them from Stripe, GitHub and the rest, with retries, signatures and every attempt on record. In our cloud or self-hosted.",
+      "description": "Open-source webhook gateway. Send webhooks to your customers and receive them from Stripe, GitHub and others, with retries, signatures and a log of every attempt. In our cloud or self-hosted.",
       "title": "Railhook — Open-source webhook gateway"
     },
     "privacy": {
@@ -4227,51 +4207,39 @@
   },
   "pricing": {
     "title": "Free, in our cloud or on your servers",
-    "lead": "Start on the cloud's free plan, or run everything yourself under the MIT licence. Neither needs a card.",
+    "lead": "The cloud's free plan, or the whole product on your own server under the MIT licence. No card for either.",
     "cloud": {
       "pill": "Railhook Cloud",
       "title": "Cloud Free",
       "price": "Free",
-      "body": "{{events}} events a month, {{projects}} projects, {{endpoints}} endpoints per project and {{retention}} days of history. Every feature is included.",
-      "later": "Later we'll add paid plans with support and higher limits.",
+      "body": "{{events}} events a month, {{projects}} projects, {{endpoints}} endpoints per project, {{retention}} days of history. All features included.",
+      "later": "Paid plans with support and higher limits will come later.",
       "cta": "Start free"
     },
     "selfHosted": {
       "pill": "Open source · MIT",
       "title": "Self-hosted",
       "price": "Free",
-      "body": "The same software with every feature, no plan limits and no licence key. One command installs it with PostgreSQL, Kafka and Redis on a server with Docker and 4 GB of RAM.",
+      "body": "Every feature, no plan limits, no licence key.",
       "cta": "Read the install guide"
     },
     "faq": {
       "title": "Questions",
-      "free": {
-        "q": "Is Railhook really free?",
-        "a": "Yes. The cloud's Free plan includes every feature within its limits, and the self-hosted edition is the same software under the MIT licence, with no limits and no licence key."
-      },
       "limit": {
-        "q": "What happens when I reach the monthly event limit?",
-        "a": "The API refuses new events with a quota_exceeded error until the next month starts. Events it accepted before that are still delivered and retried."
-      },
-      "card": {
-        "q": "Do I need a credit card?",
-        "a": "No. Sign up with an email address or a Google account and send your first event."
-      },
-      "paid": {
-        "q": "Will there be paid plans?",
-        "a": "Later we'll add paid plans with support and higher limits. The self-hosted edition stays complete and free."
+        "q": "What happens at the monthly event limit?",
+        "a": "The API refuses new events with quota_exceeded until the next month starts. Events accepted before that are still delivered and retried."
       },
       "selfHost": {
-        "q": "What do I need to run it myself?",
-        "a": "A server with Docker and 4 GB of RAM. One command installs Railhook with PostgreSQL, Kafka and Redis, and sets up HTTPS on your domain."
+        "q": "What does self-hosting need?",
+        "a": "A server with Docker and 4 GB of RAM. One command installs Railhook with PostgreSQL, Kafka and Redis and sets up HTTPS on your domain."
       }
     }
   },
   "tester": {
     "eyebrow": "Free tool · no account",
     "title": "Webhook tester",
-    "lead": "Get a URL, send it a webhook from Stripe, GitHub or curl, and see exactly what arrived: method, headers and body. Nothing to install, and it keeps what it receives for 24 hours.",
-    "createHint": "Your URL records every request sent to it — the latest 100, with the first 64 KB of each body — and shows them here as they arrive.",
+    "lead": "Get a URL, send it a webhook from Stripe, GitHub or curl, and see the method, headers and body that arrived. Requests are kept for 24 hours.",
+    "createHint": "Requests sent to the URL show up here as they arrive.",
     "create": "Create a test URL",
     "creating": "Creating…",
     "loading": "Loading your URL…",
@@ -4292,8 +4260,8 @@
     "from": "from {{ip}}",
     "size": "{{size}} bytes",
     "cta": {
-      "title": "Receive webhooks for real",
-      "body": "A free Railhook account keeps every request, verifies Stripe, GitHub and Shopify signatures, retries delivery to your service when it is down, and forwards to localhost while you develop.",
+      "title": "Receive webhooks in production",
+      "body": "A free account keeps every request, verifies Stripe, GitHub and Shopify signatures, retries delivery to your service when it is down, and forwards to localhost while you develop.",
       "button": "Start free",
       "docs": "Receive your first webhook"
     },
@@ -4306,12 +4274,12 @@
       "generic": "Could not create a URL. Try again."
     },
     "limits": {
-      "title": "How it works, and its limits",
+      "title": "Limits",
       "lifetime": "A URL lives for 24 hours, then it is deleted with everything it received.",
       "kept": "It keeps the latest 100 requests, up to 1 MB in total; each body up to 64 KB.",
       "rate": "Up to 10 requests a second per URL, and three live URLs per visitor.",
-      "masked": "Authorization, cookies and signature headers are masked, but anyone with the URL can see what it received — don't send production secrets.",
-      "methods": "Any method — GET, POST, PUT, PATCH, DELETE — answered with 200 and {\"ok\": true}."
+      "masked": "Authorization, cookies and signature headers are masked, but anyone with the URL sees what it received. Do not send production secrets.",
+      "methods": "Any method (GET, POST, PUT, PATCH, DELETE) gets 200 and {\"ok\": true}."
     },
     "masked": "Anyone with this URL can read what it received, so Authorization, cookies and signature headers are masked."
   },
@@ -4522,8 +4490,8 @@
   "webhookSignature": {
     "eyebrow": "Free tool",
     "title": "Webhook signature verifier",
-    "lead": "Paste a webhook's body, its signing secret and its signature header to see whether they match. Works for Standard Webhooks, Stripe, GitHub, Shopify, Slack and Railhook.",
-    "private": "Runs entirely in your browser. Your secret and payload never leave this page.",
+    "lead": "Paste a webhook's body, signing secret and signature header to check whether they match. Standard Webhooks, Stripe, GitHub, Shopify, Slack and Railhook.",
+    "private": "Runs in your browser. The secret and payload never leave this page.",
     "provider": "Provider",
     "providers": {
       "standard": "Standard Webhooks",
@@ -4576,16 +4544,15 @@
       "railhook": "Signs t.body with the endpoint secret. X-Signature carries t=<milliseconds>,v1=<hex>, with a 5-minute window. Railhook sends the Standard Webhooks headers as well."
     },
     "cta": {
-      "title": "Railhook checks these for you on every incoming webhook",
-      "body": "Point Stripe, GitHub, GitLab, Shopify, Slack, Twilio, Square, Adyen, SendGrid or HubSpot at a Railhook source. Every request is verified with the provider's own scheme before it is stored, and a forged one is refused.",
+      "title": "Railhook verifies these on every incoming webhook",
+      "body": "Point Stripe, GitHub, GitLab, Shopify, Slack, Twilio, Square, Adyen, SendGrid or HubSpot at a Railhook source. Each request is checked with the provider's scheme before it is stored; a forged one is refused.",
       "button": "Start free",
       "docs": "How verification works"
     }
   },
   "blog": {
-    "eyebrow": "Blog",
-    "title": "The Railhook blog",
-    "lead": "Webhooks, delivery and the things that go wrong with them — written from the code that has to handle them.",
+    "title": "Blog",
+    "lead": "Webhook delivery, retries and failures, with sources.",
     "postsHeading": "Posts",
     "empty": "Nothing published here yet.",
     "feed": "RSS feed",
@@ -4596,15 +4563,15 @@
     "previous": "Older",
     "next": "Newer",
     "moreReading": "More reading",
-    "sourcesCheckedOn": "Every figure quoted from a provider was read from that provider's own documentation on {{date}}, and each one is linked. Providers change these without notice — check the link before you rely on a number.",
+    "sourcesCheckedOn": "Every provider figure was read from that provider's documentation on {{date}} and is linked. Providers change these without notice, so check the link before relying on a number.",
     "notFound": {
       "title": "No such post",
       "lead": "This address does not match anything published. It may have been renamed.",
       "back": "Back to the blog"
     },
     "cta": {
-      "title": "Stop losing webhooks",
-      "body": "Railhook takes the delivery, keeps it, retries it on its own schedule and lets you replay it. Free in the cloud, MIT-licensed on your own servers.",
+      "title": "Railhook",
+      "body": "Stores every delivery, retries it on its own schedule, and lets you replay it. Free in the cloud, MIT on your own servers.",
       "docs": "Read the docs",
       "tester": "Try the webhook tester"
     },

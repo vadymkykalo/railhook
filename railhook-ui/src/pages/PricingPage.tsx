@@ -13,7 +13,7 @@ import { FREE_PLAN } from './landing/plans';
 /** No competitor prices here: the owner's call. */
 
 /** FAQ order is part of the page, and the FAQPage data follows it. */
-const FAQ = ['free', 'limit', 'card', 'paid', 'selfHost'] as const;
+const FAQ = ['limit', 'selfHost'] as const;
 
 const CARD = 'flex flex-col gap-3 border bg-card p-6 sm:p-10';
 const PRICE = 'text-[2.5rem] font-normal leading-none tracking-[-0.02em] text-foreground';
