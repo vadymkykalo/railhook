@@ -3,7 +3,7 @@
 Only the releases that need something from you are listed. Everything else upgrades with
 `./railhook upgrade` (Compose) or `helm upgrade`.
 
-## Unreleased
+## 2.31.0
 
 - The `./railhook` helper no longer has a `monitoring` command, and `./railhook upgrade` no longer
   refreshes `monitoring/`. The running containers are untouched. Manage them from the install
