@@ -1,8 +1,5 @@
 name: CI
 
-# No push trigger for release/**: a release branch only exists to be opened as a PR into
-# main, and that pull_request run is the one the required checks come from. Pushing to it
-# as well ran the whole workflow twice for every commit on the branch.
 on:
   push:
     branches:
@@ -141,9 +138,6 @@ jobs:
   # authenticated chain and got a 401, and APP_BASE_URL was left at the app's
   # own http://localhost:5173 so verification and invite links pointed at
   # nobody's machine. A render is not an install; this job installs.
-  #
-  # needs: docker-build for the same reason install-smoke does — it loads the
-  # three images that job built rather than building them again.
   helm-kind-smoke:
     name: Helm Chart Install Smoke Test
     runs-on: ubuntu-latest
@@ -384,7 +378,6 @@ jobs:
       # This and the integration job below are separate GitHub Actions
       # jobs on separate runners with no shared filesystem, so each writes
       # its own distinctly-named exec file (jacoco-unit.exec here,
-      # jacoco-it-<shard>.exec in each integration shard) rather than the plugin's
       # default target/jacoco.exec - a naive setup where both jobs wrote the
       # same filename and only one got published/read downstream would
       # silently report only whichever run happened to be looked at, not the
@@ -419,10 +412,6 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-  # The integration suite ran as one 12-minute job, the longest in the workflow. It is
-  # split across parallel shards; scripts/ci-integration-shard.sh deals the classes out
-  # (found by suffix, so a new test needs no list edited). Raising the shard count is a
-  # one-line change to the matrix below.
   backend-integration-test-shard:
     name: Backend Integration Tests (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
@@ -476,11 +465,7 @@ jobs:
           echo "- PostgreSQL: Testcontainers" >> $GITHUB_STEP_SUMMARY
 
       # See the matching comment in the unit-test job above - distinct
-      # filename per shard, uploaded so coverage-report can merge them with the
-      # unit job's exec data into one real aggregate. Tarred because
-      # upload-artifact roots a glob at the files' common ancestor: a shard whose
-      # classes all sit in one module would upload its file without the
-      # railhook-<module>/target/ it has to be restored into.
+      # Tarred: upload-artifact drops the railhook-<module>/target/ prefix when all files share it.
       - name: Pack integration test coverage data
         if: always()
         run: |
@@ -501,9 +486,7 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-  # The required status check. It keeps the name the shards used to share as one
-  # job, and fails unless every shard passed - a skipped shard included, which is
-  # what a failed build upstream leaves behind.
+  # Keeps the required check name; fails unless every shard passed.
   backend-integration-test:
     name: Backend Integration Tests
     runs-on: ubuntu-latest
@@ -520,10 +503,7 @@ jobs:
           [ "$RESULT" = "success" ] || { echo "::error::an integration test shard did not succeed ($RESULT)"; exit 1; }
 
   # The actual point of splitting exec-data upload above - neither
-  # backend-test nor any integration shard alone has the full picture
-  # (each only ran part of the test classes), and they run on separate runners
   # with no shared filesystem, so "coverage" can't just be read out of
-  # any one job directly. This job collects every artifact into one checkout,
   # recompiles (tests skipped - only the just-downloaded exec data is used
   # for coverage, not a fresh run) so class files exist for JaCoCo to map
   # execution data onto, then runs `mvn verify` so both
@@ -531,7 +511,6 @@ jobs:
   # each real module's own jacoco:merge + jacoco:check (root pom.xml +
   # common/api/worker/cli's own pom.xml) fire against the true merged
   # unit+integration coverage.
-  #
   # `if: ${{ !cancelled() }}` (not the default "needs both to succeed") so a
   # real coverage number - even partial - is still visible on the PR when
   # one suite has unrelated failures; --fail-at-end in both test jobs above
@@ -569,8 +548,6 @@ jobs:
           path: ${{ runner.temp }}/jacoco-it
         continue-on-error: true
 
-      # One jacoco-it-<shard>.exec per shard lands in each module's target/; the
-      # root pom's jacoco-merge folds jacoco-it*.exec together before the checks.
       - name: Unpack integration test coverage data
         run: |
           shopt -s nullglob
@@ -978,16 +955,6 @@ jobs:
   # dependency-CVE coverage through `container-scan` below, which scans the same
   # Maven artifacts inside the built images. See that workflow's header comment.
 
-  # The only image builds in the workflow. install-smoke, upgrade-smoke,
-  # helm-kind-smoke and container-scan need the same three images; each used to
-  # rebuild them from the layer cache, three minutes apiece. They now download
-  # the images saved here and `docker load` them, which is why they declare
-  # needs: docker-build.
-  #
-  # No needs of its own: every Dockerfile builds from source in its own stage, so
-  # nothing upstream feeds it, and the jobs that wait on it start while the test
-  # suites are still running. One image per matrix leg, since the UI build alone
-  # takes as long as the other two together.
   docker-build:
     name: Docker Images (${{ matrix.svc }})
     runs-on: ubuntu-latest
@@ -1003,8 +970,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
       
-      # The layer cache is scoped per image so the three do not evict one another;
-      # docker-publish.yml reads the same scopes.
       - name: Build the ${{ matrix.svc }} image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
@@ -1029,9 +994,6 @@ jobs:
 
   # Proves docker-compose.yml (the no-Maven/no-npm quick start
   # advertised in the README) actually boots and answers health checks, so it
-  # can't silently rot the way the old build-only compose flow did. Loads
-  # the three images docker-build saved (as container-scan below does), tagged
-  # to match what docker-compose.yml resolves to when DOCKER_REGISTRY
   # is pointed at the local :test images instead of GHCR — no registry
   # credentials needed to run this.
   install-smoke:

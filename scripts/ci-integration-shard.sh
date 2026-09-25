@@ -1,20 +1,8 @@
 #!/usr/bin/env bash
+# Usage: ci-integration-shard.sh <shard> <total> | --list <total>
 set -euo pipefail
 
-# Prints the integration test classes one CI shard runs, as a surefire -Dtest value.
-#
-# The integration suite is split across parallel jobs in .github/workflows/ci.yml.
-# The classes are found on disk by the same suffixes check-test-routing.sh routes
-# by, so a new test lands in a shard without anyone listing it. They are sorted by
-# fully-qualified name and dealt out round-robin, which keeps the class counts
-# within one of each other and the assignment stable between runs.
-#
-# Usage: scripts/ci-integration-shard.sh <shard 1..N> <N>
-#        scripts/ci-integration-shard.sh --list <N>   every class with its shard
-
 cd "$(git rev-parse --show-toplevel)"
-
-INTEGRATION_SUFFIXES='(IntegrationTest|IT|RepositoryTest|ConcurrencyTest|RbacTest|IsolationTest)\.java$'
 
 usage() {
     echo "usage: $0 <shard> <total> | --list <total>" >&2
@@ -25,12 +13,9 @@ usage() {
 total=$2
 [[ "$total" =~ ^[1-9][0-9]*$ ]] || usage
 
-# Paths relative to src/test/java without .java, e.g. com/webhook/platform/api/FooIT:
-# surefire matches that form exactly, and it runs a class's @Nested classes with it.
-# git ls-files rather than find: a checkout with worktrees under .claude/ would
-# otherwise count every other worktree's copy of each test too.
+# git ls-files, not find: worktrees under .claude/ hold copies of every test.
 classes=$(git ls-files --cached --others --exclude-standard -- '*/src/test/java/*.java' \
-    | grep -E "$INTEGRATION_SUFFIXES" \
+    | grep -E '(IntegrationTest|IT|RepositoryTest|ConcurrencyTest|RbacTest|IsolationTest)\.java$' \
     | sed -E 's|^.*/src/test/java/||; s|\.java$||' \
     | LC_ALL=C sort -u)
 
@@ -46,7 +31,7 @@ shard=$1
 
 selected=$(echo "$classes" | awk -v n="$total" -v s="$shard" '(NR - 1) % n + 1 == s')
 
-# An empty -Dtest makes surefire run every test in the build, unit tests included.
-[ -n "$selected" ] || { echo "shard $shard of $total has no classes; lower the shard count" >&2; exit 1; }
+# An empty -Dtest makes surefire run every test, unit tests included.
+[ -n "$selected" ] || { echo "shard $shard of $total is empty" >&2; exit 1; }
 
 echo "$selected" | paste -sd, -
