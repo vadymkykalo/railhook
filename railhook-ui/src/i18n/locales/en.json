@@ -17,7 +17,6 @@
     "columns": {
       "details": "Details",
       "severity": "Severity",
-      "severityIcon": "Severity icon",
       "status": "Status",
       "time": "Time",
       "title": "Alert",
@@ -79,10 +78,6 @@
     "snoozeFor": "Snooze {{hours}}h",
     "snoozed": "Snoozed",
     "subtitle": "Monitor delivery health and get notified of issues",
-    "tabs": {
-      "events": "Alert History",
-      "rules": "Alert Rules"
-    },
     "threshold": "Threshold",
     "tiles": {
       "allClear": "All clear",
@@ -138,8 +133,6 @@
   "analytics": {
     "avgLatency": "Avg Latency",
     "deliveriesPerSec": "deliveries/sec",
-    "deliveryVolume": "Delivery Volume",
-    "deliveryVolumeDesc": "Success vs Failed over time",
     "endpointPerformance": "Endpoint Performance",
     "endpointPerformanceDesc": "Health status and metrics",
     "endpointStatus": {
@@ -157,23 +150,16 @@
     "eventTypes": "Event Types",
     "eventTypesDesc": "Distribution by type",
     "eventTypesSeries": "Events",
-    "events": "events",
     "failed": "Failed",
-    "failureRate": "failure rate",
     "latencyPercentiles": "Latency Percentiles",
     "latencyPercentilesDesc": "Response time distribution",
     "latencySeries": "Latency",
     "loadFailed": "Couldn't load analytics for this project",
-    "noData": "No Data Available",
-    "noDataDesc": "Start sending webhook events to see analytics",
     "noDeliveryData": "No delivery data yet",
-    "noDeliveryDataDesc": "Send events to see the chart",
     "noEndpointData": "No endpoint data available",
     "noEventsRecorded": "No events recorded",
     "noLatencyData": "No latency data yet",
-    "noLatencyDataDesc": "Metrics appear after deliveries",
     "noLatencyPercentiles": "No latency data",
-    "of": "of",
     "outcome": {
       "delivered": "Delivered",
       "desc": "Delivered and failed over the selected range",
@@ -197,8 +183,7 @@
       "failedHint": "{{percent}}% of all deliveries",
       "latencyHint": "p95 {{p95}} · p99 {{p99}}",
       "successRateHint": "{{delivered}} of {{total}} delivered"
-    },
-    "title": "Analytics"
+    }
   },
   "apiKeys": {
     "activeKey": "Active",
@@ -225,29 +210,21 @@
     "created": "Created",
     "expired": "Expired",
     "expires": "Expires",
-    "expiresAt": "Expires {{date}}",
-    "justNow": "Just now",
     "keyDialog": {
       "copied": "Copied",
       "copyKey": "Copy key",
       "description": "Save this API key securely. It won't be shown again.",
       "done": "Done",
-      "hideKey": "Hide key",
-      "hint": "Use this key in the X-API-Key header when sending events",
       "howToUse": "How to use it",
       "label": "API Key",
       "onlyChance": "This is the only time the key is shown. Copy it now — it cannot be read again.",
-      "showKey": "Show key",
       "title": "API Key Created Successfully"
     },
     "lastUsed": "Last used",
-    "name": "Name",
     "never": "Never",
     "noKeys": "No API keys yet",
     "noKeysDesc": "Create your first API key to start sending events",
     "noKeysDescViewer": "No API keys have been created yet. Ask a Developer or Owner to create one.",
-    "prefix": "Prefix",
-    "projectNotFound": "Project not found",
     "retiring": "Retiring",
     "retiringHint": "Replaced by a newer key. This one keeps working until the time above, then stops.",
     "revoke": "Revoke",
@@ -259,7 +236,6 @@
       "title": "Revoke API Key?"
     },
     "revokeNamed": "Revoke {{name}}",
-    "revoking": "Revoking...",
     "rotate": "Rotate",
     "rotateDialog": {
       "description": "Issues a replacement key straight away. This key keeps working for the window you choose, so you can deploy the new one before the old one stops.",
@@ -283,7 +259,6 @@
     "toast": {
       "copied": "API key copied to clipboard",
       "createFailed": "Failed to create API key",
-      "created": "API key created successfully",
       "loadFailed": "Failed to load data",
       "revokeFailed": "Failed to revoke API key",
       "revoked": "API key revoked successfully",
@@ -347,7 +322,6 @@
       "clear": "Clear",
       "failure": "Failure",
       "from": "From",
-      "showing": "Showing {{count}} of {{total}} on this page",
       "success": "Success",
       "to": "To"
     },
@@ -355,7 +329,6 @@
     "noLogsDesc": "Actions like creating endpoints, rotating secrets will appear here",
     "noMatches": "No events match these filters",
     "noMatchesDesc": "Widen the date range, or clear a filter to see everything again",
-    "pagination": "{{total}} total events · Page {{page}} of {{pages}}",
     "subtitle": "Track who did what in your organization",
     "title": "Audit Log"
   },
@@ -408,7 +381,6 @@
       "tryAgain": "Try again"
     },
     "forgotPassword": {
-      "backToLogin": "Back to login",
       "backToSignIn": "Back to sign in",
       "checkEmail": "Check your email",
       "email": "Email address",
@@ -436,16 +408,10 @@
       "title": "What brings you to Railhook?"
     },
     "login": {
-      "brandSubtitle": "Reliable delivery, automatic retries, and complete visibility for every webhook.",
-      "brandTitle": "Webhook infrastructure\nyou can trust",
       "copyright": "© {{year}} Railhook. Built for production systems.",
       "createAccount": "Create account",
       "email": "Email address",
-      "emailPlaceholder": "name@company.com",
       "failed": "Login failed. Please try again.",
-      "feature1": "Sub-second delivery latency",
-      "feature2": "HMAC signature verification",
-      "feature3": "Full delivery transparency",
       "forgotPassword": "Forgot password?",
       "noAccount": "Don't have an account?",
       "originRejected": "The server refused sign-in from this address: the page's origin is not on its allowed list. If you run this Railhook, add this address to CORS_ALLOWED_ORIGINS and restart the API.",
@@ -462,16 +428,9 @@
       "railLabel": "Four attempts: three failed, the fourth returned 200"
     },
     "register": {
-      "benefit1": "Free to start — no credit card required",
-      "benefit2": "Unlimited endpoints during trial",
-      "benefit3": "Full API access from day one",
-      "benefit4": "Automatic retries with exponential backoff",
-      "brandSubtitle": "Create your account and send your first webhook event in under 5 minutes.",
-      "brandTitle": "Start delivering\nwebhooks in minutes",
       "checkEmail": "Check your email",
       "continueToDashboard": "Continue to Dashboard",
       "email": "Email address",
-      "emailPlaceholder": "name@company.com",
       "failed": "Registration failed. Please try again.",
       "fullName": "Full name",
       "fullNamePlaceholder": "John Doe",
@@ -479,7 +438,6 @@
       "organization": "Organization",
       "organizationPlaceholder": "Acme Inc.",
       "password": "Password",
-      "passwordHint": "Must include uppercase, lowercase, digit, and special character (@$!%*?&-_#)",
       "passwordPlaceholder": "Min. 8 characters",
       "resendHint": "Didn't receive it? Check your spam folder or click resend above.",
       "resendVerification": "Resend verification email",
@@ -493,7 +451,6 @@
       "verificationSent": "We've sent a verification link to <strong>{{email}}</strong>. Click it to activate your account."
     },
     "resetPassword": {
-      "backToLogin": "Back to login",
       "backToSignIn": "Back to sign in",
       "confirmPassword": "Confirm password",
       "failed": "Failed to reset password. The link may have expired.",
@@ -552,7 +509,6 @@
     "currentPlan": "Current Plan",
     "custom": "Custom",
     "days": "{{count}} days",
-    "downgrade": "Downgrade",
     "endpoints": "Endpoints",
     "events": "Events this month",
     "featureMtls": "mTLS",
@@ -576,7 +532,6 @@
     "invoices": "Invoices",
     "invoicesDesc": "Every invoice issued to this organization.",
     "invoicesEmpty": "No invoices yet",
-    "managePlan": "Manage Plan",
     "manageSubscription": "Manage subscription",
     "manageSubscriptionDesc": "Payment method, invoices and cancellation, on your payment provider.",
     "members": "Members",
@@ -584,19 +539,16 @@
     "nearLimit": "Near limit",
     "noCeiling": "This plan sets no ceiling.",
     "notIncluded": "Not included",
-    "of": "of {{limit}}",
     "openPortal": "Open billing portal",
     "openPortalHint": "Opens your provider, signed in as this organization.",
     "overLimit": "Over limit",
     "perMonth": "/mo",
     "perSecond": "{{count}}/sec",
     "perYear": "/yr",
-    "planFeatures": "Plan Features",
     "portalFailed": "Could not open the billing portal.",
     "projects": "Projects",
     "rateLimit": "Ingest rate limit",
     "retention": "Retention",
-    "save": "Save",
     "selfHosted": "Self-hosted mode — all features unlocked, no limits",
     "statuses": {
       "ACTIVE": "Active",
@@ -622,33 +574,17 @@
     "empty": "Nothing to plot yet"
   },
   "commandPalette": {
-    "analytics": "Analytics",
-    "apiKeys": "API Keys",
-    "auditLog": "Audit Log",
     "close": "close",
-    "dashboard": "Dashboard",
-    "deliveries": "Deliveries",
-    "dlq": "Dead Letter Queue",
     "documentation": "Documentation",
-    "endpoints": "Endpoints",
-    "events": "Events",
-    "groupNavigation": "Navigation",
     "groupProjects": "Projects",
     "groupResources": "Resources",
-    "members": "Members",
     "navigate": "navigate",
     "noResults": "No results found",
     "noResultsHint": "Try a page name, a project or an event type.",
     "open": "open",
-    "openProjectEndpoints": "Open project endpoints",
     "placeholder": "Search pages, projects...",
-    "projects": "Projects",
     "results": "Results",
-    "settings": "Settings",
-    "subscriptions": "Subscriptions",
-    "testEndpoints": "Test Endpoints",
-    "title": "Command palette",
-    "tunnels": "Tunnels"
+    "title": "Command palette"
   },
   "common": {
     "actions": "Actions",
@@ -664,7 +600,6 @@
     "copyId": "Copy ID",
     "copyNamed": "Copy {{label}}",
     "create": "Create",
-    "creating": "Creating...",
     "delete": "Delete",
     "deleting": "Deleting...",
     "deselectAll": "Deselect all",
@@ -683,7 +618,6 @@
     "learnMore": "Learn more",
     "loadErrorTitle": "Couldn't load this page",
     "loading": "Loading...",
-    "manage": "Manage",
     "more": "more",
     "next": "Next",
     "no": "No",
@@ -698,14 +632,12 @@
     "retrying": "Retrying...",
     "save": "Save",
     "saving": "Saving...",
-    "search": "Search",
     "selectAll": "Select all",
     "selectRow": "Select row",
     "selectedCount": "{{count}} selected",
     "sending": "Sending...",
     "showing": "Showing {{from}}–{{to}} of {{total}}",
-    "viewAll": "View all",
-    "yes": "Yes"
+    "viewAll": "View all"
   },
   "configExport": {
     "description": "Export or import project configuration (endpoints and subscriptions) as JSON",
@@ -737,12 +669,6 @@
   },
   "connectionSetup": {
     "back": "Back",
-    "complete": {
-      "desc": "Your webhook endpoint is fully configured and ready to receive events.",
-      "sendEvent": "Send First Event",
-      "title": "Connection Ready!",
-      "viewEndpoints": "View Endpoints"
-    },
     "finish": "Create connection",
     "next": "Continue",
     "pageDesc": "One endpoint, its signing secret and the event types it is subscribed to.",
@@ -757,10 +683,7 @@
     "steps": {
       "events": {
         "add": "Add event type",
-        "create": "Create Subscriptions",
         "desc": "Which events should this endpoint receive?",
-        "done": "{{count}} event type(s) subscribed",
-        "pending": "Create an endpoint first to subscribe to events.",
         "remove": "Remove event type",
         "rowLabel": "Event type {{n}}",
         "title": "Event Types"
@@ -770,11 +693,9 @@
         "delays": "Retry delays (seconds, comma-separated)",
         "delaysHint": "Comma-separated seconds between retries. Default: 1m, 5m, 15m, 1h, 6h, 24h",
         "desc": "Configure how failed deliveries are retried",
-        "done": "{{attempts}} attempts, {{timeout}}s timeout",
         "maxAttempts": "Max attempts",
         "preview": "Schedule",
         "railLabel": "Retry ladder: {{count}} attempts over {{span}}",
-        "save": "Confirm Retry Policy",
         "timeout": "Timeout (seconds)",
         "title": "Retry Policy"
       },
@@ -788,7 +709,6 @@
         "desc": "Send a test event to verify your endpoint is reachable",
         "failed": "Connection failed",
         "passed": "Connection successful!",
-        "pending": "Create an endpoint first to run a test.",
         "retryHint": "Check your endpoint URL and server, then try again.",
         "send": "Send Test Ping",
         "title": "Test Ping"
@@ -802,14 +722,10 @@
         "urlLabel": "Endpoint URL"
       }
     },
-    "subtitle": "Set up a new webhook connection for {{project}} step by step",
     "title": "Connection Setup",
     "toast": {
       "connectionCreated": "Connection created",
       "endpointCreated": "Endpoint created",
-      "retryConfigured": "Retry policy configured",
-      "secretCopied": "Secret copied to clipboard",
-      "subscriptionsCreated": "{{count}} subscription(s) created",
       "testPassed": "Test ping successful"
     }
   },
@@ -827,9 +743,6 @@
     "empty": "No connections yet",
     "emptyDesc": "Create endpoints and subscriptions to see the connection map",
     "emptyDescNew": "A connection is an endpoint plus the event types it is subscribed to. Create the first one and events start flowing to it.",
-    "endpointDisabled": "Endpoint off",
-    "endpoints": "{{count}} endpoints",
-    "eventTypes": "{{count}} event types",
     "expand": "Show details",
     "expandFor": "Details for {{url}}",
     "health": {
@@ -845,13 +758,8 @@
     "secretHidden": "The secret is stored hashed and is shown once, when it is created or rotated. Rotate it if it may have leaked — the old secret stops working immediately.",
     "sendTest": "Send test event",
     "standardSecretHidden": "The whsec_… form a Standard Webhooks library expects is derived from the same secret, and is shown beside it whenever the secret itself is.",
-    "subDisabled": "Sub off",
-    "subscriptions": "{{count}} subscriptions",
-    "subtitle": "Visual overview of event routing for <strong>{{project}}</strong>",
     "title": "Connection Map",
-    "toggleSubscription": "Enable {{eventType}}",
-    "unsubscribed": "Unsubscribed Endpoints",
-    "unsubscribedDesc": "These endpoints have no active subscriptions and won't receive any events"
+    "toggleSubscription": "Enable {{eventType}}"
   },
   "createSubscription": {
     "descriptionCreate": "A subscription connects an event type to an endpoint. When a matching event is received, it will be delivered to the endpoint.",
@@ -935,11 +843,9 @@
       "title": "Needs a human"
     },
     "endpointHealth": {
-      "deliveries": "{{count}} deliveries",
       "empty": "No endpoints configured",
       "emptyDesc": "Add endpoints to start receiving webhooks",
       "subtitle": "Top endpoints by volume",
-      "success": "{{rate}}% success",
       "title": "Endpoint Health"
     },
     "headline": "Delivery health",
@@ -967,14 +873,6 @@
       "title": "Delivery outcome"
     },
     "projectPicker": "Project",
-    "quickActions": {
-      "deliveries": "Deliveries",
-      "dlq": "Failed Messages",
-      "endpoints": "Endpoints",
-      "events": "Events",
-      "incomingEvents": "Received",
-      "incomingSources": "Sources"
-    },
     "recentEvents": {
       "delivery": "{{count}} delivery",
       "deliveryCount": "{{count}} deliveries",
@@ -1002,21 +900,10 @@
       "deliveries": "Deliveries",
       "dlq": "Failed Messages",
       "dlqBadge": "In the DLQ",
-      "dlqDesc": "Max retries exceeded",
-      "failed": "Failed",
-      "failedDesc": "Retriable failures",
       "inFlight": "In flight",
       "inFlightHint": "Still owed an attempt",
-      "pending": "Pending",
-      "pendingDesc": "In progress",
-      "successRate": "{{rate}}% success rate",
-      "successful": "Successful",
-      "totalDeliveries": "Total Deliveries",
-      "totalDeliveriesDesc": "Webhook deliveries sent",
       "window": "Last 7 days"
     },
-    "subtitle": "Overview of your Railhook activity",
-    "title": "Dashboard",
     "toast": {
       "loadFailed": "Failed to load dashboard data"
     },
@@ -1033,13 +920,9 @@
   "debugLinks": {
     "copied": "Link copied to clipboard",
     "createFailed": "Failed to create debug link",
-    "created": "Debug link created",
-    "creating": "Creating link…",
-    "expiryHours": "Expires in (hours)",
     "share": "Share debug link"
   },
   "deliveries": {
-    "allTitle": "All deliveries",
     "bulkReplay": "Replay All {{status}}",
     "bulkReplayDialog": {
       "confirm": "Replay All",
@@ -1055,10 +938,7 @@
       "deliveryId": "Delivery ID",
       "endpoint": "Endpoint",
       "event": "Event",
-      "lastError": "Last Error",
-      "nextRetry": "Next Retry",
-      "status": "Status",
-      "time": "Time"
+      "status": "Status"
     },
     "filteringByEvent": "Showing deliveries for event",
     "filters": {
@@ -1071,25 +951,19 @@
       "last30d": "Last 30 days",
       "last7d": "Last 7 days",
       "searchByEventType": "Search by event type",
-      "searchById": "Search by ID",
-      "searchPlaceholder": "Enter delivery ID...",
       "status": "Status"
     },
     "goToEvents": "View Events",
-    "justNow": "just now",
     "noDeliveries": "No deliveries found",
     "noDeliveriesDesc": "Deliveries will appear here once events are sent to your endpoints",
     "noDeliveriesForEvent": "No deliveries for this event",
     "noDeliveriesForEventAction": "Create Subscription",
-    "noDeliveriesForEventDesc": "Event type <strong>{{eventType}}</strong> didn't match any active subscription. Deliveries are only created when an event type matches at least one subscription.",
     "noDeliveriesForEventPlain": "Event type {{eventType}} matched no active subscription. A delivery is only created when an event type matches at least one subscription.",
     "nothingToReplay": "This delivery cannot be replayed",
-    "projectNotFound": "Project not found",
     "rail": {
       "label": "{{count}} of {{total}} attempts used",
       "next": "next {{time}}"
     },
-    "replayError": "Please select a status filter (FAILED or DLQ) before bulk replay",
     "replayMatching": "Replay all matching ({{count}})",
     "replaySelected": "Replay selected ({{count}})",
     "replayedCount": "{{count}} deliveries queued for replay",
@@ -1098,7 +972,6 @@
     "replayedCount_one": "{{count}} delivery queued for replay",
     "replayedCount_other": "{{count}} deliveries queued for replay",
     "replayedSomeSkipped": "Queued {{replayed}} for replay, skipped {{skipped}} that were not replayable",
-    "replaying": "Replaying...",
     "status": {
       "CANCELLED": "Cancelled",
       "DLQ": "DLQ",
@@ -1117,12 +990,10 @@
       "SUCCESS": "Delivered successfully"
     },
     "subtitle": "Track webhook delivery attempts for <strong>{{project}}</strong>",
-    "title": "Deliveries",
     "toast": {
       "loadFailed": "Failed to load deliveries",
       "replayFailed": "Failed to replay delivery"
-    },
-    "viewSubscriptions": "View Subscriptions"
+    }
   },
   "deliveryDetails": {
     "attemptNumber": "Attempt #{{number}}",
@@ -1143,10 +1014,8 @@
     "deliveryId": "Delivery ID",
     "description": "View delivery status, attempts, and responses",
     "diagnosis": {
-      "attemptLabel": "#{{number}}",
       "category": "Error Type",
       "noMoreRetries": "No more retries — moved to DLQ",
-      "retryTimeline": "Retry Timeline",
       "suggestedFix": "Suggested Fix",
       "title": "Error Diagnosis"
     },
@@ -1159,9 +1028,7 @@
       "plan": "Plan:",
       "title": "Dry Run Preview"
     },
-    "duration": "Duration:",
     "endpointId": "Endpoint ID",
-    "error": "Error:",
     "eventId": "Event ID",
     "failedAt": "Failed At",
     "goTo": "Navigate to resource",
@@ -1172,7 +1039,6 @@
     "noAttempts": "No attempts recorded yet for this delivery.",
     "noData": "No delivery data available",
     "openIncidents": "Open Incidents",
-    "references": "References",
     "replay": "Replay",
     "replayDelivery": "Replay Delivery",
     "replayDialog": {
@@ -1192,37 +1058,23 @@
     "responseHeaders": "Response Headers",
     "status": "Status",
     "statusAndProgress": "Status & Progress",
-    "statusLabel": "Status:",
     "subscriptionId": "Subscription ID",
     "succeededAt": "Succeeded At",
-    "summary": "Summary",
     "title": "Delivery Details",
     "toast": {
       "copied": "{{label}} copied to clipboard",
       "dryRunFailed": "Failed to run dry-run preview",
-      "idCopied": "Delivery ID copied to clipboard",
       "incidentCreated": "Incident created from delivery",
       "incidentFailed": "Failed to create incident",
       "loadFailed": "Failed to load delivery details",
       "replayFailed": "Failed to replay delivery",
       "replaySuccess": "Delivery replay initiated successfully"
     },
-    "trace": "Trace",
-    "troubleshooting": {
-      "tip1": "Verify the endpoint URL is accessible and responding",
-      "tip2": "Check webhook signature validation in your application",
-      "tip3": "Review rate limits and ensure they're not exceeded",
-      "tip4": "Inspect the error messages in delivery attempts below",
-      "tip5": "Consider replaying the delivery after fixing the issue",
-      "title": "Troubleshooting Tips"
-    }
+    "trace": "Trace"
   },
   "dlq": {
     "abandoned": "Abandoned",
-    "activeFilters": "Active filters",
     "allEndpoints": "All endpoints",
-    "clearFilters": "Clear all",
-    "clearSearch": "Clear search",
     "columns": {
       "attempts": "Attempts",
       "endpoint": "Endpoint",
@@ -1230,10 +1082,6 @@
       "failedAt": "Failed At",
       "lastError": "Last Error"
     },
-    "dateFiltered": "Date range",
-    "deselectAll": "Deselect all",
-    "deselectItem": "Deselect row",
-    "endpointFiltered": "Endpoint",
     "filterEndpoint": "Filter by Endpoint",
     "ladderExhausted": "Retry ladder exhausted after {{count}} attempts",
     "ladderExhausted_few": "Retry ladder exhausted after {{count}} attempts",
@@ -1244,8 +1092,6 @@
     "last7d": "Last 7 Days",
     "noItems": "No items in DLQ",
     "noItemsDesc": "All deliveries are being processed successfully",
-    "pageTitle": "Failed Messages",
-    "projectNotFound": "Project not found",
     "purgeAll": "Purge All",
     "purgeDialog": {
       "description": "This will permanently delete all {{count}} failed messages. This action cannot be undone.",
@@ -1253,30 +1099,19 @@
       "impactItems": "{{count}} failed deliveries will be permanently deleted",
       "title": "Purge All DLQ Items?"
     },
-    "purging": "Purging...",
     "replayOne": "Replay this delivery",
     "replaySelected": "Replay selected ({{count}})",
-    "retry": "Retry",
-    "retryCount": "Retry ({{count}})",
-    "searchActive": "Search",
-    "selectAll": "Select all",
-    "selectItem": "Select row",
     "subtitle": "Failed deliveries for <strong>{{project}}</strong>",
-    "title": "Failed Messages",
     "toast": {
       "bulkReplayed": "{{count}} deliveries queued for replay",
       "bulkReplayed_few": "{{count}} deliveries queued for replay",
       "bulkReplayed_many": "{{count}} deliveries queued for replay",
       "bulkReplayed_one": "{{count}} delivery queued for replay",
       "bulkReplayed_other": "{{count}} deliveries queued for replay",
-      "bulkRetried": "{{count}} deliveries queued for retry",
-      "bulkRetryFailed": "Failed to retry deliveries",
       "loadFailed": "Failed to load DLQ data",
       "purgeFailed": "Failed to purge DLQ",
       "purged": "{{count}} items purged from DLQ",
-      "replayed": "Delivery queued for replay",
-      "retried": "Delivery queued for retry",
-      "retryFailed": "Failed to retry delivery"
+      "replayed": "Delivery queued for replay"
     },
     "totalItems": "Total Items",
     "unknownError": "Unknown error"
@@ -1484,7 +1319,6 @@
     }
   },
   "eventDetail": {
-    "back": "Back to events",
     "copyCurl": "Copy as curl",
     "copyLink": "Copy link",
     "createLink": "Create Link",
@@ -1497,7 +1331,6 @@
     "existingLinks": "Existing debug links (PII-safe):",
     "expires": "Expires {{time}}",
     "linkCopied": "Link copied",
-    "linkedDeliveries": "Linked Deliveries",
     "noDebugLinks": "No debug links created yet",
     "noSchema": "No schema registered for event type \"{{type}}\"",
     "payloadCopied": "Payload copied",
@@ -1525,7 +1358,6 @@
   "eventDiff": {
     "added": "{{count}} added",
     "addedLabel": "Added",
-    "betweenEvents": "Between these two events of type",
     "changed": "{{count}} changed",
     "changedLabel": "Changed",
     "changes": "{{count}} difference(s)",
@@ -1546,7 +1378,6 @@
     "left": "Left",
     "leftEvent": "Left event",
     "noDiffs": "No differences found — payloads are identical",
-    "noDiffsSubtitle": "Both events have identical payloads",
     "noDiffsTitle": "No differences found",
     "noEvents": "No events found",
     "noSearchResults": "No events match your search",
@@ -1605,7 +1436,6 @@
     "noEvents": "No events yet",
     "noEventsDesc": "Send your first webhook event to start processing deliveries",
     "noMatchDesc": "No event type matches this search. Try a shorter prefix, such as order.",
-    "outgoingTitle": "Outgoing events",
     "sendModal": {
       "description": "Send a webhook event to trigger deliveries to subscribed endpoints",
       "eventType": "Event Type",
@@ -1628,10 +1458,8 @@
     "subtitle": "Webhook events for <strong>{{project}}</strong>",
     "title": "Events",
     "toast": {
-      "idCopied": "Event ID copied to clipboard",
       "loadFailed": "Failed to load events",
-      "noSubscriptionMatch": "Event sent, but no active subscriptions match '{{eventType}}'. No deliveries were created.",
-      "zeroDeliveries": "Event sent, but 0 deliveries were created. Check your subscriptions."
+      "noSubscriptionMatch": "Event sent, but no active subscriptions match '{{eventType}}'. No deliveries were created."
     },
     "viewDeliveries": "View deliveries for this event"
   },
@@ -1685,7 +1513,6 @@
     "investigate": "Investigate",
     "investigateDeliveries": "Investigate deliveries",
     "loadFailed": "Couldn't load incidents for this project",
-    "noOpen": "No open incidents",
     "noteDialog": {
       "detail": "Detail (optional)",
       "detailPlaceholder": "What you found, and what you did",
@@ -1696,7 +1523,6 @@
     },
     "openCount": "{{count}} open incidents",
     "openOnly": "Open Only",
-    "pageOf": "{{page}} / {{total}}",
     "rcaNotes": "Root Cause Analysis",
     "rcaPlaceholder": "Document the root cause, impact, and remediation steps...",
     "reopen": "Reopen",
@@ -1732,7 +1558,6 @@
     }
   },
   "incomingDestinations": {
-    "authType": "Auth Type",
     "create": "Add Destination",
     "createDialog": {
       "authConfig": "Auth Configuration (JSON)",
@@ -1740,19 +1565,14 @@
       "authConfigPlaceholder": "{\"token\": \"your-bearer-token\"}",
       "authType": "Authentication Type",
       "customHeaders": "Custom Headers (JSON)",
-      "customHeadersPlaceholder": "{\"X-Custom\": \"value\"}",
       "description": "Configure where incoming webhooks should be forwarded",
       "maxAttempts": "Max Attempts",
-      "maxAttemptsPlaceholder": "5",
       "noTransformation": "None (use inline transform below)",
       "payloadTransform": "Payload Transform (JSONPath)",
       "payloadTransformHint": "Optional JSONPath expression to transform payload before forwarding",
-      "payloadTransformPlaceholder": "$.data",
       "retryDelays": "Retry Delays (seconds, comma-separated)",
-      "retryDelaysPlaceholder": "60,300,900,3600,21600",
       "retryPolicy": "Retry Policy",
       "timeout": "Timeout (seconds)",
-      "timeoutPlaceholder": "30",
       "title": "Add Forwarding Destination",
       "transformation": "Transformation",
       "transformationHint": "Select a reusable transformation or use the inline JSONPath field below.",
@@ -1772,11 +1592,8 @@
     "enabled": "Enabled",
     "ladderLabel": "Retry ladder: {{count}} attempts",
     "ladderSummary": "{{attempts}} attempts · {{timeout}}s timeout",
-    "maxAttempts": "Max Attempts",
     "noDestinations": "No destinations configured",
     "noDestinationsDesc": "Add a forwarding destination to route incoming webhooks to your application",
-    "payloadTransform": "Payload Transform",
-    "retryDelays": "Retry Delays",
     "retryPresets": {
       "aggressive": {
         "desc": "10s → 30s → 1m → 2m",
@@ -1795,9 +1612,7 @@
         "label": "Standard"
       }
     },
-    "status": "Status",
     "subtitle": "Where incoming webhooks are forwarded to",
-    "timeout": "Timeout",
     "title": "Forwarding Destinations",
     "toast": {
       "createFailed": "Failed to create destination",
@@ -1807,7 +1622,6 @@
       "updateFailed": "Failed to update destination",
       "updated": "Destination updated"
     },
-    "url": "URL",
     "validation": {
       "allValid": "All configuration is valid",
       "attemptsRange": "Max attempts must be between 1 and 20",
@@ -1822,7 +1636,6 @@
       "timeoutRange": "Timeout must be between 1 and 120 seconds",
       "transformInvalidJson": "Payload transform must be valid JSON",
       "urlRequired": "URL is required",
-      "validJson": "Valid JSON",
       "validate": "Validate"
     }
   },
@@ -1888,15 +1701,11 @@
       "attemptRequestBody": "Forwarded request body",
       "attemptRequestHeaders": "Forwarded request headers",
       "body": "Request Body",
-      "bodyTruncated": "Body truncated ({{size}})",
-      "error": "Error",
-      "forwardingResults": "Forwarding Results",
       "forwards": "Forwards",
       "headers": "Request Headers",
       "nextRetry": "Next retry: {{time}}",
       "noAttempts": "No forwarding attempts yet",
       "requestMeta": "Request Metadata",
-      "responseCode": "HTTP {{code}}",
       "signatureResult": "Signature Verification",
       "title": "Event Details"
     },
@@ -1921,14 +1730,12 @@
     },
     "replaySelected": "Replay selected ({{count}})",
     "subtitle": "Incoming webhook events for <strong>{{project}}</strong>",
-    "title": "Incoming Events",
     "toast": {
       "bulkReplayed": "{{count}} incoming events queued for replay",
       "bulkReplayed_few": "{{count}} incoming events queued for replay",
       "bulkReplayed_many": "{{count}} incoming events queued for replay",
       "bulkReplayed_one": "{{count}} incoming event queued for replay",
       "bulkReplayed_other": "{{count}} incoming events queued for replay",
-      "idCopied": "Request ID copied to clipboard",
       "loadFailed": "Failed to load incoming events",
       "replayFailed": "Failed to replay event",
       "replayed": "Event replayed to {{count}} destinations"
@@ -1967,7 +1774,6 @@
       "title": "Disable incoming source?"
     },
     "descriptionV2": "Providers whose webhooks arrive here, and how each one is proven genuine before it is forwarded.",
-    "destinations": "Destinations",
     "detailDescription": "Webhooks arriving at this URL are verified, then forwarded to every destination below.",
     "disabled": "Disabled",
     "editDialog": {
@@ -1979,13 +1785,10 @@
     "howToSend": {
       "copy": "Copy URL",
       "curlExample": "Example cURL request:",
-      "description": "Configure your provider to send webhooks to the ingress URL below:",
       "signedByProvider": "{{provider}} signs every webhook in the {{header}} header. Send a test event from {{provider}}'s dashboard: an unsigned request, such as a plain cURL, is rejected with 401.",
-      "signedCurl": "Replace the placeholder with the HMAC-SHA256 of the exact body, signed with this source's secret. Without a valid {{header}} the request is rejected with 401.",
-      "title": "How to send webhooks"
+      "signedCurl": "Replace the placeholder with the HMAC-SHA256 of the exact body, signed with this source's secret. Without a valid {{header}} the request is rejected with 401."
     },
     "ingressUrl": "Ingress URL",
-    "name": "Name",
     "noSources": "No incoming sources yet",
     "noSourcesDesc": "Create your first incoming source to start receiving webhooks from external providers",
     "provider": "Provider",
@@ -2003,17 +1806,10 @@
       "HUBSPOT": "HubSpot"
     },
     "rateLimit": "Rate Limit",
-    "rateLimitHint": "Requests per second (leave empty for unlimited)",
     "security": {
       "noVerificationDesc": "Without HMAC verification, anyone with the ingress URL can send events. Consider enabling HMAC_GENERIC or PROVIDER verification for production use.",
-      "noVerificationTitle": "No signature verification",
-      "postureSafe": "Verified",
-      "postureWarning": "Unverified",
-      "rotateHmacHint": "Rotate your HMAC secret periodically to maintain security. Update the secret here and in your provider's webhook settings simultaneously."
+      "noVerificationTitle": "No signature verification"
     },
-    "slug": "Slug",
-    "status": "Status",
-    "subtitle": "Manage incoming webhook sources for <strong>{{project}}</strong>",
     "title": "Incoming Sources",
     "toast": {
       "createFailed": "Failed to create incoming source",
@@ -2030,8 +1826,7 @@
       "HMAC_GENERIC": "HMAC (generic)",
       "NONE": "None",
       "PROVIDER": "Provider signature"
-    },
-    "viewDetails": "View details"
+    }
   },
   "invite": {
     "accepting": "Accepting invitation...",
@@ -2298,7 +2093,6 @@
     "writeNeedsRole": "Read & write can be granted by an owner or developer of the organization."
   },
   "members": {
-    "actions": "Actions",
     "addMember": "Add Member",
     "addMemberLower": "Add member",
     "addModal": {
@@ -2354,7 +2148,6 @@
       "title": "Remove Member?"
     },
     "removeFrom": "Remove {{email}}",
-    "removing": "Removing...",
     "revokeDialog": {
       "description": "The link sent to {{email}} stops working and they will not be able to join. You can invite them again at any time.",
       "title": "Revoke this invite?"
@@ -2475,15 +2268,12 @@
     "analytics": "Analytics",
     "apiKeys": "API Keys",
     "auditLog": "Audit Log",
-    "automation": "Automation",
     "billing": "Billing",
     "closeMenu": "Close menu",
     "collapseSidebar": "Collapse sidebar",
-    "connectionSetup": "Connection Setup",
     "connections": "Connections",
     "currentProject": "Current project: {{name}}",
     "darkMode": "Dark mode",
-    "dashboard": "Dashboard",
     "deliveries": "Deliveries",
     "develop": "Develop",
     "dlq": "Failed Messages",
@@ -2496,7 +2286,6 @@
     "incidents": "Incidents",
     "incoming": "Incoming",
     "incomingDlq": "Failed Forwards",
-    "incomingEvents": "Received",
     "incomingSources": "Sources",
     "lightMode": "Light mode",
     "loggedOut": "Logged out successfully",
@@ -2505,25 +2294,19 @@
     "metrics": "Metrics",
     "navigation": "Navigation",
     "openMenu": "Open menu",
-    "operations": "Operations",
     "orgSettings": "Organization",
-    "organization": "Organization",
     "outgoing": "Outgoing",
     "overview": "Overview",
     "piiRules": "PII Masking",
-    "pipeline": "Pipeline",
     "profile": "Profile",
     "project": "Project",
-    "recovery": "Recovery",
     "replay": "Time Machine",
     "resources": "Resources",
     "rules": "Rules",
     "schemas": "Schemas",
     "search": "Search",
-    "security": "Security",
     "selectProject": "Select project",
     "settings": "Settings",
-    "showAdvanced": "Show Advanced Features",
     "skipToContent": "Skip to main content",
     "subscriptions": "Subscriptions",
     "testConsole": "Test Console",
@@ -2576,12 +2359,9 @@
   "orgSettings": {
     "access": "Access control",
     "accessDesc": "How many people hold each role in this organization.",
-    "authMethod": "Auth method",
     "configuration": "Configuration",
     "configurationDesc": "Export a project's endpoints and subscriptions, or import them into another project.",
-    "createdAt": "Created",
     "dangerZone": "Danger Zone",
-    "dangerZoneDesc": "Irreversible actions for your organization",
     "deleteImpactHistory": "Every event, delivery and audit entry is erased and cannot be recovered",
     "deleteImpactKeys": "All API keys stop working immediately",
     "deleteImpactMembers": "{{count}} members lose access",
@@ -2596,13 +2376,11 @@
     "deleteImpactProjects_other": "{{count}} projects are deleted with their endpoints and sources",
     "deleteOrg": "Delete Organization",
     "deleteOrgButton": "Delete Organization Permanently",
-    "deleteOrgConfirm": "Type the organization name to confirm deletion:",
     "deleteOrgDesc": "Permanently delete this organization and all associated data including projects, endpoints, events, deliveries, and members. This action cannot be undone.",
     "deleteOrgFailed": "Failed to delete organization",
     "deleteOrgSuccess": "Organization deleted",
     "details": "Organization Details",
     "detailsDesc": "Basic information about your organization",
-    "developers": "Developers",
     "exportButton": "Export Organization Data",
     "exportFailed": "Failed to export data",
     "exportSuccess": "Data export downloaded",
@@ -2616,26 +2394,18 @@
     "manageMembers_many": "Manage {{count}} members",
     "manageMembers_one": "Manage {{count}} member",
     "manageMembers_other": "Manage {{count}} members",
-    "membersOverview": "Members",
-    "membersOverviewDesc": "Overview of organization membership",
     "orgId": "Organization ID",
     "orgIdHint": "Quote this ID when you contact support.",
     "orgName": "Organization Name",
     "orgNameHint": "Shown to every member and on invitations.",
     "orgNamePlaceholder": "Acme Inc.",
-    "owners": "Owners",
-    "rbac": "Access control",
-    "security": "Security",
-    "securityDesc": "Authentication and access control configuration",
     "since": "Since {{date}}",
     "subtitle": "Manage your organization details and membership",
     "title": "Organization Settings",
     "toast": {
       "updateFailed": "Failed to update organization",
       "updated": "Organization updated"
-    },
-    "totalMembers": "Total",
-    "viewers": "Viewers"
+    }
   },
   "passwordStrength": {
     "fair": "Fair",
@@ -2653,10 +2423,7 @@
   },
   "permissions": {
     "contactOwner": "Contact your organization owner to request access",
-    "developerRole": "Developer",
-    "ownerRole": "Owner",
-    "requiredRole": "Requires {{role}} role",
-    "viewerRole": "Viewer"
+    "requiredRole": "Requires {{role}} role"
   },
   "piiRules": {
     "addRule": "Add rule",
@@ -2668,9 +2435,6 @@
       "description": "This rule will be permanently removed. Event payloads will no longer be masked by this rule.",
       "title": "Delete masking rule?"
     },
-    "disabled": "Disabled",
-    "enabled": "Enabled",
-    "example": "Example",
     "jsonPath": "JSON path",
     "maskStyle": "Mask style",
     "maskStyles": {
@@ -2679,7 +2443,6 @@
       "PARTIAL": "Partial"
     },
     "newRule": "New custom rule",
-    "newRuleDesc": "Specify a JSON path or pattern name to mask in event payloads",
     "newRuleEyebrow": "New rule",
     "noRules": "No masking rules configured",
     "noRulesHint": "Seed defaults to add email, phone, and card masking",
@@ -2709,7 +2472,6 @@
       "custom": "Custom",
       "total": "Total"
     },
-    "status": "Status",
     "subtitle": "Configure which fields are masked before sharing event payloads",
     "title": "PII Masking Rules",
     "toast": {
@@ -2720,10 +2482,8 @@
       "loadFailed": "Failed to load PII rules",
       "seedFailed": "Failed to seed defaults",
       "seeded": "Default rules added",
-      "updateFailed": "Failed to update rule",
-      "updated": "Masking rule updated"
-    },
-    "type": "Type"
+      "updateFailed": "Failed to update rule"
+    }
   },
   "platformAdmin": {
     "adminBadge": "Platform admin",
@@ -2904,8 +2664,6 @@
     "deleteNamed": "Delete {{name}}",
     "health": {
       "endpoints": "{{count}} endpoints",
-      "errors": "{{count}} errors",
-      "healthy": "Healthy",
       "lastEvent": "Last event {{time}}",
       "noDeliveries": "No deliveries yet",
       "noEndpoints": "No endpoints",
@@ -2943,37 +2701,28 @@
   },
   "replay": {
     "cancel": "Cancel Replay",
-    "cancelling": "Cancelling...",
     "confirmStart": "This will create new deliveries for all matching events. Existing deliveries are not affected. Continue?",
-    "createNew": "New Replay Session",
     "errorCount": "errors: {{count}}",
     "estimate": "Estimate",
     "estimateFirst": "Estimate first to see how many deliveries this would create.",
     "estimate_result": {
       "activeSubscriptions": "Active subscriptions",
       "estimatedDeliveries": "Estimated deliveries",
-      "title": "Replay Estimate",
-      "totalEvents": "Events to replay",
-      "warning": "Warning"
+      "totalEvents": "Events to replay"
     },
     "estimating": "Estimating...",
     "filters": {
       "allEndpoints": "All Endpoints",
-      "allStatuses": "All Statuses",
       "endpoint": "Endpoint",
       "eventType": "Event Type",
       "eventTypePlaceholder": "e.g. order.created",
       "fromDate": "From",
-      "sourceStatus": "Original Status",
       "toDate": "To"
     },
     "history": "Replay History",
     "live": "Live",
-    "newReplay": "New Replay",
     "noSessions": "No replay sessions",
     "noSessionsDesc": "Create a replay to re-deliver events from a specific time range",
-    "pageTitle": "Time Machine",
-    "projectNotFound": "Project not found",
     "quickRanges": {
       "1h": "Last hour",
       "24h": "Last 24 hours",
@@ -2990,20 +2739,11 @@
     "session": {
       "allEndpoints": "All endpoints",
       "allTypes": "All types",
-      "cancelled": "Cancelled",
-      "collapseDetails": "Collapse details",
-      "completed": "Completed",
       "created": "Created",
       "deliveries": "Deliveries created",
-      "duration": "Duration",
       "endpoint": "Endpoint",
-      "errors": "Errors",
       "eventType": "Event type",
-      "events": "Events",
-      "expandDetails": "Expand details",
       "progress": "Progress",
-      "started": "Started",
-      "status": "Status",
       "timeRange": "Time range"
     },
     "startReplay": "Start Replay",
@@ -3058,8 +2798,6 @@
       "TAG": "Tag event",
       "TRANSFORM": "Transform payload"
     },
-    "actions": "actions",
-    "actionsLabel": "Actions",
     "conditionCount": "Conditions: {{count}}",
     "conditions": "conditions",
     "conditionsLabel": "Conditions",
@@ -3116,10 +2854,6 @@
       "selectTransformation": "Select transformation…",
       "tagPlaceholder": "Tag name, e.g. high-priority",
       "valuePlaceholder": "Value"
-    },
-    "infoBanner": {
-      "body": "Subscriptions define static event→endpoint routing. Rules add dynamic logic on top — match events by payload conditions, then route to extra endpoints, apply transformations, or drop events entirely. Rules are evaluated after subscriptions, so they extend (not replace) your existing delivery setup.",
-      "title": "How Rules differ from Subscriptions"
     },
     "noActions": "No actions — this rule only records a match",
     "noResults": "No rules match your search.",
@@ -3525,7 +3259,6 @@
     "statusPending": "Pending",
     "statusProcessing": "Processing",
     "statusSuccess": "Success",
-    "subtitle": "Send events and inspect delivery results for <strong>{{project}}</strong>",
     "succeeded": "Delivered",
     "title": "Test Console",
     "verdictAbandoned": "Abandoned",
@@ -3571,7 +3304,6 @@
     "noRequestsHint": "Send a request to this URL and it appears here within a second.",
     "queryString": "Query String",
     "refresh": "Refresh",
-    "remaining": "remaining",
     "requestCount": "Requests: {{count}}",
     "resultEyebrow": "Result",
     "selectEndpoint": "Select an endpoint to view requests",
@@ -3594,7 +3326,6 @@
     "errors": {
       "conflict": "This action conflicts with an existing resource.",
       "forbidden": "You don't have permission to perform this action.",
-      "locked": "Too many failed sign-in attempts. Wait for the lockout to lapse, or reset your password to unlock the account now.",
       "network": "Network error. Check your connection and try again.",
       "notFound": "The requested resource was not found.",
       "payloadTooLarge": "Request body is too large. Please reduce the payload size.",
@@ -3625,11 +3356,7 @@
     },
     "diffHint": "Run the script to compare the body it returns against the event you gave it.",
     "dryRun": "Dry-run Delivery",
-    "dryRunBody": "Request Body",
     "dryRunBtn": "Simulate Delivery",
-    "dryRunDesc": "Simulate a full delivery — see the transformed payload, computed HMAC signature, and all HTTP headers that your endpoint would receive. Nothing is sent.",
-    "dryRunEmptyDesc": "Pick a target endpoint and simulate to see the exact request it would receive.",
-    "dryRunEmptyTitle": "Nothing simulated yet",
     "dryRunEndpoint": "Target Endpoint",
     "dryRunEventType": "Event Type",
     "dryRunFailed": "Failed to simulate delivery",
@@ -3638,8 +3365,6 @@
     "dryRunResult": "Delivery Dry-run Result",
     "dryRunRunning": "Simulating...",
     "dryRunSignature": "HMAC Signature",
-    "dryRunTransformation": "Transformation",
-    "editScript": "Edit script",
     "emptyTitle": "Nothing to show yet",
     "errorDetail": "What the engine said",
     "errorReason": {
@@ -3653,26 +3378,14 @@
       "UNAVAILABLE": "JavaScript transformations are not available on this deployment.",
       "UNKNOWN": "The script produced no payload."
     },
-    "errors": "Validation Errors",
-    "expression": "Transform Expression (JSONPath-like)",
     "format": "Format",
-    "help": {
-      "drillArrays": "drill into arrays",
-      "emptyExpr": "Empty expression = forward full payload as-is",
-      "extractField": "extract a nested field",
-      "headersMerge": "Custom headers are merged with system headers",
-      "testBefore": "Use this to test before saving to a destination"
-    },
     "hints": {
       "extractCustomer": "Extract customer info",
       "extractData": "Extract the data object",
       "extractItems": "Extract items array",
       "extractMetadata": "Extract metadata",
-      "passThrough": "Pass through entire payload",
-      "title": "Quick Expressions"
+      "passThrough": "Pass through entire payload"
     },
-    "howItWorks": "How it works",
-    "inputEyebrow": "Input",
     "inputPayload": "Input Payload",
     "kindJavascript": "JavaScript",
     "kindLabel": "Language",
@@ -3682,17 +3395,13 @@
     "loadMore": "Load more...",
     "metricConsole": "Console lines",
     "metricDuration": "Ran in",
-    "metricErrors": "Errors",
-    "metricHeaders": "Headers",
     "metricOutputSize": "Output size",
-    "metricSigned": "Signed",
     "modeDryRun": "Dry run",
     "modeLabel": "What to run",
     "modePreview": "Preview",
     "noEvents": "No events found in this project",
     "noOutput": "Click \"Run Preview\" to see the transform output",
     "noSavedTransformation": "— Use custom expression below —",
-    "openInStudio": "Open in Studio",
     "outputHeaders": "Output Headers",
     "outputPayload": "Output Payload",
     "previewFailed": "Failed to run transform preview",
@@ -3702,7 +3411,6 @@
     "run": "Run Preview",
     "runAgainst": "What to run it against",
     "runEyebrow": "Run",
-    "runHint": "Nothing is sent and nothing is stored.",
     "runShortcutHint": "⌘/Ctrl+Enter to run, ⌘/Ctrl+S to save. Nothing is sent and nothing is stored.",
     "running": "Running...",
     "save": "Save script",
@@ -3749,33 +3457,15 @@
     "disabledHint": "Disabled — won't be available for new subscriptions",
     "duplicate": "Duplicate",
     "editDesc": "Update the transformation template. A changed template is published as a new version you can come back to.",
-    "editInStudio": "A JavaScript transformation is edited in the Transform Studio, where you can run it against a real event before saving.",
     "editTitle": "Edit Transformation",
     "empty": "No transformations yet",
     "emptyDesc": "Create reusable transformations to normalize payloads across subscriptions and incoming destinations.",
     "enabledHint": "This transformation can be assigned to subscriptions",
     "expressionCount": "Expressions: {{count}}",
-    "expressionEventId": "Event ID",
-    "expressionEventType": "Event type",
-    "expressionFullPayload": "Full payload object",
-    "expressionNestedField": "Nested field",
-    "expressionTimestamp": "Timestamp",
-    "expressionsAvailable": "Available expressions:",
     "format": "Format",
     "history": "History",
     "howItWorks": {
-      "deliveredPayload": "Delivered Payload",
-      "deliveredPayloadDesc": "What your endpoint receives",
-      "hint": "Use <code>${$.field}</code> to reference fields from the original event. Assign this transformation to a subscription to apply it automatically.",
-      "incomingEvent": "Incoming Event",
-      "incomingEventDesc": "Original payload from your API",
-      "templateStep": "Template",
-      "templateStepDesc": "Your transformation reshapes the data",
-      "title": "How Transformations Work"
-    },
-    "howToApply": {
-      "body": "After saving, go to <strong>Subscriptions</strong> → edit or create a subscription → under <strong>Advanced Settings</strong>, select this transformation from the dropdown. Every delivery for that subscription will use this template instead of the original payload.",
-      "title": "How to apply this transformation"
+      "hint": "Use <code>${$.field}</code> to reference fields from the original event. Assign this transformation to a subscription to apply it automatically."
     },
     "kind": "Language",
     "kindJavascript": "JavaScript",
@@ -3784,14 +3474,12 @@
     "name": "Name",
     "nameHint": "A short name to identify this transformation (e.g. \"Slack Format\", \"Stripe Normalize\")",
     "namePlaceholder": "e.g. Stripe v2 → CRM v1",
-    "newScript": "New JavaScript transformation",
     "noMatching": "No matching transformations",
     "noMatchingDesc": "Try adjusting your search filter.",
     "openInStudio": "Open in Transform Studio",
     "outputPreview": "Output (what endpoint receives)",
     "previewEmpty": "Write a template to see the live output preview",
     "previewFixJson": "Fix the template JSON to see the preview",
-    "projectNotFound": "Project not found",
     "sampleInputEvent": "Sample Input Event",
     "search": "Search",
     "searchPlaceholder": "Filter by name or description…",
@@ -3799,7 +3487,6 @@
     "subscriptionCount": "Subscriptions: {{count}}",
     "subtitle": "Reusable payload transformation templates for normalizing and reshaping webhook data.",
     "template": "Template",
-    "templateHint": "JSON template with ${$.jsonpath} expressions. Example: {\"event\": \"${$.type}\", \"amount\": \"${$.data.amount}\"}",
     "title": "Transformations",
     "toast": {
       "createFailed": "Failed to create transformation",
@@ -3812,8 +3499,6 @@
     "updated": "Updated",
     "usedBy": "Used by",
     "validation": {
-      "expression": "expression",
-      "expressions": "expressions",
       "invalidJson": "Invalid JSON format",
       "nameRequired": "Name is required",
       "templateRequired": "Template is required",
@@ -3882,13 +3567,6 @@
     }
   },
   "usage": {
-    "breakdown": {
-      "dlq": "Dead Letter Queue",
-      "failed": "Failed",
-      "pending": "Pending / Processing",
-      "success": "Successful",
-      "title": "Delivery Breakdown (30d)"
-    },
     "description": "What this project has used, and what your plan allows.",
     "history": {
       "date": "Date",
@@ -3911,8 +3589,6 @@
       "title": "Where deliveries ended up",
       "total": "{{total}} deliveries in total"
     },
-    "noData": "No usage data",
-    "noDataDesc": "Start sending events to see usage metrics",
     "periodLabel": "Time range",
     "periods": {
       "30d": "Last 30 days",
@@ -3934,16 +3610,8 @@
     },
     "resources": {
       "alertRules": "Alert Rules",
-      "endpoints": "Active Endpoints",
-      "sources": "Incoming Sources"
+      "endpoints": "Active Endpoints"
     },
-    "stats": {
-      "deliveries": "Deliveries (30d)",
-      "dlq": "DLQ",
-      "events": "Events (30d)",
-      "successRate": "Success Rate"
-    },
-    "subtitle": "Resource usage for <strong>{{project}}</strong>",
     "tiles": {
       "alertRulesHint": "Watching this project",
       "endpointsHint": "Registered and enabled",
@@ -4023,7 +3691,6 @@
       "WAITING": "Waiting"
     },
     "failed": "Failed",
-    "loading": "Loading...",
     "nameLabel": "Name",
     "namePlaceholder": "Workflow name",
     "newWorkflow": "New Workflow",
@@ -4153,7 +3820,6 @@
         "label": "Webhook Trigger"
       }
     },
-    "nodes": "nodes",
     "stepStatus": {
       "FAILED": "Failed",
       "PENDING": "Pending",
