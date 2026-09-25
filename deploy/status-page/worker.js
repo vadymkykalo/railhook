@@ -177,7 +177,7 @@ function duration(from, to) {
   return `${hours} h ${minutes % 60} min`;
 }
 
-const ICON = `<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#1D4BFF"/><path d="M8 7v12c0 3.9 3.1 7 7 7s7-3.1 7-7v-6" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><path d="M19 16l3-3 3 3" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="7" r="2" fill="#fff"/></svg>`;
+const ICON = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.25 3.5v6.75a4 4 0 0 0 8 0V8.5"/><path d="M10.25 6.25l3-2.75 3 2.75"/><circle cx="5.25" cy="3.5" r="1.75" fill="currentColor" stroke="none"/></svg>`;
 
 const HEADLINE = {
   up: 'All systems operational',
@@ -231,31 +231,31 @@ function renderPage(status) {
 <meta http-equiv="refresh" content="60">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Onest:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#fff;--fg:#0B0E1A;--muted:#5A6072;--rail:#E4E6EE;--card:#fff;--primary:#1D4BFF;--ok:#16A34A;--warn:#D97706;--bad:#DC2626;--none:#E4E6EE;--soft:#F5F7FF}
-@media (prefers-color-scheme:dark){:root{--bg:#0B0D14;--fg:#EDEFF5;--muted:#9AA3B5;--rail:#232838;--card:#10131C;--primary:#6F8DFF;--ok:#22C55E;--warn:#F59E0B;--bad:#F87171;--none:#232838;--soft:#141A2E}}
+:root{--bg:#fff;--fg:#000;--muted:#555;--rail:#E5E7EB;--card:#fff;--hl:#7FE7FF;--ok:#16A34A;--warn:#D97706;--bad:#DC2626;--none:#E5E7EB;--soft:#F4F4F4}
+@media (prefers-color-scheme:dark){:root{--bg:#0A0A0A;--fg:#fff;--muted:#A3A3A3;--rail:#2E2E2E;--card:#0A0A0A;--ok:#22C55E;--warn:#F59E0B;--bad:#F87171;--none:#2E2E2E;--soft:#111}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 Onest,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-a{color:var(--primary);text-decoration:none}a:hover{text-decoration:underline}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 Geist,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--fg);text-decoration:underline;text-underline-offset:3px}a:hover{background:var(--hl);color:#000}
 .wrap{max-width:52rem;margin:0 auto;padding:0 16px}
 header{border-bottom:1px solid var(--rail)}
 header .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
-.brand{display:flex;align-items:center;gap:10px;color:var(--fg);font-weight:600}
-.brand svg{width:28px;height:28px}
+.brand{display:flex;align-items:center;gap:8px;color:var(--fg);font-weight:500;font-size:18px;text-decoration:none}
+.brand svg{width:22px;height:22px}
 .brand small{color:var(--muted);font-weight:500;margin-left:2px}
-header nav{display:flex;gap:18px;font-size:14px}header nav a{color:var(--muted)}header nav a:hover{color:var(--fg);text-decoration:none}
-h1{font-family:Manrope,sans-serif;font-weight:800;letter-spacing:-.03em;font-size:clamp(1.9rem,5vw,2.6rem);line-height:1.1;margin:0}
-h2{font-family:Manrope,sans-serif;font-weight:700;letter-spacing:-.02em;font-size:1.3rem;margin:48px 0 16px}
-h3{font-size:15px;font-weight:600;margin:0}
+header nav{display:flex;gap:18px;font-size:14px}header nav a{color:var(--muted);text-decoration:none}header nav a:hover{color:var(--fg);background:none}
+h1{font-weight:400;letter-spacing:-.03em;font-size:clamp(1.9rem,5vw,2.6rem);line-height:1.1;margin:0}
+h2{font:400 12px/1 'JetBrains Mono',ui-monospace,monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:48px 0 14px}
+h3{font-size:15px;font-weight:500;margin:0}
 .hero{padding:48px 0 8px}
-.banner{margin-top:24px;display:flex;align-items:center;gap:12px;border-radius:16px;padding:18px 20px;border:1px solid var(--rail);background:var(--soft);font-weight:600}
+.banner{margin-top:24px;display:flex;align-items:center;gap:12px;padding:18px 20px;border:1px solid var(--rail);background:var(--soft);font-weight:500}
 .banner .dot{width:12px;height:12px}
 .banner.up .dot{background:var(--ok);box-shadow:0 0 0 6px color-mix(in srgb,var(--ok) 18%,transparent)}
 .banner.degraded .dot{background:var(--warn)}.banner.down .dot{background:var(--bad)}
 .banner small{margin-left:auto;color:var(--muted);font-weight:400;font-size:13px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--none)}
-.card{border:1px solid var(--rail);border-radius:16px;background:var(--card);overflow:hidden}
+.card{border:1px solid var(--rail);background:var(--card);overflow:hidden}
 .component{padding:18px 20px}.component+.component{border-top:1px solid var(--rail)}
 .row{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .state{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}
@@ -263,14 +263,14 @@ h3{font-size:15px;font-weight:600;margin:0}
 .state.degraded{color:var(--warn)}.state.degraded .dot{background:var(--warn)}
 .state.down{color:var(--bad)}.state.down .dot{background:var(--bad)}
 .bars{display:flex;gap:2px;height:34px;margin-top:14px}
-.bars i{flex:1;border-radius:2px;background:var(--none);min-width:2px}
+.bars i{flex:1;background:var(--none);min-width:2px}
 .bars i.ok{background:var(--ok)}.bars i.warn{background:var(--warn)}.bars i.bad{background:var(--bad)}
 .bars i:hover{opacity:.7}
 .legend{display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--muted);font-family:'JetBrains Mono',ui-monospace,monospace}
 .legend .uptime{color:var(--fg)}.legend .sm{display:none}
-.incident{border:1px solid var(--rail);border-radius:14px;padding:16px 18px;margin-bottom:12px;background:var(--card)}
+.incident{border:1px solid var(--rail);padding:16px 18px;margin-bottom:12px;background:var(--card)}
 .incident p{margin:8px 0 0;color:var(--muted);font-size:14px}.incident .meta{font-size:12px}
-.tag{font-size:12px;border-radius:999px;padding:2px 10px;background:var(--soft);color:var(--muted)}
+.tag{font:400 11px 'JetBrains Mono',ui-monospace,monospace;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;background:var(--soft);color:var(--muted)}
 .incident.open .tag{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
 .incident.resolved .tag{color:var(--ok)}
 .empty{color:var(--muted)}
