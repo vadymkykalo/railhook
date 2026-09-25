@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.31.1] - 2026-09-25
+
+### Changed
+
+- The About, Security and Contact pages are gone (301 to the home page and the docs); shorter Privacy, Terms and Pricing; plainer dashboard text.
+
 ## [2.31.0] - 2026-09-25
 
 ### Changed
@@ -421,7 +427,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release: event ingestion, subscriptions, signed delivery with retries and a DLQ, and a dashboard.
 
-[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.31.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/railhook/compare/v2.31.1...HEAD
 [2.20.2]: https://github.com/vadymkykalo/railhook/compare/v2.20.1...v2.20.2
 [2.20.1]: https://github.com/vadymkykalo/railhook/compare/v2.20.0...v2.20.1
 [2.20.0]: https://github.com/vadymkykalo/railhook/compare/v2.19.2...v2.20.0
