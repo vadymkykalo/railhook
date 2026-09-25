@@ -78,6 +78,6 @@ describe('PricingPage', () => {
     renderPricing();
     const uk = (await import('../../i18n/locales/uk.json')).default;
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(uk.pricing.title);
-    expect(jsonLd().mainEntity[0].name).toBe(uk.pricing.faq.free.q);
+    expect(jsonLd().mainEntity[0].name).toBe(uk.pricing.faq.limit.q);
   });
 });

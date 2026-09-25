@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Cookie, MessageCircle, X } from 'lucide-react';
 import { contactDomain, webAnalyticsToken } from '../../lib/runtimeConfig';
@@ -11,7 +11,6 @@ import ContactForm from './ContactForm';
 
 /** Owned together: on a phone they share the bottom edge, so the launcher rises above the notice. */
 export default function SiteOverlays() {
-  const { pathname } = useLocation();
   const [noticeOpen, setNoticeOpen] = useState(false);
 
   useEffect(() => {
@@ -20,7 +19,7 @@ export default function SiteOverlays() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const showWidget = Boolean(contactDomain()) && pathname !== '/contact';
+  const showWidget = Boolean(contactDomain());
 
   return (
     <>

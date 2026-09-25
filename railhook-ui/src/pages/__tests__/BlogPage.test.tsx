@@ -39,28 +39,15 @@ describe('BlogPage', () => {
     }
   });
 
-  it('shows each post’s date, reading time, lead and tags', () => {
-    renderBlog();
-    const post = posts[0];
-    const article = screen.getByRole('link', { name: post.title }).closest('article') as HTMLElement;
-    expect(within(article).getByText(post.lead)).toBeInTheDocument();
-    expect(article.querySelector(`time[datetime="${post.date}"]`)).not.toBeNull();
-    expect(article.textContent).toContain(en.blog.readingTime.replace('{{minutes}}', String(post.readingMinutes)));
-    for (const tag of post.tags) expect(within(article).getByText(tag)).toBeInTheDocument();
-  });
-
-  it('makes the whole card one link: a single link per card, stretched over it', () => {
-    // jsdom does not hit-test pseudo-elements; this checks the structure the stretched link needs.
+  it('shows each post’s date, reading time and lead, with the title as its one link', () => {
     renderBlog();
     for (const post of posts) {
       const link = screen.getByRole('link', { name: post.title });
-      const card = link.closest('article') as HTMLElement;
-      expect(within(card).getAllByRole('link')).toEqual([link]);
-      expect(link).toHaveAttribute('data-stretched-link');
-      expect(link.className).toMatch(/after:absolute/);
-      expect(link.className).toMatch(/after:inset-0/);
-      expect(card.className).toMatch(/\brelative\b/);
-      expect(card.className).toMatch(/cursor-pointer/);
+      const article = link.closest('article') as HTMLElement;
+      expect(within(article).getAllByRole('link')).toEqual([link]);
+      expect(within(article).getByText(post.lead)).toBeInTheDocument();
+      expect(article.querySelector(`time[datetime="${post.date}"]`)).not.toBeNull();
+      expect(article.textContent).toContain(en.blog.readingTime.replace('{{minutes}}', String(post.readingMinutes)));
     }
   });
 

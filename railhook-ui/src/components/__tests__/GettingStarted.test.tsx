@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import '../../i18n';
+import en from '../../i18n/locales/en.json';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import { DISMISS_KEY, INTENT_KEY } from '../../lib/onboarding';
 import type { OnboardingStatus } from '../../api/dashboard.api';
@@ -145,7 +146,7 @@ describe('GettingStarted', () => {
       { hasIncomingSources: true, hasIncomingDestinations: true },
       [{ ...SOURCE, verificationMode: 'PROVIDER', hmacSecretConfigured: true }]
     );
-    expect(await screen.findByText(/You're all set/)).toBeInTheDocument();
+    expect(await screen.findByText(en.onboarding.allDone)).toBeInTheDocument();
   });
 
   it('can be dismissed and brought back', async () => {
