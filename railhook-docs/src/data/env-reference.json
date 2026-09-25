@@ -302,7 +302,7 @@
           "name": "PLATFORM_ADMIN_EMAILS",
           "default": "",
           "example": null,
-          "description": "Comma-separated emails allowed into the platform admin panel with their own sign-in (verified,\nactive, signed in within 12 hours). Empty means nobody.\nExample: PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com"
+          "description": "Comma-separated emails allowed into the platform admin panel (sign-in under 12 hours old).\nEmpty means nobody."
         }
       ]
     },
@@ -820,7 +820,7 @@
           "name": "WEBHOOK_TRUSTED_PROXIES",
           "default": "",
           "example": null,
-          "description": "Comma-separated IPs/CIDRs of reverse proxies whose X-Forwarded-For is trusted, e.g.\n  WEBHOOK_TRUSTED_PROXIES=10.0.0.5,172.20.0.0/16\nDecides the client IP for rate limits, audit logs and source IP checks. Behind a CDN, include its\nranges too. Empty trusts nothing."
+          "description": "Comma-separated proxy IPs/CIDRs whose X-Forwarded-For sets the client IP (rate limits, audit,\nsource IP checks); behind a CDN include its ranges. Empty trusts nothing."
         }
       ]
     },
@@ -1635,13 +1635,13 @@
           "name": "GOOGLE_OAUTH_CLIENT_ID",
           "default": null,
           "example": null,
-          "description": "Google OAuth client (\"Web application\") for \"Continue with Google\"; off unless both are set.\nAuthorized redirect URI:\n  <APP_BASE_URL>/api/v1/auth/oauth/google/callback"
+          "description": "\"Continue with Google\", off unless both are set. Redirect URI:\n<APP_BASE_URL>/api/v1/auth/oauth/google/callback"
         },
         {
           "name": "GOOGLE_OAUTH_CLIENT_SECRET",
           "default": null,
           "example": null,
-          "description": "Google OAuth client (\"Web application\") for \"Continue with Google\"; off unless both are set.\nAuthorized redirect URI:\n  <APP_BASE_URL>/api/v1/auth/oauth/google/callback"
+          "description": "\"Continue with Google\", off unless both are set. Redirect URI:\n<APP_BASE_URL>/api/v1/auth/oauth/google/callback"
         }
       ]
     },
