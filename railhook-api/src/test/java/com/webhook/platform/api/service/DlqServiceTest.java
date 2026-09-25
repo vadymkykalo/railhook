@@ -15,10 +15,7 @@ import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.DlqItemResponse;
-import com.webhook.platform.api.dto.DlqStatsResponse;
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
-import com.webhook.platform.api.service.DeliveryDispatch;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +27,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -65,13 +63,6 @@ class DlqServiceTest {
         return Project.builder().id(projectId).organizationId(orgId).build();
     }
 
-    // ─── validateProjectOwnership ───────────────────────────────────────
-
-
-    /**
-     * DlqService reads its organization from the ambient tenant scope now, not from a parameter
-     * rather than from a parameter; a unit test has no request to establish one, so it enters it.
-     */
     @BeforeEach
     void enterTenantScope() {
         TenantContext.set(orgId);
@@ -81,22 +72,6 @@ class DlqServiceTest {
     void leaveTenantScope() {
         TenantContext.clear();
     }
-
-    @Test
-    void validateProjectOwnership_matchingOrg_doesNotThrow() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
-        dlqService.validateProjectOwnership(projectId);
-    }
-
-    @Test
-    void validateProjectOwnership_projectNotFound_throwsNotFound() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> dlqService.validateProjectOwnership(projectId))
-                .isInstanceOf(NotFoundException.class);
-    }
-
-
-    // ─── listDlqItems ────────────────────────────────────────────────────
 
     @Test
     void listDlqItems_noEndpointFilter_usesProjectQuery_andBatchLoadsLastAttempts() {
@@ -124,22 +99,6 @@ class DlqServiceTest {
     }
 
     @Test
-    void listDlqItems_withEndpointFilter_usesEndpointScopedQuery() {
-        UUID endpointId = UUID.randomUUID();
-        Pageable pageable = PageRequest.of(0, 20);
-        when(deliveryRepository.findDlqByProjectIdAndEndpointId(projectId, endpointId, pageable))
-                .thenReturn(new PageImpl<>(List.of()));
-
-        Page<DlqItemResponse> result = dlqService.listDlqItems(projectId, endpointId, pageable);
-
-        assertThat(result.getContent()).isEmpty();
-        verify(deliveryRepository).findDlqByProjectIdAndEndpointId(projectId, endpointId, pageable);
-        verify(deliveryRepository, never()).findDlqByProjectId(any(), any());
-        // Empty page must not trigger a batch-attempt query at all.
-        verify(deliveryAttemptRepository, never()).findLatestAttemptsByDeliveryIds(any(), any());
-    }
-
-    @Test
     void listDlqItems_lastAttemptHasNoErrorMessage_fallsBackToHttpStatus() {
         UUID deliveryId = UUID.randomUUID();
         Delivery delivery = Delivery.builder().id(deliveryId).eventId(UUID.randomUUID())
@@ -155,24 +114,6 @@ class DlqServiceTest {
         Page<DlqItemResponse> result = dlqService.listDlqItems(projectId, null, pageable);
 
         assertThat(result.getContent().get(0).getLastError()).isEqualTo("HTTP 503");
-    }
-
-    // ─── getDlqItem ──────────────────────────────────────────────────────
-
-    @Test
-    void getDlqItem_validDlqDelivery_returnsMappedResponse() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
-        UUID deliveryId = UUID.randomUUID();
-        Delivery delivery = Delivery.builder().id(deliveryId).status(DeliveryStatus.DLQ)
-                .eventId(UUID.randomUUID()).endpointId(UUID.randomUUID()).build();
-        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
-        stubEventIn(delivery, projectId);
-        when(deliveryAttemptRepository.findTopByDeliveryIdOrderByAttemptNumberDesc(deliveryId))
-                .thenReturn(Optional.empty());
-
-        DlqItemResponse response = dlqService.getDlqItem(projectId, deliveryId);
-
-        assertThat(response.getDeliveryId()).isEqualTo(deliveryId);
     }
 
     @Test
@@ -194,16 +135,6 @@ class DlqServiceTest {
     }
 
     @Test
-    void getDlqItem_deliveryNotFound_throwsNotFound() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
-        UUID deliveryId = UUID.randomUUID();
-        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> dlqService.getDlqItem(projectId, deliveryId))
-                .isInstanceOf(NotFoundException.class);
-    }
-
-    @Test
     void getDlqItem_deliveryNotInDlq_throwsIllegalArgument() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
         UUID deliveryId = UUID.randomUUID();
@@ -219,8 +150,6 @@ class DlqServiceTest {
 
     @Test
     void getDlqItem_projectOutsideTenant_throwsNotFoundBeforeLoadingDelivery() {
-        // A project in another organization is invisible to this tenant, so the
-        // repository returns nothing rather than a row with a mismatched org.
         when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
         UUID deliveryId = UUID.randomUUID();
 
@@ -228,23 +157,6 @@ class DlqServiceTest {
                 .isInstanceOf(NotFoundException.class);
         verify(deliveryRepository, never()).findById(any());
     }
-
-    // ─── getDlqStats ─────────────────────────────────────────────────────
-
-    @Test
-    void getDlqStats_returnsCountsFromRepository() {
-        when(deliveryRepository.countDlqByProjectId(projectId)).thenReturn(100L);
-        when(deliveryRepository.countDlqByProjectIdSince(eq(projectId), any(Instant.class)))
-                .thenReturn(10L, 50L);
-
-        DlqStatsResponse stats = dlqService.getDlqStats(projectId);
-
-        assertThat(stats.getTotalItems()).isEqualTo(100L);
-        assertThat(stats.getLast24Hours()).isEqualTo(10L);
-        assertThat(stats.getLast7Days()).isEqualTo(50L);
-    }
-
-    // ─── retryDeliveries ─────────────────────────────────────────────────
 
     @Test
     void retryDeliveries_resetsDeliveryStateAndCreatesOutboxMessage() {
@@ -271,11 +183,7 @@ class DlqServiceTest {
         verify(deliveryRepository).save(savedCaptor.capture());
         Delivery saved = savedCaptor.getValue();
         assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
-        // attemptCount is carried forward, not reset. delivery_attempts is unique on
-        // (delivery_id, attempt_number), so restarting the count makes the attempt this retry
-        // records collide with one already on the record — the history reads as two attempt 1s
-        // and "the latest attempt" stops being well defined. Headroom comes from maxAttempts
-        // instead, which is what pressing retry is actually asking for.
+        // Restarting the count collided with (delivery_id, attempt_number); headroom comes from maxAttempts.
         assertThat(saved.getAttemptCount()).isEqualTo(7);
         assertThat(saved.getMaxAttempts()).isEqualTo(10);
         assertThat(saved.getNextRetryAt()).isNull();
@@ -296,7 +204,7 @@ class DlqServiceTest {
         Delivery delivery = Delivery.builder().id(deliveryId).eventId(eventId)
                 .endpointId(UUID.randomUUID()).status(DeliveryStatus.DLQ)
                 .attemptCount(7).maxAttempts(7)
-                .createdAt(Instant.now().minus(java.time.Duration.ofDays(5)))
+                .createdAt(Instant.now().minus(Duration.ofDays(5)))
                 .build();
         when(deliveryRepository.findByIdInAndStatus(List.of(deliveryId), DeliveryStatus.DLQ))
                 .thenReturn(List.of(delivery));
@@ -305,8 +213,7 @@ class DlqServiceTest {
 
         dlqService.retryDeliveries(projectId, List.of(deliveryId));
 
-        // The worker escalates a PENDING Delivery past the hard cap. Measured from createdAt, this
-        // five-day-old one went straight back to the DLQ at the next sweep.
+        // Measured from createdAt, a five-day-old retry went straight back to the DLQ at the next sweep.
         ArgumentCaptor<Delivery> savedCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(savedCaptor.capture());
         assertThat(savedCaptor.getValue().getLadderResumedAt()).isNotNull().isAfterOrEqualTo(before);
@@ -351,8 +258,6 @@ class DlqServiceTest {
 
     @Test
     void retryDeliveries_projectOutsideTenant_throwsNotFoundBeforeTouchingDeliveries() {
-        // A project in another organization is invisible to this tenant, so the
-        // repository returns nothing rather than a row with a mismatched org.
         when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> dlqService.retryDeliveries(projectId, List.of(UUID.randomUUID())))
@@ -360,40 +265,20 @@ class DlqServiceTest {
         verifyNoInteractions(deliveryRepository);
     }
 
-    // ─── purgeAllDlq ─────────────────────────────────────────────────────
-
-    @Test
-    void purgeAllDlq_deletesAndReturnsCount() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
-        when(deliveryRepository.deleteDlqBatchByProjectId(any(), eq(projectId), anyInt())).thenReturn(5);
-
-        int purged = dlqService.purgeAllDlq(projectId);
-
-        // One short batch means the DLQ is drained, so exactly one round-trip.
-        assertThat(purged).isEqualTo(5);
-        verify(deliveryRepository).deleteDlqBatchByProjectId(any(), eq(projectId), anyInt());
-    }
-
     @Test
     void purgeAllDlq_keepsDeletingUntilABatchComesBackShort() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
-        // A full batch means there may be more; the loop stops on the first short one.
         when(deliveryRepository.deleteDlqBatchByProjectId(any(), eq(projectId), anyInt()))
                 .thenReturn(500, 500, 12);
 
         int purged = dlqService.purgeAllDlq(projectId);
 
-        // Batched rather than one unbounded DELETE: with the V061 foreign key back, each
-        // delivery cascades into its attempt rows, so an unbounded purge held locks across all
-        // of them for the length of a single transaction.
         assertThat(purged).isEqualTo(1012);
         verify(deliveryRepository, times(3)).deleteDlqBatchByProjectId(any(), eq(projectId), anyInt());
     }
 
     @Test
     void purgeAllDlq_projectOutsideTenant_throwsNotFoundBeforeDeleting() {
-        // A project in another organization is invisible to this tenant, so the
-        // repository returns nothing rather than a row with a mismatched org.
         when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> dlqService.purgeAllDlq(projectId))

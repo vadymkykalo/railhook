@@ -22,15 +22,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * The sweep that reclaims lost Claims, and what happens when the thing it coordinates through
- * is the thing that is broken.
- *
- * <p>A Claim is revocable because the holder can die, and this is what revokes it. Gating that on
- * Redis meant a Redis outage stopped it — so every Delivery whose worker died during the outage
- * stayed PROCESSING, claimed by nobody, for as long as the outage lasted. The circuit breaker
- * already fails open for the same reason, and says so in a counter rather than in silence.
- */
+/** Gating the claim sweep on Redis left Deliveries PROCESSING for the whole of a Redis outage. */
 class ExclusiveSweepTest {
 
     private RedissonClient redisson;
@@ -83,12 +75,6 @@ class ExclusiveSweepTest {
     @Test
     @DisplayName("Redis being down does not cancel the sweep, it only costs the exclusivity")
     void sweepsAnywayWhenRedisIsUnreachable() {
-        // The exception used to propagate out of the @Scheduled method, so nothing swept at all
-        // while Redis was down — and Redis being down is exactly when workers are being restarted
-        // and Claims are being lost. What the lock buys is that one replica sweeps instead of
-        // several; the sweeps themselves are UPDATE ... WHERE status = 'PROCESSING' AND
-        // last_attempt_at < threshold, so a second replica running one finds nothing to do.
-        // Losing the coordination is cheap. Losing the sweep is not.
         when(redisson.getLock(anyString()))
                 .thenThrow(new RedisConnectionException("no connection available"));
         AtomicInteger ran = new AtomicInteger();

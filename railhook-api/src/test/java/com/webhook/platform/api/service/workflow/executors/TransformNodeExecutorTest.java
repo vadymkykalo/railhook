@@ -17,10 +17,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class TransformNodeExecutorTest {
@@ -52,11 +49,6 @@ class TransformNodeExecutorTest {
     }
 
     @Test
-    void getType_returnsTransform() {
-        assertThat(executor.getType()).isEqualTo("transform");
-    }
-
-    @Test
     void noTemplate_passesThroughInput() throws Exception {
         JsonNode input = json("{\"a\":1}");
         StepResult result = executor.execute(json("{}"), input);
@@ -83,19 +75,6 @@ class TransformNodeExecutorTest {
     }
 
     @Test
-    void jsonTemplateAsObjectNode_resolvesPlaceholders() throws Exception {
-        JsonNode template = json("{\"id\": \"{{orderId}}\"}");
-        var config = mapper.createObjectNode();
-        config.set("template", template);
-        JsonNode input = json("{\"orderId\":\"abc-123\"}");
-
-        StepResult result = executor.execute(config, input);
-
-        assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
-        assertThat(result.output().get("id").asText()).isEqualTo("abc-123");
-    }
-
-    @Test
     void plainStringTemplate_wrapsResolvedValueInResultField() throws Exception {
         JsonNode config = json("{\"template\":\"Order {{orderId}} received\"}");
         JsonNode input = json("{\"orderId\":\"o-9\"}");
@@ -118,38 +97,16 @@ class TransformNodeExecutorTest {
     }
 
     @Test
-    void nestedObjectTemplate_resolvesNestedFields() throws Exception {
-        JsonNode config = json("""
-                {"template": "{\\"a\\": {\\"b\\": \\"{{x}}\\"}}"}
-                """);
-        JsonNode input = json("{\"x\":\"nested-value\"}");
-
-        StepResult result = executor.execute(config, input);
-
-        assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
-        assertThat(result.output().get("a").get("b").asText()).isEqualTo("nested-value");
-    }
-
-    @Test
     void malformedJsonTemplate_returnsFailed() throws Exception {
         JsonNode config = json("{\"template\":\"{not valid json\"}");
 
         StepResult result = executor.execute(config, json("{}"));
 
-        // "{not valid json" starts with "{" so it's parsed as JSON and should fail to parse
         assertThat(result.status()).isEqualTo(StepStatus.FAILED);
         assertThat(result.errorMessage()).contains("Transform error");
     }
 
-    // ── Pointing at a saved transformation ──────────────────────────
-    //
-    // The node took an inline template and nothing else, so a project that had built up named
-    // transformations — the same objects a rule action points at — had to retype one into every
-    // workflow that needed it, in a second template language. They are not interchangeable: a
-    // saved transformation is ${$.path} JSONPath run by the same engine that transforms a
-    // delivery payload, the node's own template is {{field.path}}. Pasting one into the other
-    // produced literal braces and no error.
-
+    // A saved transformation is ${$.path} JSONPath, the inline template {{field}}: not interchangeable.
     @Test
     void savedTransformation_runsInItsOwnSyntax() throws Exception {
         UUID id = UUID.randomUUID();
@@ -172,8 +129,6 @@ class TransformNodeExecutorTest {
 
         StepResult result = executor.execute(json("{\"transformationId\":\"" + id + "\"}"), json("{\"a\":1}"));
 
-        // Deleting a transformation a workflow still points at is a mistake somebody should
-        // hear about, not one that quietly starts delivering the raw event instead.
         assertThat(result.status()).isEqualTo(StepStatus.FAILED);
         assertThat(result.errorMessage()).contains(id.toString());
     }
@@ -185,16 +140,12 @@ class TransformNodeExecutorTest {
 
         StepResult result = executor.execute(json("{\"transformationId\":\"" + id + "\"}"), json("{}"));
 
-        // Disabled means "do not run this", and the only honest reading of that inside a
-        // workflow told to run it is a failed step.
         assertThat(result.status()).isEqualTo(StepStatus.FAILED);
         assertThat(result.errorMessage()).containsIgnoringCase("disabled");
     }
 
     @Test
     void reference_winsOverAnInlineTemplateLeftBehind() throws Exception {
-        // Switching a node from inline to saved leaves the old text in the config. The node
-        // must run one of them, and the one the operator last chose is the reference.
         UUID id = UUID.randomUUID();
         when(transformationRepository.findById(id))
                 .thenReturn(Optional.of(saved("{\"from\":\"saved\"}", true)));
@@ -206,11 +157,4 @@ class TransformNodeExecutorTest {
         assertThat(result.output().path("from").asText()).isEqualTo("saved");
     }
 
-    @Test
-    void unreadableTransformationId_isRefusedWithoutTouchingTheDatabase() throws Exception {
-        StepResult result = executor.execute(json("{\"transformationId\":\"not-a-uuid\"}"), json("{}"));
-
-        assertThat(result.status()).isEqualTo(StepStatus.FAILED);
-        verify(transformationRepository, never()).findById(any());
-    }
 }

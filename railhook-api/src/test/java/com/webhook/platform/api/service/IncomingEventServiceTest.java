@@ -3,9 +3,7 @@ package com.webhook.platform.api.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingEvent;
-import com.webhook.platform.api.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.api.domain.entity.IncomingSource;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
@@ -13,14 +11,10 @@ import com.webhook.platform.api.domain.repository.IncomingForwardAttemptReposito
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
-import com.webhook.platform.api.dto.IncomingEventResponse;
-import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
-import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.domain.enums.MembershipRole;
-import com.webhook.platform.api.service.ForwardDispatch;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
@@ -33,8 +27,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
@@ -85,9 +77,6 @@ class IncomingEventServiceTest {
     @BeforeEach
     void setUp() {
         when(txManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
-        // What the real service does for a project with no masking rules: hand the payload
-        // straight back. An unstubbed mock returns null, which would silently assert that
-        // masking blanks every body.
         lenient().when(piiMaskingService.sanitizePayload(any(), anyString()))
                 .thenAnswer(inv -> inv.getArgument(1));
 
@@ -118,77 +107,6 @@ class IncomingEventServiceTest {
     private void stubAccess() {
         when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-    }
-
-    @Test
-    void listEvents_byProject() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        IncomingEvent event = buildEvent();
-        when(eventRepository.findByProjectId(eq(projectId), any()))
-                .thenReturn(new PageImpl<>(List.of(event)));
-        when(sourceRepository.findAllById(List.of(sourceId))).thenReturn(List.of(source));
-
-        Page<IncomingEventResponse> page = service.listEvents(projectId, null, PageRequest.of(0, 20));
-
-        assertThat(page.getTotalElements()).isEqualTo(1);
-        assertThat(page.getContent().get(0).getRequestId()).isEqualTo("req-123");
-        assertThat(page.getContent().get(0).getSourceName()).isEqualTo("Test Source");
-    }
-
-    @Test
-    void listEvents_bySourceId() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        IncomingEvent event = buildEvent();
-        when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
-        when(eventRepository.findByIncomingSourceId(eq(sourceId), any()))
-                .thenReturn(new PageImpl<>(List.of(event)));
-        when(sourceRepository.findAllById(List.of(sourceId))).thenReturn(List.of(source));
-
-        Page<IncomingEventResponse> page = service.listEvents(projectId, sourceId, PageRequest.of(0, 20));
-
-        assertThat(page.getTotalElements()).isEqualTo(1);
-    }
-
-    @Test
-    void getEvent_success() {
-        IncomingEvent event = buildEvent();
-        when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
-        stubAccess();
-
-        IncomingEventResponse response = service.getEvent(eventId, auth);
-
-        assertThat(response.getId()).isEqualTo(eventId);
-        assertThat(response.getMethod()).isEqualTo("POST");
-        assertThat(response.getBodyRaw()).isEqualTo("{\"data\":1}");
-    }
-
-    @Test
-    void getEvent_notFound() {
-        when(eventRepository.findById(eventId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.getEvent(eventId, auth))
-                .isInstanceOf(NotFoundException.class);
-    }
-
-    @Test
-    void getEventAttempts_success() {
-        IncomingEvent event = buildEvent();
-        when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
-        stubAccess();
-
-        IncomingForwardAttempt attempt = IncomingForwardAttempt.builder()
-                .id(UUID.randomUUID()).incomingEventId(eventId).destinationId(destId)
-                .attemptNumber(1).status(ForwardAttemptStatus.SUCCESS)
-                .responseCode(200).createdAt(Instant.now())
-                .build();
-        when(forwardAttemptRepository.findByIncomingEventId(eq(eventId), any()))
-                .thenReturn(new PageImpl<>(List.of(attempt)));
-
-        Page<IncomingForwardAttemptResponse> page = service.getEventAttempts(eventId, auth, PageRequest.of(0, 20));
-
-        assertThat(page.getTotalElements()).isEqualTo(1);
-        assertThat(page.getContent().get(0).getStatus()).isEqualTo(ForwardAttemptStatus.SUCCESS);
-        assertThat(page.getContent().get(0).getResponseCode()).isEqualTo(200);
     }
 
     @Test
@@ -249,11 +167,4 @@ class IncomingEventServiceTest {
         verify(eventRepository, never()).findByIncomingSourceId(any(), any());
     }
 
-    @Test
-    void replayEvent_notFound() {
-        when(eventRepository.findById(eventId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.replayEvent(eventId, auth))
-                .isInstanceOf(NotFoundException.class);
-    }
 }

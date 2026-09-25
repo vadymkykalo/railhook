@@ -3,6 +3,8 @@ package com.webhook.platform.api.service.captcha;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -15,23 +17,7 @@ import com.sun.net.httpserver.HttpServer;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * The two things that decide whether a CAPTCHA is worth having.
- *
- * <p>The first is that switching it off is honest: an unconfigured deployment gets a verifier
- * that accepts everything, rather than a stub pretending to check. Self-hosting has nobody to
- * challenge, and sending its visitors to a third party to prove otherwise would be the worse
- * default.
- *
- * <p>The second is which way it fails. A provider that is unreachable, slow, or answering
- * nonsense must refuse the registration, not wave it through — a CAPTCHA that silently stops
- * verifying is the exact state it was added to prevent, and it would be invisible from the
- * outside. Every case below that is not an explicit {@code success: true} is a refusal.
- *
- * <p>Driven against a real local HTTP server rather than a mocked WebClient: what is being
- * asserted is the behaviour of an outbound call, and a mock would let a response-parsing bug
- * through while agreeing with itself.
- */
+// A CAPTCHA that silently stops verifying is the state it exists to prevent, so every doubt refuses.
 class CaptchaVerifierTest {
 
     private HttpServer server;
@@ -59,8 +45,6 @@ class CaptchaVerifierTest {
     }
 
     private CaptchaVerifier turnstile() {
-        // allow-private-ips is on because the stub is on loopback; the connector is otherwise
-        // the same one every outbound client in the service uses.
         return new TurnstileCaptchaVerifier(WebClient.builder().build(), new ObjectMapper(), verifyUrl, "test-secret");
     }
 
@@ -81,12 +65,17 @@ class CaptchaVerifierTest {
         assertTrue(turnstile().verify("valid-token", "203.0.113.7"));
     }
 
-    @Test
-    void aRejectedTokenFails() {
-        responseStatus = 200;
-        responseBody = "{\"success\":false,\"error-codes\":[\"invalid-input-response\"]}";
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "200 | {\"success\":false,\"error-codes\":[\"invalid-input-response\"]}",
+            "500 | {\"message\":\"upstream on fire\"}",
+            "200 | {\"unexpected\":\"shape\"}",
+    })
+    void anythingButAnExplicitSuccessRefuses(int status, String body) {
+        responseStatus = status;
+        responseBody = body;
 
-        assertFalse(turnstile().verify("bad-token", "203.0.113.7"));
+        assertFalse(turnstile().verify("valid-token", "203.0.113.7"));
     }
 
     @Test
@@ -99,29 +88,11 @@ class CaptchaVerifierTest {
     }
 
     @Test
-    void aProviderErrorRefusesRatherThanWavingThrough() {
-        responseStatus = 500;
-        responseBody = "{\"message\":\"upstream on fire\"}";
-
-        assertFalse(turnstile().verify("valid-token", "203.0.113.7"));
-    }
-
-    @Test
     void anUnreachableProviderRefuses() {
-        // The port is closed: the only honest answer to "is this caller genuine" when the thing
-        // that knows cannot be asked is no.
         CaptchaVerifier verifier = new TurnstileCaptchaVerifier(
                 WebClient.builder().build(), new ObjectMapper(), "http://127.0.0.1:1/siteverify",
                 "test-secret");
 
         assertFalse(verifier.verify("valid-token", "203.0.113.7"));
-    }
-
-    @Test
-    void aNonsenseResponseRefuses() {
-        responseStatus = 200;
-        responseBody = "{\"unexpected\":\"shape\"}";
-
-        assertFalse(turnstile().verify("valid-token", "203.0.113.7"));
     }
 }

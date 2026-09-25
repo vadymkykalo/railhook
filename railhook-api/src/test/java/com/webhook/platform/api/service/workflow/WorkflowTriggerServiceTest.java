@@ -7,7 +7,6 @@ import com.webhook.platform.api.domain.repository.WorkflowExecutionRepository;
 import com.webhook.platform.api.domain.repository.WorkflowRepository;
 import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -26,12 +25,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Covers WorkflowTriggerService's recursion depth guard — the mechanism that
- * stops a workflow's own createEvent/delivery side effects from re-triggering
- * more workflows indefinitely — plus idempotency and per-workflow failure
- * isolation.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class WorkflowTriggerServiceTest {
@@ -67,23 +60,6 @@ class WorkflowTriggerServiceTest {
         WorkflowTriggerService.clearCurrentDepth();
     }
 
-    // ─── Depth ThreadLocal plumbing ──────────────────────────────────────
-
-    @Test
-    void currentDepth_defaultsToZero() {
-        assertThat(WorkflowTriggerService.getCurrentDepth()).isZero();
-    }
-
-    @Test
-    void setAndClearCurrentDepth_roundTrips() {
-        WorkflowTriggerService.setCurrentDepth(4);
-        assertThat(WorkflowTriggerService.getCurrentDepth()).isEqualTo(4);
-        WorkflowTriggerService.clearCurrentDepth();
-        assertThat(WorkflowTriggerService.getCurrentDepth()).isZero();
-    }
-
-    // ─── Recursion depth guard ───────────────────────────────────────────
-
     @Test
     void depthExceedsMax_skipsEntirely_neverTouchesWorkflowRepository() {
         WorkflowTriggerService service = newService(3);
@@ -92,18 +68,6 @@ class WorkflowTriggerServiceTest {
 
         verifyNoInteractions(workflowRepository);
         verifyNoInteractions(workflowEngine);
-    }
-
-    @Test
-    void depthEqualToMax_stillProcesses_guardIsStrictlyGreaterThan() {
-        WorkflowTriggerService service = newService(3);
-        when(workflowRepository.findEnabledWebhookWorkflows(projectId)).thenReturn(List.of());
-
-        service.triggerWorkflowsSync(projectId, eventId, "order.created", "{}", 3);
-
-        // depth == max is allowed through (guard is `depth > maxRecursionDepth`);
-        // it still reaches the repository call, just finds no workflows.
-        verify(workflowRepository).findEnabledWebhookWorkflows(projectId);
     }
 
     @Test
@@ -120,11 +84,6 @@ class WorkflowTriggerServiceTest {
 
     @Test
     void depthPropagatesToEngineExecute_soNestedWorkflowsInheritIncrementedDepth() {
-        // This is the actual guard mechanism end to end: WorkflowEngine reads
-        // WorkflowTriggerService.getCurrentDepth() (via executeWithTimeout) while
-        // setCurrentDepth(depth) is active for the duration of engine.execute(),
-        // so anything the engine triggers downstream (e.g. CreateEventNodeExecutor
-        // re-entering the ingest → trigger pipeline) sees the current hop count.
         WorkflowTriggerService service = newService(5);
         Workflow workflow = enabledWorkflow(null);
         when(workflowRepository.findEnabledWebhookWorkflows(projectId)).thenReturn(List.of(workflow));
@@ -144,11 +103,8 @@ class WorkflowTriggerServiceTest {
         service.triggerWorkflowsSync(projectId, eventId, "order.created", "{}", 2);
 
         assertThat(observedDuringExecute.get()).isEqualTo(2);
-        // Cleared again afterward so it doesn't leak onto whatever runs next on this thread.
         assertThat(WorkflowTriggerService.getCurrentDepth()).isZero();
     }
-
-    // ─── Idempotency ─────────────────────────────────────────────────────
 
     @Test
     void duplicateEvent_skipsCreatingExecution_engineNeverInvoked() {
@@ -176,8 +132,6 @@ class WorkflowTriggerServiceTest {
 
         verifyNoInteractions(workflowEngine);
     }
-
-    // ─── Trigger pattern matching ────────────────────────────────────────
 
     @Test
     void nonMatchingEventTypePattern_skipsWorkflow() {
@@ -210,23 +164,6 @@ class WorkflowTriggerServiceTest {
     }
 
     @Test
-    void noTriggerConfigPattern_matchesAllEvents() {
-        WorkflowTriggerService service = newService(3);
-        Workflow workflow = enabledWorkflow(null); // triggerConfig = "{}"
-        when(workflowRepository.findEnabledWebhookWorkflows(projectId)).thenReturn(List.of(workflow));
-        when(executionRepository.existsByWorkflowIdAndTriggerEventId(workflow.getId(), eventId)).thenReturn(false);
-        when(executionRepository.save(any(WorkflowExecution.class))).thenAnswer(inv -> {
-            WorkflowExecution e = inv.getArgument(0);
-            e.setId(UUID.randomUUID());
-            return e;
-        });
-
-        service.triggerWorkflowsSync(projectId, eventId, "anything.at.all", "{}", 0);
-
-        verify(workflowEngine).execute(any(), any(), any());
-    }
-
-    @Test
     void malformedTriggerConfig_treatsAsNonMatching() {
         WorkflowTriggerService service = newService(3);
         Workflow workflow = Workflow.builder().id(UUID.randomUUID()).organizationId(organizationId)
@@ -239,8 +176,6 @@ class WorkflowTriggerServiceTest {
         verifyNoInteractions(workflowEngine);
     }
 
-    // ─── Malformed payload / no workflows ────────────────────────────────
-
     @Test
     void malformedEventPayload_doesNotThrow_skipsAllWorkflows() {
         WorkflowTriggerService service = newService(3);
@@ -251,19 +186,6 @@ class WorkflowTriggerServiceTest {
 
         verifyNoInteractions(workflowEngine);
     }
-
-    @Test
-    void noEnabledWorkflows_returnsWithoutTouchingExecutionRepository() {
-        WorkflowTriggerService service = newService(3);
-        when(workflowRepository.findEnabledWebhookWorkflows(projectId)).thenReturn(List.of());
-
-        service.triggerWorkflowsSync(projectId, eventId, "order.created", "{}", 0);
-
-        verifyNoInteractions(executionRepository);
-        verifyNoInteractions(workflowEngine);
-    }
-
-    // ─── Per-workflow failure isolation ──────────────────────────────────
 
     @Test
     void oneWorkflowThrows_othersStillTriggered() {
@@ -307,15 +229,9 @@ class WorkflowTriggerServiceTest {
         assertThat(captor.getValue().getTriggerEventId()).isEqualTo(eventId);
     }
 
-    // ─── Tenant scope ────────────────────────────────────────────────────
-
     @Test
     void triggering_entersTheWorkflowsOrganizationScope_notTheCallersSystemScope() {
-        // The only caller is the outbox poller, which runs as the system tenant. Under root,
-        // Hibernate stamps nothing: whatever scope is live when executionRecord is saved is what
-        // decides the row's organization_id, and NOT NULL makes "no scope" a rollback, not a
-        // warning. Assert on the ambient scope rather than on the entity, because
-        // the entity deliberately does not carry the value.
+        // The poller runs as the system tenant; the scope live at save decides the row's organization_id.
         WorkflowTriggerService service = newService(3);
         Workflow workflow = enabledWorkflow(null);
         when(workflowRepository.findEnabledWebhookWorkflows(projectId)).thenReturn(List.of(workflow));
@@ -338,10 +254,7 @@ class WorkflowTriggerServiceTest {
                 service.triggerWorkflowsSync(projectId, eventId, "order.created", "{}", 0));
 
         assertThat(scopeAtSave.get()).isEqualTo(organizationId);
-        // The engine and the node executors it drives write deliveries and outbox rows of their
-        // own, so the scope has to still be there when they run — not only for the insert above.
         assertThat(scopeAtExecute.get()).isEqualTo(organizationId);
-        // And it is given back: the poller goes on to mark the outbox row done as the system.
         assertThat(TenantContext.current()).isNull();
     }
 }

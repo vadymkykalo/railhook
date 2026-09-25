@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Duration;
@@ -12,20 +13,9 @@ import java.time.Instant;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * What a receiver's {@code Retry-After} is allowed to do to the Retry Ladder.
- *
- * <p>Three rules, and the second is the one that makes this safe to turn on for everybody:
- * it is honoured only where it means what we think it means (429 and 503), it may only push a
- * retry <em>later</em> than the Ladder would have, and it is clamped, because the header is
- * attacker-controlled in the sense that matters — a misconfigured receiver can park an
- * obligation for a year with one line.
- *
- * <p>Deliberately a plain {@code *Test}: pure parsing and arithmetic over a clock passed in.
- */
+/** Retry-After is honoured only for 429/503, only pushes a retry later, and is clamped. */
 class RetryAfterTest {
 
-    /** Fixed so the HTTP-date cases can assert an exact instant rather than a range. */
     private static final Instant NOW = Instant.parse("2026-09-20T12:00:00Z");
 
     private static final Duration MAX = Duration.ofHours(24);
@@ -54,15 +44,10 @@ class RetryAfterTest {
                     RetryAfter.nextRetryAt(ladderNext(60), "600", status, NOW, MAX));
         }
 
-        @Test
-        @DisplayName("no header at all keeps the Ladder's own delay")
-        void missingHeader() {
-            assertEquals(ladderNext(60), RetryAfter.nextRetryAt(ladderNext(60), null, 429, NOW, MAX));
-        }
-
         @ParameterizedTest
-        @ValueSource(strings = { "", "   ", "soon", "-30", "1.5", "NaN", "60s", "not-a-date" })
-        @DisplayName("a header that does not parse is ignored rather than guessed at")
+        @ValueSource(strings = { "", "   ", "soon", "-30", "1.5", "NaN", "60s", "not-a-date", "0" })
+        @NullSource
+        @DisplayName("a missing, zero or unparseable header keeps the Ladder's own delay")
         void unparseableHeader(String header) {
             assertEquals(ladderNext(60), RetryAfter.nextRetryAt(ladderNext(60), header, 429, NOW, MAX));
         }
@@ -93,11 +78,6 @@ class RetryAfterTest {
                     RetryAfter.nextRetryAt(ladderNext(60), "Sun, 20 Sep 2026 11:00:00 GMT", 503, NOW, MAX));
         }
 
-        @Test
-        @DisplayName("zero seconds means the Ladder's delay, not an immediate retry")
-        void zeroSeconds() {
-            assertEquals(ladderNext(60), RetryAfter.nextRetryAt(ladderNext(60), "0", 429, NOW, MAX));
-        }
     }
 
     @Nested

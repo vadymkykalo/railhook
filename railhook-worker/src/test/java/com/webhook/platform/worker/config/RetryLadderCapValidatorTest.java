@@ -8,10 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RetryLadderCapValidatorTest {
 
-    /**
-     * The original pairing: a ~83h ladder against a 48h escalation cap. It has to fail at startup
-     * rather than let the escalation sweep DLQ a Delivery before its last two tiers ever fire.
-     */
+    /** A ~83h ladder against a 48h cap let the escalation sweep DLQ Deliveries early. */
     @Test
     void ladderOutlivingItsHardCap_failsStartup() {
         IllegalStateException ex = assertThrows(IllegalStateException.class,

@@ -28,12 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/**
- * A createEvent node names the project its Event goes to. Nothing checked that name, so a workflow
- * could be saved pointing at another organization's project — and at run time the Event was stored
- * there, and delivered to that organization's endpoints. Saving now refuses a project the caller
- * cannot see, the same way every other project reference in the API is refused.
- */
+// A createEvent node could name another organization's project and deliver to its endpoints.
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class WorkflowServiceTest {

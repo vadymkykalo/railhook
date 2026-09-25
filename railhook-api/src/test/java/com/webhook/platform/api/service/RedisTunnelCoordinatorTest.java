@@ -39,8 +39,7 @@ class RedisTunnelCoordinatorTest {
         coordinator.startListening();
     }
 
-    // The instance handling DELETE /tunnels/{id} is rarely the one holding the CLI's socket, so a
-    // close has to reach every instance, and the slug must stop resolving at once.
+    // The instance handling the DELETE rarely holds the CLI's socket, so the close must reach them all.
     @Test
     void disconnectForgetsTheOwnerAndBroadcastsTheSlug() {
         coordinator.disconnect("tun-gone");

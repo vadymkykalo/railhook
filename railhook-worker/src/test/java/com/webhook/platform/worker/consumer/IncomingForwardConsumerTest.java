@@ -6,6 +6,8 @@ import com.webhook.platform.worker.service.BoundedAsyncExecutor;
 import com.webhook.platform.worker.service.IncomingForwardService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,20 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit coverage for IncomingForwardConsumer -- the incoming-forward analogue of
- * DeliveryConsumerTest. Like the outgoing consumer, this one hands the attempt back to the
- * retry ladder and acks when the executor is full.
- *
- * <p>An earlier revision deliberately did the opposite and left the record unacked, on the
- * belief that the container's own backpressure would cause redelivery. It does not: the
- * listener factory sets asyncAcks(true), under which an unacked record is not redelivered
- * until a rebalance or restart and blocks this partition's offset commits in the meantime --
- * the failure mode DeliveryConsumer documents as fatal.
- */
+/** An unacked record under asyncAcks blocks the partition's commits until a rebalance. */
 class IncomingForwardConsumerTest {
 
     private IncomingForwardService forwardService;
@@ -60,9 +53,8 @@ class IncomingForwardConsumerTest {
 
         consumer.consume(record, ack);
 
-        Thread.sleep(200);
-        verify(forwardService).processForward(message);
-        verify(ack).acknowledge();
+        verify(forwardService, timeout(5000)).processForward(message);
+        verify(ack, timeout(5000)).acknowledge();
     }
 
     @Test
@@ -75,8 +67,6 @@ class IncomingForwardConsumerTest {
 
         consumer.consume(record, ack);
 
-        // Not processed now -- but handed to the retry ladder and acked, so the partition
-        // keeps committing instead of stalling until the next rebalance.
         verify(forwardService, never()).processForward(any());
         verify(forwardService).rescheduleForBackpressure(message);
         verify(ack).acknowledge();
@@ -112,7 +102,7 @@ class IncomingForwardConsumerTest {
         ConsumerRecord<String, IncomingForwardMessage> record = mock(ConsumerRecord.class);
         when(record.value()).thenReturn(message);
         when(record.topic()).thenReturn(KafkaTopics.INCOMING_FORWARD_DISPATCH);
-        org.apache.kafka.common.header.Headers headers = new org.apache.kafka.common.header.internals.RecordHeaders();
+        Headers headers = new RecordHeaders();
         when(record.headers()).thenReturn(headers);
         return record;
     }

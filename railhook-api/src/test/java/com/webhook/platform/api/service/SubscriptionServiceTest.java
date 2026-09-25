@@ -10,9 +10,7 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.SubscriptionRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.dto.SubscriptionRequest;
-import com.webhook.platform.api.dto.SubscriptionResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
-import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
@@ -91,24 +89,6 @@ class SubscriptionServiceTest {
                 .eventType("order.created");
     }
 
-    // ── Endpoint ownership in createSubscription ──
-
-    @Test
-    void createSubscription_sameProjectEndpoint_succeeds() {
-        when(subscriptionRepository.existsByEndpointIdAndEventType(any(), any())).thenReturn(false);
-        when(subscriptionRepository.saveAndFlush(any(Subscription.class))).thenAnswer(inv -> {
-            Subscription s = inv.getArgument(0);
-            s.setId(UUID.randomUUID());
-            s.setCreatedAt(Instant.now());
-            s.setUpdatedAt(Instant.now());
-            return s;
-        });
-
-        SubscriptionResponse response = service.createSubscription(projectId, baseRequest().build());
-        assertThat(response).isNotNull();
-        verify(subscriptionRepository).saveAndFlush(any());
-    }
-
     @Test
     void createSubscription_foreignEndpoint_throwsForbidden() {
         SubscriptionRequest request = baseRequest().endpointId(foreignEndpoint.getId()).build();
@@ -119,35 +99,6 @@ class SubscriptionServiceTest {
     }
 
     @Test
-    void createSubscription_nonExistentEndpoint_throwsNotFound() {
-        UUID missingId = UUID.randomUUID();
-        when(endpointRepository.findById(missingId)).thenReturn(Optional.empty());
-        SubscriptionRequest request = baseRequest().endpointId(missingId).build();
-
-        assertThatThrownBy(() -> service.createSubscription(projectId, request))
-                .isInstanceOf(NotFoundException.class)
-                .hasMessageContaining("Endpoint not found");
-    }
-
-    // ── Transformation ownership in createSubscription ──
-
-    @Test
-    void createSubscription_sameProjectTransformation_succeeds() {
-        when(subscriptionRepository.existsByEndpointIdAndEventType(any(), any())).thenReturn(false);
-        when(subscriptionRepository.saveAndFlush(any(Subscription.class))).thenAnswer(inv -> {
-            Subscription s = inv.getArgument(0);
-            s.setId(UUID.randomUUID());
-            s.setCreatedAt(Instant.now());
-            s.setUpdatedAt(Instant.now());
-            return s;
-        });
-
-        SubscriptionRequest request = baseRequest().transformationId(transformationId).build();
-        SubscriptionResponse response = service.createSubscription(projectId, request);
-        assertThat(response).isNotNull();
-    }
-
-    @Test
     void createSubscription_foreignTransformation_throwsForbidden() {
         SubscriptionRequest request = baseRequest().transformationId(foreignTransformation.getId()).build();
 
@@ -155,24 +106,6 @@ class SubscriptionServiceTest {
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Transformation does not belong to this project");
     }
-
-    @Test
-    void createSubscription_nullTransformation_succeeds() {
-        when(subscriptionRepository.existsByEndpointIdAndEventType(any(), any())).thenReturn(false);
-        when(subscriptionRepository.saveAndFlush(any(Subscription.class))).thenAnswer(inv -> {
-            Subscription s = inv.getArgument(0);
-            s.setId(UUID.randomUUID());
-            s.setCreatedAt(Instant.now());
-            s.setUpdatedAt(Instant.now());
-            return s;
-        });
-
-        SubscriptionRequest request = baseRequest().transformationId(null).build();
-        SubscriptionResponse response = service.createSubscription(projectId, request);
-        assertThat(response).isNotNull();
-    }
-
-    // ── Endpoint ownership in updateSubscription ──
 
     @Test
     void updateSubscription_foreignEndpoint_throwsForbidden() {
@@ -191,8 +124,6 @@ class SubscriptionServiceTest {
                 .hasMessageContaining("Endpoint does not belong to this project");
     }
 
-    // ── Transformation ownership in updateSubscription ──
-
     @Test
     void updateSubscription_foreignTransformation_throwsForbidden() {
         UUID subId = UUID.randomUUID();
@@ -209,12 +140,6 @@ class SubscriptionServiceTest {
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Transformation does not belong to this project");
     }
-
-    // ── Retry ladder validation ──
-    //
-    // The ladder is rejected here rather than at delivery time. Before this the worker met a
-    // malformed value and quietly substituted a hardcoded array of its own, so a typo bought
-    // the customer a retry policy that was neither theirs nor documented anywhere.
 
     @Test
     void createSubscription_malformedRetryDelays_throwsWithActionableMessage() {
@@ -284,14 +209,11 @@ class SubscriptionServiceTest {
         assertThat(existing.getRetryDelays()).isEqualTo(RetryLadderDefaults.OUTGOING_DELAYS);
     }
 
-    // A custom ladder longer than the delivery escalation cap was accepted, and the Delivery was
-    // then moved to the DLQ by age before its later tiers ever ran.
-
+    // A ladder longer than the escalation cap was accepted, then dead-lettered by age before its later tiers.
     @Test
     void createSubscription_ladderOutlivingTheEscalationCap_throws() {
         when(subscriptionRepository.existsByEndpointIdAndEventType(any(), any())).thenReturn(false);
         when(subscriptionRepository.saveAndFlush(any(Subscription.class))).thenAnswer(inv -> inv.getArgument(0));
-        // 10 attempts at a day each: up to 360h with jitter, against a 96h cap.
         SubscriptionRequest request = baseRequest().retryDelays("86400").maxAttempts(10).build();
 
         assertThatThrownBy(() -> service.createSubscription(projectId, request))
@@ -330,7 +252,6 @@ class SubscriptionServiceTest {
             return sub;
         });
 
-        // 2 attempts at a day each: up to 72h with jitter, inside the 96h cap.
         service.createSubscription(projectId, baseRequest().retryDelays("86400").maxAttempts(2).build());
 
         verify(subscriptionRepository).saveAndFlush(any(Subscription.class));

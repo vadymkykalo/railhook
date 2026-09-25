@@ -28,14 +28,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * What happens to an outbox row the executor will not take.
- *
- * <p>Both ways a row can be turned away — the workflow pool being saturated, and the
- * per-project in-flight cap — return it to PENDING for the next poll. Neither is a failure of
- * the workflow, so neither may consume the row's retry budget or leave it in a status nothing
- * reclaims.</p>
- */
+// A row turned away by backpressure is not a workflow failure: back to PENDING, retry budget untouched.
 @ExtendWith(MockitoExtension.class)
 class WorkflowTriggerOutboxServiceTest {
 
@@ -57,7 +50,6 @@ class WorkflowTriggerOutboxServiceTest {
         row.setProjectId(UUID.randomUUID());
         row.setEventId(UUID.randomUUID());
         row.setEventType("user.signup");
-        // claimBatch has already flipped the row to PROCESSING and charged it an attempt.
         row.setStatus(WorkflowTriggerOutboxStatus.PROCESSING);
         row.setAttempts(1);
     }
@@ -68,13 +60,12 @@ class WorkflowTriggerOutboxServiceTest {
                 50, MAX_ATTEMPTS, 5, MAX_CONCURRENT_PER_PROJECT, STALLED_AFTER_MINUTES);
     }
 
-    /** Stands in for a saturated workflowTaskExecutor. */
     private static final Executor REJECTING = task -> {
         throw new TaskRejectedException("pool saturated");
     };
 
     @Test
-    void aRejectedRowGoesBackToPendingRatherThanStayingProcessing() {
+    void aRejectedRowGoesBackToPendingWithItsRetryBudgetIntact() {
         when(outboxRepository.claimBatch(anyInt(), anyInt())).thenReturn(List.of(row));
 
         serviceWith(REJECTING).poll();
@@ -82,38 +73,16 @@ class WorkflowTriggerOutboxServiceTest {
         ArgumentCaptor<WorkflowTriggerOutbox> saved = ArgumentCaptor.forClass(WorkflowTriggerOutbox.class);
         verify(outboxRepository, atLeastOnce()).save(saved.capture());
 
-        // claimBatch selects `status = 'PENDING'` only, and nothing sweeps PROCESSING back:
-        // a row left PROCESSING here is a workflow that never runs and never retries.
         assertEquals(WorkflowTriggerOutboxStatus.PENDING, saved.getValue().getStatus());
+        assertEquals(0, saved.getValue().getAttempts(),
+                "a row that was never handed to a workflow has not attempted anything");
         verify(triggerService, never()).triggerWorkflowsSync(
                 row.getProjectId(), row.getEventId(), row.getEventType(), row.getEventPayload(), row.getDepth());
     }
 
     @Test
-    void backpressureDoesNotSpendTheRetryBudget() {
-        when(outboxRepository.claimBatch(anyInt(), anyInt())).thenReturn(List.of(row));
-
-        serviceWith(REJECTING).poll();
-
-        ArgumentCaptor<WorkflowTriggerOutbox> saved = ArgumentCaptor.forClass(WorkflowTriggerOutbox.class);
-        verify(outboxRepository, atLeastOnce()).save(saved.capture());
-
-        // claimBatch charges `attempts = attempts + 1` on every claim. Deferring without
-        // giving that back means a busy project burns all three attempts on backpressure
-        // alone, and the first real exception then finds attempts >= maxAttempts and marks
-        // the row FAILED having never actually tried it.
-        assertEquals(0, saved.getValue().getAttempts(),
-                "a row that was never handed to a workflow has not attempted anything");
-    }
-
-    @Test
     void theInFlightCapReleasesWhenAProjectsRowsAreRejected() {
-        // Same project, one row per poll, rejected every time. The in-flight counter is
-        // incremented before the executor call and decremented in the task's finally — which
-        // never runs for a task that was never accepted. If the rejection path does not give
-        // the slot back, the cap latches after maxConcurrentPerProject rejections and every
-        // later row for this project is deferred before the executor is even consulted: that
-        // project stops running workflows permanently.
+        // The slot is released in the task's finally, which never runs for a rejected task.
         when(outboxRepository.claimBatch(anyInt(), anyInt()))
                 .thenAnswer(invocation -> List.of(freshRowForSameProject()));
 
@@ -139,9 +108,7 @@ class WorkflowTriggerOutboxServiceTest {
 
         serviceWith(REJECTING).reclaimStalledRows();
 
-        // Nothing else in the system moves a row out of PROCESSING: claimBatch reads PENDING,
-        // cleanup deletes DONE. Without this sweep a pod that dies mid-workflow loses the
-        // trigger permanently and leaves the row behind for good.
+        // Nothing else moves a row out of PROCESSING, so a pod dying mid-workflow lost the trigger.
         ArgumentCaptor<Instant> cutoff = ArgumentCaptor.forClass(Instant.class);
         verify(outboxRepository).reclaimStalledRows(cutoff.capture());
         assertTrue(cutoff.getValue().isBefore(Instant.now().minus(STALLED_AFTER_MINUTES - 1, ChronoUnit.MINUTES)),

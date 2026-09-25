@@ -25,21 +25,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Seeing what is signed in, and being able to end one of them.
- *
- * <p>Refresh tokens are self-contained JWTs, so nothing anywhere knew how many were outstanding:
- * logout revoked the token it was handed and a user could neither see nor end a session on a
- * machine they no longer have — least of all a CLI device-code grant, which is the credential
- * most likely to outlive the laptop it was issued to.
- *
- * <p>Two things these pin that are easy to get subtly wrong. First, revoking has to reach the
- * access token as well as the refresh token, or "sign this device out" is a promise kept a
- * quarter of an hour late on the one screen where somebody is acting because they think a device
- * is compromised. Second, {@code user_sessions} carries no {@code @TenantId} and nothing confines
- * it structurally, so every lookup has to be by {@code (session, user)} rather than by session —
- * otherwise the endpoint is a way to sign out a stranger.
- */
+// user_sessions has no @TenantId, so every lookup must be by (session, user).
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserSessionService — the list of signed-in devices, and ending one")
 class UserSessionServiceTest {
@@ -98,9 +84,6 @@ class UserSessionServiceTest {
 
         SessionResponse response = service().listSessions(userId, null).get(0);
 
-        /* Readable by anything holding an access token, so it must not be a place a stolen
-           short-lived credential can be upgraded into a long-lived one. Asserted over the
-           serialised fields rather than by eye, so a field added later has to be considered. */
         assertThat(response.toString()).doesNotContain(live.getRefreshTokenJti());
     }
 
@@ -114,7 +97,6 @@ class UserSessionServiceTest {
 
         assertThat(live.getRevokedAt()).isNotNull();
         verify(userSessionRepository).save(live);
-        // Without this the sign-out would only take effect when the access token expired on its own.
         verify(tokenBlacklistService).revokeSession(sessionId, Date.from(live.getExpiresAt()));
     }
 
@@ -142,8 +124,7 @@ class UserSessionServiceTest {
 
         assertThat(alreadyRevoked.getRevokedAt()).isEqualTo(revokedAt);
         verify(userSessionRepository, never()).save(any());
-        /* The Redis marker is still rewritten: it is the enforcement half and it has a TTL, so a
-           marker lost to a restart has to be replaceable by doing the obvious thing again. */
+        // The Redis marker has a TTL, so re-revoking must rewrite it.
         verify(tokenBlacklistService).revokeSession(eq(sessionId), any());
     }
 

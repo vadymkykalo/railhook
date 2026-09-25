@@ -15,14 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * A tunnelled body has to reach the other end as the bytes that were sent: a provider signs those
- * bytes, and a gzip or protobuf body stops being one after a round trip through a String.
- *
- * <p>Installed CLIs and older self-hosted servers keep reading {@code body}, so it stays populated
- * as it always was; {@code bodyBase64} rides alongside only when that string cannot carry the
- * bytes, and each side prefers it when it is there.
- */
+/** A provider signs the bytes it sent, so a tunnelled body must arrive as those bytes, old peers included. */
 class TunnelBodyTest {
 
     private static final byte[] NOT_UTF8 = {(byte) 0x1f, (byte) 0x8b, 0x08, 0x00, (byte) 0xff, (byte) 0xfe,
@@ -63,8 +56,6 @@ class TunnelBodyTest {
         assertEquals("gzip", read.getHeaders().get("Content-Encoding"));
     }
 
-    // New server, installed CLI: the CLI still finds the body where it always looked, decoded as
-    // it always was, and the field it does not know is ignored rather than failing the message.
     @Test
     void anInstalledCliStillReadsTheStringBody() throws Exception {
         TunnelRequestMessage request = TunnelRequestMessage.builder()
@@ -79,8 +70,6 @@ class TunnelBodyTest {
         assertTrue(lenient.readTree(json).get("request").has("bodyBase64"));
     }
 
-    // Older server, new CLI: no bodyBase64, so the string is encoded back with the charset the
-    // server decoded it with — the one Content-Type names, UTF-8 when it names none.
     @Test
     void aMessageFromAnOlderServerFallsBackToTheString() throws Exception {
         String old = "{\"type\":\"TUNNEL_REQUEST\",\"request\":{\"requestId\":\"r1\",\"method\":\"POST\","
@@ -115,7 +104,6 @@ class TunnelBodyTest {
         assertEquals(new String(NOT_UTF8, StandardCharsets.UTF_8), read.getBody(), "string kept for old servers");
     }
 
-    // Installed CLI, new server: only the string, encoded with the charset the CLI decoded it with.
     @Test
     void aResponseFromAnInstalledCliFallsBackToTheString() throws Exception {
         String old = "{\"requestId\":\"r1\",\"statusCode\":200,"
@@ -146,7 +134,6 @@ class TunnelBodyTest {
         assertEquals(StandardCharsets.UTF_8, TunnelBody.charsetOf(Map.of("content-type", "text/plain; charset=nope")));
     }
 
-    // Both sides may be a version ahead: a field added later must not fail the message.
     @Test
     void aFieldFromANewerPeerIsIgnored() throws Exception {
         TunnelMessage read = mapper.readValue("{\"type\":\"TUNNEL_RESPONSE\",\"somethingNew\":1,"
@@ -156,5 +143,16 @@ class TunnelBodyTest {
         TunnelRequestMessage request = mapper.readValue("{\"requestId\":\"r1\",\"future\":[1]}",
                 TunnelRequestMessage.class);
         assertEquals("r1", request.getRequestId());
+    }
+
+    @Test
+    void aMessageLeavesItsUnsetFieldsOutOfTheJson() throws Exception {
+        String json = mapper.writeValueAsString(TunnelMessage.heartbeat());
+
+        assertTrue(json.contains("\"type\":\"HEARTBEAT\""));
+        assertFalse(json.contains("\"request\""));
+        assertFalse(json.contains("\"response\""));
+        assertFalse(json.contains("\"tunnelUrl\""));
+        assertFalse(json.contains("\"error\""));
     }
 }

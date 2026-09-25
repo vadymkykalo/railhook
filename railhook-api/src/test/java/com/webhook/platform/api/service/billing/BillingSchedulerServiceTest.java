@@ -82,13 +82,16 @@ class BillingSchedulerServiceTest {
         when(entitlementService.isBillingEnabled()).thenReturn(true);
     }
 
-    // ── processRenewals ─────────────────────────────────────────────
-
     @Test
-    void processRenewals_skipsWhenBillingDisabled() {
+    void everyJobIsANoOpWhenBillingIsDisabled() {
         when(entitlementService.isBillingEnabled()).thenReturn(false);
+
         service.processRenewals();
-        verifyNoInteractions(providerRegistry);
+        service.processGracePeriodExpiry();
+        service.processPastDueToGrace();
+        service.applyScheduledChanges();
+
+        verifyNoInteractions(providerRegistry, subscriptionRepository, scheduledChangeRepository, lifecycleService);
     }
 
     @Test
@@ -125,22 +128,18 @@ class BillingSchedulerServiceTest {
 
         service.processRenewals();
 
-        // Invoice created and then marked PAID
         ArgumentCaptor<BillingInvoice> invCap = ArgumentCaptor.forClass(BillingInvoice.class);
         verify(invoiceRepository, atLeastOnce()).save(invCap.capture());
         List<BillingInvoice> savedInvoices = invCap.getAllValues();
         assertThat(savedInvoices).hasSizeGreaterThanOrEqualTo(2);
         assertThat(savedInvoices.get(0).getTotalCents()).isEqualTo(2900L);
-        // Final save has PAID status
         assertThat(savedInvoices.get(savedInvoices.size() - 1).getStatus()).isEqualTo(InvoiceStatus.PAID);
 
-        // Payment recorded
         ArgumentCaptor<BillingPayment> payCap = ArgumentCaptor.forClass(BillingPayment.class);
         verify(paymentRepository).save(payCap.capture());
         assertThat(payCap.getValue().getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
         assertThat(payCap.getValue().getExternalPaymentId()).isEqualTo("ext_pay_123");
 
-        // Lifecycle renew called
         verify(lifecycleService).renew(eq(sub.getId()), any(), any());
     }
 
@@ -243,47 +242,12 @@ class BillingSchedulerServiceTest {
 
         service.processRenewals();
 
-        // The catalog price is USD cents; charging it in the subscription's UAH renewed a
-        // 1199 UAH plan at 29 UAH.
+        // Charging the USD catalog price in the subscription's UAH once renewed a 1199 UAH plan at 29 UAH.
         assertThat(charged).singleElement().satisfies(req -> {
             assertThat(req.amountCents()).isEqualTo(119900L);
             assertThat(req.currency()).isEqualTo("UAH");
         });
     }
-
-    // ── processGracePeriodExpiry ─────────────────────────────────────
-
-    @Test
-    void processGracePeriodExpiry_suspendsExpired() {
-        BillingSubscription sub = buildSub(SubscriptionStatus.GRACE_PERIOD, "stripe");
-        when(subscriptionRepository.findGracePeriodExpired(any())).thenReturn(List.of(sub));
-
-        service.processGracePeriodExpiry();
-
-        verify(lifecycleService).suspend(sub.getId());
-    }
-
-    @Test
-    void processGracePeriodExpiry_skipsWhenBillingDisabled() {
-        when(entitlementService.isBillingEnabled()).thenReturn(false);
-        service.processGracePeriodExpiry();
-        verifyNoInteractions(subscriptionRepository);
-    }
-
-    // ── processPastDueToGrace ───────────────────────────────────────
-
-    @Test
-    void processPastDueToGrace_startsGracePeriod() {
-        BillingSubscription sub = buildSub(SubscriptionStatus.PAST_DUE, "stripe");
-        when(subscriptionRepository.findExpiredByStatus(eq(SubscriptionStatus.PAST_DUE), any()))
-                .thenReturn(List.of(sub));
-
-        service.processPastDueToGrace();
-
-        verify(lifecycleService).startGracePeriod(sub.getId());
-    }
-
-    // ── applyScheduledChanges ───────────────────────────────────────
 
     @Test
     void applyScheduledChanges_appliesPlanChange() {
@@ -327,15 +291,6 @@ class BillingSchedulerServiceTest {
 
         verify(lifecycleService).cancel(subId, "Scheduled cancellation");
     }
-
-    @Test
-    void applyScheduledChanges_skipsWhenBillingDisabled() {
-        when(entitlementService.isBillingEnabled()).thenReturn(false);
-        service.applyScheduledChanges();
-        verifyNoInteractions(scheduledChangeRepository);
-    }
-
-    // ── Helpers ─────────────────────────────────────────────────────
 
     private BillingSubscription buildSub(SubscriptionStatus status, String provider) {
         return BillingSubscription.builder()

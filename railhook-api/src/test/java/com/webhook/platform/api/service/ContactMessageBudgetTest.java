@@ -16,11 +16,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * The contact form's daily ceiling across every sender. Per-address limits do not stop a sender
- * with many addresses, and every message spends the same mail quota that verification and
- * password-reset mails need, so past the ceiling the form refuses until the next UTC day.
- */
+// Per-address limits do not stop a sender with many addresses; the mail quota is shared.
 class ContactMessageBudgetTest {
 
     private static final Clock DAY_ONE = Clock.fixed(Instant.parse("2026-09-18T10:00:00Z"), ZoneOffset.UTC);

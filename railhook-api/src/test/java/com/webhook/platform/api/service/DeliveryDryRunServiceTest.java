@@ -27,15 +27,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * The dry-run mints a real signature, which makes it the one read path where getting the scope
- * wrong hands out something that works elsewhere.
- *
- * <p>{@code @TenantId} confines it to the organization, and the interceptor confines the
- * {@code {projectId}} in the URI — but the endpoint arrives in the request <em>body</em>, where
- * neither can see it. An organization with two projects is the ordinary case, not an exotic one,
- * and an API key is issued against one project rather than against all of them.
- */
+// The endpoint arrives in the body, where neither @TenantId nor the project interceptor can scope it.
 class DeliveryDryRunServiceTest {
 
     private static final UUID CALLERS_PROJECT = UUID.randomUUID();
@@ -96,9 +88,6 @@ class DeliveryDryRunServiceTest {
     @Test
     @DisplayName("an endpoint belonging to a sibling project is neither signed for nor described")
     void refusesASiblingProjectsEndpoint() {
-        // Two things leaked, and the signature is the worse of them: a valid X-Signature over a
-        // body of the caller's choosing is a webhook the sibling project's receiver will accept
-        // as genuine. The URL told them where to send it.
         Endpoint endpoint = endpointIn(ANOTHER_PROJECT);
         when(endpointRepository.findById(endpoint.getId())).thenReturn(Optional.of(endpoint));
 
@@ -112,9 +101,6 @@ class DeliveryDryRunServiceTest {
     @Test
     @DisplayName("it does not say which of the two it was, because that is an oracle")
     void doesNotDistinguishWrongProjectFromMissing() {
-        // "Not found" and "not yours" are the same answer everywhere else in this codebase —
-        // findById under @TenantId returns empty for another organization's row rather than 403.
-        // Saying "wrong project" here would turn the dry-run into a way to enumerate endpoint ids.
         Endpoint endpoint = endpointIn(ANOTHER_PROJECT);
         when(endpointRepository.findById(endpoint.getId())).thenReturn(Optional.of(endpoint));
         DeliveryDryRunResponse foreign = service.dryRun(CALLERS_PROJECT, requestFor(endpoint));

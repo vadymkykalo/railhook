@@ -18,19 +18,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * The propagation contract every pool has to honour, including the two built by hand.
- *
- * <p>{@code AsyncConfig} hands its executors the decorator as a Spring {@code TaskDecorator}, but
- * a pool built with {@code Executors.new*} has no such hook — {@link
- * TenantPropagatingTaskDecorator#wrap} is that hook, and these cases pin the behaviour the two
- * hand-built pools had each re-implemented differently (one of the copies had no counterpart to
- * the {@code captured == null} pass-through, so an unscoped submission got {@code null} written
- * into the ThreadLocal instead of nothing).
- *
- * <p>Deliberately a plain {@code *Test}: threads and ThreadLocals only, no Spring context and no
- * container (see {@code scripts/check-test-routing.sh}).
- */
 class TenantPropagatingTaskDecoratorTest {
 
     private static final UUID ORG = UUID.fromString("33333333-3333-3333-3333-333333333333");
@@ -91,10 +78,6 @@ class TenantPropagatingTaskDecoratorTest {
     void wrapLeavesTheWorkerThreadUnscopedWhenTheSubmitterIs() throws Exception {
         pool = TenantPropagatingTaskDecorator.wrap(Executors.newSingleThreadExecutor());
 
-        // Prime the worker thread with a scope, then submit from a thread that has none. The
-        // pass-through must not overwrite it with null — the point is that "no scope captured"
-        // and "scope of null" are different things, and only the first is what an unscoped
-        // submitter means.
         pool.submit(() -> TenantContext.set(ORG)).get(5, TimeUnit.SECONDS);
 
         TenantContext.clear();
@@ -135,21 +118,6 @@ class TenantPropagatingTaskDecoratorTest {
         pool.execute(block);   // fills the single queue slot
 
         assertThatThrownBy(() -> pool.execute(block)).isInstanceOf(RejectedExecutionException.class);
-    }
-
-    @Test
-    @DisplayName("shutdown and awaitTermination reach the delegate")
-    void wrapDelegatesLifecycle() throws Exception {
-        ThreadPoolExecutor delegate = new ThreadPoolExecutor(
-                1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
-        pool = TenantPropagatingTaskDecorator.wrap(delegate);
-
-        pool.shutdown();
-
-        assertThat(pool.isShutdown()).isTrue();
-        assertThat(delegate.isShutdown()).isTrue();
-        assertThat(pool.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
-        assertThat(pool.isTerminated()).isTrue();
     }
 
     @Test

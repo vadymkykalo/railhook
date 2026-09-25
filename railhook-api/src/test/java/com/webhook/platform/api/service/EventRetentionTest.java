@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionOperations;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -27,21 +28,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * {@code events} and {@code deliveries} grew without bound in the deployment shape the project
- * recommends.
- *
- * <p>The only code that deleted from either by age was
- * {@code RetentionCleanupScheduler}, whose first line returns unless billing is enabled — and
- * {@code BILLING_ENABLED} defaults to false, which the README describes as what makes
- * self-hosting unrestricted. Self-hosted plans additionally carry
- * {@code max_retention_days = -1}, which that scheduler's SQL skips, so the default deployment
- * had two independent locks on never deleting anything.
- *
- * <p>Meanwhile {@code delivery_attempts} partitions were dropped at 90 days. The attempts
- * vanished on schedule and the parent rows carrying the payloads stayed forever, which is the
- * worst of both: the detail an operator needs for a post-mortem is gone, and the bytes are not.
- */
+// The only age-based cleanup ran only with billing on, so default deployments never deleted events.
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("DataRetentionService — events and deliveries are bounded without billing")
@@ -58,7 +45,6 @@ class EventRetentionTest {
         return new DataRetentionService(
                 deliveryAttemptRepository, incomingEventRepository, tunnelRequestLogRepository,
                 eventRepository, meterRegistry, TransactionOperations.withoutTransaction(), Clock.systemUTC(),
-                // attempts, successfulAttempts, incoming, tunnelLog, maxPerDelivery, events, batch
                 90, 14, 30, 7, 10, eventsRetentionDays, 1000);
     }
 
@@ -70,9 +56,6 @@ class EventRetentionTest {
 
         service(90).cleanupOldEvents();
 
-        /* Draining in batches is what keeps this off a single long transaction holding row
-           locks across a whole table — and, with the cascades in place, across every
-           delivery and attempt beneath it. */
         verify(eventRepository, times(3)).deleteOldEvents(any(Instant.class), eq(1000));
     }
 
@@ -81,9 +64,6 @@ class EventRetentionTest {
     void unlimitedRetentionDeletesNothing() {
         service(-1).cleanupOldEvents();
 
-        /* -1 is the sentinel the plans table already uses for unlimited retention. An operator
-           who wants the old behaviour has to be able to ask for it, and asking must cost no
-           queries rather than a delete with an unreachable cutoff. */
         verify(eventRepository, never()).deleteOldEvents(any(), anyInt());
     }
 
@@ -95,7 +75,7 @@ class EventRetentionTest {
 
         service(30).cleanupOldEvents();
 
-        var cutoff = org.mockito.ArgumentCaptor.forClass(Instant.class);
+        ArgumentCaptor<Instant> cutoff = ArgumentCaptor.forClass(Instant.class);
         verify(eventRepository).deleteOldEvents(cutoff.capture(), anyInt());
         assertThat(cutoff.getValue())
                 .isBetween(before.minusSeconds(60), before.plusSeconds(60));
@@ -112,9 +92,6 @@ class EventRetentionTest {
         DataRetentionService service = service(90);
         service.refreshTableSizeMetrics();
 
-        /* delivery_attempts and incoming_events already had gauges. The two tables with no
-           retention at all had none, so the growth that mattered most was the growth nobody
-           could see. */
         assertThat(meterRegistry.get("events_table_rows").gauge().value()).isEqualTo(4_200_000d);
         assertThat(meterRegistry.get("deliveries_table_rows").gauge().value()).isEqualTo(9_100_000d);
     }

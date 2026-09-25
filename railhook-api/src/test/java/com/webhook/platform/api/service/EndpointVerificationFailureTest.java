@@ -22,14 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * What a failed verification tells the person who pressed the button.
- *
- * <p>An endpoint pointed at a Railhook tunnel is verified through it, and a tunnel with no
- * {@code railhook tunnel} client connected answers 503. That reached the UI as
- * "Verification request failed: 503 Service Unavailable from POST https://…/tunnel/…" — true, and
- * no help: nothing said the fix was to start the tunnel.
- */
+// An offline tunnel's 503 reached the UI with nothing saying the fix was to start the tunnel.
 class EndpointVerificationFailureTest {
 
     private HttpServer server;

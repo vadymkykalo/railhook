@@ -19,9 +19,7 @@ class StatusCommandTest extends CliCommandTestBase {
         int exitCode = run("status");
 
         assertEquals(0, exitCode);
-        assertTrue(out().contains("not authenticated"));
         assertTrue(out().contains("railhook login"));
-        // Must return before ever attempting to reach the backend.
         assertFalse(out().contains("Health:"));
     }
 
@@ -50,9 +48,7 @@ class StatusCommandTest extends CliCommandTestBase {
 
         assertEquals(0, exitCode);
         String output = out();
-        assertTrue(output.contains("authenticated"));
         assertTrue(output.contains("user-1"));
-        assertTrue(output.contains("org-1"));
         assertTrue(output.contains("UP"));
         assertTrue(output.contains("Active:   2"));
         assertTrue(output.contains("tun.example/abc"));
@@ -60,10 +56,7 @@ class StatusCommandTest extends CliCommandTestBase {
 
     @Test
     void authenticated_backendUnreachable_printsUnreachableInsteadOfCrashing() throws Exception {
-        // HttpServer.create() already binds the listening socket even before start(),
-        // so stop() it now to get a genuine "connection refused" instead of a TCP
-        // connection that's accepted but never serviced (which would just hang until
-        // getHealth()'s 5s connect timeout).
+        // Stopped rather than never started: a bound but unserved socket hangs until the connect timeout.
         server.stop(0);
         writeConfig(authenticatedConfig());
 

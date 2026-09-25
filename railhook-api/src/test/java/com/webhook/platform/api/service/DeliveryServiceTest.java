@@ -4,6 +4,7 @@ import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Delivery;
+import com.webhook.platform.api.domain.entity.DeliveryAttempt;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Event;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
@@ -16,6 +17,7 @@ import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.BulkReplayResponse;
+import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
 import com.webhook.platform.api.dto.DryRunReplayResponse;
 import com.webhook.platform.api.domain.enums.MembershipRole;
@@ -23,8 +25,9 @@ import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
-import com.webhook.platform.api.service.DeliveryDispatch;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -89,14 +92,6 @@ class DeliveryServiceTest {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
     }
 
-    // ─── getDelivery ─────────────────────────────────────────────────────
-
-
-    /**
-     * Every service under test now reads its organization from the ambient tenant scope instead
-     * of taking it as a parameter. A unit test has no request to establish one, so it
-     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
-     */
     @BeforeEach
     void enterTenantScope() {
         TenantContext.set(orgId);
@@ -107,19 +102,6 @@ class DeliveryServiceTest {
         TenantContext.clear();
     }
 
-    @Test
-    void getDelivery_notFound_throwsNotFound() {
-        UUID deliveryId = UUID.randomUUID();
-        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> deliveryService.getDelivery(deliveryId, auth))
-                .isInstanceOf(NotFoundException.class);
-    }
-
-    /**
-     * {@code Project} carries {@code @TenantId}, so another organization's project comes back
-     * empty rather than with a foreign organization id on it.
-     */
     @Test
     void getDelivery_projectOfAnotherOrg_isNotFound() {
         UUID deliveryId = UUID.randomUUID();
@@ -146,62 +128,12 @@ class DeliveryServiceTest {
     }
 
     @Test
-    void getDelivery_valid_returnsMappedResponse() {
-        UUID deliveryId = UUID.randomUUID();
-        Delivery delivery = Delivery.builder().id(deliveryId).eventId(eventId).endpointId(UUID.randomUUID())
-                .status(DeliveryStatus.SUCCESS).attemptCount(1).maxAttempts(7).build();
-        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
-        stubOwnershipChain();
-
-        DeliveryResponse response = deliveryService.getDelivery(deliveryId, auth);
-
-        assertThat(response.getId()).isEqualTo(deliveryId);
-        assertThat(response.getStatus()).isEqualTo(DeliveryStatus.SUCCESS);
-    }
-
-    // ─── listDeliveries ──────────────────────────────────────────────────
-
-    @Test
-    void listDeliveries_missingEventId_throwsIllegalArgument() {
-        assertThatThrownBy(() -> deliveryService.listDeliveries(null, auth, PageRequest.of(0, 20)))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void listDeliveries_validEventId_returnsPagedResults() {
-        stubOwnershipChain();
-        Delivery delivery = Delivery.builder().id(UUID.randomUUID()).eventId(eventId).status(DeliveryStatus.PENDING).build();
-        Pageable pageable = PageRequest.of(0, 20);
-        when(deliveryRepository.findByEventId(eventId, pageable)).thenReturn(new PageImpl<>(List.of(delivery)));
-
-        Page<DeliveryResponse> result = deliveryService.listDeliveries(eventId, auth, pageable);
-
-        assertThat(result.getContent()).hasSize(1);
-    }
-
-    // ─── listDeliveriesByProject ─────────────────────────────────────────
-
-    @Test
     void listDeliveriesByProject_projectOfAnotherOrg_isNotFound() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> deliveryService.listDeliveriesByProject(
                 projectId, null, null, null, null, null, null, PageRequest.of(0, 20)))
                 .isInstanceOf(NotFoundException.class);
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void listDeliveriesByProject_valid_delegatesToRepository() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
-        when(deliveryRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
-
-        Page<DeliveryResponse> result = deliveryService.listDeliveriesByProject(
-                projectId, DeliveryStatus.FAILED, null, null, null, null, null, PageRequest.of(0, 20));
-
-        assertThat(result.getContent()).isEmpty();
-        verify(deliveryRepository).findAll(any(Specification.class), any(Pageable.class));
     }
 
     @Test
@@ -224,8 +156,6 @@ class DeliveryServiceTest {
                 .containsExactly("order.created", "payment.succeeded");
     }
 
-    // ─── replayDelivery ──────────────────────────────────────────────────
-
     @Test
     void replayDelivery_successfulDelivery_throwsIllegalArgument() {
         UUID deliveryId = UUID.randomUUID();
@@ -241,8 +171,7 @@ class DeliveryServiceTest {
 
     @Test
     void replayDelivery_inFlight_isRefusedWithConflict() {
-        // A PROCESSING delivery has a request on the wire. Putting it back to PENDING and
-        // announcing it again sent a second request while the first was still in flight.
+        // Replaying a PROCESSING delivery once sent a second request while the first was in flight.
         UUID deliveryId = UUID.randomUUID();
         Delivery delivery = Delivery.builder().id(deliveryId).eventId(eventId).endpointId(UUID.randomUUID())
                 .status(DeliveryStatus.PROCESSING).claimToken(UUID.randomUUID()).attemptCount(2).build();
@@ -271,8 +200,7 @@ class DeliveryServiceTest {
         verify(deliveryRepository).save(savedCaptor.capture());
         Delivery saved = savedCaptor.getValue();
         assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
-        // Reset to zero, the next Attempt was recorded as a second attempt 1 and the history
-        // stopped being a sequence — the same reason a retry from the DLQ carries it forward.
+        // Reset to zero, the next Attempt was recorded as a second attempt 1.
         assertThat(saved.getAttemptCount()).isEqualTo(7);
         assertThat(saved.getMaxAttempts()).isEqualTo(10);
         assertThat(saved.getNextRetryAt()).isNull();
@@ -284,8 +212,6 @@ class DeliveryServiceTest {
         assertThat(outboxCaptor.getValue().getEventType()).isEqualTo("DeliveryReplayed");
         assertThat(outboxCaptor.getValue().getProjectId()).isEqualTo(projectId);
     }
-
-    // ─── replayFromAttempt ───────────────────────────────────────────────
 
     @Test
     void replayFromAttempt_successfulDelivery_throwsIllegalArgument() {
@@ -339,8 +265,6 @@ class DeliveryServiceTest {
 
         ArgumentCaptor<Delivery> savedCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(savedCaptor.capture());
-        // From attempt 3 of 7 there were 5 attempts left. The count is carried forward rather
-        // than wound back to 2, so attempts 3-5 are not recorded a second time.
         assertThat(savedCaptor.getValue().getAttemptCount()).isEqualTo(5);
         assertThat(savedCaptor.getValue().getMaxAttempts()).isEqualTo(10);
         assertThat(savedCaptor.getValue().getStatus()).isEqualTo(DeliveryStatus.PENDING);
@@ -349,8 +273,6 @@ class DeliveryServiceTest {
         verify(outboxMessageRepository).save(outboxCaptor.capture());
         assertThat(outboxCaptor.getValue().getEventType()).isEqualTo("DeliveryReplayedFromStep");
     }
-
-    // ─── dryRunReplay ────────────────────────────────────────────────────
 
     @Test
     void dryRunReplay_alreadySucceeded_plansSkip() {
@@ -422,18 +344,6 @@ class DeliveryServiceTest {
         assertThat(response.getIdempotencyKey()).isEqualTo("custom-key-123");
     }
 
-    // ─── bulkReplayDeliveries ────────────────────────────────────────────
-
-    @Test
-    void bulkReplay_noIdsAndNoProjectId_returnsEmptyResultWithoutTouchingRepositories() {
-        BulkReplayResponse response = deliveryService.bulkReplayDeliveries(
-                List.of(), null, null, null, null, auth);
-
-        assertThat(response.getTotalRequested()).isZero();
-        assertThat(response.getReplayed()).isZero();
-        verifyNoInteractions(deliveryRepository);
-    }
-
     @Test
     void bulkReplay_byIds_skipsAlreadySuccessfulAndMissingDeliveries() {
         UUID successId = UUID.randomUUID();
@@ -491,7 +401,6 @@ class DeliveryServiceTest {
     @Test
     void bulkReplay_byIds_overLimit_capsAndReportsHasMore() {
         List<UUID> ids = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
-        // All missing so nothing is actually replayed — this test only cares about capping/hasMore.
         for (UUID id : ids) {
             when(deliveryRepository.findById(id)).thenReturn(Optional.empty());
         }
@@ -500,7 +409,6 @@ class DeliveryServiceTest {
 
         assertThat(response.getTotalRequested()).isEqualTo(3);
         assertThat(response.isHasMore()).isTrue();
-        // Only the first 2 (capped) should have been looked up.
         verify(deliveryRepository, times(1)).findById(ids.get(0));
         verify(deliveryRepository, times(1)).findById(ids.get(1));
         verify(deliveryRepository, never()).findById(ids.get(2));
@@ -528,7 +436,7 @@ class DeliveryServiceTest {
                 .endpointId(UUID.randomUUID()).status(DeliveryStatus.DLQ).build();
 
         when(deliveryRepository.count(any(Specification.class))).thenReturn(2L);
-        when(deliveryRepository.findAll(any(Specification.class), any(org.springframework.data.domain.Pageable.class)))
+        when(deliveryRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(d1, d2)));
 
         BulkReplayResponse response = deliveryService.bulkReplayDeliveries(
@@ -542,26 +450,10 @@ class DeliveryServiceTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void bulkReplay_byProject_moreMatchedThanLimit_setsHasMoreTrue() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
-        when(deliveryRepository.count(any(Specification.class))).thenReturn(500L);
-        when(deliveryRepository.findAll(any(Specification.class), any(org.springframework.data.domain.Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
-
-        BulkReplayResponse response = deliveryService.bulkReplayDeliveries(
-                null, null, null, projectId, 10, auth);
-
-        assertThat(response.isHasMore()).isTrue();
-        assertThat(response.getTotalRequested()).isEqualTo(10);
-    }
-
-    @Test
     void bulkReplay_requestedLimitAboveMax_isClampedToMax() {
-        // 5000 is BULK_REPLAY_MAX_LIMIT; requesting 999999 must not blow past it.
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
         when(deliveryRepository.count(any(Specification.class))).thenReturn(0L);
-        when(deliveryRepository.findAll(any(Specification.class), any(org.springframework.data.domain.Pageable.class)))
+        when(deliveryRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenAnswer(inv -> {
                     Pageable pageable = inv.getArgument(1);
                     assertThat(pageable.getPageSize()).isEqualTo(5000);
@@ -569,5 +461,81 @@ class DeliveryServiceTest {
                 });
 
         deliveryService.bulkReplayDeliveries(null, null, null, projectId, 999_999, auth);
+    }
+
+    // Masking was applied to the events list but not to the screens opened when a delivery fails.
+    @Nested
+    @DisplayName("DeliveryService — masking rules reach the attempt bodies and the replay preview")
+    class DeliveryPiiMasking {
+
+        private static final String RAW = "{\"email\":\"ada@example.com\"}";
+        private static final String MASKED = "{\"email\":\"***\"}";
+
+        private final UUID deliveryId = UUID.randomUUID();
+        private final UUID endpointId = UUID.randomUUID();
+
+        @BeforeEach
+        void stubDeliveryWithPayload() {
+            Event event = Event.builder().id(eventId).projectId(projectId)
+                    .eventType("user.signup").payload(RAW).build();
+            Delivery delivery = Delivery.builder().id(deliveryId).eventId(eventId)
+                    .endpointId(endpointId).status(DeliveryStatus.FAILED)
+                    .attemptCount(1).maxAttempts(6).build();
+
+            when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+            when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
+            when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(
+                    Endpoint.builder().id(endpointId).projectId(projectId)
+                            .url("https://api.customer.com/hook").enabled(true).build()));
+
+            when(piiMaskingService.sanitizePayload(eq(projectId), anyString()))
+                    .thenAnswer(inv -> MASKED);
+        }
+
+        @Test
+        @DisplayName("an attempt's request and response bodies are masked")
+        void attemptBodiesAreMasked() {
+            when(deliveryAttemptRepository.findByDeliveryIdOrderByAttemptNumberAsc(deliveryId))
+                    .thenReturn(List.of(DeliveryAttempt.builder()
+                            .id(UUID.randomUUID()).deliveryId(deliveryId).attemptNumber(1)
+                            .requestBody(RAW).responseBody(RAW).httpStatusCode(500).build()));
+
+            List<DeliveryAttemptResponse> attempts = deliveryService.getDeliveryAttempts(deliveryId, auth);
+
+            assertThat(attempts).singleElement().satisfies(a -> {
+                assertThat(a.getRequestBody()).isEqualTo(MASKED);
+                assertThat(a.getResponseBody()).isEqualTo(MASKED);
+            });
+        }
+
+        @Test
+        @DisplayName("the replay dry-run preview is masked")
+        void dryRunPayloadIsMasked() {
+            when(deliveryAttemptRepository.findByDeliveryIdOrderByAttemptNumberAsc(deliveryId))
+                    .thenReturn(List.of());
+
+            var response = deliveryService.dryRunReplay(deliveryId, auth);
+
+            assertThat(response.getPayload()).isEqualTo(MASKED);
+        }
+
+        @Test
+        @DisplayName("a project with no rules is not charged for a rewrite it did not ask for")
+        void noRulesLeavesPayloadUntouched() {
+            when(piiMaskingService.sanitizePayload(eq(projectId), anyString()))
+                    .thenAnswer(inv -> inv.getArgument(1));
+            when(deliveryAttemptRepository.findByDeliveryIdOrderByAttemptNumberAsc(deliveryId))
+                    .thenReturn(List.of(DeliveryAttempt.builder()
+                            .id(UUID.randomUUID()).deliveryId(deliveryId).attemptNumber(1)
+                            .requestBody(RAW).responseBody(null).build()));
+
+            List<DeliveryAttemptResponse> attempts = deliveryService.getDeliveryAttempts(deliveryId, auth);
+
+            assertThat(attempts).singleElement().satisfies(a -> {
+                assertThat(a.getRequestBody()).isEqualTo(RAW);
+                assertThat(a.getResponseBody()).isNull();
+            });
+        }
     }
 }

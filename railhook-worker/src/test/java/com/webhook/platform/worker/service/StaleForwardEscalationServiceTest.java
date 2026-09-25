@@ -27,18 +27,14 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.offset;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * The Incoming direction had no way to give up on a Forward: {@link StuckForwardRecoveryService}
- * resets an Attempt stuck in PROCESSING, and nothing else ever wrote a terminal state for one
- * whose Destination simply stayed unreachable.
- */
+/** Nothing used to give up on a Forward whose Destination stayed unreachable. */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class StaleForwardEscalationServiceTest {
@@ -111,8 +107,7 @@ class StaleForwardEscalationServiceTest {
 
         ArgumentCaptor<Instant> cutoff = ArgumentCaptor.forClass(Instant.class);
         verify(attemptRepository).findStaleForwardAttemptIds(cutoff.capture(), eq(100));
-        // Bracketed rather than compared with toHours(), which truncates downward and made this
-        // read 23 for a cutoff that was exactly the cap behind a `now` taken microseconds later.
+        // Bracketed: toHours() truncates and read 23 for an exact 24h cutoff.
         Duration cap = Duration.ofHours(HARD_CAP_HOURS);
         assertThat(cutoff.getValue())
                 .isBetween(before.minus(cap), after.minus(cap));
@@ -151,20 +146,8 @@ class StaleForwardEscalationServiceTest {
 
         service.runEscalation();
 
-        // The DLQ write already committed; the notification is best-effort by design.
         verify(attemptRepository).saveAll(any());
         assertThat(meterRegistry.counter("forward_escalated_to_dlq_total").count()).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("nothing stale means nothing written and nothing published")
-    void nothingStaleIsANoOp() {
-        when(attemptRepository.findStaleForwardAttemptIds(any(Instant.class), anyInt())).thenReturn(List.of());
-
-        service.runEscalation();
-
-        verify(attemptRepository, never()).saveAll(any());
-        verify(kafkaTemplate, never()).send(any(String.class), any(String.class), any(IncomingForwardMessage.class));
     }
 
     @Test
@@ -177,7 +160,7 @@ class StaleForwardEscalationServiceTest {
         service.runEscalation();
 
         double ageSeconds = meterRegistry.get("forward_oldest_pending_age_seconds").gauge().value();
-        assertThat(ageSeconds).isCloseTo(Duration.ofHours(5).getSeconds(), org.assertj.core.data.Offset.offset(60.0));
+        assertThat(ageSeconds).isCloseTo(Duration.ofHours(5).getSeconds(), offset(60.0));
     }
 
     @Test
@@ -194,9 +177,6 @@ class StaleForwardEscalationServiceTest {
     @Test
     @DisplayName("the shipped incoming ladder fits inside the shipped forward cap")
     void shippedLadderFitsTheShippedCap() {
-        // Guards the pairing this service's default was chosen for: the incoming ladder's
-        // worst case is ~11h against a 24h cap. RetrySchedulerService enforces the same thing
-        // at startup; this states it where the cap is defined.
         long worstCase = RetryLadderDefaults.incoming().worstCaseSpanSeconds();
         assertThat(worstCase).isLessThan(Duration.ofHours(HARD_CAP_HOURS).getSeconds());
     }

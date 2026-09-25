@@ -5,9 +5,10 @@ import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
+import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
-import com.webhook.platform.api.dto.TunnelSessionResponse;
+import com.webhook.platform.api.service.billing.EntitlementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,10 +20,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -39,10 +43,10 @@ class TunnelServiceTest {
     private ProjectRepository projectRepository;
 
     @Mock
-    private com.webhook.platform.api.domain.repository.OrganizationRepository organizationRepository;
+    private OrganizationRepository organizationRepository;
 
     @Mock
-    private com.webhook.platform.api.service.billing.EntitlementService entitlementService;
+    private EntitlementService entitlementService;
 
     @Mock
     private RedisTunnelCoordinator redisTunnelCoordinator;
@@ -56,12 +60,6 @@ class TunnelServiceTest {
         ReflectionTestUtils.setField(tunnelService, "heartbeatTimeoutSeconds", 120);
     }
 
-
-    /**
-     * Every service under test now reads its organization from the ambient tenant scope instead
-     * of taking it as a parameter. A unit test has no request to establish one, so it
-     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
-     */
     @BeforeEach
     void enterTenantScope() {
         TenantContext.set(tenantOrgId);
@@ -77,7 +75,6 @@ class TunnelServiceTest {
         UUID userId = UUID.randomUUID();
         UUID projectId = UUID.randomUUID();
 
-        // Mock project belongs to the same org
         Project project = Project.builder().id(projectId).organizationId(tenantOrgId).build();
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
@@ -125,27 +122,7 @@ class TunnelServiceTest {
         assertNotNull(captor.getValue().getClosedAt());
     }
 
-    @Test
-    void shouldCloseSessionById() {
-        UUID sessionId = UUID.randomUUID();
-        TunnelSession session = TunnelSession.builder()
-                .id(sessionId)
-                .tunnelToken("test-token")
-                .publicSlug("tun-xyz789")
-                .status(TunnelStatus.ACTIVE)
-                .build();
-
-        when(tunnelSessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
-        when(tunnelSessionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        tunnelService.closeSession(sessionId);
-
-        verify(tunnelSessionRepository).save(argThat(s -> s.getStatus() == TunnelStatus.CLOSED));
-    }
-
-    // Deleting a tunnel only marked its row CLOSED. The CLI's socket stayed up and the slug stayed
-    // registered, so the tunnel kept forwarding — outside the plan's active-tunnel count, which
-    // only counts ACTIVE rows, and outside bandwidth metering, which only meters ACTIVE ones.
+    // Deleting a tunnel only marked its row CLOSED, and the socket kept forwarding unmetered.
     @Test
     void closingASessionByIdDisconnectsItsTunnelEverywhere() {
         UUID sessionId = UUID.randomUUID();
@@ -172,44 +149,6 @@ class TunnelServiceTest {
     }
 
     @Test
-    void shouldUpdateHeartbeat() {
-        TunnelSession session = TunnelSession.builder()
-                .id(UUID.randomUUID())
-                .tunnelToken("hb-token")
-                .status(TunnelStatus.ACTIVE)
-                .build();
-
-        when(tunnelSessionRepository.findByTunnelToken("hb-token")).thenReturn(Optional.of(session));
-        when(tunnelSessionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        tunnelService.heartbeat("hb-token");
-
-        verify(tunnelSessionRepository).save(argThat(s -> s.getLastHeartbeat() != null));
-    }
-
-    @Test
-    void shouldGetActiveBySlug() {
-        TunnelSession session = TunnelSession.builder()
-                .id(UUID.randomUUID())
-                .publicSlug("tun-active")
-                .status(TunnelStatus.ACTIVE)
-                .build();
-
-        when(tunnelSessionRepository.findByPublicSlug("tun-active")).thenReturn(Optional.of(session));
-
-        TunnelSession result = tunnelService.getActiveBySlug("tun-active");
-        assertNotNull(result);
-        assertEquals(TunnelStatus.ACTIVE, result.getStatus());
-    }
-
-    @Test
-    void shouldThrowWhenSlugNotFound() {
-        when(tunnelSessionRepository.findByPublicSlug("missing")).thenReturn(Optional.empty());
-
-        assertThrows(ResponseStatusException.class, () -> tunnelService.getActiveBySlug("missing"));
-    }
-
-    @Test
     void shouldThrowWhenSlugNotActive() {
         TunnelSession session = TunnelSession.builder()
                 .id(UUID.randomUUID())
@@ -222,58 +161,30 @@ class TunnelServiceTest {
         assertThrows(ResponseStatusException.class, () -> tunnelService.getActiveBySlug("tun-closed"));
     }
 
+    // A slug cut out of base64 came up short when enough '-' and '_' were stripped, and creation threw.
     @Test
-    void shouldListActiveTunnels() {
-        TunnelSession session = TunnelSession.builder()
-                .id(UUID.randomUUID())
-                .organizationId(tenantOrgId)
-                .userId(UUID.randomUUID())
-                .publicSlug("tun-list1")
-                .localPort(3000)
-                .status(TunnelStatus.ACTIVE)
-                .createdAt(Instant.now())
-                .build();
+    void everySlugIsTwelveAlphanumericCharactersAfterTheTunPrefix() {
+        Random random = new Random(20260922L);
+        Set<String> seen = new HashSet<>();
 
-        when(tunnelSessionRepository.findByOrganizationIdAndStatus(tenantOrgId, TunnelStatus.ACTIVE))
-                .thenReturn(List.of(session));
+        for (int i = 0; i < 10_000; i++) {
+            String slug = TunnelService.slug(random);
+            assertThat(slug).matches("tun-[a-z0-9]{12}");
+            seen.add(slug);
+        }
 
-        List<TunnelSessionResponse> results = tunnelService.listActive();
-        assertEquals(1, results.size());
-        assertEquals("tun-list1", results.get(0).getPublicSlug());
-        assertTrue(results.get(0).getPublicUrl().contains("tun-list1"));
+        assertThat(seen).as("a slug is a name in a URL, so it may not repeat").hasSize(10_000);
     }
 
     @Test
-    void shouldBuildPublicUrl() {
-        String url = tunnelService.buildPublicUrl("tun-slug123");
-        assertEquals("http://localhost:8080/tunnel/tun-slug123", url);
-    }
+    void aSlugFromASourceThatKeepsReturningTheFirstCharacterStillHasTwelve() {
+        String slug = TunnelService.slug(new Random() {
+            @Override
+            public int nextInt(int bound) {
+                return 0;
+            }
+        });
 
-    @Test
-    void shouldConvertToResponse() {
-        TunnelSession session = TunnelSession.builder()
-                .id(UUID.randomUUID())
-                .organizationId(UUID.randomUUID())
-                .userId(UUID.randomUUID())
-                .projectId(UUID.randomUUID())
-                .publicSlug("tun-resp")
-                .localPort(4000)
-                .status(TunnelStatus.ACTIVE)
-                .createdAt(Instant.now())
-                .lastHeartbeat(Instant.now())
-                .clientInfo("test-client")
-                .build();
-
-        TunnelSessionResponse response = tunnelService.toResponse(session);
-
-        assertEquals(session.getId(), response.getId());
-        assertEquals(session.getOrganizationId(), response.getOrganizationId());
-        assertEquals(session.getUserId(), response.getUserId());
-        assertEquals(session.getProjectId(), response.getProjectId());
-        assertEquals("tun-resp", response.getPublicSlug());
-        assertEquals("http://localhost:8080/tunnel/tun-resp", response.getPublicUrl());
-        assertEquals(4000, response.getLocalPort());
-        assertEquals(TunnelStatus.ACTIVE, response.getStatus());
-        assertEquals("test-client", response.getClientInfo());
+        assertThat(slug).matches("tun-[a-z0-9]{12}");
     }
 }

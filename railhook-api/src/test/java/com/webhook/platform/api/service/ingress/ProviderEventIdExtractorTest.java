@@ -5,11 +5,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The dedup id has to be one the provider really sends and keeps across its own resends. Stripe
- * and Twilio were read from headers neither sends, so every Stripe resend — re-signed with a fresh
- * timestamp, so the replay check does not catch it either — was stored and forwarded again.
- */
+// Stripe and Twilio ids were read from headers neither sends, so every resend was forwarded again.
 class ProviderEventIdExtractorTest {
 
     private static final String STRIPE_EVENT =
@@ -75,12 +71,7 @@ class ProviderEventIdExtractorTest {
                 .isEqualTo("6a8f5f28-54a1-4eb0-a98a-3111513fd4fc");
     }
 
-    /**
-     * Adyen names no event id. What two copies of one event share is the pspReference and the
-     * eventCode together, so that pair is the key — and only for a notification carrying exactly
-     * one item, because a key built from the first of several would answer a later request with
-     * an earlier one and quietly drop the items it did not name.
-     */
+    // Keyed only for a single item: a key from the first of several would drop the others.
     @Test
     void anAdyenNotificationIsKeyedByItsPspReferenceAndEventCode() {
         assertThat(ProviderEventIdExtractor.extract(adyenRequest(), adyenBody(
@@ -105,7 +96,6 @@ class ProviderEventIdExtractorTest {
         assertThat(ProviderEventIdExtractor.extract(adyenRequest(), "not json")).isNull();
     }
 
-    /** Adyen's header-signed webhooks are a different body shape with no pspReference at all. */
     @Test
     void anAdyenHeaderSignedWebhookIsNotDeduplicated() {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/ingress/token");

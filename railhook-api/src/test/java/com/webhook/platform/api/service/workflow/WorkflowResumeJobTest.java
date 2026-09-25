@@ -34,14 +34,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * The other half of not sleeping: something has to wake the execution up.
- *
- * <p>A suspended execution is a row nobody is holding. If this job loses one — because the
- * workflow was deleted, or the snapshot cannot be read — the row sits in WAITING and is polled
- * forever, which is a slower version of the leak the suspension was meant to fix. So every path
- * out of here is terminal in one direction or the other.
- */
+// A suspended execution nobody resumes sits in WAITING and is polled forever.
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("WorkflowResumeJob — nothing suspended is left behind")
@@ -82,9 +75,7 @@ class WorkflowResumeJobTest {
 
         job().resumeDueExecutions();
 
-        /* The job runs @SystemTenant, with Hibernate's tenant filter off. The engine writes
-           step rows, which are tenant-scoped — resuming without re-entering would write them
-           owned by nobody. */
+        // The job runs with the tenant filter off; step rows written outside a tenant are owned by nobody.
         assertThat(tenantAtResume.get()).isEqualTo(organizationId);
     }
 
@@ -100,8 +91,7 @@ class WorkflowResumeJobTest {
 
         job().resumeDueExecutions();
 
-        /* Dropping it would reset the execution budget on every suspension, so a workflow that
-           alternated delays and work could run forever without ever tripping the timeout. */
+        // Dropping it would reset the execution budget on every suspension.
         verify(engine).resume(eq(execution.getId()), any(), any(), any(), eq(1234L));
     }
 
@@ -137,8 +127,6 @@ class WorkflowResumeJobTest {
 
         job().resumeDueExecutions();
 
-        /* The two rows belong to different organizations as far as this job knows. One
-           customer's unreadable snapshot must not hold up everyone else's delays. */
         verify(engine).resume(eq(healthy.getId()), any(), any(), any(), anyLong());
     }
 

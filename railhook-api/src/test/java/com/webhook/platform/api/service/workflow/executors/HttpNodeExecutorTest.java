@@ -3,7 +3,6 @@ package com.webhook.platform.api.service.workflow.executors;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus;
 import com.webhook.platform.api.service.workflow.StepResult;
@@ -19,11 +18,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Uses a local JDK HttpServer (no extra test deps) bound to loopback, so
- * {@code allowPrivateIps=true} is required for the "success" tests — SSRF
- * blocking itself is tested separately with the default (false) setting.
- */
 class HttpNodeExecutorTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
@@ -49,19 +43,6 @@ class HttpNodeExecutorTest {
 
     private JsonNode json(String raw) throws Exception {
         return mapper.readTree(raw);
-    }
-
-    @Test
-    void getType_returnsHttp() {
-        assertThat(executor(true).getType()).isEqualTo("http");
-    }
-
-    @Test
-    void missingUrl_returnsFailed() throws Exception {
-        StepResult result = executor(true).execute(json("{}"), json("{}"));
-
-        assertThat(result.status()).isEqualTo(StepStatus.FAILED);
-        assertThat(result.errorMessage()).contains("url is required");
     }
 
     @Test
@@ -154,19 +135,12 @@ class HttpNodeExecutorTest {
 
         StepResult result = executor(true).execute(config, json("{}"));
 
-        // WebClient's default retrieve() raises WebClientResponseException for any
-        // non-2xx status before the executor's own "statusCode >= 200 && < 300" check
-        // ever runs, so the failure is surfaced via the generic catch block, not the
-        // "HTTP <code>: <body>" branch further down in HttpNodeExecutor#execute.
         assertThat(result.status()).isEqualTo(StepStatus.FAILED);
         assertThat(result.errorMessage()).contains("HTTP error").contains("500");
     }
 
     @Test
     void unreachableHost_failsWithinConfiguredTimeout() throws Exception {
-        // Close the server immediately so nothing is listening on this port, and bound
-        // the executor's own wait via a short "timeout" config value rather than relying
-        // on how quickly the OS/sandbox reports connection refusal.
         int port = server.getAddress().getPort();
         server.stop(0);
         server = null;

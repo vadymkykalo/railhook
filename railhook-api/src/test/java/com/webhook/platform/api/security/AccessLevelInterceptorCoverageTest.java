@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.lang.reflect.Method;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -29,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * that do not ({@code /ingress}, {@code /tunnel}, {@code /hook}) are unauthenticated by design and
  * carry no annotation. This freezes that coincidence into a rule.
  *
- * <p>{@code AccessLevelEnforcementTest} proves the interceptor enforces the annotation. This
+ * <p>{@code ScopeEnforcementInterceptorTest} proves the interceptor enforces the annotation. This
  * proves the interceptor is reached. Both are needed: the first passes just as happily when the
  * handler under test is the only one on an intercepted path.
  *
@@ -116,7 +117,7 @@ class AccessLevelInterceptorCoverageTest {
                         throw new IllegalStateException("Scanned but could not load " + name, e);
                     }
                 })
-                .sorted(java.util.Comparator.comparing(Class::getName))
+                .sorted(Comparator.comparing(Class::getName))
                 .toList();
     }
 }

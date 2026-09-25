@@ -13,10 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-/**
- * The public tester is off unless a deployment turns it on: a self-hosted install that never
- * asked for it must not open an anonymous store on its owner's server.
- */
+// A self-hosted install that never enabled the public tester must not open an anonymous store.
 class PublicBinServiceTest {
 
     private final PublicBinRepository bins = mock(PublicBinRepository.class);

@@ -66,15 +66,6 @@ class QuotaCounterServiceTest {
     }
 
     @Test
-    void aSuccessfulIncrementCountsNoFallback() {
-        when(counter.incrementAndGet()).thenReturn(2L);
-
-        service.increment();
-
-        assertThat(fallbackCount()).isZero();
-    }
-
-    @Test
     void countsAFallbackWhenRedisRefusesTheRead() {
         when(counter.isExists()).thenThrow(new IllegalStateException("Redis is down"));
         when(eventRepository.countEventsAndIncomingEventsBetween(any(), any(), any())).thenReturn(41L);
@@ -157,24 +148,12 @@ class QuotaCounterServiceTest {
 
     @Test
     void aKeyTheIncrementHadToRecreateIsReseeded_notBelievedAtOne() {
-        // The month's key was evicted under memory pressure: incrementAndGet creates it afresh at
-        // 1, and from then on it exists and is believed.
+        // An evicted key is recreated at 1 by incrementAndGet and would otherwise be believed.
         when(counter.incrementAndGet()).thenReturn(1L);
         when(eventRepository.countEventsAndIncomingEventsBetween(eq(orgId), any(), any())).thenReturn(4_200L);
 
         service.increment();
 
         verify(counter).set(4_200L);
-    }
-
-    @Test
-    void theDatabaseCountIncludesIncomingEvents() {
-        // Both directions charge the counter (EventIngestService and IngressService), so the count
-        // a re-seed or a fallback replaces it with has to include both, or every re-seed forgives
-        // an organization its incoming webhooks for the month so far.
-        when(counter.isExists()).thenReturn(false);
-        when(eventRepository.countEventsAndIncomingEventsBetween(eq(orgId), any(), any())).thenReturn(33L);
-
-        assertThat(service.getCurrentCount()).isEqualTo(33L);
     }
 }

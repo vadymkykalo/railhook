@@ -8,10 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-/**
- * One line of the log is one event. A value somebody outside chose must not be able to end that
- * line early and start a second one that reads like ours.
- */
 class LogSanitizerTest {
 
     @Test
@@ -19,7 +15,7 @@ class LogSanitizerTest {
     void newlineIsNeutralised() {
         String forged = LogSanitizer.forLog("GET /api\nWARN  Organization deleted");
 
-        assertFalse(forged.contains("\n"), "a value that keeps its newline splits the entry in two");
+        assertFalse(forged.contains("\n"));
         assertEquals("GET /api_WARN  Organization deleted", forged);
     }
 
@@ -33,12 +29,8 @@ class LogSanitizerTest {
     @Test
     @DisplayName("the invisible controls go as well, not only the two that break lines")
     void otherControlCharactersAreNeutralised() {
-        // A tab does not split the entry, but it does let a value dress itself up as the field
-        // separators around it.
         assertEquals("a_b", LogSanitizer.forLog("a\tb"));
         assertEquals("a_b", LogSanitizer.forLog("a\u0000b"));
-
-        // A space is not one of them: it separates the fields, it does not impersonate them.
         assertEquals("GET /api", LogSanitizer.forLog("GET /api"));
     }
 
@@ -47,7 +39,7 @@ class LogSanitizerTest {
     void ordinaryValueIsUnchanged() {
         String clean = "GET /api/v1/deliveries?limit=50";
 
-        // Same instance, not merely equal: every request that is not an attack pays nothing.
+        // Same instance: a request that is not an attack pays nothing.
         assertSame(clean, LogSanitizer.forLog(clean));
     }
 

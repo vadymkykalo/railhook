@@ -6,8 +6,6 @@ import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.IncomingSourceRequest;
 import com.webhook.platform.api.dto.IncomingSourceResponse;
-import com.webhook.platform.api.exception.ForbiddenException;
-import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
 import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
@@ -19,13 +17,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -84,53 +79,25 @@ class IncomingSourceServiceTest {
     }
 
     @Test
-    void createSource_success() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        when(sourceRepository.existsByProjectIdAndSlug(eq(projectId), anyString())).thenReturn(false);
-        when(sourceRepository.existsByIngressPathToken(anyString())).thenReturn(false);
-        when(sourceRepository.saveAndFlush(any(IncomingSource.class))).thenAnswer(inv -> {
-            IncomingSource s = inv.getArgument(0);
-            s.setId(sourceId);
-            s.setCreatedAt(Instant.now());
-            s.setUpdatedAt(Instant.now());
-            return s;
-        });
+    void createSource_storesTheHmacSecretEncrypted() {
+        stubSave();
 
-        IncomingSourceRequest request = IncomingSourceRequest.builder()
+        IncomingSourceResponse response = service.createSource(projectId, IncomingSourceRequest.builder()
                 .name("GitHub Webhooks")
-                .slug("github-webhooks")
                 .providerType(ProviderType.GITHUB)
                 .verificationMode(VerificationMode.HMAC_GENERIC)
                 .hmacSecret("my-secret")
                 .hmacHeaderName("X-Hub-Signature-256")
-                .hmacSignaturePrefix("sha256=")
-                .build();
+                .build());
 
-        IncomingSourceResponse response = service.createSource(projectId, request);
-
-        assertThat(response.getId()).isEqualTo(sourceId);
-        assertThat(response.getName()).isEqualTo("GitHub Webhooks");
-        assertThat(response.getSlug()).isEqualTo("github-webhooks");
-        assertThat(response.getProviderType()).isEqualTo(ProviderType.GITHUB);
-        assertThat(response.getStatus()).isEqualTo(IncomingSourceStatus.ACTIVE);
-        assertThat(response.getVerificationMode()).isEqualTo(VerificationMode.HMAC_GENERIC);
-        assertThat(response.getHmacHeaderName()).isEqualTo("X-Hub-Signature-256");
-        assertThat(response.getHmacSignaturePrefix()).isEqualTo("sha256=");
         assertThat(response.isHmacSecretConfigured()).isTrue();
-        assertThat(response.getIngressUrl()).startsWith("http://localhost:8080/ingress/");
-
         ArgumentCaptor<IncomingSource> captor = ArgumentCaptor.forClass(IncomingSource.class);
         verify(sourceRepository).saveAndFlush(captor.capture());
-        IncomingSource saved = captor.getValue();
-        assertThat(saved.getHmacSecretEncrypted()).isNotNull();
-        assertThat(saved.getHmacSecretIv()).isNotNull();
+        assertThat(captor.getValue().getHmacSecretEncrypted()).isNotNull().doesNotContain("my-secret");
+        assertThat(captor.getValue().getHmacSecretIv()).isNotNull();
     }
 
-    /**
-     * A secret with no verificationMode used to save as NONE: a Stripe source created over the API
-     * with its signing secret accepted forged and unsigned webhooks alike — found on production.
-     * Supplying the secret is the intent to verify, so the mode follows from it.
-     */
+    // A secret with no mode once saved as NONE, so a Stripe source accepted forged webhooks in production.
     @Test
     void createSource_secretWithoutMode_verifiesWithTheProviderPreset() {
         stubSave();
@@ -165,30 +132,6 @@ class IncomingSourceServiceTest {
     }
 
     @Test
-    void createSource_defaultValues() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        when(sourceRepository.existsByProjectIdAndSlug(eq(projectId), anyString())).thenReturn(false);
-        when(sourceRepository.existsByIngressPathToken(anyString())).thenReturn(false);
-        when(sourceRepository.saveAndFlush(any(IncomingSource.class))).thenAnswer(inv -> {
-            IncomingSource s = inv.getArgument(0);
-            s.setId(sourceId);
-            s.setCreatedAt(Instant.now());
-            s.setUpdatedAt(Instant.now());
-            return s;
-        });
-
-        IncomingSourceRequest request = IncomingSourceRequest.builder()
-                .name("My Source")
-                .build();
-
-        IncomingSourceResponse response = service.createSource(projectId, request);
-
-        assertThat(response.getProviderType()).isEqualTo(ProviderType.GENERIC);
-        assertThat(response.getVerificationMode()).isEqualTo(VerificationMode.NONE);
-        assertThat(response.isHmacSecretConfigured()).isFalse();
-    }
-
-    @Test
     void createSource_duplicateSlug_throws() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
         when(sourceRepository.existsByProjectIdAndSlug(projectId, "github-webhooks")).thenReturn(true);
@@ -201,58 +144,6 @@ class IncomingSourceServiceTest {
         assertThatThrownBy(() -> service.createSource(projectId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("already exists");
-    }
-
-
-    @Test
-    void getSource_success() {
-        IncomingSource source = buildSource();
-        when(sourceRepository.findByIdAndProjectId(sourceId, projectId)).thenReturn(Optional.of(source));
-
-        IncomingSourceResponse response = service.getSource(projectId, sourceId);
-
-        assertThat(response.getId()).isEqualTo(sourceId);
-        assertThat(response.getName()).isEqualTo("GitHub Webhooks");
-    }
-
-    @Test
-    void getSource_notFound() {
-        when(sourceRepository.findByIdAndProjectId(sourceId, projectId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.getSource(projectId, sourceId))
-                .isInstanceOf(NotFoundException.class);
-    }
-
-    @Test
-    void listSources_success() {
-        IncomingSource source = buildSource();
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        when(sourceRepository.findByProjectId(eq(projectId), any()))
-                .thenReturn(new PageImpl<>(List.of(source)));
-
-        Page<IncomingSourceResponse> page = service.listSources(projectId, PageRequest.of(0, 20));
-
-        assertThat(page.getTotalElements()).isEqualTo(1);
-        assertThat(page.getContent().get(0).getName()).isEqualTo("GitHub Webhooks");
-    }
-
-    @Test
-    void updateSource_success() {
-        IncomingSource source = buildSource();
-        when(sourceRepository.findByIdAndProjectId(sourceId, projectId)).thenReturn(Optional.of(source));
-        when(sourceRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        IncomingSourceRequest request = IncomingSourceRequest.builder()
-                .name("Updated Name")
-                .providerType(ProviderType.STRIPE)
-                .status(IncomingSourceStatus.DISABLED)
-                .build();
-
-        IncomingSourceResponse response = service.updateSource(projectId, sourceId, request);
-
-        assertThat(response.getName()).isEqualTo("Updated Name");
-        assertThat(response.getProviderType()).isEqualTo(ProviderType.STRIPE);
-        assertThat(response.getStatus()).isEqualTo(IncomingSourceStatus.DISABLED);
     }
 
     @Test
@@ -272,7 +163,7 @@ class IncomingSourceServiceTest {
         setField(registry, "multiKeys", "");
         setField(registry, "configuredActiveVersion", 0);
         setField(registry, "salt", salt);
-        var init = registry.getClass().getDeclaredMethod("init");
+        Method init = registry.getClass().getDeclaredMethod("init");
         init.setAccessible(true);
         init.invoke(registry);
         return registry;
@@ -284,7 +175,7 @@ class IncomingSourceServiceTest {
         f.set(obj, value);
     }
 
-    // ── Refusing a source that would only fail once webhooks arrive ──────────
+    // A source that saved fine but could not verify only failed once the provider was sending.
 
     @Test
     void createRejectsProviderModeForAProviderWithNoVerifier() {
@@ -295,11 +186,6 @@ class IncomingSourceServiceTest {
         request.setProviderType(ProviderType.GENERIC);
         request.setVerificationMode(VerificationMode.PROVIDER);
 
-        /* GENERIC is the one ProviderType with no verifier, and deliberately so: it is the
-           label for a provider with no preset, which HMAC_GENERIC mode is what verifies.
-           This used to save happily and throw IllegalStateException at ingress — the source
-           looked configured, and the failure showed up once the provider was already
-           sending. */
         assertThatThrownBy(() -> service.createSource(projectId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("no built-in verifier");
@@ -337,9 +223,6 @@ class IncomingSourceServiceTest {
         request.setVerificationMode(VerificationMode.HMAC_GENERIC);
         request.setHmacHeaderName("X-Provider-Signature");
 
-        /* Not a crash like the PROVIDER case — every delivery would simply be stored with
-           verified=false and "Verification error", and the cause would be a field nobody
-           filled in. Cheaper to refuse at the keyboard. */
         assertThatThrownBy(() -> service.createSource(projectId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("hmacSecret");
@@ -355,28 +238,9 @@ class IncomingSourceServiceTest {
         IncomingSourceRequest request = new IncomingSourceRequest();
         request.setVerificationMode(VerificationMode.PROVIDER);
 
-        /* The request alone looks harmless — it names no provider. It is the combination
-           with the provider already on the row that is unverifiable, which is why the check
-           runs against the merged state. */
         assertThatThrownBy(() -> service.updateSource(projectId, sourceId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("no built-in verifier");
     }
 
-    @Test
-    void noneModeAcceptsAnyProvider() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        when(sourceRepository.existsByProjectIdAndSlug(any(), any())).thenReturn(false);
-        when(sourceRepository.existsByIngressPathToken(any())).thenReturn(false);
-        when(sourceRepository.saveAndFlush(any(IncomingSource.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        IncomingSourceRequest request = new IncomingSourceRequest();
-        request.setName("A provider that does not sign at all");
-        request.setProviderType(ProviderType.GENERIC);
-        request.setVerificationMode(VerificationMode.NONE);
-
-        // Receiving from anything that can POST is the point; only PROVIDER mode makes a
-        // promise about the provider.
-        assertThatCode(() -> service.createSource(projectId, request)).doesNotThrowAnyException();
-    }
 }

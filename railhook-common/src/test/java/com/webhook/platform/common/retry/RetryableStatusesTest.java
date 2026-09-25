@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -12,17 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Which HTTP statuses are worth another Attempt, as a Subscription or Destination may spell it.
- *
- * <p>Written against the behaviour that used to be three literals inside
- * {@code RetryPolicy.isRetryable}: 408, 429 and the whole 5xx range. That set is still the
- * default, and {@link #defaultSpecReproducesTheOldHardcodedSet()} is what says so — the
- * feature is only safe because nobody who leaves the field alone notices it exists.
- *
- * <p>Deliberately a plain {@code *Test}: pure arithmetic over a string, no container — it must
- * run in the no-Docker unit job. See {@code scripts/check-test-routing.sh}.
- */
 class RetryableStatusesTest {
 
     @Nested
@@ -88,34 +78,20 @@ class RetryableStatusesTest {
     @DisplayName("exclusions win wherever they are written")
     class Exclusions {
 
-        @Test
-        @DisplayName("an excluded status inside an included range is not retryable")
-        void exclusionBeatsInclusion() {
-            RetryableStatuses statuses = RetryableStatuses.parse("500-599,!501");
-            assertTrue(statuses.isRetryable(500));
-            assertFalse(statuses.isRetryable(501));
-            assertTrue(statuses.isRetryable(502));
-        }
-
-        @Test
-        @DisplayName("order does not matter — an exclusion written first still wins")
-        void exclusionFirstStillWins() {
-            assertFalse(RetryableStatuses.parse("!501,500-599").isRetryable(501));
-        }
-
-        @Test
-        @DisplayName("a range may be excluded, not only a single status")
-        void excludedRange() {
-            RetryableStatuses statuses = RetryableStatuses.parse(">=500,!501-509");
-            assertTrue(statuses.isRetryable(500));
-            assertFalse(statuses.isRetryable(505));
-            assertTrue(statuses.isRetryable(510));
-        }
-
-        @Test
-        @DisplayName("a spec that excludes everything it includes retries nothing, rather than failing")
-        void exclusionsMayEmptyTheSet() {
-            assertFalse(RetryableStatuses.parse("500,!500").isRetryable(500));
+        @ParameterizedTest
+        @CsvSource({
+                "'500-599,!501', 500, true",
+                "'500-599,!501', 501, false",
+                "'500-599,!501', 502, true",
+                "'!501,500-599', 501, false",
+                "'>=500,!501-509', 500, true",
+                "'>=500,!501-509', 505, false",
+                "'>=500,!501-509', 510, true",
+                "'500,!500', 500, false",
+        })
+        @DisplayName("an exclusion beats an inclusion in any order, may be a range, and may empty the set")
+        void exclusionsWin(String spec, int status, boolean retryable) {
+            assertEquals(retryable, RetryableStatuses.parse(spec).isRetryable(status));
         }
     }
 
@@ -127,17 +103,12 @@ class RetryableStatusesTest {
         @ValueSource(strings = {
                 "", "   ", "abc", "500,", ",500", "500,,502", "5xxx", "50x",
                 "500-", "-500", "599-500", "500-600", "99", "600", ">=", ">=abc",
-                "!", "!!500", "500..599", "2xx-3xx",
+                "!", "!!500", "500..599", "2xx-3xx", "100-700",
         })
-        @DisplayName("a malformed spec throws instead of substituting the default")
+        @NullSource
+        @DisplayName("a malformed, out-of-range or null spec throws instead of substituting the default")
         void malformedThrows(String spec) {
             assertThrows(IllegalArgumentException.class, () -> RetryableStatuses.parse(spec));
-        }
-
-        @Test
-        @DisplayName("null throws — every row carries a spec, so null is a bug and not a default")
-        void nullThrows() {
-            assertThrows(IllegalArgumentException.class, () -> RetryableStatuses.parse(null));
         }
 
         @Test
@@ -154,24 +125,11 @@ class RetryableStatusesTest {
                     () -> RetryableStatuses.validate("nonsense", "retryableStatuses"));
             assertTrue(e.getMessage().contains("retryableStatuses"), e.getMessage());
         }
-
-        @Test
-        @DisplayName("a status outside 100-599 is not an HTTP status and is refused")
-        void outOfRangeThrows() {
-            assertThrows(IllegalArgumentException.class, () -> RetryableStatuses.parse("100-700"));
-        }
     }
 
     @Nested
     @DisplayName("round-trips")
     class RoundTrip {
-
-        @Test
-        @DisplayName("the declared default parses")
-        void defaultParses() {
-            assertEquals(RetryableStatuses.parse(RetryableStatuses.DEFAULT_SPEC),
-                    RetryableStatuses.parse(RetryableStatuses.DEFAULT_SPEC));
-        }
 
         @Test
         @DisplayName("two specs that mean the same set compare equal")
