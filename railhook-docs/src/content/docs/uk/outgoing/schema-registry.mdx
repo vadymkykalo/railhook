@@ -2,7 +2,7 @@
 title: Реєстр схем
 description: Як вести JSON Schema з версіями для кожного типу події, бачити, що змінила кожна версія, і вирішувати, чи відхиляти події, які схемі не відповідають.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
 Реєстр схем зберігає JSON Schema для кожного типу події в проєкті. Коли ви завантажуєте нову версію, Railhook порівнює її з попередньою й відхиляє зміни, які порушують обіцяну вами сумісність. Якщо ввімкнути валідацію, кожну подію перевірятимуть за активною версією одразу під час надходження, ще до збереження.
 
@@ -61,13 +61,5 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 | `FULL` | Усе, що відхиляють `BACKWARD` і `FORWARD`. |
 
 <Aside type="tip">
-Railhook записує зміни між версіями. Переглянути їх можна для одного типу події через `GET /api/v1/projects/{projectId}/schemas/{eventTypeId}/changes`, а для всього проєкту — через `GET /api/v1/projects/{projectId}/schemas/changes`.
+Railhook записує зміни між версіями. Переглянути їх можна для одного типу події через `GET /api/v1/projects/{projectId}/schemas/{eventTypeId}/changes`, а для всього проєкту через `GET /api/v1/projects/{projectId}/schemas/changes`.
 </Aside>
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Ендпоінти та підписки" href="/docs/uk/outgoing/endpoints-subscriptions/" description="Шаблони типів подій і те, які події потрапляють під підписку." />
-  <LinkCard title="Помилки та обмеження" href="/docs/uk/platform/errors-limits/" description="Що бачить відправник, коли подію відхилено." />
-  <LinkCard title="Довідник API" href="/docs/uk/api-reference/" description="Усі запити й відповіді реєстру схем." />
-</CardGrid>

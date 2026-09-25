@@ -2,9 +2,9 @@
 title: Retries and failed messages
 description: When Railhook tries a delivery again, when it gives up, and how to resend what it gave up on.
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-A delivery is an obligation to get one event to one endpoint. Railhook keeps trying it on a fixed schedule, the **retry ladder**, until the endpoint answers `2xx` or the ladder runs out. What it gives up on is kept in **Failed Messages** for a person to decide about.
+Railhook retries a delivery on a fixed schedule, the **retry ladder**, until the endpoint answers `2xx` or the ladder runs out. What it gives up on goes to **Failed Messages**.
 
 ## Delivery statuses
 
@@ -21,40 +21,38 @@ A delivery is an obligation to get one event to one endpoint. Railhook keeps try
 | Result of the attempt | What happens |
 |---|---|
 | `2xx` | `SUCCESS`. |
-| `408`, `429`, any `5xx` | Retried on the ladder. This set is the default; a subscription or an incoming destination can change it — see [Which statuses are worth retrying](#which-statuses-are-worth-retrying). |
+| `408`, `429`, any `5xx` | Retried on the ladder. This is the default set. A subscription or an incoming destination can change it: see [Which statuses are worth retrying](#which-statuses-are-worth-retrying). |
 | A connection error, a timeout, or a host that does not resolve | Retried on the ladder. |
 | The transformation failed to apply | Retried on the ladder. The raw payload is never sent instead. |
-| Any other `4xx`, or a `3xx` | `DLQ` on the first attempt, without the rest of the ladder. A `401`, a `404` or a redirect will not change on its own, but you can change it: fix the credentials or the URL, then retry from Failed Messages. Redirects are not followed. |
+| Any other `4xx`, or a `3xx` | `DLQ` on the first attempt, without the rest of the ladder. Fix the credentials or the URL, then retry from Failed Messages. Redirects are not followed. |
 | The endpoint cannot receive it, for example it is not verified, or its URL is refused by the private address check | `FAILED` without an attempt. |
 
 ## The retry ladders
 
-Each wait is jittered between 50% and 150% of its value, so a burst of retries does not arrive at once.
+Each wait is jittered between 50% and 150% of its value, so retries do not arrive in a burst.
 
 | Direction | Attempts | Waits between attempts | Nominal total |
 |---|---|---|---|
 | Outgoing (a delivery) | 7 | 1 min, 5 min, 15 min, 1 h, 6 h, 24 h | about 31 h 21 min |
 | Incoming (a forward) | 5 | 1 min, 5 min, 15 min, 1 h | about 1 h 21 min |
 
-These are the defaults. A subscription can set its own `maxAttempts` (1 to 20) and `retryDelays` in seconds, and an incoming destination can set its own too. When there are more attempts than delays, the last delay repeats.
+A subscription or an incoming destination can set its own `maxAttempts` (1 to 20) and `retryDelays` in seconds. When there are more attempts than delays, the last delay repeats.
 
 <Aside title="Why the two ladders differ">
-On purpose. Outgoing carries your own event to an endpoint you registered, where holding it for a day is a reasonable promise. Incoming relays somebody else's webhook onward, where giving up sooner is the better promise.
+On purpose. Outgoing carries your own event to an endpoint you registered, so trying for a day is reasonable. Incoming relays someone else's webhook, so giving up sooner is better.
 </Aside>
 
 ### What is not an attempt
 
-Some work is turned away before any request is made: a tenant or per-endpoint rate limit, all concurrency slots in use, an open circuit breaker, or an ordered delivery waiting for an earlier one. That is a **deferral**. It does not use up an attempt or move the ladder; the delivery is simply scheduled again. Only requests that were actually made count.
+A tenant or per-endpoint rate limit, full concurrency slots, an open circuit breaker, or an ordered delivery waiting for an earlier one stops the request before it is made. That is a **deferral**: it does not use an attempt or move the ladder, the delivery is just scheduled again.
 
 ## Timeouts
 
-One attempt waits 30 seconds for a response unless the subscription sets `timeoutSeconds`, which must be between 1 and 60. A timeout counts as a failed attempt and is retried like any other failure.
+One attempt waits 30 seconds for a response unless the subscription sets `timeoutSeconds`, which must be between 1 and 60. A timeout is a failed attempt.
 
 ## Which statuses are worth retrying
 
-By default a delivery is retried on `408`, `429` and every `5xx`, and nothing else. A subscription can say otherwise with `retryableStatuses`, and an incoming destination has the same field.
-
-The value is a comma-separated list of terms:
+By default a delivery is retried on `408`, `429` and every `5xx`, and nothing else. A subscription or an incoming destination can change this with `retryableStatuses`, a comma-separated list of terms:
 
 | Term | Matches |
 |---|---|
@@ -64,38 +62,36 @@ The value is a comma-separated list of terms:
 | `>=500`, `>500`, `<=408`, `<400` | Open at one end. |
 | `!501` | Excluded. Any term can be prefixed with `!`. |
 
-Exclusions win wherever they are written, so `5xx,!501` and `!501,5xx` mean the same thing. A few worth knowing:
+Exclusions win wherever they are written: `5xx,!501` and `!501,5xx` mean the same.
 
 ```text title="Examples"
-408,429,500-599    the default — what Railhook did before this was configurable
+408,429,500-599    the default
 5xx,!501           retry every server error except "not implemented"
 >=500,408,429,409  a receiver that answers 409 while it is still catching up
 408,429            a receiver whose 5xx means the payload was rejected for good
 ```
 
-The API rejects a list it cannot read, with a message naming the term at fault. A status the list does not cover is treated the way a `4xx` is: the delivery goes to Failed Messages on the first attempt, without the rest of the ladder, and you can retry it from there.
+The API rejects a list it cannot read and names the bad term. A status the list does not cover is treated like a `4xx`: the delivery goes to Failed Messages on the first attempt.
 
 <Aside title="A subscription's list is copied onto its deliveries">
-Like the ladder, it is stamped on each delivery as that delivery is created. Editing the subscription changes what happens to new deliveries, not to ones already partway through their ladder — a delivery is judged by the rules it started under.
+Like the ladder, it is stamped on each delivery when the delivery is created. Editing the subscription affects new deliveries only, not ones already partway through their ladder.
 </Aside>
 
 ## Retry-After
 
-A receiver answering `429` or `503` can say when to come back, with a `Retry-After` header. Railhook honours it in both forms the HTTP spec allows: a number of seconds, or an HTTP date.
+A receiver answering `429` or `503` can set `Retry-After`. Railhook accepts both HTTP forms: seconds or an HTTP date. Three rules bound it:
 
-Three rules bound it:
+- **Only on `429` and `503`.** Only there does it mean "over capacity, wait". On a `500` it is often a header a proxy left on.
+- **It can only push an attempt later.** A receiver cannot make Railhook retry harder than the subscription owner configured.
+- **It is clamped**, by `WEBHOOK_RETRY_AFTER_MAX_SECONDS` (default `21600`, six hours). Otherwise one misconfigured response could park a delivery for a year.
 
-- **Only on `429` and `503`.** Those are the two statuses where the header means "I am over capacity, wait". On a `500` it is at best a guess and at worst a header a proxy left on.
-- **It can only push an attempt later.** A receiver asking to be called back sooner than the ladder says is asking Railhook to retry harder than its owner configured, which is not the receiver's decision.
-- **It is clamped**, by `WEBHOOK_RETRY_AFTER_MAX_SECONDS` (default `21600`, six hours). One line of a misconfigured response would otherwise park a delivery for a year.
+Six hours is the largest step both default ladders share, and seven attempts at that maximum still fit inside the 96-hour age cap. A longer wait (Hookdeck allows seven days) would be cut short by the cap anyway. Set the variable to `0` to ignore the header.
 
-Six hours is the largest tier both default ladders share, so honouring the header never holds a delivery longer than the ladder itself already can, and seven attempts at the maximum still fit inside the 96-hour age cap. Hookdeck allows seven days; Railhook does not, because a week-long wait would be cut short by that cap rather than honoured. Set the variable to `0` to ignore the header entirely.
-
-An honoured `Retry-After` does not buy an extra attempt. A `429` on the last rung goes to Failed Messages like any other failure, however politely it asked.
+An honoured `Retry-After` does not add an attempt. A `429` on the last attempt goes to Failed Messages like any other failure.
 
 ## The age cap
 
-A delivery still outstanding 96 hours after it was created is moved to Failed Messages whatever its attempt count. A delivery you retried or resent by hand is measured from that moment instead, so an old delivery gets its new attempts. For incoming forwards the cap is 24 hours. The cap catches obligations that stopped moving; the ladder ends the ones that are failing.
+A delivery still outstanding 96 hours after it was created is moved to Failed Messages whatever its attempt count. A delivery retried or resent by hand is measured from that moment, so it gets its new attempts. For incoming forwards the cap is 24 hours. The cap catches deliveries that stopped moving; the ladder ends the ones that keep failing.
 
 | Variable | Default | Direction |
 |---|---|---|
@@ -106,21 +102,12 @@ The worker refuses to start if a default ladder, at the top of its jitter, would
 
 ## Failed Messages
 
-Failed Messages lists what Railhook abandoned: the endpoint, the event type, how many attempts were made and the last error. The same list is available from the API at `GET /api/v1/projects/{projectId}/dlq`.
+Failed Messages lists each abandoned delivery with its endpoint, event type, attempt count and last error. API: `GET /api/v1/projects/{projectId}/dlq`.
 
-**Retrying from Failed Messages** puts the same delivery back to `PENDING` and gives it 3 more attempts. It keeps its delivery id, its attempt history and its `Idempotency-Key`, so a receiver that already processed it can recognise the duplicate. The first new attempt is sent straight away. Retry one delivery with `POST /api/v1/projects/{projectId}/dlq/{deliveryId}/retry`, or several with `POST /api/v1/projects/{projectId}/dlq/retry`.
+**Retrying from Failed Messages** puts the same delivery back to `PENDING` and gives it 3 more attempts. It keeps its delivery id, attempt history and `Idempotency-Key`, so a receiver that already processed it can detect the duplicate. The first new attempt is sent at once. Retry one delivery with `POST /api/v1/projects/{projectId}/dlq/{deliveryId}/retry`, or several with `POST /api/v1/projects/{projectId}/dlq/retry`.
 
-For incoming webhooks the same screen is called **Failed Forwards**. Retrying a failed forward creates a new forward to the same destination that starts again from attempt 1.
+For incoming webhooks the same screen is called **Failed Forwards**. Retrying one creates a new forward to the same destination, starting from attempt 1.
 
 <Aside type="tip" title="Retry or replay?">
-A retry is the next attempt on the same delivery. A replay builds new deliveries from events already stored, and leaves the originals as they are. The dashboard calls replay the Time Machine. See [Replay and Time Machine](/docs/outgoing/replay/).
+A retry is the next attempt on the same delivery. A replay builds new deliveries from stored events and leaves the originals alone (the dashboard's Time Machine). See [Replay and Time Machine](/docs/outgoing/replay/).
 </Aside>
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Replay and Time Machine" href="/docs/outgoing/replay/" description="Resend one delivery, or rebuild deliveries for a time range." />
-  <LinkCard title="Event diff" href="/docs/outgoing/event-diff/" description="Compare the event that failed with one that did not." />
-  <LinkCard title="Ordering" href="/docs/outgoing/ordering/" description="How retries interact with ordered delivery." />
-  <LinkCard title="Alerts" href="/docs/platform/alerts/" description="Get told when deliveries start failing." />
-</CardGrid>

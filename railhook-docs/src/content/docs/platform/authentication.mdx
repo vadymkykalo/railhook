@@ -2,9 +2,9 @@
 title: Authentication
 description: Sign in for a session token, send events with a project API key, and rotate either without downtime.
 ---
-import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-Railhook accepts four credentials. This page shows which one to use, how to get it, and how to replace it without breaking the callers that hold it.
+Railhook accepts four credentials.
 
 | Credential | Used by | Sent as | Carries |
 |---|---|---|---|
@@ -194,11 +194,3 @@ An account created through Google has no password. To add one, use **Forgot pass
 <Aside type="note">
 The browser never sees a token in a URL. After Google, the API redirects to the dashboard with a one-time code that works once, within 60 seconds, and the dashboard trades it for a session with `POST /api/v1/auth/oauth/exchange`. The code works only in the browser Google sent back: the callback also sets a short-lived `railhook_signin_handoff` cookie, and the exchange refuses a code that arrives without it. A sign-in link copied into another browser does nothing.
 </Aside>
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Organizations and roles" href="/docs/platform/organizations-rbac/" description="What each role and key scope may do." />
-  <LinkCard title="Errors and limits" href="/docs/platform/errors-limits/" description="What a 401, 403 or 429 means and what to do next." />
-  <LinkCard title="Send your first webhook" href="/docs/start/send-first-webhook/" description="Use your API key to send an event." />
-</CardGrid>

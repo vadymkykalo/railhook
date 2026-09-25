@@ -2,7 +2,7 @@
 title: Воркфлоу
 description: Як запускати граф кроків на кожну нову подію, щоб відфільтрувати її, змінити, викликати сервіс, доставити подію або надіслати нову.
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
 Воркфлоу — це граф кроків, який запускається, коли надходить подія, або коли ви запускаєте його вручну. Кожен крок отримує результат попереднього. У панелі є візуальний конструктор, а той самий воркфлоу можна створити й через API.
 
@@ -80,11 +80,3 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/workflows" \
 - Вузол `slack` приймає лише URL, що починається з `https://hooks.slack.com/`.
 - Кожен крок зберігає свої вхідні й вихідні дані як є. Усе секретне в даних можна буде прочитати в історії виконань, тож спершу замаскуйте це. Див. [Маскування PII](/docs/uk/platform/pii-masking/).
 </Aside>
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Правила" href="/docs/uk/outgoing/rules/" description="Однокрокові рішення про маршрутизацію, які ухвалюються ще до створення доставок." />
-  <LinkCard title="Трансформації" href="/docs/uk/outgoing/transformations/" description="Збережені шаблони, які може повторно використати вузол transform." />
-  <LinkCard title="Довідник API" href="/docs/uk/api-reference/" description="Усі запити й відповіді воркфлоу." />
-</CardGrid>

@@ -2,9 +2,9 @@
 title: Kubernetes
 description: Install Railhook on Kubernetes with the Helm chart, pointed at your own PostgreSQL, Kafka and Redis.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-The Helm chart runs the API, the worker and the dashboard. It does not bundle a database, a broker or a cache, so you supply those.
+The Helm chart runs the API, the worker and the dashboard. You supply PostgreSQL, Kafka and Redis.
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ The Helm chart runs the API, the worker and the dashboard. It does not bundle a 
      --from-literal=password="$REDIS_PASSWORD"
    ```
 
-   All three keys in `railhook-secrets` are required. Without them the API and worker pods crash-loop.
+   All three keys in `railhook-secrets` are required; without them the API and worker pods crash-loop.
 
 2. **Write a values file**
 
@@ -64,11 +64,11 @@ The Helm chart runs the API, the worker and the dashboard. It does not bundle a 
                pathType: Prefix
    ```
 
-   Leave `app.baseUrl` empty and the chart derives the public URL from the first ingress host. Set it if people reach Railhook by another name.
+   With `app.baseUrl` empty, the chart takes the public URL from the first ingress host. Set it if Railhook is reached by another name.
 
 3. **Install the chart**
 
-   The chart is published to GHCR on every release. Its version is the release number without the `v`:
+   The chart is on GHCR for every release; its version is the release number without the `v`:
 
    ```bash
    helm install railhook oci://ghcr.io/vadymkykalo/charts/railhook \
@@ -85,7 +85,7 @@ The Helm chart runs the API, the worker and the dashboard. It does not bundle a 
 </Steps>
 
 <Aside type="danger">
-Back up `encryption-key` and `encryption-salt`, and never change the salt in place. It is an input to key derivation, so a changed salt makes every stored endpoint secret decrypt to garbage.
+Back up `encryption-key` and `encryption-salt`, and never change the salt in place. It feeds key derivation, so a changed salt makes every stored endpoint secret decrypt to garbage.
 </Aside>
 
 ## Email
@@ -129,10 +129,3 @@ Take a database backup first. `helm rollback` returns the chart and the images, 
 ```bash
 helm uninstall railhook -n railhook
 ```
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Configuration" description="The environment variables behind the chart's values." href="/docs/self-hosting/configuration/" />
-  <LinkCard title="Monitoring" description="ServiceMonitor, alert rules and dashboards." href="/docs/self-hosting/monitoring/" />
-</CardGrid>

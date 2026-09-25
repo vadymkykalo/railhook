@@ -1,26 +1,26 @@
 ---
 title: Live demo
-description: Let visitors open the real dashboard in a read-only sample organization without signing up, and why it is off unless you turn it on.
+description: Let visitors open the real dashboard in a read-only sample organization without signing up. Off unless you turn it on.
 ---
-import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps } from '@astrojs/starlight/components';
 
-Use this page to turn on the live demo: a **Try the live demo** button that opens the real dashboard, signed in to a sample organization, for anyone who clicks it. It is how railhook.io shows the product before a sign-up. A self-hosted install does not need it, and does not have it unless you turn it on.
+The live demo is a **Try the live demo** button that opens the real dashboard, signed in to a sample organization, for anyone. railhook.io uses it; a self-hosted install has it only if you turn it on.
 
 ## What a visitor gets
 
 The demo is one organization, **Acme Inc.**, with one project, **Acme Shop**:
 
-- four endpoints with their subscriptions, including a partner endpoint that fails now and then, so there are retried deliveries and a Failed Messages entry to look at;
+- four endpoints with subscriptions, one of which fails now and then, so there are retried deliveries and a Failed Messages entry;
 - a Stripe source and a GitHub source, with verified incoming events forwarded to their destinations;
 - about a day and a half of traffic, so the dashboard and analytics always show the last 24 hours.
 
-A visitor can open every screen and read everything in it. They cannot change anything.
+A visitor can open and read every screen, and change nothing.
 
 ## Why it is off by default
 
-The demo hands a session to anyone who asks for one. On a deployment that serves only your own team that is an anonymous way in you have no reason to open, so with `DEMO_ENABLED=false`, the default:
+The demo hands a session to anyone who asks. On a deployment for your own team that is an anonymous way in with no purpose, so with `DEMO_ENABLED=false` (the default):
 
-- no demo organization is created, and one left from when the demo was on is removed;
+- no demo organization is created, and a leftover one is removed;
 - the entry points on the landing page, on `/pricing` and in the **Developers** menu are hidden;
 - the session endpoint, `POST /api/v1/public/demo/session`, answers `404`.
 
@@ -40,9 +40,9 @@ The demo hands a session to anyone who asks for one. On a deployment that serves
    ./railhook start
    ```
 
-   The API creates the demo organization as it starts. The dashboard reads the same variable for its entry points, so set it once for both.
+   The API creates the demo organization as it starts. The dashboard reads the same variable for its entry points.
 
-3. **Open `/demo`** on your Railhook address. It opens a session and takes you to the dashboard.
+3. **Open `/demo`** on your Railhook address. It opens a session and goes to the dashboard.
 
 </Steps>
 
@@ -60,30 +60,22 @@ ui:
 
 A demo session is an access token for the demo organization with the **Viewer** role, and nothing more:
 
-- **Every change is refused on the server**, not only hidden in the dashboard. A request from a demo session with any method other than `GET`, `HEAD` or `OPTIONS` is answered `403`, whatever the endpoint — API keys, members, settings, billing, replay, sending events, portal sessions, connected apps, the visitor's own profile. Exports are refused too, although they are reads. The only exceptions change nothing of the demo's: signing out, opening a new demo session, and the public site's contact form and webhook tester.
-- **It cannot be extended.** There is no refresh token behind it. It lasts `DEMO_SESSION_TTL_MINUTES` (30 by default), then the visitor is returned to the landing page and can open a new one.
+- **The server refuses every change**, not only the dashboard. Any method other than `GET`, `HEAD` or `OPTIONS` gets `403` on every endpoint (API keys, members, settings, billing, replay, sending events, portal sessions, connected apps, the visitor's own profile). Exports are refused too, although they are reads. The only exceptions change nothing in the demo: signing out, opening a new demo session, and the public site's contact form and webhook tester.
+- **It cannot be extended.** There is no refresh token. It lasts `DEMO_SESSION_TTL_MINUTES` (30 by default), then the visitor returns to the landing page and can open a new one.
 - **It works only on the API.** A demo token is not accepted anywhere outside `/api/`.
-- **Opening one is limited**: ten sessions a minute from one address, behind the registration CAPTCHA when you have configured one (`CAPTCHA_SECRET_KEY` and `CAPTCHA_SITE_KEY`).
-- **Nothing is ever delivered.** Every URL in the demo is on a reserved `.example` host, every delivery and forward in it is already finished, and the demo's sources refuse incoming webhooks. The worker never has anything of the demo's to send.
+- **Opening one is limited**: ten sessions a minute per address, behind the registration CAPTCHA if configured (`CAPTCHA_SECRET_KEY` and `CAPTCHA_SITE_KEY`).
+- **Nothing is ever delivered.** Every URL is on a reserved `.example` host, every delivery and forward is already finished, and the demo's sources refuse incoming webhooks. The worker never has demo work to send.
 
 ## Keeping it current
 
-The API rewrites the demo's history every `DEMO_REFRESH_INTERVAL_MINUTES` (60 by default), so it always ends at the present. The organization, its endpoints and sources are created once and left as they are; only the events, deliveries and incoming events are replaced.
+The API rewrites the demo's history every `DEMO_REFRESH_INTERVAL_MINUTES` (60 by default), so it always ends at the present. The organization, endpoints and sources are created once; only events, deliveries and incoming events are replaced.
 
-The demo is kept out of the deployment's own numbers: the [platform admin](/docs/self-hosting/platform-admin/) overview does not count its organization, account or traffic, and its Failed Messages do not raise the `webhook_dlq_depth` alert.
+The [platform admin](/docs/self-hosting/platform-admin/) overview does not count the demo's organization, account or traffic, and its Failed Messages do not raise the `webhook_dlq_depth` alert.
 
 ## Turning it off
 
-Set `DEMO_ENABLED=false` and run `./railhook start`. No new session can be opened and the entry points disappear; a session already open lasts until it expires, but finds the demo empty.
+Set `DEMO_ENABLED=false` and run `./railhook start`. No new session can be opened and the entry points disappear; an open session lasts until it expires but finds the demo empty.
 
-As it starts, the API also removes the demo: the organization, its account, project, endpoints, sources and all of its history. It deletes only the demo's own rows, found by ids no other organization can have, and writes one line to the API log saying what it removed. Once nothing of the demo is left, later starts do nothing. Turning the demo back on creates it again from scratch.
+On start the API removes the demo: organization, account, project, endpoints, sources and all history. It deletes only rows with the demo's own ids, which no other organization can have, and logs one line saying what it removed. Later starts do nothing. Turning the demo back on recreates it from scratch.
 
-All three variables are in the [configuration reference](/docs/self-hosting/configuration/), and the session endpoint in the [API reference](/docs/api-reference/).
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Configuration" href="/docs/self-hosting/configuration/" description="Every environment variable, including the demo's three." />
-  <LinkCard title="Organizations and roles" href="/docs/platform/organizations-rbac/" description="What the Viewer role a demo session carries can do." />
-  <LinkCard title="Platform admin panel" href="/docs/self-hosting/platform-admin/" description="The operator's view of the deployment, which leaves the demo out." />
-</CardGrid>
+All three variables are in the [configuration reference](/docs/self-hosting/configuration/), the session endpoint in the [API reference](/docs/api-reference/).

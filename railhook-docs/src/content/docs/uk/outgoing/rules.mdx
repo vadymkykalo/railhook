@@ -2,7 +2,7 @@
 title: Правила
 description: Як відбирати події за вмістом і ще до створення доставок спрямовувати їх на додатковий ендпоінт, трансформувати або відкидати.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
 Правило заглядає всередину події й ще до створення будь-якої доставки вирішує, чи додати ендпоінт, змінити вміст або зупинити подію.
 
@@ -55,7 +55,7 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 
 ## Приклад: спрямування великих замовлень
 
-Кожна подія `order.*` із сумою від 1000 у USD або EUR додатково йде на ендпоінт антифрод-перевірки — окрім усього, що вже роблять її підписки.
+Кожна подія `order.*` із сумою від 1000 у USD або EUR додатково йде на ендпоінт антифрод-перевірки, окрім усього, що вже роблять її підписки.
 
 ```bash
 curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/rules" \
@@ -81,11 +81,3 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/rules" \
 ```
 
 Увімкнути чи вимкнути правило можна через `PATCH /api/v1/projects/{projectId}/rules/{id}/toggle`.
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Трансформації" href="/docs/uk/outgoing/transformations/" description="Як написати трансформацію, яку застосовує дія TRANSFORM." />
-  <LinkCard title="Ендпоінти та підписки" href="/docs/uk/outgoing/endpoints-subscriptions/" description="Підбір підписок, що відбувається після правил." />
-  <LinkCard title="Воркфлоу" href="/docs/uk/outgoing/workflows/" description="Багатокрокова логіка, яка запускається, коли надходить подія." />
-</CardGrid>

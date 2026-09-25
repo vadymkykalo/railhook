@@ -2,9 +2,7 @@
 title: Endpoint security
 description: Rotate an endpoint's secret, prove you own it, present a client certificate, and control which addresses deliveries may reach.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
-
-Everything on an endpoint that is about trust: its signing secret, the proof that whoever registered it owns it, the certificate Railhook presents to it, and the network rules every delivery passes.
+import { Steps, Aside } from '@astrojs/starlight/components';
 
 ## Rotate the signing secret
 
@@ -98,11 +96,3 @@ Despite its name, `allowedSourceIps` restricts nothing. It records which address
 ## Secrets at rest
 
 Endpoint signing secrets, client certificates and client keys are stored encrypted with the deployment's encryption key. A `caCert` is public and is stored as given. The operator sets it with `WEBHOOK_ENCRYPTION_KEY`, or with versioned keys in `WEBHOOK_ENCRYPTION_KEYS` and `WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION`. See [Configuration](/docs/self-hosting/configuration/).
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Verify signatures" href="/docs/outgoing/signatures/" description="Check the signature on every delivery." />
-  <LinkCard title="Static egress IP" href="/docs/resources/static-egress-ip/" description="Give receivers one address to allowlist." />
-  <LinkCard title="Configuration" href="/docs/self-hosting/configuration/" description="Every deployment setting, including the ones above." />
-</CardGrid>

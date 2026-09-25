@@ -1,16 +1,16 @@
 ---
 title: Receive Shopify webhooks reliably
-description: Keep Shopify from removing your webhook subscription when your app is slow or down — Railhook verifies X-Shopify-Hmac-SHA256, answers within Shopify's five seconds, and forwards with retries and replay.
+description: Keep Shopify from removing your webhook subscription when your app is slow or down. Railhook verifies X-Shopify-Hmac-SHA256, answers within Shopify's five seconds, and forwards with retries and replay.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps } from '@astrojs/starlight/components';
 
-This guide puts Railhook between Shopify and your app. Shopify sends its webhooks to a Railhook source, which verifies the HMAC, stores each webhook as it arrived and forwards it to your service with retries. Shopify only ever talks to Railhook, which answers straight away, so a slow or failing app no longer puts the subscription at risk.
+Shopify sends its webhooks to a Railhook source. The source verifies the HMAC, stores each webhook as it arrived and forwards it to your service with retries. Railhook answers Shopify straight away, so a slow or failing app no longer puts the subscription at risk.
 
 ## Why Shopify webhooks need a buffer
 
-Shopify expects your app to respond within five seconds. It retries a failed webhook up to eight times over four hours, and if failures continue, the subscription is removed. ([Shopify: Troubleshooting webhooks](https://shopify.dev/docs/apps/build/webhooks/troubleshooting-webhooks)) Shopify also tells you to deduplicate deliveries by `X-Shopify-Webhook-Id`. ([Shopify: Deliver webhooks through HTTPS](https://shopify.dev/docs/apps/build/webhooks/subscribe/https))
+Shopify expects your app to respond within five seconds. It retries a failed webhook up to eight times over four hours, and if failures continue, the subscription is removed. ([Shopify: Troubleshooting webhooks](https://shopify.dev/docs/apps/build/webhooks/troubleshooting-webhooks)) Deliveries should be deduplicated by `X-Shopify-Webhook-Id`. ([Shopify: Deliver webhooks through HTTPS](https://shopify.dev/docs/apps/build/webhooks/subscribe/https))
 
-Four hours is a short window for a bad deploy, and five seconds is a tight budget for an order handler. With Railhook in front:
+With Railhook in front:
 
 - Shopify is answered as soon as the webhook is stored, well inside the five seconds.
 - Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed Forwards**.
@@ -19,7 +19,7 @@ Four hours is a short window for a bad deploy, and five seconds is a tight budge
 
 ## Connect Shopify
 
-You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+You need a Railhook project and an API key. The same steps are available under **Incoming** in the dashboard.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -98,7 +98,7 @@ The body exactly as Shopify sent it, byte for byte. Railhook passes Shopify's ev
 
 ## Replay after an outage
 
-Replay what arrived while your service was down. Each replayed webhook goes to every destination of the source as a new forward:
+Each replayed webhook goes to every destination of the source as a new forward:
 
 ```bash
 curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
@@ -108,11 +108,3 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-rep
 ```
 
 Replay reaches back as far as events are kept: 7 days on Railhook Cloud, and whatever you configure when self-hosting. Keep your handler idempotent on `X-Shopify-Webhook-Id`, since a replay can send webhooks your service already processed. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
-  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Credentials, retries and transformations per destination." />
-  <LinkCard title="Transformations" href="/docs/outgoing/transformations/" description="Reshape a forwarded body before your service sees it." />
-</CardGrid>

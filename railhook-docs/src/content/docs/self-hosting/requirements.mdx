@@ -2,9 +2,9 @@
 title: Requirements
 description: The host, ports and network access a self-hosted Railhook needs.
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-Check these before you install. The installer stops without Docker, Compose, 2 GiB of RAM or a free port, and warns when memory or disk is below the recommendation. On an existing installation, `./railhook doctor` checks Docker, Compose and the configuration on disk.
+The installer stops without Docker, Compose, 2 GiB of RAM or a free port, and warns when memory or disk is below the recommendation. On an existing installation, `./railhook doctor` checks Docker, Compose and the configuration on disk.
 
 ## Host
 
@@ -16,7 +16,7 @@ Check these before you install. The installer stops without Docker, Compose, 2 G
 | Disk | At least 5 GiB free for the images, plus room for the database and the Kafka log. The installer warns below 5 GiB |
 | Tools | `curl` and `openssl`, which the installer uses to download files and generate secrets |
 
-The stack runs two JVMs, a broker, a database and a cache. These are the default memory limits per container, and each one can be changed in `.env`:
+The stack runs two JVMs, a broker, a database and a cache. Default memory limits per container, each set in `.env`:
 
 | Service | Limit | Variable |
 |---|---|---|
@@ -44,16 +44,9 @@ Nothing else is published to the host.
 - **Outbound, to deliver:** HTTP and HTTPS to your endpoints and destinations, on whatever ports they use.
 
 <Aside type="caution">
-By default Railhook refuses to deliver to private and internal IP addresses, so an endpoint cannot be used to reach your internal network. To allow one named internal host, add it to `WEBHOOK_ALLOWED_HOSTS` instead of switching the protection off.
+By default Railhook refuses private and internal IP addresses, so an endpoint cannot reach your internal network. To allow one internal host, add it to `WEBHOOK_ALLOWED_HOSTS` rather than switching the protection off.
 </Aside>
 
 ## Kubernetes
 
 The Helm chart needs Kubernetes 1.24+ and Helm 3.8+, plus PostgreSQL 16+, Kafka 3.7+ and Redis 7+ that you supply. See [Kubernetes](/docs/self-hosting/kubernetes/).
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Install with Docker" description="Run the installer." href="/docs/self-hosting/install-docker/" />
-  <LinkCard title="Kubernetes" description="Install the Helm chart." href="/docs/self-hosting/kubernetes/" />
-</CardGrid>

@@ -1,25 +1,25 @@
 ---
 title: Transformations
-description: Reshape a payload before it is signed and sent — with a JSON template or a JavaScript function — without changing the event your application sent.
+description: Reshape a webhook payload before it is signed and sent, with a JSON template or a JavaScript function, without changing the stored event.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-A transformation turns the event payload into the body a particular receiver expects. The stored event is not changed; only the body of the delivery is.
+A transformation turns the event payload into the body a receiver expects. Only the delivery body changes; the stored event does not.
 
 ## Two kinds
 
-Every transformation carries a `kind`, and it decides how the text you save is read.
+A transformation's `kind` decides how its text is read.
 
 | `kind` | What it is | Reach for it when |
 |---|---|---|
-| `TEMPLATE` | A JSON document whose string values can contain `${$.jsonpath}` expressions. The default, and what every transformation was before JavaScript existed. | The receiver wants the same fields under different names, or a subset of them. It is declarative, it cannot loop, and it cannot surprise you. |
+| `TEMPLATE` | A JSON document whose string values can contain `${$.jsonpath}` expressions. The default. | The receiver wants the same fields under different names, or a subset. Declarative: no loops, no surprises. |
 | `JAVASCRIPT` | One `function handler(webhook)` that returns the body, run in a sandbox. | The shape has to be computed: an array to walk, a field that depends on a value, a date to format, a delivery to drop. |
 
-Omitting `kind` means `TEMPLATE`. Every transformation that existed before this was added is a template, and nothing migrates them — a template that works is not a problem to be fixed.
+Omitting `kind` means `TEMPLATE`. Transformations created before `kind` existed are templates and stay that way.
 
 ## The template
 
-A `TEMPLATE` transformation is a JSON document whose string values can contain JSONPath expressions in `${…}` placeholders. Placeholders are resolved against the event payload; everything else is copied as written.
+A `TEMPLATE` is a JSON document whose string values can contain JSONPath expressions in `${…}` placeholders, resolved against the event payload. Everything else is copied as written.
 
 ```json title="Template"
 {
@@ -40,10 +40,10 @@ A `TEMPLATE` transformation is a JSON document whose string values can contain J
 | A path that matches nothing | `null` for a whole-value expression, and the text `null` inside a longer string. Not an error. |
 
 <Aside type="caution" title="A typo in a path is silent">
-A path that matches nothing does not fail the template, so an optional field stays optional. The same rule means a misspelled path produces `null` without complaint. Preview a template against a real payload before you attach it.
+A path that matches nothing does not fail the template, so optional fields work, but a misspelled path also produces `null` silently. Preview a template against a real payload before you attach it.
 </Aside>
 
-A template is not a script. It can read the payload and rearrange it; it cannot loop, branch, call out or compute. That is what the other kind is for.
+A template can read and rearrange the payload. It cannot loop, branch, call out or compute; use `JAVASCRIPT` for that.
 
 ## The JavaScript contract
 
@@ -55,9 +55,7 @@ function handler(webhook) {
 }
 ```
 
-`handler` is the only name Railhook calls. Everything else in the file — helper functions, constants — is yours, and runs before it. Any form that leaves `handler` defined as a function works, including `const handler = (webhook) => ({ payload: webhook.payload });`.
-
-This is a promise we intend to keep: scripts are written against these names, so growing the list is a contract change rather than a tweak.
+`handler` is the only name Railhook calls. Helper functions and constants in the file run before it. Any form that leaves `handler` defined as a function works, including `const handler = (webhook) => ({ payload: webhook.payload });`.
 
 ### What `webhook` carries
 
@@ -69,10 +67,10 @@ This is a promise we intend to keep: scripts are written against these names, so
 | `timestamp` | When the event was announced, as an ISO-8601 string. |
 | `direction` | `OUTGOING` for a delivery, `INCOMING` for a forwarded webhook. |
 | `url` | The endpoint or destination URL this attempt is aimed at. Readable, not writable. |
-| `headers` | The custom headers configured on the endpoint or destination this attempt is going to — not Railhook's own, and not the finished request. The signature, the ids and the sequence number are computed after the script runs and are deliberately not shown: a script that could read a signature is a script that could leak one. In a preview it is the `customHeaders` you sent. |
-| `attemptNumber` | Which try this is, `1` for the first. What an idempotency hint, or a line logged only on a retry, needs and cannot work out. `null` in a preview, where there is no attempt. |
+| `headers` | The custom headers configured on the endpoint or destination, not Railhook's own and not the finished request. The signature, ids and sequence number are computed after the script runs and are not shown, so a script cannot leak a signature. In a preview it is the `customHeaders` you sent. |
+| `attemptNumber` | Which try this is, `1` for the first. `null` in a preview, where there is no attempt. |
 
-That list is the whole of the script's world. There is nothing else to reach for.
+The script can reach nothing else.
 
 ### What it must return
 
@@ -82,64 +80,64 @@ That list is the whole of the script's world. There is nothing else to reach for
 | `{ payload: …, headers: { … } }` | Those headers are added to the request. Values are stringified; a `null` or a nested object is dropped. |
 | `{ cancel: true, cancelReason: '…' }` | Nothing is sent and the delivery ends. See [When a script cancels](#when-a-script-cancels). |
 
-`payload` is required unless you are cancelling. Anything else — no return at all, a string, an object with neither `payload` nor `cancel` — is a contract failure, and the attempt fails.
+`payload` is required unless you are cancelling. Anything else (no return, a string, an object with neither `payload` nor `cancel`) is a contract failure, and the attempt fails.
 
 ### The language
 
-The script runs in strict mode, at ECMAScript 2023. It is one file and one synchronous function:
+Strict mode, ECMAScript 2023, one file, one synchronous function:
 
 - no modules, no `require`, no `import`, no `module.exports`;
 - no `async`, no `await`, no promises to wait on;
-- no state carried between runs. Each run gets a fresh global, so a variable set at the top level is back at its initial value on the next delivery.
+- no state between runs. Each run gets a fresh global, so a top-level variable is back at its initial value on the next delivery.
 
-`console.log`, `console.info`, `console.warn`, `console.error` and `console.debug` are captured rather than printed, and shown next to the output in [Transform Studio](/docs/outgoing/transform-studio/) — including the lines a script logged before it threw, which are often the only clue there is.
+`console.log`, `console.info`, `console.warn`, `console.error` and `console.debug` are captured and shown next to the output in [Transform Studio](/docs/outgoing/transform-studio/), including lines logged before the script threw.
 
 ### What a script deliberately cannot change
 
-- **The URL.** Railhook validates the address against its SSRF rules *before* the script runs. A script that could rewrite the address afterwards would be standing on the other side of that check, which would turn a transformation into a way to send your signed traffic anywhere. `webhook.url` is readable; assigning to it does nothing.
+- **The URL.** Railhook checks the address against its SSRF rules *before* the script runs, so a script that could rewrite it would bypass that check and could send your signed traffic anywhere. `webhook.url` is readable; assigning to it does nothing.
 - **The HTTP method.** An attempt is a `POST`, and no return value changes that.
-- **Secrets.** A script has no secret store of its own. A script that must authenticate to a receiver uses the endpoint's or the destination's own configured credentials — a signing secret, an mTLS client certificate, a destination's auth config — which are encrypted at rest and applied *after* the script runs, so a script can neither read nor overwrite them.
-- **Railhook's own headers.** Headers a script returns go on first, and the endpoint's or destination's credentials and custom headers go on after them; the signature is computed outside that merge entirely. A script may add a header, not impersonate one.
+- **Secrets.** A script has no secret store. To authenticate to a receiver, use the endpoint's or destination's own credentials (signing secret, mTLS client certificate, destination auth config). They are encrypted at rest and applied *after* the script runs, so a script can neither read nor overwrite them.
+- **Railhook's own headers.** Script headers go on first, then the endpoint's or destination's credentials and custom headers; the signature is computed outside that merge. A script may add a header, not override one.
 
 ## The sandbox
 
-A script belongs to one organization and runs on workers shared by all of them. So it gets a language and nothing else: no filesystem, no network, no threads, and no way to name a Java class.
+A script belongs to one organization but runs on workers shared by all of them, so it gets a language and nothing else: no filesystem, no network, no threads, no Java classes.
 
 ### The limits
 
-Five ceilings apply to every run. They are deployment settings rather than per-transformation ones, because whoever operates the workers is who they protect, and none of them can be raised, caught or negotiated from inside a script.
+Five ceilings apply to every run. They are deployment settings, not per-transformation ones, because they protect the workers, and a script cannot raise or catch them.
 
 | Setting | Default | What tripping it does |
 |---|---|---|
-| `TRANSFORM_SCRIPT_TIMEOUT_MS` | `2000` | The run is stopped and the attempt fails with `TIMEOUT`. Wall clock for one run, on a worker thread that is doing nothing else meanwhile. |
-| `TRANSFORM_SCRIPT_MAX_MEMORY_MB` | `128` | The run is stopped and the attempt fails with `MEMORY`. Measured as how much the run allocates, not as how much it holds: a script that churns a gigabyte through the collector costs a worker as much as one that keeps it. |
-| `TRANSFORM_SCRIPT_MAX_OUTPUT_BYTES` | `1048576` | A larger body fails with `OUTPUT_TOO_LARGE` instead of being sent. The receiver would have rejected it anyway, and failing here names the script rather than the endpoint. |
-| `TRANSFORM_SCRIPT_MAX_CONSOLE_LINES` | `100` | Nothing fails. The run continues, the extra lines are dropped, and the result says that they were. |
-| `TRANSFORM_SCRIPT_MAX_CHARS` | `65536` | The script is refused with `SOURCE_TOO_LARGE` rather than compiled. The API already refuses a longer one when you save it, so this is the second line rather than the first. |
+| `TRANSFORM_SCRIPT_TIMEOUT_MS` | `2000` | The run is stopped and the attempt fails with `TIMEOUT`. Wall clock for one run. |
+| `TRANSFORM_SCRIPT_MAX_MEMORY_MB` | `128` | The run is stopped and the attempt fails with `MEMORY`. Measured as total allocation, not live memory: churning a gigabyte through the collector costs a worker as much as keeping it. |
+| `TRANSFORM_SCRIPT_MAX_OUTPUT_BYTES` | `1048576` | A larger body fails with `OUTPUT_TOO_LARGE` instead of being sent, so the error names the script, not the endpoint. |
+| `TRANSFORM_SCRIPT_MAX_CONSOLE_LINES` | `100` | Nothing fails. Extra lines are dropped, and the result says so. |
+| `TRANSFORM_SCRIPT_MAX_CHARS` | `65536` | The script is refused with `SOURCE_TOO_LARGE`. The API already refuses a longer one on save; this is the backstop. |
 
-Each of these lives in your `.env`; see the [configuration reference](/docs/self-hosting/configuration/).
+Set them in `.env`: see the [configuration reference](/docs/self-hosting/configuration/).
 
 ### What is refused
 
-Each line here is a test, not an intention.
+Each row is covered by a test.
 
 | Attempt | What happens |
 |---|---|
 | `require('fs')`, `readFully('/etc/passwd')`, `load('https://…/evil.js')` | There is no filesystem and no loader. `require` and `load` are not defined. |
-| `fetch(…)`, `new XMLHttpRequest()`, `new java.net.Socket(…)` | There is no network. Not a blocked socket — an absent one. |
+| `fetch(…)`, `new XMLHttpRequest()`, `new java.net.Socket(…)` | There is no network API at all. |
 | `new Worker('x')` | A script cannot create a thread. It runs on exactly the thread that called it and cannot outlive the call. |
 | `Java.type('java.lang.System')`, `Packages.java.lang.System`, `new java.io.File(…)` | No Java class can be named, so no repository, no connection pool and no other organization's row is reachable. |
-| `process.env`, `Polyglot.eval(…)` | There is no host environment and no second language. `process`, `Polyglot`, `java`, `Java`, `load` and their neighbours are deleted before your first line runs, so the error is "not defined" rather than something that half-works. |
+| `process.env`, `Polyglot.eval(…)` | There is no host environment and no second language. `process`, `Polyglot`, `java`, `Java`, `load` and similar globals are deleted before your first line runs, so the error is "not defined". |
 | `while (true) {}` | The run is cancelled from outside, on another thread, once the timeout passes. |
 | `while (true) { a.push(new Array(200000)) }` | The same, once the allocation ceiling passes. |
 
 <Aside type="danger" title="A try/catch in the script cannot swallow a cancellation">
-The time and memory ceilings are not enforced by asking a script to stop. The whole run is torn down from outside it, so a `while (true)` inside a `try` — or inside its `finally` — ends exactly as fast as one standing on its own. A runaway script costs one delivery slot for the length of the timeout and nothing else: the next script, and every other organization's script, keeps running.
+The time and memory ceilings tear the whole run down from outside, so a `while (true)` inside a `try` or its `finally` ends as fast as any other. A runaway script costs one delivery slot for the length of the timeout; other scripts keep running.
 </Aside>
 
 ## A worked example
 
-Three things the template language cannot do: reshape an array, add a field conditionally, format a date. This exact script is the fixture the parity tests hold both the preview and the worker to, so what it produces here is what it produces there.
+Three things a template cannot do: reshape an array, add a field conditionally, format a date. The parity tests run this exact script in both the preview and the worker.
 
 ```js title="Transformation"
 function handler(webhook) {
@@ -198,7 +196,7 @@ With one header added: `X-Order-Value: 101.48`.
 
 ## Where a transformation attaches
 
-Either kind attaches in the same places, and the `kind` travels with the transformation.
+Both kinds attach in the same places.
 
 | Attached to | Effect |
 |---|---|
@@ -207,21 +205,21 @@ Either kind attaches in the same places, and the `kind` travels with the transfo
 | Rule, `TRANSFORM` action | Overrides the subscription's transformation for the events the rule matches. When several matching rules transform, the last one wins. See [Rules](/docs/outgoing/rules/). |
 | Destination, `transformationId` | A saved transformation applied to forwarded incoming webhooks. |
 | Destination, `payloadTransform` | A single JSONPath expression, such as `$.data`, used when no `transformationId` is set. |
-| Workflow, `transform` node | Reshapes data inside a workflow. A script sees the step's input as its `payload` and nothing for the delivery context, and a script that cancels fails the step — there is no delivery there to drop. See [Workflows](/docs/outgoing/workflows/). |
+| Workflow, `transform` node | Reshapes data inside a workflow. A script sees the step's input as its `payload` and no delivery context. A script that cancels fails the step, since there is no delivery to drop. See [Workflows](/docs/outgoing/workflows/). |
 
 ## When it runs
 
-The transformation is applied inside each attempt, before the signature is computed. The signature covers the transformed bytes, so a receiver that verifies the signature verifies what it actually received.
+The transformation is applied in each attempt, before signing, so the signature covers the transformed bytes the receiver gets.
 
-A saved transformation is looked up when the attempt runs. Fixing a broken template or script therefore helps the attempts still to come.
+A saved transformation is looked up when the attempt runs, so fixing a broken one helps the attempts still to come.
 
 <Aside type="danger" title="A broken transformation never leaks the raw payload">
-If a configured transformation cannot be applied — a template that will not resolve, a script that threw, timed out, allocated too much or returned the wrong shape — or a `transformationId` points at a transformation that is missing or disabled, the attempt fails and is retried like any other failure. The original payload is never sent in its place, because transformations are often how personal data is stripped before it leaves. Each failure increments the `transform_failed_total` counter.
+If a transformation cannot be applied (a template that will not resolve; a script that threw, timed out, ran out of memory or returned the wrong shape; a `transformationId` pointing at a missing or disabled transformation), the attempt fails and is retried like any other failure. The original payload is never sent instead, because transformations often strip personal data. Each failure increments `transform_failed_total`.
 </Aside>
 
 ### Why a script failed
 
-A failed script is recorded against the attempt as `TRANSFORM_FAILED`, carrying a reason and — where there is one — the line in your own script, counted from your first line rather than from anything Railhook wraps around it.
+A failed script is recorded on the attempt as `TRANSFORM_FAILED` with a reason and, where known, the line number in your script.
 
 | Reason | What it means |
 |---|---|
@@ -232,19 +230,19 @@ A failed script is recorded against the attempt as `TRANSFORM_FAILED`, carrying 
 | `MEMORY` | It allocated past the ceiling. |
 | `OUTPUT_TOO_LARGE` | It returned a body larger than the ceiling. |
 | `SOURCE_TOO_LARGE` | The script itself is longer than the engine will compile. |
-| `UNAVAILABLE` | The engine is not present in this deployment. An operator's problem, not an author's. |
+| `UNAVAILABLE` | The engine is not present in this deployment. An operator problem. |
 
 ### When a script cancels
 
-`{ cancel: true }` is not a failure, and it is treated as nothing else is:
+`{ cancel: true }` is not a failure:
 
-- nothing is sent — the endpoint is never asked, so nothing touches its circuit breaker;
-- nothing is retried — the next attempt would run the same script over the same payload and reach the same answer;
+- nothing is sent, so the endpoint's circuit breaker is not affected;
+- nothing is retried, since the same script on the same payload would cancel again;
 - the delivery ends there with the status **`CANCELLED`**, which is neither `SUCCESS` nor `FAILED`, recorded as `CANCELLED_BY_TRANSFORMATION` followed by the `cancelReason` the script gave, or `no reason given`;
-- it does **not** land in [Failed Messages](/docs/outgoing/retries/). That queue is for what a person could still fix, and a filter doing its job is not that;
+- it does **not** go to [Failed Messages](/docs/outgoing/retries/), which is for what a person could still fix;
 - it is counted as `transform_cancelled_total`, separately from `transform_failed_total`.
 
-Use it for traffic a receiver should not see at all: test events, a customer who opted out, an event type that turns out to carry nothing worth sending.
+Use it for traffic a receiver should not see: test events, a customer who opted out, an event with nothing worth sending.
 
 ```js
 function handler(webhook) {
@@ -268,11 +266,11 @@ function handler(webhook) {
      -d '{"name":"Orders to CRM","kind":"JAVASCRIPT","template":"function handler(webhook) { return { payload: { id: webhook.payload.orderId } }; }"}'
    ```
 
-   A script is compiled and checked for its `handler` before it is saved — inside the same sandbox and under the same limits a real delivery gets — so a syntax error is refused here, with the line it is on, rather than once per attempt forever.
+   A script is compiled and checked for its `handler` before it is saved, in the same sandbox and limits as a delivery, so a syntax error is refused here with its line number instead of failing every attempt.
 
-2. Preview it against a payload you paste in, with `POST /api/v1/projects/{projectId}/transform-preview`. Send `inputPayload` and either `transformationId` or an inline `template` with its `kind`. For a script you can also send `eventType`, `eventId`, `url` and `customHeaders`, which is what it sees as `webhook.*`. The response carries the output, the headers, anything logged to `console`, how long the run took and, on a failure, the reason and the line. Nothing is delivered.
+2. Preview it against a payload you paste in, with `POST /api/v1/projects/{projectId}/transform-preview`. Send `inputPayload` and either `transformationId` or an inline `template` with its `kind`. For a script you can also send `eventType`, `eventId`, `url` and `customHeaders`, which it sees as `webhook.*`. The response carries the output, headers, `console` lines, run time and, on failure, the reason and line. Nothing is delivered.
 
-3. Dry-run a delivery with `POST /api/v1/projects/{projectId}/transform-preview/delivery-dry-run`. Send the `payload`, the transformation or `payloadTemplate`, and an `endpointId`. The response shows the transformed body, the headers and the signature that would be sent, and the transformation name and version. Nothing is sent.
+3. Dry-run a delivery with `POST /api/v1/projects/{projectId}/transform-preview/delivery-dry-run`. Send the `payload`, the transformation or `payloadTemplate`, and an `endpointId`. The response shows the transformed body, headers and signature that would be sent, plus the transformation name and version. Nothing is sent.
 
 4. Attach it by setting `transformationId` on a subscription.
 
@@ -280,15 +278,15 @@ function handler(webhook) {
 
 ## In the dashboard
 
-[Transform Studio](/docs/outgoing/transform-studio/) — **Develop → Transform Studio**, and the edit button on a transformation — runs exactly the engine the worker runs, with the same sandbox and the same limits, so a script that works there is a script that works on a delivery. It has tabs for **Input**, **Output**, **Diff** and **Console**, runs on ⌘/Ctrl+Enter, highlights the line a failure came from, and saves the script back into the transformation — which publishes a new version, the same as saving through the API.
+[Transform Studio](/docs/outgoing/transform-studio/) (**Develop → Transform Studio**, or the edit button on a transformation) runs the worker's engine with the same sandbox and limits, so a script that works there works on a delivery. It has **Input**, **Output**, **Diff** and **Console** tabs, runs on ⌘/Ctrl+Enter, highlights the failing line, and saving publishes a new version, as the API does.
 
 ## Version history
 
-Saving a template or a script that differs from the one stored publishes a new version and increments the version number. Saving without touching it — renaming a transformation, editing its description, turning it off — does not. Switching a transformation's `kind` without changing a character of the text counts as a change too, because the same text means different things in the two languages.
+Saving a changed template or script publishes a new version. Renaming, editing the description or turning it off does not. Changing only `kind` counts as a change, because the same text means different things in the two languages.
 
-Every published version is kept, with the text it published, **the language it was written in**, who published it and when. In the dashboard, the version number in the transformations list opens the history, where you can read any version, tick two of them to see what changed between them, and put one back. The API exposes the same four things under the transformation; see the [API reference](/docs/api-reference/).
+Every version is kept with its text, **its language**, who published it and when. In the dashboard, the version number in the transformations list opens the history: read a version, compare two, or restore one. The API has the same operations: see the [API reference](/docs/api-reference/).
 
-Restoring is not an undo. It publishes the old version again as the next version and leaves everything published since exactly where it is, so the record of which version was live at a past moment stays true. The new version is marked with the version it was restored from, and the restore is written to the audit log as a `RESTORE`. A restore puts back the text **and** the language together — otherwise restoring a template version into a transformation that has since been rewritten as a script would leave JSON in a transformation still marked `JAVASCRIPT`, and every attempt would fail trying to compile it.
+Restoring is not an undo. It publishes the old version as the next version and keeps everything since, so the history of what was live stays true. The new version records which version it came from, and the audit log gets a `RESTORE`. A restore puts back the text **and** the language together; otherwise a template restored into a transformation now marked `JAVASCRIPT` would fail every attempt.
 
 ```bash
 curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/transformations/$TRANSFORMATION_ID/versions/2/restore" \
@@ -296,20 +294,11 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/transformations/$TRANSFO
 ```
 
 <Aside type="tip" title="Two scripts are compared line by line">
-A field-by-field diff is something you can do to two JSON templates and not to two scripts, where every line would read as one unparseable field. When either side of a comparison is JavaScript, the field diff is empty and the two texts are compared line by line instead — which is what a person reading a script wants anyway.
+A field-by-field diff works for JSON templates, not scripts. When either side is JavaScript, the field diff is empty and the texts are compared line by line.
 </Aside>
 
 <Aside type="caution" title="History is capped">
-Each transformation keeps its most recent `TRANSFORMATION_HISTORY_LIMIT` versions — 50 by default. Beyond that the oldest fall off; the version in use never does. Raise it in your `.env` if you need to reach further back, at up to 65536 characters per version.
+Each transformation keeps its most recent `TRANSFORMATION_HISTORY_LIMIT` versions (50 by default). Older ones are dropped; the version in use never is. Raise it in `.env` to keep more, at up to 65536 characters per version.
 </Aside>
 
-Transformations that existed before this was added start with one version: the template they hold now.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Transform Studio" href="/docs/outgoing/transform-studio/" description="Write a script against a real event, and dry-run the request an endpoint would get." />
-  <LinkCard title="Rules" href="/docs/outgoing/rules/" description="Apply a transformation only to events that match a condition." />
-  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Transform incoming webhooks before they are forwarded." />
-  <LinkCard title="PII masking" href="/docs/platform/pii-masking/" description="Hide personal data where people read payloads." />
-</CardGrid>
+Transformations created before version history existed start with one version: their current template.

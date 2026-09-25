@@ -14,7 +14,7 @@ import { lastmodFor, socialImageHead } from './scripts/seo.mjs';
  */
 
 const FONTS =
-  'https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
+  'https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap';
 
 const DOCS_DIR = new URL('./src/content/docs/', import.meta.url);
 
@@ -49,7 +49,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Railhook Docs',
-      logo: { src: './src/assets/railhook-mark.svg', alt: 'Railhook' },
+      logo: { light: './src/assets/railhook-mark.svg', dark: './src/assets/railhook-mark-dark.svg', alt: 'Railhook' },
       favicon: '/favicon.svg',
       defaultLocale: 'root',
       locales: {
@@ -77,36 +77,39 @@ export default defineConfig({
         { tag: 'script', attrs: { src: '/config.js' } },
         { tag: 'script', attrs: { src: '/analytics.js', defer: true } },
       ],
-      // The code surface is dark in both site themes, as it is on the landing page and in
-      // the dashboard: one theme, no light/dark switch for code.
+      // The code surface is the same near-black in both site themes: one code theme, no switch.
       expressiveCode: {
         themes: ['github-dark'],
         useStarlightDarkModeSwitch: false,
         useStarlightUiThemeColors: false,
         styleOverrides: {
-          borderRadius: '12px',
-          borderColor: '#23263A',
-          codeBackground: '#0E1020',
-          codeForeground: '#E6E8F2',
+          borderRadius: '0',
+          borderColor: '#2E2E2E',
+          codeBackground: '#111111',
+          codeForeground: '#EDEDED',
           codeFontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
-          uiFontFamily: "'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif",
+          uiFontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+          uiFontSize: '0.75rem',
           frames: {
             frameBoxShadowCssValue: 'none',
-            editorBackground: '#0E1020',
-            editorTabBarBackground: '#0E1020',
-            editorTabBarBorderBottomColor: '#23263A',
-            editorActiveTabBackground: '#0E1020',
-            editorActiveTabForeground: '#E6E8F2',
-            editorActiveTabIndicatorBottomColor: '#1D4BFF',
-            // github-dark paints the top indicator in a red-orange — a status hue on chrome.
+            editorBackground: '#111111',
+            editorTabBarBackground: '#111111',
+            editorTabBarBorderBottomColor: '#2E2E2E',
+            editorActiveTabBackground: '#111111',
+            editorActiveTabForeground: '#EDEDED',
+            editorActiveTabIndicatorBottomColor: '#7FE7FF',
+            // github-dark paints the top indicator in a red-orange, a status hue on chrome.
             editorActiveTabIndicatorTopColor: 'transparent',
-            terminalBackground: '#0E1020',
-            terminalTitlebarBackground: '#0E1020',
-            terminalTitlebarForeground: '#8A90A6',
-            terminalTitlebarBorderBottomColor: '#23263A',
-            terminalTitlebarDotsForeground: '#8A90A6',
-            inlineButtonForeground: '#E6E8F2',
-            inlineButtonBorder: '#23263A',
+            terminalBackground: '#111111',
+            terminalTitlebarBackground: '#111111',
+            terminalTitlebarForeground: '#9C9C9C',
+            terminalTitlebarBorderBottomColor: '#2E2E2E',
+            terminalTitlebarDotsForeground: '#474747',
+            terminalTitlebarDotsOpacity: '1',
+            inlineButtonForeground: '#EDEDED',
+            inlineButtonBorder: '#2E2E2E',
+            tooltipSuccessBackground: '#7FE7FF',
+            tooltipSuccessForeground: '#000000',
           },
         },
       },

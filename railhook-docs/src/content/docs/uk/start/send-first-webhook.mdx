@@ -2,9 +2,9 @@
 title: Надішліть перший вебхук
 description: Зареєструйте ендпоінт, підпишіть його на тип події, надішліть подію та перевірте її підпис на боці отримувача.
 ---
-import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-На цій сторінці ви через API проведете одну подію від вашої системи до ендпоінта вашого клієнта, а отримувач дізнається, як переконатися, що запит справді надіслали ви. Вам знадобляться ідентифікатор проєкту та API-ключ із рівнем доступу `READ_WRITE` (як їх отримати, описано у [швидкому старті](/docs/uk/start/quickstart/)).
+Потрібні ідентифікатор проєкту та API-ключ із рівнем доступу `READ_WRITE` (див. [швидкий старт](/docs/uk/start/quickstart/)).
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance, e.g. http://localhost or https://hooks.example.com
@@ -130,18 +130,10 @@ export PROJECT_ID=...
      </TabItem>
    </Tabs>
 
-   Крім того, SDK типово відхиляють запит, позначка часу якого старша за п'ять хвилин, тож перехоплений запит не вдасться надіслати повторно пізніше.
+   SDK також типово відхиляють позначку часу, старшу за п'ять хвилин, тож перехоплений запит не вдасться відтворити.
 
 </Steps>
 
 <Aside type="tip">
 Railhook гарантує доставку щонайменше один раз (at-least-once). Спроба може вдатися на вашому ендпоінті, але так і не потрапити в запис, тож відповідайте `2xx` швидко й пропускайте доставки з ідентифікатором, який ви вже обробили.
 </Aside>
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Підписи" description="Обидві схеми підпису, ротація секретів і Standard Webhooks." href="/docs/uk/outgoing/signatures/" />
-  <LinkCard title="Повторні спроби та недоставлені повідомлення" description="Що відбувається, поки ендпоінт недоступний." href="/docs/uk/outgoing/retries/" />
-  <LinkCard title="SDK" description="Клієнти для Node.js, Python і PHP." href="/docs/uk/tools/sdks/" />
-</CardGrid>

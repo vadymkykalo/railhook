@@ -1,23 +1,23 @@
 ---
 title: Platform admin panel
-description: Give the people who run your deployment a view of every organization and account, and what stops anyone else from getting it.
+description: Turn on the platform admin panel, which shows every organization and account on a deployment, and who can open it.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-Use this page to open the platform admin panel on your deployment: every organization and account in one place, usage against plan limits, recent sign-ups, and suspension. It is for the people who run the instance, not for your customers.
+The platform admin panel shows every organization and account on a deployment, usage against plan limits, recent sign-ups, and suspension. It is for the people who run the instance, not for customers.
 
-Each deployment has its own panel and its own list of admins. A platform admin of your self-hosted instance sees only the organizations and accounts on that instance; on Railhook Cloud (railhook.io) the list belongs to the people who operate the service and is set in its deployment environment, and no customer account is ever on it.
+Each deployment has its own panel and admin list. A self-hosted admin sees only that instance. On Railhook Cloud (railhook.io) the list is set in the service's deployment environment and holds no customer account.
 
 ## Who is a platform admin
 
-A person is a platform admin when all four of these hold, checked on the server for every admin request:
+A person is a platform admin when all four hold. The server checks them on every admin request:
 
 - Their email address is listed in `PLATFORM_ADMIN_EMAILS`.
 - The address is verified.
 - The account is active, not disabled.
 - They signed in less than 12 hours ago. After that the panel asks them to sign in again.
 
-An organization `OWNER` is not a platform admin. Owning an organization gives no access to any other organization, however the role is used.
+An organization `OWNER` is not a platform admin and gets no access to any other organization.
 
 <Aside type="caution">
 List only addresses you control, and make sure each person's account is protected. The panel shows member addresses of every organization on the deployment.
@@ -25,15 +25,15 @@ List only addresses you control, and make sure each person's account is protecte
 
 ## Turn it on
 
-Nobody is a platform admin until you name someone. There is no "first account to register becomes the admin": on a public instance that would be whoever finds the sign-up page first.
+Nobody is a platform admin until you name someone. The first account to register does not become admin: on a public instance that would be whoever finds the sign-up page first.
 
-The quickest way is to name the admins when you install:
+Name the admins at install time:
 
 ```bash
 curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --admin-email ops@example.com
 ```
 
-Several addresses are separated by commas. The installer refuses anything that is not an email address. For an installation that already exists, run the installer with `--refresh --dir <install dir> --admin-email <addresses>`, then `./railhook start`.
+Separate several addresses with commas. The installer refuses anything that is not an email address. For an installation that already exists, run the installer with `--refresh --dir <install dir> --admin-email <addresses>`, then `./railhook start`.
 
 To set or change the list by hand:
 
@@ -47,7 +47,7 @@ To set or change the list by hand:
    PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com
    ```
 
-   Addresses are compared without regard to case or surrounding spaces, and only whole addresses match.
+   Matching ignores case and surrounding spaces; only whole addresses match.
 
 3. **Recreate the API** so it reads the new value:
 
@@ -62,7 +62,7 @@ To set or change the list by hand:
 </Steps>
 
 <Aside type="caution">
-With email turned off, which is the default, registration marks an address verified without sending anything to it. Register the listed address yourself straight after installing, or turn email on, so nobody else can claim it first.
+With email off (the default), registration marks an address verified without sending anything. Register the listed address yourself right after installing, or turn email on, so nobody else claims it first.
 </Aside>
 
 On Kubernetes, set the Helm value instead:
@@ -72,7 +72,7 @@ platformAdmin:
   emails: "ops@example.com,oncall@example.com"
 ```
 
-Leaving the variable empty, which is the default, turns the panel off: nobody sees the entry and the admin API refuses every signed-in user.
+An empty variable (the default) turns the panel off: nobody sees the entry and the admin API refuses every signed-in user.
 
 ## What the panel shows
 
@@ -85,30 +85,22 @@ Leaving the variable empty, which is the default, turns the panel off: nobody se
 
 Platform admins are marked with a **Platform admin** badge in the Users list and in an organization's members.
 
-With billing turned off, which is the default on a self-hosted install, every organization is on the unlimited Self-Hosted plan and usage reads **Unlimited** instead of a limit.
+With billing off (the self-hosted default), every organization is on the unlimited Self-Hosted plan and usage reads **Unlimited**.
 
 The panel never returns password hashes, tokens, API key material, endpoint secrets or payloads. The organization's audit log is shown without the request bodies it records.
 
 ## Suspending an organization
 
-Suspending and reinstating are the only changes the panel can make; everything else in it is read-only.
+Suspending and reinstating are the only changes the panel can make; the rest is read-only.
 
-Suspending stops an organization changing anything, event ingestion included, until it is reinstated. Its members can still sign in and read, and are shown the reason you give. A payment does not lift a suspension.
+A suspended organization cannot change anything, event ingestion included, until reinstated. Members can still sign in and read, and see the reason you give. A payment does not lift a suspension.
 
-The panel asks you to type the organization's name and a reason before it suspends or reinstates. The suspension records your own address as the person who did it.
+The panel asks for the organization's name and a reason, and records your address as the actor.
 
 ## What is recorded
 
-Every request to the admin API is rate-limited to 120 per minute per admin, and written to the audit log as `PLATFORM_ADMIN_ACCESS` with the admin, the address the request came from, the organization or account it concerned, and the outcome. These rows are kept apart from every organization's own audit log. A suspension or reinstatement is also written to the audit log of the organization it affected.
+Admin API requests are limited to 120 per minute per admin. Each is written to the audit log as `PLATFORM_ADMIN_ACCESS` with the admin, the source address, the organization or account concerned, and the outcome. These rows are kept apart from organizations' own audit logs. A suspension or reinstatement is also written to the affected organization's audit log.
 
 ## The operator token
 
-`PLATFORM_ADMIN_TOKEN` is a separate credential for scripts, sent in the `X-Platform-Admin-Token` header. It reaches the same admin API, and it is the only credential that can rotate encryption keys: a signed-in platform admin cannot. Leave it empty unless you need it. Both variables are described in the [configuration reference](/docs/self-hosting/configuration/), and every admin endpoint in the [API reference](/docs/api-reference/).
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Configuration" href="/docs/self-hosting/configuration/" description="Every environment variable, including both platform admin settings." />
-  <LinkCard title="Organizations and roles" href="/docs/platform/organizations-rbac/" description="What organization members can do, and how tenants are kept apart." />
-  <LinkCard title="Monitoring" href="/docs/self-hosting/monitoring/" description="Health checks, metrics and alerts for the deployment itself." />
-</CardGrid>
+`PLATFORM_ADMIN_TOKEN` is a separate credential for scripts, sent in the `X-Platform-Admin-Token` header. It reaches the same admin API and is the only credential that can rotate encryption keys; a signed-in platform admin cannot. Leave it empty unless you need it. Both variables are in the [configuration reference](/docs/self-hosting/configuration/), every admin endpoint in the [API reference](/docs/api-reference/).

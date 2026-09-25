@@ -1,24 +1,24 @@
 ---
 title: Receive HubSpot webhooks reliably
-description: HubSpot gives a webhook 10 retries over 24 hours and never retries a 400, 403 or 404. Put Railhook in front — it verifies X-HubSpot-Signature-v3, answers at once, and forwards to your app with retries and replay.
+description: HubSpot gives a webhook 10 retries over 24 hours and never retries a 400, 403 or 404. Railhook verifies X-HubSpot-Signature-v3, answers at once, and forwards to your app with retries and replay.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-This guide puts Railhook between HubSpot and your application. HubSpot posts batches of CRM events to a Railhook source, which verifies the v3 signature, stores each batch as it arrived and forwards it to your service with retries.
+HubSpot posts batches of CRM events to a Railhook source. The source verifies the v3 signature, stores each batch as it arrived and forwards it to your service with retries.
 
 ## Why HubSpot webhooks need a buffer
 
-HubSpot retries a failed delivery up to 10 times across 24 hours, with exponential backoff and some randomisation so a mass failure does not re-fire all at once. It retries on a connection failure, a timeout and most error statuses — but **not** on `400`, `403` or `404`, which it treats as permanent. ([HubSpot: Updated webhook retry logic](https://developers.hubspot.com/changelog/2018-12-10-updated-webhook-retry-logic))
+HubSpot retries a failed delivery up to 10 times across 24 hours, with exponential backoff and some randomisation so a mass failure does not re-fire all at once. It retries on a connection failure, a timeout and most error statuses, but **not** on `400`, `403` or `404`, which it treats as permanent. ([HubSpot: Updated webhook retry logic](https://developers.hubspot.com/changelog/2018-12-10-updated-webhook-retry-logic))
 
-That exception is the sharp edge. A route that is briefly missing during a deploy answers `404`, and HubSpot writes the event off on the first try. With Railhook in front:
+A route that is briefly missing during a deploy answers `404`, and HubSpot writes the event off on the first try. With Railhook in front:
 
 - HubSpot always reaches a URL that exists and answers immediately, so a `404` from your app is never HubSpot's answer.
 - Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed Forwards**.
-- Anything stored can be replayed after you fix the route, which is exactly what HubSpot's `404` rule takes away.
+- Anything stored can be replayed after you fix the route.
 
 ## Connect HubSpot
 
-You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+You need a Railhook project and an API key. The same steps are available under **Incoming** in the dashboard.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -61,37 +61,37 @@ export PROJECT_ID=...
      -d '{"url":"https://api.example.com/webhooks/hubspot","authType":"BEARER","authConfig":"{\"token\":\"...\"}","enabled":true}'
    ```
 
-6. **Trigger a subscribed event** — create a contact, change a property — in a portal where the app is installed. It appears under **Incoming → Received**, with one forward per destination.
+6. **Trigger a subscribed event** (create a contact, change a property) in a portal where the app is installed. It appears under **Incoming → Received**, with one forward per destination.
 
 </Steps>
 
 <Aside type="caution" title="The client secret signs everything your app does">
-This is not a per-webhook key you can rotate on its own: it is the credential behind your app's OAuth. Give the source its own project if you keep webhook configuration separate from application credentials, and rotate the source's `hmacSecret` at the same moment you rotate it in HubSpot — the two have to change together, since there is no grace window in HubSpot's scheme.
+This is not a per-webhook key you can rotate on its own: it is the credential behind your app's OAuth. Give the source its own project if you keep webhook configuration separate from application credentials, and rotate the source's `hmacSecret` at the same moment you rotate it in HubSpot. HubSpot's scheme has no grace window, so the two must change together.
 </Aside>
 
 ## How the signature is checked
 
-HubSpot v3 sends `X-HubSpot-Signature-v3`: a base64 HMAC-SHA256 of the request method, the full URL, the raw body and the timestamp, concatenated in that order with no separators, keyed with the client secret. `X-HubSpot-Request-Timestamp` carries that timestamp in milliseconds, and HubSpot's own instruction is to refuse anything older than five minutes — which Railhook does. ([HubSpot: Validate requests](https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/request-validation))
+HubSpot v3 sends `X-HubSpot-Signature-v3`: a base64 HMAC-SHA256 of the request method, the full URL, the raw body and the timestamp, concatenated in that order with no separators, keyed with the client secret. `X-HubSpot-Request-Timestamp` carries that timestamp in milliseconds, and HubSpot says to refuse anything older than five minutes, which Railhook does. ([HubSpot: Validate requests](https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/request-validation))
 
 A request that does not verify, or that arrives more than five minutes late, is answered `401` and is not stored.
 
 <Aside type="caution" title="The URL is part of the signature">
-`http` where HubSpot has `https`, a trailing slash, a different host — any of them changes the digest. Railhook rebuilds the URL from its configured public address rather than from the incoming request, so a reverse proxy cannot corrupt it. On a self-hosted instance that address is `APP_BASE_URL`, which the installer sets from `--domain`, or `TUNNEL_INGRESS_BASE_URL` when webhooks arrive on a different host. Give HubSpot exactly the ingress URL the source shows.
+`http` where HubSpot has `https`, a trailing slash, or a different host changes the digest. Railhook rebuilds the URL from its configured public address rather than from the incoming request, so a reverse proxy cannot corrupt it. On a self-hosted instance that address is `APP_BASE_URL`, which the installer sets from `--domain`, or `TUNNEL_INGRESS_BASE_URL` when webhooks arrive on a different host. Give HubSpot exactly the ingress URL the source shows. See [Configuration](/docs/self-hosting/configuration/).
 </Aside>
 
 <Aside type="tip" title="Only v3">
-HubSpot's older v1 and v2 signatures are a plain SHA-256 over the secret and the body, with no timestamp and so no bound on how long a captured request stays valid. Railhook implements v3 only, on purpose. If a legacy integration sends nothing but v1, verify it as a generic HMAC and understand what you are accepting — see [Verification](/docs/incoming/verification/#generic-hmac).
+HubSpot's older v1 and v2 signatures are a plain SHA-256 over the secret and the body, with no timestamp and so no bound on how long a captured request stays valid. Railhook implements v3 only, on purpose. If a legacy integration sends nothing but v1, verify it as a generic HMAC and understand what you are accepting. See [Verification](/docs/incoming/verification/#generic-hmac).
 </Aside>
 
 ## Deduplicate per event, not per request
 
-A HubSpot request is a JSON array of events, each with its own `eventId` and an `attemptNumber` that counts up across retries. There is no id for the batch, so Railhook records no provider event id for a HubSpot source and does not deduplicate its requests — keying a batch on its first event would drop the rest of it if HubSpot ever re-cut the batch on a retry.
+A HubSpot request is a JSON array of events, each with its own `eventId` and an `attemptNumber` that counts up across retries. There is no id for the batch, so Railhook records no provider event id for a HubSpot source and does not deduplicate its requests: keying a batch on its first event would drop the rest of it if HubSpot re-cut the batch on a retry.
 
 Deduplicate in your own handler, on `eventId` together with `portalId`. The signed five-minute window and the replay cache are what stop a captured request being replayed at Railhook's door; they are not a substitute for an idempotent handler.
 
 ## What your service receives
 
-The body exactly as HubSpot sent it, byte for byte: the array, not one event per request. The signature headers are not forwarded — your service authenticates Railhook through the destination's credentials, and the v3 signature would not verify against your URL anyway, since your URL is part of what it covers. See [Destinations](/docs/incoming/destinations/#what-the-destination-receives).
+The body exactly as HubSpot sent it, byte for byte: the array, not one event per request. The signature headers are not forwarded: your service authenticates Railhook through the destination's credentials, and the v3 signature covers the ingress URL, so it would not verify against yours. See [Destinations](/docs/incoming/destinations/#what-the-destination-receives).
 
 ## Develop locally with the CLI
 
@@ -111,7 +111,7 @@ The body exactly as HubSpot sent it, byte for byte: the array, not one event per
 
 ## Replay after an outage
 
-Replay what arrived while your service was down. Each replayed batch goes to every destination of the source as a new forward:
+Each replayed batch goes to every destination of the source as a new forward:
 
 ```bash
 curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
@@ -120,12 +120,4 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-rep
   -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
 ```
 
-Replay reaches back as far as events are kept: 7 days on Railhook Cloud, and whatever you configure when self-hosting. This is the answer to HubSpot writing an event off after a `404`: it never reached HubSpot's retry logic, because Railhook answered, and the batch is still here. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
-  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Credentials, retries and transformations per destination." />
-  <LinkCard title="Configuration" href="/docs/self-hosting/configuration/" description="Set the public address HubSpot signs." />
-</CardGrid>
+Replay reaches back as far as events are kept: 7 days on Railhook Cloud, and whatever you configure when self-hosting. An event your app answered `404` never reached HubSpot's retry logic, because Railhook answered, so the batch is still here to replay. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).

@@ -2,7 +2,7 @@
 title: SDK
 description: "Офіційні SDK для Node.js, Python і PHP: надсилання подій, керування ендпоінтами й перевірка підпису вебхуків."
 ---
-import { Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 SDK покривають ті частини API, які ви викликаєте з коду застосунку: події, ендпоінти, підписки, доставки, вхідні джерела й вхідні події, а також перевірку підпису. Для автентифікації їм достатньо самого API-ключа.
 
@@ -101,11 +101,3 @@ SDK для Node.js не має залежностей під час викона
 <Aside type="tip">
 SDK не охоплюють трансформацій, правил, воркфлоу, схем, DLQ, сповіщень і адміністрування проєктів. Для цього в кожному SDK є універсальний метод для довільного запиту, а всі ендпоінти API перелічено в [довіднику API](/docs/uk/api-reference/).
 </Aside>
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Надішліть перший вебхук" description="Ендпоінт, підписка, подія й підпис — від початку до кінця." href="/docs/uk/start/send-first-webhook/" />
-  <LinkCard title="Підписи" description="Обидві схеми підпису й ротація секретів." href="/docs/uk/outgoing/signatures/" />
-  <LinkCard title="MCP-сервер" description="Дайте ШІ-агенту працювати з тим самим проєктом через його API-ключ." href="/docs/uk/tools/mcp/" />
-</CardGrid>

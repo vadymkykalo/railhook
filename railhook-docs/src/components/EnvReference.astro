@@ -198,7 +198,7 @@ const slug = (/** @type {string} */ title) =>
     gap: 0.75rem;
     padding: 0.5rem;
     border: 1px solid var(--sl-color-hairline);
-    border-radius: var(--rh-radius-card, 16px);
+    border-radius: 0;
     background: var(--sl-color-bg);
   }
   .env-ref__search {
@@ -209,13 +209,13 @@ const slug = (/** @type {string} */ title) =>
     font: inherit;
     font-size: var(--sl-text-sm);
     color: var(--sl-color-white);
-    background: var(--rh-mist, var(--sl-color-bg-sidebar));
-    border: 1px solid var(--rh-rail-strong, var(--sl-color-gray-5));
-    border-radius: var(--rh-radius-control, 10px);
+    background: var(--rh-soft, var(--sl-color-gray-7));
+    border: 1px solid var(--rh-line-strong, var(--sl-color-gray-5));
+    border-radius: 0;
     padding: 0.5rem 0.75rem;
   }
   .env-ref__search input:focus-visible {
-    outline: 2px solid var(--sl-color-accent);
+    outline: 2px solid var(--sl-color-white);
     outline-offset: 1px;
   }
   .env-ref__count {
@@ -226,14 +226,14 @@ const slug = (/** @type {string} */ title) =>
   }
   .env-ref__section h3 {
     font-size: var(--sl-text-lg);
-    font-weight: 600;
+    font-weight: 500;
     color: var(--sl-color-white);
     margin: 0 0 0.625rem;
   }
   .env-ref__scroll {
     overflow-x: auto;
     border: 1px solid var(--sl-color-hairline);
-    border-radius: var(--rh-radius-card, 16px);
+    border-radius: 0;
   }
   table {
     width: 100%;
@@ -243,10 +243,13 @@ const slug = (/** @type {string} */ title) =>
   }
   th {
     text-align: start;
-    font-weight: 500;
-    font-size: var(--sl-text-xs);
+    font-family: var(--__sl-font-mono);
+    font-weight: 400;
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     color: var(--sl-color-gray-3);
-    background: var(--rh-mist, var(--sl-color-bg-sidebar));
+    background: var(--rh-soft, var(--sl-color-gray-7));
     padding: 0.625rem 1rem;
     border-bottom: 1px solid var(--sl-color-hairline);
   }
@@ -259,7 +262,8 @@ const slug = (/** @type {string} */ title) =>
     border-bottom: 0;
   }
   tr:target td {
-    background: var(--sl-color-accent-low);
+    background: var(--rh-hl, var(--sl-color-accent-low));
+    color: #000;
   }
   code {
     font-family: var(--__sl-font-mono);

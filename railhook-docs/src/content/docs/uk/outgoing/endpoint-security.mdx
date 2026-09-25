@@ -2,9 +2,7 @@
 title: Безпека ендпоінта
 description: Як ротувати секрет ендпоінта, довести, що ендпоінт ваш, пред'явити клієнтський сертифікат і обмежити адреси, на які можуть іти доставки.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
-
-Усе, що в ендпоінті стосується довіри: його секрет підпису, доказ того, що ендпоінт належить тому, хто його зареєстрував, сертифікат, який Railhook йому пред'являє, і мережеві правила, які проходить кожна доставка.
+import { Steps, Aside } from '@astrojs/starlight/components';
 
 ## Ротація секрету підпису
 
@@ -12,7 +10,7 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 
 1. Викличте `POST /api/v1/projects/{projectId}/endpoints/{id}/rotate-secret` або виконайте ротацію в панелі. Відповідь містить новий `secret` і `standardWebhooksSecret`.
 
-2. Протягом перехідного періоду ендпоінта (типово 24 години) кожна доставка має два підписи: один зроблено новим секретом, другий — старим. Отримувач пройде перевірку з будь-яким із них.
+2. Протягом перехідного періоду ендпоінта (типово 24 години) кожна доставка має два підписи: один зроблено новим секретом, другий старим. Отримувач пройде перевірку з будь-яким із них.
 
 3. За цей час розгорніть новий секрет в отримувача. Коли період мине, старим секретом більше нічого не підписуватимуть, і отримувач, який досі його використовує, не пройде перевірку.
 
@@ -42,7 +40,7 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
    {"type":"webhook.verification","challenge":"<token>","timestamp":"2026-09-13T10:30:00Z"}
    ```
 
-2. Відповідайте значенням challenge — у JSON або просто токеном:
+2. Відповідайте значенням challenge у JSON або просто токеном:
 
    ```http title="Що відповісти"
    HTTP/1.1 200 OK
@@ -51,11 +49,11 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
    {"challenge":"<token>"}
    ```
 
-3. Якщо відповідь збігається, ендпоінт отримує статус `VERIFIED`. За будь-якої іншої відповіді — `FAILED`, і перевірку можна запустити знову.
+3. Якщо відповідь збігається, ендпоінт отримує статус `VERIFIED`. За будь-якої іншої відповіді статус `FAILED`, і перевірку можна запустити знову.
 
 </Steps>
 
-Щоб доставляти без перевірки, викличте `POST /api/v1/projects/{projectId}/endpoints/{id}/skip-verification` із полем `reason`. Причина зберігається в ендпоінті, тож неперевірений ендпоінт — це зафіксоване рішення, а не крок, який непомітно пропустили.
+Щоб доставляти без перевірки, викличте `POST /api/v1/projects/{projectId}/endpoints/{id}/skip-verification` із полем `reason`. Причина зберігається в ендпоінті, тож неперевірений ендпоінт залишається зафіксованим рішенням, а не крок, який непомітно пропустили.
 
 ## Клієнтський сертифікат (mTLS)
 
@@ -98,11 +96,3 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 ## Як зберігаються секрети
 
 Секрети підпису, клієнтські сертифікати й клієнтські ключі ендпоінтів зберігаються зашифрованими ключем шифрування розгортання. `caCert` публічний, тож зберігається як є. Ключ шифрування оператор задає через `WEBHOOK_ENCRYPTION_KEY` або версіонованими ключами в `WEBHOOK_ENCRYPTION_KEYS` і `WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION`. Див. [Конфігурація](/docs/uk/self-hosting/configuration/).
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Перевірка підписів" href="/docs/uk/outgoing/signatures/" description="Перевіряйте підпис кожної доставки." />
-  <LinkCard title="Статична вихідна IP-адреса" href="/docs/uk/resources/static-egress-ip/" description="Дайте отримувачам одну адресу для білого списку." />
-  <LinkCard title="Конфігурація" href="/docs/uk/self-hosting/configuration/" description="Усі налаштування розгортання, зокрема наведені вище." />
-</CardGrid>

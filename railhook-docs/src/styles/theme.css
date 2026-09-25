@@ -2,261 +2,394 @@
  * Railhook tokens mapped onto Starlight.
  *
  * Starlight's own styles live in cascade layers, so these unlayered rules win without
- * specificity games. Starlight names its scale for dark mode — "white" is the strongest text,
- * "black" the page — and swaps the scale under [data-theme='light'].
+ * specificity games. Starlight names its scale for dark mode: "white" is the strongest text,
+ * "black" the page, and it swaps the scale under [data-theme='light'].
  *
- * Status hues (ok / retry / halt) are used only where Starlight itself means a status:
- * caution and danger asides, and success/caution/danger badges. The accent never stands in
- * for a status, and chrome never borrows a status hue.
+ * One accent, cyan, used as a fill behind ink (the active sidebar item, a hovered link, a
+ * selection). Never as text or a thin line on white, where it cannot be read. Status hues are
+ * for caution and danger asides only.
  */
 
 :root {
-  --sl-font: 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --sl-font: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --sl-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --rh-font-display: 'Manrope', 'Onest', system-ui, sans-serif;
 
-  --rh-radius-control: 10px;
-  --rh-radius-card: 16px;
+  --rh-hl: #7fe7ff;
+  --rh-on-hl: #000000;
 
   /* dark */
-  --rh-paper: #0b0d14;
-  --rh-mist: #10131c;
-  --rh-ink: #edeff5;
-  --rh-slate: #9aa3b5;
-  --rh-rail: #232838;
-  --rh-rail-strong: #343a4c;
-  --rh-accent: #6f8dff;
-  --rh-accent-hover: #8ba3ff;
-  --rh-accent-tint: #151e45;
-  --rh-on-accent: #0b0d14;
-  --rh-ok: #3fc486;
-  --rh-ok-soft: #0f2a1e;
-  --rh-retry: #f0a640;
-  --rh-retry-soft: #2e2210;
-  --rh-halt: #f2685c;
-  --rh-halt-soft: #33141a;
+  --rh-bg: #0a0a0a;
+  --rh-soft: #141414;
+  --rh-ink: #ffffff;
+  --rh-text: #d4d4d4;
+  --rh-muted: #a3a3a3;
+  --rh-line: #262626;
+  --rh-line-strong: #474747;
+  --rh-code-bg: #111111;
+  --rh-code-line: #2e2e2e;
+  --rh-caution: #f59e0b;
+  --rh-danger: #f87171;
 
   --sl-color-white: var(--rh-ink);
   --sl-color-gray-1: var(--rh-ink);
-  --sl-color-gray-2: #cdd2de;
-  --sl-color-gray-3: var(--rh-slate);
-  --sl-color-gray-4: #6b7385;
-  --sl-color-gray-5: var(--rh-rail-strong);
-  --sl-color-gray-6: var(--rh-rail);
-  --sl-color-black: var(--rh-paper);
+  --sl-color-gray-2: var(--rh-text);
+  --sl-color-gray-3: var(--rh-muted);
+  --sl-color-gray-4: #737373;
+  --sl-color-gray-5: var(--rh-line-strong);
+  --sl-color-gray-6: var(--rh-line);
+  --sl-color-gray-7: var(--rh-soft);
+  --sl-color-black: var(--rh-bg);
 
-  --sl-color-accent-low: var(--rh-accent-tint);
-  --sl-color-accent: var(--rh-accent);
-  --sl-color-accent-high: var(--rh-accent-hover);
+  --sl-color-accent-low: var(--rh-soft);
+  --sl-color-accent: var(--rh-hl);
+  --sl-color-accent-high: var(--rh-ink);
 
-  --sl-color-blue-low: var(--rh-accent-tint);
-  --sl-color-blue: var(--rh-accent);
-  --sl-color-blue-high: var(--rh-accent);
-  --sl-color-purple-low: var(--rh-accent-tint);
-  --sl-color-purple: var(--rh-accent);
-  --sl-color-purple-high: var(--rh-accent);
-  --sl-color-green-low: var(--rh-ok-soft);
-  --sl-color-green: var(--rh-ok);
-  --sl-color-green-high: var(--rh-ok);
-  --sl-color-orange-low: var(--rh-retry-soft);
-  --sl-color-orange: var(--rh-retry);
-  --sl-color-orange-high: var(--rh-retry);
-  --sl-color-red-low: var(--rh-halt-soft);
-  --sl-color-red: var(--rh-halt);
-  --sl-color-red-high: var(--rh-halt);
+  --sl-color-blue-low: var(--rh-soft);
+  --sl-color-blue: var(--rh-ink);
+  --sl-color-blue-high: var(--rh-ink);
+  --sl-color-purple-low: var(--rh-soft);
+  --sl-color-purple: var(--rh-hl);
+  --sl-color-purple-high: var(--rh-ink);
+  --sl-color-green-low: var(--rh-soft);
+  --sl-color-green: var(--rh-ink);
+  --sl-color-green-high: var(--rh-ink);
+  --sl-color-orange-low: var(--rh-soft);
+  --sl-color-orange: var(--rh-caution);
+  --sl-color-orange-high: var(--rh-ink);
+  --sl-color-red-low: var(--rh-soft);
+  --sl-color-red: var(--rh-danger);
+  --sl-color-red-high: var(--rh-ink);
 
-  --sl-color-text: var(--sl-color-gray-2);
-  --sl-color-text-accent: var(--rh-accent);
-  --sl-color-text-invert: var(--rh-on-accent);
-  --sl-color-bg: var(--rh-paper);
-  --sl-color-bg-nav: var(--rh-paper);
-  --sl-color-bg-sidebar: var(--rh-mist);
-  --sl-color-bg-inline-code: var(--rh-mist);
-  --sl-color-bg-accent: var(--rh-accent);
-  --sl-color-hairline-light: var(--rh-rail);
-  --sl-color-hairline: var(--rh-rail);
-  --sl-color-hairline-shade: #06070d;
+  --sl-color-text: var(--rh-text);
+  --sl-color-text-accent: var(--rh-ink);
+  --sl-color-text-invert: var(--rh-on-hl);
+  --sl-color-bg: var(--rh-bg);
+  --sl-color-bg-nav: var(--rh-bg);
+  --sl-color-bg-sidebar: var(--rh-bg);
+  --sl-color-bg-inline-code: var(--rh-soft);
+  --sl-color-bg-accent: var(--rh-hl);
+  --sl-color-hairline-light: var(--rh-line);
+  --sl-color-hairline: var(--rh-line);
+  --sl-color-hairline-shade: var(--rh-line);
 
-  --sl-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --sl-shadow-md: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.35);
+  --sl-shadow-sm: none;
+  --sl-shadow-md: none;
+  --sl-shadow-lg: none;
+
+  --sl-nav-height: 3.5rem;
+  --sl-text-h1: 2.5rem;
+  --sl-text-h2: 1.75rem;
+  --sl-text-h3: 1.3125rem;
+  --sl-text-h4: 1.125rem;
 }
 
 :root[data-theme='light'] {
-  --rh-paper: #ffffff;
-  --rh-mist: #f5f6fa;
-  --rh-ink: #0b0e1a;
-  --rh-slate: #5a6072;
-  --rh-rail: #e4e6ee;
-  --rh-rail-strong: #cdd1dc;
-  --rh-accent: #1d4bff;
-  --rh-accent-hover: #1239db;
-  --rh-accent-tint: #e8eeff;
-  --rh-on-accent: #ffffff;
-  --rh-ok: #12804f;
-  --rh-ok-soft: #e4f5ec;
-  --rh-retry: #b25e00;
-  --rh-retry-soft: #fdf0dd;
-  --rh-halt: #c4291f;
-  --rh-halt-soft: #fce8e6;
+  --rh-bg: #ffffff;
+  --rh-soft: #f4f4f4;
+  --rh-ink: #000000;
+  --rh-text: #333333;
+  --rh-muted: #555555;
+  --rh-line: #e5e7eb;
+  --rh-line-strong: #afafaf;
+  --rh-caution: #b45309;
+  --rh-danger: #dc2626;
 
   --sl-color-white: var(--rh-ink);
   --sl-color-gray-1: var(--rh-ink);
-  --sl-color-gray-2: #262b3a;
-  --sl-color-gray-3: var(--rh-slate);
-  --sl-color-gray-4: #8a90a0;
-  --sl-color-gray-5: var(--rh-rail-strong);
-  --sl-color-gray-6: var(--rh-rail);
-  --sl-color-gray-7: var(--rh-mist);
-  --sl-color-black: var(--rh-paper);
+  --sl-color-gray-2: var(--rh-text);
+  --sl-color-gray-3: var(--rh-muted);
+  --sl-color-gray-4: #8a8a8a;
+  --sl-color-gray-5: var(--rh-line-strong);
+  --sl-color-gray-6: var(--rh-line);
+  --sl-color-gray-7: var(--rh-soft);
+  --sl-color-black: var(--rh-bg);
 
-  --sl-color-accent-low: var(--rh-accent-tint);
-  --sl-color-accent: var(--rh-accent);
-  --sl-color-accent-high: var(--rh-accent-hover);
+  --sl-color-accent-low: var(--rh-soft);
+  --sl-color-accent: var(--rh-hl);
+  --sl-color-accent-high: var(--rh-ink);
 
-  --sl-color-blue-low: var(--rh-accent-tint);
-  --sl-color-blue: var(--rh-accent);
-  --sl-color-blue-high: var(--rh-accent);
-  --sl-color-purple-low: var(--rh-accent-tint);
-  --sl-color-purple: var(--rh-accent);
-  --sl-color-purple-high: var(--rh-accent);
-  --sl-color-green-low: var(--rh-ok-soft);
-  --sl-color-green: var(--rh-ok);
-  --sl-color-green-high: var(--rh-ok);
-  --sl-color-orange-low: var(--rh-retry-soft);
-  --sl-color-orange: var(--rh-retry);
-  --sl-color-orange-high: var(--rh-retry);
-  --sl-color-red-low: var(--rh-halt-soft);
-  --sl-color-red: var(--rh-halt);
-  --sl-color-red-high: var(--rh-halt);
+  --sl-color-blue-low: var(--rh-soft);
+  --sl-color-blue: var(--rh-ink);
+  --sl-color-blue-high: var(--rh-ink);
+  --sl-color-purple-low: var(--rh-soft);
+  --sl-color-purple: var(--rh-hl);
+  --sl-color-purple-high: var(--rh-ink);
+  --sl-color-green-low: var(--rh-soft);
+  --sl-color-green: var(--rh-ink);
+  --sl-color-green-high: var(--rh-ink);
+  --sl-color-orange-low: var(--rh-soft);
+  --sl-color-orange: var(--rh-caution);
+  --sl-color-orange-high: var(--rh-ink);
+  --sl-color-red-low: var(--rh-soft);
+  --sl-color-red: var(--rh-danger);
+  --sl-color-red-high: var(--rh-ink);
 
-  --sl-color-text: var(--sl-color-gray-2);
-  --sl-color-text-accent: var(--rh-accent);
-  --sl-color-text-invert: var(--rh-on-accent);
-  --sl-color-bg: var(--rh-paper);
-  --sl-color-bg-nav: var(--rh-paper);
-  --sl-color-bg-sidebar: var(--rh-mist);
-  --sl-color-bg-inline-code: var(--rh-mist);
-  --sl-color-bg-accent: var(--rh-accent);
-  --sl-color-hairline-light: var(--rh-rail);
-  --sl-color-hairline: var(--rh-rail);
-  --sl-color-hairline-shade: var(--rh-rail-strong);
-
-  --sl-shadow-sm: 0 1px 2px rgba(11, 14, 26, 0.05);
-  --sl-shadow-md: 0 1px 2px rgba(11, 14, 26, 0.05), 0 10px 30px rgba(11, 14, 26, 0.07);
+  --sl-color-text: var(--rh-text);
+  --sl-color-text-accent: var(--rh-ink);
+  --sl-color-text-invert: var(--rh-on-hl);
+  --sl-color-bg: var(--rh-bg);
+  --sl-color-bg-nav: var(--rh-bg);
+  --sl-color-bg-sidebar: var(--rh-bg);
+  --sl-color-bg-inline-code: var(--rh-soft);
+  --sl-color-bg-accent: var(--rh-hl);
+  --sl-color-hairline-light: var(--rh-line);
+  --sl-color-hairline: var(--rh-line);
+  --sl-color-hairline-shade: var(--rh-line);
 }
 
-/* ---------- type ---------- */
+/* ---------- base ---------- */
 
 body {
   -webkit-font-smoothing: antialiased;
+  background-color: var(--rh-bg);
 }
 
-/* Manrope for the page title and the site title only; everything else is Onest. */
+::selection {
+  background-color: var(--rh-hl);
+  color: var(--rh-on-hl);
+}
+
+:focus-visible {
+  outline: 2px solid var(--rh-ink);
+  outline-offset: 2px;
+}
+
+/* No rounded corners anywhere. */
+.sl-markdown-content :is(img, video, iframe, details, pre, figure),
+.expressive-code,
+.expressive-code *,
+starlight-tabs,
+starlight-tabs *,
+site-search *,
+dialog,
+dialog * {
+  border-radius: 0 !important;
+}
+
+/* ---------- type: Geist 400 and 500 only ---------- */
+
 h1#_top {
-  font-family: var(--rh-font-display);
-  font-weight: 800;
+  font-weight: 400;
+  font-size: var(--sl-text-h1);
   letter-spacing: -0.03em;
-  line-height: 1.15;
+  line-height: 1.12;
+  color: var(--rh-ink);
   text-wrap: balance;
 }
 
+.sl-markdown-content :is(h2, h3, h4, h5, h6) {
+  color: var(--rh-ink);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.sl-markdown-content h2 {
+  font-weight: 400;
+}
+
+/* A hairline above each section, across the whole column. */
+.sl-markdown-content .sl-heading-wrapper.level-h2 {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rh-line);
+}
+
+.sl-markdown-content strong,
+.sl-markdown-content b {
+  font-weight: 500;
+  color: var(--rh-ink);
+}
+
 .site-title {
-  font-family: var(--rh-font-display);
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  color: var(--sl-color-white);
+  gap: 0.5rem;
+  font-weight: 500;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+  color: var(--rh-ink);
 }
 
-.sl-markdown-content :is(h2, h3, h4) {
-  font-weight: 600;
-  letter-spacing: -0.01em;
+.site-title img {
+  height: 1.375rem;
+  width: auto;
 }
 
-/* The lead under the title. */
-.content-panel header p,
-[data-page-title] + p {
-  color: var(--rh-slate);
+/* ---------- links: ink with a 1px underline, cyan behind on hover ---------- */
+
+.sl-markdown-content a:not(:where(.not-content *)) {
+  color: var(--rh-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.sl-markdown-content a:hover:not(:where(.not-content *)) {
+  color: var(--rh-on-hl);
+  background-color: var(--rh-hl);
+  text-decoration-color: var(--rh-on-hl);
+}
+
+.sl-markdown-content :is(h2, h3, h4) a:not(:where(.not-content *)) {
+  text-decoration: none;
+}
+
+.sl-anchor-link:hover {
+  background: none !important;
 }
 
 /* ---------- header ---------- */
 
-/* The page header only. Starlight's inner Header component is a div.header too, and a border on
-   it drew a second line right under the search box. */
 header.header {
-  border-bottom: 1px solid var(--sl-color-hairline);
+  border-bottom: 1px solid var(--rh-line);
+  background-color: var(--rh-bg);
 }
 
 site-search button[data-open-modal] {
-  border-radius: var(--rh-radius-control);
-  border-color: var(--rh-rail-strong);
-  background-color: var(--rh-mist);
+  border: 1px solid var(--rh-line-strong);
+  background-color: transparent;
+  color: var(--rh-muted);
+  font-size: 0.875rem;
 }
 
-/* ---------- sidebar: active page is the accent tint ---------- */
+site-search button[data-open-modal]:hover {
+  border-color: var(--rh-ink);
+  color: var(--rh-ink);
+}
 
+site-search kbd {
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  background: var(--rh-soft);
+  border-radius: 0;
+}
+
+/* The search dialog. */
+site-search dialog {
+  border: 1px solid var(--rh-line-strong);
+  box-shadow: none;
+}
+
+site-search {
+  --pagefind-ui-primary: var(--rh-ink);
+  --pagefind-ui-text: var(--rh-text);
+  --pagefind-ui-border: var(--rh-line);
+  --pagefind-ui-border-radius: 0;
+  --pagefind-ui-tag: var(--rh-soft);
+}
+
+site-search mark {
+  background-color: var(--rh-hl);
+  color: var(--rh-on-hl);
+}
+
+/* ---------- sidebar ---------- */
+
+.sidebar-pane {
+  border-inline-end: 1px solid var(--rh-line);
+}
+
+/* Group labels read as small uppercase mono labels. */
 #starlight__sidebar .large {
-  font-size: var(--sl-text-xs);
-  font-weight: 600;
-  color: var(--sl-color-white);
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rh-muted);
+}
+
+#starlight__sidebar ul ul li {
+  border-inline-start-color: var(--rh-line);
 }
 
 #starlight__sidebar a {
-  border-radius: 7px;
-  color: var(--rh-slate);
+  border-radius: 0;
+  color: var(--rh-text);
+  font-size: 0.9rem;
 }
 
 #starlight__sidebar a:hover {
-  color: var(--sl-color-white);
+  color: var(--rh-ink);
 }
 
 #starlight__sidebar a[aria-current='page'],
 #starlight__sidebar a[aria-current='page']:hover,
 #starlight__sidebar a[aria-current='page']:focus {
-  background-color: var(--rh-accent-tint);
-  color: var(--rh-accent);
-  font-weight: 600;
+  background-color: var(--rh-hl);
+  color: var(--rh-on-hl);
+  font-weight: 500;
 }
 
 /* ---------- table of contents ---------- */
 
-starlight-toc a[aria-current='true'] {
-  color: var(--sl-color-white);
-  box-shadow: inset 2px 0 0 var(--rh-accent);
+starlight-toc h2,
+mobile-starlight-toc .toggle {
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rh-muted);
 }
 
-/* ---------- asides ---------- */
+starlight-toc a {
+  color: var(--rh-muted);
+}
+
+starlight-toc a:hover {
+  color: var(--rh-ink);
+}
+
+starlight-toc a[aria-current='true'] {
+  color: var(--rh-ink);
+  box-shadow: inset 2px 0 0 var(--rh-ink);
+}
+
+/* ---------- asides: soft band, a rule on the left, a mono label ---------- */
 
 .starlight-aside {
-  border: 1px solid var(--sl-color-asides-border);
-  border-radius: 12px;
+  border: 0;
+  border-inline-start: 2px solid var(--sl-color-asides-border);
+  border-radius: 0;
+  background-color: var(--rh-soft);
+  color: var(--rh-text);
 }
 
-.starlight-aside--note,
+.starlight-aside--note {
+  --sl-color-asides-border: var(--rh-ink);
+}
+
 .starlight-aside--tip {
-  border-color: var(--rh-accent-tint);
-  background-color: var(--rh-accent-tint);
+  --sl-color-asides-border: var(--rh-hl);
 }
 
 .starlight-aside--caution {
-  border-color: var(--rh-retry-soft);
+  --sl-color-asides-border: var(--rh-caution);
 }
 
 .starlight-aside--danger {
-  border-color: var(--rh-halt-soft);
+  --sl-color-asides-border: var(--rh-danger);
 }
 
 .starlight-aside__title {
-  color: var(--sl-color-white);
+  color: var(--rh-ink);
+  font-family: var(--sl-font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .starlight-aside__icon {
-  color: var(--sl-color-asides-text-accent);
+  display: none;
 }
 
-/* ---------- tabs: ink label, accent underline ---------- */
+.starlight-aside__content a {
+  color: var(--rh-ink);
+}
+
+/* ---------- tabs ---------- */
 
 starlight-tabs [role='tablist'] {
-  border-bottom-color: var(--sl-color-hairline);
+  border-bottom: 1px solid var(--rh-line);
   /* A row of language tabs is wider than a phone: it scrolls sideways instead of running past the
      edge of the page. On a wide screen it fits and nothing changes. */
   overflow-x: auto;
@@ -264,16 +397,22 @@ starlight-tabs [role='tablist'] {
 }
 
 starlight-tabs [role='tab'] {
-  color: var(--rh-slate);
-  font-weight: 500;
-  font-size: var(--sl-text-sm);
+  color: var(--rh-muted);
+  font-family: var(--sl-font-mono);
+  font-weight: 400;
+  font-size: 0.8125rem;
   white-space: nowrap;
 }
 
+starlight-tabs [role='tab']:hover {
+  color: var(--rh-ink);
+}
+
+/* The tablist scrolls sideways, which clips Starlight's underline below it: draw it inside. */
 starlight-tabs [role='tab'][aria-selected='true'] {
-  color: var(--sl-color-white);
-  border-color: var(--rh-accent);
-  font-weight: 600;
+  color: var(--rh-ink);
+  font-weight: 500;
+  box-shadow: inset 0 -2px 0 var(--rh-ink);
 }
 
 /* ---------- cards ---------- */
@@ -292,104 +431,165 @@ starlight-tabs [role='tab'][aria-selected='true'] {
 
 .sl-markdown-content .card,
 .sl-link-card {
-  border-radius: var(--rh-radius-card);
-  border-color: var(--sl-color-hairline);
-  background-color: var(--sl-color-bg);
+  border: 1px solid var(--rh-line);
+  border-radius: 0;
+  background-color: var(--rh-bg);
   box-shadow: none;
 }
 
 .sl-link-card:hover {
-  border-color: var(--rh-accent);
-  background-color: var(--sl-color-bg);
-  box-shadow: var(--sl-shadow-md);
+  border-color: var(--rh-ink);
+  background-color: var(--rh-bg);
+}
+
+.sl-link-card .title,
+.sl-markdown-content .card .title {
+  font-weight: 500;
+  color: var(--rh-ink);
 }
 
 .sl-link-card .icon {
-  color: var(--rh-accent);
+  color: var(--rh-ink);
 }
 
 .sl-markdown-content .card .icon {
-  color: var(--rh-accent);
-  background-color: var(--rh-accent-tint);
-  border-color: var(--rh-accent-tint);
-  border-radius: var(--rh-radius-control);
+  color: var(--rh-ink);
+  background-color: var(--rh-soft);
+  border: 0;
+  border-radius: 0;
 }
 
 /* ---------- previous / next ---------- */
 
 .pagination-links a {
-  border: 1px solid var(--sl-color-hairline);
-  border-radius: var(--rh-radius-card);
+  border: 1px solid var(--rh-line);
+  border-radius: 0;
   box-shadow: none;
-  color: var(--rh-slate);
-  font-size: var(--sl-text-sm);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  color: var(--rh-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .pagination-links a:hover {
-  border-color: var(--rh-accent);
-  box-shadow: var(--sl-shadow-md);
+  border-color: var(--rh-ink);
 }
 
 .pagination-links .link-title {
-  color: var(--sl-color-white);
-  font-size: var(--sl-text-lg);
-  font-weight: 600;
+  display: inline-block;
+  margin-top: 0.25rem;
+  color: var(--rh-ink);
+  font-family: var(--sl-font);
+  font-size: 1.125rem;
+  font-weight: 400;
   letter-spacing: -0.01em;
+  text-transform: none;
 }
 
 .pagination-links a svg {
-  color: var(--rh-accent);
+  color: var(--rh-ink);
+}
+
+/* ---------- footer meta ---------- */
+
+.meta,
+.meta a {
+  color: var(--rh-muted);
+  font-size: 0.8125rem;
 }
 
 /* ---------- buttons ---------- */
 
 .sl-link-button {
-  border-radius: var(--rh-radius-control);
-  font-weight: 600;
+  border-radius: 0;
+  font-weight: 500;
+  font-size: 0.875rem;
+  border: 1px solid var(--rh-ink);
 }
 
 .sl-link-button.primary {
-  background-color: var(--rh-accent);
-  border-color: var(--rh-accent);
-  color: var(--rh-on-accent);
+  background-color: var(--rh-ink);
+  border-color: var(--rh-ink);
+  color: var(--rh-bg);
 }
 
 .sl-link-button.primary:hover {
-  background-color: var(--rh-accent-hover);
-  border-color: var(--rh-accent-hover);
+  background-color: var(--rh-text);
+  border-color: var(--rh-text);
+  color: var(--rh-bg);
 }
 
-/* ---------- steps: numbered circles on a rail ---------- */
+.sl-link-button.secondary,
+.sl-link-button.minimal {
+  background: transparent;
+  border-color: var(--rh-line-strong);
+  color: var(--rh-text);
+}
+
+.sl-link-button.secondary:hover {
+  border-color: var(--rh-ink);
+  color: var(--rh-ink);
+}
+
+/* ---------- badges ---------- */
+
+.sl-badge {
+  border-radius: 0;
+  font-family: var(--sl-font-mono);
+  font-weight: 400;
+}
+
+/* ---------- steps: square numbers on a hairline rail ---------- */
 
 .sl-steps > li::before {
-  background-color: var(--sl-color-bg);
-  border: 1px solid var(--rh-rail-strong);
-  color: var(--sl-color-white);
-  font-weight: 600;
+  background-color: var(--rh-bg);
+  border: 1px solid var(--rh-ink);
+  border-radius: 0;
+  color: var(--rh-ink);
+  font-family: var(--sl-font-mono);
+  font-weight: 400;
 }
 
 .sl-steps > li::after {
-  background-color: var(--rh-rail-strong);
+  background-color: var(--rh-line);
 }
 
 /* ---------- inline code ---------- */
 
 .sl-markdown-content :not(pre) > code {
-  font-size: 0.86em;
-  border: 1px solid var(--sl-color-hairline);
-  border-radius: 5px;
+  font-size: 0.85em;
+  border: 0;
+  border-radius: 0;
   padding: 0.0625rem 0.3125rem;
+  background-color: var(--rh-soft);
+  color: var(--rh-ink);
 }
 
 /* ---------- tables ---------- */
 
-.sl-markdown-content table th {
-  background-color: var(--rh-mist);
-  color: var(--rh-slate);
-  font-weight: 500;
+.sl-markdown-content table:not(:where(.not-content *)) {
+  border-collapse: collapse;
+  border: 1px solid var(--rh-line);
 }
 
-:focus-visible {
-  outline-color: var(--rh-accent);
+.sl-markdown-content :is(th, td):not(:where(.not-content *)) {
+  border-bottom: 1px solid var(--rh-line);
+  padding: 0.625rem 0.875rem;
+}
+
+.sl-markdown-content th:not(:where(.not-content *)) {
+  background-color: var(--rh-soft);
+  color: var(--rh-muted);
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ---------- details ---------- */
+
+.sl-markdown-content details:not(:where(.not-content *)) {
+  border-inline-start-color: var(--rh-line-strong);
 }

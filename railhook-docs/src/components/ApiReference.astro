@@ -105,7 +105,6 @@ const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
   .railhook-api-reference {
     margin-top: 1.5rem;
     border: 1px solid var(--sl-color-hairline);
-    border-radius: var(--rh-radius-card, 16px);
     overflow: clip;
   }
 
@@ -113,45 +112,50 @@ const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
   .railhook-api-reference .scalar-app {
     --scalar-font: var(--__sl-font);
     --scalar-font-code: var(--__sl-font-mono);
-    --scalar-radius: var(--rh-radius-control, 10px);
-    --scalar-radius-lg: var(--rh-radius-card, 16px);
-    --scalar-radius-xl: var(--rh-radius-card, 16px);
+    --scalar-radius: 0;
+    --scalar-radius-lg: 0;
+    --scalar-radius-xl: 0;
+    --scalar-shadow-1: none;
+    --scalar-shadow-2: none;
+    --scalar-semibold: 500;
+    --scalar-bold: 500;
     --scalar-custom-header-height: var(--sl-nav-height);
 
     --scalar-background-1: var(--sl-color-bg);
-    --scalar-background-2: var(--rh-mist);
+    --scalar-background-2: var(--rh-soft);
     --scalar-background-3: var(--sl-color-hairline);
-    --scalar-background-accent: var(--sl-color-accent-low);
+    --scalar-background-accent: var(--rh-soft);
     --scalar-color-1: var(--sl-color-white);
-    --scalar-color-2: var(--sl-color-gray-3);
-    --scalar-color-3: var(--sl-color-gray-4);
-    --scalar-color-accent: var(--sl-color-text-accent);
+    --scalar-color-2: var(--sl-color-gray-2);
+    --scalar-color-3: var(--sl-color-gray-3);
+    --scalar-color-accent: var(--sl-color-white);
     --scalar-color-disabled: var(--sl-color-gray-4);
     --scalar-color-ghost: var(--sl-color-gray-4);
     --scalar-border-color: var(--sl-color-hairline);
 
-    --scalar-button-1: var(--rh-accent);
-    --scalar-button-1-color: var(--rh-on-accent);
-    --scalar-button-1-hover: var(--rh-accent-hover);
+    --scalar-button-1: var(--rh-ink);
+    --scalar-button-1-color: var(--rh-bg);
+    --scalar-button-1-hover: var(--rh-text);
 
-    --scalar-sidebar-background-1: var(--rh-mist);
+    --scalar-sidebar-background-1: var(--sl-color-bg);
     --scalar-sidebar-color-1: var(--sl-color-white);
-    --scalar-sidebar-color-2: var(--sl-color-gray-3);
+    --scalar-sidebar-color-2: var(--sl-color-gray-2);
     --scalar-sidebar-border-color: var(--sl-color-hairline);
-    --scalar-sidebar-item-hover-background: var(--sl-color-hairline);
+    --scalar-sidebar-item-hover-background: var(--rh-soft);
     --scalar-sidebar-item-hover-color: var(--sl-color-white);
-    --scalar-sidebar-item-active-background: var(--rh-accent-tint);
-    --scalar-sidebar-color-active: var(--rh-accent);
+    --scalar-sidebar-item-active-background: var(--rh-hl);
+    --scalar-sidebar-color-active: var(--rh-on-hl);
     --scalar-sidebar-search-background: var(--sl-color-bg);
-    --scalar-sidebar-search-border-color: var(--rh-rail-strong);
+    --scalar-sidebar-search-border-color: var(--rh-line-strong);
     --scalar-sidebar-search-color: var(--sl-color-gray-3);
 
-    /* Status hues stay status hues: response codes read ok / retry / halt. */
-    --scalar-color-green: var(--rh-ok);
-    --scalar-color-red: var(--rh-halt);
-    --scalar-color-yellow: var(--rh-retry);
-    --scalar-color-orange: var(--rh-retry);
-    --scalar-color-blue: var(--rh-accent);
-    --scalar-color-purple: var(--rh-accent);
+    /* Status hues stay status hues: response codes read ok / retry / halt. HTTP method colours
+       fall back to ink, so the page carries no extra chrome colour. */
+    --scalar-color-green: #16a34a;
+    --scalar-color-red: var(--rh-danger);
+    --scalar-color-yellow: var(--rh-caution);
+    --scalar-color-orange: var(--rh-caution);
+    --scalar-color-blue: var(--sl-color-white);
+    --scalar-color-purple: var(--sl-color-white);
   }
 </style>
