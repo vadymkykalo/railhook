@@ -157,4 +157,16 @@ class TunnelBodyTest {
                 TunnelRequestMessage.class);
         assertEquals("r1", request.getRequestId());
     }
+
+    /** Absent fields stay off the wire, so a heartbeat carries no empty request or response. */
+    @Test
+    void aMessageLeavesItsUnsetFieldsOutOfTheJson() throws Exception {
+        String json = mapper.writeValueAsString(TunnelMessage.heartbeat());
+
+        assertTrue(json.contains("\"type\":\"HEARTBEAT\""));
+        assertFalse(json.contains("\"request\""));
+        assertFalse(json.contains("\"response\""));
+        assertFalse(json.contains("\"tunnelUrl\""));
+        assertFalse(json.contains("\"error\""));
+    }
 }

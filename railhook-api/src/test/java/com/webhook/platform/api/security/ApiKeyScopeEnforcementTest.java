@@ -1,23 +1,13 @@
 package com.webhook.platform.api.security;
 
-import com.webhook.platform.api.controller.EndpointController;
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.exception.ForbiddenException;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.method.HandlerMethod;
-import org.springframework.web.servlet.HandlerMapping;
 
-import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
 
 class ApiKeyScopeEnforcementTest {
 
@@ -123,78 +113,5 @@ class ApiKeyScopeEnforcementTest {
         // When/Then: null scope (JWT users) should NOT throw for DEVELOPER
         assertDoesNotThrow(
                 () -> RbacUtil.requireWriteAccess(MembershipRole.DEVELOPER, null));
-    }
-
-    // ── EndpointController.rotateSecret cross-project reproduction ──
-    //
-    // Worst concrete case: EndpointController.rotateSecret
-    // never called AuthContext.validateProjectAccess, and EndpointService
-    // .rotateSecret checks only organizationId — which AuthContext derives from
-    // the API key's own project, so it's the same for every project in an org.
-    // A key scoped to "staging" could rotate a "production" endpoint's signing
-    // secret and get it back in plaintext. AuthContext-level unit tests above
-    // can't reproduce this: the bug was that the handler never called
-    // validateProjectAccess at all, not that the method behaves wrong. The fix
-    // moved the check into ScopeEnforcementInterceptor, which now runs
-    // unconditionally against the actual EndpointController.rotateSecret
-    // HandlerMethod, independent of what the handler itself does.
-    //
-    // This exercises ScopeEnforcementInterceptor.preHandle() directly against
-    // that exact method via reflection — no Spring context / Docker required.
-    // (A full HTTP-level reproduction, including asserting the plaintext
-    // secret is actually returned to the legitimate owner, lives in
-    // ProjectScopeEnforcementIsolationTest#apiKey_rotateSecret_*.)
-
-    @Test
-    void testRotateSecretHandler_apiKeyScopedToDifferentProject_blockedByInterceptor() throws NoSuchMethodException {
-        UUID keyProjectId = UUID.randomUUID();
-        UUID otherProjectId = UUID.randomUUID();
-
-        HandlerMethod rotateSecretHandler = rotateSecretHandlerMethod();
-        MockHttpServletRequest request = rotateSecretRequest(otherProjectId);
-        authenticateAsApiKey(keyProjectId);
-
-        try {
-            ScopeEnforcementInterceptor interceptor = new ScopeEnforcementInterceptor(org -> java.util.Optional.empty());
-            ForbiddenException ex = assertThrows(ForbiddenException.class,
-                    () -> interceptor.preHandle(request, new MockHttpServletResponse(), rotateSecretHandler));
-            assertTrue(ex.getMessage().contains("does not have access to this project"));
-        } finally {
-            SecurityContextHolder.clearContext();
-        }
-    }
-
-    @Test
-    void testRotateSecretHandler_apiKeyScopedToOwnProject_allowedByInterceptor() throws NoSuchMethodException {
-        UUID projectId = UUID.randomUUID();
-
-        HandlerMethod rotateSecretHandler = rotateSecretHandlerMethod();
-        MockHttpServletRequest request = rotateSecretRequest(projectId);
-        authenticateAsApiKey(projectId);
-
-        try {
-            ScopeEnforcementInterceptor interceptor = new ScopeEnforcementInterceptor(org -> java.util.Optional.empty());
-            assertDoesNotThrow(
-                    () -> interceptor.preHandle(request, new MockHttpServletResponse(), rotateSecretHandler));
-        } finally {
-            SecurityContextHolder.clearContext();
-        }
-    }
-
-    private static HandlerMethod rotateSecretHandlerMethod() throws NoSuchMethodException {
-        Method method = EndpointController.class.getMethod("rotateSecret", UUID.class, UUID.class, AuthContext.class);
-        return new HandlerMethod(mock(EndpointController.class), method);
-    }
-
-    private static MockHttpServletRequest rotateSecretRequest(UUID pathProjectId) {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST",
-                "/api/v1/projects/" + pathProjectId + "/endpoints/" + UUID.randomUUID() + "/rotate-secret");
-        request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("projectId", pathProjectId.toString()));
-        return request;
-    }
-
-    private static void authenticateAsApiKey(UUID keyProjectId) {
-        SecurityContextHolder.getContext().setAuthentication(
-                new ApiKeyAuthenticationToken("test-key", keyProjectId, UUID.randomUUID(), ApiKeyScope.READ_WRITE, List.of()));
     }
 }

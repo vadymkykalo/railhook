@@ -228,9 +228,9 @@ test-ui: ## Run frontend unit tests (Vitest)
 	@cd railhook-ui && npm run test:ci
 	@echo "$(GREEN)Frontend tests passed$(NC)"
 
-# Enumerates the live set of ratchets instead of asking a doc to list them. Two
-# of the nine boot Testcontainers (OpenApiDrift, EntityMappingParity), so this
-# needs Docker; the other seven are pure reflection or file reads.
+# Enumerates the live set of ratchets instead of asking a doc to list them. Some
+# boot Testcontainers (OpenApiDrift, EntityMappingParity), so this needs Docker;
+# the rest are pure reflection or file reads.
 ratchets: ## Run every @Tag("ratchet") guard test (needs Docker)
 	@echo "$(GREEN)Running ratchet guards...$(NC)"
 	@mvn test -B -Dgroups=ratchet

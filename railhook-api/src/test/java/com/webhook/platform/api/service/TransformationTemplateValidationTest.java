@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Project;
+import com.webhook.platform.api.domain.entity.Transformation;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.SubscriptionRepository;
@@ -9,6 +10,9 @@ import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.domain.repository.TransformationVersionRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.TransformationRequest;
+import com.webhook.platform.api.exception.ConflictException;
+import com.webhook.platform.common.transform.JavaScriptTransformEngine;
+import com.webhook.platform.common.transform.ScriptLimits;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,11 +22,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -101,13 +107,30 @@ class TransformationTemplateValidationTest {
            every `${` when no `}` follows, so a valid-JSON template of repeated "${{" took
            quadratic time on save — a request anyone with write access could send. */
         String template = "{\"a\":\"" + "${{".repeat(60_000) + "\"}";
-        org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
             try {
                 service.create(projectId, request(template), null);
             } catch (IllegalArgumentException expected) {
                 // rejected or accepted is not the point; finishing promptly is
             }
         });
+    }
+
+    /**
+     * Deleting a transformation still in use answers 409 with its message. It used to throw
+     * IllegalStateException, which the error handler treats as a server fault: a 500 that hides
+     * from the person what they need to do.
+     */
+    @Test
+    void deletingATransformationStillInUseIsAConflict() {
+        UUID id = UUID.randomUUID();
+        when(transformationRepository.findByIdAndProjectId(id, projectId))
+                .thenReturn(Optional.of(Transformation.builder().id(id).projectId(projectId).build()));
+        when(subscriptionRepository.countByTransformationId(id)).thenReturn(2L);
+
+        assertThatThrownBy(() -> service.delete(projectId, id))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("referenced by 2 subscriptions");
     }
 
     private TransformationRequest request(String template) {
@@ -121,8 +144,7 @@ class TransformationTemplateValidationTest {
      * The engine is built lazily inside itself, so a test that only ever validates templates
      * never brings GraalJS up at all.
      */
-    private static com.webhook.platform.common.transform.JavaScriptTransformEngine scriptEngine() {
-        return new com.webhook.platform.common.transform.JavaScriptTransformEngine(
-                new ObjectMapper(), com.webhook.platform.common.transform.ScriptLimits.defaults());
+    private static JavaScriptTransformEngine scriptEngine() {
+        return new JavaScriptTransformEngine(new ObjectMapper(), ScriptLimits.defaults());
     }
 }

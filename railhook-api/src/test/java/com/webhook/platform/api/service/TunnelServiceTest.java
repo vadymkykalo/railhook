@@ -5,9 +5,11 @@ import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
+import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
 import com.webhook.platform.api.dto.TunnelSessionResponse;
+import com.webhook.platform.api.service.billing.EntitlementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,10 +21,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -39,10 +45,10 @@ class TunnelServiceTest {
     private ProjectRepository projectRepository;
 
     @Mock
-    private com.webhook.platform.api.domain.repository.OrganizationRepository organizationRepository;
+    private OrganizationRepository organizationRepository;
 
     @Mock
-    private com.webhook.platform.api.service.billing.EntitlementService entitlementService;
+    private EntitlementService entitlementService;
 
     @Mock
     private RedisTunnelCoordinator redisTunnelCoordinator;
@@ -275,5 +281,38 @@ class TunnelServiceTest {
         assertEquals(4000, response.getLocalPort());
         assertEquals(TunnelStatus.ACTIVE, response.getStatus());
         assertEquals("test-client", response.getClientInfo());
+    }
+
+    /**
+     * A tunnel's public slug is part of a URL, and it used to be base64 with its two non-alphanumeric
+     * characters stripped and the rest cut to twelve. When five of the sixteen encoded characters came
+     * out as {@code -} or {@code _}, fewer than twelve were left and the cut threw: the CLI saw a 500
+     * on {@code railhook listen} with nothing it could do about it, and it took out a CI run.
+     */
+    @Test
+    void everySlugIsTwelveAlphanumericCharactersAfterTheTunPrefix() {
+        Random random = new Random(20260922L);
+        Set<String> seen = new HashSet<>();
+
+        for (int i = 0; i < 10_000; i++) {
+            String slug = TunnelService.slug(random);
+            assertThat(slug).matches("tun-[a-z0-9]{12}");
+            seen.add(slug);
+        }
+
+        assertThat(seen).as("a slug is a name in a URL, so it may not repeat").hasSize(10_000);
+    }
+
+    /** The length is drawn character by character, so no source of randomness can shorten it. */
+    @Test
+    void aSlugFromASourceThatKeepsReturningTheFirstCharacterStillHasTwelve() {
+        String slug = TunnelService.slug(new Random() {
+            @Override
+            public int nextInt(int bound) {
+                return 0;
+            }
+        });
+
+        assertThat(slug).matches("tun-[a-z0-9]{12}");
     }
 }
