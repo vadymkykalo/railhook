@@ -41,10 +41,10 @@ curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.co
 
 1. **Зареєструйтеся або увійдіть** на адресі вашого Railhook тим обліковим записом, який хочете використовувати, і підтвердьте адресу.
 
-2. **Додайте адресу** допоміжним скриптом — він записує її в `.env`, не виводячи значення на екран:
+2. **Додайте адресу** в `.env` у каталозі встановлення: замініть наявний рядок або додайте новий:
 
-   ```bash
-   printf 'PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com\n' | ./railhook settings
+   ```bash title=".env"
+   PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com
    ```
 
    Адреси порівнюються без урахування регістру й пробілів на початку та в кінці, а збіг зараховується лише для повної адреси.

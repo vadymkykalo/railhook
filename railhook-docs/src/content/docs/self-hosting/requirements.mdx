@@ -4,7 +4,7 @@ description: The host, ports and network access a self-hosted Railhook needs.
 ---
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Check these before you install. The installer checks the same things and refuses to go ahead until they pass. On an existing installation, `./railhook doctor` runs those checks again.
+Check these before you install. The installer stops without Docker, Compose, 2 GiB of RAM or a free port, and warns when memory or disk is below the recommendation. On an existing installation, `./railhook doctor` checks Docker, Compose and the configuration on disk.
 
 ## Host
 
@@ -13,7 +13,7 @@ Check these before you install. The installer checks the same things and refuses
 | Docker | Docker Engine 20.10 or newer, with the daemon running and reachable by your user |
 | Compose | Compose v2, as `docker compose` or the standalone `docker-compose` |
 | Memory | About 4 GiB. Between 2 and 4 GiB the installer warns you to expect swapping; below 2 GiB it stops |
-| Disk | At least 5 GiB free for the images, plus room for the database and the Kafka log |
+| Disk | At least 5 GiB free for the images, plus room for the database and the Kafka log. The installer warns below 5 GiB |
 | Tools | `curl` and `openssl`, which the installer uses to download files and generate secrets |
 
 The stack runs two JVMs, a broker, a database and a cache. These are the default memory limits per container, and each one can be changed in `.env`:

@@ -4,7 +4,7 @@ description: Health checks, Prometheus metrics, the bundled Grafana stack with h
 ---
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Railhook exposes health checks on its public port and Prometheus metrics on internal ports. The repository ships an optional monitoring stack — Grafana, Prometheus, Alertmanager, Loki and exporters for the host, the containers and uptime — that you start next to it with one command.
+Railhook exposes health checks on its public port and Prometheus metrics on internal ports. The repository ships an optional monitoring stack — Grafana, Prometheus, Alertmanager, Loki and exporters for the host, the containers and uptime — that you start next to it with one Compose command.
 
 ## Health checks
 
@@ -55,13 +55,18 @@ Only Grafana publishes a port, on `127.0.0.1:3001`. Prometheus, Alertmanager and
 
    Slack (`ALERTMANAGER_SLACK_WEBHOOK_URL`), a generic webhook (`ALERTMANAGER_WEBHOOK_URL`) and Telegram (`ALERTMANAGER_TELEGRAM_BOT_TOKEN`, `ALERTMANAGER_TELEGRAM_CHAT_ID`) work the same way.
 
-3. **Start it.**
+3. **Download `monitoring/` for the release the server runs, and start it.** It is its own Compose project, named `railhook-monitoring`, reading the platform's `.env`:
 
    ```bash
-   ./railhook monitoring up
+   v=$(grep '^API_IMAGE_TAG=' .env | cut -d= -f2)
+   curl -fsSL "https://github.com/vadymkykalo/railhook/archive/refs/tags/v${v}.tar.gz" \
+     | tar xz --strip-components=1 --wildcards '*/monitoring/*'
+   docker compose -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml up -d
    ```
 
-   The first run downloads `monitoring/` for the release the server runs. `./railhook upgrade` refreshes it and restarts the stack if it was running.
+   It joins the platform's network, `railhook_webhook-network` when the install directory is named `railhook`. For any other directory, set `RAILHOOK_NETWORK` in `.env` to the name `docker network ls` shows. Set `MONITORING_NODENAME` to the server's name for the Host dashboard.
+
+   After `./railhook upgrade`, download `monitoring/` again for the new release and run the same `up -d` with `--force-recreate`. The containers mount the files they started with, so without it they keep the old rules and dashboards.
 
 4. **Open Grafana** through an SSH tunnel, and sign in as `admin` with the password from `.env`:
 
@@ -73,23 +78,29 @@ Only Grafana publishes a port, on `127.0.0.1:3001`. Prometheus, Alertmanager and
 
 </Steps>
 
-`./railhook monitoring status` lists the containers and the health of every Prometheus target. `./railhook monitoring logs [service]` follows the logs. `./railhook monitoring down` stops the stack and keeps its metrics and logs.
+The same command with `ps`, `logs -f [service]` or `down` in place of `up -d` lists the containers, follows the logs, or stops the stack. `down` keeps its metrics and logs in the `railhook-monitoring_*` volumes.
 
 ### Grafana on its own domain
 
-Set `MONITORING_DOMAIN=grafana.example.com` in `.env`, point that name at the server, and run `./railhook monitoring up` again. It adds the name to the Caddyfile and reloads Caddy, which obtains a certificate the same way it did for the platform. With `--behind-proxy`, point your own proxy at `127.0.0.1:3001` instead.
+Set `MONITORING_DOMAIN=grafana.example.com` in `.env`, point that name at the server, and rewrite the Caddyfile with the installer's `--refresh`:
+
+```bash
+curl -fsSL https://railhook.io/install.sh | bash -s -- --refresh --dir /opt/railhook
+```
+
+It adds the name to the Caddyfile and reloads Caddy, which obtains a certificate the same way it did for the platform. `./railhook upgrade` keeps the block. With `--behind-proxy`, point your own proxy at `127.0.0.1:3001` instead.
 
 <Aside type="caution">
 Put an identity-aware proxy such as Cloudflare Access in front of that name. Grafana's login should not be the only thing between the internet and your logs. If the proxy covers every path, exempt `/.well-known/acme-challenge/`, or Caddy cannot renew the certificate.
 
-Some proxies stop Let's Encrypt from reaching the name at all: Cloudflare with Always Use HTTPS sends the challenge to HTTPS, where there is no certificate yet. Give Caddy one instead, such as a Cloudflare origin certificate for that name. Copy the certificate and key into the Caddy data volume, name them in `.env`, and run `./railhook monitoring up` again:
+Some proxies stop Let's Encrypt from reaching the name at all: Cloudflare with Always Use HTTPS sends the challenge to HTTPS, where there is no certificate yet. Give Caddy one instead, such as a Cloudflare origin certificate for that name. Copy the certificate and key into the Caddy data volume, name them in `.env`, and run the `--refresh` above again:
 
 ```bash
 docker exec webhook-caddy mkdir -p /data/certs
 docker cp grafana.pem webhook-caddy:/data/certs/grafana.example.com.pem
 docker cp grafana.key webhook-caddy:/data/certs/grafana.example.com.key
 printf '%s\n' MONITORING_TLS_CERT=/data/certs/grafana.example.com.pem \
-  MONITORING_TLS_KEY=/data/certs/grafana.example.com.key | ./railhook settings
+  MONITORING_TLS_KEY=/data/certs/grafana.example.com.key >> .env
 ```
 </Aside>
 

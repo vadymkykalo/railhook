@@ -4,7 +4,7 @@ description: Перевірки стану, метрики Prometheus, вбуд�
 ---
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Railhook надає перевірки стану на публічному порту, а метрики Prometheus — на внутрішніх. У репозиторії є необов'язковий стек моніторингу — Grafana, Prometheus, Alertmanager, Loki та експортери для хоста, контейнерів і доступності, — який можна запустити поруч однією командою.
+Railhook надає перевірки стану на публічному порту, а метрики Prometheus — на внутрішніх. У репозиторії є необов'язковий стек моніторингу — Grafana, Prometheus, Alertmanager, Loki та експортери для хоста, контейнерів і доступності, — який можна запустити поруч однією командою Compose.
 
 ## Перевірки стану
 
@@ -55,13 +55,18 @@ nginx проксує лише шляхи перевірок стану. Будь
 
    Slack (`ALERTMANAGER_SLACK_WEBHOOK_URL`), довільний вебхук (`ALERTMANAGER_WEBHOOK_URL`) і Telegram (`ALERTMANAGER_TELEGRAM_BOT_TOKEN`, `ALERTMANAGER_TELEGRAM_CHAT_ID`) налаштовуються так само.
 
-3. **Запустіть стек.**
+3. **Завантажте `monitoring/` для релізу, на якому працює сервер, і запустіть стек.** Це окремий Compose-проєкт `railhook-monitoring`, який читає `.env` платформи:
 
    ```bash
-   ./railhook monitoring up
+   v=$(grep '^API_IMAGE_TAG=' .env | cut -d= -f2)
+   curl -fsSL "https://github.com/vadymkykalo/railhook/archive/refs/tags/v${v}.tar.gz" \
+     | tar xz --strip-components=1 --wildcards '*/monitoring/*'
+   docker compose -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml up -d
    ```
 
-   Перший запуск завантажує `monitoring/` для релізу, на якому працює сервер. `./railhook upgrade` оновлює його та перезапускає стек, якщо той працював.
+   Стек приєднується до мережі платформи: `railhook_webhook-network`, якщо каталог встановлення називається `railhook`. Для будь-якого іншого каталогу задайте в `.env` змінну `RAILHOOK_NETWORK` з назвою, яку показує `docker network ls`. Задайте `MONITORING_NODENAME` — ім'я сервера для дашборду Host.
+
+   Після `./railhook upgrade` знову завантажте `monitoring/` для нового релізу й виконайте той самий `up -d` з `--force-recreate`. Контейнери монтують файли, з якими стартували, тож без цього прапорця лишаються на старих правилах і дашбордах.
 
 4. **Відкрийте Grafana** через SSH-тунель і увійдіть як `admin` з паролем із `.env`:
 
@@ -73,23 +78,29 @@ nginx проксує лише шляхи перевірок стану. Будь
 
 </Steps>
 
-`./railhook monitoring status` показує контейнери та стан кожної цілі Prometheus. `./railhook monitoring logs [service]` показує логи в реальному часі. `./railhook monitoring down` зупиняє стек, зберігаючи його метрики та логи.
+Та сама команда з `ps`, `logs -f [service]` або `down` замість `up -d` показує контейнери, показує логи в реальному часі або зупиняє стек. `down` зберігає метрики та логи в томах `railhook-monitoring_*`.
 
 ### Grafana на власному домені
 
-Задайте `MONITORING_DOMAIN=grafana.example.com` у `.env`, спрямуйте це доменне ім'я на сервер і знову виконайте `./railhook monitoring up`. Команда додасть ім'я до Caddyfile і перезавантажить Caddy, який отримає сертифікат так само, як для платформи. Якщо ви встановлювали з `--behind-proxy`, натомість спрямуйте на `127.0.0.1:3001` власний проксі.
+Задайте `MONITORING_DOMAIN=grafana.example.com` у `.env`, спрямуйте це доменне ім'я на сервер і перезапишіть Caddyfile через `--refresh` інсталятора:
+
+```bash
+curl -fsSL https://railhook.io/install.sh | bash -s -- --refresh --dir /opt/railhook
+```
+
+Він додасть ім'я до Caddyfile і перезавантажить Caddy, який отримає сертифікат так само, як для платформи. `./railhook upgrade` цей блок зберігає. Якщо ви встановлювали з `--behind-proxy`, натомість спрямуйте на `127.0.0.1:3001` власний проксі.
 
 <Aside type="caution">
 Поставте перед цим доменом identity-aware проксі, наприклад Cloudflare Access. Вхід у Grafana не має бути єдиним бар'єром між інтернетом і вашими логами. Якщо проксі охоплює всі шляхи, виключіть `/.well-known/acme-challenge/`, інакше Caddy не зможе оновити сертифікат.
 
-Деякі проксі взагалі не пускають Let's Encrypt до цього імені: Cloudflare з Always Use HTTPS перенаправляє ACME-перевірку на HTTPS, де сертифіката ще немає. Тоді дайте Caddy готовий сертифікат, наприклад origin-сертифікат Cloudflare для цього імені. Скопіюйте сертифікат і ключ у том даних Caddy, вкажіть їх у `.env` і знову виконайте `./railhook monitoring up`:
+Деякі проксі взагалі не пускають Let's Encrypt до цього імені: Cloudflare з Always Use HTTPS перенаправляє ACME-перевірку на HTTPS, де сертифіката ще немає. Тоді дайте Caddy готовий сертифікат, наприклад origin-сертифікат Cloudflare для цього імені. Скопіюйте сертифікат і ключ у том даних Caddy, вкажіть їх у `.env` і знову виконайте `--refresh`, наведений вище:
 
 ```bash
 docker exec webhook-caddy mkdir -p /data/certs
 docker cp grafana.pem webhook-caddy:/data/certs/grafana.example.com.pem
 docker cp grafana.key webhook-caddy:/data/certs/grafana.example.com.key
 printf '%s\n' MONITORING_TLS_CERT=/data/certs/grafana.example.com.pem \
-  MONITORING_TLS_KEY=/data/certs/grafana.example.com.key | ./railhook settings
+  MONITORING_TLS_KEY=/data/certs/grafana.example.com.key >> .env
 ```
 </Aside>
 

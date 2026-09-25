@@ -33,7 +33,7 @@ Prometheus збирає `/actuator/prometheus` з **порту керуванн�
    ```
 
 2. Вкажіть, куди надсилати сповіщення: `ALERTMANAGER_EMAIL_TO` (листи йдуть через ваш SMTP-релей `SMTP_*`), `ALERTMANAGER_SLACK_WEBHOOK_URL`, `ALERTMANAGER_WEBHOOK_URL` або `ALERTMANAGER_TELEGRAM_BOT_TOKEN` і `ALERTMANAGER_TELEGRAM_CHAT_ID`. Якщо жодну змінну не задано, сповіщення видно лише в Grafana.
-3. Запустіть стек: `./railhook monitoring up` на сервері, де Railhook встановлено через install.sh, або `make monitoring-up` у клоні репозиторію.
+3. Запустіть стек: `make monitoring-up` у клоні репозиторію або, на сервері, де Railhook встановлено через install.sh, команду `docker compose -p railhook-monitoring` зі сторінки [Моніторинг](/docs/uk/self-hosting/monitoring/).
 </Steps>
 
 | Компонент | Адреса | Примітки |

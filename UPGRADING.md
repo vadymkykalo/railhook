@@ -21,6 +21,22 @@ A Subscription and a Destination can now also say **which statuses are worth ano
 (`retryableStatuses`). The column default is `408,429,500-599` — exactly what the worker
 hardcoded before — so nothing changes for a row that does not set it.
 
+### The `./railhook` helper no longer runs the monitoring stack
+
+`./railhook upgrade` rewrites the helper, and the new one has no `monitoring` command. The
+running monitoring containers are untouched; only their management moves to plain Compose,
+from the install directory:
+
+```bash
+docker compose -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml ps
+```
+
+`up -d`, `logs -f` and `down` work the same way. The upgrade no longer refreshes `monitoring/`
+either: download it for the new release and recreate the stack, as described under "The bundled
+stack" in the self-hosting monitoring docs. Grafana on `MONITORING_DOMAIN` stays in the
+Caddyfile. `./railhook settings` still exists; editing `.env` and running `./railhook start` is
+the documented way to change a setting by hand.
+
 ## v2.17.2
 
 ### `./railhook settings` — change `.env` without editing it

@@ -310,5 +310,5 @@ groups:
         annotations:
           summary: "Alertmanager could not deliver to {{ $labels.integration }}"
           description: |
-            Alerts are firing and not arriving. `./railhook monitoring logs alertmanager` shows the
+            Alerts are firing and not arriving. `docker logs railhook-alertmanager` shows the
             SMTP or API error.

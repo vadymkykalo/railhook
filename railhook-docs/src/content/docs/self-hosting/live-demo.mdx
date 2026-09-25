@@ -28,10 +28,10 @@ The demo hands a session to anyone who asks for one. On a deployment that serves
 
 <Steps>
 
-1. **Set the variable** with the helper, which writes it to `.env`:
+1. **Set the variable** in `.env` in the install directory, adding the line if it is not there:
 
-   ```bash
-   printf 'DEMO_ENABLED=true\n' | ./railhook settings
+   ```bash title=".env"
+   DEMO_ENABLED=true
    ```
 
 2. **Recreate the containers** so both the API and the dashboard read it:

@@ -12,13 +12,20 @@ On an `install.sh` deployment (`/opt/railhook`):
 cd /opt/railhook
 echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
 echo "ALERTMANAGER_EMAIL_TO=you@example.com" >> .env     # optional
-./railhook monitoring up
+# This directory, for the release the host runs
+v=$(grep '^API_IMAGE_TAG=' .env | cut -d= -f2)
+curl -fsSL "https://github.com/vadymkykalo/railhook/archive/refs/tags/v${v}.tar.gz" \
+  | tar xz --strip-components=1 --wildcards '*/monitoring/*'
+docker compose -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml up -d
 ssh -L 3001:127.0.0.1:3001 you@your-host                 # then http://localhost:3001, user admin
 ```
 
-`monitoring up` fetches this directory for the release the host runs (the file list lives in the
-helper and a test holds it equal to this directory), then starts the stack. `./railhook upgrade`
-refreshes it and restarts it if it was running.
+After `./railhook upgrade`, download the directory again for the new release and run the same
+`up -d` with `--force-recreate`: the containers mount the files they started with, and a plain
+`up -d` or a reload keeps the old rules and dashboards.
+
+The stack joins `railhook_webhook-network`, which is what an install directory named `railhook`
+creates. For any other directory, set `RAILHOOK_NETWORK` in `.env`.
 
 From a clone:
 
@@ -30,15 +37,15 @@ make monitoring-up                                        # http://localhost:300
 
 There is no default Grafana password. Grafana refuses to start with an empty one, a known default,
 or anything under 16 characters, and re-applies the one in `.env` on every start — change it
-there and run `monitoring up` again.
+there and run `up -d` again.
 
 ## Grafana on a domain
 
 Set `MONITORING_DOMAIN=grafana.example.com` in `.env`, point DNS at the host and run
-`./railhook monitoring up`. The helper asks `install.sh --refresh` to rewrite the Caddyfile, which
-adds a site block proxying to `railhook-grafana:3000`, and reloads Caddy. Caddy obtains the
-certificate as it does for the platform. With `--behind-proxy`, point your own proxy at
-`127.0.0.1:3001` instead.
+`curl -fsSL https://railhook.io/install.sh | bash -s -- --refresh --dir /opt/railhook`. That
+rewrites the Caddyfile with a site block proxying to `railhook-grafana:3000` and reloads Caddy,
+which obtains the certificate as it does for the platform; `./railhook upgrade` keeps the block.
+With `--behind-proxy`, point your own proxy at `127.0.0.1:3001` instead.
 
 Put an identity-aware proxy (Cloudflare Access, for one) in front of that host name. If it covers
 every path, give `/.well-known/acme-challenge/` a bypass, or Caddy cannot renew the certificate.
@@ -46,10 +53,11 @@ every path, give `/.well-known/acme-challenge/` a bypass, or Caddy cannot renew 
 ## Commands
 
 ```bash
-./railhook monitoring up              # start, or apply .env changes
-./railhook monitoring status          # containers, and every Prometheus target's health
-./railhook monitoring logs [service]
-./railhook monitoring down            # stop; metrics and logs stay in the volumes
+mon="docker compose -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml"
+$mon up -d                # start, or apply .env changes
+$mon ps
+$mon logs -f [service]
+$mon down                 # stop; metrics and logs stay in the volumes
 ```
 
 `make monitoring-up`, `make monitoring-down` and `make monitoring-logs` do the same in a clone.

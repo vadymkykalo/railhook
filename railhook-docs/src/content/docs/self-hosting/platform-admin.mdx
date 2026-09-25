@@ -41,10 +41,10 @@ To set or change the list by hand:
 
 1. **Sign up or sign in** at your Railhook address with the account you want to use, and verify the address.
 
-2. **List the address** with the helper, which writes it to `.env` without printing it back:
+2. **List the address** in `.env` in the install directory, replacing the line that is there or adding one:
 
-   ```bash
-   printf 'PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com\n' | ./railhook settings
+   ```bash title=".env"
+   PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com
    ```
 
    Addresses are compared without regard to case or surrounding spaces, and only whole addresses match.

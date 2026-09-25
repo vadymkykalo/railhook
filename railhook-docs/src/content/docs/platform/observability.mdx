@@ -33,7 +33,7 @@ On Kubernetes the Helm chart wires this up: its `ServiceMonitor` scrapes the por
    ```
 
 2. Set a receiver for alerts: `ALERTMANAGER_EMAIL_TO` (sent through your `SMTP_*` relay), `ALERTMANAGER_SLACK_WEBHOOK_URL`, `ALERTMANAGER_WEBHOOK_URL`, or `ALERTMANAGER_TELEGRAM_BOT_TOKEN` and `ALERTMANAGER_TELEGRAM_CHAT_ID`. With none set, alerts show only in Grafana.
-3. Start the stack: `./railhook monitoring up` on a server installed with install.sh, `make monitoring-up` in a clone.
+3. Start the stack: `make monitoring-up` in a clone, or on a server installed with install.sh the `docker compose -p railhook-monitoring` command in [Monitoring](/docs/self-hosting/monitoring/).
 </Steps>
 
 | Component | Address | Notes |
