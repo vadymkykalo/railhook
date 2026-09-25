@@ -41,33 +41,6 @@ const t = uk
     };
 
 const total = data.sections.reduce((n, s) => n + s.variables.length, 0);
-
-/**
- * Hard-wrapped comment lines back into paragraphs. An indented line is an example
- * (`  WEBHOOK_TRUSTED_PROXIES=10.0.0.5,…`), so a run of them is kept verbatim as code while
- * the prose around it is rejoined.
- */
-function paragraphs(/** @type {string} */ text) {
-  /** @type {Array<{ code: boolean, text: string }>} */
-  const blocks = [];
-  for (const para of text.split('\n\n').filter(Boolean)) {
-    for (const line of para.split('\n')) {
-      const code = /^\s{2,}/.test(line);
-      const last = blocks.at(-1);
-      if (last && last.code === code && !last.text.endsWith('\n\n')) {
-        last.text += code ? `\n${line}` : ` ${line.trim()}`;
-      } else {
-        blocks.push({ code, text: code ? line : line.trim() });
-      }
-    }
-    const last = blocks.at(-1);
-    if (last) last.text += '\n\n';
-  }
-  return blocks.map((b) => ({ code: b.code, text: b.code ? b.text.replace(/\n+$/, '') : b.text.trim() }));
-}
-
-const slug = (/** @type {string} */ title) =>
-  `env-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 ---
 
 <div
